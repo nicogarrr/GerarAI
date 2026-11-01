@@ -25,7 +25,7 @@ describe('walk-forward: fechas de corte', () => {
     });
     it('la vista usa formatMarketDate para asOf, nunca formatUserDate', () => {
         assert.ok(!/formatUserDate/.test(view), 'formatUserDate queda vetado en WalkForwardResults');
-        assert.match(view, /formatMarketDate\(first\.asOf\)\} - \{formatMarketDate\(last\.asOf\)/);
+        assert.match(view, /from: formatMarketDate\(first\.asOf\), to: formatMarketDate\(last\.asOf\)/);
         const rowUses = view.match(/formatMarketDate\(row\.asOf\)/g) ?? [];
         assert.equal(rowUses.length, 2, 'tabla y tarjetas usan formatMarketDate(row.asOf)');
     });

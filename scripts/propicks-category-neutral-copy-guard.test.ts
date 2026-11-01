@@ -64,7 +64,7 @@ describe('copy de categorías ProPicks derivado del run (no literal)', () => {
     assert.match(cards, /import \{ CATEGORY_KEYS, categoryNeutralNote \} from '\.\/category-display';/);
     assert.match(
       cards,
-      /categoryNeutralNote\(CATEGORY_KEYS\.filter\(\(key\) => allNeutralCategory\(picks, key\)\), picks\.length\)/,
+      /categoryNeutralNote\(CATEGORY_KEYS\.filter\(\(key\) => allNeutralCategory\(picks, key\)\), picks\.length, locale\)/,
     );
     assert.match(cards, /\{neutralNote\.marker\} \{neutralNote\.text\}/);
     // El bloque «Sobre ProPicks IA» se eliminó: queda solo la línea medida.

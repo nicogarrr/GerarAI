@@ -4,16 +4,13 @@ import { Card } from '@/components/ui/card';
 import { MethodologyDisclosure } from '@/components/ui/methodology-disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { BarChart3 } from 'lucide-react';
-import { formatMarketDate, formatNumber, formatPercent } from '@/lib/format';
+import { useFormat, useT } from '@/lib/i18n/client';
 import type { WalkForwardBacktestResult } from '@/lib/actions/propicks-backtest.actions';
 
 interface WalkForwardResultsProps {
     result: WalkForwardBacktestResult;
 }
 
-/** El backtest entrega porcentajes ya multiplicados por 100 (puntos, no ratio). */
-const fmtPct = (v: number, digits = 2) =>
-    formatPercent(v, { fromRatio: false, digits, signDisplay: 'always' });
 const signedClass = (v: number) => (v > 0 ? 'text-green-400' : 'text-red-400');
 
 function Metric({ label, value, footnote }: { label: string; value: string; footnote?: string }) {
@@ -27,6 +24,13 @@ function Metric({ label, value, footnote }: { label: string; value: string; foot
 }
 
 export default function WalkForwardResults({ result }: WalkForwardResultsProps) {
+    const t = useT();
+    const { formatMarketDate, formatNumber, formatPercent } = useFormat();
+    /** El backtest entrega porcentajes ya multiplicados por 100 (puntos, no ratio). */
+    const fmtPct = (v: number, digits = 2) =>
+        formatPercent(v, { fromRatio: false, digits, signDisplay: 'always' });
+    const months = formatNumber(result.months, { maximumFractionDigits: 0 });
+    const picksPerMonth = formatNumber(result.picksPorMes, { maximumFractionDigits: 0 });
     const first = result.tablaMensual[0];
     const last = result.tablaMensual[result.tablaMensual.length - 1];
 
@@ -39,12 +43,12 @@ export default function WalkForwardResults({ result }: WalkForwardResultsProps) 
             <Card className="w-full min-w-0 overflow-hidden rounded-lg border border-gray-700 bg-gray-800/50 p-4 sm:p-6">
                 <div className="mb-4 flex items-center gap-3">
                     <BarChart3 aria-hidden="true" className="h-6 w-6 text-teal-400" />
-                    <h3 className="text-xl font-bold text-gray-100">Backtest walk-forward point-in-time</h3>
+                    <h3 className="text-xl font-bold text-gray-100">{t('propicks.walkForward.title')}</h3>
                 </div>
                 <EmptyState
                     icon={BarChart3}
-                    title="Ningún mes se ha simulado"
-                    description="Cada corte mensual necesita al menos 253 cierres anteriores de cada símbolo del universo y el cierre de salida del mes siguiente; si el proveedor de precios no devuelve esas series, el motor descarta el corte y no queda ningún mes que medir. No se muestran ceros: un 0,00 % sin meses detrás no es un resultado."
+                    title={t('propicks.walkForward.emptyTitle')}
+                    description={t('propicks.walkForward.emptyDescription')}
                 />
             </Card>
         );
@@ -55,28 +59,26 @@ export default function WalkForwardResults({ result }: WalkForwardResultsProps) 
             <div className="mb-6">
                 <div className="mb-2 flex items-center gap-3">
                     <BarChart3 aria-hidden="true" className="h-6 w-6 text-teal-400" />
-                    <h3 className="text-xl font-bold text-gray-100">Backtest walk-forward point-in-time</h3>
+                    <h3 className="text-xl font-bold text-gray-100">{t('propicks.walkForward.title')}</h3>
                 </div>
                 <p className="text-sm text-gray-400">
-                    {formatNumber(result.months, { maximumFractionDigits: 0 })} meses simulados,{' '}
-                    {formatNumber(result.picksPorMes, { maximumFractionDigits: 0 })} picks por mes, selección
-                    mensual solo con datos anteriores a cada corte.
+                    {t('propicks.walkForward.summary', { months, picks: picksPerMonth })}
                 </p>
                 <p className="mt-2 text-xs text-amber-400">
-                    Mide una estrategia de momentum sobre 30 megacaps actuales. No mide la selección de calidad y valor de ProPicks.
+                    {t('propicks.walkForward.scopeWarning')}
                 </p>
                 {first && last && (
                     <p className="mt-2 text-xs text-gray-500">
-                        Período: {/* asOf es un instante UTC (fin de mes 23:59:59Z): en la zona del mercado sigue siendo ese dia; en la del usuario saltaba al dia siguiente. */}
-                        {formatMarketDate(first.asOf)} - {formatMarketDate(last.asOf)}
+                        {/* asOf es un instante UTC (fin de mes 23:59:59Z): en la zona del mercado sigue siendo ese dia; en la del usuario saltaba al dia siguiente. */}
+                        {t('propicks.walkForward.period', { from: formatMarketDate(first.asOf), to: formatMarketDate(last.asOf) })}
                     </p>
                 )}
             </div>
 
             <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3">
-                <Metric label="Retorno neto" value={fmtPct(result.retornoNeto)} footnote="Compuesto, descontados costes (15 pb/pata)" />
-                <Metric label="Retorno bruto" value={fmtPct(result.retornoBruto)} footnote="Antes de costes" />
-                <Metric label="SPY (mismo período)" value={fmtPct(result.spy)} footnote="Buy & hold" />
+                <Metric label={t('propicks.walkForward.netReturn')} value={fmtPct(result.retornoNeto)} footnote={t('propicks.walkForward.netReturnNote')} />
+                <Metric label={t('propicks.walkForward.grossReturn')} value={fmtPct(result.retornoBruto)} footnote={t('propicks.walkForward.grossReturnNote')} />
+                <Metric label={t('propicks.walkForward.spySamePeriod')} value={fmtPct(result.spy)} footnote="Buy & hold" />
                 <Metric
                     label="Sharpe"
                     value={formatNumber(result.sharpe, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -85,21 +87,21 @@ export default function WalkForwardResults({ result }: WalkForwardResultsProps) 
                     label="Sortino"
                     value={formatNumber(result.sortino, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 />
-                <Metric label="Máx. drawdown" value={formatPercent(result.maxDD, { fromRatio: false, digits: 2 })} footnote="Sobre la curva neta" />
+                <Metric label={t('propicks.walkForward.maxDrawdown')} value={formatPercent(result.maxDD, { fromRatio: false, digits: 2 })} footnote={t('propicks.walkForward.maxDrawdownNote')} />
             </div>
 
             <div className="mb-6 min-w-0">
-                <h4 className="mb-3 text-sm font-semibold text-gray-300">Desempeño mensual</h4>
-                <div aria-label="Desempeño mensual del backtest" className="hidden overflow-x-auto md:block" role="region" tabIndex={0}>
+                <h4 className="mb-3 text-sm font-semibold text-gray-300">{t('propicks.walkForward.monthlyTitle')}</h4>
+                <div aria-label={t('propicks.walkForward.monthlyAria')} className="hidden overflow-x-auto md:block" role="region" tabIndex={0}>
                     <table className="w-full text-sm">
-                        <caption className="sr-only">Desempeño mensual del backtest walk-forward: corte, picks, retorno neto, SPY y rotación</caption>
+                        <caption className="sr-only">{t('propicks.walkForward.monthlyCaption')}</caption>
                         <thead>
                             <tr className="border-b border-gray-700">
-                                <th className="py-2 text-left text-gray-400" scope="col">Corte</th>
+                                <th className="py-2 text-left text-gray-400" scope="col">{t('propicks.walkForward.colCutoff')}</th>
                                 <th className="py-2 text-left text-gray-400" scope="col">Picks</th>
-                                <th className="py-2 text-right text-gray-400" scope="col">Mes neto</th>
+                                <th className="py-2 text-right text-gray-400" scope="col">{t('propicks.walkForward.colNetMonth')}</th>
                                 <th className="py-2 text-right text-gray-400" scope="col">SPY</th>
-                                <th className="py-2 text-right text-gray-400" scope="col">Rotación</th>
+                                <th className="py-2 text-right text-gray-400" scope="col">{t('propicks.walkForward.colTurnover')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -125,24 +127,24 @@ export default function WalkForwardResults({ result }: WalkForwardResultsProps) 
                             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
                                 <span className="min-w-0 truncate">{row.picks.join(', ')}</span>
                                 <span>SPY {fmtPct(row.spy)}</span>
-                                <span>Rotación {formatPercent(row.turnover, { fromRatio: false, digits: 0 })}</span>
+                                <span>{t('propicks.walkForward.turnoverValue', { value: formatPercent(row.turnover, { fromRatio: false, digits: 0 }) })}</span>
                             </div>
                         </div>
                     ))}
                 </div>
             </div>
 
-            <MethodologyDisclosure title="Metodología del backtest">
+            <MethodologyDisclosure title={t('propicks.walkForward.methodologyTitle')}>
                 <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-gray-400">
-                    <li>Walk-forward mensual: cada corte usa únicamente precios de cierre anteriores a ese corte (sin datos futuros).</li>
-                    <li>Señal: momentum 12-1M (se excluye el último mes) sobre un universo líquido de 30 valores; {formatNumber(result.picksPorMes, { maximumFractionDigits: 0 })} picks equiponderados.</li>
-                    <li>Costes aplicados: 15 pb por pata de rotación. Rotación media mensual: {formatPercent(result.turnover, { fromRatio: false, digits: 0 })}.</li>
-                    <li>Benchmark: SPY buy & hold en el mismo período.</li>
-                    <li>Sesgo de supervivencia: las 30 empresas son megacaps de hoy, elegidas con conocimiento actual; las que cayeron o salieron del índice no están.</li>
-                    <li>Muestra corta: {formatNumber(result.months, { maximumFractionDigits: 0 })} meses. Sharpe, Sortino y la diferencia con SPY no son distinguibles del azar con tan pocos datos.</li>
-                    <li>Precios de cierre del proveedor sin dividendos explícitos; sin impuestos ni deslizamiento más allá de los costes indicados.</li>
-                    <li>La selección de ProPicks (calidad, valor, insiders, 13F) se congela cada mes en un snapshot point-in-time; ese historial es la base de un backtest futuro sin sesgo de anticipación, y todavía no hay meses suficientes.</li>
-                    <li>Resultados pasados simulados no garantizan rendimientos futuros. Esto no es asesoramiento financiero.</li>
+                    <li>{t('propicks.walkForward.method.pointInTime')}</li>
+                    <li>{t('propicks.walkForward.method.signal', { picks: picksPerMonth })}</li>
+                    <li>{t('propicks.walkForward.method.costs', { turnover: formatPercent(result.turnover, { fromRatio: false, digits: 0 }) })}</li>
+                    <li>{t('propicks.walkForward.method.benchmark')}</li>
+                    <li>{t('propicks.walkForward.method.survivorship')}</li>
+                    <li>{t('propicks.walkForward.method.shortSample', { months })}</li>
+                    <li>{t('propicks.walkForward.method.prices')}</li>
+                    <li>{t('propicks.walkForward.method.snapshots')}</li>
+                    <li>{t('propicks.walkForward.method.disclaimer')}</li>
                 </ul>
             </MethodologyDisclosure>
         </Card>

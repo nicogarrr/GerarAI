@@ -20,6 +20,9 @@
  */
 import type { CategoryKey } from '@/lib/propicks/category-display';
 
+/** Idioma del texto (el módulo es puro: el componente le pasa el locale activo). */
+export type CategoryNoteLocale = 'es' | 'en';
+
 /** Orden canónico de las seis categorías del embudo. */
 export const CATEGORY_KEYS: readonly CategoryKey[] = [
     'value',
@@ -55,6 +58,26 @@ export const CATEGORY_NEUTRAL_CAUSE: Record<CategoryKey, string> = {
     debtLiquidity: 'sin deuda neta sobre EBITDA (no aplica a bancos)',
 };
 
+/** Etiqueta en inglés (mismo orden y claves que la española). */
+export const CATEGORY_LABEL_EN: Record<CategoryKey, string> = {
+    value: 'Valuation',
+    growth: 'Growth',
+    profitability: 'Profitability',
+    cashFlow: 'Cash flow',
+    momentum: 'Momentum',
+    debtLiquidity: 'Debt & liquidity',
+};
+
+/** La misma causa que `CATEGORY_NEUTRAL_CAUSE`, en inglés. */
+export const CATEGORY_NEUTRAL_CAUSE_EN: Record<CategoryKey, string> = {
+    value: 'missing per-company CFROI and WACC',
+    growth: 'missing the 5-year revenue series',
+    profitability: 'missing the audited quality score',
+    cashFlow: 'missing the 5-year free cash flow margin',
+    momentum: 'missing the 12-month price series',
+    debtLiquidity: 'missing net debt to EBITDA (not applicable to banks)',
+};
+
 export type CategoryNeutralNote = {
     /** Marcador del checklist: ✓ todas con datos, ~ alguna neutra. */
     marker: '✓' | '~';
@@ -75,23 +98,31 @@ export type CategoryNeutralNote = {
 export function categoryNeutralNote(
     neutralKeys: readonly CategoryKey[],
     pickCount: number,
+    locale: CategoryNoteLocale = 'es',
 ): CategoryNeutralNote | null {
+    const en = locale === 'en';
     if (pickCount <= 0) return null;
     if (neutralKeys.length === 0) {
         return {
             marker: '✓',
             neutralKeys: [],
-            text:
+            text: en
+                ? `All ${CATEGORY_KEYS.length} funnel categories have data for the ${pickCount} picks in this run: ` +
+                  'every one scores for real and every one ranks.'
+                :
                 `Las ${CATEGORY_KEYS.length} categorías del embudo tienen datos en los ` +
                 `${pickCount} picks de este run: todas puntúan de verdad y todas ordenan.`,
         };
     }
-    const labels = neutralKeys.map((key) => CATEGORY_LABEL_ES[key]).join(', ');
-    const causes = neutralKeys.map((key) => CATEGORY_NEUTRAL_CAUSE[key]).join('; ');
+    const labels = neutralKeys.map((key) => (en ? CATEGORY_LABEL_EN : CATEGORY_LABEL_ES)[key]).join(', ');
+    const causes = neutralKeys.map((key) => (en ? CATEGORY_NEUTRAL_CAUSE_EN : CATEGORY_NEUTRAL_CAUSE)[key]).join('; ');
     return {
         marker: '~',
         neutralKeys: [...neutralKeys],
-        text:
+        text: en
+            ? `${labels}: data missing for the ${pickCount} picks in this run (${causes}). ` +
+              'Without that input the category comes in neutral (50) and does not discriminate: the 50 means “data missing”, not a score.'
+            :
             `${labels}: sin datos en los ${pickCount} picks de este run (${causes}). ` +
             'Sin esa entrada la categoría entra neutra (50) y no discrimina: el 50 es «sin dato», no un score.',
     };

@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const view = readFileSync('components/proPicks/WalkForwardResults.tsx', 'utf8');
+const view =
+  readFileSync('components/proPicks/WalkForwardResults.tsx', 'utf8') +
+  readFileSync('lib/i18n/messages/es/propicks.json', 'utf8');
 
 test('el backtest dice qué mide y qué no', () => {
   assert.ok(view.includes('momentum sobre 30 megacaps actuales'));

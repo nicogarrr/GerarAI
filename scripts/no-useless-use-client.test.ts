@@ -47,8 +47,6 @@ const root = join(here, '..');
  * PortfolioTabs / ProPicksTabs / TaxesView.
  */
 const COMPONENTS_EXCEPTIONS: Record<string, string> = {
-  'components/proPicks/StrategyFactsheet.tsx':
-    "Lo importa components/proPicks/ProPicksTabs.tsx ('use client'): cliente por herencia, quitar la directiva no ahorra un byte. Se deja tal cual para no ensuciar el diff de un fichero sin ganancia real.",
 };
 
 /**
@@ -84,6 +82,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/ui/methodology-disclosure.tsx': 'useT lee locale para título predeterminado; también usado desde componentes client',
   'components/ui/name-avatar.tsx': 'useT lee locale para el texto alternativo de la foto',
   'components/proPicks/WalkForwardResults.tsx': 'importa MethodologyDisclosure client, que ahora consume contexto React de locale',
+  'components/proPicks/StrategyFactsheet.tsx': 'useT/useLocale/useFormat: textos y números en el idioma elegido (contexto React de locale)',
 
   'components/settings/LanguageForm.tsx':
     'selector de idioma: escribe la cookie de locale y router.refresh() (transición)',
