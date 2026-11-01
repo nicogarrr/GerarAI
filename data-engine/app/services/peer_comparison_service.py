@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import desc, func, select
@@ -6,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.tenancy import tenant_filters
 from app.models import Company, FinancialFact, PeerRelationship
 from app.services.metric_calculation_service import METRIC_DEFINITIONS, MetricCalculationService, MetricResult
+from app.valuation.currency import resolve_fx
 
 DEFAULT_PEER_METRICS = [
     "gross_margin",
@@ -102,7 +104,7 @@ class PeerComparisonService:
         # Una sola query de market cap para el target y TODOS los candidatos:
         # antes era una por compania del universo (maestro + stubs + IBKR) y
         # el coste de /peers crecia con el tamano de la tabla companies.
-        market_caps = self._latest_market_caps(
+        market_caps = self._latest_market_caps_usd(
             db, [company.id, *(candidate.id for candidate in candidates)]
         )
         target_market_cap = market_caps.get(company.id)
@@ -226,9 +228,42 @@ class PeerComparisonService:
             rationale.append(f"market-cap ratio {float(ratio):.2f}x")
         return score, rationale, dimensions
 
+    def _latest_market_caps_usd(
+        self, db: Session, company_ids: list[int]
+    ) -> dict[int, Decimal]:
+        """Ultimo market cap por compania pasado a USD para comparar tamaños.
+
+        Cada hecho guarda su divisa (Finnhub en USD, el derivado en la de la
+        empresa: JPY, EUR, GBX...). Comparar los valores tal cual ponia a
+        Toyota (45 billones de JPY) 150 veces por encima de una empresa de
+        300.000 M USD. Sin tipo de cambio valido, sin market cap (N/D).
+        """
+        today = date.today()
+        rates: dict[str, Decimal | None] = {}
+        out: dict[int, Decimal] = {}
+        for fact in self._latest_market_cap_facts(db, company_ids):
+            company_id, value = fact.company_id, fact.value
+            code = _cap_currency(fact.unit)
+            if not code:
+                out[company_id] = value  # sin divisa: comportamiento previo
+                continue
+            if code not in rates:
+                fx = resolve_fx(db, code, "USD", today)
+                rates[code] = None if fx is None else Decimal(str(fx.rate))
+            rate = rates[code]
+            if rate is not None:
+                out[company_id] = value * rate
+        return out
+
     def _latest_market_caps(
         self, db: Session, company_ids: list[int]
     ) -> dict[int, Decimal]:
+        """Ultimo market cap por compania (valor tal cual, ver ``_latest_market_cap_facts``)."""
+        return {fact.company_id: fact.value for fact in self._latest_market_cap_facts(db, company_ids)}
+
+    def _latest_market_cap_facts(
+        self, db: Session, company_ids: list[int]
+    ) -> list[FinancialFact]:
         """Ultimo market cap por compania en UNA query (sin N+1).
 
         Mismo criterio que ``_latest_market_cap``: ejercicio mas reciente
@@ -238,7 +273,7 @@ class PeerComparisonService:
         ocupar el puesto 1 y dejar a la compania sin valor.
         """
         if not company_ids:
-            return {}
+            return []
         ranked = (
             select(
                 FinancialFact.id,
@@ -260,14 +295,11 @@ class PeerComparisonService:
             )
             .subquery()
         )
-        return {
-            fact.company_id: fact.value
-            for fact in db.scalars(
-                select(FinancialFact)
-                .join(ranked, FinancialFact.id == ranked.c.id)
-                .where(ranked.c.rank == 1)
-            ).all()
-        }
+        return list(db.scalars(
+            select(FinancialFact)
+            .join(ranked, FinancialFact.id == ranked.c.id)
+            .where(ranked.c.rank == 1)
+        ).all())
 
     def _latest_market_cap(
         self, db: Session, company_id: int
@@ -399,3 +431,11 @@ class PeerComparisonService:
         if len(sorted_values) % 2:
             return sorted_values[midpoint]
         return (sorted_values[midpoint - 1] + sorted_values[midpoint]) / Decimal("2")
+
+
+def _cap_currency(unit: str | None) -> str:
+    """«USD», «iso4217:JPY», «GBX» -> codigo de divisa (sin perder la subunidad)."""
+    text = (unit or "").strip()
+    if text.lower().startswith("iso4217:"):
+        text = text[len("iso4217:"):]
+    return text.split("/", 1)[0].strip()
