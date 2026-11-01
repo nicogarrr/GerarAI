@@ -178,6 +178,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/search/TickerSearchInput.tsx': 'useState, useCallback, useRef, useEffect, browser:fetch, jsx-onChange, jsx-onClick',
   'components/UserDropdown.tsx': 'useRouter, jsx-onClick, importa cliente: components/ui/dropdown-menu.tsx, importa cliente: components/ui/avatar.tsx',
   'components/alerts/AlertsManager.tsx': 'useSearchParams, useState, useEffect, jsx-onOpenChange, jsx-onChange, jsx-onValueChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/confirm-dialog.tsx, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/select.tsx, importa cliente: components/ui/label.tsx',
+  'components/brain/BrainExpertTeam.tsx': 'useT (hook de locale del cliente para traducir el aviso de expertos)',
   'components/brain/GlobalBrain.tsx': 'usePathname, useState, useEffect, browser:window, jsx-onClick, jsx-onPointerDown, jsx-onFocus, dynamic (panel del cerebro diferido en GlobalBrainPanel)',
   'components/brain/GlobalBrainPanel.tsx': 'usePathname, useState, useRef, useEffect, browser:navigator, browser:document, jsx-onClick, jsx-spread, jsx-onSubmit, jsx-onChange, dynamic react-markdown (chunk diferido: solo se descarga al abrir el cerebro)',
   'components/calendar/CompanyLogo.tsx': 'useState: cae al mosaico de iniciales cuando la imagen del ticker da 404',
