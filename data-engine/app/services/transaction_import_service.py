@@ -12,6 +12,7 @@ Expected Behavior:
 
 from __future__ import annotations
 
+import codecs
 import csv
 import hashlib
 import io
@@ -324,7 +325,12 @@ def parse_file_rows(file_bytes: bytes, filename: str = "") -> tuple[list[str], l
         return headers, data_rows
 
     try:
-        text = file_bytes.decode("utf-8-sig")
+        # «Texto Unicode» de Excel: UTF-16 con BOM (en Latin-1 salían bytes
+        # nulos y el lector CSV reventaba).
+        if file_bytes.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+            text = file_bytes.decode("utf-16")
+        else:
+            text = file_bytes.decode("utf-8-sig")
     except UnicodeDecodeError:
         try:
             text = file_bytes.decode("latin-1")
@@ -342,8 +348,16 @@ def parse_file_rows(file_bytes: bytes, filename: str = "") -> tuple[list[str], l
     elif first_line.count("\t") > first_line.count(","):
         delimiter = "\t"
 
-    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
-    all_rows = list(reader)
+    # newline="": el lector CSV parte bien las filas acabadas en \r a secas
+    # («CSV (Macintosh)» de Excel para Mac); sin él lanzaba csv.Error.
+    reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter)
+    try:
+        all_rows = list(reader)
+    except csv.Error as exc:
+        # csv.Error no es ValueError: sin esto la ruta respondía 500.
+        raise ValueError(
+            "El archivo CSV está mal formado y no se puede leer; guárdalo de nuevo como CSV (UTF-8)"
+        ) from exc
     if not all_rows:
         raise ValueError("El archivo CSV no contiene registros válidos")
 
