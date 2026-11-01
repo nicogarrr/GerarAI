@@ -18,6 +18,7 @@ from app.services.paper_cost_service import (
     execution_fee,
 )
 from app.services.paper_thesis_anchor import current_thesis
+from app.valuation.currency import normalize_currency
 
 
 def utc(value: datetime) -> datetime:
@@ -130,7 +131,8 @@ def apply_quote(row: PaperTrade, quote: dict, now: datetime, *, costs: PaperCost
         return False
     if at <= utc(row.created_at) or (row.mark_at is not None and at <= utc(row.mark_at)):
         return False
-    if row.currency is not None and currency != row.currency:
+    # Misma moneda y misma escala: GBX y GBp son peniques; GBP (libras) no.
+    if row.currency is not None and normalize_currency(currency) != normalize_currency(row.currency):
         return False
     if costs is None and row.entry_fee is not None:
         costs = current_assumptions()
