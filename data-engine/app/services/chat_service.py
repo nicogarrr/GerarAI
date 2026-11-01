@@ -3,6 +3,7 @@ import os
 import re
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
@@ -240,6 +241,57 @@ def _english() -> bool:
     from app.core.i18n import current_language
 
     return current_language() == "en"
+
+
+# Respuesta general sin ticker (texto y panel plegado), en español o inglés.
+_GENERAL_ES: dict[str, Any] = {
+    "answer_context": (
+        "CONTEXTO\n- Pregunta general sin ticker: el asistente dispone de memorias de cartera, sesiones de research y contexto documental.\n\n"
+        "SIN CALCULOS\n- Sin ticker no hay calculos de cartera en esta respuesta.\n\n"
+        "MEMORIAS\n"
+    ),
+    "answer_no_memory": "- No se recuperó memoria de cartera relevante.",
+    "answer_no_claims": (
+        "SIN AFIRMACIONES DE EMPRESA\n- Pregunta por un ticker concreto para revisar afirmaciones y evidencia.\n\n"
+        "CONTEXTO DOCUMENTAL\n"
+    ),
+    "answer_no_library": "- Para respuestas con fuentes de empresa, indica un ticker o ingiere evidencia primero.",
+    "facts": "Solo contexto de memorias de cartera y sesiones de research.",
+    "calculations": "No se hizo ningún cálculo de cartera.",
+    "user_hypotheses": "Memorias de cartera recuperadas.",
+    "unverified_claims": "Pregunta por un ticker concreto para revisar afirmaciones y evidencia.",
+    "inferences": "Hace falta un ticker para inferencias de empresa.",
+    "contradictions": "No se seleccionaron afirmaciones de empresa.",
+    "insufficient_data": "Indica un ticker o ingiere evidencia de cartera.",
+    "conclusion": "No hay conclusión de empresa disponible.",
+    "actions": ("Pregunta por un ticker", "Ingiere documentos de cartera"),
+}
+_GENERAL_EN: dict[str, Any] = {
+    "answer_context": (
+        "CONTEXT\n- General question with no ticker: the assistant has portfolio memories, research sessions and document context.\n\n"
+        "NO CALCULATIONS\n- Without a ticker there are no portfolio calculations in this answer.\n\n"
+        "MEMORIES\n"
+    ),
+    "answer_no_memory": "- No relevant portfolio memory was retrieved.",
+    "answer_no_claims": (
+        "NO COMPANY CLAIMS\n- Ask about a specific ticker to review claims and evidence.\n\n"
+        "DOCUMENT CONTEXT\n"
+    ),
+    "answer_no_library": "- For answers with company sources, give a ticker or ingest evidence first.",
+    "facts": "Only context from portfolio memories and research sessions.",
+    "calculations": "No portfolio calculation was made.",
+    "user_hypotheses": "Portfolio memories retrieved.",
+    "unverified_claims": "Ask about a specific ticker to review claims and evidence.",
+    "inferences": "A ticker is needed for company inferences.",
+    "contradictions": "No company claims were selected.",
+    "insufficient_data": "Give a ticker or ingest portfolio evidence.",
+    "conclusion": "No company conclusion available.",
+    "actions": ("Ask about a ticker", "Ingest portfolio documents"),
+}
+
+
+def _general_texts() -> dict[str, Any]:
+    return _GENERAL_EN if _english() else _GENERAL_ES
 
 
 # Textos de relleno del panel plegado `sections` de la ficha de empresa (es, en).
@@ -3941,21 +3993,20 @@ class ChatService:
                 )
             )
 
+        g = _general_texts()
+        memory_lines = chr(10).join(f"- {_short(item.content, 180)}" for item in portfolio_memories[:5])
         answer = (
-            "CONTEXTO\n- Pregunta general sin ticker: el asistente dispone de memorias de cartera, sesiones de research y contexto documental.\n\n"
-            "SIN CALCULOS\n- Sin ticker no hay calculos de cartera en esta respuesta.\n\n"
-            "MEMORIAS\n"
-            f"{chr(10).join(f'- {_short(item.content, 180)}' for item in portfolio_memories[:5]) or '- No se recuperó memoria de cartera relevante.'}\n\n"
-            "SIN AFIRMACIONES DE EMPRESA\n- Pregunta por un ticker concreto para revisar afirmaciones y evidencia.\n\n"
-            "CONTEXTO DOCUMENTAL\n"
-            + ("\n".join(library_lines) or "- Para respuestas con fuentes de empresa, indica un ticker o ingiere evidencia primero.")
+            g["answer_context"]
+            + f"{memory_lines or g['answer_no_memory']}\n\n"
+            + g["answer_no_claims"]
+            + ("\n".join(library_lines) or g["answer_no_library"])
         )
         return ChatResponse(
             answer=answer,
             sections=[
                 {
                     "key": "facts",
-                    "body": "Solo contexto de memorias de cartera y sesiones de research.",
+                    "body": g["facts"],
                     "citations": [
                         f"memory_item:{item.id}"
                         for item in portfolio_memories[:5]
@@ -3963,12 +4014,12 @@ class ChatService:
                 },
                 {
                     "key": "calculations",
-                    "body": "No se hizo ningún cálculo de cartera.",
+                    "body": g["calculations"],
                     "citations": [],
                 },
                 {
                     "key": "user_hypotheses",
-                    "body": "Memorias de cartera recuperadas.",
+                    "body": g["user_hypotheses"],
                     "citations": [
                         f"memory_item:{item.id}"
                         for item in portfolio_memories[:5]
@@ -3976,33 +4027,33 @@ class ChatService:
                 },
                 {
                     "key": "unverified_claims",
-                    "body": "Pregunta por un ticker concreto para revisar afirmaciones y evidencia.",
+                    "body": g["unverified_claims"],
                     "citations": [],
                 },
                 {
                     "key": "inferences",
-                    "body": "\n".join(library_lines) or "Hace falta un ticker para inferencias de empresa.",
+                    "body": "\n".join(library_lines) or g["inferences"],
                     "citations": [f"knowledge_chunk:{item['id']}" for item in library_context],
                 },
                 {
                     "key": "contradictions",
-                    "body": "No se seleccionaron afirmaciones de empresa.",
+                    "body": g["contradictions"],
                     "citations": [],
                 },
                 {
                     "key": "insufficient_data",
-                    "body": "Indica un ticker o ingiere evidencia de cartera.",
+                    "body": g["insufficient_data"],
                     "citations": [],
                 },
                 {
                     "key": "conclusion",
-                    "body": "No hay conclusión de empresa disponible.",
+                    "body": g["conclusion"],
                     "citations": [],
                 },
             ],
             sources=sources,
             blocked=False,
-            proposed_actions=["Pregunta por un ticker", "Ingiere documentos de cartera"],
+            proposed_actions=list(g["actions"]),
             prompt_version="source-aware-synthesis-v1",
             model="deterministic",
         )
