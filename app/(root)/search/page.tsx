@@ -11,7 +11,7 @@ import { searchResearchLibrary } from '@/lib/actions/research-tools.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { formatDate, formatNumber, formatPercent } from '@/lib/format';
 import { entityTypeDisplay, evidenceStatusDisplay, sourceDisplay, sourceTierDisplay } from '@/lib/research/source-display';
-import { getT } from '@/lib/i18n/server';
+import { getLocale, getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -39,7 +39,7 @@ type PageProps = {
 };
 
 export default async function UniversalSearchPage({ searchParams }: PageProps) {
-  const t = await getT();
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
   const query = await searchParams;
   const searched = Boolean(query.q?.trim());
   // El botón «Reintentar» de BackendOffline vuelve a la MISMA consulta: sin
@@ -131,10 +131,10 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
                   {/* F2: los ids internos del motor (document_chunk, tier_1_regulatory,
                       active) se etiquetan en es-ES; el localizador «entidad:id» y la
                       puntuación del reranker son diagnóstico y van plegados. */}
-                  <div className="flex flex-wrap items-center gap-2"><Badge>{entityTypeDisplay(result.entity_type)}</Badge>{result.ticker ? <Badge variant="outline">{result.ticker}</Badge> : null}<Badge variant="outline">{sourceTierDisplay(result.source_tier)}</Badge><Badge variant="outline">{evidenceStatusDisplay(result.status)}</Badge></div>
+                  <div className="flex flex-wrap items-center gap-2"><Badge>{entityTypeDisplay(result.entity_type, locale)}</Badge>{result.ticker ? <Badge variant="outline">{result.ticker}</Badge> : null}<Badge variant="outline">{sourceTierDisplay(result.source_tier, locale)}</Badge><Badge variant="outline">{evidenceStatusDisplay(result.status, locale)}</Badge></div>
                   <h2 className="mt-3 break-words text-lg font-semibold text-gray-100">{result.title}</h2>
                   <p className="mt-2 line-clamp-5 whitespace-pre-wrap text-sm leading-6 text-gray-300">{result.text}</p>
-                  <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500"><span>{result.collection ?? sourceDisplay(result.source_type)}</span><span>{formatDate(result.as_of, undefined, t('research.notAvailable'))}</span><span>{t('search.confidence', { value: formatPercent(result.source_trust, { digits: 0 }) })}</span></div>
+                  <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500"><span>{result.collection ?? sourceDisplay(result.source_type, locale)}</span><span>{formatDate(result.as_of, undefined, t('research.notAvailable'))}</span><span>{t('search.confidence', { value: formatPercent(result.source_trust, { digits: 0 }) })}</span></div>
                   <details className="mt-2">
                     <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-300">{t('search.techDetails')}</summary>
                     <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500"><span>{t('search.reference', { value: result.citation })}</span><span>{t('search.score', { value: formatNumber(result.scores.reranker, { minimumFractionDigits: 4, maximumFractionDigits: 4 }) })}</span></div>

@@ -62,11 +62,7 @@ const SOURCE_TYPE_KEYS: Record<string, TranslationKey> = {
 /** En inglés las etiquetas curadas salen de las claves; los ids propios (SEC EDGAR, ESEF...) se quedan. */
 function sourceTypeLabel(value: string, t?: TranslateFn): string {
   if (t && Object.hasOwn(SOURCE_TYPE_KEYS, value)) return t(SOURCE_TYPE_KEYS[value]);
-  return SOURCE_TYPE_LABELS[value] ?? sourceDisplay(value);
-}
-
-function sourceTierLabel(value: string): string {
-  return sourceTierDisplay(value);
+  return SOURCE_TYPE_LABELS[value] ?? sourceDisplay(value, t ? 'en' : 'es');
 }
 
 const SOURCE_SCOPE_LABELS = {
@@ -244,7 +240,7 @@ export default async function ResearchSourcesPage({
                     )}
                   </td>
                   <td className="py-3 text-gray-400">{sourceTypeLabel(document.source_type, locale === 'en' ? t : undefined)}</td>
-                  <td className="py-3 text-gray-400">{sourceTierLabel(document.source_tier)}</td>
+                  <td className="py-3 text-gray-400">{sourceTierDisplay(document.source_tier, locale)}</td>
                   <td className="py-3 text-gray-500">
                     {document.published_at ? formatDate(document.published_at, undefined, NA) : t('research.sourcesPage.noDate')}
                   </td>
@@ -344,12 +340,12 @@ export default async function ResearchSourcesPage({
               <div key={audit.id} className="rounded-md border border-gray-800 bg-black/30 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className={audit.passed ? 'font-semibold text-teal-300' : 'font-semibold text-amber-300'}>
-                    {auditStatusLabel(audit.passed)}
+                    {auditStatusLabel(audit.passed, locale)}
                   </span>
-                  <span className="text-sm text-gray-500" title={auditScoreText(audit.passed, audit.source_coverage_score, (value) => formatNumber(value, { maximumFractionDigits: 2 }))}>{t('research.sourcesPage.citations', { score: formatNumber(audit.source_coverage_score, { maximumFractionDigits: 2 }) })}</span>
+                  <span className="text-sm text-gray-500" title={auditScoreText(audit.passed, audit.source_coverage_score, (value) => formatNumber(value, { maximumFractionDigits: 2 }), locale)}>{t('research.sourcesPage.citations', { score: formatNumber(audit.source_coverage_score, { maximumFractionDigits: 2 }) })}</span>
                 </div>
                 {audit.required_fixes.length ? (
-                  <div className="mt-2 text-xs text-amber-200">{audit.required_fixes.map(auditFixLabel).join(' ')}</div>
+                  <div className="mt-2 text-xs text-amber-200">{audit.required_fixes.map((fix) => auditFixLabel(fix, locale)).join(' ')}</div>
                 ) : null}
               </div>
             ))}

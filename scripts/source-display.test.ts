@@ -22,7 +22,7 @@ test('bloqueos conocidos y métricas se presentan en español sin cambiar cifras
 test('sources no inventa identificadores y traduce los motivos de bloqueo', () => {
   const sources = readFileSync('app/(root)/research/sources/page.tsx', 'utf8');
   assert.ok(!sources.includes('Tesis #'));
-  assert.ok(sources.includes('map(auditFixLabel)'));
+  assert.ok(sources.includes('map((fix) => auditFixLabel(fix, locale))'));
 });
 
 test('aviso de entradas de valoración en inglés se traduce', () => {

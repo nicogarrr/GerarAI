@@ -1056,5 +1056,32 @@
     "optUserText": "Texto aportado por el usuario",
     "open": "abrir",
     "emptyTicker": "Sin documentos de {ticker}."
+  },
+  "auditDetail": {
+    "viewThesis": "Ver tesis",
+    "moreItems": "y {count} más",
+    "blockedWeakOnly": "Bloqueada por afirmaciones de baja confianza (detalle abajo).",
+    "blockedNoReason": "Motivo del bloqueo no registrado en esta auditoría. Regenera la tesis para obtenerlo.",
+    "unsupportedClaims": "Afirmaciones sin fuente",
+    "dataConflicts": "Datos en conflicto",
+    "lowConfidence": "Baja confianza",
+    "reconciliation": "Conciliación SEC/FMP",
+    "reconciliationMissing": "Falta conciliar con SEC/FMP las cifras financieras reportadas."
+  },
+  "blockedValuation": {
+    "ariaLabel": "Valoración bloqueada",
+    "title": "Valoración bloqueada: {model}",
+    "negativeFcf": "El margen de flujo de caja libre registrado es negativo. Este modelo DCF no puede valorarlo sin falsear el consumo de caja. Revisa un modelo de financiación y dilución; no fuerces un margen positivo.",
+    "missingInputs": "Este modelo no puede publicar una valoración con las entradas disponibles: {inputs}.",
+    "missingUnspecified": "el motor no especifica las entradas que faltan",
+    "inputSource": "Fuente de las entradas: {source}.",
+    "sourceUnspecified": "no especificada en esta valoración",
+    "periods": "Periodos: {periods}.",
+    "periodsNone": "no registrados",
+    "facts": "Hechos registrados: {facts}.",
+    "navAria": "Revisar valoración bloqueada",
+    "reviewData": "Revisar datos y fuentes",
+    "reviewAssumptions": "Revisar supuestos",
+    "viewModel": "Ver modelo a largo plazo"
   }
 }

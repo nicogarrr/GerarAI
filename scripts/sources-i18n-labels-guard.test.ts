@@ -23,7 +23,7 @@ const BACKEND_TIERS = [
 
 test('F323: tipo y nivel de fuente se pintan con etiqueta en espanol', () => {
     assert.match(page, /\{sourceTypeLabel\(document\.source_type(, locale === 'en' \? t : undefined)?\)\}/);
-    assert.match(page, /\{sourceTierLabel\(document\.source_tier\)\}/);
+    assert.match(page, /\{sourceTierDisplay\(document\.source_tier, locale\)\}/);
     assert.doesNotMatch(page, /\{document\.source_type\}<\/td>/);
     assert.doesNotMatch(page, /\{document\.source_tier\}<\/td>/);
 });
@@ -35,7 +35,11 @@ test('F323: los mapas cubren el catalogo del backend', () => {
     for (const key of BACKEND_TIERS) {
         assert.match(display, new RegExp(`${key}: '`), `falta tier ${key}`);
     }
-    assert.match(page, /SOURCE_TYPE_LABELS\[value\] \?\? sourceDisplay\(value\)/);
-    assert.match(page, /sourceTierDisplay\(value\)/);
-    assert.match(display, /SOURCE_TIER_LABELS\[value\] : value\.replaceAll/);
+    assert.match(page, /SOURCE_TYPE_LABELS\[value\] \?\? sourceDisplay\(value, t \? 'en' : 'es'\)/);
+    assert.match(page, /sourceTierDisplay\(document\.source_tier, locale\)/);
+    assert.match(display, /pickLabel\(SOURCE_TIER_LABELS, SOURCE_TIER_LABELS_EN, value, locale\)/);
+    assert.match(display, /es\[value\] : value\.replaceAll/);
+    for (const key of BACKEND_TIERS) {
+        assert.match(display.slice(display.indexOf('SOURCE_TIER_LABELS_EN')), new RegExp(`${key}: '`), `falta tier en inglés ${key}`);
+    }
 });
