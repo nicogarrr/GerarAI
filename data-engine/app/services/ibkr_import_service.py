@@ -326,7 +326,14 @@ def _csv_delimiter(csv_text: str) -> str:
 
 def _csv_rows(csv_text: str) -> list[list[str]]:
     text = csv_text.strip()
-    return list(csv.reader(io.StringIO(text), delimiter=_csv_delimiter(text)))
+    # newline="": filas acabadas en \r a secas («CSV (Macintosh)») y
+    # csv.Error como error de importación (400), no como 500.
+    try:
+        return list(csv.reader(io.StringIO(text, newline=""), delimiter=_csv_delimiter(text)))
+    except csv.Error as exc:
+        raise IBKRImportError(
+            "El CSV está mal formado y no se puede leer; expórtalo de nuevo desde IBKR"
+        ) from exc
 
 
 _SLASH_DATE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2}|\d{4})$")
