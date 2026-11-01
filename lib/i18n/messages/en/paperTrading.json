@@ -38,7 +38,25 @@
     "refreshError": "Could not update quotes: {error}",
     "refreshErrorNetwork": "Could not update quotes: network or server failure.",
     "stale": "Out of date: positions have changed since the last quote check. They refresh on their own while the tab is visible, or you can request it with the button.",
-    "unavailable": "Valuation not available yet: no quotes checked. They are checked on their own while the tab is visible, or you can request it with the button."
+    "unavailable": "Valuation not available yet: no quotes checked. They are checked on their own while the tab is visible, or you can request it with the button.",
+    "rowNotes": {
+      "listingCurrency": "The listing says {currency}: there is no conversion, N/A.",
+      "currencyNotVerifiedListing": "Quote currency not verified in the listing: N/A (it is not inferred from the ticker).",
+      "optionNotValued": "Option not valued: there is no quote for the contract's premium, and the underlying's quote is not its price.",
+      "noSymbol": "Instrument without a recognizable ticker.",
+      "notQueried": "Not checked: limit of 25 tickers per request.",
+      "currencyUnverified": "The quote currency could not be verified.",
+      "noQuote": "No quote available from the approved sources (your trade prices are not used).",
+      "sourceNotApproved": "No quote available from the approved sources.",
+      "currencyUnknown": "Quote currency unknown: N/A.",
+      "currencyMismatch": "The quote is in {quote} and the position in {position}; there is no conversion: N/A."
+    },
+    "quoteLabels": {
+      "live": "{time} (Madrid time) · live",
+      "close": "close of {date}",
+      "lastClose": "last close, data from {date} {time}",
+      "unknownClose": "close, date unknown"
+    }
   },
   "account": {
     "ariaLabel": "Demo account balance",

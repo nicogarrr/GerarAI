@@ -9,6 +9,7 @@
  * - `@/database/models/manual-demo.model` -> colecciones en memoria con
  *   unicidad (userId, clientOrderId) y escritura condicional por version.
  * - `mongoose` -> stub de Types.ObjectId (cursor del historial paginado).
+ * - `@/lib/research/backend-error-locale` -> requestLocale() = 'es' (sin petición).
  * - `@/lib/paper-trading/{types,accounting,options,ledger-adapter}` y
  *   `@/lib/market/{demo-valuation,quote-freshness}` ->
  *   ficheros REALES del repo (el codigo bajo test es el fuente real).
@@ -29,6 +30,7 @@ export async function resolve(specifier, context, nextResolve) {
     if (specifier === '@/database/mongoose') return { url: 'guard-stub:mongoose', shortCircuit: true };
     if (specifier === '@/database/models/manual-demo.model') return { url: 'guard-stub:manual-demo-model', shortCircuit: true };
     if (specifier === 'mongoose') return { url: 'guard-stub:mongoose-types', shortCircuit: true };
+    if (specifier === '@/lib/research/backend-error-locale') return { url: 'guard-stub:request-locale', shortCircuit: true };
     if (REAL[specifier]) return { url: new URL(REAL[specifier], import.meta.url).href, shortCircuit: true };
     if (specifier.startsWith('@/')) throw new Error(`manual-demo guard loader: import no esperado: ${specifier}`);
     return nextResolve(specifier, context);
@@ -191,6 +193,7 @@ export async function load(url, context, nextLoad) {
     if (url === 'guard-stub:require-user') return { format: 'module', shortCircuit: true, source: REQUIRE_USER_STUB };
     if (url === 'guard-stub:mongoose') return { format: 'module', shortCircuit: true, source: MONGOOSE_STUB };
     if (url === 'guard-stub:manual-demo-model') return { format: 'module', shortCircuit: true, source: MODEL_STUB };
+    if (url === 'guard-stub:request-locale') return { format: 'module', shortCircuit: true, source: "export async function requestLocale() { return 'es'; }" };
     if (url === 'guard-stub:mongoose-types') return { format: 'module', shortCircuit: true, source: MONGOOSE_TYPES_STUB };
     return nextLoad(url, context);
 }
