@@ -6,6 +6,9 @@
  * y desde /metodologia, para que el usuario aprenda inversión con la app.
  */
 
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { DEFAULT_LOCALE, type Locale } from './i18n/locale.ts';
+
 export type GlossaryKey =
   | 'dcf'
   | 'wacc'
@@ -186,6 +189,155 @@ export const glossary: Record<GlossaryKey, GlossaryEntry> = {
   },
 };
 
+/** Glosario en inglés (Ajustes → Idioma = English). Mismas claves que `glossary`. */
+export const glossaryEn: Record<GlossaryKey, GlossaryEntry> = {
+  dcf: {
+    term: "DCF (discounted cash flow)",
+    short:
+      "Values a company by discounting the free cash flow it is expected to generate back to today, at a rate that reflects its risk. It is the core of the valuation: it moves with your growth, margin and WACC assumptions, so it is a range of scenarios rather than a fixed price target. Never treat it as an exact figure.",
+  },
+  wacc: {
+    term: "WACC (weighted average cost of capital)",
+    short:
+      "The discount rate: what shareholders and lenders together require for financing the company, weighted by its capital structure. More risk or costlier debt means a higher WACC and a lower present value. Over long horizons, one point of WACC moves the value a lot.",
+  },
+  reverse_dcf: {
+    term: "Reverse DCF",
+    short:
+      "Turns the DCF around: instead of estimating value, it starts from today's price and works out what growth or margin the market is already pricing in. If what the price requires is implausible against your base case, the stock is expensive (or cheap). It is the most honest way to test your assumptions against the price.",
+  },
+  moat: {
+    term: "Moat (competitive advantage)",
+    short:
+      "The advantage that shields profits from competition for years, grouped into types (network effects, switching costs, brand…). It must be backed by concrete evidence, never by hearsay. Without a durable moat, a high ROIC attracts rivals and erodes.",
+  },
+  margen_seguridad: {
+    term: "Margin of safety",
+    short:
+      "The gap between what you pay and your estimate of intrinsic value, in %: the cushion for when you are wrong. The more uncertain the business, the more margin you should demand (30%+ in hard cases). It does not prevent losses; it limits the damage if the thesis fails.",
+  },
+  look_ahead: {
+    term: "Look-ahead bias",
+    short:
+      "The mistake of using information that did not yet exist on the date being analysed, such as results published later or data revised after the fact. It artificially inflates any backtest and any thesis. GerarAI only uses data that was available on each simulated date to avoid it.",
+  },
+  owner_earnings: {
+    term: "Owner earnings",
+    short:
+      "What the owner can actually take out of the business: net income + depreciation and amortisation − maintenance capex − change in working capital (Buffett's definition). More honest than accounting profit because it subtracts what must be reinvested just to hold position.",
+  },
+  tam: {
+    term: "TAM (Total Addressable Market)",
+    short:
+      "The total market: maximum demand if you had 100% of the global market. It is the theoretical ceiling and says little on its own; always read it together with SAM and SOM.",
+  },
+  sam: {
+    term: "SAM (Serviceable Addressable Market)",
+    short:
+      "The reachable market: the part of the TAM your product and your geographies can actually reach. It is the market worth planning around in the medium term.",
+  },
+  som: {
+    term: "SOM (Serviceable Obtainable Market)",
+    short:
+      "The obtainable market: the share of the SAM you can capture within a few years with your real capacity (sales, channels, competition). It is the number that really matters for valuing the company.",
+  },
+  bear: {
+    term: "Bear case (pessimistic)",
+    short:
+      "The adverse case: weaker execution, margins under pressure and costlier capital. It is a price carrying a risk premium, not an arbitrary catastrophe. Use it to gauge how much you could lose if the thesis goes wrong.",
+  },
+  base: {
+    term: "Base case (central)",
+    short:
+      "The most likely case with normalised assumptions: growth and margin in line with the company's history. It anchors the valuation but it is not «the» value: reality almost never matches it exactly.",
+  },
+  bull: {
+    term: "Bull case (optimistic)",
+    short:
+      "The favourable case: stronger execution, margin expansion and cheaper capital. Every extra point must be justified; wishful thinking is not an assumption. It shows how much you are paying today for optimism.",
+  },
+  roic: {
+    term: "ROIC (return on invested capital)",
+    short:
+      "After-tax operating profit divided by the capital invested in the business. Compare it with WACC: if ROIC > WACC the company creates value; if it is lower, it destroys value even while growing. It is the best X-ray of growth quality.",
+  },
+  var: {
+    term: "VaR (Value at Risk)",
+    short:
+      "The maximum expected loss over a given horizon at a confidence level (e.g. a 5% chance of losing more than X in a month). It does not cover the worst case, only a statistical threshold. It needs history and distribution assumptions: an estimate, never a promise.",
+  },
+  drawdown: {
+    term: "Drawdown (maximum decline)",
+    short:
+      "The worst fall from a peak to the next trough, in %. It measures the real pain an investor would have endured, beyond volatility. A −40% fall needs a +67% gain to get back to where it started.",
+  },
+  sharpe: {
+    term: "Sharpe ratio",
+    short:
+      "Return above the risk-free rate divided by volatility: how much return you earn per unit of risk. The higher, the better the risk is rewarded. It depends on the chosen window: two different periods give different rankings.",
+  },
+  moat_network_effects: {
+    term: "Moat: network effects",
+    short:
+      "The product gains value with every new user (payments, marketplaces, social networks). Once it reaches critical mass it is hard to displace, but beware: the network can move if it loses usefulness.",
+  },
+  moat_switching_costs: {
+    term: "Moat: switching costs",
+    short:
+      "Moving to a competitor costs the customer time, money or operational risk (integrations, accumulated data, retraining). Loyalty is friction, not love. Measure how long a real customer would take to leave.",
+  },
+  moat_cost_advantage: {
+    term: "Moat: cost advantage",
+    short:
+      "Producing the same thing at a lower unit cost, sustainably (processes, raw materials, location). It lets the company gain share or margin at equal prices. It is only a moat if rivals cannot replicate it with capex.",
+  },
+  moat_scale_economies: {
+    term: "Moat: economies of scale",
+    short:
+      "Being bigger spreads fixed costs over more units and lowers the average cost. It works best where fixed costs are high (industry, software). A smaller player can win if the market fragments.",
+  },
+  moat_distribution: {
+    term: "Moat: distribution",
+    short:
+      "Reaching customers where rivals cannot: channel agreements, an own network or an installed base. A great idea without a channel does not sell. Especially valuable in consumer and retail.",
+  },
+  moat_brand: {
+    term: "Moat: brand and intangibles",
+    short:
+      "Customers pay more or choose first because of trust, patents or licences. Even if the product is copied, the perception is not. It is kept with years of consistency and lost with a single scandal.",
+  },
+  moat_regulation: {
+    term: "Moat: regulatory barriers",
+    short:
+      "Licences, concessions or rules that limit who can compete (banking, insurance, spectrum, pharma). Strong protection, but it depends on the regulator: a rule change can wipe out the moat overnight.",
+  },
+  moat_data: {
+    term: "Moat: data advantage",
+    short:
+      "Exclusive, large-scale data improves the product, and a better product attracts more data: a virtuous loop that is hard to replicate. Watch privacy rules, since regulation can break the loop.",
+  },
+  moat_ecosystem: {
+    term: "Moat: ecosystem",
+    short:
+      "A family of products and services that reinforce each other (hardware + software + services). Leaving one product drags the others along. Stronger than a standalone product, but it needs constant integration.",
+  },
+  moat_capital_barrier: {
+    term: "Moat: capital barrier",
+    short:
+      "Competing requires an upfront investment so large that few can afford it (factories, fleets, satellite constellations). It offers little protection when capital is cheap: watch the credit cycle.",
+  },
+  moat_process_advantage: {
+    term: "Moat: process advantage",
+    short:
+      "A proprietary way of making or delivering things that is better and hard to imitate (the Toyota Production System, semiconductor lithography). It is an organisation that executes better every year, more than a one-off secret.",
+  },
+};
+
+/** Glosario del idioma elegido (español por defecto). */
+export function glossaryFor(locale: Locale = DEFAULT_LOCALE): Record<GlossaryKey, GlossaryEntry> {
+  return locale === 'en' ? glossaryEn : glossary;
+}
+
 /** Mapea la clave canónica del backend (moat_framework.MOAT_CATEGORIES y afines) a su clave de glosario. */
 export const moatGlossaryKey: Record<string, GlossaryKey> = {
   network_effects: 'moat_network_effects',
@@ -208,8 +360,8 @@ export const moatGlossaryKey: Record<string, GlossaryKey> = {
   capital_barrier: 'moat_capital_barrier',
 };
 
-/** Etiqueta en español para una clave de moat del backend; fallback legible si llega una clave desconocida. */
-export function moatLabel(type: string): string {
+/** Etiqueta (español por defecto) para una clave de moat del backend; fallback legible si llega una clave desconocida. */
+export function moatLabel(type: string, locale: Locale = DEFAULT_LOCALE): string {
   const key = Object.hasOwn(moatGlossaryKey, type) ? moatGlossaryKey[type] : undefined;
-  return key ? glossary[key].term.replace('Moat: ', '') : type.replaceAll('_', ' ');
+  return key ? glossaryFor(locale)[key].term.replace('Moat: ', '') : type.replaceAll('_', ' ');
 }

@@ -156,7 +156,7 @@ import { createFormatters, formatDate, formatMarketCapUsd, formatMarketDate, for
 import { getInsiderFilings, getOwnershipSignals } from '@/lib/actions/insider.actions';
 import { OwnershipSignalsPanel } from '@/components/research/OwnershipSignalsPanel';
 import { insiderName, insiderRole } from '@/lib/insider/format';
-import { glossary, moatGlossaryKey } from '@/lib/glossary';
+import { glossaryFor, moatGlossaryKey } from '@/lib/glossary';
 import {
   RESEARCH_RENDER_BUDGET_MS,
   pick,
@@ -327,9 +327,9 @@ function safeHttpUrl(value: string | null | undefined): string | null {
 }
 
 /** Definición metodológica del foso (glosario compartido) para pintarla en la card */
-function moatDefinition(type: string): string | null {
+function moatDefinition(type: string, locale: Locale): string | null {
   const key = moatGlossaryKey[type];
-  return key ? glossary[key].short : null;
+  return key ? glossaryFor(locale)[key].short : null;
 }
 
 function metricValue(value: number | string | null | undefined, unit: string, t: TranslateFn) {
@@ -1606,11 +1606,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     return (
       <div className="space-y-5">
         <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage={t('research.fichaMoatRefreshed')}><Button type="submit" variant="outline"><ShieldCheck className="mr-2 h-4 w-4" />{t('research.fichaReevaluateEvidence')}</Button></MutationForm>
-        <MoatClassificationPanel moat={moat} ti={t} />
+        <MoatClassificationPanel moat={moat} ti={t} locale={locale} />
         <MoatChecklistPanel moat={moat} ti={t} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {moat?.moats.length ? moat.moats.map((item) => {
-            const definition = moatDefinition(item.type);
+            const definition = moatDefinition(item.type, locale);
             return (
               <div className="rounded-xl border border-gray-800 bg-surface-1 p-4" key={item.type}>
                 <div className="flex justify-between gap-3"><MoatTerm type={item.type} /><Badge>{item.strength}/100</Badge></div>
