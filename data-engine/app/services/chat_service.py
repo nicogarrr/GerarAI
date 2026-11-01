@@ -1693,6 +1693,19 @@ class ChatService:
             baseline.llm_trace = {"fallback": True, "fallback_reason": "chat_total_deadline"}
             baseline.context = context_echo
             return baseline
+        # Equipo de expertos (EXPERT_TEAM_ENABLED, apagado por defecto): solo
+        # preguntas sobre una empresa que piden ≥2 expertos; cualquier fallo o
+        # ninguna afirmación con fuente sigue por la síntesis de siempre.
+        if ticker:
+            from app.services.expert_team import chat as expert_chat
+
+            if expert_chat.wants_team(question or "", ticker):
+                team_answer = await expert_chat.answer_with_team(
+                    db, question or "", ticker, self.provider, deadline_s=remaining_seconds() - 5.0
+                )
+                if team_answer is not None:
+                    team_answer.context = context_echo
+                    return team_answer
         # Fast-path Jev (4): si la pregunta es una consulta factual simple
         # (baseline_ok, conf >= 0.8), el contexto determinista ya responde y
         # se ahorra la llamada LLM de sintesis. Sin key o ante fallo,
