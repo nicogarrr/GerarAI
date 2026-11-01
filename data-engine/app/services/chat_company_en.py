@@ -12,6 +12,7 @@ import re
 from decimal import Decimal
 
 from app.models.entities import Claim, Company, FinancialFact, NewsEvent, ThesisVersion
+from app.services.thesis_publication_gate import withheld_reason_en
 
 METRIC_LABELS_EN = {
     "revenue": "revenue",
@@ -257,7 +258,7 @@ def natural_company_answer_en(
         )
     if thesis and thesis_withheld:
         stamp = thesis.created_at.date().isoformat() if thesis.created_at else "unverified date"
-        thesis_line = f"Archived thesis v{thesis.version} ({stamp}): {thesis_withheld}"
+        thesis_line = f"Archived thesis v{thesis.version} ({stamp}): {withheld_reason_en(thesis_withheld)}"
         parts.append(thesis_line)
     elif thesis:
         details = []
@@ -301,3 +302,20 @@ def natural_company_answer_en(
             "Ask about the other company separately.",
         )
     return "\n\n".join(parts)
+
+
+def thesis_section_text_en(ticker: str, thesis: ThesisVersion | None, withheld_reason: str | None) -> str:
+    """Línea de tesis del panel plegado `sections`, en inglés (mismos datos que la castellana)."""
+    if thesis is None:
+        return f"No thesis stored yet for {ticker}."
+    if withheld_reason:
+        stamp = thesis.created_at.date().isoformat() if thesis.created_at else "unverified date"
+        return (
+            f"Archived thesis v{thesis.version} ({stamp}): {withheld_reason_en(withheld_reason)} "
+            f"[thesis_version:{thesis.id}]"
+        )
+    return (
+        f"Thesis {ticker} v{thesis.version}: `{thesis.status}` with rating `{thesis.rating}`. "
+        f"Expected value={_to_float(thesis.expected_value)} vs current price={_to_float(thesis.current_price)}. "
+        f"[thesis_version:{thesis.id}]"
+    )
