@@ -1008,6 +1008,16 @@ def _asks_position(question: str) -> bool:
     )
 
 
+def _team_advice(question: str, ticker: str) -> bool:
+    """«¿Debería comprar X?» es una consulta, no una orden: con el equipo de
+    expertos encendido (EXPERT_TEAM_ENABLED) la contesta el equipo; apagado,
+    o si es una orden de verdad («vende mis acciones de X»), nada cambia."""
+    from app.services.expert_team import chat as expert_chat
+    from app.services.expert_team.coordinator import is_broad_question
+
+    return is_broad_question(question) and expert_chat.wants_team(question, ticker)
+
+
 def _asks_purchase_cost(question: str) -> bool:
     if _PURCHASE_COST_RE.search(question):
         return True
@@ -1604,7 +1614,11 @@ class ChatService:
         # con el broker. Antes caia en el volcado de datos de la empresa como
         # si se hubiera preguntado por ella. Las preguntas de IRPF al vender
         # ya salieron por _sale_tax_route / _sale_tax_answer.
-        if company is not None and _ORDER_VERB_RE.search(question or ""):
+        if (
+            company is not None
+            and _ORDER_VERB_RE.search(question or "")
+            and not _team_advice(question or "", company.ticker)
+        ):
             return ChatResponse(
                 answer=(
                     "I don't place orders: GerarAI doesn't buy or sell at your broker. "

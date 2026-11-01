@@ -21,6 +21,27 @@ _JUDGE_LABELS = {"bullish": "positive", "bearish": "negative", "neutral": "neutr
 
 Judge = Callable[[RunContext, str, str], Awaitable[str]]
 
+#: Preguntas amplias sobre una empresa (texto ya sin tildes y en minúsculas):
+#: «¿merece la pena X?», «¿debería comprar X?», «analiza X», «is X worth it?».
+#: Las contestan los expertos marcados ``broad`` aunque no digan «riesgo» o
+#: «valoración». Nada de cartera/cuenta: sin empresa el equipo no entra.
+_BROAD_RE = re.compile(
+    r"\b(?:merece|vale)\s+la\s+pena"
+    r"|\bdeberia\s+(?:comprar|invertir|entrar|mantener|vender|quedarme|salir)"
+    r"|\b(?:es|seria)\b[^?.!]{0,40}\bbuena\s+(?:inversion|compra|empresa|idea|oportunidad)"
+    r"|\bque\s+(?:opinas|piensas)\s+(?:de|sobre)\b|\bque\s+te\s+parece\b|\bcomo\s+ves\b"
+    r"|\banaliza(?:me|r)?\b|\banalisis\s+(?:de|completo|a\s+fondo)\b|\binvertir\s+en\b"
+    r"|\bworth\s+(?:it|buying|investing|holding|a\s+buy)\b"
+    r"|\bshould\s+i\s+(?:buy|invest|hold|sell|keep)\b"
+    r"|\bgood\s+(?:investment|buy|company|stock)\b"
+    r"|\bwhat\s+do\s+you\s+think\s+(?:of|about)\b|\bthoughts\s+on\b"
+    r"|\banaly[sz]e\b|\banalysis\s+of\b|\binvest\s+in\b"
+)
+
+
+def is_broad_question(question: str) -> bool:
+    return bool(_BROAD_RE.search(_fold(question)))
+
 
 def _fold(text: str) -> str:
     decomposed = unicodedata.normalize("NFKD", text.lower())
@@ -56,15 +77,20 @@ class ExpertTeam:
         self.judge_prompt = judge_prompt
 
     def plan(self, ctx: RunContext) -> list[str]:
-        """Determinista: tesis = todos los aplicables; chat = por palabras clave."""
+        """Determinista: tesis = todos los aplicables; chat = por palabras clave o pregunta amplia."""
         chosen: list[str] = []
         question = _fold(ctx.question or "")
+        broad = ctx.mode == "chat" and bool(_BROAD_RE.search(question))
         for spec in self.experts:
             if ctx.mode not in spec.modes:
                 continue
             if spec.applies is not None and not spec.applies(ctx):
                 continue
-            if ctx.mode == "chat" and not any(re.search(rf"\b{re.escape(k)}", question) for k in spec.keywords):
+            if (
+                ctx.mode == "chat"
+                and not (broad and spec.broad)
+                and not any(re.search(rf"\b{re.escape(k)}", question) for k in spec.keywords)
+            ):
                 continue
             chosen.append(spec.name)
         return chosen

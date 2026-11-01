@@ -15,6 +15,7 @@ def default_experts() -> list[ExpertSpec]:
     return [
         ExpertSpec(
             name="fundamental",
+            broad=True,
             prompt_name="expert_fundamental",
             tools=("financial_facts",),
             keywords=("fundamental", "ingresos", "ventas", "margen", "beneficio", "caja", "balance",
@@ -22,6 +23,7 @@ def default_experts() -> list[ExpertSpec]:
         ),
         ExpertSpec(
             name="valuation",
+            broad=True,
             prompt_name="expert_valuation",
             tools=("valuation_engine",),
             keywords=("valoracion", "valorar", "dcf", "multiplo", "precio objetivo", "valor razonable",
@@ -29,6 +31,7 @@ def default_experts() -> list[ExpertSpec]:
         ),
         ExpertSpec(
             name="risk",
+            broad=True,
             prompt_name="expert_risk",
             tools=("risk_events", "portfolio_concentration"),
             keywords=("riesgo", "peligro", "concentracion", "deuda", "risk", "downside", "concentration"),

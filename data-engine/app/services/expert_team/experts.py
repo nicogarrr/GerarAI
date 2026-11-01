@@ -49,6 +49,8 @@ class ExpertSpec:
     keywords: tuple[str, ...] = ()
     #: Condición extra del plan (p. ej. fiscal solo con posición).
     applies: Callable[[RunContext], bool] | None = None
+    #: Entra también en preguntas amplias del chat («¿merece la pena X?»).
+    broad: bool = False
 
 
 def basic_citation_check(claim: Claim, ledger: EvidenceLedger, spec: ExpertSpec) -> str:
