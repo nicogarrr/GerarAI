@@ -40,8 +40,8 @@ test('actions preserve structured endpoint copy instead of guessing from substri
     const errorState = globalThis as typeof globalThis & { __authBoundaryEndpointError?: Error };
     for (const [code, message, status] of [
         ['AUTH_ENDPOINT_USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL', 'Este email ya está registrado. Inicia sesión.', 422],
-        ['AUTH_ENDPOINT_ACCOUNT_PENDING', 'Tu cuenta está pendiente de aprobación.', 403],
-        ['AUTH_ENDPOINT_ACCOUNT_REJECTED', 'Tu solicitud de acceso no ha sido aprobada.', 403],
+        ['AUTH_ENDPOINT_ACCOUNT_PENDING', 'Tu cuenta está pendiente de aprobación. Te avisaremos por email cuando esté activa.', 403],
+        ['AUTH_ENDPOINT_ACCOUNT_REJECTED', 'Tu solicitud de acceso no fue aprobada.', 403],
         ['AUTH_ENDPOINT_PASSWORD_TOO_SHORT', 'La contraseña debe tener al menos 8 caracteres.', 400],
         ['AUTH_ENDPOINT_ERROR', 'Demasiados intentos. Espera un momento antes de volver a intentarlo.', 429],
         ['AUTH_UNAVAILABLE', 'El servicio de acceso no está disponible. Inténtalo más tarde.', 503],

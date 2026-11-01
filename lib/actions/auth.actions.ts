@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { callAuthEndpoint } from "@/lib/auth/endpoint";
 import { AuthenticationError, toAppError, getSafeErrorMessage } from "@/lib/types/errors";
 import { getT } from "@/lib/i18n/server";
+import { authEndpointErrorMessage } from "@/lib/auth/endpoint-messages";
 
 export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData): Promise<{ success: boolean; error?: string; accountStatus?: string }> => {
     const t = await getT();
@@ -24,10 +25,10 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
         return { success: true, ...(response.accountStatus ? { accountStatus: response.accountStatus } : {}) };
     } catch (error: unknown) {
         const appError = toAppError(error);
-        // The endpoint maps documented status/code pairs to safe Spanish copy.
+        // The endpoint maps documented status/code pairs to safe copy (chosen language).
         // Do not reinterpret that structured result by English substrings.
         if (appError.code.startsWith('AUTH_ENDPOINT_') || appError.code === 'AUTH_UNAVAILABLE') {
-            return { success: false, error: getSafeErrorMessage(appError) };
+            return { success: false, error: authEndpointErrorMessage(appError, t, getSafeErrorMessage(appError)) };
         }
 
 
@@ -72,7 +73,7 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
         return { success: true };
     } catch (error: unknown) {
         const appError = toAppError(error);
-        // The endpoint maps documented status/code pairs to safe Spanish copy.
+        // The endpoint maps documented status/code pairs to safe copy (chosen language).
         // Do not reinterpret that structured result by English substrings.
         if (appError.code.startsWith('AUTH_ENDPOINT_') || appError.code === 'AUTH_UNAVAILABLE') {
             // Código estable para el front solo donde el contrato lo pide
@@ -85,7 +86,7 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
                     : undefined;
             return {
                 success: false,
-                error: getSafeErrorMessage(appError),
+                error: authEndpointErrorMessage(appError, t, getSafeErrorMessage(appError)),
                 ...(stableCode ? { code: stableCode } : {}),
             };
         }
