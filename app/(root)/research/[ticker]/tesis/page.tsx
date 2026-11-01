@@ -150,13 +150,13 @@ function ThesisToc({ items, variant, t }: { items: TocItem[]; variant: 'aside' |
           {t('research.thesisDoc.tocToggle')}
           <ChevronDown aria-hidden="true" className="h-4 w-4 text-gray-500 transition-transform group-open:rotate-180" />
         </summary>
-        <nav aria-label="Índice de la tesis" className="border-t border-gray-800 px-1 py-2">{list}</nav>
+        <nav aria-label={t('research.thesisDoc.tocAria')} className="border-t border-gray-800 px-1 py-2">{list}</nav>
       </details>
     );
   }
   return (
     <aside className="hidden print:hidden lg:block">
-      <nav aria-label="Índice de la tesis" className="sticky top-[calc(var(--shell-top)+1.5rem)]">
+      <nav aria-label={t('research.thesisDoc.tocAria')} className="sticky top-[calc(var(--shell-top)+1.5rem)]">
         <p className="px-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{t('research.thesisDoc.tocTitle')}</p>
         <div className="mt-2 border-l border-gray-800 pl-2">{list}</div>
       </nav>
@@ -283,7 +283,7 @@ export default async function ThesisReadingPage({ params }: PageProps) {
         <div className="mx-auto max-w-[40rem]">
           <Link href={`/research/${encoded}?view=thesis`} className="text-sm text-teal-300 underline">{t('research.thesisDoc.backToFicha', { ticker })}</Link>
           <h1 className="mt-8 text-3xl text-gray-50">{ticker} · {name}</h1>
-          <WithheldThesisText thesis={displayedVersion} model={snapshot?.model_summary} />
+          <WithheldThesisText thesis={displayedVersion} model={snapshot?.model_summary} locale={locale} />
           <p className="mt-4 text-sm leading-6 text-gray-400">{t('research.thesisDoc.withheldNote')}</p>
           {/*
               Salida del callejón (auditoría 29-oct-2026): la nota de archivo

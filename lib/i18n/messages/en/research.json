@@ -976,7 +976,8 @@
     "basisUndocumented": "Basis not documented",
     "sourceAria": "Source {n} for {label}: {host} (opens in a new tab)",
     "evidenceScores": "Evidence quality: data confidence {data}/100 · source coverage {sources}/100 · red team {redTeam}/100.",
-    "disclaimer": "Informational research document. It isn't financial advice or a recommendation to buy or sell."
+    "disclaimer": "Informational research document. It isn't financial advice or a recommendation to buy or sell.",
+    "tocAria": "Thesis contents"
   },
   "sourcesPage": {
     "typeManualUpload": "Manual upload",
@@ -1678,5 +1679,26 @@
     "valoracion": "Valuation",
     "seguimiento": "Tracking",
     "fuentes": "Sources"
+  },
+  "ttm": {
+    "empty": "No saved quarters or fiscal years to calculate TTM. Refresh the financials (SEC) to pull in the 10-Qs.",
+    "basisTtm": "TTM (last 4 quarters)",
+    "basisFy": "FY (latest fiscal year)",
+    "basisQ": "Latest quarter",
+    "noData": "No data",
+    "provOfficial": "OFFICIAL",
+    "provInferred": "INFERRED",
+    "periodUntil": "{label} · through {date}",
+    "periodClose": "{label} · period ended {date}",
+    "quarterQ4Inferred": "{date} (Q4 = FY − 9 months, inferred)",
+    "quarterCumulativeInferred": "{date} (year-to-date minus prior quarters, inferred)",
+    "sumOf": "Sum of: {quarters}"
+  },
+  "thesisWithheld": {
+    "dated": "Archived text from v{version}, generated on {date}: summary and figures withheld because {reason}. They are not presented as current analysis; the original is kept on file.",
+    "undated": "Archived text from v{version}, with no verified generation date: summary and figures withheld because {reason}. They are not presented as current analysis; the original is kept on file.",
+    "reasonNotPublic": "the thesis is neither published nor approved",
+    "reasonNotPublishable": "the model is not publishable",
+    "reasonUnverified": "the model could not be verified as publishable"
   }
 }
