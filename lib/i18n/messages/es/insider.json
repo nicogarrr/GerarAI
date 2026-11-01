@@ -135,5 +135,20 @@
     "canadaSourcePost": " (consulta manual)",
     "sideBuyLabel": "Compra",
     "sideSellLabel": "Venta"
+  },
+  "statusCopy": {
+    "reason": {
+      "secBlocksDatacenter": "la SEC rechaza las consultas automáticas desde este servidor (HTTP 403)",
+      "secRateLimited": "la SEC limitó las peticiones; reintenta en un minuto",
+      "sourceUnavailable": "la fuente no respondió"
+    },
+    "degradedCounts": "{ticker}: SEC EDGAR no devolvió ningún Form 4 legible ({failed} con error de {scanned} escaneados).",
+    "degradedGeneric": "{ticker}: no se pudieron consultar o leer las señales Form 4 de SEC EDGAR.",
+    "readableOfScanned": "{parsed} legibles de {scanned} escaneados",
+    "analyzed": "{count} analizados",
+    "durableReadFailed": "No se ha podido leer el histórico de filings guardados por el monitor, así que su número es desconocido y no cero: es un fallo de esa lectura, no una ausencia de Form 4. Las señales de arriba se leen de SEC EDGAR directamente y no dependen de ese histórico.",
+    "noDate": "s/d",
+    "persistedOf": "{ticker}: {count} de {scanned} Form 4 desde filings persistidos (último filing: {latest}); la lectura en vivo de SEC EDGAR falló. Los datos son los de esos filings, no de hoy.",
+    "persisted": "{ticker}: {count} Form 4 desde filings persistidos (último filing: {latest}); la lectura en vivo de SEC EDGAR falló. Los datos son los de esos filings, no de hoy."
   }
 }

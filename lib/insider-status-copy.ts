@@ -12,6 +12,17 @@
 
 // @ts-expect-error TS5097: extension explicita para node --experimental-strip-types (guards).
 import { plural } from './utils/plural.ts';
+// @ts-expect-error TS5097
+import { createTranslator } from './i18n/translate.ts';
+import type { Locale } from './i18n/locale.ts';
+
+/** Inglés (Ajustes → Idioma): misma lógica, copia en insider.statusCopy.*. */
+const tEn = () => createTranslator('en');
+const REASON_KEY = {
+    sec_bloquea_datacenter: 'insider.statusCopy.reason.secBlocksDatacenter',
+    sec_limita_peticiones: 'insider.statusCopy.reason.secRateLimited',
+    fuente_no_disponible: 'insider.statusCopy.reason.sourceUnavailable',
+} as const;
 
 export type InsiderStatusFields = {
     reason?: unknown;
@@ -36,8 +47,9 @@ const REASON_COPY: Record<string, string> = {
 
 /** Detalle apto para usuario: códigos conocidos en español; cualquier otra
  *  cadena (nombres de excepción, trazas) no se muestra nunca (F30). */
-export function reasonCopy(reason: unknown): string | null {
+export function reasonCopy(reason: unknown, locale: Locale = 'es'): string | null {
     if (typeof reason !== 'string' || !reason) return null;
+    if (locale === 'en') return Object.hasOwn(REASON_KEY, reason) ? tEn()(REASON_KEY[reason as keyof typeof REASON_KEY]) : null;
     return Object.hasOwn(REASON_COPY, reason) ? REASON_COPY[reason] : null;
 }
 
@@ -45,9 +57,16 @@ export function degradedCopy(
     ticker: string,
     fields: InsiderStatusFields,
     countText: CountText,
+    locale: Locale = 'es',
 ): { header: string; detail: string | null } {
     const scanned = asNumber(fields.filings_scanned);
     const failed = asNumber(fields.filings_failed);
+    if (locale === 'en') {
+        const header = scanned !== null && failed !== null
+            ? tEn()('insider.statusCopy.degradedCounts', { ticker, failed: countText(failed), scanned: countText(scanned) })
+            : tEn()('insider.statusCopy.degradedGeneric', { ticker });
+        return { header, detail: reasonCopy(fields.reason, locale) };
+    }
     // Con contadores sabemos que se escanearon Form 4 y todos fallaron; con
     // reason sola (catch global) el fallo pudo ser ANTES de consultar filings
     // (CIK, listado), asi que la cabecera abarca consulta y lectura.
@@ -62,9 +81,16 @@ export function analyzedCountCopy(
     status: string,
     fields: InsiderStatusFields,
     countText: CountText,
+    locale: Locale = 'es',
 ): string {
     const scanned = asNumber(fields.filings_scanned);
     const parsed = asNumber(fields.filings_parsed);
+    if (locale === 'en') {
+        if (status === 'partial' && scanned !== null && parsed !== null) {
+            return tEn()('insider.statusCopy.readableOfScanned', { parsed: countText(parsed), scanned: countText(scanned) });
+        }
+        return tEn()('insider.statusCopy.analyzed', { count: countText(fields.filings_scanned) });
+    }
     if (status === 'partial' && scanned !== null && parsed !== null) {
         return `${plural(parsed, 'legible', 'legibles')} de ${plural(scanned, 'escaneado', 'escaneados')}`;
     }
@@ -85,11 +111,11 @@ export function analyzedCountCopy(
  * importa lo segundo: las señales de arriba se leen de SEC EDGAR directamente y
  * no dependen de ese histórico.
  */
-export function durableReadCopy(fields: InsiderStatusFields): {
+export function durableReadCopy(fields: InsiderStatusFields, locale: Locale = 'es'): {
     header: string;
     detail: string | null;
 } {
-    const header =
+    const header = locale === 'en' ? tEn()('insider.statusCopy.durableReadFailed') :
         'No se ha podido leer el histórico de filings guardados por el monitor, así que su número es ' +
         'desconocido y no cero: es un fallo de esa lectura, no una ausencia de Form 4. Las señales de ' +
         'arriba se leen de SEC EDGAR directamente y no dependen de ese histórico.';
@@ -107,10 +133,18 @@ export function persistedSourceCopy(
     ticker: string,
     fields: InsiderStatusFields,
     countText: CountText,
+    locale: Locale = 'es',
 ): string | null {
     const fromPersisted = asNumber(fields.filings_from_persisted);
     if (fromPersisted === null || fromPersisted <= 0) return null;
     const scanned = asNumber(fields.filings_scanned);
+    if (locale === 'en') {
+        const latestEn = typeof fields.latest_persisted_filing_date === 'string' && fields.latest_persisted_filing_date
+            ? fields.latest_persisted_filing_date : tEn()('insider.statusCopy.noDate');
+        return scanned !== null
+            ? tEn()('insider.statusCopy.persistedOf', { ticker, count: countText(fromPersisted), scanned: countText(scanned), latest: latestEn })
+            : tEn()('insider.statusCopy.persisted', { ticker, count: countText(fromPersisted), latest: latestEn });
+    }
     const latest =
         typeof fields.latest_persisted_filing_date === 'string' && fields.latest_persisted_filing_date
             ? fields.latest_persisted_filing_date
