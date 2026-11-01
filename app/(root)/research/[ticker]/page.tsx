@@ -1375,6 +1375,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             <ThesisMemo
               thesis={data.thesis}
               ticker={ticker}
+              locale={locale}
               currency={company.currency}
               model={snapshot?.model_summary}
               extraSections={data.sections.filter((section) => section.section_key !== 'thesis_debate')}

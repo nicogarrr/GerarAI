@@ -21,7 +21,8 @@ test('render is fail-closed: only a verified official source counts as reportado
   assert.match(item, /f\.oficial && !!f\.fecha/);
   assert.match(memo, /isVerifiedOficial\(item\)\) === group\.key/);
   assert.match(groups, /verified \? 'reportado' : 'sin_verificar'/);
-  assert.match(memo, /Base no documentada/);
+  assert.match(memo, /basis \?\? t\('research\.memo\.basisUndocumented'\)/);
+  assert.match(readFileSync('lib/i18n/messages/es/research.json', 'utf8'), /"basisUndocumented": "Base no documentada"/);
 });
 
 test('basis texts are Spanish', () => {

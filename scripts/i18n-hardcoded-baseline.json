@@ -154,7 +154,7 @@
   "components/research/ThesisHumanInputForm.tsx": 9,
   "components/research/ThesisInvalidationRulesForm.tsx": 11,
   "components/research/ThesisMarkdownPager.tsx": 5,
-  "components/research/ThesisMemo.tsx": 51,
+  "components/research/ThesisMemo.tsx": 12,
   "components/research/ThesisScenariosPanel.tsx": 6,
   "components/research/ThesisSummary.tsx": 5,
   "components/research/TtmPanel.tsx": 2,
