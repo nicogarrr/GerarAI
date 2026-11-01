@@ -10,7 +10,7 @@ import {
     getManualDemoValuation,
     placeManualOrder,
 } from '@/lib/actions/manual-demo.actions';
-import { getManualDemoHistory } from '@/lib/actions/manual-demo-history.actions';
+import { getManualDemoHistory } from '@/lib/actions/manual-demo.actions';
 import type { RefreshResult } from '@/components/paper-trading/ManualDemoPanel';
 import { getT } from '@/lib/i18n/server';
 import type { DemoValuation } from '@/lib/market/demo-valuation';

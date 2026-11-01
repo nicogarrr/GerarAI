@@ -7,13 +7,20 @@ const { requireAuthenticatedUser, connectToDatabase, tradeFind } = vi.hoisted(()
 }));
 vi.mock('@/lib/auth/require-user', () => ({ requireAuthenticatedUser }));
 vi.mock('@/database/mongoose', () => ({ connectToDatabase }));
+vi.mock('@/lib/paper-trading/accounting', () => ({ computeManualDemoAccount: vi.fn() }));
+vi.mock('@/lib/paper-trading/ledger-adapter', () => ({ docsToLedger: vi.fn(() => ({ entries: [], violations: [] })) }));
+vi.mock('@/lib/market/quote-cache', () => ({
+    createQuoteCache: () => ({ getQuote: vi.fn() }),
+    combineAbortSignals: (s: AbortSignal) => s,
+}));
+vi.mock('@/lib/market/quote-freshness', () => ({ sanitizeFinnhubQuote: (q: unknown) => q }));
 vi.mock('@/database/models/manual-demo.model', () => ({
     MANUAL_DEMO_STARTING_CASH_EUR: 100000,
     ManualDemoTrade: { find: tradeFind },
 }));
 
 import { Types } from 'mongoose';
-import { getManualDemoHistory } from '@/lib/actions/manual-demo-history.actions';
+import { getManualDemoHistory } from '@/lib/actions/manual-demo.actions';
 
 const doc = (id: string, createdAtMs: number) => ({
     _id: new Types.ObjectId(id.padEnd(24, '0').slice(0, 24)),

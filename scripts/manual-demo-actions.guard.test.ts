@@ -897,12 +897,12 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* Historial PAGINADO (manual-demo-history.actions): keyset cursor     */
+/* Historial PAGINADO (getManualDemoHistory, en manual-demo.actions):  */
 /* (createdAt, _id), autorización por página, empates, concurrencia.   */
 /* ------------------------------------------------------------------ */
 
 // @ts-expect-error TS5097: la extensión .ts explícita la exige node --experimental-strip-types.
-const historyActions = await import('../lib/actions/manual-demo-history.actions.ts');
+const historyActions = await import('../lib/actions/manual-demo.actions.ts');
 
 type HistoryPage =
     | { ok: true; orders: Array<{ clientOrderId: string; status: string; fillPrice: number | null; rejectReason: string | null }>; hasMore: boolean; nextBefore: string | null }
