@@ -47,7 +47,7 @@
   "components/proPicks/category-display.ts": 12,
   "components/proPicks/DcaBacktestPanel.tsx": 2,
   "components/proPicks/gemsFormat.ts": 3,
-  "components/proPicks/monthlyRebalance.ts": 7,
+  "components/proPicks/monthlyRebalance.ts": 10,
   "components/research/BrainAskForm.tsx": 1,
   "components/research/CompanyHeaderQuote.tsx": 6,
   "components/research/CompanyHeaderQuoteSkeleton.tsx": 2,

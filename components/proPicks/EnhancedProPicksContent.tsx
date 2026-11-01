@@ -11,6 +11,7 @@ import { generateEnhancedProPicksWithRun, type ProPick } from '@/lib/actions/pro
 import { generateFunnelRunNow } from '@/lib/actions/propicks-funnel.actions';
 import { allNeutralCategory, categoryDisplay } from '@/lib/propicks/category-display';
 import { CATEGORY_KEYS, categoryNeutralNote } from './category-display';
+import { reasonDisplayText } from './monthlyRebalance';
 import { addToWatchlist } from '@/lib/actions/watchlist.actions';
 import { etiquetaSector } from '@/lib/labels';
 import { useFormat, useLocale, useT } from '@/lib/i18n/client';
@@ -401,9 +402,9 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                     {pick.confidenceReasons.length > 0 && (
                                         <div className="space-y-1.5 mb-3">
                                             {pick.confidenceReasons.slice(0, 3).map((reason, reasonIndex) => (
-                                                <div key={reasonIndex} className="flex min-w-0 items-start gap-2 text-xs text-gray-300" title={`Dato verificado: ${reason.metric} = ${reason.value}`}>
+                                                <div key={reasonIndex} className="flex min-w-0 items-start gap-2 text-xs text-gray-300" title={`${t('propicks.rebalance.verifiedTitle')}: ${reason.metric} = ${reason.value}`}>
                                                     <TrendingUp aria-hidden="true" className="h-3 w-3 text-teal-400 flex-shrink-0 mt-0.5" />
-                                                    <span className="line-clamp-1 min-w-0 break-words">{reason.text}</span>
+                                                    <span className="line-clamp-1 min-w-0 break-words">{reasonDisplayText(reason.text, locale)}</span>
                                                 </div>
                                             ))}
                                         </div>

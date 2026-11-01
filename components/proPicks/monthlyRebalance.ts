@@ -217,8 +217,49 @@ export function reasonDisplayText(text: string, locale: Locale = 'es'): string {
         const level = CONFIDENCE_EN[score[2].trim().toLowerCase()] ?? score[2];
         return `Score ${score[1]}/100 with ${level} confidence`;
     }
+    for (const [pattern, render] of SIGNAL_REASONS_EN) {
+        const m = pattern.exec(text);
+        if (m) return render(m);
+    }
     return text;
 }
+
+/** Cifra es-ES («12.345,6», «+4,2») en formato en-US («12,345.6», «+4.2»). */
+function esToEnNumber(value: string): string {
+    return value.replace(/\./g, '\u0007').replace(/,/g, '.').replace(/\u0007/g, ',');
+}
+
+const REGIME_EN: Record<string, string> = {
+    'pánico': 'panic',
+    'aversión al riesgo alta': 'high risk aversion',
+    'tensión moderada': 'moderate stress',
+    'complacencia/calma': 'complacency/calm',
+};
+
+const n = esToEnNumber;
+const pluralEn = (count: string, one: string, many: string) => `${n(count)} ${count === '1' ? one : many}`;
+
+/**
+ * Motivos del embudo (lib/actions/propicks-funnel.actions.ts) y detalle de las
+ * señales de mercado (lib/utils/propicksSignals.ts). El valor crudo «(valor X)»
+ * se conserva tal cual (regla R5 de trazabilidad).
+ */
+const SIGNAL_REASONS_EN: Array<[RegExp, (m: RegExpExecArray) => string]> = [
+    [/^Marco de calidad (\d+)\/(\d+) criterios superados según fundamentales auditados$/,
+        (m) => `Quality framework: ${m[1]}/${m[2]} criteria passed on audited fundamentals`],
+    [/^CFROI (\S+) % vs WACC (\S+) %: spread de (\S+) puntos$/,
+        (m) => `CFROI ${n(m[1])}% vs WACC ${n(m[2])}%: spread of ${n(m[3])} points`],
+    [/^Ingresos creciendo al (\S+) % anual \(5 años\)$/, (m) => `Revenue growing ${n(m[1])}% a year (5 years)`],
+    [/^Margen FCF medio del (\S+) % \(5 años\)$/, (m) => `Average FCF margin of ${n(m[1])}% (5 years)`],
+    [/^Sorpresa media de beneficios (\S+) % en (\S+) trimestres? hasta (.+) \(valor (\S+)\)$/,
+        (m) => `Average earnings surprise ${n(m[1])}% over ${pluralEn(m[2], 'quarter', 'quarters')} through ${m[3]} (value ${m[4]})`],
+    [/^Compra neta insider: (\S+) compras? frente a (\S+) ventas? en 90 días hasta (.+) \(valor (\S+)\)$/,
+        (m) => `Net insider buying: ${pluralEn(m[1], 'buy', 'buys')} vs ${pluralEn(m[2], 'sale', 'sales')} in 90 days through ${m[3]} (value ${m[4]})`],
+    [/^Interés en corto FINRA de (\S+) acciones a (.+) \(valor (\S+)\)$/,
+        (m) => `FINRA short interest of ${n(m[1])} shares as of ${m[2]} (value ${m[3]})`],
+    [/^VIX en (\S+) el (\S+) \(régimen de (.+)\) \(valor (\S+)\)$/,
+        (m) => `VIX at ${n(m[1])} on ${m[2]} (${REGIME_EN[m[3]] ?? m[3]} regime) (value ${m[4]})`],
+];
 
 export function toSnapshotPick(pick: ProPick): SnapshotPick {
     return {
