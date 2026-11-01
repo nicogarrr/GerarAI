@@ -4,7 +4,12 @@
 // @ts-expect-error TS5097
 import { redactSecretsInText } from '../upstream/redact.ts';
 // @ts-expect-error TS5097
-import { spanishBackendMessage } from '../research/backend-error-es.ts';
+import { backendMessage } from '../research/backend-error-es.ts';
+// @ts-expect-error TS5097
+import { DEFAULT_LOCALE, type Locale } from '../i18n/locale.ts';
+import type { TranslationKey } from '../i18n/t.ts';
+// @ts-expect-error TS5097
+import { createTranslator } from '../i18n/translate.ts';
 /**
  * Tipos centralizados para manejo de errores
  * Reemplaza el uso de 'any' en catch blocks
@@ -284,40 +289,36 @@ export function classifyError(error: unknown): ErrorCause {
 }
 
 /** Traducciones de mensajes backend/cliente habituales al español */
-const MESSAGE_TRANSLATIONS: Array<[RegExp, string]> = [
-  [/^a valid ticker is required$/i, 'Introduce un ticker válido.'],
-  [/^invalid alert id$/i, 'Identificador de alerta no válido.'],
-  [/^authentication failed$/i, 'Necesitas iniciar sesión para continuar.'],
-  [/^access denied$/i, 'No tienes permiso para esta operación.'],
-  [/^rate limit exceeded$/i, 'Demasiadas peticiones. Espera un momento y reintenta.'],
-  [/^an unexpected error occurred$/i, 'Ha ocurrido un error inesperado.'],
-  [/^an unknown error occurred$/i, 'Ha ocurrido un error inesperado.'],
-  [/unexpected response/i, 'El motor de análisis no responde ahora mismo.'],
+const MESSAGE_TRANSLATIONS: Array<[RegExp, TranslationKey]> = [
+  [/^a valid ticker is required$/i, 'errors.friendly.invalidTicker'],
+  [/^invalid alert id$/i, 'errors.friendly.invalidAlertId'],
+  [/^authentication failed$/i, 'errors.friendly.signIn'],
+  [/^access denied$/i, 'errors.friendly.forbidden'],
+  [/^rate limit exceeded$/i, 'errors.friendly.rateLimit'],
+  [/^an unexpected error occurred$/i, 'errors.friendly.unexpected'],
+  [/^an unknown error occurred$/i, 'errors.friendly.unexpected'],
+  [/unexpected response/i, 'errors.friendly.engineDown'],
 ];
 
-const DEFAULT_UNKNOWN_MESSAGE = 'No se pudo completar la operación. Inténtalo de nuevo.';
-
 /**
- * Mensaje de error en español y accionable para toasts:
- * - `stale` → "nueva versión, recarga".
- * - `offline` → "motor no disponible, reintenta".
- * - `duplicate` → "ya sigues este ticker" (o `options.duplicateMessage`).
- * - resto → traducción del mensaje de negocio o fallback genérico
- *   (el detalle crudo queda en consola para depurar).
+ * Mensaje de error para la UI en el idioma elegido (Ajustes → Idioma). Sin
+ * `locale` queda en español, como siempre.
  */
 export function getFriendlyErrorMessage(
   error: unknown,
-  options: { duplicateMessage?: string } = {},
+  options: { duplicateMessage?: string; locale?: Locale } = {},
 ): string {
+  const locale = options.locale ?? DEFAULT_LOCALE;
+  const t = createTranslator(locale);
   const cause = classifyError(error);
   if (cause === 'stale') {
-    return 'Hay una nueva versión de la app: recarga la página.';
+    return t('errors.friendly.stale');
   }
   if (cause === 'offline') {
-    return 'El motor de análisis no responde ahora mismo. Reintenta en unos segundos.';
+    return t('errors.friendly.offline');
   }
   if (cause === 'duplicate') {
-    return options.duplicateMessage ?? 'Ya sigues este ticker.';
+    return options.duplicateMessage ?? t('errors.friendly.duplicateTicker');
   }
 
   // Sesión caducada o sin permiso: el mensaje interno ('User not
@@ -326,20 +327,19 @@ export function getFriendlyErrorMessage(
   // crudo a un toast.
   if (cause === 'auth' && error instanceof AppError) {
     return error.code === 'AUTHORIZATION_ERROR'
-      ? 'No tienes permiso para esta operación.'
-      : 'Necesitas iniciar sesión para continuar.';
+      ? t('errors.friendly.forbidden')
+      : t('errors.friendly.signIn');
   }
 
   const message = getErrorMessage(error);
-  for (const [pattern, replacement] of MESSAGE_TRANSLATIONS) {
-    if (pattern.test(message)) return replacement;
+  for (const [pattern, key] of MESSAGE_TRANSLATIONS) {
+    if (pattern.test(message)) return t(key);
   }
 
   // Textos del motor en inglés («Holding not found», «Tenant context
-  // required»…): traducidos o, si no se conocen, aviso genérico en español.
-  // Antes solo se ocultaban los de más de 12 palabras y «X not found» salía
-  // como «Holding no encontrado».
-  const spanish = spanishBackendMessage(message, DEFAULT_UNKNOWN_MESSAGE);
-  if (spanish !== message) console.error('[error traducido para la UI]', error);
-  return spanish;
+  // required»…): en español, traducidos o aviso genérico; en inglés, la frase
+  // legible del motor o un aviso genérico en inglés.
+  const shown = backendMessage(message, locale, t('errors.friendly.unknown'));
+  if (shown !== message) console.error('[error traducido para la UI]', error);
+  return shown;
 }

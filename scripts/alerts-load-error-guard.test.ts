@@ -23,7 +23,7 @@ test('el alta offline se reintenta inline dentro del diálogo, sin toast acciona
     // El catch del alta clasifica: offline -> estado inline; resto -> toast
     // informativo sin acción (duplicados, validación de servidor...).
     assert.match(source, /classifyError\(error\) === 'offline'/);
-    assert.match(source, /setCreateError\(getFriendlyErrorMessage\(error\)\)/);
+    assert.match(source, /setCreateError\(getFriendlyErrorMessage\(error, \{ locale \}\)\)/);
     // La región inline es un role=alert enfocable con su propio Reintentar
     // que relanza el alta; se limpia al reintentar y al cerrar el diálogo.
     assert.match(source, /role="alert"/);

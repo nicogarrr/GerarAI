@@ -1,5 +1,6 @@
 'use server';
 
+import { requestLocale } from '@/lib/research/backend-error-locale';
 import { revalidatePath } from 'next/cache';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest } from '@/lib/research/client';
@@ -32,7 +33,7 @@ export async function startDcaManualJob(): Promise<DcaMutationResult & { runId?:
         const receipt = await researchRequest<{ run_id: number }>('/api/watchlist/dca-signals/evaluate-async', { method: 'POST' });
         return { success: true, runId: receipt.run_id };
     } catch (error) {
-        return { success: false, code: classifyError(error), message: getFriendlyErrorMessage(error) };
+        return { success: false, code: classifyError(error), message: getFriendlyErrorMessage(error, { locale: await requestLocale() }) };
     }
 }
 
@@ -45,7 +46,7 @@ export async function getDcaManualJob(runId: number): Promise<DcaMutationResult 
         return { success: true, status: result.status, summary: result.summary ?? undefined,
             message: result.status === 'error' ? 'La evaluación falló. Revisa el estado en la watchlist.' : undefined };
     } catch (error) {
-        return { success: false, code: classifyError(error), message: getFriendlyErrorMessage(error) };
+        return { success: false, code: classifyError(error), message: getFriendlyErrorMessage(error, { locale: await requestLocale() }) };
     }
 }
 
@@ -104,6 +105,6 @@ export async function getDcaBacktest(input: {
         return { data, error: null };
     } catch (error) {
         console.error('getDcaBacktest error:', error);
-        return { data: null, error: getFriendlyErrorMessage(error) };
+        return { data: null, error: getFriendlyErrorMessage(error, { locale: await requestLocale() }) };
     }
 }

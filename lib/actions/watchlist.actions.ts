@@ -1,5 +1,6 @@
 'use server';
 
+import { requestLocale } from '@/lib/research/backend-error-locale';
 import type { TrackedAnalysisStatus } from '@/lib/tracked-analysis-status';
 import type { components } from '@/lib/research/openapi.generated';
 import { revalidatePath } from 'next/cache';
@@ -29,11 +30,11 @@ export interface WatchlistMutationResult {
     message?: string;
 }
 
-function failure(error: unknown): WatchlistMutationResult {
+function failure(error: unknown, locale: 'es' | 'en' = 'es'): WatchlistMutationResult {
     return {
         success: false,
         code: classifyError(error),
-        message: getFriendlyErrorMessage(error, { duplicateMessage: 'Ya sigues este ticker.' }),
+        message: getFriendlyErrorMessage(error, { locale }),
     };
 }
 
@@ -88,7 +89,7 @@ export async function addToWatchlist(symbol: string, company?: string): Promise<
         return { success: true };
     } catch (error) {
         console.error('addToWatchlist error:', error);
-        return failure(error);
+        return failure(error, await requestLocale());
     }
 }
 
@@ -127,7 +128,7 @@ export async function removeFromWatchlist(symbol: string): Promise<WatchlistMuta
         return { success: true };
     } catch (error) {
         console.error('removeFromWatchlist error:', error);
-        return failure(error);
+        return failure(error, await requestLocale());
     }
 }
 /**

@@ -219,7 +219,7 @@ function AlertsManager() {
             if (classifyError(error) === 'offline') {
                 // Superficie inline: el reintento debe ser alcanzable con
                 // teclado y no puede cerrar el diálogo al pulsarse.
-                setCreateError(getFriendlyErrorMessage(error));
+                setCreateError(getFriendlyErrorMessage(error, { locale }));
             } else {
                 showErrorToast(error, {
                     duplicateMessage: ti('alerts.errors.duplicate'),
