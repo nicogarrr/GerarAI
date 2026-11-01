@@ -204,3 +204,34 @@ def test_headline_of_other_company_under_tracked_ticker_makes_no_alert(db):
     _news(db, t1, a, "Novo Nordisk filing shows new obesity data", "https://publisher.example/novo")
     db.info["tenant_id"] = t1.id
     assert evaluate(db, now=NOW)["created"] == 0
+
+
+def test_alert_in_english_for_user_with_english_saved(db, monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
+    get_settings.cache_clear()
+    try:
+        t1, t2, a, b = _setup(db)
+        t1.metadata_ = {"language": "en"}
+        db.commit()
+        _news(db, t1, a, "ASTS ITU filing submitted", "https://publisher.example/asts")
+        _news(db, t2, a, "ASTS acquisition report", "https://publisher.example/other")
+        db.info["tenant_id"] = t1.id
+        evaluate(db, now=NOW)
+        english = db.scalars(select(ResearchAlert)).one()
+        db.info["tenant_id"] = t2.id
+        evaluate(db, now=NOW)
+        spanish = db.scalars(select(ResearchAlert)).one()
+        assert english.title == "News about ASTS: ASTS ITU filing submitted"
+        assert english.message == (
+            "Article from publisher.example, dated 2026-09-27 by publisher.example: ASTS ITU filing submitted. "
+            "Check the source; the GDELT date is not the publication date and the headline alone does not confirm the facts."
+        )
+        assert english.metadata_["language"] == "en"
+        assert spanish.title == "Noticia sobre ASTS: ASTS acquisition report"
+        assert spanish.message.startswith("Artículo de publisher.example, fechada el 2026-09-27 por publisher.example")
+        assert "language" not in spanish.metadata_
+    finally:
+        monkeypatch.delenv("I18N_GENERATION_ENABLED")
+        get_settings.cache_clear()
