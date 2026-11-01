@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AutoscaleInfo, IChartApi, IPriceLine, ISeriesApi, ISeriesMarkersPluginApi, SeriesMarker, Time, UTCTimestamp } from 'lightweight-charts';
 import type { CompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
-import { formatMarketDate, formatMoney, formatNumber, isValidCurrencyCode } from '@/lib/format';
+import { isValidCurrencyCode, type Formatters } from '@/lib/format';
+import { useFormat, useT } from '@/lib/i18n/client';
+import { intlLocale } from '@/lib/i18n/locale';
+import type { TranslateFn } from '@/lib/i18n/translate';
+import type { TranslationKey } from '@/lib/i18n/t';
 import { getCompanyChartHistory, type CompanyChartHistory, type CompanyChartBar } from '@/lib/actions/company-chart.actions';
 import MobileCollapse from '@/components/ui/mobile-collapse';
 import { TRADINGVIEW_URL } from '@/lib/market/candles';
@@ -11,14 +15,36 @@ import { CHART_RANGES, type CompanyChartRange } from '@/lib/market/chart-ranges'
 import { normalizeChartPriceUnits } from '@/lib/market/chart-price-units';
 import { adx, cleanBars, dailyPivots, fibonacci, rangeBars, sma, structure } from '@/lib/market/technical';
 import { getChartEvents, type ChartEvents } from '@/lib/actions/price-events.actions';
-import { availableIndicators, barsSince, detectMovements, eventsInRange, movementEvents, indicatorSeries, INDICATOR_LABELS, markersByDay, volumeSpikeFlags, type IndicatorKind, type PriceEventKind } from '@/lib/market/price-events';
+import { availableIndicators, barsSince, detectMovements, eventsInRange, movementEvents, indicatorSeries, INDICATOR_KEYS, markersByDay, volumeSpikeFlags, type IndicatorKind, type PriceEventKind } from '@/lib/market/price-events';
 import { PriceEventsPanel } from '@/components/research/PriceEventsPanel';
 
-function price(value: number, currency: string | null) {
+function price(value: number, currency: string | null, { formatMoney, formatNumber }: Pick<Formatters, 'formatMoney' | 'formatNumber'>) {
     return isValidCurrencyCode(currency) ? formatMoney(value, currency) : formatNumber(value);
 }
 
+/** Etiqueta visible de cada rango (el valor interno sigue en español: «1A», «Máx»). */
+const RANGE_KEYS: Record<CompanyChartRange, TranslationKey> = {
+    '1D': 'research.chart.range1D', '5D': 'research.chart.range5D', '1M': 'research.chart.range1M', '6M': 'research.chart.range6M',
+    YTD: 'research.chart.rangeYTD', '1A': 'research.chart.range1A', '5A': 'research.chart.range5A', 'Máx': 'research.chart.rangeMax',
+};
+
+/** structure() devuelve la palabra española de referencia; aquí se traduce al mostrarla. */
+const TREND_KEYS: Record<ReturnType<typeof structure>, TranslationKey> = {
+    Alcista: 'research.chart.trendUp', Bajista: 'research.chart.trendDown', Mixta: 'research.chart.trendMixed', 'Sin datos': 'research.chart.noData',
+};
+
+function sideKey(close: number, average: number): 'above' | 'below' | 'at' {
+    return close > average ? 'above' : close < average ? 'below' : 'at';
+}
+
+function readingLines(t: TranslateFn, trend: ReturnType<typeof structure>) {
+    return trend === 'Alcista' ? t('research.chart.structureUp') : trend === 'Bajista' ? t('research.chart.structureDown') : t('research.chart.structureMixed');
+}
+
 export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyMarketSnapshot }) {
+    const t = useT();
+    const fmt = useFormat();
+    const { formatMarketDate, formatNumber } = fmt;
     const [retry, setRetry] = useState(0);
     const [range, setRange] = useState<CompanyChartRange>('1M');
     const daily = useMemo(() => normalizeChartPriceUnits(cleanBars(snapshot.history), { ticker: snapshot.ticker, currency: snapshot.currency, candleCurrency: snapshot.historyCurrency }), [snapshot.history, snapshot.ticker, snapshot.currency, snapshot.historyCurrency]);
@@ -66,12 +92,12 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
     const [focusDate, setFocusDate] = useState<string | null>(null);
     const storedEvents = useMemo(() => eventsInRange(eventData?.events ?? [], firstDay, lastDay), [eventData, firstDay, lastDay]);
     // «¿Por qué se movió?»: los días de movimiento fuerte se listan con lo que pasó alrededor.
-    const rangeEvents = useMemo(() => hourly ? storedEvents : eventsInRange([...storedEvents, ...movementEvents(detectMovements(visible), storedEvents)], firstDay, lastDay), [storedEvents, visible, hourly, firstDay, lastDay]);
+    const rangeEvents = useMemo(() => hourly ? storedEvents : eventsInRange([...storedEvents, ...movementEvents(detectMovements(visible), storedEvents, t, fmt.locale)], firstDay, lastDay), [storedEvents, visible, hourly, firstDay, lastDay, t, fmt.locale]);
     const markers = useMemo(() => hourly ? [] : markersByDay(rangeEvents, hiddenKinds), [rangeEvents, hiddenKinds, hourly]);
     const priceLines = useMemo(() => [
-        ...(target != null ? [{ label: 'Objetivo analistas', price: target, color: '#a78bfa' }] : []),
-        ...(averageCost != null ? [{ label: 'Tu precio medio', price: averageCost, color: '#fbbf24' }] : []),
-    ], [target, averageCost]);
+        ...(target != null ? [{ label: t('research.chart.lineTarget'), price: target, color: '#a78bfa' }] : []),
+        ...(averageCost != null ? [{ label: t('research.chart.lineAverageCost'), price: averageCost, color: '#fbbf24' }] : []),
+    ], [target, averageCost, t]);
 
     const levels = useMemo(() => dailyPivots(bars), [bars]);
     const fib = useMemo(() => fibonacci(visible), [visible]);
@@ -80,26 +106,26 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
     const previousAverage = sma(bars.slice(0, -1), 50);
     const strength = adx(bars.slice(-100));
     const last = bars.at(-1);
-    const shortTerm = !last || average == null ? 'Sin datos' : last.close > average ? 'Sobre SMA50' : last.close < average ? 'Bajo SMA50' : 'En SMA50';
-    const slope = average == null || previousAverage == null ? null : average > previousAverage ? 'sube' : average < previousAverage ? 'baja' : 'plana';
+    const shortTerm = !last || average == null ? t('research.chart.noData') : { above: t('research.chart.aboveSma50'), below: t('research.chart.belowSma50'), at: t('research.chart.atSma50') }[sideKey(last.close, average)];
+    const slope = average == null || previousAverage == null ? null : average > previousAverage ? t('research.chart.sma50Rising') : average < previousAverage ? t('research.chart.sma50Falling') : t('research.chart.sma50Flat');
     const chartLevels = daily.currency === visibleCurrency ? levels : [];
     return (
-        <section className="min-w-0 overflow-hidden rounded-xl border border-gray-800 bg-surface-1" data-testid="company-technical-chart" aria-label="Precio y lectura técnica">
+        <section className="min-w-0 overflow-hidden rounded-xl border border-gray-800 bg-surface-1" data-testid="company-technical-chart" aria-label={t('research.chart.sectionAria')}>
             <div className="grid min-w-0 xl:grid-cols-[minmax(0,1fr)_340px]">
                 <div className="min-w-0 p-3 sm:p-5">
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <h2 className="text-sm font-semibold text-gray-200">Precio</h2>
-                        <span className="text-xs text-gray-500">{hourly ? 'Horario (UTC)' : 'Diario'}{visible.at(-1) ? ` · ${formatMarketDate(visible.at(-1)!.date)}` : ''}</span>
+                        <h2 className="text-sm font-semibold text-gray-200">{t('research.chart.price')}</h2>
+                        <span className="text-xs text-gray-500">{hourly ? t('research.chart.hourlyUtc') : t('research.chart.daily')}{visible.at(-1) ? ` · ${formatMarketDate(visible.at(-1)!.date)}` : ''}</span>
                     </div>
-                    {needsRemote && requestState === 'loading' ? <div className="grid h-[280px] place-items-center text-xs text-gray-500 sm:h-[360px]" role="status">Cargando rango {range}</div> : needsRemote && requestState === 'error' ? <div className="grid h-[280px] place-items-center text-sm text-gray-500 sm:h-[360px]" role="alert">No se pudo cargar este rango</div> : <PriceCanvas bars={visible} levels={chartLevels} currency={visibleCurrency} hourly={hourly} indicator={indicatorValues} indicatorLabel={INDICATOR_LABELS[indicator]} spikes={spikes} markers={markers} priceLines={priceLines} focusDate={focusDate} />}
+                    {needsRemote && requestState === 'loading' ? <div className="grid h-[280px] place-items-center text-xs text-gray-500 sm:h-[360px]" role="status">{t('research.chart.loadingRange', { range: t(RANGE_KEYS[range]) })}</div> : needsRemote && requestState === 'error' ? <div className="grid h-[280px] place-items-center text-sm text-gray-500 sm:h-[360px]" role="alert">{t('research.chart.rangeError')}</div> : <PriceCanvas bars={visible} levels={chartLevels} currency={visibleCurrency} hourly={hourly} indicator={indicatorValues} indicatorLabel={t(INDICATOR_KEYS[indicator])} spikes={spikes} markers={markers} priceLines={priceLines} focusDate={focusDate} />}
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex w-full flex-wrap gap-1 sm:w-auto" aria-label="Rango del gráfico">
-                            {CHART_RANGES.map((value) => <button type="button" key={value} disabled={range === value && requestState !== 'error'} aria-pressed={range === value} className={`min-h-11 min-w-11 rounded-md px-1 text-[11px] transition sm:px-3 sm:text-xs ${range === value ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { if (range === value) setRetry((count) => count + 1); setRequestState(value === '1D' || value === '5D' || value === '5A' || value === 'Máx' ? 'loading' : 'ready'); setSinceBuy(false); setRange(value); }}>{value}</button>)}
-                            {eventData?.firstBuyDate ? <button type="button" aria-pressed={sinceBuy} className={`min-h-11 rounded-md px-2 text-[11px] transition sm:px-3 sm:text-xs ${sinceBuy ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { setSinceBuy(true); if (range !== 'Máx') { setRequestState('loading'); setRange('Máx'); } }}>Desde compra</button> : null}
+                        <div className="flex w-full flex-wrap gap-1 sm:w-auto" aria-label={t('research.chart.rangeAria')}>
+                            {CHART_RANGES.map((value) => <button type="button" key={value} disabled={range === value && requestState !== 'error'} aria-pressed={range === value} className={`min-h-11 min-w-11 rounded-md px-1 text-[11px] transition sm:px-3 sm:text-xs ${range === value ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { if (range === value) setRetry((count) => count + 1); setRequestState(value === '1D' || value === '5D' || value === '5A' || value === 'Máx' ? 'loading' : 'ready'); setSinceBuy(false); setRange(value); }}>{t(RANGE_KEYS[value])}</button>)}
+                            {eventData?.firstBuyDate ? <button type="button" aria-pressed={sinceBuy} className={`min-h-11 rounded-md px-2 text-[11px] transition sm:px-3 sm:text-xs ${sinceBuy ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { setSinceBuy(true); if (range !== 'Máx') { setRequestState('loading'); setRange('Máx'); } }}>{t('research.chart.sinceBuy')}</button> : null}
                         </div>
                         <a href={TRADINGVIEW_URL} target="_blank" rel="noreferrer" className="inline-flex min-h-11 min-w-11 items-center text-[10px] text-gray-500 underline">TradingView</a>
                     </div>
-                    {visible.length > 0 ? <p className="mt-1 text-[11px] text-gray-500">{formatMarketDate(visible[0].date)} – {formatMarketDate(visible.at(-1)!.date)} · {visible.length} {hourly ? 'velas horarias' : 'sesiones'}{range === 'Máx' ? ' · Máximo disponible del proveedor' : ''}{hourly ? ' · Ventana sobre la última vela disponible' : ''}</p> : null}
+                    {visible.length > 0 ? <p className="mt-1 text-[11px] text-gray-500">{formatMarketDate(visible[0].date)} – {formatMarketDate(visible.at(-1)!.date)} · {hourly ? t('research.chart.hourlyBars', { count: visible.length }) : t('research.chart.sessions', { count: visible.length })}{range === 'Máx' ? ` · ${t('research.chart.providerMax')}` : ''}{hourly ? ` · ${t('research.chart.lastBarWindow')}` : ''}</p> : null}
                     <PriceEventsPanel
                         events={rangeEvents}
                         hiddenKinds={hiddenKinds}
@@ -109,29 +135,31 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                         indicator={indicator}
                         onIndicator={setIndicatorChoice}
                         hourly={hourly}
+                        t={t}
+                        formatMarketDate={formatMarketDate}
                     />
                 </div>
-                <MobileCollapse title="Lectura técnica"><aside className="min-w-0 border-t border-gray-800 p-4 xl:border-l xl:border-t-0" data-testid="technical-reading">
-                    <h2 className="hidden text-base font-semibold text-gray-100 md:block">Lectura técnica</h2>
+                <MobileCollapse title={t('research.chart.reading')}><aside className="min-w-0 border-t border-gray-800 p-4 xl:border-l xl:border-t-0" data-testid="technical-reading">
+                    <h2 className="hidden text-base font-semibold text-gray-100 md:block">{t('research.chart.reading')}</h2>
                     <div id={`technical-panel-${snapshot.ticker}`} className="mt-3 space-y-4 text-xs text-gray-400">
-                        {last ? <p className="text-[11px] text-gray-500">Precios diarios observados hasta {formatMarketDate(last.date)}</p> : null}
-                        {last ? <p className="text-[11px] text-gray-500">El proveedor no confirma el cierre de la última vela: puede estar en curso. La lectura técnica y los niveles son provisionales.</p> : null}
+                        {last ? <p className="text-[11px] text-gray-500">{t('research.chart.observedUntil', { date: formatMarketDate(last.date) })}</p> : null}
+                        {last ? <p className="text-[11px] text-gray-500">{t('research.chart.unconfirmedClose')}</p> : null}
                         <>
                             <dl className="grid grid-cols-3 gap-2">
-                                <Metric label="Estructura" value={trend} detail="Dos bloques de 10 sesiones" />
-                                <Metric label="Corto plazo" value={shortTerm} detail={slope ? `SMA50 ${slope}` : '50 sesiones necesarias'} />
-                                <Metric label="Fuerza" value={strength == null ? 'Sin datos' : `${formatNumber(strength, { maximumFractionDigits: 1 })} ADX`} detail={strength == null ? 'OHLC completo necesario' : strength >= 25 ? 'Tendencia fuerte' : 'Tendencia débil'} />
+                                <Metric label={t('research.chart.structure')} value={t(TREND_KEYS[trend])} detail={t('research.chart.structureDetail')} />
+                                <Metric label={t('research.chart.shortTerm')} value={shortTerm} detail={slope ?? t('research.chart.needs50Sessions')} />
+                                <Metric label={t('research.chart.strength')} value={strength == null ? t('research.chart.noData') : `${formatNumber(strength, { maximumFractionDigits: 1 })} ADX`} detail={strength == null ? t('research.chart.needsOhlc') : strength >= 25 ? t('research.chart.strongTrend') : t('research.chart.weakTrend')} />
                             </dl>
                             <div className="space-y-2 border-t border-gray-800 pt-3 leading-5">
-                                {trend !== 'Sin datos' ? <p>{trend === 'Alcista' ? 'Máximos y mínimos crecientes' : trend === 'Bajista' ? 'Máximos y mínimos decrecientes' : 'Máximos y mínimos sin dirección conjunta'} entre los dos últimos bloques de 10 sesiones.</p> : <p>Estructura: sin datos OHLC suficientes.</p>}
-                                {average != null && last ? <p>Último precio diario {price(last.close, daily.currency)}, {last.close > average ? 'sobre' : last.close < average ? 'bajo' : 'en'} la media de 50 sesiones ({price(average, daily.currency)}).</p> : null}
-                                {strength != null ? <p>ADX14 {formatNumber(strength, { maximumFractionDigits: 1 })}: {strength >= 25 ? 'fuerza de tendencia' : 'sin fuerza de tendencia confirmada'}. No indica dirección.</p> : null}
+                                {trend !== 'Sin datos' ? <p>{readingLines(t, trend)}</p> : <p>{t('research.chart.structureNoData')}</p>}
+                                {average != null && last ? <p>{{ above: t('research.chart.lastCloseAbove', { price: price(last.close, daily.currency, fmt), average: price(average, daily.currency, fmt) }), below: t('research.chart.lastCloseBelow', { price: price(last.close, daily.currency, fmt), average: price(average, daily.currency, fmt) }), at: t('research.chart.lastCloseAt', { price: price(last.close, daily.currency, fmt), average: price(average, daily.currency, fmt) }) }[sideKey(last.close, average)]}</p> : null}
+                                {strength != null ? <p>{strength >= 25 ? t('research.chart.adxStrong', { value: formatNumber(strength, { maximumFractionDigits: 1 }) }) : t('research.chart.adxWeak', { value: formatNumber(strength, { maximumFractionDigits: 1 }) })}</p> : null}
                             </div>
                         </>
                         <div>
-                            <h3 className="mb-2 font-medium text-gray-200">Niveles de retroceso ({range})</h3>
-                            {fib.length ? <dl className="space-y-3">{fib.map((level) => <div key={level.ratio} className="flex justify-between border-b border-gray-800 pb-2"><dt>{formatNumber(level.ratio * 100)} %</dt><dd className="tabular-nums text-gray-200">{price(level.price, visibleCurrency)}</dd></div>)}</dl> : <p>Sin datos OHLC para Fibonacci.</p>}
-                            <p className="mt-3 text-[11px] text-gray-500">Desde el máximo al mínimo del tramo visible.</p>
+                            <h3 className="mb-2 font-medium text-gray-200">{t('research.chart.fibTitle', { range: t(RANGE_KEYS[range]) })}</h3>
+                            {fib.length ? <dl className="space-y-3">{fib.map((level) => <div key={level.ratio} className="flex justify-between border-b border-gray-800 pb-2"><dt>{t('research.chart.fibRatio', { value: formatNumber(level.ratio * 100) })}</dt><dd className="tabular-nums text-gray-200">{price(level.price, visibleCurrency, fmt)}</dd></div>)}</dl> : <p>{t('research.chart.fibNoData')}</p>}
+                            <p className="mt-3 text-[11px] text-gray-500">{t('research.chart.fibNote')}</p>
                         </div>
                     </div>
                 </aside></MobileCollapse>
@@ -159,6 +187,8 @@ function PriceCanvas({ bars, levels, currency, hourly = false, indicator = [], i
     priceLines?: CanvasPriceLine[];
     focusDate?: string | null;
 }) {
+    const t = useT();
+    const fmt = useFormat();
     const container = useRef<HTMLDivElement>(null);
     const engine = useRef<{
         chart: IChartApi;
@@ -170,11 +200,12 @@ function PriceCanvas({ bars, levels, currency, hourly = false, indicator = [], i
         dashed: IPriceLine[];
         dashedStyle: number;
     } | null>(null);
-    const latest = useRef({ bars, levels, currency });
+    const percent = (value: string) => t('research.chart.fibRatio', { value });
+    const latest = useRef({ bars, levels, currency, fmt, percent });
     // Sincroniza el ref tras cada render (react-hooks/refs prohibe escribirlo
     // durante el render). Declarado antes del resto de efectos: se ejecuta primero.
     useEffect(() => {
-        latest.current = { bars, levels, currency };
+        latest.current = { bars, levels, currency, fmt, percent };
     });
     const [ready, setReady] = useState(false);
     const [error, setError] = useState(false);
@@ -191,11 +222,11 @@ function PriceCanvas({ bars, levels, currency, hourly = false, indicator = [], i
                     grid: { vertLines: { visible: false }, horzLines: { color: '#27272a' } },
                     rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.12, bottom: 0.08 } },
                     timeScale: { borderVisible: false, rightOffset: 6 },
-                    localization: { locale: 'es-ES', priceFormatter: (value: number) => price(value, latest.current.currency) },
+                    localization: { locale: intlLocale(latest.current.fmt.locale), priceFormatter: (value: number) => price(value, latest.current.currency, latest.current.fmt) },
                 });
                 const line = chart.addSeries(AreaSeries, { lineColor: '#5eead4', topColor: 'rgba(94,234,212,0.12)', bottomColor: 'rgba(94,234,212,0)', lineWidth: 2, priceLineVisible: false });
                 // Tres paneles con el mismo eje de tiempo: precio, indicador y volumen.
-                const indicatorSeriesApi = chart.addSeries(LineSeries, { color: '#a78bfa', lineWidth: 1, priceLineVisible: false, lastValueVisible: true, priceFormat: { type: 'custom', formatter: (value: number) => `${formatNumber(value, { maximumFractionDigits: 1 })} %`, minMove: 0.01 } }, 1);
+                const indicatorSeriesApi = chart.addSeries(LineSeries, { color: '#a78bfa', lineWidth: 1, priceLineVisible: false, lastValueVisible: true, priceFormat: { type: 'custom', formatter: (value: number) => latest.current.percent(latest.current.fmt.formatNumber(value, { maximumFractionDigits: 1 })), minMove: 0.01 } }, 1);
                 const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false }, 2);
                 const panes = chart.panes();
                 panes[0]?.setStretchFactor(3);
@@ -243,7 +274,7 @@ function PriceCanvas({ bars, levels, currency, hourly = false, indicator = [], i
         if (bar) current.chart.setCrosshairPosition(bar.close, (bar.timestamp ? bar.timestamp as UTCTimestamp : bar.date) as Time, current.line);
     }, [ready, focusDate, bars]);
     return <div className="relative">
-        <div ref={container} className="h-[380px] w-full sm:h-[480px]" role="figure" aria-label={`Evolución del precio${bars.length ? ` del ${formatMarketDate(bars[0].date)} al ${formatMarketDate(bars.at(-1)!.date)}` : ': sin datos'}`} data-testid="technical-price-canvas" />
-        {error || bars.length < 2 ? <p role="status" className="absolute inset-0 grid place-items-center bg-surface-1 text-sm text-gray-500">{error ? 'No se pudo cargar el gráfico' : 'Sin datos suficientes para este rango'}</p> : !ready ? <p role="status" className="absolute inset-0 grid animate-pulse place-items-center text-xs text-gray-500">Cargando gráfico</p> : null}
+        <div ref={container} className="h-[380px] w-full sm:h-[480px]" role="figure" aria-label={bars.length ? t('research.chart.canvasAria', { from: fmt.formatMarketDate(bars[0].date), to: fmt.formatMarketDate(bars.at(-1)!.date) }) : t('research.chart.canvasAriaEmpty')} data-testid="technical-price-canvas" />
+        {error || bars.length < 2 ? <p role="status" className="absolute inset-0 grid place-items-center bg-surface-1 text-sm text-gray-500">{error ? t('research.chart.chartError') : t('research.chart.notEnoughData')}</p> : !ready ? <p role="status" className="absolute inset-0 grid animate-pulse place-items-center text-xs text-gray-500">{t('research.chart.loadingChart')}</p> : null}
     </div>;
 }

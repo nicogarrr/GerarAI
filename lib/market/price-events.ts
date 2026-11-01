@@ -4,6 +4,14 @@
  * Idea de Tracking Alpha (Jera Value): precio, indicador, volumen y eventos juntos.
  */
 
+// @ts-expect-error TS5097: node --test (--experimental-strip-types) necesita la extensión.
+import { intlLocale, type Locale } from '../i18n/locale.ts';
+// @ts-expect-error TS5097: idem
+import { t as esT, type TranslationKey, type TranslationVars } from '../i18n/t.ts';
+
+/** Traductor del idioma elegido; por defecto el español de referencia. */
+export type EventsT = (key: TranslationKey, vars?: TranslationVars) => string;
+
 export type PriceEventKind = 'results' | 'ex_dividend' | 'filing' | 'insider' | 'news' | 'movement';
 
 export interface PriceEvent {
@@ -32,6 +40,16 @@ export const EVENT_KINDS: Record<PriceEventKind, { label: string; short: string;
     movement: { label: 'Movimiento', short: 'M', color: '#f87171' },
 };
 
+/** Clave de traducción de cada tipo de evento (la etiqueta de EVENT_KINDS es el español de referencia). */
+export const EVENT_KIND_KEYS: Record<PriceEventKind, TranslationKey> = {
+    results: 'research.chart.kindResults',
+    ex_dividend: 'research.chart.kindExDividend',
+    filing: 'research.chart.kindFiling',
+    insider: 'research.chart.kindInsider',
+    news: 'research.chart.kindNews',
+    movement: 'research.chart.kindMovement',
+};
+
 export const EVENT_KIND_ORDER: PriceEventKind[] = ['results', 'ex_dividend', 'filing', 'insider', 'news', 'movement'];
 
 export type IndicatorKind = 'target' | 'drawdown' | 'pnl';
@@ -40,6 +58,12 @@ export const INDICATOR_LABELS: Record<IndicatorKind, string> = {
     target: 'Distancia al objetivo',
     drawdown: 'Caída desde máximo 52 sem.',
     pnl: 'Plusvalía latente',
+};
+
+export const INDICATOR_KEYS: Record<IndicatorKind, TranslationKey> = {
+    target: 'research.chart.indicatorTarget',
+    drawdown: 'research.chart.indicatorDrawdown',
+    pnl: 'research.chart.indicatorPnl',
 };
 
 export const VOLUME_SPIKE_RATIO = 2.5;
@@ -188,7 +212,7 @@ export function detectMovements(bars: EventBar[], window = VOLUME_WINDOW): Movem
     return out;
 }
 
-const pctText = (value: number) => `${value > 0 ? '+' : ''}${(value * 100).toLocaleString('es-ES', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} %`;
+const pctText = (value: number, locale: Locale) => `${value > 0 ? '+' : ''}${(value * 100).toLocaleString(intlLocale(locale), { maximumFractionDigits: 1, minimumFractionDigits: 1 })}${locale === 'es' ? ' %' : '%'}`;
 
 function shiftDay(day: string, delta: number): string {
     return new Date(Date.parse(`${day}T00:00:00Z`) + delta * 86_400_000).toISOString().slice(0, 10);
@@ -198,22 +222,22 @@ function shiftDay(day: string, delta: number): string {
  * «¿Por qué se movió?»: cada movimiento como evento, con lo que pasó ese día (±1) o «Sin noticias ese día».
  * Nunca afirma la causa: «puede explicarlo».
  */
-export function movementEvents(movements: Movement[], events: PriceEvent[]): PriceEvent[] {
+export function movementEvents(movements: Movement[], events: PriceEvent[], ti: EventsT = esT, locale: Locale = 'es'): PriceEvent[] {
     return movements.map((move) => {
         const near = events.filter((e) => e.kind !== 'movement' && e.date >= shiftDay(move.date, -1) && e.date <= shiftDay(move.date, 1));
         const parts: string[] = [];
-        if (move.byPrice) parts.push(`${pctText(move.change)} en el día`);
-        if (move.byVolume && move.volumeRatio != null) parts.push(`volumen ${move.volumeRatio.toLocaleString('es-ES', { maximumFractionDigits: 1 })}× la media de 60 sesiones`);
+        if (move.byPrice) parts.push(ti('research.chart.moveDay', { pct: pctText(move.change, locale) }));
+        if (move.byVolume && move.volumeRatio != null) parts.push(ti('research.chart.moveVolume', { ratio: move.volumeRatio.toLocaleString(intlLocale(locale), { maximumFractionDigits: 1 }) }));
         const detail = near.length
-            ? `Puede explicarlo:\n${near.map((e) => `· ${e.date} ${EVENT_KINDS[e.kind].label}: ${e.title} (${e.source})`).join('\n')}`
-            : 'Sin noticias ese día (ni el anterior ni el siguiente) entre los eventos guardados.';
+            ? `${ti('research.chart.moveMaybe')}\n${near.map((e) => `· ${e.date} ${ti(EVENT_KIND_KEYS[e.kind])}: ${e.title} (${e.source})`).join('\n')}`
+            : ti('research.chart.moveNoNews');
         return {
             id: `movement-${move.date}`,
             date: move.date,
             kind: 'movement' as const,
-            title: `¿Por qué se movió? ${parts.join(', ')}`,
+            title: ti('research.chart.moveTitle', { parts: parts.join(', ') }),
             detail,
-            source: 'Cálculo de GerarAI sobre los precios diarios',
+            source: ti('research.chart.moveSource'),
             source_url: null,
         };
     });
