@@ -208,6 +208,8 @@ MAX_NUMERIC_20_2 = Decimal("999999999999999999.99")
 MAX_NUMERIC_20_4 = Decimal("9999999999999999.9999")
 MIN_NUMERIC_20_4 = Decimal("0.0001")
 MIN_NUMERIC_20_6 = Decimal("0.000001")
+MAX_NUMERIC_20_10 = Decimal("9999999999.9999999999")
+MIN_NUMERIC_20_10 = Decimal("0.0000000001")
 
 
 class PortfolioTransactionInput(BaseModel):
@@ -260,7 +262,15 @@ def _not_in_the_future(value: date | None) -> date | None:
 
 class PortfolioPriceInput(BaseModel):
     ticker: str = Field(min_length=1, max_length=20)
-    price: Decimal = Field(gt=0)
+    # Mismos topes que una operacion (market_prices.close es Numeric(20, 6)):
+    # «1e400» se guardaba nulo y GET /positions daba 500 para toda la cartera;
+    # «0,0000001» pasaba gt=0 y quedaba guardado como precio 0.
+    price: Decimal = Field(gt=0, le=MAX_NUMERIC_20_6)
+
+    @field_validator("price")
+    @classmethod
+    def _price_not_rounded_to_zero(cls, value: Decimal) -> Decimal:
+        return PortfolioTransactionInput._not_rounded_to_zero(value)
     as_of: date | None = None
 
     _as_of_not_future = field_validator("as_of")(_not_in_the_future)
@@ -278,7 +288,16 @@ class PortfolioConfigurationInput(BaseModel):
 class FXRateInput(BaseModel):
     base_currency: str = Field(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")
     quote_currency: str = Field(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")
-    rate: Decimal = Field(gt=0)
+    # fx_rates.rate es Numeric(20, 10): «1e400» se guardaba nulo y «1e-400»
+    # como 0, un tipo de cambio que convierte cualquier importe en nada.
+    rate: Decimal = Field(gt=0, le=MAX_NUMERIC_20_10)
+
+    @field_validator("rate")
+    @classmethod
+    def _rate_not_rounded_to_zero(cls, value: Decimal) -> Decimal:
+        if value.quantize(MIN_NUMERIC_20_10, rounding=ROUND_HALF_EVEN) == 0:
+            raise ValueError("must be at least 0.0000000001 (10 decimal places)")
+        return value
     rate_date: date
     source: str = Field(default="manual", min_length=1, max_length=80)
 
