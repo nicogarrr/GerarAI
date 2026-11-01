@@ -640,3 +640,93 @@ def test_stored_v1_state_is_refreshed_to_v2_and_pending_only_until_then(db):
     assert state.hit_rates['params_version'] == 'nico-v2'
     # Ya evaluado con la formula vigente: sale de la cola (solo lo desactualizado).
     assert pending_symbols(db, now=later + timedelta(hours=1)) == []
+
+
+def _english(db, monkeypatch):
+    """Usuario con inglés guardado en Ajustes y generación multidioma encendida."""
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
+    get_settings.cache_clear()
+    tenant = db.get(Tenant, 1)
+    tenant.metadata_ = {"language": "en"}
+    db.commit()
+
+
+def test_alert_uses_saved_english_language(db, monkeypatch):
+    _english(db, monkeypatch)
+    _watch(db, "UBER")
+    fetcher = FakeFetcher()
+    fetcher.set("UBER", series(80.0))
+    _run(db, fetcher)
+    fetcher.set("UBER", series(70.0))
+    _run(db, fetcher)
+    alerts = _alerts(db)
+    assert [a.title for a in alerts] == ["UBER entered 3X DCA"]
+    assert "Drop from 36m high: 30.0%" in alerts[0].message
+    assert "Zone: Strong buy zone" in alerts[0].message
+    assert "Decision support, not financial advice." in alerts[0].message
+    assert "Caída" not in alerts[0].message
+    assert alerts[0].metadata_["language"] == "en"
+
+
+def test_alert_stays_spanish_without_saved_language(db, monkeypatch):
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
+    get_settings.cache_clear()
+    _watch(db, "UBER")
+    fetcher = FakeFetcher()
+    fetcher.set("UBER", series(80.0))
+    _run(db, fetcher)
+    fetcher.set("UBER", series(70.0))
+    _run(db, fetcher)
+    alerts = _alerts(db)
+    assert [a.title for a in alerts] == ["UBER entró en 3X DCA"]
+    assert "language" not in alerts[0].metadata_
+
+
+def test_alert_stays_spanish_with_generation_flag_off(db, monkeypatch):
+    _english(db, monkeypatch)
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "false")
+    get_settings.cache_clear()
+    _watch(db, "UBER")
+    fetcher = FakeFetcher()
+    fetcher.set("UBER", series(80.0))
+    _run(db, fetcher)
+    fetcher.set("UBER", series(70.0))
+    _run(db, fetcher)
+    assert [a.title for a in _alerts(db)] == ["UBER entró en 3X DCA"]
+
+
+def test_drop_email_in_english():
+    from app.services.dca_alert_copy import email_content
+
+    dca = {
+        "symbol": "VOD.L", "label": "RECORTE LIGERO", "previous_label": "3X DCA", "direction": "down",
+        "zone": "Zona de recorte ligero", "status": "forming", "color": "#FF9F0A", "fg": "#000000",
+        "signal_date": "2026-10-18", "close": 1234.5, "currency": "GBp", "sources": ["portfolio"],
+    }
+    content = email_content(dca, "en")
+    assert content.subject == "VOD.L drops to LIGHT TRIM (from 3X DCA)"
+    assert "For your information: the level drops from 3X DCA to LIGHT TRIM." in content.html
+    assert '<html lang="en">' in content.html
+    for line in ("Zone: Light trim zone", "Status: month still forming", "Signal date: 18 Oct 2026",
+                 "Settled close: 1,234.50 GBX (pence)", "Source: portfolio"):
+        assert line in content.text
+    assert "The month has not closed yet" in content.text
+    spanish = email_content(dca)
+    assert spanish.subject == "VOD.L baja a RECORTE LIGERO (desde 3X DCA)"
+    assert "Cierre asentado: 1.234,50 GBX (peniques)" in spanish.text
+    assert "Fecha de señal: 18 oct 2026" in spanish.text
+
+
+def test_dca_email_dispatch_reads_alert_language(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.services import notification_service as ns
+
+    sent = []
+    monkeypatch.setattr(ns, "send_email", lambda settings, content: sent.append(content) or {"status": "delivered"})
+    dca = {"symbol": "UBER", "label": "3X DCA", "zone": "Zona de compra fuerte", "status": "confirmed"}
+    alert = SimpleNamespace(alert_type="dca_level", metadata_={"dca": dca, "language": "en"})
+    ns.NotificationService()._dispatch_email(None, alert, {})
+    alert_es = SimpleNamespace(alert_type="dca_level", metadata_={"dca": dca})
+    ns.NotificationService()._dispatch_email(None, alert_es, {})
+    assert [c.subject for c in sent] == ["UBER entered 3X DCA", "UBER entró en 3X DCA"]

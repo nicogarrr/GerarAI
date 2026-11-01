@@ -50,6 +50,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.i18n import generation_language
 from app.core.tenancy import tenant_filters
 from app.models import (
     AlertDelivery,
@@ -451,16 +452,22 @@ def _emit_alert_row(db: Session, dca: dict[str, Any], *, company_id: int | None,
     )
     if exists is not None:
         return "duplicate", exists
+    # Idioma guardado del usuario al disparar (Ajustes); sin preferencia o con
+    # la generacion multidioma apagada, espanol como siempre.
+    language = generation_language(db)
+    metadata: dict[str, Any] = {"dca": dca}
+    if language != "es":
+        metadata["language"] = language
     alert = service.emit_alert(
         db,
         company_id=company_id,
         alert_type=ALERT_TYPE,
         severity="low" if down else SEVERITY_BY_LEVEL.get(int(dca["level"]), "low"),
-        title=dca_alert_copy.title(dca),
-        message=dca_alert_copy.message_text(dca),
+        title=dca_alert_copy.title(dca, language),
+        message=dca_alert_copy.message_text(dca, language),
         fingerprint_parts=parts,
         channels=alert_channels(settings),
-        metadata={"dca": dca},
+        metadata=metadata,
     )
     # Intencion de entrega DURABLE: una fila 'pending' por canal externo en la
     # misma transaccion que la alerta. Si el despacho falla antes de crear las
