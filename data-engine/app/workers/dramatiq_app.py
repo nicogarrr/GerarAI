@@ -990,6 +990,11 @@ def reset_local_leases() -> None:
     _local_leases.clear()
 
 
+# 429 del proveedor LLM en la extraccion KPI: 2 min, 4 min... (techo 30 min).
+KPI_RATE_LIMIT_BASE_SECONDS = 120.0
+KPI_RATE_LIMIT_CAP_SECONDS = 1800.0
+
+
 @dramatiq.actor(max_retries=2, min_backoff=15_000, queue_name=KPI_QUEUE_NAME)
 def extract_document_kpis(
     document_id: int,
@@ -1019,6 +1024,20 @@ def extract_document_kpis(
         }
     except Exception as exc:
         _rollback(db)
+        from app.llm.errors import ProviderHTTPError
+
+        if isinstance(exc, ProviderHTTPError) and exc.status_code == 429:
+            # Limite del proveedor LLM: el backoff del actor (15-30 s) volvia
+            # contra la misma ventana y acababa en dead-letter (prod, 1-nov).
+            # Espera creciente con jitter; en el ultimo intento se descarta
+            # sin dead-letter: la marca kpi_deferred sigue puesta y
+            # backfill_document_kpis lo reencola.
+            from app.workers.rate_limit_retry import RateLimitRetriesExhausted, retry_or_drop
+
+            try:
+                retry_or_drop("KPI LLM", base=KPI_RATE_LIMIT_BASE_SECONDS, cap=KPI_RATE_LIMIT_CAP_SECONDS)
+            except RateLimitRetriesExhausted as drop:
+                return {**_handle_actor_error("extract_document_kpis", drop), "document_id": document_id}
         return _handle_actor_error("extract_document_kpis", exc, document_id=document_id)
     finally:
         db.close()
