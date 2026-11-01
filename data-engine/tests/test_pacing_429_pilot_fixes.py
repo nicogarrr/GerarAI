@@ -172,6 +172,11 @@ def test_finnhub_con_redis_caido_mantiene_pacing_local(monkeypatch):
         esperas.append(seconds)
         reloj[0] += seconds
 
+    # The module singleton may retain slots/cooldowns from earlier tests.
+    # Pair the injected clock with local state in that same time domain;
+    # monkeypatch restores both original values after this test.
+    monkeypatch.setattr(pacer, "_local_next", 0.0)
+    monkeypatch.setattr(pacer, "_local_blocked_until", 0.0)
     monkeypatch.setattr(pacer, "_monotonic", lambda: reloj[0])
     monkeypatch.setattr(pacer, "_sleep", fake_sleep)
     monkeypatch.setattr(pacer, "_factory", lambda: None)  # Redis caido
