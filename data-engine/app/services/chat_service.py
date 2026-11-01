@@ -717,9 +717,15 @@ _POSITION_QUERY_RE = re.compile(
     r"|\bcu[aá]nto\s+(?:l[oa]s?\s+)?(?:compr[eé]|pagu[eé])\b"
     r"|\bcu[aá]nto\s+me\s+cost(?:[oó]|aron)\b"
     r"|\bmi\s+precio\s+(?:medio\s+)?de\s+compra\b"
+    # «¿Cuál es el coste medio de mis UBER?», «precio medio de compra de mis
+    # MSFT»: antes iban al volcado de la empresa.
+    r"|\b(?:precio|coste)\s+medio\b[^.!?\n]{0,25}\bmis\b"
 )
 # «mi precio de compra» lleva «compra» pero es pregunta, no una orden.
-_PURCHASE_COST_RE = re.compile(r"(?i)\bmi\s+precio\s+(?:medio\s+)?de\s+compra\b")
+_PURCHASE_COST_RE = re.compile(
+    r"(?i)\bmi\s+precio\s+(?:medio\s+)?de\s+compra\b"
+    r"|\b(?:precio|coste)\s+medio\s+de\s+compra\s+de\s+mis\b"
+)
 # Impuesto de una venta de un ticker concreto («¿cuánto IRPF pagaría si vendo
 # todo UBER?»). Antes el verbo «vendo» la sacaba de la ruta de posición (es
 # un verbo de orden) y el sintetizador de empresa no recibía la posición:
