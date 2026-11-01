@@ -32,7 +32,9 @@ test('radar global: candidatos sin etiqueta de fuente', () => {
 test('objetivos de analistas: aviso de divisa sin fuente', () => {
     const view = read('components/research/AnalystTargetsView.tsx');
     assert.doesNotMatch(view, /fuente de mercado/i);
-    assert.match(view, /Divisa no declarada: importes sin unidad verificada/);
+    assert.match(view, /research\.analystTargets\.currencyUndeclared/);
+    const es = JSON.parse(read('lib/i18n/messages/es/research.json'));
+    assert.match(es.analystTargets.currencyUndeclared, /Divisa no declarada: importes sin unidad verificada/);
 });
 
 test('facts panels: cifras no oficiales sin etiqueta de fuente', () => {

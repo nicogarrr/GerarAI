@@ -73,6 +73,18 @@ describe('GET: confirmación, nunca decide (escáneres)', () => {
         expect(userUpdateOne).not.toHaveBeenCalled();
     });
 
+    it('con la cookie de inglés, la confirmación sale en inglés; sin ella, en español', async () => {
+        const en = await GET(new NextRequest(url(tokenFor('approve')), { headers: { cookie: 'gerarai_locale=en' } }));
+        const html = await en.text();
+        expect(html).toContain('<html lang="en">');
+        expect(html).toContain('Confirm: approve');
+        expect(html).toContain('You are about to <strong>approve</strong> the account');
+        expect(html).not.toContain('Confirmar');
+        const es = await (await GET(new NextRequest(url(tokenFor('approve'))))).text();
+        expect(es).toContain('<html lang="es">');
+        expect(es).toContain('Confirmar: aprobar');
+    });
+
     it('token manipulado: 400 sin tocar nada', async () => {
         const res = await GET(new NextRequest(url(tokenFor('approve').replace('.approve.', '.reject.'))));
         expect(res.status).toBe(400);

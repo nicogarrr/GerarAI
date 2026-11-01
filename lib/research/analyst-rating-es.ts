@@ -30,9 +30,13 @@ const RATINGS_ES: Record<string, string> = {
   'strong sell': 'Venta fuerte',
 };
 
-/** Recomendación de analista en español; si no hay traducción conocida se deja el texto original (nada inventado). */
-export function analystRatingEs(rating: string | null | undefined): string | null {
+/**
+ * Recomendación de analista en español; si no hay traducción conocida se deja el texto original (nada inventado).
+ * En inglés (Ajustes → Idioma) la recomendación ya viene en inglés de la fuente: se muestra tal cual.
+ */
+export function analystRatingEs(rating: string | null | undefined, locale: 'es' | 'en' = 'es'): string | null {
   if (!rating) return null;
+  if (locale === 'en') return rating.trim();
   const key = rating.trim().toLowerCase().replace(/\s+/g, ' ');
   return Object.hasOwn(RATINGS_ES, key) ? RATINGS_ES[key] : rating.trim();
 }
