@@ -419,6 +419,15 @@ def _natural_company_answer(
     fuente, siglas de seccion ni titulares en ingles en el cuerpo: el detalle
     queda plegado.
     """
+    if _english():
+        from app.services.chat_company_en import natural_company_answer_en
+
+        return natural_company_answer_en(
+            company=company, facts=facts, thesis=thesis, news=news, missing_metrics=missing_metrics,
+            claims=claims, contradiction_claims=contradiction_claims, price_line=price_line,
+            memory_notes=memory_notes, market_cap_fact=market_cap_fact, question=question,
+            thesis_withheld=thesis_withheld, sec=files_with_sec(company),
+        )
     parts: list[str] = []
     thesis_line: str | None = None
     if price_line:
@@ -3530,6 +3539,13 @@ class ChatService:
                     f"({kind} del {_fmt_date_es(latest_price.date.isoformat())}, "
                     f"fuente {latest_price.source})."
                 )
+                if _english():
+                    from app.services.chat_company_en import price_line_en
+
+                    price_line = price_line_en(
+                        company.ticker, value, company.currency, adjusted=adjusted,
+                        day=latest_price.date.isoformat(), source=latest_price.source,
+                    )
                 sources.append(
                     self._source_entry(
                         "market_price",
