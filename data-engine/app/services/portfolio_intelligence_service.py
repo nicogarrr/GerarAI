@@ -28,6 +28,7 @@ from app.services.tax_report_service import (
     is_cash_action,
     withholding_cost,
 )
+from app.valuation.currency import normalize_currency
 
 # Exchange -> listing-market country. Best-effort fallback only: the owning
 # fact is issuer domicile, and positions without a known exchange are grouped
@@ -754,8 +755,13 @@ class PortfolioIntelligenceService:
         ending_value = 0.0
         for position, company in positions:
             value = position.market_value_base
-            if value is None and position.currency.upper() == base and position.market_value > 0:
-                value = position.market_value
+            if value is None and position.market_value > 0:
+                # Misma divisa principal pero quizá subunidad: con una posición
+                # en GBp market_value está en peniques, y upper() lo daba por
+                # libras (x100 en el valor final del XIRR con base GBP).
+                pos_major, pos_divisor = normalize_currency(position.currency)
+                if pos_major == base:
+                    value = position.market_value / pos_divisor
             if value is None:
                 missing_fx.append(
                     {
