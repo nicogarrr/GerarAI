@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 // @ts-expect-error TS5097: explicit extension for node strip-types.
-import { INVESTOR_CHANNELS } from '../app/(root)/inversores/canales/channels.ts';
+import { INVESTOR_CHANNELS, channelNoteLabel, channelSourceLabel } from '../app/(root)/inversores/canales/channels.ts';
 
 const page = readFileSync('app/(root)/inversores/canales/page.tsx', 'utf8');
 const list = readFileSync('app/(root)/inversores/_components/HubNav.tsx', 'utf8');
@@ -45,4 +45,18 @@ test('los canales generalistas van en negocio, no en inversion', () => {
     assert.equal(byName.get('The Diary Of A CEO'), 'negocio');
     assert.equal(byName.get("Sourcery with Molly O'Shea"), 'negocio');
     assert.match(page, /category: 'negocio'/);
+});
+
+test('en inglés, fuente y nota de cada canal salen en inglés; en español, tal cual', () => {
+    const spanish = /[áéíóúñ]|\b(de|del|la|el|en|y|cargada|capturas|sugerido|tema|probable|enlazado|economía)\b/i;
+    for (const channel of INVESTOR_CHANNELS) {
+        assert.equal(channelSourceLabel(channel.source), channel.source);
+        assert.doesNotMatch(channelSourceLabel(channel.source, 'en').replace(/https:\/\/\S+/, ''), spanish, channel.name);
+        if (channel.note) {
+            assert.equal(channelNoteLabel(channel.note), channel.note);
+            assert.doesNotMatch(channelNoteLabel(channel.note, 'en').replace('Jose Luis Cava', ''), spanish, channel.name);
+        }
+    }
+    assert.match(page, /channelSourceLabel\(channel\.source, locale\)/);
+    assert.match(page, /channelNoteLabel\(channel\.note, locale\)/);
 });

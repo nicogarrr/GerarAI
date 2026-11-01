@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
-import { getT } from '@/lib/i18n/server';
+import { getLocale, getT } from '@/lib/i18n/server';
 
-import { INVESTOR_CHANNELS, type ChannelCategory } from './channels';
+import { INVESTOR_CHANNELS, channelNoteLabel, channelSourceLabel, type ChannelCategory } from './channels';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getT();
@@ -13,6 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function ChannelsPage() {
     const t = await getT();
+    const locale = await getLocale();
     const SECTIONS: { category: ChannelCategory; title: string }[] = [
         { category: 'inversion', title: t('investors.channels.sectionInversion') },
         { category: 'negocio', title: t('investors.channels.sectionNegocio') },
@@ -48,8 +49,8 @@ export default async function ChannelsPage() {
                                         {channel.name}
                                     </a>
                                     <p className="text-xs text-gray-500">
-                                        {channel.handle} · {channel.language === 'es' ? t('investors.channels.spanish') : t('investors.channels.english')} · {channel.source}
-                                        {channel.note ? ` · ${channel.note}` : ''}
+                                        {channel.handle} · {channel.language === 'es' ? t('investors.channels.spanish') : t('investors.channels.english')} · {channelSourceLabel(channel.source, locale)}
+                                        {channel.note ? ` · ${channelNoteLabel(channel.note, locale)}` : ''}
                                     </p>
                                 </li>
                             ))}
