@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+// Los textos de Pro Picks viven en el diccionario es (i18n): se comprueban junto al código.
+const ES_PROPICKS_JSON = readFileSync('lib/i18n/messages/es/propicks.json', 'utf8');
 
 /**
  * Estados de error coherentes (revisión visual transversal 2026-10-21):
@@ -12,7 +14,7 @@ import test from 'node:test';
  */
 const section = readFileSync('components/system/SectionLoadError.tsx', 'utf8');
 const alerts = readFileSync('components/alerts/AlertsManager.tsx', 'utf8');
-const propicks = readFileSync('components/proPicks/ProPicksLoadError.tsx', 'utf8');
+const propicks = (readFileSync('components/proPicks/ProPicksLoadError.tsx', 'utf8') + ES_PROPICKS_JSON);
 const backendOffline = readFileSync('components/system/BackendOffline.tsx', 'utf8');
 
 test('SectionLoadError comparte el acento ámbar de BackendOffline, no rojo', () => {

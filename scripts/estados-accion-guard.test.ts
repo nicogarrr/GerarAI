@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+// Los textos de Pro Picks viven en el diccionario es (i18n): se comprueban junto al código.
+const ES_PROPICKS_JSON = readFileSync('lib/i18n/messages/es/propicks.json', 'utf8');
 
 const read = (p: string) => readFileSync(p, 'utf8');
 
@@ -39,7 +41,7 @@ test('la acción de sincronización llama a la ruta async que encola el actor', 
 });
 
 test('propicks: sin run publicado el botón genera la selección, no relee el vacío', () => {
-  const src = read('components/proPicks/EnhancedProPicksContent.tsx');
+  const src = (read('components/proPicks/EnhancedProPicksContent.tsx') + ES_PROPICKS_JSON);
   assert.ok(src.includes('handleGenerateRun'), 'debe existir la acción de generar el primer run');
   assert.ok(src.includes('generateFunnelRunNow'));
   assert.ok(src.includes('Generar selección ahora'));

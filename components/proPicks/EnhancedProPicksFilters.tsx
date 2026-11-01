@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { ChevronDown, Filter, X } from 'lucide-react';
 import { etiquetaSector } from '@/lib/labels';
+import { useLocale, useT } from '@/lib/i18n/client';
 
 export interface ProPicksFilters {
   timePeriod: 'week' | 'month' | 'quarter' | 'year';
@@ -58,6 +59,8 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
   // ve (Tester 4: el panel ocupaba toda la primera pantalla). En escritorio
   // (xl) el cuerpo siempre visible y el toggle oculto.
   const [open, setOpen] = useState(false);
+  const t = useT();
+  const locale = useLocale();
   const updateFilter = <K extends keyof ProPicksFilters>(key: K, value: ProPicksFilters[K]) => {
     onFiltersChange({ ...filters, [key]: value });
   };
@@ -78,24 +81,24 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-teal-400" />
-              <CardTitle as="h2" className="text-sm font-semibold">Filtros</CardTitle>
+              <CardTitle as="h2" className="text-sm font-semibold">{t('propicks.filters.title')}</CardTitle>
             </div>
             <div className="flex items-center gap-1">
               {activeFilterCount > 0 && (
-                <span className="rounded-full bg-teal-500/20 px-2 py-0.5 text-xs font-semibold text-teal-300" title="Filtros distintos de los valores por defecto">
-                  {activeFilterCount} {activeFilterCount === 1 ? 'filtro' : 'filtros'}
+                <span className="rounded-full bg-teal-500/20 px-2 py-0.5 text-xs font-semibold text-teal-300" title={t('propicks.filters.activeTitle')}>
+                  {t(activeFilterCount === 1 ? 'propicks.filters.countOne' : 'propicks.filters.countOther', { count: activeFilterCount })}
                 </span>
               )}
               {activeFilterCount > 0 && (
                 <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={resetFilters}>
                   <X className="h-4 w-4 mr-1" />
-                  Limpiar
+                  {t('propicks.filters.clear')}
                 </Button>
               )}
               <Button
                 aria-expanded={open}
                 aria-controls="propicks-filtros-cuerpo"
-                aria-label={open ? 'Ocultar filtros' : 'Mostrar filtros'}
+                aria-label={open ? t('propicks.filters.hide') : t('propicks.filters.show')}
                 className="min-h-[44px] min-w-[44px] xl:hidden"
                 onClick={() => setOpen((v) => !v)}
                 size="sm"
@@ -111,7 +114,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
           {/* Cantidad de resultados */}
           <div className="space-y-3">
             <Label id="propicks-filtro-limit-label" className="text-sm font-medium text-gray-200">
-              Cantidad de acciones: {filters.limit}
+              {t('propicks.filters.limit', { count: filters.limit })}
             </Label>
             <Slider
               aria-labelledby="propicks-filtro-limit-label"
@@ -132,7 +135,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
           {/* Puntuación mínima */}
           <div className="space-y-3">
             <Label id="propicks-filtro-minscore-label" className="text-sm font-medium text-gray-200">
-              Puntuación mínima: {filters.minScore}
+              {t('propicks.filters.minScore', { score: filters.minScore })}
             </Label>
             <Slider
               aria-labelledby="propicks-filtro-minscore-label"
@@ -145,14 +148,14 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
               className="py-3"
             />
             <div className="flex justify-between text-xs text-gray-500">
-              <span>50 (Aceptable)</span>
-              <span>95 (Excelente)</span>
+              <span>{t('propicks.filters.scoreLow')}</span>
+              <span>{t('propicks.filters.scoreHigh')}</span>
             </div>
           </div>
 
           {/* Sector */}
           <div className="space-y-3">
-            <Label id="propicks-filtro-sector-label" className="text-sm font-medium text-gray-200">Sector</Label>
+            <Label id="propicks-filtro-sector-label" className="text-sm font-medium text-gray-200">{t('propicks.filters.sector')}</Label>
             <Select disabled={disabled}
               value={filters.sector}
               onValueChange={(value) => updateFilter('sector', value)}
@@ -163,7 +166,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
               <SelectContent>
                 {sectors.map(sector => (
                   <SelectItem key={sector} value={sector}>
-                    {sector === 'all' ? 'Todos los sectores' : etiquetaSector(sector)}
+                    {sector === 'all' ? t('propicks.filters.allSectors') : locale === 'en' ? sector : etiquetaSector(sector)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -172,7 +175,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
 
           {/* Ordenar por */}
           <div className="space-y-3">
-            <Label id="propicks-filtro-sortby-label" className="text-sm font-medium text-gray-200">Ordenar por</Label>
+            <Label id="propicks-filtro-sortby-label" className="text-sm font-medium text-gray-200">{t('propicks.filters.sortBy')}</Label>
             <Select disabled={disabled}
               value={filters.sortBy}
               onValueChange={(value: ProPicksFilters['sortBy']) => updateFilter('sortBy', value)}
@@ -181,15 +184,15 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="score">Puntuación general</SelectItem>
+                <SelectItem value="score">{t('propicks.filters.sortScore')}</SelectItem>
                 <SelectItem disabled={neutralSorts.includes('momentum')} value="momentum">
-                  Momentum{neutralSorts.includes('momentum') ? ' (n/d en estos resultados)' : ''}
+                  {t('propicks.filters.sortMomentum')}{neutralSorts.includes('momentum') ? t('propicks.filters.naSuffix') : ''}
                 </SelectItem>
                 <SelectItem disabled={neutralSorts.includes('value')} value="value">
-                  Valor{neutralSorts.includes('value') ? ' (n/d en estos resultados)' : ''}
+                  {t('propicks.filters.sortValue')}{neutralSorts.includes('value') ? t('propicks.filters.naSuffix') : ''}
                 </SelectItem>
-                <SelectItem value="growth">Crecimiento</SelectItem>
-                <SelectItem value="profitability">Rentabilidad</SelectItem>
+                <SelectItem value="growth">{t('propicks.filters.sortGrowth')}</SelectItem>
+                <SelectItem value="profitability">{t('propicks.filters.sortProfitability')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -197,7 +200,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
           {/* Botón Aplicar */}
           <Button onClick={onApply} className="min-h-11 w-full whitespace-normal text-center leading-tight">
             <Filter className="h-4 w-4 mr-2" />
-            Aplicar filtros
+            {t('propicks.filters.apply')}
           </Button>
         </CardContent>
       </fieldset>
