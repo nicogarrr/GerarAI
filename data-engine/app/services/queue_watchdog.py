@@ -4,9 +4,10 @@ Motivo (Nico, 1-nov-2026): el lunes entra la carga de noticias y precios y no
 puede haber colas atascadas silenciosas. Una cola se declara atascada por lo
 MEDIDO, no por su profundidad:
 
-- el mismo mensaje lleva >= umbral en CABEZA de la lista ready (persistencia
-  del ready id, no message_timestamp: ese incluye el tiempo de RetryAfter en
-  la cola diferida y alertaria en un cooldown normal), y
+- el mensaje listo MAS ANTIGUO lleva >= umbral sin consumir (primer
+  avistamiento en la lista ready de los K ids mas viejos, no
+  message_timestamp: ese incluye el tiempo de RetryAfter en la cola
+  diferida y alertaria en un cooldown normal), y
 - la variacion neta de profundidad entre ticks es <= 0: no decrece. Es la
   diferencia de pendientes entre muestras (msgs + DQ.msgs, como
   kpi_queue_depth), NO mensajes completados: si entran 50 y salen 50 la
@@ -50,7 +51,12 @@ DEFAULT_QUEUES = (
 )
 
 _SAMPLE_PREFIX = "queue_watchdog:sample:"  # {ts, depth} del ultimo tick muestreador
-_HEAD_PREFIX = "queue_watchdog:head:"      # "<ready_id>:<ts_ms>": desde cuando es cabeza
+_SEEN_PREFIX = "queue_watchdog:seen:"      # hash ready_id -> primer avistamiento (ms)
+# Ventana de avistamiento: los K ids listos MAS ANTIGUOS por cola. La cola es
+# FIFO (RPUSH/LPOP), asi que el mas viejo siempre esta dentro; un id sale de
+# la ventana al consumirse (o cuando la cola supera K, los mas jovenes, que
+# no definen la edad del mas antiguo).
+_SEEN_WINDOW = 1000
 _TICK_LOCK_KEY = "queue_watchdog:tick_lock"
 _RESULT_KEY = "queue_watchdog:last_result"
 
@@ -100,25 +106,41 @@ def _as_str(raw: Any) -> str:
 
 
 def _ready_head_age(client: Any, base: str, queue: str, now_ms: float) -> float | None:
-    """Segundos que el mensaje en cabeza lleva listo sin consumir.
+    """Segundos que el mensaje listo MAS ANTIGUO lleva sin consumir.
 
-    Persistencia del ready id: la primera vez que un id es cabeza se anota su
-    instante; mientras siga siendo cabeza, su edad crece. Cola vacia: se borra
-    la anotacion (None). Nunca usa message_timestamp (incluye RetryAfter).
+    Primer avistamiento como ready: cada tick se anota el instante en que
+    cada id de la ventana (los K mas viejos) se vio por primera vez en la
+    lista ready, y la edad es la del avistamiento mas antiguo presente.
+    Nunca usa message_timestamp (incluye RetryAfter). Persistir solo la
+    cabeza subestimaba la edad real con drenaje parcial: la cabeza avanza
+    cada tick y su "edad como cabeza" vuelve a 0 aunque el mensaje que la
+    releva llevara minutos listo (medido con scripts/ingest_load_lab: edad
+    real 840 s, edad de cabeza 0, alerta NUNCA). La edad puede subestimar
+    como mucho un tick (el avistamiento es discreto), nunca sobrestimar.
     """
-    ids = client.lrange(base, 0, 0)
-    key = f"{_HEAD_PREFIX}{queue}"
+    ids = client.lrange(base, 0, _SEEN_WINDOW - 1)
+    key = f"{_SEEN_PREFIX}{queue}"
     if not ids:
         client.delete(key)
         return None
-    head = _as_str(ids[0])
-    raw = client.get(key)
-    if raw is not None:
-        stored_id, _, stored_ts = _as_str(raw).partition(":")
-        if stored_id == head:
-            return max(0.0, (now_ms - float(stored_ts)) / 1000.0)
-    client.set(key, f"{head}:{now_ms}")
-    return 0.0
+    seen = client.hgetall(key)
+    pipe = client.pipeline()
+    stale = [mid for mid in seen if mid not in ids]
+    for mid in stale:
+        pipe.hdel(key, mid)
+    first_seen: list[float] = []
+    present = set()
+    for mid in ids:
+        ts = seen.get(mid)
+        if ts is None:
+            pipe.hset(key, mid, str(int(now_ms)))
+        else:
+            present.add(mid)
+            first_seen.append(float(ts))
+    pipe.execute()
+    if not first_seen:
+        return 0.0  # toda la ventana es nueva en este tick
+    return max(0.0, (now_ms - min(first_seen)) / 1000.0)
 
 
 def sample_queues(client: Any, *, namespace: str = "dramatiq", queues: tuple[str, ...] = DEFAULT_QUEUES,

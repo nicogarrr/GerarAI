@@ -95,19 +95,39 @@ def test_edad_por_persistencia_no_message_timestamp(redis_client):
     assert 395 <= sample.ready_age_seconds <= 405
 
 
-def test_cabeza_nueva_reinicia_edad_y_cola_vacia_la_borra(redis_client):
+def test_drenaje_parcial_conserva_la_edad_del_mas_antiguo(redis_client):
+    """El agujero del lunes: la cabeza avanza (drenaje parcial) pero el
+    mensaje que la releva YA fue visto listo: su edad no vuelve a 0."""
+    _push(redis_client, "prices")
+    _push(redis_client, "prices")
+    t0 = NOW.timestamp() * 1000
+    wd.sample_queues(redis_client, queues=("prices",), now_ms=t0)  # avistamiento
+    # Se consume SOLO la cabeza (drenaje parcial): el relevo ya era conocido.
+    mid = redis_client.lpop("dramatiq:prices")
+    redis_client.hdel("dramatiq:prices.msgs", mid)
+    (sample,) = wd.sample_queues(redis_client, queues=("prices",), now_ms=t0 + 400_000)
+    assert sample.ready_age_seconds == 400.0  # no 0: el relevo llevaba 400 s listo
+
+
+def test_mensaje_joven_no_reinicia_la_edad_del_mas_antiguo(redis_client):
+    _push(redis_client, "prices")
+    t0 = NOW.timestamp() * 1000
+    wd.sample_queues(redis_client, queues=("prices",), now_ms=t0)
+    _push(redis_client, "prices")  # mensaje nuevo al final (FIFO)
+    (sample,) = wd.sample_queues(redis_client, queues=("prices",), now_ms=t0 + 60_000)
+    assert sample.ready_age_seconds == 60.0  # manda el más antiguo
+
+
+def test_cola_vacia_borra_la_anotacion(redis_client):
     _push(redis_client, "prices")
     wd.sample_queues(redis_client, queues=("prices",), now_ms=NOW.timestamp() * 1000)
-    _push(redis_client, "prices")  # nueva cabeza (LIFO no: RPUSH -> la vieja sigue en cabeza)
-    (sample,) = wd.sample_queues(redis_client, queues=("prices",), now_ms=NOW.timestamp() * 1000 + 60_000)
-    assert sample.ready_age_seconds == 60.0  # la cabeza original sigue
-    # Consumir ambas: cola vacía -> edad None y anotación borrada.
-    redis_client.lrange("dramatiq:prices", 0, -1) and [
-        redis_client.lrem("dramatiq:prices", 1, mid) for mid in redis_client.lrange("dramatiq:prices", 0, -1)
-    ]
-    (sample,) = wd.sample_queues(redis_client, queues=("prices",), now_ms=NOW.timestamp() * 1000 + 120_000)
+    mid = redis_client.lpop("dramatiq:prices")
+    redis_client.hdel("dramatiq:prices.msgs", mid)
+    (sample,) = wd.sample_queues(
+        redis_client, queues=("prices",), now_ms=NOW.timestamp() * 1000 + 120_000
+    )
     assert sample.ready_age_seconds is None
-    assert redis_client.get(f"{wd._HEAD_PREFIX}prices") is None
+    assert redis_client.get(f"{wd._SEEN_PREFIX}prices") is None
 
 
 # --- Detección pura: variación neta de profundidad, no completados ------------
