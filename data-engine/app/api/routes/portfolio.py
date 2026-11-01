@@ -24,6 +24,7 @@ from app.models import (
     Company,
     FundamentalModelVersion,
     FXRate,
+    MarketPrice,
     Portfolio,
     PortfolioDailySnapshot,
     Position,
@@ -1249,6 +1250,39 @@ def create_transaction_batch(
         ) from exc
 
 
+def _forget_removed_trade_price(
+    db: Session, company_id: int | None, price: Decimal | None, trade_date: date | None
+) -> None:
+    """Olvida el «precio de mercado» que solo era el de la operación quitada.
+
+    Sin cotización, rebuild_position valora con el precio de la última
+    operación (respaldo A3) y en el siguiente rebuild solo lo reconoce como
+    respaldo si coincide con alguna operación que SIGUE existiendo. Al borrar
+    o editar esa operación, su precio pasaba por cotización real: compras a
+    10 € y 14 €, borrar la de 14 € dejaba 10 títulos a 14 € (+40 € inventados).
+    Una cotización guardada desde esa fecha (MarketPrice) no se toca.
+    """
+    if company_id is None or price is None or trade_date is None:
+        return
+    position = db.scalar(
+        select(Position).where(Position.company_id == company_id, *tenant_filters(db, Position))
+    )
+    if (
+        position is None
+        or position.source != "postgres_ledger"
+        or position.valuation_hold_reason
+        or position.market_price != price
+    ):
+        return
+    quoted = db.scalar(
+        select(MarketPrice.id)
+        .where(MarketPrice.company_id == company_id, MarketPrice.date >= trade_date)
+        .limit(1)
+    )
+    if quoted is None:
+        position.market_price = Decimal("0")
+
+
 @router.put("/transactions/{transaction_id}", response_model=PortfolioTransactionOut)
 def update_transaction(
     transaction_id: int,
@@ -1274,6 +1308,7 @@ def update_transaction(
         )
     service = PortfolioLedgerService()
     original_company_id = transaction.company_id
+    original_price, original_trade_date = transaction.price, transaction.trade_date
     company = service.ensure_company(db, payload.ticker)
     transaction.company_id = company.id
     transaction.action = payload.action
@@ -1291,6 +1326,7 @@ def update_transaction(
         # (posicion fantasma del ticker viejo, venta anterior a su compra
         # aceptada) mientras las cantidades salen del objeto ya editado.
         db.flush()
+        _forget_removed_trade_price(db, original_company_id, original_price, original_trade_date)
         if original_company_id is not None:
             service.rebuild_position(
                 db,
@@ -1323,9 +1359,11 @@ def delete_transaction(transaction_id: int, db: Session = Depends(get_db)) -> No
     if not transaction or transaction.action not in {"buy", "sell"}:
         raise HTTPException(status_code=404, detail="Transaction not found")
     company_id = transaction.company_id
+    removed_price, removed_trade_date = transaction.price, transaction.trade_date
     try:
         db.delete(transaction)
         db.flush()
+        _forget_removed_trade_price(db, company_id, removed_price, removed_trade_date)
         if company_id is not None:
             PortfolioLedgerService().rebuild_position(db, company_id, drop_when_empty=True)
         db.commit()
