@@ -808,6 +808,125 @@ def _plan_answer(db: Session, tenant: int, text: str) -> ChatResponse:
     return _response("\n".join(lines), sources, "account_plan")
 
 
+_N_WORDS = {"un": 1, "una": 1, "a": 1, "one": 1, "dos": 2, "two": 2, "tres": 3, "three": 3, "seis": 6, "six": 6}
+_HIST_AGO = re.compile(
+    r"\bhace\s+(un|una|dos|tres|seis|\d+)\s+(dias?|semanas?|mes|meses|anos?)\b"
+    r"|\b(?:el|los|la|las)\s+ultim[oa]s?\s+(?:(\d+|dos|tres|seis)\s+)?(dias?|semanas?|mes|meses)\b"
+    r"|\b(a|one|two|three|six|\d+)\s+(days?|weeks?|months?|years?)\s+ago\b"
+    r"|\b(?:the\s+)?(?:last|past)\s+(?:(\d+|two|three|six)\s+)?(days?|weeks?|months?)\b"
+)
+_HIST_THIS = re.compile(r"\b(?:est[ae]|this)\s+(semana|mes|week|month)\b")
+_HIST_VERB = re.compile(r"\b(?:valia|subido|bajado|ido|evolucion\w*|variado|cambiado|rentabilidad|ganado|perdido|"
+                        r"worth|done|changed|gone|grown|evolved|return|gained|lost|up|down)\b")
+_UNIT = {"dia": "d", "dias": "d", "day": "d", "days": "d", "semana": "w", "semanas": "w", "week": "w", "weeks": "w",
+         "mes": "m", "meses": "m", "month": "m", "months": "m", "ano": "y", "anos": "y", "year": "y", "years": "y"}
+
+
+def _months_back(day, months: int):
+    from calendar import monthrange
+
+    year, month = divmod(day.year * 12 + day.month - 1 - months, 12)
+    return day.replace(year=year, month=month + 1, day=min(day.day, monthrange(year, month + 1)[1]))
+
+
+def _history_target(text: str):
+    """(fecha de comparación, es_este_periodo) o None si la frase no pide un pasado."""
+    from datetime import timedelta
+
+    today = local_today()
+    this = _HIST_THIS.search(text)
+    if this:
+        if this.group(1) in {"semana", "week"}:
+            return today - timedelta(days=today.weekday() + 1), True
+        return today.replace(day=1) - timedelta(days=1), True
+    match = _HIST_AGO.search(text)
+    if not match:
+        return None
+    groups = [g for g in match.groups()]
+    pairs = [(groups[i], groups[i + 1]) for i in range(0, len(groups), 2) if groups[i + 1]]
+    raw, unit_word = pairs[0]
+    count = int(raw) if raw and raw.isdigit() else _N_WORDS.get(raw or "", 1)
+    unit = _UNIT.get(unit_word, "d")
+    if unit == "d":
+        return today - timedelta(days=count), False
+    if unit == "w":
+        return today - timedelta(days=7 * count), False
+    return _months_back(today, count * (12 if unit == "y" else 1)), False
+
+
+def _asks_history(text: str, question: str) -> bool:
+    return bool((_HIST_AGO.search(text) or _HIST_THIS.search(text)) and _PORTFOLIO_WORD.search(text)
+                and _HIST_VERB.search(text) and not _tickers_in(question) and not re.search(r"\bsi\b|\bif\b", text))
+
+
+def _history_answer(db: Session, tenant: int, text: str) -> ChatResponse:
+    english = _english()
+    target, this_period = _history_target(text) or (local_today(), False)
+    when = (lambda day: _date_en(day)) if english else (lambda day: fecha_es(day))
+    base = select(PortfolioDailySnapshot).where(PortfolioDailySnapshot.tenant_id == tenant)
+    latest = db.scalar(base.order_by(PortfolioDailySnapshot.snapshot_date.desc(),
+                                     PortfolioDailySnapshot.id.desc()).limit(1))
+    if latest is None:
+        return _response(
+            "There is no daily history of your portfolio yet (a snapshot is saved each day when prices refresh)."
+            if english else
+            "Aún no hay histórico diario de tu cartera (se guarda una foto cada día al actualizar precios).",
+            [], "portfolio_history")
+    same = base.where(PortfolioDailySnapshot.portfolio_id == latest.portfolio_id)
+    past = db.scalar(same.where(PortfolioDailySnapshot.snapshot_date <= target)
+                     .order_by(PortfolioDailySnapshot.snapshot_date.desc()).limit(1))
+    sources = [_source("portfolio_snapshot", latest.id, f"Cartera {fecha_es(latest.snapshot_date)}", "/portfolio")]
+    if past is None:
+        first = db.scalar(same.order_by(PortfolioDailySnapshot.snapshot_date.asc()).limit(1))
+        first_day = when(first.snapshot_date) if first else when(latest.snapshot_date)
+        text_out = (f"I have no snapshot of your portfolio on or before {when(target)}: the first one is from {first_day}."
+                    if english else
+                    f"No tengo foto de tu cartera del {when(target)} ni anterior: la primera es del {first_day}.")
+        return _response(text_out, sources, "portfolio_history")
+    if past.id == latest.id or past.snapshot_date >= latest.snapshot_date:
+        if this_period:
+            text_out = (f"There is no snapshot of your portfolio for this period yet (the latest is from "
+                        f"{when(latest.snapshot_date)})." if english else
+                        f"Aún no hay ninguna foto de tu cartera de este {'mes' if 'mes' in text else 'periodo'} "
+                        f"(la última es del {when(latest.snapshot_date)}).")
+        else:
+            text_out = (f"The latest snapshot of your portfolio is from {when(latest.snapshot_date)}; there is nothing "
+                        "newer to compare." if english else
+                        f"La última foto de tu cartera es del {when(latest.snapshot_date)}; no hay nada más nuevo con "
+                        "que comparar.")
+        return _response(text_out, sources, "portfolio_history")
+    currency = latest.base_currency
+    now_value, then_value = float(latest.total_value_base or 0), float(past.total_value_base or 0)
+    flows = db.scalars(same.where(PortfolioDailySnapshot.snapshot_date > past.snapshot_date,
+                                  PortfolioDailySnapshot.snapshot_date <= latest.snapshot_date)).all()
+    flow = float(sum((Decimal(s.net_external_flow_base or 0) for s in flows), Decimal("0")))
+    change = now_value - then_value
+    m = (lambda value, signed=False: _money(value, currency, signed=signed, english=english))
+    if english:
+        lines = [f"On {when(past.snapshot_date)} your portfolio was worth {m(then_value)}; in the latest snapshot "
+                 f"({when(latest.snapshot_date)}), {m(now_value)}: {m(change, True)}."]
+    else:
+        lines = [f"El {when(past.snapshot_date)} tu cartera valía {m(then_value)}; en la última foto "
+                 f"({when(latest.snapshot_date)}), {m(now_value)}: {m(change, True)}."]
+    if latest.cumulative_twr is not None and past.cumulative_twr is not None:
+        ret = (1 + float(latest.cumulative_twr)) / (1 + float(past.cumulative_twr)) - 1
+        label = "TWR"
+    else:
+        ret = (change - flow) / then_value if then_value else None
+        label = "approx." if english else "aprox."
+    pct = f" ({_pct(ret, signed=True, english=english)} {label})" if ret is not None else ""
+    if abs(flow) >= 0.005:
+        lines.append(f"Net deposits/withdrawals in that time: {m(flow, True)}; without them, {m(change - flow, True)}{pct}."
+                     if english else
+                     f"Aportaciones/retiradas netas en ese tiempo: {m(flow, True)}; sin ellas, {m(change - flow, True)}{pct}.")
+    elif pct:
+        lines.append(f"No deposits or withdrawals in that time{pct}." if english
+                     else f"Sin aportaciones ni retiradas en ese tiempo{pct}.")
+    lines.append("Saved daily snapshots, not live prices." if english
+                 else "Fotos diarias guardadas, no cotización en directo.")
+    return _response("\n".join(lines), sources, "portfolio_history")
+
+
 def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     """Respuesta de datos de la cuenta, o None si la pregunta no es de este módulo."""
     tenant = _tenant(db)
@@ -816,6 +935,8 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     text = _fold(question)
     if _asks_daily_change(text):
         return _daily_change_answer(db, tenant)
+    if _asks_history(text, question):
+        return _history_answer(db, tenant, text)
     if _asks_sell_all_tax(text, question):
         return _sell_all_answer(db, tenant)
     if _asks_plan(text, question):
