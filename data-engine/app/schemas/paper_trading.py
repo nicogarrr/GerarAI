@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.valuation.currency import canonical_currency_code, is_currency_code
+
 
 class PaperProposal(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
@@ -23,7 +25,12 @@ class PaperProposal(BaseModel):
     @field_validator("currency")
     @classmethod
     def upper_currency(cls, value):
-        return value.upper() if value else value
+        # Sin .upper() a secas: «GBp» (peniques, el quote de Londres) no es «GBP».
+        if not value:
+            return value
+        if not is_currency_code(value):
+            raise ValueError("Moneda no reconocida (ISO 4217 o subunidad como GBp)")
+        return canonical_currency_code(value)
 
     @field_validator("conviction", "proposed_entry", "stop", "target", "quantity", mode="before")
     @classmethod
