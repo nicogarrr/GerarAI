@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ComponentProps, ComponentType } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
+
+type LazyComponent = ComponentType<Record<string, unknown>>;
 
 const nav = vi.hoisted(() => ({ params: new URLSearchParams(), path: '/portfolio' }));
 vi.mock('next/navigation', () => ({
@@ -9,14 +12,14 @@ vi.mock('next/dynamic', () => ({
     // Respeta el loader: cada vista diferida renderiza su módulo (mockeado
     // abajo) una vez resuelta la promesa. El gráfico NAV (ssr: false) sigue
     // sustituido por un stub ligero con los props que asertan los tests.
-    default: (loader: () => Promise<{ default: any }>, opts?: { ssr?: boolean }) => {
+    default: (loader: () => Promise<{ default: LazyComponent }>, opts?: { ssr?: boolean }) => {
         if (opts?.ssr === false) {
             const NavChartStub = (props: { data: unknown[]; positive: boolean; currency: string }) =>
                 <div data-testid="nav-chart" data-points={props.data.length} data-positive={String(props.positive)} data-currency={props.currency} />;
             NavChartStub.displayName = "NavChartStub";
             return NavChartStub;
         }
-        let Comp: any = null;
+        let Comp: LazyComponent | null = null;
         void loader().then((mod) => { Comp = mod.default; });
         return function LazyStub(props: Record<string, unknown>) {
             return Comp ? <Comp {...props} /> : null;
@@ -36,13 +39,15 @@ vi.mock('@/components/portfolio/PortfolioForecast', () => ({ default: () => <div
 vi.mock('@/components/portfolio/PortfolioDividends', () => ({ default: () => <div>dividends-tab</div> }));
 import PortfolioTabs from '@/components/portfolio/PortfolioTabs';
 
-function summary(over: Record<string, unknown> = {}): any {
+type TabsProps = ComponentProps<typeof PortfolioTabs>;
+
+function summary(over: Record<string, unknown> = {}): TabsProps['summary'] {
     return { totalValue: 10000, totalCost: 8000, totalGain: 2000, totalGainPercent: 25, baseCurrency: 'EUR', cash: 0,
-        holdings: [{ symbol: 'A', cost: 8000, value: 10000, gain: 2000, gainPercent: 25 }], quality: undefined, ...over };
+        holdings: [{ symbol: 'A', cost: 8000, value: 10000, gain: 2000, gainPercent: 25 }], quality: undefined, ...over } as TabsProps['summary'];
 }
 function renderTabs(over: Record<string, unknown> = {}) {
-    return render(<PortfolioTabs summary={summary()} transactions={[]} scores={{} as any} tearsheet={null}
-        forecast={null} dividends={null} userId="u" {...over as any} />);
+    return render(<PortfolioTabs summary={summary()} transactions={[]} scores={{} as TabsProps['scores']} tearsheet={null}
+        forecast={null} dividends={null} userId="u" {...(over as Partial<TabsProps>)} />);
 }
 const selected = () => screen.getAllByRole('tab').find((t) => t.getAttribute('aria-selected') === 'true')!.textContent;
 // Las vistas de pestaña no inicial cargan diferidas (next/dynamic): su mock se
@@ -75,7 +80,7 @@ describe('PortfolioTabs pestana desde la URL', () => {
         const { rerender } = renderTabs();
         expect(selected()).toBe('Resumen');
         nav.params = new URLSearchParams({ tab: 'posiciones' });
-        rerender(<PortfolioTabs summary={summary()} transactions={[]} scores={{} as any} tearsheet={null} forecast={null} dividends={null} userId="u" />);
+        rerender(<PortfolioTabs summary={summary()} transactions={[]} scores={{} as TabsProps['scores']} tearsheet={null} forecast={null} dividends={null} userId="u" />);
         await flushDynamic();
         expect(selected()).toBe('Posiciones');
     });

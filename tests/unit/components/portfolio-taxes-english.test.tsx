@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ComponentProps, ComponentType } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { LocaleProvider } from '@/lib/i18n/client';
 
@@ -6,14 +7,16 @@ import { LocaleProvider } from '@/lib/i18n/client';
 // dividendos y el desglose 0588 deben pintarse en inglés, no en el español por
 // defecto de los parámetros `ti`/`f`.
 
+type LazyComponent = ComponentType<Record<string, unknown>>;
+
 const nav = vi.hoisted(() => ({ params: new URLSearchParams({ tab: 'dividendos' }) }));
 vi.mock('next/navigation', () => ({
     useSearchParams: () => nav.params, usePathname: () => '/portfolio', useRouter: () => ({ refresh: vi.fn() }),
 }));
 vi.mock('next/dynamic', () => ({
-    default: (loader: () => Promise<{ default: any }>, opts?: { ssr?: boolean }) => {
+    default: (loader: () => Promise<{ default: LazyComponent }>, opts?: { ssr?: boolean }) => {
         if (opts?.ssr === false) return function Stub() { return null; };
-        let Comp: any = null;
+        let Comp: LazyComponent | null = null;
         void loader().then((mod) => { Comp = mod.default; });
         return function LazyStub(props: Record<string, unknown>) { return Comp ? <Comp {...props} /> : null; };
     },
@@ -39,14 +42,19 @@ import PortfolioTabs from '@/components/portfolio/PortfolioTabs';
 import { FilingSection } from '@/components/taxes/FilingSections';
 import { translateMessage } from '@/lib/i18n/translate';
 
-const summary: any = { totalValue: 1, totalCost: 1, totalGain: 0, totalGainPercent: 0, baseCurrency: 'EUR', cash: 0, holdings: [] };
+type TabsProps = ComponentProps<typeof PortfolioTabs>;
+
+const summary: TabsProps['summary'] = {
+    totalValue: 1, totalCost: 1, totalGain: 0, totalGainPercent: 0, baseCurrency: 'EUR', cash: 0, holdings: [],
+    equityValue: 1, status: 'ok', missingFx: [], valuationHold: [],
+};
 const holdingsEn = translateMessage('en', 'portfolio.holdings.title');
 
 describe('cartera en inglés', () => {
     it.each([['dividendos', 'dividends'], ['prevision', 'forecast']])('?tab=%s recibe el idioma activo', async (tab, label) => {
         nav.params = new URLSearchParams({ tab });
-        render(<LocaleProvider locale="en"><PortfolioTabs summary={summary} transactions={[]} scores={{} as any}
-            tearsheet={null} forecast={{} as any} dividends={{} as any} userId="u" /></LocaleProvider>);
+        render(<LocaleProvider locale="en"><PortfolioTabs summary={summary} transactions={[]} scores={{} as TabsProps['scores']}
+            tearsheet={null} forecast={{} as TabsProps['forecast']} dividends={{} as TabsProps['dividends']} userId="u" /></LocaleProvider>);
         await act(async () => {});
         expect(await screen.findByText(`${label}:${holdingsEn}`)).toBeInTheDocument();
     });
