@@ -133,3 +133,50 @@ def test_session_failure_is_a_structured_error_with_context(env, monkeypatch):
     out = worker.review_theses.fn(tenant_id=1, user_id="u", ticker="AAA")
     assert out["status"] == "error"
     assert out["error"]["context"] == {"tenant_id": 1, "user_id": "u", "ticker": "AAA"}
+
+
+# ---------- presupuesto de tiempo (dead-letter de prod, 1-nov-2026) ----------
+# 5 review_theses murieron por TimeLimitExceeded (10 min por defecto): una
+# tesis por empresa con LLM, todas en la misma corrida.
+
+
+class _FakeClock:
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self):
+        return self.now
+
+
+def test_presupuesto_agotado_corta_entre_empresas_y_encola_la_continuacion(env, monkeypatch):
+    from app.services import ticker_news_lane
+
+    clock = _FakeClock()
+    real_deadline = ticker_news_lane.Deadline
+    monkeypatch.setattr(ticker_news_lane, "Deadline", lambda seconds: real_deadline(seconds, clock=clock))
+    sent = []
+    monkeypatch.setattr(worker.review_theses, "send", lambda *a, **k: sent.append(k))
+
+    class SlowSvc:
+        def generate(self, session, ticker, force_new_version=False):
+            env.generated.append((ticker, force_new_version))
+            clock.now += worker.REVIEW_THESES_BUDGET_SECONDS + 1  # una tesis gasta todo el presupuesto
+            return SimpleNamespace(id=100 + len(env.generated), version=2, status="published", created_at=NOW)
+
+    monkeypatch.setattr(thesis_service, "ThesisService", SlowSvc)
+    for t in ("AAA", "BBB", "CCC"):
+        _change(env, t, NOW - timedelta(hours=1))
+    out = worker.review_theses.fn(tenant_id=1, user_id="u")
+    assert [g[0] for g in env.generated] == ["AAA"]
+    assert out["status"] == "partial"
+    assert out["truncated"] is True
+    assert sent == [{"tenant_id": 1, "user_id": "u", "ticker": None, "start_after": "AAA"}]
+
+
+def test_continuacion_empieza_despues_del_cursor(env):
+    for t in ("AAA", "BBB", "CCC"):
+        _change(env, t, NOW - timedelta(hours=1))
+    out = worker.review_theses.fn(tenant_id=1, user_id="u", start_after="AAA")
+    assert [g[0] for g in env.generated] == ["BBB", "CCC"]
+    assert out["status"] == "ok"
+    assert out["truncated"] is False

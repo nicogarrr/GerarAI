@@ -360,3 +360,31 @@ def test_carril_nuevo_nace_cerrado_por_defecto(monkeypatch):
     assert (event.metadata_ or {}).get("news_lane") == "carril_futuro"
     db.close()
     engine.dispose()
+
+
+
+# ---------- presupuesto de tiempo del carril macro ----------
+# Prod (1-nov-2026): 2 refresh_macro_news murieron por TimeLimitExceeded. El
+# actor no declaraba time_limit (10 min) y 10 temas con pacing GDELT de hasta
+# 120 s por consulta y reintentos 429 en linea no caben.
+
+
+def test_macro_corta_por_presupuesto_y_deja_temas_para_el_siguiente_tick(macro_env, monkeypatch):
+    from app.services import ticker_news_lane
+
+    now = {"t": 0.0}
+    real_deadline = ticker_news_lane.Deadline
+    monkeypatch.setattr(ticker_news_lane, "Deadline", lambda seconds: real_deadline(seconds, clock=lambda: now["t"]))
+    item = ConnectorItem(source="gdelt", title="Oro al alza", url="https://x.example/1")
+
+    class _Slow(_FakeMacroService):
+        async def poll_gdelt(self, query, *, ticker=None, max_records=15):
+            now["t"] += dramatiq_app.MACRO_NEWS_BUDGET_SECONDS / 2 + 1
+            return await super().poll_gdelt(query, ticker=ticker, max_records=max_records)
+
+    service = _Slow(items=[item])
+    macro_env(service, _FakeRedis())
+    result = dramatiq_app.refresh_macro_news(tenant_id=3, user_id="u1")
+    assert service.polls == 2
+    assert result["truncated"] is True
+    assert result["status"] == "partial"

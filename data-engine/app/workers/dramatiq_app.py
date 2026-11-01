@@ -3588,6 +3588,11 @@ def _gdelt_macro_cache_set(client, theme: str, result) -> None:
         return
 
 
+# Presupuesto del barrido macro: deja ~3 min de margen hasta el TimeLimit
+# por defecto (10 min) para el tema en vuelo y su ingesta.
+MACRO_NEWS_BUDGET_SECONDS = 420
+
+
 @dramatiq.actor(max_retries=6, min_backoff=60_000, max_backoff=900_000, queue_name=GDELT_QUEUE_NAME)
 @_coalesce_on_success("refresh_macro_news", 50 * 60, ("tenant_id",))
 def refresh_macro_news(
@@ -3648,7 +3653,16 @@ def refresh_macro_news(
                 cache_client = _redis_client()
             except Exception:  # noqa: BLE001 — cache fail-open
                 cache_client = None
+            from app.services.ticker_news_lane import Deadline, finalize_status
+
+            # Sin presupuesto, 10 temas con pacing GDELT (hasta 120 s por
+            # consulta) y reintentos 429 en linea pasaban de los 10 min del
+            # TimeLimit y el lote moria entero (prod, 1-nov). Corte limpio
+            # entre temas: los restantes los cubre el siguiente tick.
+            deadline = Deadline(MACRO_NEWS_BUDGET_SECONDS)
             for theme, query in iter_macro_queries():
+                if deadline.expired():
+                    break
                 result = _gdelt_macro_cache_get(cache_client, theme)
                 if result is None:
                     try:
@@ -3728,10 +3742,11 @@ def refresh_macro_news(
                     processed += 1
                 ingested += int(ingestion.get("created", 0))
             return {
-                "status": _batch_status(processed, errors),
+                "status": finalize_status(_batch_status(processed, errors), deadline.truncated),
                 "actor": actor_name,
                 "themes_processed": processed,
                 "news_ingested": ingested,
+                "truncated": deadline.truncated,
                 "errors": errors,
             }
         finally:
@@ -3963,12 +3978,19 @@ def scan_contradictions(
         return _handle_actor_error(actor_name, exc, tenant_id=tenant_id, user_id=user_id)
 
 
+# Presupuesto por corrida de review_theses: una tesis por empresa con LLM;
+# cortar a los 6 min deja 4 min de margen hasta el TimeLimit por defecto para
+# la tesis en vuelo. El resto sigue en una continuacion con cursor.
+REVIEW_THESES_BUDGET_SECONDS = 360
+
+
 @dramatiq.actor(max_retries=1)
 @_coalesce_on_success("review_theses", 20 * 3600, ("tenant_id", "ticker"))
 def review_theses(
     tenant_id: int | None = None,
     user_id: str | None = None,
     ticker: str | None = None,
+    start_after: str | None = None,
 ) -> dict[str, Any]:
     actor_name = "review_theses"
     try:
@@ -3996,11 +4018,20 @@ def review_theses(
                     "pending_changes": 0,
                     "reviews": [],
                 }
+            if start_after:
+                statement = statement.where(Company.ticker > start_after)
+
+            from app.services.ticker_news_lane import Deadline, finalize_status
 
             service = ThesisService()
             reviews: list[dict] = []
             errors: list[dict] = []
+            deadline = Deadline(REVIEW_THESES_BUDGET_SECONDS)
+            last_ticker: str | None = None
             for company in db.scalars(statement.order_by(Company.ticker)).all():
+                if last_ticker is not None and deadline.expired():
+                    break
+                last_ticker = company.ticker
                 try:
                     thesis = service.generate(db, company.ticker, force_new_version=False)
                     resolved = 0
@@ -4039,12 +4070,18 @@ def review_theses(
                             "message": str(exc),
                         }
                     )
+            if deadline.truncated:
+                # Antes todas las empresas iban en una corrida y el TimeLimit
+                # (10 min) la mataba a mitad (prod, 1-nov): sigue en otro
+                # mensaje desde la ultima empresa tratada.
+                review_theses.send(tenant_id=tenant_id, user_id=user_id, ticker=ticker, start_after=last_ticker)
             return {
-                "status": _batch_status(len(reviews), errors),
+                "status": finalize_status(_batch_status(len(reviews), errors), deadline.truncated),
                 "actor": actor_name,
                 "companies_reviewed": len(reviews),
                 "pending_changes": len(pending),
                 "reviews": reviews,
+                "truncated": deadline.truncated,
                 "errors": errors,
             }
         finally:
