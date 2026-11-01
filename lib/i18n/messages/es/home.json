@@ -42,6 +42,7 @@
   },
   "fair": {
     "none": "Sin valor justo",
+    "abbr": "VJ",
     "title": "Valor justo · {label}",
     "source": {
       "tesis": "tesis",

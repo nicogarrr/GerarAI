@@ -6,7 +6,8 @@
   "rank": "Rank",
   "coverage": "Coverage",
   "confidence": "Confidence",
-  "metaDescription": "Liquid large caps with real price and market cap, saved filters from the analysis engine, and offline reading with Finnhub.",
+  "metaTitle": "Explore stocks",
+  "metaDescription": "Liquid large caps with real price and market cap, saved filters from the analysis engine, and an offline price reading.",
   "vistas": {
     "empresas": "Companies",
     "subidas": "Gainers",
@@ -37,6 +38,7 @@
   "tableRegionLabel": "Opportunities by sector",
   "tableCaption": "Screener opportunities by sector: ticker, name, price, session change, market cap and follow action",
   "colName": "Name",
+  "colPrice": "Price",
   "colChange": "Session change",
   "colMarketCap": "Market cap",
   "colFollow": "Follow",
@@ -54,7 +56,7 @@
     "other": "{count} saved filters"
   },
   "openScreeners": "Open screeners",
-  "engineDownText": "The table shows Finnhub prices as an offline reading, without coverage analysis. The saved-filter engine is unavailable.",
+  "engineDownText": "The table shows prices as an offline reading, without coverage analysis. The saved-filter engine is unavailable.",
   "noSavedFiltersText": "The analysis engine responds, but there are no saved filters.",
   "createFirstLink": "Create the first one in Screeners",
   "sectorFilterLabel": "Filter by sector",

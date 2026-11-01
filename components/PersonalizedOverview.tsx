@@ -80,7 +80,7 @@ function HomeFairValueHint({ holding, signals }: { holding: PortfolioHolding; si
     const gap = fairValueGapPercent(holding.currentPrice, holding.nativeCurrency, fair);
     return (
         <span className="whitespace-nowrap text-[11px] text-gray-400" title={t('home.fair.title', { label: fair.label })}>
-            VJ {gap !== null ? formatPercent(gap, { fromRatio: false, digits: 0, signDisplay: 'always' }) : formatNumber(fair.value)}
+            {t('home.fair.abbr')} {gap !== null ? formatPercent(gap, { fromRatio: false, digits: 0, signDisplay: 'always' }) : formatNumber(fair.value)}
             <span className="text-gray-500"> · {fair.source === 'tesis' ? t('home.fair.source.tesis') : fair.source === 'motor' ? t('home.fair.source.motor') : t('home.fair.source.orient')}</span>
         </span>
     );

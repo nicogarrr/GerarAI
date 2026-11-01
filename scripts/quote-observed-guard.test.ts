@@ -23,5 +23,5 @@ import { fileURLToPath } from 'node:url';
 // como si el precio fuese de ese instante.
 test('índices del screener declaran la vela diaria (hora de apertura)', () => {
     const screener = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'app/(root)/screener/page.tsx'), 'utf8');
-    assert.ok(screener.includes("quoteObserved(i.priceAsOf, 'daily_candle_open')"), 'índices con kind daily_candle_open');
+    assert.ok(screener.includes("quoteObserved(i.priceAsOf, 'daily_candle_open'"), 'índices con kind daily_candle_open');
 });

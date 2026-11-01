@@ -6,7 +6,8 @@
   "rank": "Ranking",
   "coverage": "Cobertura",
   "confidence": "Confianza",
-  "metaDescription": "Large caps líquidos con precio y market cap reales, filtros guardados del motor de análisis y lectura offline con Finnhub.",
+  "metaTitle": "Explorar acciones",
+  "metaDescription": "Large caps líquidos con precio y market cap reales, filtros guardados del motor de análisis y lectura offline de precios.",
   "vistas": {
     "empresas": "Empresas",
     "subidas": "Subidas",
@@ -37,6 +38,7 @@
   "tableRegionLabel": "Oportunidades por sector",
   "tableCaption": "Oportunidades del screener por sector: ticker, nombre, precio, cambio de sesión, capitalización y acción de seguir",
   "colName": "Nombre",
+  "colPrice": "Precio",
   "colChange": "Cambio sesión",
   "colMarketCap": "Capitalización",
   "colFollow": "Seguir",
@@ -54,7 +56,7 @@
     "other": "{count} filtros guardados"
   },
   "openScreeners": "Abrir screeners",
-  "engineDownText": "La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertura. El motor de filtros guardados no está disponible.",
+  "engineDownText": "La tabla muestra precios como lectura offline, sin análisis de cobertura. El motor de filtros guardados no está disponible.",
   "noSavedFiltersText": "El motor de análisis responde, pero no hay filtros guardados.",
   "createFirstLink": "Crea el primero en Screeners",
   "sectorFilterLabel": "Filtrar por sector",

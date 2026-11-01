@@ -42,8 +42,10 @@ test('facts panels: cifras no oficiales sin etiqueta de fuente', () => {
 });
 
 test('screener: lectura offline sin nombre de proveedor', () => {
-    const page = read('app/(root)/screener/page.tsx');
-    assert.doesNotMatch(page, /precios Finnhub|lectura offline con Finnhub/);
+    // El aviso vive en el diccionario: solo se añaden sus dos claves (es y en).
+    const dicts = ['es', 'en'].map((lang) => JSON.parse(read(`lib/i18n/messages/${lang}/screener.json`)));
+    const page = read('app/(root)/screener/page.tsx') + JSON.stringify(dicts.map((d) => [d.engineDownText, d.metaDescription]));
+    assert.doesNotMatch(page, /precios Finnhub|lectura offline con Finnhub|Finnhub prices|with Finnhub/);
     assert.match(page, /La tabla muestra precios como lectura offline/);
 });
 

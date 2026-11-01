@@ -21,7 +21,9 @@ import { readFileSync } from 'node:fs';
 import { marketIndexUnit } from '../lib/marketIndexUnit.ts';
 
 const route = readFileSync('data-engine/app/api/routes/market.py', 'utf8');
-const screener = readFileSync('app/(root)/screener/page.tsx', 'utf8');
+// El título de la tarjeta vive en es/screener.json (solo esa clave).
+const screener = readFileSync('app/(root)/screener/page.tsx', 'utf8')
+  + JSON.stringify({ indicesTitle: JSON.parse(readFileSync('lib/i18n/messages/es/screener.json', 'utf8')).indicesTitle });
 const overview = readFileSync('components/PersonalizedOverview.tsx', 'utf8');
 const actions = readFileSync('lib/actions/market.actions.ts', 'utf8');
 
@@ -59,7 +61,7 @@ describe('market index units guard (F152)', () => {
     assert.match(screener, /formatPrice\(i\.price, 'USD'\)/, 'el US$ vive solo en la rama usd');
     assert.match(
       screener,
-      /i\.unit === 'usd'\s*\?\s*formatPrice\(i\.price, 'USD'\)\s*:\s*formatNumber\(i\.price/,
+      /i\.unit === 'usd'\s*\?\s*(?:fmt\.)?formatPrice\(i\.price, 'USD'\)\s*:\s*(?:fmt\.)?formatNumber\(i\.price/,
       'la rama no-usd va como número plano, nunca como dinero',
     );
   });

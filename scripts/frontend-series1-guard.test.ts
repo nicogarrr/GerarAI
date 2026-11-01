@@ -38,8 +38,8 @@ test('volume belongs to most-active movers only and screener has units', () => {
   assert.match(movers, /showVolume \? <th/);
   assert.match(movers, /caption=\{caption\} tickerSets=\{tickerSets\} showVolume=\{vista === 'activas'\}/);
   const screener = read('app/(root)/screener/page.tsx');
-  assert.match(screener, /formatMarketCapUsd\(value\)/);
-  assert.match(screener, /screenerMarketCap\(r.marketCap\)/);
+  assert.match(screener, /formatMarketCapUsd\(value[,)]/);
+  assert.match(screener, /screenerMarketCap\(r.marketCap[,)]/);
 });
 
 test('decisional fields removed from columns stay reachable in row detail (auditoria SERIE 1)', () => {
