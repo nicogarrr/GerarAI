@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Panel } from '@/components/ui/panel';
 import { formatUserDateTime } from '@/lib/format';
+import { useLocale, useT } from '@/lib/i18n/client';
+import type { TranslationKey } from '@/lib/i18n/t';
 import { metricLabel } from '@/lib/research/metric-labels';
 import { changeHeadlineCopy, changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
 import { groupReviews } from '@/lib/research/review-groups';
@@ -14,11 +16,11 @@ import { Pager } from './Pager';
 export const CHANGES_PAGE_SIZE = 10;
 type Filter = 'all' | 'reviews' | 'alerts';
 
-const DIRECTION_LABEL: Record<ChangeDirection, string> = {
-  improves: 'Mejora',
-  worsens: 'Empeora',
-  mixed: 'Mixto',
-  none: 'Sin conclusión',
+const DIRECTION_KEY: Record<ChangeDirection, TranslationKey> = {
+  improves: 'research.changesFeed.directionImproves',
+  worsens: 'research.changesFeed.directionWorsens',
+  mixed: 'research.changesFeed.directionMixed',
+  none: 'research.changesFeed.directionNone',
 };
 const DIRECTION_CLASS: Record<ChangeDirection, string> = {
   improves: 'bg-emerald-500/10 text-emerald-300',
@@ -29,26 +31,29 @@ const DIRECTION_CLASS: Record<ChangeDirection, string> = {
 
 
 function EventCard({ event, ticker, open, onToggle }: { event: ChangeEvent; ticker: string; open?: boolean; onToggle?: (open: boolean) => void }) {
+  const t = useT();
+  const locale = useLocale();
+  const dateTime = (value: string | null | undefined) => formatUserDateTime(value, undefined, undefined, locale);
   const lead = event.changes[0];
   const openReview = event.reviews.find((r) => isOpenReview(r.status));
-  const title = changeHeadlineCopy(lead?.summary ?? openReview?.title ?? event.alerts[0]?.message ?? 'Registro sin resumen');
+  const title = changeHeadlineCopy(lead?.summary ?? openReview?.title ?? event.alerts[0]?.message ?? t('research.changesFeed.noSummary'));
   const records = event.changes.length + event.reviews.length + event.alerts.length;
   const touches = [
-    ...event.metrics.map((metric) => metricLabel(metric)),
-    ...(event.claimCount ? [`${event.claimCount} ${event.claimCount === 1 ? 'afirmación' : 'afirmaciones'} de la tesis`] : []),
+    ...event.metrics.map((metric) => metricLabel(metric, locale)),
+    ...(event.claimCount ? [t(event.claimCount === 1 ? 'research.changesFeed.claimsOne' : 'research.changesFeed.claimsMany', { count: event.claimCount })] : []),
   ];
   return (
     <li className="scroll-mt-24 rounded-lg border border-gray-800 p-4" data-testid="change-event" id={lead ? `thesis-change-${lead.id}` : undefined}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${DIRECTION_CLASS[event.direction]}`}>{DIRECTION_LABEL[event.direction]}</span>
-        {lead ? <Badge variant="outline">{changeTypeLabel(lead.change_type)}</Badge> : null}
-        {event.hasOpenReview || event.requiresReview ? <Badge>revisión pendiente</Badge> : <Badge variant="outline">sin revisión abierta</Badge>}
-        {event.alerts.length ? <Badge variant="outline">{event.alerts.length === 1 ? '1 alerta' : `${event.alerts.length} alertas`}</Badge> : null}
+        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${DIRECTION_CLASS[event.direction]}`}>{t(DIRECTION_KEY[event.direction])}</span>
+        {lead ? <Badge variant="outline">{changeTypeLabel(lead.change_type, locale)}</Badge> : null}
+        {event.hasOpenReview || event.requiresReview ? <Badge>{t('research.changesFeed.reviewPending')}</Badge> : <Badge variant="outline">{t('research.changesFeed.noOpenReview')}</Badge>}
+        {event.alerts.length ? <Badge variant="outline">{event.alerts.length === 1 ? t('research.changesFeed.alertsOne') : t('research.changesFeed.alertsMany', { count: event.alerts.length })}</Badge> : null}
       </div>
       <p className="mt-3 break-words text-sm text-gray-300">{title.text}</p>
       {title.note ? <p className="mt-2 text-xs text-amber-300">{title.note}</p> : null}
-      <p className="mt-2 text-xs text-gray-500">{event.latest ? `${formatUserDateTime(event.latest)} (Madrid)` : 'Fecha desconocida'}</p>
-      {touches.length ? <p className="mt-1 text-xs text-gray-500">Supuesto afectado: {touches.join(' · ')}</p> : null}
+      <p className="mt-2 text-xs text-gray-500">{event.latest ? t('research.changesFeed.dateMadrid', { date: dateTime(event.latest) }) : t('research.changesFeed.unknownDate')}</p>
+      {touches.length ? <p className="mt-1 text-xs text-gray-500">{t('research.changesFeed.affectedAssumption', { items: touches.join(' · ') })}</p> : null}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {openReview ? (
           <button
@@ -56,23 +61,23 @@ function EventCard({ event, ticker, open, onToggle }: { event: ChangeEvent; tick
             onClick={() => window.dispatchEvent(new CustomEvent('gerarai:open-brain', { detail: { ticker, review_id: openReview.id } }))}
             type="button"
           >
-            Abrir en el Cerebro
+            {t('research.changesFeed.openInBrain')}
           </button>
         ) : null}
-        <a className="text-xs text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>Ver la tesis</a>
+        <a className="text-xs text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>{t('research.changesFeed.viewThesis')}</a>
       </div>
       {records > 1 || event.reviews.length || event.alerts.length ? (
         <details className="mt-3 text-sm text-gray-400" onToggle={onToggle ? (e) => onToggle(e.currentTarget.open) : undefined} open={open ?? false}>
-          <summary className="min-h-11 cursor-pointer text-xs text-gray-400 sm:min-h-0">Ver los {records} registros originales</summary>
+          <summary className="min-h-11 cursor-pointer text-xs text-gray-400 sm:min-h-0">{t('research.changesFeed.viewRecords', { count: records })}</summary>
           <div className="mt-2 space-y-2">
             {event.changes.map((c: ResearchThesisChange) => (
-              <p className="rounded border border-gray-800 p-2 text-xs" id={`thesis-change-${c.id}`} key={`c${c.id}`}><span className="text-gray-500">Cambio · {formatUserDateTime(c.created_at)} · materialidad {c.materiality_score}</span><br />{changeSummaryText(c.summary)}</p>
+              <p className="rounded border border-gray-800 p-2 text-xs" id={`thesis-change-${c.id}`} key={`c${c.id}`}><span className="text-gray-500">{t('research.changesFeed.changeMeta', { date: dateTime(c.created_at), score: c.materiality_score })}</span><br />{changeSummaryText(c.summary)}</p>
             ))}
             {groupReviews(event.reviews.map((r) => ({ id: r.id, title: r.title, created_at: r.created_at }))).map((g) => (
-              <p className="rounded border border-gray-800 p-2 text-xs" key={`r${g.ids[0]}`}><span className="text-gray-500">Revisión{g.count > 1 ? ` ×${g.count}` : ''}{g.latest ? ` · ${formatUserDateTime(g.latest)}` : ''}</span><br />{g.title}</p>
+              <p className="rounded border border-gray-800 p-2 text-xs" key={`r${g.ids[0]}`}><span className="text-gray-500">{t('research.changesFeed.review')}{g.count > 1 ? ` ×${g.count}` : ''}{g.latest ? ` · ${dateTime(g.latest)}` : ''}</span><br />{g.title}</p>
             ))}
             {event.alerts.map((a) => (
-              <p className="rounded border border-gray-800 p-2 text-xs" key={`a${a.id}`}><span className="text-gray-500">Alerta ({a.severity}) · {formatUserDateTime(a.created_at)}</span><br />{a.message}</p>
+              <p className="rounded border border-gray-800 p-2 text-xs" key={`a${a.id}`}><span className="text-gray-500">{t('research.changesFeed.alertMeta', { severity: a.severity, date: dateTime(a.created_at) })}</span><br />{a.message}</p>
             ))}
           </div>
         </details>
@@ -93,6 +98,7 @@ export function ChangesFeed({ ticker, changes, reviews, alerts }: {
   reviews: EventReview[];
   alerts: EventAlert[];
 }) {
+  const t = useT();
   const [filter, setFilter] = useState<Filter>('all');
   const [page, setPage] = useState(1);
   const [openKeys, setOpenKeys] = useState<ReadonlySet<string>>(new Set());
@@ -137,9 +143,9 @@ export function ChangesFeed({ ticker, changes, reviews, alerts }: {
     >{text} ({counts[id]})</button>
   );
   return (
-    <Panel title="Qué ha cambiado">
-      <div className="mb-3 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Filtrar sucesos">
-        {chip('all', 'Todos')}{chip('reviews', 'Revisiones abiertas')}{chip('alerts', 'Alertas')}
+    <Panel title={t('research.changesFeed.title')}>
+      <div className="mb-3 flex gap-2 overflow-x-auto pb-1" role="group" aria-label={t('research.changesFeed.filterAria')}>
+        {chip('all', t('research.changesFeed.filterAll'))}{chip('reviews', t('research.changesFeed.filterReviews'))}{chip('alerts', t('research.changesFeed.filterAlerts'))}
       </div>
       {view.items.length ? (
         <ul className="space-y-3">{view.items.map((event) => (
@@ -156,9 +162,9 @@ export function ChangesFeed({ ticker, changes, reviews, alerts }: {
           />
         ))}</ul>
       ) : (
-        <p className="text-sm text-gray-500">{events.length ? 'Ningún suceso coincide con este filtro.' : 'Sin cambios materiales registrados.'}</p>
+        <p className="text-sm text-gray-500">{events.length ? t('research.changesFeed.emptyFiltered') : t('research.changesFeed.empty')}</p>
       )}
-      <Pager label="sucesos" onPage={setPage} page={view.page} pages={view.pages} total={filtered.length} />
+      <Pager label={t('research.changesFeed.pagerUnit')} onPage={setPage} page={view.page} pages={view.pages} total={filtered.length} />
     </Panel>
   );
 }

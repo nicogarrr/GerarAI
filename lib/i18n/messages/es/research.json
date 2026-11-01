@@ -1083,5 +1083,41 @@
     "reviewData": "Revisar datos y fuentes",
     "reviewAssumptions": "Revisar supuestos",
     "viewModel": "Ver modelo a largo plazo"
+  },
+  "changesFeed": {
+    "directionImproves": "Mejora",
+    "directionWorsens": "Empeora",
+    "directionMixed": "Mixto",
+    "directionNone": "Sin conclusión",
+    "noSummary": "Registro sin resumen",
+    "claimsOne": "{count} afirmación de la tesis",
+    "claimsMany": "{count} afirmaciones de la tesis",
+    "reviewPending": "revisión pendiente",
+    "noOpenReview": "sin revisión abierta",
+    "alertsOne": "1 alerta",
+    "alertsMany": "{count} alertas",
+    "dateMadrid": "{date} (Madrid)",
+    "unknownDate": "Fecha desconocida",
+    "affectedAssumption": "Supuesto afectado: {items}",
+    "openInBrain": "Abrir en el Cerebro",
+    "viewThesis": "Ver la tesis",
+    "viewRecords": "Ver los {count} registros originales",
+    "changeMeta": "Cambio · {date} · materialidad {score}",
+    "review": "Revisión",
+    "alertMeta": "Alerta ({severity}) · {date}",
+    "title": "Qué ha cambiado",
+    "filterAria": "Filtrar sucesos",
+    "filterAll": "Todos",
+    "filterReviews": "Revisiones abiertas",
+    "filterAlerts": "Alertas",
+    "emptyFiltered": "Ningún suceso coincide con este filtro.",
+    "empty": "Sin cambios materiales registrados.",
+    "pagerUnit": "sucesos"
+  },
+  "documentsList": {
+    "searchAria": "Buscar documentos",
+    "searchPlaceholder": "Buscar por título o tipo",
+    "noMatch": "Ningún documento coincide con la búsqueda.",
+    "pagerUnit": "documentos"
   }
 }

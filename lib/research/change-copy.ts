@@ -11,9 +11,22 @@ const CHANGE_TYPE_LABELS: Record<string, string> = {
     claim_uncertain: 'afirmación incierta',
 };
 
-export function changeTypeLabel(value: string | null | undefined): string {
-    if (!value) return 'N/D';
-    return CHANGE_TYPE_LABELS[value] ?? value.replaceAll('_', ' ');
+const CHANGE_TYPE_LABELS_EN: Record<string, string> = {
+    update: 'update',
+    earnings_update: 'earnings',
+    news_material_update: 'material news',
+    news_potential_invalidation: 'possible invalidation',
+    news_material_positive: 'positive news',
+    claim_contradiction: 'contradicted claim',
+    claim_superseded: 'superseded claim',
+    claim_stale: 'outdated claim',
+    claim_uncertain: 'uncertain claim',
+};
+
+export function changeTypeLabel(value: string | null | undefined, locale: 'es' | 'en' = 'es'): string {
+    if (!value) return locale === 'en' ? '—' : 'N/D';
+    const table = locale === 'en' ? CHANGE_TYPE_LABELS_EN : CHANGE_TYPE_LABELS;
+    return table[value] ?? value.replaceAll('_', ' ');
 }
 
 const LEGACY_PREFIXES: Array<[RegExp, string]> = [
