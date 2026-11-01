@@ -9,7 +9,7 @@ import { searchStocksWithStatus, getPopularStocks } from "@/lib/actions/finnhub.
 import { loadPopularStocks } from "@/lib/popular-stocks-loader";
 import { isNextRedirectError } from "@/lib/types/errors";
 import { flattenNavItems, ROUTE_CATALOG, SYMBOL_VALIDATION } from "@/lib/constants";
-import { useT } from "@/lib/i18n/client";
+import { useLocale, useT } from "@/lib/i18n/client";
 import { navItemMatchesSearch, navSectionMatchesSearch } from "@/lib/search/nav-search";
 import { closeSearchCommand } from "@/lib/search/search-command-store";
 import { parseTickerCommand } from "@/lib/research/ticker-commands";
@@ -24,6 +24,7 @@ import { etiquetaTipoInstrumento } from "@/lib/labels";
  */
 export default function SearchCommandDialog({ open, initialStocks, getFocusTarget }: SearchCommandDialogProps) {
     const t = useT();
+    const locale = useLocale();
     const router = useRouter()
     const [searchTerm, setSearchTerm] = useState("")
     const [loading, setLoading] = useState(false)
@@ -331,7 +332,7 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                                             <TrendingUp aria-hidden="true" className="h-4 w-4 text-gray-500" />
                                             <div className="min-w-0 flex-1">
                                                 <div className="search-item-name line-clamp-2 break-words" title={formatCompanyName(stock.name)}>{formatCompanyName(stock.name)}</div>
-                                                <div className="text-sm text-gray-500">{stock.symbol} | {stock.exchange} | {etiquetaTipoInstrumento(stock.type)}</div>
+                                                <div className="text-sm text-gray-500">{stock.symbol} | {stock.exchange} | {etiquetaTipoInstrumento(stock.type, locale)}</div>
                                                 {stock.fichaCoverage === 'unknown' ? (
                                                     <div className="mt-0.5 text-xs text-gray-500">{t('ui.command.unverifiedCoverage')}</div>
                                                 ) : null}

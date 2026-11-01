@@ -20,7 +20,7 @@ describe('risk position exposure guard (F43)', () => {
   });
 
   it('el sector usa etiqueta ES compartida, nunca el string inglés crudo', () => {
-    assert.match(view, /etiquetaSector\(String\(sector\)\)/, 'etiquetaSector aplicada');
+    assert.match(view, /etiquetaSector\(String\(sector\)[,)]/, 'etiquetaSector aplicada');
     assert.equal(view.includes('formatRecordValue(position.sector)'), false, 'sin sector crudo');
   });
 

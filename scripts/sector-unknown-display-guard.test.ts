@@ -37,7 +37,7 @@ test('los valores conocidos se traducen; lo sin mapa pasa tal cual (nunca invent
 });
 
 test('índice y ficha componen la línea con sectorIndustryLine', () => {
-    assert.match(index, /sectorIndustryLine\(company\.sector, company\.industry\)/);
-    assert.match(ticker, /sectorIndustryLine\(company\.sector, company\.industry\)/);
+    assert.match(index, /sectorIndustryLine\(company\.sector, company\.industry[,)]/);
+    assert.match(ticker, /sectorIndustryLine\(company\.sector, company\.industry[,)]/);
     assert.ok(!/\{company\.sector\} · \{company\.industry\}/.test(ticker), 'la cabecera de la ficha aún concatena en crudo');
 });

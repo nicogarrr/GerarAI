@@ -105,7 +105,9 @@ export const INDUSTRIAS: Record<string, string> = {
 };
 
 /** Etiqueta ES de un sector; si el backend manda uno desconocido, se muestra tal cual. */
-export function etiquetaSector(value: string): string {
+export function etiquetaSector(value: string, locale: 'es' | 'en' = 'es'): string {
+  // En inglés el backend ya manda el nombre original (GICS en inglés).
+  if (locale === 'en') return value;
   return SECTORES[value] ?? value;
 }
 
@@ -214,8 +216,18 @@ const COMPONENTES_ATRIBUCION: Record<string, string> = {
   sizing: 'Contribución ponderada',
 };
 
-export function etiquetaComponenteAtribucion(value: string): string {
-  return COMPONENTES_ATRIBUCION[value] ?? value;
+const COMPONENTES_ATRIBUCION_EN: Record<string, string> = {
+  fundamental_growth: 'Fundamental growth',
+  multiple: 'Multiple',
+  dividends: 'Dividends',
+  buybacks: 'Buybacks',
+  dilution: 'Dilution',
+  fx: 'Currency',
+  sizing: 'Weighted contribution',
+};
+
+export function etiquetaComponenteAtribucion(value: string, locale: 'es' | 'en' = 'es'): string {
+  return (locale === 'en' ? COMPONENTES_ATRIBUCION_EN : COMPONENTES_ATRIBUCION)[value] ?? value;
 }
 
 const TIPOS_EVENTO_EN: Record<string, string> = {
@@ -258,7 +270,9 @@ const TIPOS_INSTRUMENTO: Record<string, string> = {
   PUBLIC: 'PUBLIC',
 };
 
-export function etiquetaTipoInstrumento(value: string): string {
+export function etiquetaTipoInstrumento(value: string, locale: 'es' | 'en' = 'es'): string {
+  // En inglés el tipo ya llega en inglés desde el proveedor.
+  if (locale === 'en') return value;
   return TIPOS_INSTRUMENTO[value] ?? value;
 }
 
@@ -314,12 +328,13 @@ const cleanSectorPart = (value: unknown): string | null => {
  * Quick win UX 4: se traduce lo conocido (etiquetaSector deja lo
  * desconocido tal cual, nunca inventa) y se colapsa cuando sector e
  * industria traducen lo mismo («Tecnología · Tecnología» -> «Tecnología»). */
-export function sectorIndustryLine(sector: unknown, industry: unknown): string {
+export function sectorIndustryLine(sector: unknown, industry: unknown, locale: 'es' | 'en' = 'es'): string {
     const parts = [cleanSectorPart(sector), cleanSectorPart(industry)]
         .filter((p): p is string => p !== null)
-        .map((part) => INDUSTRIAS[part] ?? etiquetaSector(part));
+        .map((part) => (locale === 'en' ? part : INDUSTRIAS[part] ?? etiquetaSector(part)));
     const unique = parts.filter((part, index) => parts.indexOf(part) === index);
-    return unique.length ? unique.join(' · ') : 'Sector sin dato';
+    if (unique.length) return unique.join(' · ');
+    return locale === 'en' ? 'Sector not available' : 'Sector sin dato';
 }
 
 /** Etiqueta ES de la severidad de una alerta de riesgo (high/medium/low).
@@ -332,8 +347,16 @@ const SEVERIDADES: Record<string, string> = {
   info: 'Informativa',
 };
 
-export function etiquetaSeveridad(value: string): string {
-  return SEVERIDADES[value.toLowerCase()] ?? value;
+const SEVERIDADES_EN: Record<string, string> = {
+  critical: 'Critical',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+  info: 'Informational',
+};
+
+export function etiquetaSeveridad(value: string, locale: 'es' | 'en' = 'es'): string {
+  return (locale === 'en' ? SEVERIDADES_EN : SEVERIDADES)[value.toLowerCase()] ?? value;
 }
 
 /** Etiquetas ES de los factores/temas de cartera (factor_tags del backend).
@@ -413,19 +436,45 @@ const TIPOS_EMPRESA: Record<string, string> = {
  * conocidos (primero las claves de dos tokens: pre_fcf, small_cap...);
  * un token desconocido devuelve el tipo tal cual, nunca una etiqueta
  * inventada. */
-export function companyTypeLabel(value: string): string {
-  const exact = TIPOS_EMPRESA[value.toLowerCase()];
+const TIPOS_EMPRESA_EN: Record<string, string> = {
+  ai_big_tech: 'AI big tech',
+  ai_infra_capacity: 'AI infrastructure',
+  asset_manager_holding: 'asset manager holding',
+  auto_energy_optionality: 'automotive with energy optionality',
+  china_adr_holding: 'Chinese holding (ADR)',
+  defense_contract_backlog: 'defense contract backlog',
+  healthcare_regulatory: 'regulated healthcare',
+  mining_pre_revenue: 'pre-revenue mining',
+  platform_fcf_compounder: 'FCF compounder platform',
+  software_ai_disruption: 'software disrupted by AI',
+  software_ai_platform: 'AI software platform',
+  software_durable_growth: 'durable-growth software',
+  space_defense_growth: 'growing space and defense',
+  speculative_scenario: 'speculative scenario',
+  subscriber_media: 'subscription media',
+  uranium_mining: 'uranium mining',
+  operating_company: 'operating company',
+  research_candidate: 'research candidate',
+  fund: 'fund',
+  etf: 'ETF',
+  trust: 'trust',
+};
+
+export function companyTypeLabel(value: string, locale: 'es' | 'en' = 'es'): string {
+  const tipos = locale === 'en' ? TIPOS_EMPRESA_EN : TIPOS_EMPRESA;
+  const factores = locale === 'en' ? FACTORES_EN : FACTORES;
+  const exact = tipos[value.toLowerCase()];
   if (exact) return exact;
   const tokens = value.toLowerCase().split('_');
   const labels: string[] = [];
   let i = 0;
   while (i < tokens.length) {
     const pair = tokens.slice(i, i + 2).join('_');
-    if (i + 1 < tokens.length && FACTORES[pair]) {
-      labels.push(FACTORES[pair]);
+    if (i + 1 < tokens.length && factores[pair]) {
+      labels.push(factores[pair]);
       i += 2;
-    } else if (FACTORES[tokens[i]]) {
-      labels.push(FACTORES[tokens[i]]);
+    } else if (factores[tokens[i]]) {
+      labels.push(factores[tokens[i]]);
       i += 1;
     } else {
       return value;
@@ -434,8 +483,50 @@ export function companyTypeLabel(value: string): string {
   return labels.join(' · ');
 }
 
-export function etiquetaFactor(value: string): string {
-  const known = FACTORES[value.toLowerCase()];
+const FACTORES_EN: Record<string, string> = {
+  ads: 'Advertising',
+  ai: 'AI',
+  ai_biology: 'AI in biology',
+  auto: 'Automotive',
+  biotech: 'Biotech',
+  china: 'China',
+  cloud: 'Cloud',
+  commodities: 'Commodities',
+  cyclical: 'Cyclical',
+  defense: 'Defense',
+  drones: 'Drones',
+  ecommerce: 'E-commerce',
+  energy: 'Energy',
+  fcf: 'Free-cash-flow positive',
+  financials: 'Financials',
+  glp1: 'GLP-1',
+  government: 'Government',
+  growth: 'Growth',
+  healthcare: 'Healthcare',
+  infra: 'Infrastructure',
+  media: 'Media',
+  mining: 'Mining',
+  mobility: 'Mobility',
+  optionality: 'Optionality',
+  platform: 'Platform / marketplace',
+  pre_fcf: 'Pre free cash flow',
+  quality: 'Quality',
+  rates: 'Interest rates',
+  regulatory: 'Regulatory',
+  robotics: 'Robotics',
+  semiconductors: 'Semiconductors',
+  small_cap: 'Small cap',
+  software: 'Software',
+  sotp: 'Sum of the parts',
+  space: 'Space',
+  speculative: 'Speculative',
+  subscriber: 'Subscription (recurring revenue)',
+  telecom: 'Telecom',
+  uranium: 'Uranium',
+};
+
+export function etiquetaFactor(value: string, locale: 'es' | 'en' = 'es'): string {
+  const known = (locale === 'en' ? FACTORES_EN : FACTORES)[value.toLowerCase()];
   if (known) return known;
   const adr = /^adr:(\d+)$/i.exec(value);
   if (adr) return `ADR (ratio ${adr[1]})`;
@@ -499,6 +590,43 @@ const VALORES_BACKEND: Record<string, string> = {
 
 /** Etiqueta ES de un código del backend: primero tiers de fuente y el mapa
  *  central; si no está, el código con espacios en vez de guiones bajos. */
-export function etiquetaValor(value: string): string {
+const VALORES_BACKEND_EN: Record<string, string> = {
+  unproven: 'unproven',
+  proven: 'proven',
+  uncertain: 'uncertain',
+  improving: 'improving',
+  deteriorating: 'deteriorating',
+  strengthening: 'strengthening',
+  weakening: 'weakening',
+  moderate: 'moderate',
+  durable: 'durable',
+  insufficient_evidence: 'insufficient evidence',
+  insufficient_data: 'insufficient data',
+  primary_official: 'primary official',
+  wacc_policy: 'WACC policy',
+  damodaran: 'Damodaran (NYU Stern)',
+  model_policy: 'model policy',
+  calculated_metric: 'calculated metric',
+  financial_facts: 'financial data',
+  historical_case: 'historical case',
+  inferred_input: 'inferred input',
+  manual_transcript: 'manual transcript',
+  manual_upload: 'manual upload',
+  sec_filing: 'SEC filing',
+  earnings_call: 'earnings call',
+  investor_relations: 'investor relations',
+  transcript: 'transcript',
+  yfinance: 'Yahoo Finance',
+  yahoo_fundamentals: 'Yahoo Finance (unofficial source)',
+  YAHOO_FUNDAMENTALS: 'Yahoo Finance (unofficial source)',
+  user: 'user',
+  chat: 'chat',
+  url: 'link',
+  brand: 'brand',
+  capital_barrier: 'capital barrier',
+};
+
+export function etiquetaValor(value: string, locale: 'es' | 'en' = 'es'): string {
+  if (locale === 'en') return TIERS_FUENTE_EN[value] ?? VALORES_BACKEND_EN[value] ?? value.replaceAll('_', ' ');
   return TIERS_FUENTE[value] ?? VALORES_BACKEND[value] ?? value.replaceAll('_', ' ');
 }

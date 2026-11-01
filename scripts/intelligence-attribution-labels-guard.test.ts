@@ -27,7 +27,7 @@ test('F282: clave desconocida -> se muestra cruda, nunca oculta', () => {
 });
 
 test('F282: la cabecera de la tabla ya no pinta la clave cruda', () => {
-    assert.match(page, /\{etiquetaComponenteAtribucion\(key\)\}/);
+    assert.match(page, /\{etiquetaComponenteAtribucion\(key(?:, f\.locale)?\)\}/);
     assert.doesNotMatch(page, /key\.replaceAll\('_', ' '\)/);
 });
 
