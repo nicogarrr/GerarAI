@@ -54,7 +54,7 @@ function TarjetaMetrica({ label, metrica, t, fmt }: { label: string; metrica?: R
             <p className="text-xl font-semibold text-gray-100">{valorMetrica(metrica, fmt)}</p>
             <p className="text-xs text-gray-500">{t('movers.regime.dataOf', { date: fmt.formatMarketDate(metrica.date) })}</p>
             {'method' in metrica && metrica.method ? (
-              <p className="text-xs text-gray-500">{metrica.method}</p>
+              <p className="text-xs text-gray-500">{textoRegimen(metrica.method, fmt.locale)}</p>
             ) : null}
           </>
         ) : (
@@ -91,12 +91,12 @@ function TarjetaHmm({ regimen, t, fmt }: { regimen: MarketRegime; t: TranslateFn
                 {typeof hmm.training_sessions === 'number' ? ` · ${trainingSessionsText(hmm.training_sessions, fmt.locale)}` : ''}
               </p>
             ) : null}
-            {hmm.method ? <p className="text-xs text-gray-500">{hmm.method}</p> : null}
+            {hmm.method ? <p className="text-xs text-gray-500">{textoRegimen(hmm.method, fmt.locale)}</p> : null}
           </>
         ) : (
           <>
             <p className="text-sm text-gray-500">{t('movers.regime.noData')}</p>
-            {hmm?.reason ? <p className="text-xs text-gray-500">{hmm.reason}</p> : null}
+            {hmm?.reason ? <p className="text-xs text-gray-500">{textoRegimen(hmm.reason, fmt.locale)}</p> : null}
           </>
         )}
       </CardContent>
@@ -167,6 +167,39 @@ const MOTIVO_CONCENTRACION_SIN_DATOS_EN: Record<string, string> = {
   index_weights_not_published_by_source: 'The factsheet does not publish the weight of the largest constituents.',
 };
 
+/**
+ * Motivos y métodos que el motor declara en español (bloque HMM, beta de
+ * cartera, curva 10a−2a). Con el inglés elegido se muestran traducidos; un
+ * texto que no está en la lista se muestra tal cual.
+ */
+const TEXTO_REGIMEN_EN: Record<string, string> = {
+  'sesiones discontinuas': 'non-consecutive sessions',
+  'varianza de benchmark nula': 'zero benchmark variance',
+  'universo de constituyentes incompleto': 'incomplete constituent universe',
+  'capitalizaciones positivas y fechadas incompletas': 'incomplete positive, dated market caps',
+  'historial insuficiente': 'not enough history',
+  'valores inválidos': 'invalid values',
+  'serie constante': 'constant series',
+  'ajuste no convergente': 'the fit did not converge',
+  'probabilidad inválida': 'invalid probability',
+  'modelo no disponible': 'model not available',
+  'observaciones recientes ausentes': 'no recent observations',
+  'sin posiciones o benchmark S&P 500': 'no positions or S&P 500 benchmark',
+  'benchmark S&P 500 sin cierres ajustados': 'S&P 500 benchmark without adjusted closes',
+  'La beta de tu cartera aún no está disponible.': 'Your portfolio beta is not available yet.',
+  'La beta de tu cartera aún no está disponible; el snapshot macro es global y no mezcla carteras.':
+    'Your portfolio beta is not available yet; the macro snapshot is global and does not mix portfolios.',
+  'HMM gaussiano de 2 estados; filtro hacia adelante; estados sin etiqueta económica':
+    '2-state Gaussian HMM; forward filter; states with no economic label',
+  'DGS10 menos DGS2 en la misma fecha': 'DGS10 minus DGS2 on the same date',
+  'cov(retorno activo, retorno S&P 500) / var(retorno S&P 500); cierres ajustados pareados':
+    'cov(active return, S&P 500 return) / var(S&P 500 return); paired adjusted closes',
+};
+
+export function textoRegimen(text: string, locale: Locale = 'es'): string {
+  return locale === 'en' ? (TEXTO_REGIMEN_EN[text] ?? text) : text;
+}
+
 function motivoConcentracionSinDatos(top?: RegimeTopTen, locale: Locale = 'es') {
   if (!top?.reason && !top?.detail) return null;
   const motivo = locale === 'en'
@@ -176,7 +209,7 @@ function motivoConcentracionSinDatos(top?: RegimeTopTen, locale: Locale = 'es') 
   return <p className="text-xs text-gray-500">{motivo}</p>;
 }
 
-function TarjetaBeta({ beta, t }: { beta?: RegimeStatusBlock; t: TranslateFn }) {
+function TarjetaBeta({ beta, t, locale = 'es' }: { beta?: RegimeStatusBlock; t: TranslateFn; locale?: Locale }) {
   return (
     <Card className="min-w-0 border-gray-800">
       <CardHeader className="pb-2">
@@ -184,7 +217,7 @@ function TarjetaBeta({ beta, t }: { beta?: RegimeStatusBlock; t: TranslateFn }) 
       </CardHeader>
       <CardContent className="space-y-1">
         <p className="text-sm text-gray-500">{beta?.status === 'no_disponible' ? t('movers.regime.unavailable') : t('movers.regime.noData')}</p>
-        {beta?.reason ? <p className="text-xs text-gray-500">{beta.reason}</p> : null}
+        {beta?.reason ? <p className="text-xs text-gray-500">{textoRegimen(beta.reason, locale)}</p> : null}
       </CardContent>
     </Card>
   );
@@ -241,7 +274,7 @@ export async function MarketRegimeVista() {
           <div className="grid min-w-0 grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-3">
             <TarjetaHmm regimen={regimen} t={t} fmt={fmt} />
             <TarjetaConcentracion top={regimen.metrics.top_ten_sp500} t={t} fmt={fmt} />
-            <TarjetaBeta beta={regimen.portfolio_beta ?? regimen.metrics.portfolio_beta} t={t} />
+            <TarjetaBeta beta={regimen.portfolio_beta ?? regimen.metrics.portfolio_beta} t={t} locale={fmt.locale} />
           </div>
           {regimen.note ? <p className="text-xs text-gray-500">{regimen.note}</p> : null}
         </>
