@@ -301,3 +301,51 @@ def test_session_gap_is_named_with_missing_day_not_as_plain_missing_data(db):
     assert "SAN.MC (falta el cierre del 2026-10-27)" in alert.message
     assert "hueco de sesión, no 0" in alert.message
     assert alert.metadata_["coverage"] == "parcial"
+
+
+@pytest.fixture
+def english(db, monkeypatch):
+    """Usuario con inglés guardado en Ajustes y generación multidioma encendida."""
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
+    get_settings.cache_clear()
+    db.get(Tenant, 1).metadata_ = {"language": "en"}
+    db.commit()
+    yield
+    monkeypatch.delenv("I18N_GENERATION_ENABLED")
+    get_settings.cache_clear()
+
+
+def test_digest_in_english_for_user_with_english_saved(db, english):
+    items = [
+        {"ticker": "ASTS", "status": "disponible", "price_change_pct": 2.5},
+        {"ticker": "NBIS", "status": "sin datos"},
+        {"ticker": "UBER", "status": "hueco de sesión", "missing_sessions": ["2026-10-08"]},
+    ]
+    alert = emit_digest_alert(db, make_digest(db, items=items), AS_OF)
+    assert alert.title == "Daily summary of your portfolio as of 2026-10-09"
+    assert alert.message == (
+        "1 of 3 positions moved: ASTS +2.50%. No data: NBIS. "
+        "No daily change because of a session gap, not 0: UBER (missing the close of 2026-10-08). "
+        "Price changes from yfinance adjusted closes as of 2026-10-09, not your position's P&L. "
+        "Portfolio measured when the summary was generated (2026-10-10 07:15 (Madrid time)); "
+        "later moves are not included. Summary coverage: partial."
+    )
+    assert alert.metadata_["coverage"] == "parcial"
+
+
+def test_digest_in_english_with_no_positions(db, english):
+    alert = emit_digest_alert(db, make_digest(db, items=[]), AS_OF)
+    assert alert.message.startswith("There were no open positions to summarise.")
+
+
+def test_digest_stays_spanish_without_saved_language(db, monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
+    get_settings.cache_clear()
+    alert = emit_digest_alert(db, make_digest(db), AS_OF)
+    get_settings.cache_clear()
+    assert alert.title == "Resumen diario de tu cartera al 2026-10-09"
+    assert "Sin datos: NBIS." in alert.message
