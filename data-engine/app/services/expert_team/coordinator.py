@@ -163,7 +163,13 @@ class ExpertTeam:
                 for cid in claim.citations:
                     evidence = ledger.get(cid)
                     if evidence is not None and cid not in seen:
-                        seen[cid] = {"id": cid, "tool": evidence.tool, "expert": evidence.expert, **evidence.source}
+                        # El «id» de la fila (aviso de riesgo, tesis) no puede pisar el de la
+                        # evidencia: es el que llevan las citas [n]. Se guarda como «row_id».
+                        source = dict(evidence.source)
+                        row_id = source.pop("id", None)
+                        seen[cid] = {**source, "id": cid, "tool": evidence.tool, "expert": evidence.expert}
+                        if row_id is not None:
+                            seen[cid]["row_id"] = row_id
         return list(seen.values())
 
     @staticmethod
@@ -171,7 +177,7 @@ class ExpertTeam:
         by_metric: dict[str, list[dict[str, Any]]] = {}
         for report in reports:
             for claim in report.claims:
-                if claim.metric and claim.numbers:
+                if claim.metric and claim.numbers and not claim.reason:  # solo con fuente
                     by_metric.setdefault(claim.metric, []).append(
                         {"expert": report.expert, "value": claim.numbers[0], "citations": list(claim.citations)}
                     )
@@ -187,7 +193,7 @@ class ExpertTeam:
 
     @staticmethod
     def _stance_conflict(reports: list[ExpertReport]) -> dict[str, Any] | None:
-        ok = [r for r in reports if r.status == "ok" and r.claims]
+        ok = [r for r in reports if r.status == "ok" and any(not c.reason for c in r.claims)]
         positive = [r.expert for r in ok if r.stance == "positive"]
         negative = [r.expert for r in ok if r.stance == "negative"]
         if positive and negative:
@@ -201,7 +207,9 @@ class ExpertTeam:
         from app.services.prompt_registry import get_prompt
 
         def case(names: list[str]) -> str:
-            return "\n".join(f"- [{r.expert}] {c.text}" for r in reports if r.expert in names for c in r.claims)
+            return "\n".join(
+                f"- [{r.expert}] {c.text}" for r in reports if r.expert in names for c in r.claims if not c.reason
+            )
 
         user = (
             f"Ticker: {ctx.ticker or '-'}\nCASO A FAVOR:\n{case(conflict['positive'])}\n"
