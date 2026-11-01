@@ -4,6 +4,12 @@
  * no pueden exportar funciones síncronas.
  */
 
+/** Enlace interno de una fuente: la cartera o la ficha (con una vista permitida). Nunca otra ruta. */
+export function isInternalSourcePath(url: unknown): url is string {
+    return typeof url === 'string'
+        && (url === '/portfolio' || /^\/research\/[A-Za-z0-9.%_-]+(?:\?view=(?:financials|thesis|news|valoracion))?$/.test(url));
+}
+
 export interface ChatSource {
     type: string;
     id: number | string | null;
@@ -99,7 +105,7 @@ export function toPortfolioChatCitations(sources: ChatSource[] | undefined | nul
     return unique.map((source) => {
         const existing = toChatCitations([source])[0];
         let url: string | null = null;
-        if (typeof source.url === 'string' && (source.url === '/portfolio' || /^\/research\/[A-Za-z0-9.%_-]+(?:\?view=(?:financials|thesis|news))?$/.test(source.url))) {
+        if (isInternalSourcePath(source.url)) {
             url = source.url;
         } else if (typeof source.url === 'string') {
             try {

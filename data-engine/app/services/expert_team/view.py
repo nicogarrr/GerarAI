@@ -11,6 +11,7 @@ quedó grabado en la propia corrida.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any
 
@@ -141,9 +142,13 @@ def run_summary(run: WorkflowRun, result: dict[str, Any], lang: str) -> ExpertTh
     )
 
 
+# Enlaces internos que el chat ya acepta (lib/chat/citations.ts): la ficha y sus vistas, y la cartera.
+_APP_PATH = re.compile(r"^(?:/portfolio|/research/[A-Za-z0-9.%_-]+(?:\?view=(?:financials|thesis|news|valoracion))?)$")
+
+
 def _url(src: dict[str, Any]) -> str | None:
     url = str(src.get("url") or "").strip()
-    return url if url.startswith(("https://", "http://")) else None
+    return url if url.startswith(("https://", "http://")) or _APP_PATH.match(url) else None
 
 
 def thesis_view(

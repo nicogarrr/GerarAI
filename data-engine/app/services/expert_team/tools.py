@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from typing import Any
+from urllib.parse import quote
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -46,6 +47,11 @@ def _num(value: Any) -> float | None:
         return None if value is None else float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _app_path(ticker: str, view: str) -> str:
+    """Pantalla de la app que enseña ese dato (enlace interno real, nunca inventado)."""
+    return f"/research/{quote(ticker, safe='')}?view={view}"
 
 
 def _company(db: Session, ctx: RunContext) -> Company | None:
@@ -140,7 +146,13 @@ def build_tools(db: Session, *, today: date | None = None) -> dict[str, ToolSpec
             data = {k: result.get(k) for k in _VALUATION_KEYS if result.get(k) is not None}
             if data:
                 as_of = (result.get("trace") or {}).get("price_as_of")
-                out.append(ToolOutput(source={"table": "valuation_engine", "date": str(as_of or "")}, data=data))
+                out.append(
+                    ToolOutput(
+                        source={"table": "valuation_engine", "date": str(as_of or ""),
+                                "url": _app_path(company.ticker, "valoracion")},
+                        data=data,
+                    )
+                )
         thesis = db.scalars(
             select(ThesisVersion)
             .where(ThesisVersion.tenant_id == ctx.tenant_id, ThesisVersion.company_id == company.id)
@@ -155,7 +167,8 @@ def build_tools(db: Session, *, today: date | None = None) -> dict[str, ToolSpec
             out.append(
                 ToolOutput(
                     source={"table": "thesis_versions", "id": str(thesis.id), "version": str(thesis.version),
-                            "date": _day(getattr(thesis, "created_at", None))},
+                            "date": _day(getattr(thesis, "created_at", None)),
+                            "url": _app_path(company.ticker, "thesis")},
                     data={"rating": thesis.rating, **data},
                 )
             )
@@ -191,7 +204,7 @@ def build_tools(db: Session, *, today: date | None = None) -> dict[str, ToolSpec
             return None
         mine = sum(_num(p.market_value_base) or 0.0 for p in positions if p.company_id == company.id)
         return ToolOutput(
-            source={"table": "positions", "date": _day(today or date.today())},
+            source={"table": "positions", "date": _day(today or date.today()), "url": "/portfolio"},
             data={"ticker": company.ticker, "weight_pct": round(100 * mine / total, 2),
                   "positions_count": len(positions)},
         )
