@@ -89,7 +89,9 @@ test("concepts have primary sources and do not attribute SEC education to an inv
     )?.investors,
     [],
   );
-  const diagram = read("app/(root)/inversores/conceptos/OptionPayoff.tsx");
+  // Textos del ejemplo en el diccionario español (solo la sección payoff).
+  const diagram = read("app/(root)/inversores/conceptos/OptionPayoff.tsx") +
+    JSON.stringify(JSON.parse(read("lib/i18n/messages/es/investors.json")).payoff);
   assert.match(diagram, /Ejemplo hipotético/);
   assert.match(diagram, /payoff-desc/);
   assert.match(diagram, /sin comisiones ni impuestos/);

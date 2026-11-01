@@ -109,5 +109,27 @@
     "queuing": "Queuing download...",
     "queued": "Download in progress; reload the page in a few minutes to see the letters.",
     "error": "Couldn't queue the download. Try again."
+  },
+  "concepts": {
+    "metaTitle": "Investing concepts",
+    "title": "Concepts",
+    "notFound": "Concept not found",
+    "application": "How to apply it",
+    "risk": "Risk",
+    "editorial": "Editorial summary",
+    "viewInvestor": "View investor · {name}",
+    "seeAll": "See all",
+    "noneForInvestor": "No concepts documented for this investor"
+  },
+  "payoff": {
+    "aria": "Hypothetical example of buying options",
+    "title": "Hypothetical example · at expiry",
+    "terms": "Strike $100 · premium $5 per share · before fees and taxes",
+    "chartTitle": "Payoff of buying a call or a put",
+    "chartDesc": "The call loses $5 if the price ends at $100 or below, breaks even at $105 and makes $15 at $120. The put makes $15 at $80, breaks even at $95 and loses $5 at $100 or above. Amounts per share.",
+    "axis": "Underlying price",
+    "longCall": "Long call",
+    "longPut": "Long put",
+    "formula": "Call: max(price - strike, 0) - premium. Put: max(strike - price, 0) - premium. Before expiry the option's price also depends on time and volatility."
   }
 }

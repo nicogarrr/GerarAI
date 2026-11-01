@@ -1,21 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CONCEPTS, INVESTOR_NAMES } from "../concepts";
+import { getLocale, getT } from "@/lib/i18n/server";
+import { INVESTOR_NAMES } from "../concepts";
+import { conceptsFor } from "../concepts-i18n";
 import { OptionPayoff } from "../OptionPayoff";
 
 type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+  const t = await getT();
   return {
     title:
-      CONCEPTS.find((item) => item.slug === slug)?.title ??
-      "Concepto no encontrado",
+      conceptsFor(await getLocale()).find((item) => item.slug === slug)?.title ??
+      t('investors.concepts.notFound'),
   };
 }
 export default async function ConceptPage({ params }: Props) {
   const { slug } = await params;
-  const concept = CONCEPTS.find((item) => item.slug === slug);
+  const t = await getT();
+  const concept = conceptsFor(await getLocale()).find((item) => item.slug === slug);
   if (!concept) notFound();
   return (
     <main
@@ -27,7 +31,7 @@ export default async function ConceptPage({ params }: Props) {
         className="text-sm text-teal-300 hover:underline"
         href="/inversores/conceptos"
       >
-        Conceptos
+        {t('investors.concepts.title')}
       </Link>
       <header className="flex flex-col gap-3">
         <h1 className="text-3xl font-semibold text-gray-100">
@@ -38,15 +42,15 @@ export default async function ConceptPage({ params }: Props) {
       <p className="text-sm leading-7 text-gray-300">{concept.body}</p>
       {slug === "opciones" ? <OptionPayoff /> : null}
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium text-gray-100">Aplicación</h2>
+        <h2 className="text-lg font-medium text-gray-100">{t('investors.concepts.application')}</h2>
         <p className="text-sm leading-7 text-gray-300">{concept.application}</p>
       </section>
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium text-gray-100">Riesgo</h2>
+        <h2 className="text-lg font-medium text-gray-100">{t('investors.concepts.risk')}</h2>
         <p className="text-sm leading-7 text-gray-300">{concept.risk}</p>
       </section>
       <p className="text-xs text-gray-500">
-        Síntesis editorial ·{" "}
+        {t('investors.concepts.editorial')} ·{" "}
         <a
           className="text-teal-300 hover:underline"
           href={concept.source.url}
@@ -62,7 +66,7 @@ export default async function ConceptPage({ params }: Props) {
           href={`/inversores/${investor}`}
           key={investor}
         >
-          Ver inversor · {INVESTOR_NAMES[investor] ?? investor}
+          {t('investors.concepts.viewInvestor', { name: INVESTOR_NAMES[investor] ?? investor })}
         </Link>
       ))}
     </main>

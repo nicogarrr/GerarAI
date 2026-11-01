@@ -1,15 +1,18 @@
 /** Ejemplo didáctico, no cotizaciones reales. Resultado por acción al vencimiento. */
-export function OptionPayoff() {
+import { getT } from "@/lib/i18n/server";
+
+export async function OptionPayoff() {
+  const t = await getT();
   return (
     <section
-      aria-label="Ejemplo hipotético de opciones compradas"
+      aria-label={t('investors.payoff.aria')}
       className="flex flex-col gap-4 rounded-2xl border border-gray-800 bg-surface-1 p-5"
     >
       <h2 className="text-lg font-medium text-gray-100">
-        Ejemplo hipotético · al vencimiento
+        {t('investors.payoff.title')}
       </h2>
       <p className="text-sm text-gray-400">
-        Ejercicio $100 · prima $5 por acción · sin comisiones ni impuestos
+        {t('investors.payoff.terms')}
       </p>
       <svg
         role="img"
@@ -17,12 +20,8 @@ export function OptionPayoff() {
         viewBox="0 0 440 240"
         className="w-full max-w-xl"
       >
-        <title id="payoff-title">Resultado de comprar una call o una put</title>
-        <desc id="payoff-desc">
-          La call pierde $5 si el precio termina en $100 o menos, alcanza
-          equilibrio en $105 y gana $15 en $120. La put gana $15 en $80, alcanza
-          equilibrio en $95 y pierde $5 en $100 o más. Importes por acción.
-        </desc>
+        <title id="payoff-title">{t('investors.payoff.chartTitle')}</title>
+        <desc id="payoff-desc">{t('investors.payoff.chartDesc')}</desc>
         <line x1="50" y1="145" x2="410" y2="145" stroke="#6b7280" />
         <line x1="50" y1="25" x2="50" y2="190" stroke="#6b7280" />
         <g fill="#9ca3af" fontSize="12">
@@ -45,7 +44,7 @@ export function OptionPayoff() {
             $120
           </text>
           <text x="145" y="231">
-            Precio del subyacente
+            {t('investors.payoff.axis')}
           </text>
         </g>
         <polyline
@@ -63,17 +62,15 @@ export function OptionPayoff() {
         />
         <g fontSize="13">
           <text x="290" y="40" fill="#bef264">
-            Call comprada
+            {t('investors.payoff.longCall')}
           </text>
           <text x="65" y="24" fill="#60a5fa">
-            Put comprada
+            {t('investors.payoff.longPut')}
           </text>
         </g>
       </svg>
       <p className="text-xs text-gray-500">
-        Call: max(precio - ejercicio, 0) - prima. Put: max(ejercicio - precio,
-        0) - prima. Antes del vencimiento el precio de la opción también depende
-        del tiempo y la volatilidad.
+        {t('investors.payoff.formula')}
       </p>
     </section>
   );
