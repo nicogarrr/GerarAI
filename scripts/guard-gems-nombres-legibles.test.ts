@@ -7,6 +7,6 @@ import assert from 'node:assert/strict';
 const SRC = readFileSync('components/proPicks/GemsView.tsx', 'utf8');
 
 test('GemsView formatea el nombre de empresa', () => {
-  assert.match(SRC, /import \{[^}]*formatCompanyName[^}]*\} from '@\/lib\/format'/);
+  assert.match(SRC, /const \{[^}]*formatCompanyName[^}]*\} = useFormat\(\)/);
   assert.match(SRC, /formatCompanyName\(gem\.name\)/);
 });

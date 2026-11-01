@@ -300,5 +300,53 @@
     "levelsNote": "Tiers contributing extra: IRR {irr} vs flat; with the same total money it buys {shares} shares.",
     "fixedNote": "Fixed budget (same money as flat; at 1X it invests half and keeps cash): final value {value} vs flat. Over the long history this variant usually ends up BELOW flat DCA.",
     "levelMonths": "{label}: {months} months"
+  },
+  "gems": {
+    "reviewDone": "AI review complete: {reviewed} of {total} gems reviewed.",
+    "reviewUnavailable": "The AI review isn't available right now. The list is the deterministic selection (quality + value + insiders + 13F), without the model's filter; try again later.",
+    "title": "Hidden gems",
+    "refresh": "Refresh",
+    "reviewing": "Reviewing...",
+    "review": "Review with AI",
+    "emptyTitle": "No gems with the current data",
+    "emptyDescription": "No company that passes the funnel combines a market cap of $300M to $10,000M, an FCF yield of at least 5% and a price from the last 7 days. It isn't a failure: the criteria are fixed and the list changes when new data arrives.",
+    "score": "Score",
+    "vetoed": "Discarded by the AI",
+    "kept": "Kept by the AI",
+    "confidence": "Confidence {value}",
+    "invalidation": "What would invalidate it: {text}",
+    "notReviewed": "No AI review"
+  },
+  "deepValue": {
+    "na": "n/a",
+    "sourcesDisagree": "Sources disagree: another source shows {value}",
+    "yieldExtreme": "Very high yield: check whether it's a special dividend",
+    "refresh": "Refresh",
+    "label": "Deep value strategy: discount to book value plus dividend. It isn't the ProPicks quality filter: it accepts leverage and cyclicality that the funnel rejects.",
+    "anyDividend": "Any dividend",
+    "minDividend": "Dividend ≥ {value}",
+    "empty": "No company in the universe passes these filters with recent data. Valuation metrics are computed every night after the close; if they were just deployed, the first run hasn't arrived yet.",
+    "asOf": "Data as of {date}",
+    "points": "{value} pts",
+    "bookFy": "(book FY{year})",
+    "priceAsOf": "price as of {date}",
+    "dividendTtm": "Dividend TTM"
+  },
+  "radar": {
+    "regionGlobal": "Global",
+    "regionEurope": "Europe",
+    "regionAsia": "Asia",
+    "regionUs": "US",
+    "na": "n/a",
+    "unavailable": "Market radar isn't available right now; no candidates were generated.",
+    "unverified": "Unverified candidates; check them against official sources before using them.",
+    "search": "Find candidates",
+    "liveNote": "Live query when you press the button; it may take a few seconds.",
+    "generated": "Generated: {date} · Regions: {regions}",
+    "empty": "The query returned no candidates with these filters.",
+    "inUniverse": "Already in our universe",
+    "dividend": "Dividend",
+    "yieldExtreme": "Very high yield: check whether it's a special dividend",
+    "checkHkex": "Check on HKEXnews (official source)"
   }
 }

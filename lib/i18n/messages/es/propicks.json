@@ -300,5 +300,53 @@
     "levelsNote": "Niveles aportando extra: TIR {irr} vs plano; con el mismo dinero total compra {shares} acciones.",
     "fixedNote": "Presupuesto fijo (mismo dinero que el plano; en 1X invierte la mitad y guarda caja): valor final {value} vs plano. En el histórico amplio esta variante suele quedar POR DEBAJO del DCA plano.",
     "levelMonths": "{label}: {months} meses"
+  },
+  "gems": {
+    "reviewDone": "Revisión IA completada: {reviewed} de {total} joyas revisadas.",
+    "reviewUnavailable": "La revisión IA no está disponible ahora mismo. La lista es la selección determinista (calidad + valor + insiders + 13F), sin el filtro del modelo; inténtalo de nuevo más tarde.",
+    "title": "Joyas ocultas",
+    "refresh": "Actualizar",
+    "reviewing": "Revisando...",
+    "review": "Revisar con IA",
+    "emptyTitle": "Sin joyas con los datos actuales",
+    "emptyDescription": "Ninguna empresa que supera el embudo reúne capitalización de 300 M$ a 10.000 M$, rentabilidad por FCF de al menos 5 % y precio de los últimos 7 días. No es un fallo: son criterios fijos y la lista cambia cuando llegan datos nuevos.",
+    "score": "Puntuación",
+    "vetoed": "Descartada por la IA",
+    "kept": "Mantenida por la IA",
+    "confidence": "Confianza {value}",
+    "invalidation": "La invalidaría: {text}",
+    "notReviewed": "Sin revisión IA"
+  },
+  "deepValue": {
+    "na": "N/D",
+    "sourcesDisagree": "Fuentes en desacuerdo: otra fuente indica {value}",
+    "yieldExtreme": "Yield muy alto: revisar si es un dividendo especial",
+    "refresh": "Actualizar",
+    "label": "Estrategia Deep value: descuento a valor en libros y dividendo. No es el filtro de calidad ProPicks: acepta apalancamiento y ciclicidad que el embudo rechaza.",
+    "anyDividend": "Cualquier dividendo",
+    "minDividend": "Dividendo ≥ {value}",
+    "empty": "Ninguna empresa del universo pasa estos filtros con datos recientes. Las métricas de valoración se calculan cada noche tras el cierre; si acaban de desplegarse, la primera corrida aún no ha llegado.",
+    "asOf": "Datos al {date}",
+    "points": "{value} ptos",
+    "bookFy": "(libros FY{year})",
+    "priceAsOf": "precio al {date}",
+    "dividendTtm": "Dividendo TTM"
+  },
+  "radar": {
+    "regionGlobal": "Global",
+    "regionEurope": "Europa",
+    "regionAsia": "Asia",
+    "regionUs": "EE. UU.",
+    "na": "N/D",
+    "unavailable": "Radar de mercado no disponible ahora mismo; no se han generado candidatos.",
+    "unverified": "Candidatos sin verificar; conviene cotejo oficial antes de usarlos.",
+    "search": "Buscar candidatos",
+    "liveNote": "Consulta en vivo al pulsar el botón; puede tardar unos segundos.",
+    "generated": "Generado: {date} · Regiones: {regions}",
+    "empty": "La consulta no devolvió candidatos con estos filtros.",
+    "inUniverse": "Ya en nuestro universo",
+    "dividend": "Dividendo",
+    "yieldExtreme": "Yield muy alto: revisar si es un dividendo especial",
+    "checkHkex": "Cotejar en HKEXnews (fuente oficial)"
   }
 }

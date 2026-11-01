@@ -4,24 +4,29 @@ import { useState } from 'react';
 import { AlertTriangle, ExternalLink, Loader2, Radar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { formatPercent } from '@/lib/format';
+import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 import { getRadarCandidates, type RadarCandidate, type RadarResult } from '@/lib/actions/propicks-radar.actions';
 
 const REGION_PRESETS = [
-    { id: 'global', label: 'Global', regions: [] },
-    { id: 'europa', label: 'Europa', regions: ['es', 'de', 'fr', 'gb', 'it', 'nl', 'se', 'ch'] },
-    { id: 'asia', label: 'Asia', regions: ['hk', 'jp'] },
-    { id: 'us', label: 'EE. UU.', regions: ['us'] },
+    { id: 'global', label: 'propicks.radar.regionGlobal' as const, regions: [] },
+    { id: 'europa', label: 'propicks.radar.regionEurope' as const, regions: ['es', 'de', 'fr', 'gb', 'it', 'nl', 'se', 'ch'] },
+    { id: 'asia', label: 'propicks.radar.regionAsia' as const, regions: ['hk', 'jp'] },
+    { id: 'us', label: 'propicks.radar.regionUs' as const, regions: ['us'] },
 ];
 
 function YieldValue({ candidate }: { candidate: RadarCandidate }) {
+    const t = useT();
+    const { formatPercent } = useFormat();
     if (candidate.dividend_yield === null) {
-        return <span className="text-sm text-gray-500">N/D</span>;
+        return <span className="text-sm text-gray-500">{t('propicks.radar.na')}</span>;
     }
     return <span className="text-sm text-gray-200">{formatPercent(candidate.dividend_yield)}</span>;
 }
 
 export default function RadarGlobalView() {
+    const t = useT();
+    const locale = useLocale();
+    const { formatNumber } = useFormat();
     const [preset, setPreset] = useState('global');
     const [result, setResult] = useState<RadarResult | null>(null);
     const [loading, setLoading] = useState(false);
@@ -35,7 +40,7 @@ export default function RadarGlobalView() {
             setResult(await getRadarCandidates(active.regions));
         } catch {
             // Sin candidatos inventados ni cacheados: error honesto.
-            setError('Radar de mercado no disponible ahora mismo; no se han generado candidatos.');
+            setError(t('propicks.radar.unavailable'));
         } finally {
             setLoading(false);
         }
@@ -44,7 +49,7 @@ export default function RadarGlobalView() {
     return (
         <div className="space-y-4">
             <p className="text-xs text-gray-500">
-                Candidatos sin verificar; conviene cotejo oficial antes de usarlos.
+                {t('propicks.radar.unverified')}
             </p>
             <div className="flex flex-wrap items-center gap-2">
                 {REGION_PRESETS.map((p) => (
@@ -56,16 +61,16 @@ export default function RadarGlobalView() {
                         onClick={() => setPreset(p.id)}
                         className="min-h-[44px]"
                     >
-                        {p.label}
+                        {t(p.label)}
                     </Button>
                 ))}
                 <Button onClick={buscar} disabled={loading} className="min-h-[44px]">
                     {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />}
-                    Buscar candidatos
+                    {t('propicks.radar.search')}
                 </Button>
             </div>
             <p className="text-xs text-gray-500">
-                Consulta en vivo al pulsar el botón; puede tardar unos segundos.
+                {t('propicks.radar.liveNote')}
             </p>
             {error && (
                 <Card className="border-amber-800 bg-amber-950/40 p-4">
@@ -75,11 +80,10 @@ export default function RadarGlobalView() {
             {result && (
                 <>
                     <p className="text-xs text-gray-500">
-                        Generado: {new Date(result.generado_en).toLocaleString('es-ES')} · Regiones:{' '}
-                        {result.regiones.join(', ') || 'global'}
+                        {t('propicks.radar.generated', { date: new Date(result.generado_en).toLocaleString(locale === 'en' ? 'en-US' : 'es-ES'), regions: result.regiones.join(', ') || 'global' })}
                     </p>
                     {result.candidatos.length === 0 ? (
-                        <p className="text-sm text-gray-400">La consulta no devolvió candidatos con estos filtros.</p>
+                        <p className="text-sm text-gray-400">{t('propicks.radar.empty')}</p>
                     ) : (
                         <div className="grid gap-3 sm:grid-cols-2">
                             {result.candidatos.map((c) => (
@@ -94,8 +98,8 @@ export default function RadarGlobalView() {
                                         </div>
                                         {c.en_universo_propio && (
                                             <span className="rounded bg-teal-900 px-2 py-0.5 text-xs text-teal-300">
-                                                Ya en nuestro universo
-                                            </span>
+                                            {t('propicks.radar.inUniverse')}
+                                        </span>
                                         )}
                                     </div>
                                     <div className="mt-3 grid grid-cols-2 gap-2">
@@ -103,18 +107,18 @@ export default function RadarGlobalView() {
                                             <p className="text-xs text-gray-500">P/B</p>
                                             <p className="text-sm text-gray-200">
                                                 {c.price_to_book === null
-                                                    ? 'N/D'
-                                                    : `${c.price_to_book.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}x`}
+                                                    ? t('propicks.radar.na')
+                                            : `${formatNumber(c.price_to_book, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}x`}
                                             </p>
                                         </div>
                                         <div>
-                                            <p className="text-xs text-gray-500">Dividendo</p>
+                                            <p className="text-xs text-gray-500">{t('propicks.radar.dividend')}</p>
                                             <YieldValue candidate={c} />
                                         </div>
                                     </div>
                                     {c.yield_extremo_revisar && (
                                         <p className="mt-2 flex items-center gap-1 text-xs text-amber-400">
-                                            <AlertTriangle className="h-3 w-3" /> Yield muy alto: revisar si es un dividendo especial
+                                            <AlertTriangle className="h-3 w-3" /> {t('propicks.radar.yieldExtreme')}
                                         </p>
                                     )}
                                     {c.via_cotejo && (
@@ -124,7 +128,7 @@ export default function RadarGlobalView() {
                                             rel="noopener noreferrer"
                                             className="mt-2 inline-flex min-h-[44px] items-center gap-1 text-xs text-teal-400 underline"
                                         >
-                                            Cotejar en HKEXnews (fuente oficial) <ExternalLink className="h-3 w-3" />
+                                            {t('propicks.radar.checkHkex')} <ExternalLink className="h-3 w-3" />
                                         </a>
                                     )}
                                 </Card>

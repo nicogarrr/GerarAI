@@ -9,7 +9,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-const view = readFileSync('components/proPicks/DeepValueView.tsx', 'utf8');
+// El texto vive en el diccionario (es); la vista lo pinta con t().
+const view = readFileSync('components/proPicks/DeepValueView.tsx', 'utf8') + JSON.stringify(JSON.parse(readFileSync('lib/i18n/messages/es/propicks.json', 'utf8')).deepValue);
 const service = readFileSync('data-engine/app/services/deep_value_service.py', 'utf8');
 
 test('el aviso de que NO es el filtro de calidad es visible en la vista', () => {

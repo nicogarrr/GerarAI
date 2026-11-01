@@ -14,7 +14,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const vista = readFileSync('components/proPicks/GemsView.tsx', 'utf8');
+const vista = readFileSync('components/proPicks/GemsView.tsx', 'utf8') + JSON.stringify(JSON.parse(readFileSync('lib/i18n/messages/es/propicks.json', 'utf8')).gems);
 const formato = readFileSync('components/proPicks/gemsFormat.ts', 'utf8');
 const servicio = readFileSync('data-engine/app/services/propicks_gems_service.py', 'utf8');
 
@@ -30,7 +30,8 @@ describe('Joyas: tarjetas legibles', () => {
   });
 
   it('la puntuación lleva etiqueta y escala /100', () => {
-    assert.match(vista, />\s*Puntuación\s*<\//);
+    assert.match(vista, /\{t\('propicks\.gems\.score'\)\}/);
+    assert.match(vista, /"score":"Puntuación"/);
     assert.ok(vista.includes('/100'), 'falta la escala /100');
   });
 
