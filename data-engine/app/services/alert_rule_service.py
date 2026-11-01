@@ -189,7 +189,7 @@ class AlertRuleService:
                     alert_message as thesis_alert_message,
                 )
 
-                alert_message = thesis_alert_message(company, rule, observed)
+                alert_message = thesis_alert_message(company, rule, observed, language)
             news_event = None
             if observation.get("kind") == "news_event" and observation.get("news_event_id"):
                 news_event = db.get(NewsEvent, observation["news_event_id"])
