@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
-from app.models import Company, Position, Transaction
+from app.models import Company, MarketPrice, Position, Transaction
 from app.services.portfolio_fx_service import PortfolioFXService, currency_key
 from app.valuation.currency import canonical_currency_code
 
@@ -431,6 +431,12 @@ class PortfolioLedgerService:
             db.add(position)
         # nosemgrep: gerarai-money-none-to-zero -- columna NOT NULL (default 0): el `or 0` no convierte ningun None real
         existing_price = position.market_price or Decimal("0")
+        if existing_price > 0 and self._is_trade_price_fallback(
+            db, company_id, existing_price, transactions
+        ):
+            # El precio guardado es el de una operación anterior (respaldo A3),
+            # no una cotización: se valora con la última, no con la primera.
+            existing_price = Decimal("0")
         market_price = existing_price if existing_price > 0 else last_price
         if existing_price > 0 and as_of is None and position.as_of is not None:
             # F366: se conserva la cotización guardada, así que su fecha NO se
@@ -474,6 +480,21 @@ class PortfolioLedgerService:
             position.as_of = held_as_of
         db.flush()
         return position
+
+    @staticmethod
+    def _is_trade_price_fallback(
+        db: Session, company_id: int, price: Decimal, transactions: list[Transaction]
+    ) -> bool:
+        """El precio coincide con el de una operación y no hay cotización desde ella."""
+        matching = [t.trade_date for t in transactions if t.price == price]
+        if not matching:
+            return False
+        quoted = db.scalar(
+            select(MarketPrice.id)
+            .where(MarketPrice.company_id == company_id, MarketPrice.date >= max(matching))
+            .limit(1)
+        )
+        return quoted is None
 
     @staticmethod
     def _blank_valuation(position: Position) -> None:
