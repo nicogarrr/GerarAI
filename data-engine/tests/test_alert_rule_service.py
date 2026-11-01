@@ -378,3 +378,32 @@ def test_ownership_disclosure_remains_news_without_creating_generic_alert(db):
     assert result['matched'] is False
     assert db.query(ResearchAlert).count() == 0
     assert db.get(NewsEvent, event.id) is not None
+
+
+def test_triggered_alerts_follow_saved_english_language(db, monkeypatch):
+    from app.services import alert_rule_service
+
+    monkeypatch.setattr(alert_rule_service, "generation_language", lambda db: "en")
+    company = _company(db)
+    _price(db, company, day=date.today(), close="210")
+    service = AlertRuleService()
+    price_rule = service.create(db, company, rule_type="price_above", operator=">", value=200)
+    service.evaluate(db, price_rule)
+    news_rule = service.create(db, company, rule_type="news", operator=">", value=0)
+    _news(db, company, title="Apple beats estimates")
+    service.evaluate(db, news_rule)
+    messages = sorted(a.message for a in db.query(ResearchAlert).all())
+    assert messages[0] == f"AAPL: new news for rule «{news_rule.name}»: Apple beats estimates"
+    assert messages[1].startswith(f"AAPL: rule «{price_rule.name}» was met (observed value: 210")
+    assert all(a.metadata_["language"] == "en" for a in db.query(ResearchAlert).all())
+
+
+def test_triggered_alert_stays_spanish_by_default(db):
+    company = _company(db)
+    _price(db, company, day=date.today(), close="210")
+    service = AlertRuleService()
+    rule = service.create(db, company, rule_type="price_above", operator=">", value=200)
+    service.evaluate(db, rule)
+    alert = db.query(ResearchAlert).one()
+    assert alert.message.startswith(f"AAPL: se cumplió la regla «{rule.name}» (valor observado: 210")
+    assert "language" not in alert.metadata_
