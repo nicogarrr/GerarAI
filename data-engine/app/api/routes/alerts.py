@@ -34,6 +34,12 @@ from app.services.review_alert_service import ReviewAlertService
 router = APIRouter()
 
 
+_PRICE_DIRECTION: dict[str, frozenset[str]] = {
+    "price_above": frozenset({">", ">="}),
+    "price_below": frozenset({"<", "<="}),
+}
+
+
 class ManualAlertCreate(BaseModel):
     ticker: str = Field(min_length=1, max_length=20)
     alert_type: Literal["price_above", "price_below", "price_change", "news", "earnings"]
@@ -57,8 +63,21 @@ class ManualAlertCreate(BaseModel):
         from app.services.alert_rule_service import _numeric_threshold
 
         if self.alert_type in {"price_above", "price_below", "price_change"}:
-            if _numeric_threshold(self.value) is None:
+            threshold = _numeric_threshold(self.value)
+            if threshold is None:
                 raise ValueError("El umbral de una alerta de precio o de cambio debe ser un número")
+            # La web deriva el operador del tipo («por encima» = «>», «por debajo» = «<»)
+            # y exige un precio > 0; la API aceptaba price_above con «<» (avisaba al BAJAR
+            # de un precio llamado «por encima») y umbrales 0 o negativos, que se cumplen
+            # siempre o nunca. Se rechaza igual que en la web.
+            if self.alert_type in _PRICE_DIRECTION:
+                if self.operator not in _PRICE_DIRECTION[self.alert_type]:
+                    raise ValueError(
+                        "El operador no coincide con la dirección de la alerta: "
+                        "«por encima» usa > o >=, «por debajo» usa < o <="
+                    )
+                if threshold <= 0:
+                    raise ValueError("El precio de la alerta debe ser mayor que 0")
         return self
 
 
