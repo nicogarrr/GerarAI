@@ -18,6 +18,7 @@ export async function resolve(specifier, context, nextResolve) {
     ['@/lib/paginated-backend', new URL('../lib/paginated-backend.ts', import.meta.url).href],
     ['@/lib/research/sources-inventory', new URL('../lib/research/sources-inventory.ts', import.meta.url).href],
     ['@/lib/news-landing', new URL('../lib/news-landing.ts', import.meta.url).href],
+    ['@/lib/research/backend-error-locale', 'guard-stub:request-locale'],
     ['next/cache', 'guard-stub:next-cache'],
   ]);
   const mapped = map.get(specifier);
@@ -48,6 +49,13 @@ export async function load(url, context, nextLoad) {
         "  return { 'X-CavaAI-User': 'contract-test-user' };",
         '}',
       ].join('\n'),
+      shortCircuit: true,
+    };
+  }
+  if (url === 'guard-stub:request-locale') {
+    return {
+      format: 'module',
+      source: "export async function requestLocale() { return 'es'; }",
       shortCircuit: true,
     };
   }

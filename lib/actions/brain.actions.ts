@@ -4,6 +4,7 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { trimBrainHistory, type BrainHistoryTurn } from '@/lib/brain/history';
 import type { BrainPageContext } from '@/lib/brain/page-context';
 import { toPortfolioChatCitations } from '@/lib/chat/citations';
+import { requestLocale } from '@/lib/research/backend-error-locale';
 import { jsonBody, researchRequest } from '@/lib/research/client';
 import { AppError, AuthorizationError, ExternalAPIError, ValidationError } from '@/lib/types/errors';
 
@@ -54,6 +55,10 @@ export async function chatWithPortfolio(
     try {
         response = await researchRequest<ResearchChatResponse>('/api/chat', {
             method: 'POST',
+            // Idioma de Ajustes → Idioma: las respuestas fijas del chat (posición,
+            // coste medio, peso, rentabilidad) salen en ese idioma cuando el motor
+            // tiene activa la generación multidioma; si no, en español como siempre.
+            headers: { 'x-gerarai-language': await requestLocale() },
             body: jsonBody({ question, scope: 'portfolio', ticker: null, page: page ?? null, history: trimBrainHistory(history) }),
         });
     } catch (error) {
