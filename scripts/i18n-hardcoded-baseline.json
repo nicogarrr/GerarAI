@@ -1,7 +1,6 @@
 {
   "app/(root)/error.tsx": 1,
   "app/(root)/insider/page.tsx": 1,
-  "app/(root)/inversores/_components/Avatar.tsx": 1,
   "app/(root)/inversores/_components/investor-views.ts": 3,
   "app/(root)/inversores/_components/LibraryChat.tsx": 1,
   "app/(root)/inversores/_components/Portfolio.tsx": 5,
@@ -111,7 +110,6 @@
   "lib/research/backend-error-es.ts": 58,
   "lib/research/change-copy.ts": 20,
   "lib/research/chat-intents.ts": 3,
-  "lib/research/claim-groups.ts": 2,
   "lib/research/client.ts": 2,
   "lib/research/coverage-state.ts": 1,
   "lib/research/debate-error.ts": 5,
@@ -124,7 +122,6 @@
   "lib/research/listing-status.ts": 2,
   "lib/research/metric-labels-en.ts": 3,
   "lib/research/metric-labels.ts": 102,
-  "lib/research/missing-layer-guidance.ts": 4,
   "lib/research/openapi.generated.ts": 1,
   "lib/research/ownership-display.ts": 5,
   "lib/research/ownership-signals.ts": 12,

@@ -51,7 +51,7 @@ test('la ficha pagina historial, afirmaciones y hechos financieros móviles con 
   const src = page + '\n' + panels;
   assert.equal((src.match(/<PagedList/g) ?? []).length, 3, 'historial, afirmaciones y hechos financieros móviles usan PagedList');
   assert.match(page, /collapseVersionHistory\(data\.historyDetail\.history\)\.map/);
-  assert.match(page, /groupClaimsByVersion\(data\.claims, data\.history\)\.map/);
+  assert.match(page, /groupClaimsByVersion\(data\.claims, data\.history, t\)\.map/);
   assert.match(page, /label=\{t\('research\.fichaVersionHistory'\)\}/);
   assert.match(panels, /label=\{t\('research\.facts\.label'\)\}/);
   assert.match(panels, /pageSize=\{FACTS_MOBILE_PAGE\}/);

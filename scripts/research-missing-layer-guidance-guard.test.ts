@@ -37,8 +37,8 @@ test('F305: los tickers con sufijo de mercado se codifican en la ruta', () => {
 
 test('F305: el aviso de la vista general enlaza capa a capa (no un solo enlace a documentos)', () => {
     assert.match(page, /snapshot\.research_health\.missing\.map\(\(layer\)/);
-    assert.match(page, /missingLayerAction\(ticker, layer\)/);
-    assert.match(page, /missingLayerLabel\(layer\)/);
+    assert.match(page, /missingLayerAction\(ticker, layer, t\)/);
+    assert.match(page, /missingLayerLabel\(layer, t\)/);
 });
 
 test('F309: los estados vacíos de la vista financieros ya no mandan a importar documentos', () => {
