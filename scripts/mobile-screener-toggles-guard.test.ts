@@ -14,7 +14,7 @@ const SRC = 'components/screeners/FilterFields.tsx';
 
 test('conmutador Valor/Métrica con área táctil 44px en móvil', () => {
     const src = readFileSync(SRC, 'utf8');
-    const i = src.indexOf('aria-label="Tipo de comparación"');
+    const i = src.indexOf("aria-label={t('screener.comparisonTypeAria')}");
     assert.ok(i >= 0, 'radiogroup Tipo de comparación existe');
     const bloque = src.slice(i, i + 700);
     assert.ok(bloque.includes('min-h-11'), 'Valor/Métrica con min-h-11 en móvil');
@@ -24,7 +24,7 @@ test('conmutador Valor/Métrica con área táctil 44px en móvil', () => {
 
 test('conmutador Orden con área táctil 44px en móvil', () => {
     const src = readFileSync(SRC, 'utf8');
-    const i = src.indexOf('aria-label="Orden"');
+    const i = src.indexOf("aria-label={t('screener.orderLabel')}");
     assert.ok(i >= 0, 'radiogroup Orden existe');
     const bloque = src.slice(i, i + 700);
     assert.ok(bloque.includes('min-h-11'), 'Orden con min-h-11 en móvil');

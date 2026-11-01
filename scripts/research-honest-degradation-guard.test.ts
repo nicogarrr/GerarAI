@@ -50,6 +50,9 @@ describe('watchlist desconocida no pinta "Seguir"', () => {
   });
   it('el boton se deshabilita y no ofrece Seguir si el estado es desconocido', () => {
     assert.match(FOLLOW, /disabled=\{busy \|\| stateUnknown\}/);
-    assert.match(FOLLOW, /stateUnknown \? 'Seguir \(no disponible\)'/);
+    assert.match(FOLLOW, /stateUnknown \? t\('screener\.follow\.unavailable'\)/);
+    // El texto vive en el diccionario (solo esa clave).
+    const esFollow = JSON.parse(readFileSync('lib/i18n/messages/es/screener.json', 'utf8')).follow;
+    assert.equal(esFollow.unavailable, 'Seguir (no disponible)');
   });
 });

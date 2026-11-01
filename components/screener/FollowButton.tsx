@@ -6,6 +6,7 @@ import { Check, Loader2, Plus } from 'lucide-react';
 import { addToWatchlist, removeFromWatchlist } from '@/lib/actions/watchlist.actions';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Botón seguir/dejar de seguir con estado persistente.
@@ -34,6 +35,7 @@ export default function FollowButton({
   /** Etiqueta corta por debajo de sm (cabecera de la ficha); desde sm, el texto completo. El nombre accesible sale del texto visible de cada breakpoint (sin aria-label: WCAG 2.5.3, label-content-name-mismatch). */
   compact?: boolean;
 }) {
+  const t = useT();
   const [followed, setFollowed] = useState(isFollowed);
   const [busy, setBusy] = useState(false);
 
@@ -51,8 +53,8 @@ export default function FollowButton({
         setFollowed(action === 'add');
         toast.success(
           action === 'add'
-            ? `${symbol} añadido a la watchlist`
-            : `${symbol} eliminado de la watchlist`,
+            ? t('screener.follow.added', { symbol })
+            : t('screener.follow.removed', { symbol }),
         );
       } else {
         // Duplicado: el ticker ya estaba seguido; sincronizamos el estado visible.
@@ -60,10 +62,10 @@ export default function FollowButton({
         showErrorToast(
           res.message ??
             (action === 'add'
-              ? 'No se pudo añadir a la watchlist'
-              : 'No se pudo eliminar de la watchlist'),
+              ? t('screener.follow.addError')
+              : t('screener.follow.removeError')),
           {
-          duplicateMessage: 'Ya sigues este ticker.',
+          duplicateMessage: t('screener.follow.duplicate'),
           onRetry: onClick,
         });
       }
@@ -80,7 +82,7 @@ export default function FollowButton({
       size="sm"
       onClick={onClick}
       disabled={busy || stateUnknown}
-      title={stateUnknown ? 'No se pudo comprobar tu watchlist. Recarga la página.' : undefined}
+      title={stateUnknown ? t('screener.follow.unknownTitle') : undefined}
       aria-busy={busy}
       aria-pressed={followed}
       className={compact ? 'h-11 gap-1.5 px-3 text-gray-300 hover:text-teal-300 sm:h-7 sm:w-auto sm:gap-1 sm:px-2 sm:text-xs' : 'min-h-[44px] px-3 py-2 text-sm text-gray-300 hover:text-teal-300 sm:h-7 sm:min-h-0 sm:px-2 sm:text-xs'}
@@ -93,7 +95,7 @@ export default function FollowButton({
         <Plus aria-hidden="true" className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
       )}
       {(() => {
-        const text = busy ? 'Guardando…' : stateUnknown ? 'Seguir (no disponible)' : followed ? 'Dejar de seguir' : 'Seguir';
+        const text = busy ? t('screener.follow.saving') : stateUnknown ? t('screener.follow.unavailable') : followed ? t('screener.follow.unfollow') : t('screener.follow.follow');
         if (!compact) return text;
         // En móvil una ✓ sola no dice que el estado es «siguiendo» ni que el
         // toque lo quita (informe UX 29-oct, punto 12): etiqueta corta visible.
@@ -101,7 +103,7 @@ export default function FollowButton({
         // axe-core lo marca label-content-name-mismatch (serio) a 375 px; el
         // nombre accesible es el texto visible de cada breakpoint y el estado
         // lo da aria-pressed.
-        const short = busy ? 'Guardando…' : stateUnknown ? 'No disponible' : followed ? 'Siguiendo' : 'Seguir';
+        const short = busy ? t('screener.follow.saving') : stateUnknown ? t('screener.follow.unavailableShort') : followed ? t('screener.follow.following') : t('screener.follow.follow');
         return <><span className="sm:hidden">{short}</span><span className="hidden sm:inline">{text}</span></>;
       })()}
     </Button>

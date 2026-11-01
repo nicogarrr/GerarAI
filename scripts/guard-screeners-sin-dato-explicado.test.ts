@@ -4,7 +4,10 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const SRC = readFileSync('app/(root)/screeners/[screenId]/page.tsx', 'utf8');
+// El texto español vive en es/screener.json: solo se añaden sus dos avisos.
+const ES = JSON.parse(readFileSync('lib/i18n/messages/es/screener.json', 'utf8'));
+const SRC = readFileSync('app/(root)/screeners/[screenId]/page.tsx', 'utf8')
+  + JSON.stringify({ metricsWithoutData: ES.metricsWithoutData, noMatchMissingData: ES.noMatchMissingData });
 const RESULTS_SRC = readFileSync('lib/screener-results.ts', 'utf8');
 
 test('aviso de métricas sin dato en ninguna empresa', () => {

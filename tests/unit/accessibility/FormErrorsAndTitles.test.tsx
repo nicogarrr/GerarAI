@@ -26,7 +26,9 @@ describe('Errores y títulos que un lector de pantalla puede encontrar', () => {
     });
 
     it('un filtro guardado tiene título de pestaña propio, no el genérico de la app', () => {
-        expect(src('app/(root)/screeners/[screenId]/page.tsx')).toMatch(/export const metadata: Metadata = \{\s*title: 'Resultados del filtro guardado'/);
+        // El título sale del diccionario (sigue el idioma elegido).
+        expect(src('app/(root)/screeners/[screenId]/page.tsx')).toMatch(/generateMetadata[\s\S]*title: t\('screener\.savedMetaTitle'\)/);
+        expect(JSON.parse(src('lib/i18n/messages/es/screener.json')).savedMetaTitle).toBe('Resultados del filtro guardado');
     });
 
     it('el aviso de noticias caídas no habla de «dashboard»', () => {
