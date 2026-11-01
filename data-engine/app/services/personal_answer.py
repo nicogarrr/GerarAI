@@ -353,6 +353,29 @@ def _response(
     )
 
 
+_YEAR_RE = re.compile(r"\b(20\d{2})\b")
+_THIS_YEAR_RE = re.compile(r"(?i)\b(?:este|esta|en\s+lo\s+que\s+va\s+de)\s+(?:a[nñ]o|ejercicio)\b")
+_LAST_YEAR_RE = re.compile(r"(?i)\b(?:el\s+)?(?:a[nñ]o|ejercicio)\s+pasado\b")
+
+
+def _fiscal_year_in(question: str) -> int | None:
+    """Ejercicio que pide la pregunta («este año», «2024», «el año pasado»).
+
+    Sin año explícito, None: el contexto usa el último ejercicio cerrado.
+    Antes «¿mi plusvalía realizada este año?» respondía con el anterior.
+    """
+    from app.core.local_date import local_today
+
+    explicit = _YEAR_RE.search(question or "")
+    if explicit:
+        return int(explicit.group(1))
+    if _THIS_YEAR_RE.search(question or ""):
+        return local_today().year
+    if _LAST_YEAR_RE.search(question or ""):
+        return local_today().year - 1
+    return None
+
+
 async def answer_personal_question(
     db: Session,
     question: str,
@@ -364,7 +387,12 @@ async def answer_personal_question(
     dca_reader: Any | None = None,
 ) -> ChatResponse | None:
     """Respuesta anclada a los datos del usuario; None si no hay tenant."""
-    ctx = build_user_context(db, sections=intent.sections, dca_reader=dca_reader)
+    ctx = build_user_context(
+        db,
+        sections=intent.sections,
+        dca_reader=dca_reader,
+        fiscal_year=_fiscal_year_in(question) if intent.kind == "fiscal" else None,
+    )
     if ctx is None:
         return None
     context_text = ctx.render()
