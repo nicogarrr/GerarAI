@@ -39,7 +39,7 @@ describe('pase visual: cifras, tablas y columnas que no caben', () => {
 
   it('Biblioteca: las tres cifras van en una fila también en móvil', () => {
     const source = readFileSync('app/(root)/knowledge/page.tsx', 'utf8');
-    expect(source).toContain('<section aria-label="Resumen de la biblioteca" className="grid grid-cols-3 gap-2 sm:gap-4">');
+    expect(source).toContain("<section aria-label={t('knowledge.statsAria')} className=\"grid grid-cols-3 gap-2 sm:gap-4\">");
     expect(source).not.toContain('grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4');
   });
 });

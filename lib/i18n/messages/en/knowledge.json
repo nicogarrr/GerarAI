@@ -169,5 +169,17 @@
     "confirmCollectionTitle": "Delete the empty collection “{name}”?",
     "confirmCollectionDescription": "This action cannot be undone."
   },
-  "statsAria": "Library summary"
+  "statsAria": "Library summary",
+  "search": {
+    "label": "Search the library",
+    "placeholder": "Title, author or ticker",
+    "submit": "Search",
+    "clear": "Clear search",
+    "noMatch": "No document matches “{query}” in title, author or ticker.",
+    "inText": "Search for “{query}” in the full text",
+    "matches": {
+      "one": "{count} document matches “{query}”.",
+      "other": "{count} documents match “{query}”."
+    }
+  }
 }

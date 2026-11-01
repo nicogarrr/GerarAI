@@ -13,7 +13,7 @@ describe('Biblioteca: flujo de lectura', () => {
     it('el explorador del documento abre arriba de la pestaña y tiene ancla', () => {
         const explorer = bibliotecaTab.indexOf('id="fragmentos"');
         expect(explorer).toBeGreaterThan(-1);
-        expect(explorer).toBeLessThan(bibliotecaTab.indexOf('Pendientes de aprobación'));
+        expect(explorer).toBeLessThan(bibliotecaTab.indexOf('knowledge.stats.pendingApproval'));
         expect(explorer).toBeLessThan(bibliotecaTab.indexOf('id="documentos"'));
     });
 
@@ -25,7 +25,7 @@ describe('Biblioteca: flujo de lectura', () => {
     });
 
     it('volver a la lista regresa a la misma página y al listado', () => {
-        expect(source).toContain('<Link href={libraryListHref(documentOffset, searchQuery)}>Volver a la lista</Link>');
+        expect(source).toContain("<Link href={libraryListHref(documentOffset, searchQuery)}>{t('knowledge.backToList')}</Link>");
         expect(source).toContain("return `/knowledge${params.size ? `?${params}` : ''}#documentos`;");
     });
 
@@ -35,9 +35,9 @@ describe('Biblioteca: flujo de lectura', () => {
     });
 
     it('la lista va antes que las colecciones y los formularios de alta viven en «Subir»', () => {
-        expect(bibliotecaTab.indexOf('id="documentos"')).toBeLessThan(bibliotecaTab.indexOf('>Colecciones</h2>'));
+        expect(bibliotecaTab.indexOf('id="documentos"')).toBeLessThan(bibliotecaTab.indexOf(">{t('knowledge.stats.collections')}</h2>"));
         expect(bibliotecaTab).not.toContain('action={createKnowledgeCollectionResult}');
         expect(subirTab).toContain('action={createKnowledgeCollectionResult}');
-        expect(subirTab).toContain('Colecciones por defecto');
+        expect(subirTab).toContain('knowledge.defaultsTitle');
     });
 });

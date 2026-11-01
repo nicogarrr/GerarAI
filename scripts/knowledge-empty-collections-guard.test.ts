@@ -21,8 +21,11 @@ describe('knowledge empty collections guard', () => {
 
   it('las vacías quedan plegadas en un desplegable etiquetado', () => {
     assert.match(page, /<details className="mt-3">/);
-    assert.match(page, /colecciones vacías/);
-    assert.match(page, /colección vacía/);
+    assert.match(page, /knowledge\.emptyCollections\.other/);
+    assert.match(page, /knowledge\.emptyCollections\.one/);
+    const esK = JSON.parse(readFileSync('lib/i18n/messages/es/knowledge.json', 'utf8'));
+    assert.match(esK.emptyCollections.other, /colecciones vacías/);
+    assert.match(esK.emptyCollections.one, /colección vacía/);
   });
 
   it('las vacías conservan su botón de borrado dentro del desplegable', () => {
