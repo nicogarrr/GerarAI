@@ -256,3 +256,23 @@ def test_chat_con_posicion_vender_la_mitad_a_un_precio_usa_el_precio_del_usuario
     assert response.llm_trace.get("sale_price_source") == "usuario"
     # 50 acciones × (20 − 10) = 500 € de ganancia; con el valor guardado sería una pérdida.
     assert "500" in response.answer
+
+
+
+@pytest.mark.parametrize(("question", "expected"), [
+    ("¿cuánto IRPF pagaría si vendo SHEL.L a 30 £?", (D("30"), "GBP")),
+    ("si vendo todo AAPL a 200 $", (D("200"), "USD")),
+    ("si vendo mis acciones de TEST a 150 €", (D("150"), "EUR")),
+    ("vendo todas mis acciones de TEST por 150 euros", (D("150"), "EUR")),
+    ("si vendo TEST hoy a 150 €", (D("150"), "EUR")),
+])
+def test_vender_un_ticker_sin_cantidad_a_un_precio_respeta_el_precio(question, expected):
+    # Antes el ticker solo se aceptaba detras de una cantidad («vendo 10 TEST a
+    # 150 €»): «si vendo TEST a 150 €» no reconocia el precio y el IRPF del
+    # chat se calculaba EN SILENCIO con la cotizacion guardada.
+    assert parse_sale_price(question) == expected
+
+
+def test_vender_sin_precio_sigue_sin_precio():
+    assert parse_sale_price("si vendo TEST mañana a las 10") is None
+    assert parse_sale_price("cuánto IRPF si vendo todo TEST") is None
