@@ -503,3 +503,37 @@ def test_precio_en_libras_con_lotes_en_peniques(db):
     assert resp.llm_trace["sale_price_source"] == "usuario"
     assert "coste 299,00 €" in resp.answer
     assert "ganancia de 46,00 €" in resp.answer
+
+
+def test_precio_en_euros_con_lotes_en_dolares_al_cambio_de_hoy(db):
+    """Precio de venta en euros («a 150 €») de un valor en dólares.
+
+    Criterio del informe fiscal (DGT V0152-26): la ganancia se calcula en la
+    divisa del valor y se pasa a euros al cambio de la venta, así que el coste
+    en dólares va al cambio de HOY. Compra 10 a 100 $ (0,90 €/$); hoy 0,80 €/$
+    y venta a 150 €: valor 1.500,00 €, coste 1.000 $ × 0,80 = 800,00 €,
+    ganancia 700,00 € (antes 900,00 € al cambio de la compra y 600,00 €).
+    """
+    comp = Company(ticker="AAPL", name="Apple", exchange="NASDAQ", company_type="standard",
+                   valuation_model="unassigned", currency="USD")
+    db.add(comp)
+    db.flush()
+    db.add(FXRate(base_currency="EUR", quote_currency="USD", rate_date=date(2026, 3, 2),
+                  rate=Decimal("0.90"), source="test"))
+    db.add(FXRate(base_currency="EUR", quote_currency="USD", rate_date=date.today(),
+                  rate=Decimal("0.80"), source="test"))
+    _tx(db, comp, date(2026, 3, 2), "buy", 10, 100, currency="USD")
+    db.add(Position(
+        tenant_id=1, company_id=comp.id, quantity=Decimal("10"), average_cost=Decimal("100"),
+        market_value=Decimal("1200"), market_value_native=Decimal("1200"), market_value_base=Decimal("960"),
+        cost_basis_native=Decimal("1000"), cost_basis_base=Decimal("900"),
+        currency="USD", base_currency="EUR", as_of=date.today(),
+    ))
+    db.commit()
+    resp = _ask(db, "¿Cuánto IRPF pagaría si vendo 10 AAPL a 150 €?")
+    assert resp.llm_trace["method"] == "fifo"
+    assert resp.llm_trace["sale_price_source"] == "usuario"
+    assert "valor 1.500,00 €" in resp.answer
+    assert "coste 800,00 €" in resp.answer
+    assert "ganancia de 700,00 €" in resp.answer
+
