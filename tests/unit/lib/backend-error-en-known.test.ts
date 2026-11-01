@@ -14,6 +14,25 @@ describe('known Spanish engine messages are shown in English with English select
     expect(backendMessage('rango máximo: 366 días', 'en')).toBe('Maximum range: 366 days.');
   });
 
+  it('translates IBKR connection, import, image, watchlist and plan messages', () => {
+    expect(backendMessage('Revisa el token Flex: debe contener solo números.', 'en')).toBe('Check the Flex token: it must contain only digits.');
+    expect(backendMessage('Esta cartera ya está vinculada a otra cuenta IBKR. No se pueden mezclar cuentas en esta versión.', 'en'))
+      .toBe('This portfolio is already linked to another IBKR account. Accounts cannot be mixed in this version.');
+    expect(backendMessage('El CSV está mal formado y no se puede leer; expórtalo de nuevo desde IBKR', 'en'))
+      .toBe('The CSV is malformed and cannot be read; export it again from IBKR.');
+    expect(backendMessage('La fecha de operación es anterior a 1970 (1900-01-02): revisa el año', 'en'))
+      .toBe('The trade date is before 1970 (1900-01-02): check the year.');
+    expect(backendMessage('Error al leer el archivo Excel: File is not a zip file', 'en')).toBe('Error reading the Excel file: File is not a zip file');
+    expect(backendMessage('La imagen debe ocupar como máximo 2 MB', 'en')).toBe('The image must be 2 MB at most.');
+    expect(backendMessage('La captura contiene demasiado texto. Recorta solo la tabla de posiciones', 'en'))
+      .toBe('The screenshot has too much text. Crop just the positions table.');
+    expect(backendMessage('Value error, La etiqueta no puede llevar saltos de línea ni caracteres de control', 'en'))
+      .toBe('The label cannot contain line breaks or control characters.');
+    expect(backendMessage('Los objetivos de tipo sector suman 120 %: no pueden superar el 100 %.', 'en'))
+      .toBe('sector targets add up to 120%: they cannot exceed 100%.');
+    expect(backendMessage('La imagen debe ocupar como máximo 2 MB', 'es')).toBe('La imagen debe ocupar como máximo 2 MB');
+  });
+
   it('leaves unknown Spanish text and the Spanish interface untouched', () => {
     expect(backendMessage('La colección no está vacía', 'en')).toBe('La colección no está vacía');
     const raw = 'Ya existe una cartera con este nombre para el usuario.';

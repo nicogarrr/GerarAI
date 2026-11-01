@@ -46,6 +46,31 @@ const KNOWN: ReadonlyArray<readonly [RegExp, string]> = [
   [/^La revisión no existe en tu cartera$/, 'The review does not exist in your portfolio.'],
   [/^Faltan cotizaciones o la revisión ha caducado\. Vuelve a revisar$/, 'Quotes are missing or the review has expired. Review again.'],
   [/^Cotización caducada\. Vuelve a revisar$/, 'Quote expired. Review again.'],
+  // Conexión IBKR (Ajustes)
+  [/^Inicia sesión para configurar IBKR\.?$/, 'Sign in to set up IBKR.'],
+  [/^Revisa el token Flex: debe contener solo números\.?$/, 'Check the Flex token: it must contain only digits.'],
+  [/^Revisa el Query ID de tu consulta Flex\.?$/, 'Check the Query ID of your Flex query.'],
+  [/^Introduce la cuenta IBKR tal como figura en el extracto\.?$/, 'Enter the IBKR account exactly as it appears on the statement.'],
+  [/^Esta cartera ya está vinculada a otra cuenta IBKR\. No se pueden mezclar cuentas en esta versión\.?$/, 'This portfolio is already linked to another IBKR account. Accounts cannot be mixed in this version.'],
+  [/^La cuenta no coincide con la fuente IBKR existente de esta cartera\.?$/, "The account does not match this portfolio's existing IBKR source."],
+  [/^El CSV está mal formado y no se puede leer; expórtalo de nuevo desde IBKR$/, 'The CSV is malformed and cannot be read; export it again from IBKR.'],
+  // Importación de operaciones (más)
+  [/^El archivo CSV está mal formado y no se puede leer; guárdalo de nuevo como CSV \(UTF-8\)$/, 'The CSV file is malformed and cannot be read; save it again as CSV (UTF-8).'],
+  [/^Error al leer el archivo Excel: (.+)$/, 'Error reading the Excel file: $1'],
+  [/^La fecha de operación es anterior a (\d{4}) \((.+)\): revisa el año$/, 'The trade date is before $1 ($2): check the year.'],
+  // Importar cartera desde imagen (más)
+  [/^La imagen debe ocupar como máximo 2 MB$/, 'The image must be 2 MB at most.'],
+  [/^Usa una imagen PNG, JPEG o WebP sin animación$/, 'Use a PNG, JPEG or WebP image without animation.'],
+  [/^La imagen debe tener entre 100 píxeles de lado y 12 megapíxeles$/, 'The image must be between 100 pixels per side and 12 megapixels.'],
+  [/^No se pudo iniciar la lectura local\. Usa un fichero o la entrada manual$/, 'Local reading could not start. Use a file or manual entry.'],
+  [/^No se pudo leer la captura\. Prueba con un recorte más nítido o importa un fichero$/, 'The screenshot could not be read. Try a sharper crop or import a file.'],
+  [/^La captura contiene demasiado texto\. Recorta solo la tabla de posiciones$/, 'The screenshot has too much text. Crop just the positions table.'],
+  // Watchlist, plan, impuestos y asistente
+  [/^La etiqueta no puede llevar saltos de línea ni caracteres de control$/, 'The label cannot contain line breaks or control characters.'],
+  [/^Los objetivos de tipo (\S+) suman ([\d.,]+) %: no pueden superar el 100 %\.?$/, '$1 targets add up to $2%: they cannot exceed 100%.'],
+  [/^El NIF contiene caracteres de control no imprimibles\.?$/, 'The tax ID (NIF) contains non-printable control characters.'],
+  [/^El modo guía requiere un ticker$/, 'Guide mode needs a ticker.'],
+  [/^El ticket requiere un ticker$/, 'The ticket needs a ticker.'],
   // Alertas y paper trading
   [/^El umbral de una alerta de precio o de cambio debe ser un número\.?$/, 'The threshold of a price or change alert must be a number.'],
   [/^El precio de la alerta debe ser mayor que 0\.?$/, 'The alert price must be greater than 0.'],
