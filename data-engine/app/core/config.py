@@ -149,7 +149,10 @@ class Settings(BaseSettings):
     app_env: str = "local"
     app_name: str = "GerarAI Research Engine"
     api_prefix: str = "/api"
-    cors_origins: list[str] = Field(
+    # NoDecode: la plantilla (docker.env.example) y cualquier .env escriben
+    # CORS_ORIGINS como lista separada por comas; pydantic-settings intentaria
+    # leerlo como JSON y tumbaria el arranque. Ver _parse_cors_origins.
+    cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
     )
 
@@ -773,6 +776,17 @@ class Settings(BaseSettings):
             section, LLM_REASONING_EFFORT_DEFAULTS[section]
         )
         return value or None
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, value):
+        """Acepta `a,b` (formato de las plantillas) y tambien una lista JSON."""
+        if isinstance(value, str):
+            text = value.strip()
+            if text.startswith("["):
+                return json.loads(text)
+            return [origin.strip() for origin in text.split(",") if origin.strip()]
+        return value
 
     @field_validator("llm_model_overrides", mode="before")
     @classmethod
