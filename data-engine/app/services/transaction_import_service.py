@@ -207,6 +207,9 @@ def detect_month_first(raw_dates: list[str]) -> bool:
     return month_first and not day_first
 
 
+_MIN_TRADE_YEAR = 1900
+
+
 def parse_flexible_date(raw_date: Any, *, month_first: bool = False) -> date:
     """Parsea una fecha aceptando formatos estándar españoles e internacionales.
 
@@ -242,9 +245,15 @@ def parse_flexible_date(raw_date: Any, *, month_first: bool = False) -> date:
             parsed = datetime.strptime(date_str, fmt).date()
             if parsed > local_today():
                 raise ValueError(f"La fecha de operación no puede ser futura ({parsed.isoformat()})")
+            if parsed.year < _MIN_TRADE_YEAR:
+                # «0001-01-01» o «0201-03-15» (año mal escrito) no es una
+                # operación real: entraba como compra de hace dos mil años.
+                raise ValueError(
+                    f"La fecha de operación es anterior a {_MIN_TRADE_YEAR} ({parsed.isoformat()}): revisa el año"
+                )
             return parsed
         except ValueError as exc:
-            if "futura" in str(exc):
+            if "futura" in str(exc) or "revisa el año" in str(exc):
                 raise
             continue
 
@@ -565,6 +574,11 @@ class TransactionImportService:
                 row_has_error = True
             elif parsed_price < 0:
                 errors.append(RowValidationError(row_number=row_idx, field="price", message="El precio no puede ser negativo", raw_value=price_raw))
+                row_has_error = True
+            elif parsed_price == 0 and parsed_action == "buy":
+                # Una compra a 0 dejaría la posición con coste 0 y toda la
+                # venta futura como ganancia: casi siempre es un precio vacío.
+                errors.append(RowValidationError(row_number=row_idx, field="price", message="El precio de una compra debe ser mayor que cero", raw_value=price_raw))
                 row_has_error = True
             else:
                 price_num = float(parsed_price)

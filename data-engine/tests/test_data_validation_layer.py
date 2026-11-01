@@ -57,7 +57,7 @@ def test_date_not_future_validation():
 
 
 def test_price_sanity_checks():
-    """Valida comprobaciones de cordura en precios (no negativos)."""
+    """Valida comprobaciones de cordura en precios (no negativos; una compra a 0 tampoco)."""
     service = TransactionImportService()
 
     csv_data = (
@@ -69,8 +69,10 @@ def test_price_sanity_checks():
 
     prev = service.preview_import(csv_data, "precios.csv")
     price_errors = [e for e in prev.errors if e.field == "price"]
-    assert len(price_errors) == 1
+    assert len(price_errors) == 2
     assert "no puede ser negativo" in price_errors[0].message.lower()
+    assert price_errors[1].message == "El precio de una compra debe ser mayor que cero"
+    assert prev.valid_rows_count == 1
 
 
 def test_quantity_strictly_positive_for_buys():
