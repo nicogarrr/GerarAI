@@ -57,6 +57,6 @@ test('F355: management-credibility declara base grid-cols-1 en el formulario de 
 test('F343: el boton de importar afirmaciones permite envolver el texto', () => {
     assert.match(
         credibility,
-        /<Button className="h-auto whitespace-normal py-2 text-center" type="submit" variant="outline"><UploadCloud className="h-4 w-4" \/>Importar afirmaciones de la llamada<\/Button>/,
+        /<Button className="h-auto whitespace-normal py-2 text-center" type="submit" variant="outline"><UploadCloud className="h-4 w-4" \/>\{t\('research\.managementSection\.importClaims'\)\}<\/Button>/,
     );
 });
