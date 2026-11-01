@@ -41,5 +41,19 @@
     "noFile": "Ningún archivo seleccionado",
     "loading": "Cargando el selector de archivo"
   },
-  "mutationFailed": "No se pudo completar la operación. Inténtalo de nuevo."
+  "mutationFailed": "No se pudo completar la operación. Inténtalo de nuevo.",
+  "friendly": {
+    "stale": "Hay una nueva versión de la app: recarga la página.",
+    "offline": "El motor de análisis no responde ahora mismo. Reintenta en unos segundos.",
+    "duplicateTicker": "Ya sigues este ticker.",
+    "forbidden": "No tienes permiso para esta operación.",
+    "signIn": "Necesitas iniciar sesión para continuar.",
+    "invalidTicker": "Introduce un ticker válido.",
+    "invalidAlertId": "Identificador de alerta no válido.",
+    "rateLimit": "Demasiadas peticiones. Espera un momento y reintenta.",
+    "unexpected": "Ha ocurrido un error inesperado.",
+    "engineDown": "El motor de análisis no responde ahora mismo.",
+    "unknown": "No se pudo completar la operación. Inténtalo de nuevo.",
+    "reload": "Recargar"
+  }
 }

@@ -14,3 +14,12 @@ export async function backendMessageForRequest(message: string | null | undefine
     }
     return backendMessage(message, locale);
 }
+
+/** Idioma de la petición en curso (cookie de Ajustes → Idioma); fuera de una petición, español. */
+export async function requestLocale(): Promise<'es' | 'en'> {
+    try {
+        return await getLocale();
+    } catch {
+        return 'es';
+    }
+}

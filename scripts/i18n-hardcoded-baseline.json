@@ -158,7 +158,7 @@
   "lib/thesis/memo-pdf.ts": 1,
   "lib/ticker-badges.ts": 1,
   "lib/tracked-analysis-status.ts": 8,
-  "lib/types/errors.ts": 18,
+  "lib/types/errors.ts": 7,
   "lib/upstream/finnhub.ts": 2,
   "lib/utils.ts": 2,
   "lib/utils/advancedStockScoring.ts": 11,

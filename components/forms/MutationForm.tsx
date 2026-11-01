@@ -4,7 +4,7 @@ import { useRef, useState, type ComponentPropsWithoutRef } from 'react';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { classifyError, getFriendlyErrorMessage, isNextRedirectError } from '@/lib/types/errors';
-import { useT } from '@/lib/i18n/client';
+import { useLocale, useT } from '@/lib/i18n/client';
 
 type MutationFormProps = Omit<ComponentPropsWithoutRef<'form'>, 'action'> & {
   action: (formData: FormData) => Promise<unknown>;
@@ -22,6 +22,7 @@ export function MutationForm({
   ...props
 }: MutationFormProps) {
   const t = useT();
+  const locale = useLocale();
   const resolvedSuccessMessage = successMessage ?? t('auth.fields.defaultSuccess');
   const formRef = useRef<HTMLFormElement>(null);
   const lastFormData = useRef<FormData | null>(null);
@@ -57,7 +58,7 @@ export function MutationForm({
       // Los redirects de Next forman parte de la navegación: re-lanzarlos.
       if (isNextRedirectError(err)) throw err;
       // Error inline siempre visible: ningún submit falla en silencio.
-      setError(getFriendlyErrorMessage(err));
+      setError(getFriendlyErrorMessage(err, { locale }));
       // Toast SOLO cuando aporta una acción (B7): motor caído -> "Reintentar"
       // con los mismos datos; versión obsoleta -> "Recargar"; duplicado ->
       // aviso informativo. Para el resto de causas el toast repetía el

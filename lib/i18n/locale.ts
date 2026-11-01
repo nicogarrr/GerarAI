@@ -33,6 +33,16 @@ export function parseLocale(value: string | null | undefined): Locale {
   return isLocale(short) ? short : DEFAULT_LOCALE;
 }
 
+/**
+ * Idioma de la página ya pintada (el layout pone `<html lang>` con la cookie de
+ * Ajustes → Idioma). Para código de cliente sin hooks (toasts); en el servidor
+ * o sin documento, español.
+ */
+export function documentLocale(): Locale {
+  if (typeof document === 'undefined') return DEFAULT_LOCALE;
+  return parseLocale(document.documentElement.lang);
+}
+
 /** Locale Intl («es-ES» / «en-US») para Intl.NumberFormat y DateTimeFormat. */
 export function intlLocale(locale: Locale): string {
   return INTL_LOCALES[locale];
