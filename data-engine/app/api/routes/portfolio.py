@@ -1,6 +1,5 @@
 import logging
 import math
-import re
 from datetime import date
 from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Annotated, Literal
@@ -97,7 +96,7 @@ from app.services.transaction_import_service import (
     TransactionImportPreviewResponse,
     TransactionImportService,
 )
-from app.valuation.currency import MINOR_UNITS, canonical_currency_code
+from app.valuation.currency import canonical_currency_code, is_currency_code
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +212,6 @@ MAX_NUMERIC_20_10 = Decimal("9999999999.9999999999")
 MIN_NUMERIC_20_10 = Decimal("0.0000000001")
 
 
-_MINOR_UNIT_CODES = frozenset(code.upper() for code in MINOR_UNITS)
 
 
 class PortfolioTransactionInput(BaseModel):
@@ -245,8 +243,9 @@ class PortfolioTransactionInput(BaseModel):
         # encontraba nunca tipo de cambio («incompleta» para siempre). Valen
         # los ISO de 3 letras y las subunidades que conoce la valoracion
         # (GBp, GBX, GBPENCE, ZAc...); canonical_currency_code las normaliza.
+        # «NaN» o «XYZ» (tres letras sin divisa detras) tampoco: lista ISO 4217.
         text = value.strip()
-        if re.fullmatch(r"[A-Za-z]{3}", text) or text.upper() in _MINOR_UNIT_CODES:
+        if is_currency_code(text):
             return text
         raise ValueError("currency must be a currency code such as EUR, USD or GBp")
 
@@ -292,18 +291,39 @@ class PortfolioPriceInput(BaseModel):
     _as_of_not_future = field_validator("as_of")(_not_in_the_future)
 
 
+def _iso_base_currency(value: str) -> str:
+    # Divisa base de la cartera: ISO 4217 (sin subunidades: peniques como base
+    # multiplicaban toda la valoracion por 100). «XYZ» pasaba el patron.
+    if not is_currency_code(value, allow_subunits=False):
+        raise ValueError("base_currency must be an ISO 4217 code such as EUR or USD")
+    return value
+
+
+def _fx_currency(value: str) -> str:
+    # Un tipo de cambio «ABC/EUR» se guardaba y no convertia nada nunca.
+    if not is_currency_code(value):
+        raise ValueError("currency must be a currency code such as EUR or USD")
+    return value
+
+
 class CreatePortfolioInput(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     base_currency: str = Field(default="EUR", min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")
+
+    _base_is_iso = field_validator("base_currency")(_iso_base_currency)
 
 
 class PortfolioConfigurationInput(BaseModel):
     base_currency: str = Field(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")
 
+    _base_is_iso = field_validator("base_currency")(_iso_base_currency)
+
 
 class FXRateInput(BaseModel):
     base_currency: str = Field(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")
     quote_currency: str = Field(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")
+
+    _codes_are_currencies = field_validator("base_currency", "quote_currency")(_fx_currency)
     # fx_rates.rate es Numeric(20, 10): «1e400» se guardaba nulo y «1e-400»
     # como 0, un tipo de cambio que convierte cualquier importe en nada.
     rate: Decimal = Field(gt=0, le=MAX_NUMERIC_20_10)
