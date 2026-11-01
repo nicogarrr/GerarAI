@@ -73,6 +73,7 @@ from app.services.currency_ledger import (
     lots_from_sales,
 )
 from app.services.portfolio_fx_service import TAX_CURRENCY, PortfolioFXService
+from app.services.portfolio_ledger_service import trade_price_fallbacks
 from app.services.tax_irpf_filing import (
     CARRYFORWARD_WINDOW_YEARS,
     SPECIAL_PAYMENT_TOKENS,
@@ -1700,6 +1701,9 @@ def build_tax_summary_rows(db: Session, fiscal_year: int | None = None) -> list[
     rows = db.execute(
         select(Position, Company).join(Company, Position.company_id == Company.id)
     ).all()
+    # A3: precio de una operación sin cotización real -> plusvalía desconocida
+    # (null), como en /portfolio/positions; nunca un 0 o una cifra que parece medida.
+    quote_missing = trade_price_fallbacks(db, [position for position, _ in rows])
     result = []
     for position, company in rows:
         # F240: las claves son las que lista /taxes (cost_basis, market_value,
@@ -1723,6 +1727,7 @@ def build_tax_summary_rows(db: Session, fiscal_year: int | None = None) -> list[
                 "unrealized_pnl": (
                     float(position.unrealized_pnl_base)
                     if position.unrealized_pnl_base is not None
+                    and company.id not in quote_missing
                     else None
                 ),
                 "currency": position.base_currency,
