@@ -190,3 +190,9 @@ export async function backendCall(method: string, path: string, body?: unknown) 
   }
   return { status: res.status, json };
 }
+
+/** Full paginated transaction list for the isolated E2E tenant. */
+export async function backendTransactions() {
+  const { readTransactions } = await import('./transactions');
+  return readTransactions(backendCall);
+}
