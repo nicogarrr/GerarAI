@@ -87,7 +87,10 @@ describe('móvil: 44 px en inicio, índice research, watchlist y ProPicks (recor
     it('insignia de ticker de las noticias de inicio: 44 px sin crecer lo visible', () => {
         // 16 px de alto + 14 px por lado (::before -inset-3.5) = 44 px medidos en captura local.
         const src = readFileSync('components/NewsSection.tsx', 'utf8');
-        assert.ok(src.includes(`${HIT14} text-xs text-teal-300`), 'insignia de ticker con área táctil invisible de 44 px');
+        // Feed estilo Quartr (1-nov-2026): el enlace-nombre del ticker lleva el
+        // ::before -inset-3.5 (= 44 px de área táctil); el logo es size-12 (48 px).
+        assert.ok(src.includes(HIT14), 'enlace del ticker con área táctil invisible de 44 px');
+        assert.ok(src.includes('size-12 rounded-xl'), 'logo de empresa de 48 px en la fila');
     });
     it('chip de nivel DCA (watchlist/cartera): visible de 24 px, hit de 44 px', () => {
         const src = readFileSync('components/watchlist/DcaLevelBadge.tsx', 'utf8');

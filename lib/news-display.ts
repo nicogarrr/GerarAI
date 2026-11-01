@@ -135,6 +135,17 @@ export function dedupeNewsEvents<T extends NewsDedupeEvent>(events: T[]): T[] {
     return out;
 }
 
+/**
+ * Dedup del feed de Inicio (pedido de Nico 1-nov-2026: la app de referencia
+ * enseñaba el mismo titular dos veces). Mismo criterio que dedupeNewsEvents
+ * (titular normalizado o URL), sobre artículos Finnhub ({headline, url}).
+ */
+export function dedupeArticles<T extends { headline?: string | null; url?: string | null }>(items: T[]): T[] {
+    return dedupeNewsEvents(items.map((item) => ({ item, title: item.headline ?? '', url: item.url ?? undefined }))).map(
+        (row) => row.item,
+    );
+}
+
 function escapeRegExp(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

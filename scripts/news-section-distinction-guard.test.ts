@@ -44,7 +44,7 @@ describe('newsBadge (semántica F149)', () => {
 describe('news section UI (F149)', () => {
     it('la UI usa el helper y nunca pinta related crudo como vínculo', () => {
         assert.ok(src.includes('newsBadge(article, symbols)'), 'la insignia debe salir del helper');
-        assert.ok(src.includes('Mencionada · {badge.ticker}'), 'mención neutral sin afirmar cartera');
+        assert.ok(src.includes('Mencionada · ${ticker}'), 'mención neutral sin afirmar cartera');
         assert.ok(src.includes("t('home.news.generalMarket')"), 'etiqueta traducida para titulares sin ticker');
         assert.equal(es.news.generalMarket, 'Mercado general');
         assert.equal(en.news.generalMarket, 'General market');
@@ -55,6 +55,6 @@ describe('news section UI (F149)', () => {
         assert.ok(!src.includes('La insignia indica'));
         assert.ok(!src.includes('La insignia con ticker'));
         assert.ok(src.includes('badge.kind === \'mentioned\''));
-        assert.ok(src.includes('Mencionada · {badge.ticker}'));
+        assert.ok(src.includes('Mencionada · ${ticker}'));
     });
 });
