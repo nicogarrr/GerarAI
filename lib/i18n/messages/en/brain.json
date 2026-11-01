@@ -125,5 +125,16 @@
       "q3": "How does Munger think about inverting problems?",
       "q4": "What do the letters say about competitive moats?"
     }
+  },
+  "expertTeam": {
+    "title": "Answer from the expert team",
+    "note": "Each [n] is a data point an expert read for this question; you'll find it under «Sources».",
+    "experts": {
+      "fundamental": "Fundamentals",
+      "valuation": "Valuation",
+      "risk": "Risk",
+      "news": "News",
+      "tax": "Tax"
+    }
   }
 }
