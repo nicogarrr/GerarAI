@@ -198,10 +198,29 @@ def _is_sale_clause(text: str, start: int) -> bool:
     return sale_at >= 0 and sale_at > buy_at
 
 
+_YEAR_QTY_RE = re.compile(r"(?:19|20)\d{2}")
+_BEFORE_YEAR_RE = re.compile(
+    r"(?i)(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|sept?iembre|octubre|noviembre|diciembre"
+    r"|\bde|\ben|\bdel|\baño|[/-])\s*$"
+)
+
+
+def _is_date_year(text: str, match: re.Match[str]) -> bool:
+    """«el 1 de junio de 2023 a 200 $»: el año de una fecha no es un lote de 2023 acciones."""
+    return (
+        _YEAR_QTY_RE.fullmatch(match.group("qty")) is not None
+        and re.search(r"(?i)acciones|t[ií]tulos|participaciones", match.group(0)) is None
+        and _BEFORE_YEAR_RE.search(text[max(0, match.start() - 12):match.start()]) is not None
+    )
+
+
 def parse_purchase_lots(text: str) -> list[HypoLot]:
     """Lotes de compra escritos en la pregunta («10 acciones a 150 $ el 3 de marzo de 2024»)."""
     lots: list[HypoLot] = []
-    matches = [m for m in _LOT_RE.finditer(text or "") if not _is_sale_clause(text, m.start())]
+    matches = [
+        m for m in _LOT_RE.finditer(text or "")
+        if not _is_sale_clause(text, m.start()) and not _is_date_year(text, m)
+    ]
     for i, m in enumerate(matches):
         qty = parse_number(m.group("qty"))
         price = parse_number(m.group("price"))
@@ -226,10 +245,46 @@ def parse_purchase_lots(text: str) -> list[HypoLot]:
     return lots
 
 
+_PRICE_MENTION_RE = re.compile(
+    rf"(?i)\b(?:a|por)\s+(?:(?P<pre>{_CUR})\s*)?(?P<price>{_NUM})\s*(?P<cur>{_CUR})?"
+)
+_SALE_OR_BUY_VERB_RE = re.compile(r"(?i)\b(?:vend|compr)\w*")
+
+
+def _price_after_purchase_clause(text: str) -> tuple[Decimal, str | None] | None:
+    """Precio de venta cuando entre «vendo» y él va el de compra.
+
+    «vendo 10 compradas a 100 € por 90 €» / «que compré a 100 $ el 1 de junio
+    a 200 $»: el primer precio tras «compr…» es el de compra; el siguiente
+    (o uno tras «vend…») es el de venta. Antes se tomaba el de compra.
+    """
+    sale_start = re.search(r"(?i)\bvend\w*", text)
+    if sale_start is None:
+        return None
+    verbs = [(v.start(), v.group(0).lower().startswith("compr")) for v in _SALE_OR_BUY_VERB_RE.finditer(text)]
+    priced_after_buy: set[int] = set()
+    for mention in _PRICE_MENTION_RE.finditer(text, sale_start.start()):
+        last = max(((pos, is_buy) for pos, is_buy in verbs if pos < mention.start()), default=None)
+        if last is not None and last[1] and last[0] not in priced_after_buy:
+            priced_after_buy.add(last[0])
+            continue
+        price = parse_number(mention.group("price"))
+        if price is None or price <= 0:
+            return None
+        return price, _currency(mention.group("pre"), mention.group("cur"))
+    return None
+
+
 def parse_sale_price(text: str) -> tuple[Decimal, str | None] | None:
     m = _SALE_PRICE_RE.search(text or "")
     if m is None:
+        # «vendo 10 de Apple que compré a 100 $ el 1 de junio a 200 $»: la
+        # cláusula de compra cortaba el patrón y el precio dado no se leía.
+        if re.search(r"(?i)\bvend\w*\b.*\bcompr\w*", text or ""):
+            return _price_after_purchase_clause(text)
         return None
+    if m.group("price") and re.search(r"(?i)\bcompr\w*", text[m.start():m.start("price")]):
+        return _price_after_purchase_clause(text)
     raw = m.group("price") or m.group("price2")
     price = parse_number(raw) if raw else None
     if price is None or price <= 0:

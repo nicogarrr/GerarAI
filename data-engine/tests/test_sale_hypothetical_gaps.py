@@ -309,3 +309,32 @@ def test_lote_con_precio_en_formato_us():
     assert [(lot.quantity, lot.price, lot.currency) for lot in lots] == [
         (D("10"), D("1234.56"), "USD")
     ]
+
+
+@pytest.mark.parametrize(("text", "expected"), [
+    # El precio de COMPRA no es el de venta: antes «compradas a 100 € por 90 €» vendía a 100.
+    ("si vendo 10 acciones compradas a 100 € por 90 €", (D("90"), "EUR")),
+    ("Si vendo 10 acciones de Apple que compré a 100 $ el 1 de junio de 2023 a 200 $", (D("200"), "USD")),
+    ("si vendo 10 a 150 € las que compré a 100 €", (D("150"), "EUR")),
+    ("si vendo la mitad a 150 €", (D("150"), "EUR")),
+    ("si vendo 10 a 150 €", (D("150"), "EUR")),
+])
+def test_precio_de_venta_no_es_el_de_compra(text, expected):
+    assert parse_sale_price(text) == expected
+
+
+def test_sin_precio_de_venta_el_de_compra_no_cuenta():
+    assert parse_sale_price("si vendo las 10 que compré a 100 €") is None
+
+
+def test_el_ano_de_la_fecha_no_es_un_lote():
+    """«…que compré a 100 $ el 1 de junio de 2023 a 200 $»: «2023 a 200 $» se leía
+    como un lote de 2023 acciones a 200 $ (y la ganancia salía 0)."""
+    lots = parse_purchase_lots(
+        "Si vendo 10 acciones de Apple que compré a 100 $ el 1 de junio de 2023 a 200 $"
+    )
+    assert [(lot.quantity, lot.price, lot.currency, lot.trade_date) for lot in lots] == [
+        (D("10"), D("100"), "USD", date(2023, 6, 1))
+    ]
+    lots = parse_purchase_lots("compré 5 acciones a 40 € el 3/4/2024 a 60 € si las vendo")
+    assert [(lot.quantity, lot.price) for lot in lots] == [(D("5"), D("40"))]
