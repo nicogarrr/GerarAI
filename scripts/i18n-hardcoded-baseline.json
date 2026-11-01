@@ -73,7 +73,6 @@
   "lib/brain/page-context.ts": 2,
   "lib/chat/citations.ts": 3,
   "lib/config/product.ts": 2,
-  "lib/constants.ts": 17,
   "lib/env.ts": 9,
   "lib/format.ts": 3,
   "lib/glossary.ts": 43,
