@@ -34,6 +34,7 @@ from app.services.audit_service import record_audit_event
 from app.services.document_ingestion_service import guard_ooxml_zip
 from app.services.number_parsing import parse_localized_number
 from app.services.portfolio_ledger_service import PortfolioLedgerService, PortfolioOversellError
+from app.valuation.currency import is_currency_code
 
 
 class RowValidationError(BaseModel):
@@ -92,6 +93,13 @@ class TransactionImportCommitRequest(BaseModel):
                         f"Fila {tx.row_number}: {field} fuera de rango ({value}); "
                         "revisa el archivo y vuelve a generar la vista previa"
                     )
+            # Igual con la divisa: «EURO» o «1e30» dejaban la posición sin
+            # tipo de cambio para siempre.
+            if not is_currency_code(tx.currency):
+                raise ValueError(
+                    f"Fila {tx.row_number}: divisa no reconocida ({tx.currency!r}); "
+                    "revisa el archivo y vuelve a generar la vista previa"
+                )
         return self
 
 
@@ -304,7 +312,7 @@ def normalize_currency_cell(raw: Any) -> str:
         return text
     if text.upper() in _CURRENCY_SYMBOLS:
         return _CURRENCY_SYMBOLS[text.upper()]
-    if re.fullmatch(r"[A-Za-z]{3}", text):
+    if is_currency_code(text):  # ISO 4217 o subunidad: «NaN» o «XYZ» no
         return text.upper()
     raise ValueError(f"Divisa no reconocida: '{text}' (se esperaba un código como EUR, USD o GBp)")
 
