@@ -5,6 +5,10 @@ import { test } from 'node:test';
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
 import { authorKey, groupLetters, titleYear, type LetterDoc } from '../app/(root)/inversores/cartas/letters.ts';
 
+// Textos de cartas en el diccionario español (solo esas secciones, no todo investors.json).
+const esInvestors = JSON.parse(readFileSync('lib/i18n/messages/es/investors.json', 'utf8'));
+const esLetters = JSON.stringify({ letters: esInvestors.letters, reader: esInvestors.reader });
+
 const doc = (id: number, title: string, author: string | null, extra: Partial<LetterDoc> = {}): LetterDoc => ({
     id,
     title,
@@ -39,7 +43,7 @@ test('agrupa por autor, solo cartas listas, más reciente primero y sin inventar
 });
 
 test('la página dice "no registrada" sin fecha y enlaza lector y PDF original', () => {
-    const page = readFileSync('app/(root)/inversores/cartas/page.tsx', 'utf8');
+    const page = readFileSync('app/(root)/inversores/cartas/page.tsx', 'utf8') + esLetters;
     assert.match(page, /Fecha de publicación no registrada/);
     assert.match(page, /\/inversores\/cartas\/\$\{letter\.id\}/);
     assert.ok(!/\/knowledge\?document=/.test(page), 'Leer ya no va al explorador genérico de /knowledge');
@@ -49,7 +53,7 @@ test('la página dice "no registrada" sin fecha y enlaza lector y PDF original',
 });
 
 test('el lector de una carta enseña título, autor, pista de año, PDF original y vuelta, paginado', () => {
-    const reader = readFileSync('app/(root)/inversores/cartas/[id]/page.tsx', 'utf8');
+    const reader = readFileSync('app/(root)/inversores/cartas/[id]/page.tsx', 'utf8') + esLetters;
     assert.match(reader, /letter\.title/);
     assert.match(reader, /Fecha de publicación no registrada/);
     assert.match(reader, /Abrir el PDF original/);

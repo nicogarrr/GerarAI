@@ -59,5 +59,55 @@
     "conceptsText": "The key ideas of value investing, explained.",
     "channels": "Channels",
     "channelsText": "Analysis channels worth following."
+  },
+  "letters": {
+    "metaTitle": "Investor letters",
+    "metaDescription": "The library's investor letters, by author, with a link to the original PDF.",
+    "title": "Letters",
+    "back": "Back to investors",
+    "ask": "Ask the letters",
+    "empty": "There are no letters in the library yet.",
+    "count": "{count} letters",
+    "read": "Read",
+    "originalPdf": "Original PDF",
+    "noPdf": "No original PDF",
+    "publishedOn": "Published {date}",
+    "noPublicationDate": "Publication date not recorded",
+    "titleSays": "the title says {year}",
+    "noAuthor": "No author",
+    "source": "Source: GerarAI library. The letters are investment doctrine, not company data. When no publication date is recorded we say so; the year in the title is only a hint."
+  },
+  "reader": {
+    "metaTitle": "Read letter",
+    "metaDescription": "Text of an investor letter, in excerpts, with a link to the original PDF.",
+    "offline": "Letter",
+    "back": "Back to the letters",
+    "backOf": "Back to {author}'s letters",
+    "noAuthor": "Author not recorded",
+    "openPdf": "Open the original PDF",
+    "ask": "Ask about this letter",
+    "noText": "This letter has no extracted text in the library. Open the original PDF.",
+    "textAria": "Letter text",
+    "excerpt": "Excerpt {n}",
+    "page": "page {n}",
+    "more": "More letters",
+    "moreOf": "More letters from {author}",
+    "older": "← Previous letter",
+    "newer": "Next letter →",
+    "source": "Source: GerarAI library, text extracted from the PDF and split into excerpts (it may have extraction errors; the original PDF prevails). It is investment doctrine, not company data."
+  },
+  "investorLetters": {
+    "title": "Letters",
+    "unavailable": "Library unavailable",
+    "none": "N/A · No indexed letters from this investor",
+    "originalSource": "Original source",
+    "sourceNa": "Source N/A",
+    "publicSources": "Sources about the investor"
+  },
+  "ingest": {
+    "download": "Download free letters",
+    "queuing": "Queuing download...",
+    "queued": "Download in progress; reload the page in a few minutes to see the letters.",
+    "error": "Couldn't queue the download. Try again."
   }
 }

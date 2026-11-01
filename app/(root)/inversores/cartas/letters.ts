@@ -32,12 +32,15 @@ export function authorKey(name: string): string {
         .replace(/^-+|-+$/g, '');
 }
 
+/** Nombre del grupo de cartas sin autor (clave interna; la página lo traduce al pintarlo). */
+export const NO_AUTHOR = 'Sin autor';
+
 /** Solo cartas de fondo listas para leer, agrupadas por autor; sin autor van a "Sin autor". Más recientes primero. */
 export function groupLetters(docs: LetterDoc[]): AuthorGroup[] {
     const groups = new Map<string, AuthorGroup>();
     for (const doc of docs) {
         if (doc.document_type !== 'fund_letter' || doc.status !== 'ready') continue;
-        const name = doc.author?.trim() || 'Sin autor';
+        const name = doc.author?.trim() || NO_AUTHOR;
         const key = authorKey(name) || 'sin-autor';
         const group = groups.get(key) ?? { key, name, letters: [] };
         group.letters.push(doc);

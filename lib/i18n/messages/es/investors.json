@@ -59,5 +59,55 @@
     "conceptsText": "Las ideas clave de value investing, explicadas.",
     "channels": "Canales",
     "channelsText": "Canales de análisis que merece la pena seguir."
+  },
+  "letters": {
+    "metaTitle": "Cartas de inversores",
+    "metaDescription": "Las cartas a inversores de la biblioteca, por autor, con enlace al PDF original.",
+    "title": "Cartas",
+    "back": "Volver a inversores",
+    "ask": "Preguntar a las cartas",
+    "empty": "Todavía no hay cartas en la biblioteca.",
+    "count": "{count} cartas",
+    "read": "Leer",
+    "originalPdf": "PDF original",
+    "noPdf": "Sin PDF original",
+    "publishedOn": "Publicada el {date}",
+    "noPublicationDate": "Fecha de publicación no registrada",
+    "titleSays": "el título indica {year}",
+    "noAuthor": "Sin autor",
+    "source": "Fuente: biblioteca de GerarAI. Las cartas son doctrina de inversión, no datos de las empresas. Si no hay fecha de publicación registrada se dice; el año del título es solo una pista."
+  },
+  "reader": {
+    "metaTitle": "Leer carta",
+    "metaDescription": "Texto de una carta a inversores, por fragmentos, con enlace al PDF original.",
+    "offline": "Carta",
+    "back": "Volver a las cartas",
+    "backOf": "Volver a las cartas de {author}",
+    "noAuthor": "Autor no registrado",
+    "openPdf": "Abrir el PDF original",
+    "ask": "Preguntar sobre esta carta",
+    "noText": "Esta carta no tiene texto extraído en la biblioteca. Abre el PDF original.",
+    "textAria": "Texto de la carta",
+    "excerpt": "Fragmento {n}",
+    "page": "página {n}",
+    "more": "Más cartas",
+    "moreOf": "Más cartas de {author}",
+    "older": "← Carta anterior",
+    "newer": "Carta siguiente →",
+    "source": "Fuente: biblioteca de GerarAI, texto extraído del PDF y troceado en fragmentos (puede tener errores de extracción; el PDF original manda). Es doctrina de inversión, no datos de las empresas."
+  },
+  "investorLetters": {
+    "title": "Cartas",
+    "unavailable": "Biblioteca no disponible",
+    "none": "N/D · Sin cartas indexadas de este inversor",
+    "originalSource": "Fuente original",
+    "sourceNa": "Fuente N/D",
+    "publicSources": "Fuentes sobre el inversor"
+  },
+  "ingest": {
+    "download": "Descargar cartas gratuitas",
+    "queuing": "Encolando descarga...",
+    "queued": "Descarga en curso; recarga la página en unos minutos para ver las cartas.",
+    "error": "No se pudo encolar la descarga. Inténtalo de nuevo."
   }
 }

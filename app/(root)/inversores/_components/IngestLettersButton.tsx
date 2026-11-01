@@ -5,9 +5,11 @@ import { BookOpen } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { ingestLettersCorpusNow } from '@/lib/actions/research-tools.actions';
+import { useT } from '@/lib/i18n/client';
 
 // Interactivo (estado + server action en onClick): no puede ser servidor.
 export function IngestLettersButton() {
+    const t = useT();
     const [state, setState] = useState<'idle' | 'ingesting' | 'queued' | 'error'>('idle');
 
     const handleIngest = async () => {
@@ -34,13 +36,13 @@ export function IngestLettersButton() {
                 className="gap-2"
             >
                 <BookOpen aria-hidden="true" className="h-4 w-4" />
-                {loading ? 'Encolando descarga...' : 'Descargar cartas gratuitas'}
+                {loading ? t('investors.ingest.queuing') : t('investors.ingest.download')}
             </Button>
             {state === 'queued' ? (
-                <p className="text-sm text-teal-300">Descarga en curso; recarga la página en unos minutos para ver las cartas.</p>
+                <p className="text-sm text-teal-300">{t('investors.ingest.queued')}</p>
             ) : null}
             {state === 'error' ? (
-                <p className="text-sm text-red-400">No se pudo encolar la descarga. Inténtalo de nuevo.</p>
+                <p className="text-sm text-red-400">{t('investors.ingest.error')}</p>
             ) : null}
         </div>
     );

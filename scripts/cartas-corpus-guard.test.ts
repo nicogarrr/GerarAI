@@ -3,13 +3,16 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const read = (p: string) => readFileSync(p, 'utf8');
+// Textos de cartas en el diccionario español (solo esas secciones, no todo investors.json).
+const esInvestors = JSON.parse(read('lib/i18n/messages/es/investors.json'));
+const esLetters = JSON.stringify({ letters: esInvestors.letters, ingest: esInvestors.ingest });
 
 test('cartas: biblioteca vacía ofrece descargar el corpus libre (actor, no relleno)', () => {
-  const page = read('app/(root)/inversores/cartas/page.tsx');
+  const page = read('app/(root)/inversores/cartas/page.tsx') + esLetters;
   assert.ok(page.includes('IngestLettersButton'), 'la página de cartas debe usar IngestLettersButton en el estado vacío');
   assert.ok(page.includes('Todavía no hay cartas en la biblioteca.'));
 
-  const button = read('app/(root)/inversores/_components/IngestLettersButton.tsx');
+  const button = read('app/(root)/inversores/_components/IngestLettersButton.tsx') + esLetters;
   assert.ok(button.includes('Descargar cartas gratuitas'));
   assert.ok(!button.includes('bg-teal-600'), 'sin override de primario: usa el Button por defecto');
   assert.ok(button.includes('Descarga en curso'), 'confirma que la descarga quedó encolada');
