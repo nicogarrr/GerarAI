@@ -193,6 +193,14 @@ def resolve_model_price(db: Session, company_id: int, as_of: date | None = None)
             .order_by(desc(Position.as_of), desc(Position.id))
             .limit(1)
         )
+        from app.services.portfolio_ledger_service import trade_price_fallbacks
+
+        if position is not None and position.company_id in trade_price_fallbacks(
+            db, [position], tenant_id=position.tenant_id
+        ):
+            # Sin cotización real el mark del ledger es el precio de tu propia
+            # operación (auditoría A3): no es un precio de mercado.
+            position = None
         if position is not None:
             converted = to_major_units(position.market_price, position.currency or quote_unit)
             if converted is not None and converted.value > 0:
