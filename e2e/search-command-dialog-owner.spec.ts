@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waitForHydration } from './fixtures/wait-for-hydration';
 // Calentamiento del chunk de la paleta (patrón del repo, cf. 'MSFT ALERT'
 // en search-hash-scroll.spec.ts): con el dev server frío (CI), el primer
 // Ctrl+K compila el chunk del diálogo y los listeners de Escape de Radix se
@@ -29,6 +30,7 @@ test.describe('buscador global: una sola instancia de diálogo', () => {
         test(`Ctrl+K abre exactamente 1 diálogo a ${width}px y Escape devuelve el foco`, async ({ page }) => {
             await page.setViewportSize({ width, height: 860 });
             await page.goto('/research/MSFT', { waitUntil: 'networkidle' });
+            await waitForHydration(page);
             await page.locator('[data-testid="search-command-trigger"]:visible').first().waitFor();
             await page.waitForTimeout(500); // registro de instancias tras hidratar
             await warmUpPalette(page);
@@ -58,6 +60,7 @@ test.describe('buscador global: una sola instancia de diálogo', () => {
             return route.continue();
         });
         await page.goto('/research/MSFT', { waitUntil: 'networkidle' });
+        await waitForHydration(page);
         await page.locator('[data-testid="search-command-trigger"]:visible').first().waitFor();
         await page.waitForTimeout(500);
 
@@ -88,6 +91,7 @@ test.describe('owner huérfano (objeción auditor)', () => {
     test('desmontar a la dueña (drawer -> resize) no deja diálogo fantasma', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 860 });
         await page.goto('/research/MSFT', { waitUntil: 'networkidle' });
+        await waitForHydration(page);
         await page.locator('[data-testid="search-command-trigger"]:visible').first().waitFor();
         await page.waitForTimeout(500);
         await warmUpPalette(page);
