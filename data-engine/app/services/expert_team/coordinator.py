@@ -74,6 +74,7 @@ class ExpertTeam:
         validator: Validator | None = None,
         guard: run_guard.LLMRunGuard | None = None,
         judge_prompt: str = "thesis_debate_judge",
+        judge_timeout_s: float = 30.0,
     ) -> None:
         for spec in experts:
             missing = [t for t in spec.tools if t not in tools]
@@ -89,6 +90,9 @@ class ExpertTeam:
         self.validator = validator or citation_validator()
         self.guard = guard
         self.judge_prompt = judge_prompt
+        #: Tope propio del juez: si no llega, el equipo contesta sin veredicto
+        #: en vez de perder todo lo que dijeron los expertos.
+        self.judge_timeout_s = judge_timeout_s
 
     def plan(self, ctx: RunContext) -> list[str]:
         """Determinista: tesis = todos los aplicables; chat = por palabras clave o pregunta amplia."""
@@ -205,7 +209,11 @@ class ExpertTeam:
         )
         try:
             prompt = get_prompt(self.judge_prompt, lang=ctx.lang)
-            text = await self.reasoner(prompt.text, user, 200, "expert_team.judge")
+            text = await asyncio.wait_for(
+                self.reasoner(prompt.text, user, 200, "expert_team.judge"), timeout=max(0.0, self.judge_timeout_s)
+            )
+        except TimeoutError:
+            return {"label": "neutral", "rationale": "", "source": "timeout"}
         except Exception:
             return {"label": "neutral", "rationale": "", "source": "unresolved"}
         match = re.search(r"(bullish|bearish|neutral)\s*\|?\s*(.*)", text or "", re.IGNORECASE | re.DOTALL)

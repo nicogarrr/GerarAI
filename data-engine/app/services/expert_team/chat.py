@@ -37,6 +37,7 @@ _LABELS = {
         "news": "Noticias", "tax": "Fiscal",
         "no_data": "sin datos suficientes", "timeout": "no respondió a tiempo", "error": "no disponible",
         "conflicts": "Choques entre expertos", "verdict": "Veredicto del juez",
+        "judge_timeout": "El juez no llegó a tiempo: sin veredicto, quedan las posturas de cada experto",
         "stance": "{pos} lo ven a favor y {neg} en contra",
         "metric": "{metric}: cifras distintas según el experto",
         "labels": {"bullish": "a favor", "bearish": "en contra", "neutral": "neutral"},
@@ -46,6 +47,7 @@ _LABELS = {
         "news": "News", "tax": "Tax",
         "no_data": "not enough data", "timeout": "did not answer in time", "error": "unavailable",
         "conflicts": "Disagreements between experts", "verdict": "Judge's verdict",
+        "judge_timeout": "The judge did not answer in time: no verdict, each expert's view stands above",
         "stance": "{pos} lean positive and {neg} negative",
         "metric": "{metric}: different figures depending on the expert",
         "labels": {"bullish": "positive", "bearish": "negative", "neutral": "neutral"},
@@ -150,6 +152,9 @@ def render(result: TeamResult, lang: str) -> ChatResponse | None:
         body = f"{t['verdict']}: {label}. {result.verdict.get('rationale', '')}".strip()
         sections.append(SynthesisSection(key="conclusion", body=body))
         lines.append(body)
+    elif result.verdict and result.verdict.get("source") == "timeout":
+        sections.append(SynthesisSection(key="conclusion", body=t["judge_timeout"]))
+        lines.append(f"{t['judge_timeout']}.")
     # Las fuentes viajan en «sources» (el chat las pinta en su lista «Fuentes»
     # con el mismo número [n] que lleva cada afirmación).
     answer = "\n\n".join(lines)
@@ -172,6 +177,7 @@ def render(result: TeamResult, lang: str) -> ChatResponse | None:
             "timed_out": [r.expert for r in result.reports if r.status == "timeout"],
             "dropped": sum(len(r.dropped) for r in result.reports),
             "conflicts": len(result.conflicts),
+            "judge": (result.verdict or {}).get("source"),
         }},
     )
 
@@ -181,6 +187,12 @@ def team_budget_s(timeout: float) -> float:
     sale como «no respondió a tiempo» y se contesta con lo que sí llegó, en vez
     de perder la respuesta entera al vencer el tope."""
     return timeout - _TEAM_MARGIN_S if timeout > 2 * _TEAM_MARGIN_S else timeout * 0.5
+
+
+def judge_budget_s(timeout: float) -> float:
+    """Tope del juez: cabe en el margen que dejan los expertos y deja un poco
+    para pintar la respuesta; si no llega, se contesta sin veredicto."""
+    return (timeout - team_budget_s(timeout)) * 0.75
 
 
 async def answer_with_team(
@@ -194,7 +206,7 @@ async def answer_with_team(
         result = await asyncio.wait_for(
             run_team(
                 db, ticker=ticker, mode="chat", question=question, provider=provider,
-                total_timeout_s=team_budget_s(timeout),
+                total_timeout_s=team_budget_s(timeout), judge_timeout_s=judge_budget_s(timeout),
             ),
             timeout=timeout,
         )
