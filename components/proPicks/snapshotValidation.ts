@@ -29,15 +29,26 @@ export function isMonthlySnapshot(value: unknown): value is MonthlySnapshot {
  * F384: el snapshot «anterior» debe ser de la misma estrategia y de un mes
  * estrictamente anterior al actual. Devuelve el motivo del rechazo o null.
  */
+export function previousSnapshotRejection(
+    snapshot: MonthlySnapshot,
+    strategyId: string,
+    currentMonth: string,
+): 'otherStrategy' | 'notPrevious' | null {
+    if (snapshot.strategyId !== strategyId) return 'otherStrategy';
+    if (snapshot.month >= currentMonth) return 'notPrevious';
+    return null;
+}
+
 export function previousSnapshotError(
     snapshot: MonthlySnapshot,
     strategyId: string,
     currentMonth: string,
 ): string | null {
-    if (snapshot.strategyId !== strategyId) {
+    const rejection = previousSnapshotRejection(snapshot, strategyId, currentMonth);
+    if (rejection === 'otherStrategy') {
         return 'Ese snapshot es de otra estrategia: no se puede comparar con la actual.';
     }
-    if (snapshot.month >= currentMonth) {
+    if (rejection === 'notPrevious') {
         return 'Ese snapshot no es de un mes anterior al actual.';
     }
     return null;

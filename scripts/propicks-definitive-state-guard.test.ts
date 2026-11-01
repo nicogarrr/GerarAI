@@ -82,7 +82,8 @@ describe('ProPicks sin estados intermedios (ficha, backtest, rebalanceo)', () =>
     // Sin snapshot previo la lista no se rotula como entrada: no hay mes con el
     // que comparar, así que poner «Entran» sobre toda la cartera es inventar.
     assert.match(rebalance, /showTone=\{false\}/);
-    assert.match(rebalance, /Selección vigente · \{monthLabelEs\(month\)\}/);
+    assert.match(rebalance, /"currentSelection": "Selección vigente · \{month\}"/);
+    assert.match(rebalance, /t\('propicks\.rebalance\.currentSelection', \{ month: monthLabel\(month, locale\) \}\)/);
     assert.match(rebalance, /no se puede decir qué entra ni qué sale/);
     // Y el motivo es de arquitectura, no de un trabajo futuro.
     assert.match(rebalance, /GerarAI no guarda el histórico de meses/);
@@ -91,7 +92,7 @@ describe('ProPicks sin estados intermedios (ficha, backtest, rebalanceo)', () =>
   it('el rebalanceo conserva los guardas de export y carga de snapshot', () => {
     assert.match(rebalance, /disabled=\{picksStatus !== 'ready'\}/);
     assert.match(rebalance, /if \(picksStatus !== 'ready'\) return;/);
-    assert.match(rebalance, /previousSnapshotError\(parsed, strategyId, month\)/);
+    assert.match(rebalance, /previousSnapshotRejection\(parsed, strategyId, month\)/);
   });
 });
  it('la referencia de la ficha coincide con la pestaña Selección IA', () => {

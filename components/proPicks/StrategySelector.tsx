@@ -8,6 +8,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useT } from '@/lib/i18n/client';
 
 interface Strategy {
     id: string;
@@ -30,6 +31,7 @@ interface StrategySelectorProps {
 
 export default function StrategySelector({ strategies, currentStrategy, onStrategyChange, catalog }: StrategySelectorProps) {
     const router = useRouter();
+    const t = useT();
 
     const handleStrategyChange = (strategyId: string) => {
         onStrategyChange?.(strategyId);
@@ -62,10 +64,10 @@ export default function StrategySelector({ strategies, currentStrategy, onStrate
 
     return (
         <div className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-            <label className="shrink-0 text-sm font-medium text-gray-400">Estrategia:</label>
+            <label className="shrink-0 text-sm font-medium text-gray-400">{t('propicks.strategySelector.label')}</label>
             <Select value={currentStrategy} onValueChange={handleStrategyChange}>
-                <SelectTrigger aria-label="Estrategia" className="h-11 w-full border-gray-700 bg-gray-800 text-sm text-gray-300 sm:w-[300px]">
-                    <SelectValue placeholder="Seleccionar estrategia">{selectedOption?.name}</SelectValue>
+                <SelectTrigger aria-label={t('propicks.strategySelector.aria')} className="h-11 w-full border-gray-700 bg-gray-800 text-sm text-gray-300 sm:w-[300px]">
+                    <SelectValue placeholder={t('propicks.strategySelector.placeholder')}>{selectedOption?.name}</SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700">
                     {options.map((strategy) => (
@@ -79,7 +81,7 @@ export default function StrategySelector({ strategies, currentStrategy, onStrate
                                     {strategy.name}
                                     {!strategy.available && (
                                         <span className="ml-2 text-[10px] font-normal uppercase tracking-wide text-amber-400">
-                                            Sin datos
+                                            {t('propicks.strategySelector.noData')}
                                         </span>
                                     )}
                                 </span>

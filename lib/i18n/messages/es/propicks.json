@@ -396,5 +396,58 @@
     "colHorizon": "A {days} días",
     "spyThrough": "SPY ({source}) con datos hasta {date}.",
     "spyMissing": "Serie de SPY sin datos todavía: las columnas vs SPY saldrán cuando se ingiera."
+  },
+  "rebalance": {
+    "emptyGroup": "Ningún valor en este grupo.",
+    "enters": "Entra",
+    "exits": "Sale",
+    "verifiedTitle": "Dato verificado",
+    "source": "Fuente: {metric} = {value}",
+    "defaultStrategy": "Selección Adaptativa IA",
+    "notSnapshot": "Ese archivo no es un snapshot mensual de GerarAI Propicks.",
+    "readError": "No se pudo leer el archivo JSON.",
+    "title": "Rebalanceo de {month}",
+    "activeCount": "{count} valores vigentes",
+    "loadingValues": "cargando valores…",
+    "valuesUnavailable": "valores no disponibles",
+    "comparedWith": "comparado con {month}",
+    "noComparison": "sin comparación con el mes anterior",
+    "loadPrevious": "Cargar snapshot anterior",
+    "download": "Descargar snapshot JSON",
+    "loadingPicks": "Cargando los picks de esta estrategia…",
+    "picksUnavailable": "Picks de la estrategia no disponibles.",
+    "noHistory": "GerarAI no guarda el histórico de meses: solo conserva el último run del embudo, así que el mes anterior únicamente existe si cargas aquí el snapshot JSON que descargaste entonces. Sin ese archivo lo de abajo es la selección vigente completa de {month}, sin entradas ni salidas que atribuir: no hay contra qué mes compararla. Guarda el JSON de este mes y compáralo con el siguiente.",
+    "currentSelection": "Selección vigente · {month}",
+    "currentReasonsNote": "Los motivos son los del ranking vigente, no movimientos: sin el snapshot del mes anterior no se puede decir qué entra ni qué sale.",
+    "currentEmpty": "El embudo no devolvió ninguna selección para esta estrategia: no hay nada que rebalancear.",
+    "entered": "Entran",
+    "exited": "Salen",
+    "kept": "Se mantienen {count} valores",
+    "rejectOtherStrategy": "Ese snapshot es de otra estrategia: no se puede comparar con la actual.",
+    "rejectNotPrevious": "Ese snapshot no es de un mes anterior al actual."
+  },
+  "strategies": {
+    "adaptive": {
+      "name": "Selección Adaptativa IA",
+      "description": "La IA analiza datos reales actuales del mercado y selecciona las mejores oportunidades en cada momento"
+    },
+    "value": {
+      "name": "Valor (Value)",
+      "description": "Empresas baratas frente a sus fundamentales: prima el valor y la rentabilidad con exigencia de caja y balance"
+    },
+    "momentum": {
+      "name": "Momentum",
+      "description": "Tendencia y crecimiento: prima el impulso y el crecimiento con apoyo de rentabilidad y valor"
+    },
+    "defensiva": {
+      "name": "Defensiva",
+      "description": "Calidad y balance: prima la rentabilidad, la salud financiera y la caja para aguantar caídas del mercado"
+    }
+  },
+  "strategySelector": {
+    "label": "Estrategia:",
+    "aria": "Estrategia",
+    "placeholder": "Seleccionar estrategia",
+    "noData": "Sin datos"
   }
 }

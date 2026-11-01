@@ -76,6 +76,8 @@ describe('copy sin estados intermedios en las piezas degradadas', () => {
     const insider = readFileSync('lib/insider-status-copy.ts', 'utf8');
     assert.match(insider, /no una ausencia de Form 4/);
     const rebalance = readFileSync('components/proPicks/MonthlyRebalanceView.tsx', 'utf8');
-    assert.match(rebalance, /solo conserva el último run del embudo/);
+    const esRebalance = JSON.parse(readFileSync('lib/i18n/messages/es/propicks.json', 'utf8')).rebalance;
+    assert.match(rebalance, /propicks\.rebalance\.noHistory/);
+    assert.match(esRebalance.noHistory, /solo conserva el último run del embudo/);
   });
 });

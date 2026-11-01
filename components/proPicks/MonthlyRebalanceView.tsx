@@ -6,14 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowDownToLine, ArrowRightLeft, Upload } from 'lucide-react';
 import type { ProPick } from '@/lib/actions/proPicks.actions';
-import { formatNumber } from '@/lib/format';
+import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 import {
     buildMonthlySnapshot,
     diffSnapshots,
     isMonthlySnapshot,
-    previousSnapshotError,
+    previousSnapshotRejection,
     monthKey,
-    monthLabelEs,
+    monthLabel,
+    reasonDisplayText,
     type MonthlySnapshot,
     type RebalanceMove,
 } from './monthlyRebalance';
@@ -32,7 +33,7 @@ function MoveList({
     moves,
     tone,
     showTone = true,
-    emptyText = 'Ningún valor en este grupo.',
+    emptyText,
 }: {
     moves: RebalanceMove[];
     tone: 'in' | 'out';
@@ -40,8 +41,10 @@ function MoveList({
     showTone?: boolean;
     emptyText?: string;
 }) {
+    const t = useT();
+    const locale = useLocale();
     if (moves.length === 0) {
-        return <p className="text-sm text-gray-500">{emptyText}</p>;
+        return <p className="text-sm text-gray-500">{emptyText ?? t('propicks.rebalance.emptyGroup')}</p>;
     }
     return (
         <ul className="space-y-3">
@@ -67,15 +70,15 @@ function MoveList({
                                         : 'border-red-500/50 text-red-300'
                                 }
                             >
-                                {tone === 'in' ? 'Entra' : 'Sale'}
+                                {tone === 'in' ? t('propicks.rebalance.enters') : t('propicks.rebalance.exits')}
                             </Badge>
                         )}
                     </div>
                     <p className="mt-1 text-xs text-gray-500">{move.company}</p>
-                    <p className="mt-2 text-sm leading-6 text-gray-300">{move.reason.text}</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-300">{reasonDisplayText(move.reason.text, locale)}</p>
                     {move.reason.metric !== undefined && move.reason.value !== undefined && (
-                        <p className="mt-1 text-[11px] text-gray-500" title="Dato verificado">
-                            Fuente: {move.reason.metric} = {String(move.reason.value)}
+                        <p className="mt-1 text-[11px] text-gray-500" title={t('propicks.rebalance.verifiedTitle')}>
+                            {t('propicks.rebalance.source', { metric: move.reason.metric, value: String(move.reason.value) })}
                         </p>
                     )}
                 </li>
@@ -98,9 +101,12 @@ export default function MonthlyRebalanceView({
     picksStatus = 'ready',
     picksError = null,
     strategyId = 'adaptive',
-    strategyName = 'Selección Adaptativa IA',
+    strategyName,
     month = monthKey(),
 }: MonthlyRebalanceViewProps) {
+    const t = useT();
+    const locale = useLocale();
+    const { formatNumber } = useFormat();
     const [previous, setPrevious] = useState<MonthlySnapshot | null>(null);
     const [fileError, setFileError] = useState<string | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
@@ -113,17 +119,21 @@ export default function MonthlyRebalanceView({
         try {
             const parsed: unknown = JSON.parse(await file.text());
             if (!isMonthlySnapshot(parsed)) {
-                setFileError('Ese archivo no es un snapshot mensual de GerarAI Propicks.');
+                setFileError(t('propicks.rebalance.notSnapshot'));
                 return;
             }
-            const rejection = previousSnapshotError(parsed, strategyId, month);
+            const rejection = previousSnapshotRejection(parsed, strategyId, month);
             if (rejection) {
-                setFileError(rejection);
+                setFileError(
+                    rejection === 'otherStrategy'
+                        ? t('propicks.rebalance.rejectOtherStrategy')
+                        : t('propicks.rebalance.rejectNotPrevious'),
+                );
                 return;
             }
             setPrevious(parsed);
         } catch {
-            setFileError('No se pudo leer el archivo JSON.');
+            setFileError(t('propicks.rebalance.readError'));
         }
     };
 
@@ -148,24 +158,26 @@ export default function MonthlyRebalanceView({
                     <div className="flex flex-wrap items-center gap-2">
                         <ArrowRightLeft className="h-5 w-5 text-teal-400" />
                         <h3 className="text-base font-semibold text-gray-100">
-                            Rebalanceo de {monthLabelEs(month)}
+                            {t('propicks.rebalance.title', { month: monthLabel(month, locale) })}
                         </h3>
                     </div>
                     <p className="mt-1 text-sm text-gray-400">
-                        {strategyName} ·{' '}
+                        {strategyName ?? t('propicks.rebalance.defaultStrategy')} ·{' '}
                         {/* El recuento solo existe con los picks cargados: durante la
                             carga o el error mostrar «0 valores vigentes» se leía como
                             resultado real (Tester 6: «0 vigentes» y «Cargando...» a la
                             vez, con 9 picks en Selección IA del mismo run). */}
                         {picksStatus === 'ready'
-                            ? `${formatNumber(currentPicks.length, { maximumFractionDigits: 0 })} valores vigentes`
+                            ? t('propicks.rebalance.activeCount', {
+                                  count: formatNumber(currentPicks.length, { maximumFractionDigits: 0 }),
+                              })
                             : picksStatus === 'loading'
-                              ? 'cargando valores…'
-                              : 'valores no disponibles'}
+                              ? t('propicks.rebalance.loadingValues')
+                              : t('propicks.rebalance.valuesUnavailable')}
                         {' · '}
                         {diff.hasPrevious && previous
-                            ? `comparado con ${monthLabelEs(previous.month)}`
-                            : 'sin comparación con el mes anterior'}
+                            ? t('propicks.rebalance.comparedWith', { month: monthLabel(previous.month, locale) })
+                            : t('propicks.rebalance.noComparison')}
                     </p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -182,23 +194,23 @@ export default function MonthlyRebalanceView({
                         className="h-11 gap-2"
                     >
                         <Upload className="h-4 w-4" />
-                        Cargar snapshot anterior
+                        {t('propicks.rebalance.loadPrevious')}
                     </Button>
                     <Button onClick={downloadSnapshot} disabled={picksStatus !== 'ready'} className="h-11 gap-2">
                         <ArrowDownToLine className="h-4 w-4" />
-                        Descargar snapshot JSON
+                        {t('propicks.rebalance.download')}
                     </Button>
                 </div>
             </Card>
 
             {picksStatus === 'loading' && (
                 <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4 text-center">
-                    <p className="text-sm text-gray-400">Cargando los picks de esta estrategia…</p>
+                    <p className="text-sm text-gray-400">{t('propicks.rebalance.loadingPicks')}</p>
                 </Card>
             )}
             {picksStatus === 'error' && (
                 <Card className="rounded-lg border border-red-700 bg-red-900/20 p-4 text-center">
-                    <p className="text-sm text-red-400">{picksError ?? 'Picks de la estrategia no disponibles.'}</p>
+                    <p className="text-sm text-red-400">{picksError ?? t('propicks.rebalance.picksUnavailable')}</p>
                 </Card>
             )}
 
@@ -211,11 +223,7 @@ export default function MonthlyRebalanceView({
             {picksStatus === 'ready' && !diff.hasPrevious && (
                 <Card className="rounded-lg border border-amber-700/60 bg-amber-950/20 p-4">
                     <p className="text-sm leading-6 text-amber-200">
-                        GerarAI no guarda el histórico de meses: solo conserva el último run del embudo, así que
-                        el mes anterior únicamente existe si cargas aquí el snapshot JSON que descargaste
-                        entonces. Sin ese archivo lo de abajo es la selección vigente completa de{' '}
-                        {monthLabelEs(month)}, sin entradas ni salidas que atribuir: no hay contra qué mes
-                        compararla. Guarda el JSON de este mes y compáralo con el siguiente.
+                        {t('propicks.rebalance.noHistory', { month: monthLabel(month, locale) })}
                     </p>
                 </Card>
             )}
@@ -224,21 +232,20 @@ export default function MonthlyRebalanceView({
                 <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
                     <div className="mb-3 flex flex-wrap items-center gap-2">
                         <h4 className="text-sm font-semibold text-gray-200">
-                            Selección vigente · {monthLabelEs(month)}
+                            {t('propicks.rebalance.currentSelection', { month: monthLabel(month, locale) })}
                         </h4>
                         <Badge variant="outline" className="border-gray-600 text-gray-300">
                             {formatNumber(diff.entered.length, { maximumFractionDigits: 0 })}
                         </Badge>
                     </div>
                     <p className="mb-3 text-xs leading-5 text-gray-500">
-                        Los motivos son los del ranking vigente, no movimientos: sin el snapshot del mes anterior
-                        no se puede decir qué entra ni qué sale.
+                        {t('propicks.rebalance.currentReasonsNote')}
                     </p>
                     <MoveList
                         moves={diff.entered}
                         tone="in"
                         showTone={false}
-                        emptyText="El embudo no devolvió ninguna selección para esta estrategia: no hay nada que rebalancear."
+                        emptyText={t('propicks.rebalance.currentEmpty')}
                     />
                 </Card>
             ) : (
@@ -246,7 +253,7 @@ export default function MonthlyRebalanceView({
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
                     <div className="mb-3 flex items-center gap-2">
-                        <h4 className="text-sm font-semibold text-gray-200">Entran</h4>
+                        <h4 className="text-sm font-semibold text-gray-200">{t('propicks.rebalance.entered')}</h4>
                         <Badge variant="outline" className="border-green-500/50 text-green-300">
                             {formatNumber(diff.entered.length, { maximumFractionDigits: 0 })}
                         </Badge>
@@ -255,7 +262,7 @@ export default function MonthlyRebalanceView({
                 </Card>
                 <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
                     <div className="mb-3 flex items-center gap-2">
-                        <h4 className="text-sm font-semibold text-gray-200">Salen</h4>
+                        <h4 className="text-sm font-semibold text-gray-200">{t('propicks.rebalance.exited')}</h4>
                         <Badge variant="outline" className="border-red-500/50 text-red-300">
                             {formatNumber(diff.exited.length, { maximumFractionDigits: 0 })}
                         </Badge>
@@ -266,7 +273,7 @@ export default function MonthlyRebalanceView({
 
             <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
                 <p className="text-sm text-gray-400">
-                    Se mantienen {formatNumber(diff.kept.length, { maximumFractionDigits: 0 })} valores
+                    {t('propicks.rebalance.kept', { count: formatNumber(diff.kept.length, { maximumFractionDigits: 0 }) })}
                     {diff.kept.length > 0 && (
                         <>: <span className="text-gray-300">{diff.kept.join(', ')}</span></>
                     )}
