@@ -10,7 +10,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const page = readFileSync(join(root, 'app/(root)/security/page.tsx'), 'utf8');
+// El aviso vive en es/security.json: solo se añade la sección de la página.
+const page = readFileSync(join(root, 'app/(root)/security/page.tsx'), 'utf8')
+    + JSON.stringify(JSON.parse(readFileSync(join(root, 'lib/i18n/messages/es/security.json'), 'utf8')).page);
 
 describe('página de seguridad: estado de 2FA', () => {
     it('no convierte un fallo de consulta en "desactivado"', () => {

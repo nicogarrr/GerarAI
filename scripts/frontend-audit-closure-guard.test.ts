@@ -57,10 +57,13 @@ test('los documentos legales llevan disclaimer y no se indexan ni se anuncian en
 });
 
 test('2FA muestra el secreto Base32 copiable además del QR', () => {
-    const settings = read('components/security/TwoFactorSettings.tsx');
+    // Los textos viven en es/security.json: solo se añade la sección de 2FA.
+    const settings = read('components/security/TwoFactorSettings.tsx')
+        + JSON.stringify(JSON.parse(read('lib/i18n/messages/es/security.json')).twoFactor);
     assert.ok(settings.includes("searchParams.get('secret')"));
     assert.ok(settings.includes('Clave manual (Base32)'));
-    assert.ok(settings.includes('aria-label="Clave TOTP en Base32"'));
+    assert.ok(settings.includes("aria-label={t('security.twoFactor.secretAria')}"));
+    assert.ok(settings.includes('Clave TOTP en Base32'));
     assert.ok(settings.includes('Copiar clave'));
     assert.ok(settings.includes('role="img"'));
 });
@@ -115,7 +118,9 @@ test('el screener distingue «sin filtros guardados» de «motor caído»', () =
 });
 
 test('el copy de exportación dice qué incluye y qué no', () => {
-    const settings = read('components/security/PrivacySettings.tsx');
+    // El copy vive en es/security.json: solo se añade la sección de privacidad.
+    const settings = read('components/security/PrivacySettings.tsx')
+        + JSON.stringify(JSON.parse(read('lib/i18n/messages/es/security.json')).privacy);
     assert.ok(settings.includes('datos estructurados'));
     assert.ok(settings.includes('originales de los documentos') || settings.includes('archivos originales'));
     // La página pública de privacidad consume el diccionario i18n (landing.json).

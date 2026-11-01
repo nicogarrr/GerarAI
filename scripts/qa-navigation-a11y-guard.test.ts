@@ -10,7 +10,10 @@ test('search restores focus via dialog close-autofocus to connected opener',()=>
  assert.match(read('components/ui/command.tsx'),/onCloseAutoFocus=\{onCloseAutoFocus\}/);
 });
 test('page titles and 404 navigation are explicit and human readable',()=>{
- for(const [page,title] of [['discover','Descubrir'],['security','Seguridad'],['research/sources','Fuentes']]) assert.ok(read(`app/(root)/${page}/page.tsx`).includes(`title: '${title}'`));
+ for(const [page,title] of [['discover','Descubrir'],['research/sources','Fuentes']]) assert.ok(read(`app/(root)/${page}/page.tsx`).includes(`title: '${title}'`));
+ // security migro a generateMetadata + t(): clave en la pagina y ES del dict == literal historico.
+ assert.ok(read('app/(root)/security/page.tsx').includes("title: t('security.page.metaTitle')"));
+ assert.equal(JSON.parse(read('lib/i18n/messages/es/security.json')).page.metaTitle, 'Seguridad');
  // research/news migro a generateMetadata + t(): clave en la pagina y ES del dict == literal historico.
  assert.ok(read('app/(root)/research/news/page.tsx').includes("title: t('research.newsMetaTitle')"));
  assert.equal(JSON.parse(read('lib/i18n/messages/es/research.json')).newsMetaTitle, 'Noticias');

@@ -9,8 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { deleteAccount, exportAccountData } from '@/lib/actions/privacy.actions';
+import { useT } from '@/lib/i18n/client';
 
 export default function PrivacySettings({ email }: { email: string }) {
+    const t = useT();
     const router = useRouter();
     const [exporting, setExporting] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -31,10 +33,10 @@ export default function PrivacySettings({ email }: { email: string }) {
             anchor.click();
             anchor.remove();
             URL.revokeObjectURL(url);
-            toast.success('Exportación descargada');
+            toast.success(t('security.privacy.exported'));
         } catch (error) {
-            toast.error('No se pudo exportar', {
-                description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+            toast.error(t('security.privacy.exportFailed'), {
+                description: error instanceof Error ? error.message : t('security.privacy.tryAgain'),
             });
         } finally {
             setExporting(false);
@@ -44,22 +46,22 @@ export default function PrivacySettings({ email }: { email: string }) {
     const handleDelete = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         if (!understood) {
-            toast.error('Confirma que has leído la advertencia');
+            toast.error(t('security.privacy.confirmWarning'));
             return;
         }
         setDeleting(true);
         try {
             const result = await deleteAccount({ confirmation, password });
             if (!result.success) {
-                toast.error('No se borró la cuenta', { description: result.message });
+                toast.error(t('security.privacy.deleteFailed'), { description: result.message });
                 return;
             }
-            toast.success('Cuenta eliminada', { description: result.message });
+            toast.success(t('security.privacy.deleted'), { description: result.message });
             router.push('/sign-in');
             router.refresh();
         } catch {
-            toast.error('No se borró la cuenta', {
-                description: 'La sesión no está disponible. Vuelve a iniciar sesión.',
+            toast.error(t('security.privacy.deleteFailed'), {
+                description: t('security.privacy.sessionUnavailable'),
             });
         } finally {
             setDeleting(false);
@@ -69,13 +71,9 @@ export default function PrivacySettings({ email }: { email: string }) {
     return (
         <div className="min-w-0 space-y-8">
             <section className="min-w-0 rounded-lg border border-gray-800 p-5">
-                <h2 className="break-words text-xl font-semibold text-white">Exportar mis datos</h2>
+                <h2 className="break-words text-xl font-semibold text-white">{t('security.privacy.exportTitle')}</h2>
                 <p className="mt-1 text-sm text-gray-400">
-                    Descarga un JSON con tus datos estructurados y metadatos: perfil,
-                    cartera, tesis, claims y evidencia, watchlist, alertas, conocimiento,
-                    planes y ajustes. Los archivos originales de los documentos no se
-                    incluyen; de cada documento solo viajan sus metadatos y el recuento
-                    de fragmentos.
+                    {t('security.privacy.exportText')}
                 </p>
                 <Button
                     className="mt-4 w-full min-w-0 whitespace-normal text-left sm:w-auto"
@@ -85,7 +83,7 @@ export default function PrivacySettings({ email }: { email: string }) {
                     variant="outline"
                 >
                     <Download aria-hidden="true" />
-                    {exporting ? 'Preparando exportación…' : 'Exportar todos mis datos'}
+                    {exporting ? t('security.privacy.exporting') : t('security.privacy.exportButton')}
                 </Button>
             </section>
 
@@ -93,12 +91,9 @@ export default function PrivacySettings({ email }: { email: string }) {
                 <div className="flex min-w-0 items-start gap-3">
                     <ShieldAlert aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-red-300" />
                     <div className="min-w-0">
-                        <h2 className="break-words text-xl font-semibold text-white">Borrar mi cuenta</h2>
+                        <h2 className="break-words text-xl font-semibold text-white">{t('security.privacy.deleteTitle')}</h2>
                         <p className="mt-1 text-sm text-gray-400">
-                            Es irreversible. Se eliminan la cartera, tesis, claims,
-                            watchlist, alertas, documentos y sus originales, vectores de
-                            búsqueda, sesiones y la propia cuenta. Exporta antes si quieres
-                            conservar una copia.
+                            {t('security.privacy.deleteText')}
                         </p>
                     </div>
                 </div>
@@ -106,7 +101,7 @@ export default function PrivacySettings({ email }: { email: string }) {
                 <form className="mt-5 space-y-4" onSubmit={handleDelete}>
                     <div>
                         <Label className="block break-words leading-6" htmlFor="delete-confirmation">
-                            Escribe <span className="block font-mono text-gray-200 [overflow-wrap:anywhere]">{email}</span> para confirmar
+                            {t('security.privacy.typeToConfirmBefore')} <span className="block font-mono text-gray-200 [overflow-wrap:anywhere]">{email}</span> {t('security.privacy.typeToConfirmAfter')}
                         </Label>
                         <Input
                             autoComplete="off"
@@ -120,7 +115,7 @@ export default function PrivacySettings({ email }: { email: string }) {
                         />
                     </div>
                     <div>
-                        <Label htmlFor="delete-password">Contraseña actual (reautenticación)</Label>
+                        <Label htmlFor="delete-password">{t('security.privacy.currentPassword')}</Label>
                         <Input
                             autoComplete="current-password"
                             className="mt-2 min-h-11"
@@ -140,7 +135,7 @@ export default function PrivacySettings({ email }: { email: string }) {
                             onChange={(event) => setUnderstood(event.target.checked)}
                             type="checkbox"
                         />
-                        Entiendo que esta acción es irreversible y que no se puede deshacer.
+                        {t('security.privacy.understood')}
                     </label>
                     <Button
                         className="w-full min-w-0 whitespace-normal text-left sm:w-auto"
@@ -148,7 +143,7 @@ export default function PrivacySettings({ email }: { email: string }) {
                         type="submit"
                         variant="destructive"
                     >
-                        {deleting ? 'Borrando cuenta…' : 'Borrar cuenta y todos mis datos'}
+                        {deleting ? t('security.privacy.deleting') : t('security.privacy.deleteButton')}
                     </Button>
                 </form>
             </section>

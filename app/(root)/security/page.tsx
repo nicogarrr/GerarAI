@@ -9,11 +9,15 @@ import ChangePassword from "@/components/security/ChangePassword";
 import PrivacySettings from "@/components/security/PrivacySettings";
 import InstallApp from "@/components/pwa/InstallApp";
 import { Panel } from "@/components/ui/panel";
+import { getT } from '@/lib/i18n/server';
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export const metadata: Metadata = { title: 'Seguridad' };
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getT();
+    return { title: t('security.page.metaTitle') };
+}
 
 export default async function SecurityPage() {
     let user;
@@ -23,15 +27,16 @@ export default async function SecurityPage() {
         return redirectToSignIn();
     }
 
+    const t = await getT();
     const status = await getTwoFactorStatus();
     const emailResetAvailable = isPasswordResetEmailConfigured();
 
     return (
         <main id="content" tabIndex={-1} className="space-y-8">
             <div>
-                <h1 className="text-2xl font-bold text-white">Seguridad y privacidad</h1>
+                <h1 className="text-2xl font-bold text-white">{t('security.page.title')}</h1>
                 <p className="text-sm text-gray-400 mt-1">
-                    Ajustes de la cuenta de <span className="text-gray-200">{user.email}</span>.
+                    {t('security.page.accountOf')} <span className="text-gray-200">{user.email}</span>.
                 </p>
             </div>
 
@@ -43,35 +48,32 @@ export default async function SecurityPage() {
                     data-testid="two-factor-unavailable"
                     className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-200"
                 >
-                    No se pudo comprobar el estado de la verificación en dos pasos (2FA). No
-                    es lo mismo que tenerla desactivada: recarga la página o inténtalo más tarde.
+                    {t('security.page.twoFactorUnknown')}
                 </section>
             )}
 
-            <Panel title="Contraseña" description="Cambio autenticado sin depender del correo.">
+            <Panel title={t('security.page.passwordTitle')} description={t('security.page.passwordDescription')}>
                 <div className="space-y-4">
                     <ChangePassword />
                     {emailResetAvailable ? (
                         <p className="text-sm text-gray-400">
-                            ¿Has olvidado la contraseña? Cierra sesión y solicita un enlace en{' '}
+                            {t('security.page.forgotBefore')}{' '}
                             <Link className="text-teal-300 hover:underline" href="/forgot-password">
-                                restablecer contraseña
+                                {t('security.page.forgotLink')}
                             </Link>
                             .
                         </p>
                     ) : (
                         <p className="text-sm text-amber-200">
-                            El restablecimiento por correo no está configurado en este
-                            despliegue (falta SMTP). Usa el cambio autenticado de arriba o
-                            contacta con soporte.
+                            {t('security.page.noSmtp')}
                         </p>
                     )}
                 </div>
             </Panel>
 
             <Panel
-                title="Datos y cuenta"
-                description="Exporta una copia o elimina la cuenta y todos sus datos."
+                title={t('security.page.dataTitle')}
+                description={t('security.page.dataDescription')}
             >
                 <PrivacySettings email={user.email ?? ''} />
             </Panel>
