@@ -657,6 +657,17 @@ _PERFORMANCE_RE = re.compile(
     r"|qu[eé]\s+tal\s+van?\s+(?:mi|mis)|gano\s+o\s+pierdo|cu[aá]nto\s+me\s+ha\s+costado)\b"
     r"(?![^.!?\n]*\bsi\b)"
 )
+
+
+def _asks_fiscal(question: str) -> bool:
+    """«ganancias patrimoniales de 2026», «¿cuánto he ganado en 2025?»: van al
+    bloque fiscal del ejercicio, no a la rentabilidad acumulada de hoy."""
+    from app.services.personal_answer import detect_personal_intent
+
+    intent = detect_personal_intent(question)
+    return intent is not None and intent.kind == "fiscal"
+
+
 # "¿Qué es la rentabilidad?" / "¿cómo se calcula?" son preguntas de concepto:
 # las responde la ruta educativa, no la cifra de cartera.
 _CONCEPT_QUESTION_RE = re.compile(
@@ -1383,6 +1394,7 @@ class ChatService:
             and _PERFORMANCE_RE.search(question or "")
             and not _CONCEPT_QUESTION_RE.search(question or "")
             and not _ORDER_VERB_RE.search(question or "")
+            and not _asks_fiscal(question or "")
         ):
             performance_answer = self._portfolio_performance(db, question or "", company)
             if performance_answer is not None:
