@@ -662,6 +662,83 @@ def _ranking_answer(db: Session, tenant: int, text: str) -> ChatResponse:
 # ------------------------------------------------------------------ router
 
 
+_WITHHOLD = re.compile(r"\b(?:retencion\w*|retenid\w*|retuvi\w*|retien\w*|withh\w+)\b")
+_MINE = re.compile(r"\b(?:me|mis|mi|my|i)\b")
+
+
+def _asks_withholding(text: str) -> bool:
+    return bool(_WITHHOLD.search(text) and _MINE.search(text) and not re.search(r"\bsi\b|\bif\b", text))
+
+
+def _withholding_years(db: Session, tenant: int, only: set[str]) -> list[int]:
+    from app.models import Company, Transaction
+
+    query = (select(Transaction.trade_date, Transaction.action, Company.ticker)
+             .outerjoin(Company, Company.id == Transaction.company_id).where(Transaction.tenant_id == tenant))
+    years: set[int] = set()
+    for day, action, ticker in db.execute(query).all():
+        action = (action or "").lower()
+        if day is None or (only and (ticker or "") not in only):
+            continue
+        if "dividend" in action or "withholding" in action or action in {"div", "tax"}:
+            years.add(day.year)
+    return sorted(years, reverse=True)
+
+
+def _withholding_answer(db: Session, tenant: int, year: int | None, only: set[str]) -> ChatResponse:
+    english = _english()
+    years = [year] if year is not None else _withholding_years(db, tenant, only)
+    # (año o ticker, divisa) -> [retenido, bruto]
+    rows: dict[tuple[str, str], list[Decimal]] = {}
+    for current in years:
+        report = _tax_data(db, current) or {}
+        for item in report.get("dividends") or []:
+            ticker = item.get("ticker") or "?"
+            if only and ticker not in only:
+                continue
+            key = (ticker if year is not None else str(current), (item.get("currency") or "EUR").upper())
+            bucket = rows.setdefault(key, [Decimal("0"), Decimal("0")])
+            bucket[0] += Decimal(str(item.get("withholding_native") or 0))
+            bucket[1] += Decimal(str(item.get("dividends_native") or 0))
+    sources = [_source("tax_report", None, "Impuestos", "/tax")]
+    names = ", ".join(sorted(only))
+    if not rows:
+        what = names or (str(year) if year is not None else "")
+        if english:
+            text = f"You have no saved dividends or withholding{' for ' + what if what else ''}."
+        else:
+            text = f"No tienes dividendos ni retenciones guardados{' de ' + what if names else (' en ' + what if what else '')}."
+        return _response(text, sources, "account_withholding")
+    totals: dict[str, list[Decimal]] = {}
+    for (_, currency), (held, gross) in rows.items():
+        total = totals.setdefault(currency, [Decimal("0"), Decimal("0")])
+        total[0] += held
+        total[1] += gross
+
+    def part(held: Decimal, gross: Decimal, currency: str) -> str:
+        on = "on" if english else "sobre"
+        return f"{_money(float(held), currency, english=english)} {on} {_money(float(gross), currency, english=english)}"
+
+    def rate(held: Decimal, gross: Decimal) -> str:
+        return f" ({_pct(float(held / gross), english=english)})" if gross > 0 else ""
+
+    head = " + ".join(f"{part(h, g, c)} {'gross' if english else 'brutos'}{rate(h, g)}" for c, (h, g) in sorted(totals.items()))
+    if names:
+        scope = f"your {names} dividends" if english else f"tus dividendos de {names}"
+        if year is not None:
+            scope += f" in {year}" if english else f" en {year}"
+    else:
+        scope = (f"your dividends in {year}" if year is not None else "your dividends") if english else (
+            f"tus dividendos en {year}" if year is not None else "tus dividendos")
+    lines = [f"Tax withheld at source on {scope}: {head}." if english else f"Retención en origen en {scope}: {head}."]
+    if len(rows) > 1:
+        for (label, currency), (held, gross) in sorted(rows.items(), key=lambda kv: kv[0], reverse=year is None):
+            lines.append(f"- {label}: {part(held, gross, currency)}{rate(held, gross)}")
+    lines.append("From your saved dividends, as in Taxes (draft, not tax advice)." if english
+                 else "De tus dividendos guardados, como en Impuestos (borrador, no asesoría fiscal).")
+    return _response("\n".join(lines), sources, "account_withholding")
+
+
 def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     """Respuesta de datos de la cuenta, o None si la pregunta no es de este módulo."""
     tenant = _tenant(db)
@@ -675,6 +752,8 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     if _asks_return_ranking(text, question):
         return _ranking_answer(db, tenant, text)
     year = _asked_year(text)
+    if _asks_withholding(text) and _tickers_in(question):
+        return _withholding_answer(db, tenant, year, _tickers_in(question))
     if _asks_fees(text):
         return _fees_answer(db, tenant, year, _tickers_in(question))
     if _asks_cash(text, question):
