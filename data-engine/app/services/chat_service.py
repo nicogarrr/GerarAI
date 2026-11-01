@@ -2427,7 +2427,12 @@ class ChatService:
         # Criterio del informe fiscal (DGT V0152-26): coste nativo de los lotes
         # al cambio de la VENTA. Sin precio dado, el cambio es el implícito del
         # valor guardado (valor en euros / valor en divisa).
-        sale_ccy = (pos.currency or company.currency or "EUR").upper()
+        from app.valuation.currency import canonical_currency_code
+
+        # Sin .upper(): «GBp» (peniques) en mayúsculas es «GBP» y deja de
+        # coincidir con la divisa de los lotes, que se costeaban entonces al
+        # cambio de la compra (cifra distinta de la del informe fiscal).
+        sale_ccy = canonical_currency_code(pos.currency or company.currency or "EUR")
         native_value = pos.market_value_native if pos.market_value_native is not None else pos.market_value
         sale_rate: Decimal | None = None
         if sale_ccy == "EUR":
@@ -2455,7 +2460,7 @@ class ChatService:
                     confidence=0.7, llm_trace=trace,
                 )
             value_base = price * held * rate
-            sale_ccy, sale_rate = currency.upper(), rate
+            sale_ccy, sale_rate = canonical_currency_code(currency), rate
             trace["sale_price_source"] = "usuario"
         fifo_cost = fifo.cost_eur_dgt(sale_ccy, sale_rate) if fifo is not None else None
         avg_cost = pos.cost_basis_base if (pos.base_currency or "EUR") == "EUR" else None
