@@ -40,7 +40,18 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t('research.thesisDoc.metaTitle'), description: t('research.thesisDoc.metaDescription') };
 }
 
-type PageProps = { params: Promise<{ ticker: string }> };
+type PageProps = {
+  params: Promise<{ ticker: string }>;
+  searchParams?: Promise<{ expertRun?: string | string[] }>;
+};
+
+/** `?expertRun=N` abre entera una corrida anterior del equipo de expertos. */
+function parseExpertRun(raw: string | string[] | undefined): number | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value || !/^\d{1,9}$/.test(value)) return null;
+  const run = Number(value);
+  return run > 0 ? run : null;
+}
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'borrador',
@@ -204,11 +215,12 @@ function tocFor(thesis: ThesisLike, extra: { provenance: boolean; fromMarkdown?:
  * descargable (PDF/Markdown). Solo lo que contiene la version publicada;
  * un borrador mas reciente se anuncia sin cifras ni margen (regla vigente).
  */
-export default async function ThesisReadingPage({ params }: PageProps) {
+export default async function ThesisReadingPage({ params, searchParams }: PageProps) {
   const [t, locale] = await Promise.all([getT(), getLocale()]);
   const { formatGeneratedDate, formatPercent, formatUserDate } = createFormatters(locale);
   const { ticker: rawTicker } = await params;
   const ticker = rawTicker.toUpperCase();
+  const expertRun = parseExpertRun((await searchParams)?.expertRun);
 
   const [snapshotRead, workspace, expertThesis] = await Promise.all([
     // null = 404 «compañía ausente del master» (getResearchCompanySnapshot
@@ -220,7 +232,8 @@ export default async function ThesisReadingPage({ params }: PageProps) {
     ),
     getResearchThesisWorkspace(ticker).catch(() => null),
     // Tesis del equipo de expertos (EXPERT_TEAM_ENABLED): null si está apagado o no hay.
-    getExpertThesis(ticker),
+    // Con ?expertRun=N, esa corrida; si no es tuya o no existe, la última.
+    getExpertThesis(ticker, expertRun).then((found) => (found || !expertRun ? found : getExpertThesis(ticker))),
   ]);
   const snapshot = snapshotRead.value;
   const company = snapshot?.company ?? null;
@@ -658,7 +671,12 @@ export default async function ThesisReadingPage({ params }: PageProps) {
         )}
         {!companyMissing && !loadFailed ? (
           <div className="max-w-[40rem]">
-            <ExpertThesisPanel thesis={expertThesis} t={t} formatDate={formatUserDate} />
+            <ExpertThesisPanel
+              thesis={expertThesis}
+              t={t}
+              formatDate={formatUserDate}
+              basePath={`/research/${encodeURIComponent(ticker)}/tesis`}
+            />
           </div>
         ) : null}
       </div>

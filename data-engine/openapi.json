@@ -6433,6 +6433,11 @@
             "title": "History",
             "type": "array"
           },
+          "is_latest": {
+            "default": true,
+            "title": "Is Latest",
+            "type": "boolean"
+          },
           "plan": {
             "items": {
               "type": "string"
@@ -83210,7 +83215,7 @@
     },
     "/api/thesis/{ticker}/experts": {
       "get": {
-        "description": "\u00daltima tesis guardada del equipo de expertos y un historial corto de las anteriores (404 sin flag).",
+        "description": "\u00daltima tesis guardada del equipo de expertos y un historial corto de las anteriores (404 sin flag).\n\nCon ``?run=N`` abre entera esa corrida anterior (solo las tuyas, de este\nticker y completadas; si no, 404) y el historial trae las dem\u00e1s.",
         "operationId": "latest_expert_thesis_api_thesis__ticker__experts_get",
         "parameters": [
           {
@@ -83220,6 +83225,24 @@
             "schema": {
               "title": "Ticker",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run"
             }
           },
           {

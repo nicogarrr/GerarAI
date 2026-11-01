@@ -162,7 +162,9 @@
       "historyVerdict": "Veredicto: {label}",
       "historyNoVerdict": "Sin veredicto",
       "historyAnswered": "Respondieron: {experts}",
-      "historyTimedOut": "Sin respuesta a tiempo: {experts}"
+      "historyTimedOut": "Sin respuesta a tiempo: {experts}",
+      "olderRun": "Estás viendo una corrida anterior ({date}).",
+      "backToLatest": "Ver la última"
     }
   }
 }

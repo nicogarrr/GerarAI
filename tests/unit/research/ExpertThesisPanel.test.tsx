@@ -21,6 +21,7 @@ const thesis: ExpertThesis = {
     ],
     conflicts: ['Fundamental lo ven a favor y Riesgo en contra'],
     verdict: { label: 'a favor', rationale: 'Pesa más el crecimiento.' },
+    is_latest: true,
 };
 
 describe('tesis guardada del equipo de expertos', () => {
@@ -113,6 +114,36 @@ describe('tesis guardada del equipo de expertos', () => {
         unmount();
         render(<ExpertThesisPanel thesis={{ ...thesis, history: [] }} t={createTranslator('es')} />);
         expect(screen.queryByTestId('expert-thesis-history')).toBeNull();
+    });
+
+    it('cada corrida anterior se abre entera con ?expertRun= (solo con basePath)', () => {
+        const withHistory: ExpertThesis = {
+            ...thesis,
+            history: [{ run_id: 5, finished_at: '2026-10-31T09:00:00Z', verdict: 'neutral', answered: ['fundamental'], timed_out: [] }],
+        };
+        const { unmount } = render(
+            <ExpertThesisPanel thesis={withHistory} t={createTranslator('es')} basePath="/research/MSFT/tesis" formatDate={(iso) => iso.slice(0, 10)} />,
+        );
+        const link = within(screen.getByTestId('expert-thesis-run-5')).getByRole('link', { name: '2026-10-31' });
+        expect(link).toHaveAttribute('href', '/research/MSFT/tesis?expertRun=5#expert-thesis');
+        expect(screen.queryByTestId('expert-thesis-older')).toBeNull();
+        unmount();
+        render(<ExpertThesisPanel thesis={withHistory} t={createTranslator('es')} />);
+        expect(within(screen.getByTestId('expert-thesis-run-5')).queryByRole('link')).toBeNull();
+    });
+
+    it('una corrida anterior abierta lo avisa y deja volver a la última', () => {
+        const older: ExpertThesis = { ...thesis, is_latest: false, history: [] };
+        const { unmount } = render(
+            <ExpertThesisPanel thesis={older} t={createTranslator('es')} basePath="/research/MSFT/tesis" formatDate={(iso) => iso.slice(0, 10)} />,
+        );
+        const note = screen.getByTestId('expert-thesis-older');
+        expect(note).toHaveTextContent('Estás viendo una corrida anterior (2026-11-01).');
+        expect(within(note).getByRole('link', { name: 'Ver la última' })).toHaveAttribute('href', '/research/MSFT/tesis#expert-thesis');
+        unmount();
+        render(<ExpertThesisPanel thesis={older} t={createTranslator('en')} basePath="/research/MSFT/tesis" />);
+        expect(screen.getByTestId('expert-thesis-older')).toHaveTextContent('You are viewing an earlier run');
+        expect(screen.getByRole('link', { name: 'See the latest' })).toBeInTheDocument();
     });
 
     it('sin tesis (flag apagado o ninguna guardada) no pinta nada', () => {

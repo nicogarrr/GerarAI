@@ -68,3 +68,36 @@ describe('vista de lectura de la tesis: tesis del equipo de expertos', () => {
         expect(screen.getAllByText('Resumen de prueba').length).toBeGreaterThan(0);
     });
 });
+
+describe('vista de lectura de la tesis: abrir una corrida anterior del equipo', () => {
+    it('?expertRun=N pide esa corrida y la pinta entera', async () => {
+        const older = { ...experts, run_id: 2, is_latest: false, history: [{ run_id: 3, finished_at: '2026-11-01T20:00:00Z', verdict: null, answered: [], timed_out: [] }] };
+        vi.mocked(researchRequest).mockImplementation(async (path: string) => {
+            if (path.endsWith('/experts?run=2')) return older as never;
+            if (path.includes('/experts')) throw new Error(`no esperado: ${path}`);
+            return [thesis] as never;
+        });
+        render(await ThesisReadingPage({ params: Promise.resolve({ ticker: 'AAPL' }), searchParams: Promise.resolve({ expertRun: '2' }) }));
+        expect(screen.getByTestId('expert-thesis-older')).toHaveTextContent('Estás viendo una corrida anterior');
+        expect(within(screen.getByTestId('expert-thesis-run-3')).getByRole('link')).toHaveAttribute('href', '/research/AAPL/tesis?expertRun=3#expert-thesis');
+    });
+
+    it('una corrida que no es tuya o no existe (404) vuelve a la última; basura en ?expertRun se ignora', async () => {
+        const calls: string[] = [];
+        vi.mocked(researchRequest).mockImplementation(async (path: string) => {
+            if (path.includes('/experts')) {
+                calls.push(path);
+                if (path.endsWith('?run=99')) throw new AppError('Not found', 'NOT_FOUND', 404);
+                return experts as never;
+            }
+            return [thesis] as never;
+        });
+        render(await ThesisReadingPage({ params: Promise.resolve({ ticker: 'AAPL' }), searchParams: Promise.resolve({ expertRun: '99' }) }));
+        expect(calls).toEqual(['/api/thesis/AAPL/experts?run=99', '/api/thesis/AAPL/experts']);
+        expect(screen.getByTestId('expert-thesis')).toBeInTheDocument();
+        expect(screen.queryByTestId('expert-thesis-older')).toBeNull();
+        calls.length = 0;
+        render(await ThesisReadingPage({ params: Promise.resolve({ ticker: 'AAPL' }), searchParams: Promise.resolve({ expertRun: '1;drop' }) }));
+        expect(calls).toEqual(['/api/thesis/AAPL/experts']);
+    });
+});

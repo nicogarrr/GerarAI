@@ -11,11 +11,13 @@ export type ExpertThesis = components['schemas']['ExpertThesisOut'];
  * ambos casos, y ante cualquier fallo, la pantalla simplemente no la muestra
  * (es una capa opcional; nunca rompe la tesis de siempre).
  */
-export async function getExpertThesis(ticker: string): Promise<ExpertThesis | null> {
+export async function getExpertThesis(ticker: string, run?: number | null): Promise<ExpertThesis | null> {
     const encoded = encodeURIComponent(ticker.trim().toUpperCase());
     if (!encoded) return null;
+    // `run`: abrir entera una corrida anterior (solo las tuyas; si no existe, 404 → null).
+    const query = run && Number.isSafeInteger(run) && run > 0 ? `?run=${run}` : '';
     try {
-        const data = await researchRequest<ExpertThesis | null>(`/api/thesis/${encoded}/experts`, { cache: 'no-store' });
+        const data = await researchRequest<ExpertThesis | null>(`/api/thesis/${encoded}/experts${query}`, { cache: 'no-store' });
         return data && Array.isArray(data.sections) ? data : null;
     } catch {
         return null;

@@ -1,6 +1,6 @@
 import logging
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -264,8 +264,16 @@ def latest_thesis(ticker: str, db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/{ticker}/experts", response_model=ExpertThesisOut | None)
-def latest_expert_thesis(ticker: str, db: Session = Depends(get_db)) -> ExpertThesisOut | None:
-    """Última tesis guardada del equipo de expertos y un historial corto de las anteriores (404 sin flag)."""
+def latest_expert_thesis(
+    ticker: str,
+    db: Session = Depends(get_db),
+    run: Annotated[int | None, Query(ge=1, le=2**31 - 1)] = None,
+) -> ExpertThesisOut | None:
+    """Última tesis guardada del equipo de expertos y un historial corto de las anteriores (404 sin flag).
+
+    Con ``?run=N`` abre entera esa corrida anterior (solo las tuyas, de este
+    ticker y completadas; si no, 404) y el historial trae las demás.
+    """
     from app.core.config import get_settings
     from app.core.i18n import current_language
     from app.services.expert_team import view as expert_view
@@ -273,10 +281,17 @@ def latest_expert_thesis(ticker: str, db: Session = Depends(get_db)) -> ExpertTh
     if not get_settings().expert_team_enabled:
         raise HTTPException(status_code=404, detail="Expert team is off")
     found = expert_view.expert_thesis_runs(db, ticker, expert_view.HISTORY_LIMIT + 1)
+    if run is not None:
+        chosen = expert_view.expert_thesis_run(db, ticker, run)
+        if chosen is None:
+            raise HTTPException(status_code=404, detail="Expert thesis run not found")
+        others = [item for item in found if item[0].id != run][: expert_view.HISTORY_LIMIT]
+        is_latest = bool(found) and found[0][0].id == run
+        return expert_view.thesis_view(chosen[0], chosen[1], current_language(), others, is_latest=is_latest)
     if not found:
         return None
-    (run, result), earlier = found[0], found[1:]
-    return expert_view.thesis_view(run, result, current_language(), earlier)
+    (latest, result), earlier = found[0], found[1:]
+    return expert_view.thesis_view(latest, result, current_language(), earlier)
 
 
 @router.get("/{ticker}/versions", response_model=list[ThesisOut])

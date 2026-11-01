@@ -38,26 +38,44 @@ function safeUrl(url: string | null | undefined): string | null {
  * afirmaciones (cada una con su [n]) y las fuentes numeradas, con enlace
  * cuando la fuente lo tiene (p. ej. el filing de la SEC, o la pantalla de
  * valoración / cartera de la propia app). Debajo, un
- * historial corto de corridas anteriores (la más reciente primero).
+ * historial corto de corridas anteriores (la más reciente primero); con
+ * `basePath`, cada una se abre entera (`?expertRun=N`, solo lectura).
  */
 export function ExpertThesisPanel({
     thesis,
     t,
     formatDate,
+    basePath,
 }: {
     thesis: ExpertThesis | null;
     t: TranslateFn;
     formatDate?: (iso: string) => string;
+    /** Ruta de la pantalla de la tesis; sin ella el historial no enlaza. */
+    basePath?: string;
 }) {
     if (!thesis || !thesis.sections?.length) return null;
     const sources = thesis.sources ?? [];
     const known = new Set(sources.map((source) => source.n));
     const anchor = (n: number) => `expert-source-${thesis.run_id}-${n}`;
+    const dateOf = (iso: string) => (formatDate ? formatDate(iso) : iso.slice(0, 10));
     return (
-        <section data-testid="expert-thesis" aria-labelledby="expert-thesis-title" className="mt-12 border-t border-gray-800 pt-8">
+        <section id="expert-thesis" data-testid="expert-thesis" aria-labelledby="expert-thesis-title" className="mt-12 border-t border-gray-800 pt-8">
             <h2 id="expert-thesis-title" className="text-2xl text-gray-50">{t('brain.expertTeam.thesis.title')}</h2>
             {thesis.finished_at && formatDate ? (
                 <p className="mt-1 text-xs text-gray-500">{t('brain.expertTeam.thesis.generatedAt', { date: formatDate(thesis.finished_at) })}</p>
+            ) : null}
+            {thesis.is_latest === false ? (
+                <p data-testid="expert-thesis-older" className="mt-2 text-sm leading-6 text-amber-300">
+                    {t('brain.expertTeam.thesis.olderRun', { date: thesis.finished_at ? dateOf(thesis.finished_at) : '—' })}
+                    {basePath ? (
+                        <>
+                            {' '}
+                            <Link href={`${basePath}#expert-thesis`} className="text-teal-300 underline underline-offset-2">
+                                {t('brain.expertTeam.thesis.backToLatest')}
+                            </Link>
+                        </>
+                    ) : null}
+                </p>
             ) : null}
             <p className="mt-2 text-sm leading-6 text-gray-400">{t('brain.expertTeam.thesis.note')}</p>
             <div className="mt-6 space-y-6">
@@ -110,9 +128,16 @@ export function ExpertThesisPanel({
                     <ol className="mt-2 space-y-1 text-xs leading-5 text-gray-400">
                         {thesis.history.map((run) => (
                             <li key={run.run_id} data-testid={`expert-thesis-run-${run.run_id}`}>
-                                <span className="text-gray-300">
-                                    {run.finished_at ? (formatDate ? formatDate(run.finished_at) : run.finished_at.slice(0, 10)) : '—'}
-                                </span>
+                                {basePath ? (
+                                    <Link
+                                        href={`${basePath}?expertRun=${run.run_id}#expert-thesis`}
+                                        className="text-teal-300 underline underline-offset-2"
+                                    >
+                                        {run.finished_at ? dateOf(run.finished_at) : '—'}
+                                    </Link>
+                                ) : (
+                                    <span className="text-gray-300">{run.finished_at ? dateOf(run.finished_at) : '—'}</span>
+                                )}
                                 {' · '}
                                 {run.verdict
                                     ? t('brain.expertTeam.thesis.historyVerdict', { label: run.verdict })
