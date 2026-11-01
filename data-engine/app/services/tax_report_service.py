@@ -431,6 +431,15 @@ def zero_cost_buys_for_review(events_by_ticker, start, end) -> list[dict]:
     return sorted(rows, key=lambda r: (r["date"], r["ticker"]))
 
 
+def _minor_divisor(transaction) -> Decimal:
+    """Subunidades por unidad de la divisa de la operacion (``GBp`` -> 100).
+
+    El libro de divisas agrupa por divisa principal (``.upper()``: «GBp» cae
+    en «GBP»), asi que sus importes nativos se pasan a libras antes de sumar.
+    """
+    return Decimal(normalize_currency(transaction.currency)[1])
+
+
 def replay_tax_fifo(events, resolve_rate, start, end):
     """Pure annual FIFO/recompra replay, also used by read-only sale estimates.
 
@@ -1364,7 +1373,7 @@ class TaxReportService:
                 sales += [
                     {
                         "date": e["transaction"].trade_date,
-                        "proceeds_native": e["proceeds_native"],
+                        "proceeds_native": e["proceeds_native"] / _minor_divisor(e["transaction"]),
                         "proceeds_base": e["proceeds_base"],
                         "ref": f"sale#{e['transaction'].id}",
                         "time": _execution_time(e["transaction"]),
@@ -1381,6 +1390,8 @@ class TaxReportService:
                     continue
                 action = (transaction.action or "").lower()
                 day = transaction.trade_date
+                # «GBp» entra en el libro de «GBP»: sus importes van en peniques.
+                divisor = _minor_divisor(transaction)
                 payload = transaction.raw_payload if isinstance(transaction.raw_payload, dict) else {}
                 if (
                     str(payload.get("assetCategory") or "").upper() == "FUND"
@@ -1390,12 +1401,12 @@ class TaxReportService:
                 if action in BUY_ACTIONS:
                     # V0282-22 / V0706-22: la compra (con su comision) consume divisa sin resultado.
                     outflows.append(
-                        Outflow(day, transaction.quantity * transaction.price + transaction.fees, "compra", f"buy#{transaction.id}")
+                        Outflow(day, (transaction.quantity * transaction.price + transaction.fees) / divisor, "compra", f"buy#{transaction.id}")
                     )
                 elif action in SELL_ACTIONS:
                     continue  # entrada: ya esta en los lotes de ventas
                 elif "fee" in action and "dividend" not in action:
-                    outflows.append(Outflow(day, abs(cash_amount(transaction)), "comision", f"fee#{transaction.id}"))
+                    outflows.append(Outflow(day, abs(cash_amount(transaction)) / divisor, "comision", f"fee#{transaction.id}"))
                 elif "withholding" in action or "dividend" in action or "interest" in action:
                     if not income_by_analogy:
                         unmodeled.append(action)
@@ -1404,7 +1415,7 @@ class TaxReportService:
                         -withholding_cost(transaction)
                         if "withholding" in action
                         else cash_amount(transaction)
-                    )
+                    ) / divisor
                     if amount > 0:
                         rate = resolve_rate(currency, day)
                         extra_lots.append(
