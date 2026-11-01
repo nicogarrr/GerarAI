@@ -89,7 +89,7 @@
   "components/plan/PlanView.tsx": 1,
   "components/portfolio/transactionValidation.ts": 7,
   "components/proPicks/category-display.ts": 12,
-  "components/proPicks/DcaBacktestPanel.tsx": 20,
+  "components/proPicks/DcaBacktestPanel.tsx": 2,
   "components/proPicks/DeepValueView.tsx": 8,
   "components/proPicks/gemsFormat.ts": 3,
   "components/proPicks/GemsView.tsx": 9,
