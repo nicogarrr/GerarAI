@@ -1547,5 +1547,29 @@
     "manager": "manager",
     "managers": "managers",
     "footer": "Form 4 and 13F already synced. The 13F is quarterly, up to 45 days late and only covers long positions. This summary feeds the thesis."
+  },
+  "changesSinceVisit": {
+    "sectionLabel": "Changes since your last visit",
+    "heading": "Since your last visit ({date})",
+    "newDocuments_one": "{count} new document:",
+    "newDocuments_other": "{count} new documents:",
+    "andMore": " and more",
+    "newFacts_one": "{count} new financial figure",
+    "newFacts_other": "{count} new financial figures",
+    "thesis": "Thesis: {text}",
+    "needsReview": " (needs review)",
+    "metricsLabel": "What changed",
+    "source": " · Source: {source}",
+    "markRead": "Mark as read"
+  },
+  "headerQuote": {
+    "chartClose": "Last chart close",
+    "chartLastCandle": "Last chart candle (may be partial)",
+    "loadingPrice": "Loading price…",
+    "liveUnavailable": "Live quote not available right now",
+    "open": "Open",
+    "high": "High",
+    "low": "Low",
+    "previousClose": "Previous close"
   }
 }

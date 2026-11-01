@@ -30,7 +30,7 @@ describe('procedencia OHLC', () => {
         assert.match(ui, /hasDatedMetrics \? quote!.open : null/);
         // La línea de procedencia bajo el precio se quitó a petición de Nico (30-oct-2026);
         // la fecha del cierre anterior sigue visible en la tira de métricas.
-        assert.match(ui, /quoteDate\(quote\.previous_close_timestamp\)/);
+        assert.match(ui, /quoteDate\(quote\.previous_close_timestamp, locale\)/);
         assert.doesNotMatch(ui, /\['Cierre anterior', quote\?\.previous_close\]/);
         assert.match(ui, /\['Cierre anterior', quote\?\.previous_close_timestamp \|\| quote\?\.previous_close_date \? quote.previous_close : null\]/);
     });

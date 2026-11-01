@@ -15,15 +15,20 @@ describe('cabecera de precio con fallback al cierre del gráfico', () => {
     it('espera 4 s y usa solo datos de las velas (sin inventar métricas)', () => {
         assert.match(header, /setTimeout\(\(\) => setSlow\(true\), 4000\)/);
         assert.match(header, /snapshot\.history\.at\(-1\)/);
-        assert.match(header, /Último cierre del gráfico/);
-        assert.match(header, /Cotización en vivo no disponible ahora/);
+        // Textos en research.headerQuote.* (es y en); la cabecera los pide por clave.
+        const es = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).headerQuote;
+        assert.equal(es.chartClose, 'Último cierre del gráfico');
+        assert.equal(es.liveUnavailable, 'Cotización en vivo no disponible ahora');
+        assert.match(header, /research\.headerQuote\.chartClose/);
+        assert.match(header, /research\.headerQuote\.liveUnavailable/);
         assert.match(header, /last\?\.open \?\? null/);
     });
     it('subunidades (GBX): fallback solo con la divisa del listado ya en subunidad, y rotula la vela parcial', () => {
         assert.match(header, /chartFallbackCurrency\(/);
         assert.match(header, /GBX/);
         assert.match(header, /isValidCurrencyCode\(fallbackCurrency\)/);
-        assert.match(header, /Última vela del gráfico \(puede ser parcial\)/);
+        assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).headerQuote.chartLastCandle, 'Última vela del gráfico (puede ser parcial)');
+        assert.match(header, /research\.headerQuote\.chartLastCandle/);
         assert.match(header, /lastIsClose/);
     });
     it('la rama de cotización real sigue exigiendo metadata y fecha de cierre anterior', () => {

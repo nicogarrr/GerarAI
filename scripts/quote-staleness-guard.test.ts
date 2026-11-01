@@ -35,7 +35,7 @@ test('F358: los consumidores etiquetan el cierre fechado y no lo pintan actual',
     assert.match(marketWorkspace, /sessionDateEt\(quote\.t\)/, 'la ficha research fecha el cierre');
     assert.match(marketWorkspace, /priceKind: quoteLive \? 'live' : price !== null \? 'close' : null/, 'priceKind propagado');
     assert.doesNotMatch(headerQuote, /Precio de fecha desconocida/);
-    assert.match(headerQuote, /extendedQuoteLabel\(quote\)/, 'cabecera exige timestamp del payload extendido');
+    assert.match(headerQuote, /extendedQuoteLabel\(quote, locale\)/, 'cabecera exige timestamp del payload extendido');
     assert.match(watchlistActions, /priceAsOf = priceKind === 'close'/, 'watchlist fecha el cierre');
 });
 

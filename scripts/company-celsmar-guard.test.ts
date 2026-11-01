@@ -18,8 +18,8 @@ describe('ficha: cifra grande y métricas compactas', () => {
         for (const label of ['Apertura', 'Máximo', 'Mínimo', 'Cierre anterior']) assert.ok(quote.includes(label));
         assert.match(quote, /value == null \|\| !isValidCurrencyCode\(currency\) \? NA : headerMoney/);
         // Nico (29-oct-2026): el USD de cabecera va en es-ES como el resto de divisas.
-        assert.match(quote, /function headerMoney[\s\S]*?return formatMoney\(value, currency/);
-        assert.match(quote, /return formatMoney\(value, currency\)/);
+        assert.match(quote, /function headerMoney[\s\S]*?return fmt\.formatMoney\(value, currency/);
+        assert.match(quote, /return fmt\.formatMoney\(value, currency\)/);
         assert.match(quote, /divide-gray-800/);
         assert.match(quote, /isValidCurrencyCode\(currency\)/);
     });

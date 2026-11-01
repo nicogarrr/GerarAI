@@ -97,7 +97,7 @@ test('el precio de cierre se rotula con fecha y lleva gráfico técnico', () => 
     assert.match(actions, /const change = dated \? dated\.change : quoteUsable \? quote\?\.d \?\? null : null;/);
     assert.match(actions, /const priceAsOf = quoteLive[\s\S]{0,300}lastClose\?\.date \?\? null;/);
     // Rótulo «Cierre del …» y rango de fechas del sparkline.
-    assert.match(component, /extendedQuoteLabel\(quote\)/);
+    assert.match(component, /extendedQuoteLabel\(quote, locale\)/);
     assert.match(component, /CompanyTechnicalWorkspace snapshot=\{snapshot\}/);
 });
 

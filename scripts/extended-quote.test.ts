@@ -67,10 +67,22 @@ test('date-only closes never claim the daily opening timestamp as a closing hour
     assert.equal(quoteSessionDate(null), 'N/D');
     const ui = readFileSync('components/research/CompanyHeaderQuote.tsx', 'utf8');
     // «Cierre regular» salió de la cabecera con «Más detalle» (Nico, 30-oct-2026).
-    assert.match(ui, /quoteSessionDate\(quote.previous_close_date\)/);
+    assert.match(ui, /quoteSessionDate\(quote.previous_close_date, locale\)/);
 });
 
 test('post-close date and clock use the same timezone even if payload session date differs', () => {
     const timestamp = Date.parse('2026-10-16T23:59:00Z') / 1000;
     assert.equal(extendedQuoteLabel({ ...base, timestamp, session: 'cerrado', trading_date: '2026-10-17' }), 'Último post-cierre · 17 oct, 01:59 CEST');
+});
+
+test('labels follow the chosen language (English)', async () => {
+    // @ts-expect-error explicit extension required by node strip-types.
+    const { quoteSessionDate, quoteDate, quoteTime } = await import('../lib/market/extended-quote.ts');
+    assert.equal(extendedQuoteLabel(base, 'en'), 'After hours · 9 Oct, 00:05 CEST');
+    assert.equal(extendedQuoteLabel({ ...base, session: 'pre', price_session: 'pre' }, 'en'), 'Pre-market · 9 Oct, 00:05 CEST');
+    assert.equal(extendedQuoteLabel({ ...base, session: 'regular', price_session: 'regular', status: 'retrasado' }, 'en'), 'Market open · 9 Oct, 00:05 CEST · Delayed');
+    assert.equal(extendedQuoteLabel(null, 'en'), 'N/A');
+    assert.equal(quoteSessionDate('2026-10-15', 'en'), '15 Oct 2026');
+    assert.equal(quoteTime(null, 'en'), 'N/A');
+    assert.equal(quoteDate(null, 'en'), 'N/A');
 });

@@ -1547,5 +1547,29 @@
     "manager": "gestor",
     "managers": "gestores",
     "footer": "Form 4 y 13F ya sincronizados. El 13F es trimestral, con hasta 45 días de retraso y solo posiciones largas. Este resumen entra en la tesis."
+  },
+  "changesSinceVisit": {
+    "sectionLabel": "Cambios desde tu última visita",
+    "heading": "Desde tu última visita ({date})",
+    "newDocuments_one": "{count} documento nuevo:",
+    "newDocuments_other": "{count} documentos nuevos:",
+    "andMore": " y más",
+    "newFacts_one": "{count} dato financiero nuevo",
+    "newFacts_other": "{count} datos financieros nuevos",
+    "thesis": "Tesis: {text}",
+    "needsReview": " (requiere revisión)",
+    "metricsLabel": "Qué ha cambiado",
+    "source": " · Fuente: {source}",
+    "markRead": "Marcar como leído"
+  },
+  "headerQuote": {
+    "chartClose": "Último cierre del gráfico",
+    "chartLastCandle": "Última vela del gráfico (puede ser parcial)",
+    "loadingPrice": "Cargando precio…",
+    "liveUnavailable": "Cotización en vivo no disponible ahora",
+    "open": "Apertura",
+    "high": "Máximo",
+    "low": "Mínimo",
+    "previousClose": "Cierre anterior"
   }
 }
