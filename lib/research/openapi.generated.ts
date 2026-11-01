@@ -8596,7 +8596,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "ok" | "unavailable" | "unknown_company" | "no_safe_symbol" | "currency_unknown";
+            status: "ok" | "unavailable" | "unknown_company" | "no_safe_symbol" | "currency_unknown" | "failed";
             /** Ticker */
             ticker: string;
         };
@@ -10861,6 +10861,11 @@ export interface components {
             companies: number;
             /** Currency Unknown */
             currency_unknown: number;
+            /**
+             * Failed
+             * @default 0
+             */
+            failed: number;
             provenance: components["schemas"]["ProvenanceOut"];
             /** Results */
             results: components["schemas"]["DividendSyncResultOut"][];

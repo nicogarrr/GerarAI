@@ -5779,7 +5779,8 @@
               "unavailable",
               "unknown_company",
               "no_safe_symbol",
-              "currency_unknown"
+              "currency_unknown",
+              "failed"
             ],
             "title": "Status",
             "type": "string"
@@ -12927,6 +12928,11 @@
           },
           "currency_unknown": {
             "title": "Currency Unknown",
+            "type": "integer"
+          },
+          "failed": {
+            "default": 0,
+            "title": "Failed",
             "type": "integer"
           },
           "provenance": {

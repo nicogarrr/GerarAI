@@ -180,20 +180,51 @@ class ProviderIngestionService:
             "fetched_at": fetched_at.isoformat(),
         }
 
-    async def sync_portfolio(self, db: Session) -> dict[str, Any]:
-        """Ingest every currently held company."""
+    async def sync_each(self, db: Session, tickers: list[str]) -> list[dict[str, Any]]:
+        """``sync_company`` por ticker sin que uno que revienta corte al resto.
+
+        Los fallos del proveedor ya vuelven como «unavailable»; un fallo al
+        GUARDAR (dato raro, restriccion de la BD) salia del bucle y los
+        tickers siguientes se quedaban sin sincronizar ese dia y en cada
+        reintento. Ese ticker se deshace y queda «failed»; lo transitorio (BD
+        o red caidas) relanza para que Dramatiq reintente todo.
+        """
+        from app.workers.dramatiq_app import _is_transient
+
+        results: list[dict[str, Any]] = []
+        for ticker in tickers:
+            try:
+                results.append(await self.sync_company(db, ticker=ticker))
+            except Exception as exc:
+                if _is_transient(exc):
+                    raise
+                db.rollback()
+                results.append({
+                    "ticker": ticker.upper(),
+                    "status": "failed",
+                    "error": redact_secrets(f"{type(exc).__name__}: {exc}")[:300],
+                    "inserted": 0,
+                    "existing": 0,
+                })
+        return results
+
+    def _portfolio_tickers(self, db: Session) -> list[str]:
         company_ids = db.scalars(
             select(Position.company_id)
             .where(*tenant_filters(db, Position))
             .distinct()
         ).all()
-        tickers = list(
+        return list(
             db.scalars(select(Company.ticker).where(Company.id.in_(company_ids))).all()
         ) if company_ids else []
-        results = [await self.sync_company(db, ticker=ticker) for ticker in tickers]
+
+    async def sync_portfolio(self, db: Session) -> dict[str, Any]:
+        """Ingest every currently held company."""
+        results = await self.sync_each(db, self._portfolio_tickers(db))
         ok = sum(1 for r in results if r["status"] == "ok")
-        unavailable = sum(1 for r in results if r["status"] == "unavailable")
-        return {
+        failed = sum(1 for r in results if r["status"] == "failed")
+        unavailable = sum(1 for r in results if r["status"] == "unavailable") + failed
+        summary: dict[str, Any] = {
             "companies": len(results),
             "synced": ok,
             "unavailable": unavailable,
@@ -209,6 +240,9 @@ class ProviderIngestionService:
                 note=self._PROVENANCE_NOTE,
             ),
         }
+        if failed:  # solo si hubo fallos: el contrato de siempre no cambia
+            summary["failed"] = failed
+        return summary
 
 
 class SplitIngestionService(ProviderIngestionService):
