@@ -88,3 +88,43 @@ def test_observaciones_identicas_ultimo_anyo(env):
     # Ultimo fiscal_year (2025), no la media ni otro año.
     assert row["criteria"][0]["left_value"] == "2025.00000000"
     assert row["matched"] is True
+
+
+def test_lectura_calculada_acotada_a_metricas_referenciadas(env):
+    """La ventana solo rankea las metricas que la corrida referencia.
+
+    Una metrica calculada que el criterio no usa no entra en el IN de la
+    subconsulta (antes se rankeaban TODAS las del tenant) y no aparece en
+    ninguna parte del resultado por empresa.
+    """
+    db, company, statements = env
+    db.add(
+        CalculatedMetric(
+            company_id=company.id,
+            metric="metrica_no_usada",
+            value=Decimal("999"),
+            unit="x",
+            period="annual",
+            fiscal_year=2025,
+            status="ok",
+            definition_version="v1",
+            formula="x",
+            source_fact_ids=[],
+            calculation_trace={},
+            confidence=Decimal("0.7"),
+        )
+    )
+    db.commit()
+    result = ScreenerService().run(db, criteria=[{"left": "pe_ratio", "operator": "<", "right": "3000"}])
+    window_reads = [
+        s
+        for s in statements
+        if "row_number()" in s.lower() and "from calculated_metrics" in s.lower()
+    ]
+    assert window_reads, "se esperaba la lectura con ventana de calculated_metrics"
+    for stmt in window_reads:
+        assert "calculated_metrics.metric IN" in stmt, stmt
+        assert "metrica_no_usada" not in stmt or "pe_ratio" in stmt
+    (row,) = [r for r in result["results"] if r["company_id"] == company.id]
+    assert row["matched"] is True
+    assert "metrica_no_usada" not in str(row)
