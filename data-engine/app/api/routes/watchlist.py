@@ -172,6 +172,26 @@ async def watchlist_monitor(
         ).all()}
 
     lows = ranked_prices(MarketPrice.close.asc(), recent=True)
+    # Split efectivo dentro de las 52 semanas: los cierres anteriores estan en
+    # la base vieja (un contrasplit 1:10 dejaba el minimo diez veces abajo).
+    # Solo cuentan los cierres desde el ultimo split; consulta extra solo para
+    # las pocas companias con split en la ventana.
+    from app.services.split_adjustment import split_events_by_company
+
+    for company_id, events in split_events_by_company(db, company_ids).items():
+        recent_splits = [day for day, _ratio in events if cutoff < day <= today]
+        if not recent_splits:
+            continue
+        since = max(recent_splits)
+        counts[company_id] = db.scalar(
+            select(func.count(MarketPrice.id)).where(*valid_price, MarketPrice.company_id == company_id,
+                                                     MarketPrice.date >= since)
+        ) or 0
+        lows[company_id] = db.scalars(
+            select(MarketPrice).where(*valid_price, MarketPrice.company_id == company_id,
+                                      MarketPrice.date >= since)
+            .order_by(MarketPrice.close.asc(), MarketPrice.date.asc()).limit(1)
+        ).first()
     closes = ranked_prices(MarketPrice.date.desc())
     # Valor justo ÚNICO (tesis o motor, misma precedencia que inicio y screener).
     fair_values = resolve_fair_values(db, companies)
