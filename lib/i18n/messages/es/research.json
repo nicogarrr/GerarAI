@@ -1,4 +1,6 @@
 {
+  "sources": "Fuentes",
+  "notAvailable": "fecha no disponible",
   "fichaTerminalEmpty": "Sin datos del terminal financiero todavía: se cargan con los financieros de la empresa.",
   "fichaDirectivaEmpty": "Sin compromisos de la directiva registrados todavía.",
   "fichaSecNoticias": "Noticias",
@@ -167,8 +169,6 @@
   "fichaSatellitesPanel": "Satélites AST",
   "fichaOrbitalSignal": "Ver señal orbital exploratoria",
   "fichaCompanyNews": "Noticias de la empresa",
-  "sources": "Fuentes",
-  "notAvailable": "fecha no disponible",
   "indexMetaTitle": "Índice de research",
   "indexMetaDescription": "Índice de las empresas con research en GerarAI: cobertura de su research, rating de la última tesis y fecha de la última versión.",
   "noRating": "Sin rating",

@@ -1,4 +1,4 @@
 {
-"asOf": "Data as of {date}",
-"noDate": "date unavailable"
+  "asOf": "Data as of {date}",
+  "noDate": "date unavailable"
 }

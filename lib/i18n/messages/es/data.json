@@ -4,5 +4,6 @@
   "records": "registros",
   "actions": "Acciones",
   "yes": "Sí",
-  "no": "No"
+  "no": "No",
+  "moreItems": "+{count} más"
 }

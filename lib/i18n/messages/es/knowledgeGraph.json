@@ -120,7 +120,9 @@
     "nodeFallback": "Nodo {id}",
     "noEdges": "Ninguna relación coincide con el ámbito actual.",
     "confidence": "Confianza {value}",
-    "truncated": "Mostrando 30 de {total} relaciones: filtra para acotar el ámbito."
+    "truncated": "Mostrando 30 de {total} relaciones: filtra para acotar el ámbito.",
+    "edgesCaption": "Relaciones del grafo de conocimiento: nodo de origen, tipo de relación, nodo de destino, confianza y procedencia",
+    "colProvenance": "Procedencia"
   },
   "nodeType": {
     "company": "Empresa",
