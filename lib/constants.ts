@@ -46,21 +46,6 @@ export const SYMBOL_VALIDATION = {
   PATTERN: /^[A-Z0-9.-]+$/, // Solo letras mayúsculas, números, puntos y guiones
 } as const;
 
-// Mensajes de error comunes. En espanol: los de AUTH_* los muestra el usuario
-// en /sign-in y /sign-up a traves de las server actions, y una app es-ES no
-// puede mostrar "Authentication failed" en el formulario de acceso.
-export const ERROR_MESSAGES = {
-  AUTH_FAILED: 'No se pudo iniciar sesión. Revisa tu correo y tu contraseña.',
-  AUTH_UNAVAILABLE: 'El servicio de autenticación no está disponible ahora mismo. Inténtalo de nuevo en unos minutos.',
-  INVALID_SYMBOL: 'Símbolo con formato no válido. Debe tener entre 1 y 10 caracteres y solo letras, números, puntos y guiones.',
-  MISSING_API_KEY: 'Este servicio no está configurado en este servidor.',
-  RATE_LIMIT_EXCEEDED: 'Has superado el límite de peticiones. Inténtalo de nuevo en unos minutos.',
-  DATABASE_ERROR: 'No se pudo conectar con la base de datos. Inténtalo de nuevo.',
-  EXTERNAL_API_ERROR: 'No se pudieron obtener los datos del servicio externo.',
-  NOT_FOUND: 'No se encontró el recurso solicitado.',
-  VALIDATION_ERROR: 'Los datos introducidos no son válidos.',
-} as const;
-
 // Etiquetas en espanol, alineadas con el titulo (H1) de cada pagina.
 //
 // Estructura de ARBOL, no de lista plana con prefijos: `children` crea la
@@ -285,21 +270,21 @@ export const POPULAR_STOCK_SYMBOLS = [
   "PEP", "KO", "NKE", "MCD", "WMT", "BA", "GS", "UBER"
 ] as const;
 
-// Onboarding options
+// Opciones de onboarding (solo el valor: la etiqueta visible sale de *_LABEL_KEYS + t()).
 export const INVESTMENT_GOALS = [
-  { value: "growth", label: "Crecimiento a largo plazo" },
-  { value: "income", label: "Ingresos por dividendos" },
-  { value: "value", label: "Value Investing" },
-  { value: "speculation", label: "Trading especulativo" },
-  { value: "retirement", label: "Ahorro para jubilación" },
-  { value: "education", label: "Aprender a invertir" }
+  { value: "growth" },
+  { value: "income" },
+  { value: "value" },
+  { value: "speculation" },
+  { value: "retirement" },
+  { value: "education" }
 ] as const;
 
 export const RISK_TOLERANCE_OPTIONS = [
-  { value: "conservative", label: "Conservador - Mínimo riesgo" },
-  { value: "moderate", label: "Moderado - Balance riesgo/retorno" },
-  { value: "aggressive", label: "Agresivo - Alto riesgo, alto retorno" },
-  { value: "very_aggressive", label: "Muy agresivo - Máximo potencial" }
+  { value: "conservative" },
+  { value: "moderate" },
+  { value: "aggressive" },
+  { value: "very_aggressive" }
 ] as const;
 
 // Mapas valor -> clave i18n (auth.goals/risk/industries) para las opciones de onboarding.
@@ -333,14 +318,14 @@ export const PREFERRED_INDUSTRY_LABEL_KEYS = {
 } as const;
 
 export const PREFERRED_INDUSTRIES = [
-  { value: "technology", label: "Tecnología" },
-  { value: "healthcare", label: "Salud" },
-  { value: "finance", label: "Finanzas" },
-  { value: "consumer", label: "Consumo" },
-  { value: "energy", label: "Energía" },
-  { value: "industrial", label: "Industrial" },
-  { value: "real_estate", label: "Inmobiliario" },
-  { value: "materials", label: "Materiales" },
-  { value: "utilities", label: "Servicios públicos" },
-  { value: "communication", label: "Comunicación" }
+  { value: "technology" },
+  { value: "healthcare" },
+  { value: "finance" },
+  { value: "consumer" },
+  { value: "energy" },
+  { value: "industrial" },
+  { value: "real_estate" },
+  { value: "materials" },
+  { value: "utilities" },
+  { value: "communication" }
 ] as const;
