@@ -1,5 +1,6 @@
 """One SEC egress quota per IP across sync/async connectors and processes."""
 import asyncio
+import math
 from functools import lru_cache
 
 from app.services.connectors.global_pacing import _CLAIM_SLOT_LUA, GlobalPacer
@@ -75,6 +76,8 @@ def rate_limited(response, *, inline_cap: float = 60.0) -> None:
     if getattr(response, "status_code", None) != 429:
         return
     window = retry_after_seconds(response, cap=float("inf")) or 60.0
+    if not math.isfinite(window) or window <= 0:
+        window = 60.0
     pacer.cool_down(window)
     if window > inline_cap:
         raise SecQuotaDeferred(window)

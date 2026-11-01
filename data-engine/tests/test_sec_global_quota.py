@@ -114,3 +114,15 @@ def test_non_rate_limit_does_not_open_cooldown(monkeypatch):
             pytest.fail('Only a 429 can open quota cooldown')
     monkeypatch.setattr(sec_pacing, 'pacer', NoCooldown())
     sec_pacing.rate_limited(httpx.Response(403, request=httpx.Request('GET', 'https://www.sec.gov/x')))
+
+
+@pytest.mark.parametrize('header', ['inf', 'nan', '-5', 'nonsense'])
+def test_bad_retry_after_has_safe_finite_floor(monkeypatch, header):
+    waits = []
+    class Probe:
+        def reset(self): pass
+        def cool_down(self, seconds): waits.append(seconds)
+    monkeypatch.setattr(sec_pacing, 'pacer', Probe())
+    sec_pacing.rate_limited(httpx.Response(429, headers={'Retry-After': header},
+                           request=httpx.Request('GET','https://www.sec.gov/x')))
+    assert waits == [60.0]
