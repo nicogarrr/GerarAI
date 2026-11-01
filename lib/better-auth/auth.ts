@@ -33,6 +33,7 @@ import {
 } from "@/lib/auth/account-approval";
 import { AccountApproval } from "@/database/models/account-approval.model";
 import { notifyPendingAccount } from "@/lib/auth/approval-notify";
+import { profileInputProblem } from "@/lib/auth/profile-input";
 
 
 // Politica de alta compartida con las paginas de acceso (ver
@@ -98,6 +99,17 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
                     throw new APIError(403, {
                         message: SIGNUP_NOT_INVITED_MESSAGE,
                         code: SIGNUP_NOT_INVITED_CODE,
+                    });
+                }
+            }
+            // Nombre y perfil: sin saltos de línea ni tamaños absurdos (un
+            // nombre con saltos colaba un «Aprobar:» falso en el correo a Nico).
+            if (ctx.path === '/sign-up/email' || ctx.path === '/update-user') {
+                const field = profileInputProblem(ctx.body);
+                if (field) {
+                    throw new APIError(400, {
+                        message: `Invalid value for ${field}`,
+                        code: 'INVALID_PROFILE_INPUT',
                     });
                 }
                 return;
