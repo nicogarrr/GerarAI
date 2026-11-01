@@ -3,10 +3,12 @@ import Link from 'next/link';
 import { Panel } from '@/components/ui/panel';
 import type { CompanyHoldingContext } from '@/lib/actions/portfolio.actions';
 import { addTransactionHref } from '@/lib/portfolio/add-dialog-link';
-import { formatDate, formatMoney, formatNumber, formatPercent, formatPrice, isValidCurrencyCode } from '@/lib/format';
+import { createFormatters, isValidCurrencyCode, type Formatters } from '@/lib/format';
+import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locale';
+import { createTranslator } from '@/lib/i18n/translate';
 
-const money = (value: number | null, currency: string) =>
-    value === null || !isValidCurrencyCode(currency) ? null : formatMoney(value, currency, { signDisplay: 'auto' });
+const money = (fmt: Formatters, value: number | null, currency: string) =>
+    value === null || !isValidCurrencyCode(currency) ? null : fmt.formatMoney(value, currency, { signDisplay: 'auto' });
 
 /**
  * La posición real (IBKR o manual) dentro de la ficha: la tesis y la decisión
@@ -14,12 +16,16 @@ const money = (value: number | null, currency: string) =>
  * (coste en revisión, valoración en suspensión, divisa sin tipo de cambio);
  * nada se rellena con ceros.
  */
-export function CompanyPositionPanel({ context }: { context: CompanyHoldingContext | null }) {
+export function CompanyPositionPanel({ context, locale = DEFAULT_LOCALE }: { context: CompanyHoldingContext | null; locale?: Locale }) {
     if (context === null || context.status === 'not_held') return null;
+    const t = createTranslator(locale);
+    const fmt = createFormatters(locale);
+    const { formatDate, formatNumber, formatPercent, formatPrice } = fmt;
+    const NA = fmt.na;
     if (context.status === 'error') {
-        return <Panel density="compact" title="Tu posición">
-            <p className="text-sm text-amber-200" role="status">{context.message} Consulta la cartera para ver el detalle.</p>
-            <Link className="mt-2 inline-flex min-h-11 items-center text-sm text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href="/portfolio">Ir a la cartera</Link>
+        return <Panel density="compact" title={t('research.positionPanel.title')}>
+            <p className="text-sm text-amber-200" role="status">{context.message} {t('research.positionPanel.errorHint')}</p>
+            <Link className="mt-2 inline-flex min-h-11 items-center text-sm text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href="/portfolio">{t('research.positionPanel.goToPortfolio')}</Link>
         </Panel>;
     }
     const { holding, weightPercent, positionsAsOf } = context;
@@ -31,36 +37,36 @@ export function CompanyPositionPanel({ context }: { context: CompanyHoldingConte
     // compra, el coste medio sigue siendo conocido y no se rotula «desconocido».
     const nativeCostKnown = !holding.costReviewMessage && holding.avgPrice > 0;
     const costKnown = nativeCostKnown && holding.cost > 0;
-    const value = valueKnown ? money(holding.value, base) : null;
-    const gain = valueKnown && costKnown && !holding.quoteMissing ? money(holding.gain, base) : null;
-    const nativeGain = nativeCostKnown && !holding.valuationHold && !holding.quoteMissing && native !== base ? money(holding.nativeGain, native) : null;
+    const value = valueKnown ? money(fmt, holding.value, base) : null;
+    const gain = valueKnown && costKnown && !holding.quoteMissing ? money(fmt, holding.gain, base) : null;
+    const nativeGain = nativeCostKnown && !holding.valuationHold && !holding.quoteMissing && native !== base ? money(fmt, holding.nativeGain, native) : null;
     const asOf = positionsAsOf ? formatDate(positionsAsOf) : null;
-    return <Panel density="compact" description={asOf ? `Datos de tu cartera a ${asOf}.` : 'Datos de tu cartera.'} title="Tu posición">
+    return <Panel density="compact" description={asOf ? t('research.positionPanel.asOf', { date: asOf }) : t('research.positionPanel.noDate')} title={t('research.positionPanel.title')}>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
-            <div><dt className="text-gray-500">Acciones</dt><dd className="font-semibold text-gray-100">{formatNumber(holding.quantity, { maximumFractionDigits: 6 })}</dd></div>
-            <div><dt className="text-gray-500">Coste medio</dt><dd className="font-semibold text-gray-100">
-                {holding.costReviewMessage ? 'En revisión' : !nativeCostKnown ? 'N/D' : isValidCurrencyCode(native) ? formatPrice(holding.avgPrice, native) : formatNumber(holding.avgPrice)}
+            <div><dt className="text-gray-500">{t('research.positionPanel.shares')}</dt><dd className="font-semibold text-gray-100">{formatNumber(holding.quantity, { maximumFractionDigits: 6 })}</dd></div>
+            <div><dt className="text-gray-500">{t('research.positionPanel.avgCost')}</dt><dd className="font-semibold text-gray-100">
+                {holding.costReviewMessage ? t('research.positionPanel.inReview') : !nativeCostKnown ? NA : isValidCurrencyCode(native) ? formatPrice(holding.avgPrice, native) : formatNumber(holding.avgPrice)}
             </dd></div>
-            <div><dt className="text-gray-500">Valor</dt><dd className="font-semibold text-gray-100">{value ?? 'N/D'}</dd></div>
-            <div><dt className="text-gray-500">Plusvalía latente</dt><dd className={`font-semibold ${gain === null ? 'text-gray-100' : holding.gain > 0 ? 'text-emerald-300' : holding.gain < 0 ? 'text-red-300' : 'text-gray-100'}`}>
-                {gain ? `${gain} (${formatPercent(holding.gainPercent, { fromRatio: false, signDisplay: 'always' })})` : 'N/D'}
-            </dd>{nativeGain ? <dd className="text-xs text-gray-400">{nativeGain} en {native}</dd> : null}</div>
-            <div><dt className="text-gray-500">Peso</dt><dd className="font-semibold text-gray-100">{weightPercent === null ? 'N/D' : formatPercent(weightPercent, { fromRatio: false })}</dd>
-                {weightPercent !== null ? <dd className="text-xs text-gray-400">de las posiciones con valor</dd> : null}</div>
-            {holding.firstBuyDate ? <div><dt className="text-gray-500">Primera compra</dt><dd className="font-semibold text-gray-100">{formatDate(holding.firstBuyDate)}</dd></div> : null}
+            <div><dt className="text-gray-500">{t('research.positionPanel.value')}</dt><dd className="font-semibold text-gray-100">{value ?? NA}</dd></div>
+            <div><dt className="text-gray-500">{t('research.positionPanel.unrealizedGain')}</dt><dd className={`font-semibold ${gain === null ? 'text-gray-100' : holding.gain > 0 ? 'text-emerald-300' : holding.gain < 0 ? 'text-red-300' : 'text-gray-100'}`}>
+                {gain ? `${gain} (${formatPercent(holding.gainPercent, { fromRatio: false, signDisplay: 'always' })})` : NA}
+            </dd>{nativeGain ? <dd className="text-xs text-gray-400">{t('research.positionPanel.nativeGain', { amount: nativeGain, currency: native })}</dd> : null}</div>
+            <div><dt className="text-gray-500">{t('research.positionPanel.weight')}</dt><dd className="font-semibold text-gray-100">{weightPercent === null ? NA : formatPercent(weightPercent, { fromRatio: false })}</dd>
+                {weightPercent !== null ? <dd className="text-xs text-gray-400">{t('research.positionPanel.weightNote')}</dd> : null}</div>
+            {holding.firstBuyDate ? <div><dt className="text-gray-500">{t('research.positionPanel.firstBuy')}</dt><dd className="font-semibold text-gray-100">{formatDate(holding.firstBuyDate)}</dd></div> : null}
         </dl>
-        {holding.valuationHold ? <p className="mt-3 text-xs text-amber-200" role="status">Valoración en suspensión: {holding.valuationHold.reason}</p> : null}
-        {holding.quoteMissing && !holding.valuationHold ? <p className="mt-3 text-xs text-amber-200" role="status">Sin cotización real: el valor usa el precio de tu última operación. La plusvalía no se puede calcular hasta tener una cotización.</p> : null}
-        {!holding.valuationHold && holding.valueMissing ? <p className="mt-3 text-xs text-amber-200" role="status">Sin valor en {base}: falta el precio o el tipo de cambio.</p> : null}
-        {!nativeCostKnown && !holding.costReviewMessage ? <p className="mt-3 text-xs text-amber-200" role="status">Coste de adquisición desconocido. No se puede calcular la plusvalía.</p> : null}
-        {nativeCostKnown && !costKnown ? <p className="mt-3 text-xs text-amber-200" role="status">Sin coste en {base}: falta el tipo de cambio de alguna compra. No se puede calcular la plusvalía en {base}.</p> : null}
+        {holding.valuationHold ? <p className="mt-3 text-xs text-amber-200" role="status">{t('research.positionPanel.valuationHold', { reason: holding.valuationHold.reason })}</p> : null}
+        {holding.quoteMissing && !holding.valuationHold ? <p className="mt-3 text-xs text-amber-200" role="status">{t('research.positionPanel.noQuote')}</p> : null}
+        {!holding.valuationHold && holding.valueMissing ? <p className="mt-3 text-xs text-amber-200" role="status">{t('research.positionPanel.noValue', { currency: base })}</p> : null}
+        {!nativeCostKnown && !holding.costReviewMessage ? <p className="mt-3 text-xs text-amber-200" role="status">{t('research.positionPanel.costUnknown')}</p> : null}
+        {nativeCostKnown && !costKnown ? <p className="mt-3 text-xs text-amber-200" role="status">{t('research.positionPanel.noBaseCost', { currency: base })}</p> : null}
         {holding.costReviewMessage ? <p className="mt-3 text-xs text-amber-200" role="status">{holding.costReviewMessage}</p> : null}
         {/* Comprar más o vender desde la ficha abre el alta con el símbolo ya
             elegido; antes había que ir a Cartera, abrir «Añadir inversión» y
             volver a buscar la empresa. */}
         <div className="mt-2 flex flex-wrap gap-x-6">
-            <Link className="inline-flex min-h-11 items-center text-sm text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={addTransactionHref(holding.symbol)}>Registrar compra o venta</Link>
-            <Link className="inline-flex min-h-11 items-center text-sm text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href="/portfolio">Ver en la cartera</Link>
+            <Link className="inline-flex min-h-11 items-center text-sm text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={addTransactionHref(holding.symbol)}>{t('research.positionPanel.recordTrade')}</Link>
+            <Link className="inline-flex min-h-11 items-center text-sm text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href="/portfolio">{t('research.positionPanel.viewInPortfolio')}</Link>
         </div>
     </Panel>;
 }

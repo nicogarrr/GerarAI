@@ -1098,7 +1098,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               estado, ya presente en el chip «Modelo» de la cabecera (enlazado
               a la vista Modelo con el contenido completo). Redundante: se
               retira del overview; motor, datos y vista Modelo intactos. */}
-          <CompanyPositionPanel context={holdingContext} />
+          <CompanyPositionPanel context={holdingContext} locale={locale} />
         </div>
         <Panel collapsible="mobile"
           actions={

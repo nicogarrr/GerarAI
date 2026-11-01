@@ -133,5 +133,21 @@
     "ruleMatched": "The rule \"{title}\" matched for {company}.",
     "fallback": "Alert for {company}: {title}.",
     "fallbackNoDetail": "no details available"
+  },
+  "quick": {
+    "button": "Price alert",
+    "buttonShort": "Alert",
+    "typeLabel": "Alert type",
+    "targetPrice": "Target price",
+    "targetChange": "Target change %",
+    "invalidChange": "Enter a valid target change",
+    "invalidPrice": "Enter a valid target price",
+    "createdValue": "Alert created: {ticker} {label} {value}",
+    "createdSimple": "Alert created: {ticker} · {label}",
+    "duplicate": "You already have this alert set up.",
+    "changeAria": "Target change in percent",
+    "priceAria": "Target price in {currency}",
+    "create": "+ Alert",
+    "viewAlerts": "View alerts"
   }
 }
