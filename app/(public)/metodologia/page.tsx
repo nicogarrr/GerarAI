@@ -430,7 +430,7 @@ export default async function MetodologiaPage() {
       {/* Atribución de licencia de lightweight-charts (Apache 2.0): la doc pide
           el aviso de la NOTICE y el enlace en una página pública; va aquí, donde
           menos se ve, por decisión de producto (1 nov 2026). */}
-      <p className="text-xs text-gray-600">
+      <p className="text-xs text-gray-500">
         {t('landing.metodologia.chartsAttribution')}{' '}
         <a className="underline underline-offset-2 hover:text-teal-400" href="https://www.tradingview.com/" rel="noreferrer" target="_blank">
           TradingView
