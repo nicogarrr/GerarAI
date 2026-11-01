@@ -700,7 +700,7 @@ def _withholding_answer(db: Session, tenant: int, year: int | None, only: set[st
             bucket = rows.setdefault(key, [Decimal("0"), Decimal("0")])
             bucket[0] += Decimal(str(item.get("withholding_native") or 0))
             bucket[1] += Decimal(str(item.get("dividends_native") or 0))
-    sources = [_source("tax_report", None, "Impuestos", "/tax")]
+    sources = [_source("tax_report", None, "Impuestos", "/taxes")]
     names = ", ".join(sorted(only))
     if not rows:
         what = names or (str(year) if year is not None else "")
@@ -1047,6 +1047,49 @@ def _saved_screens_answer(db: Session, tenant: int) -> ChatResponse:
     return _response("\n".join(lines), sources, "account_saved_screens")
 
 
+_DOCS = re.compile(
+    r"\b(?:que|cuantos)\s+documentos\s+tengo\b(?!\s+que)|\bmis\s+documentos\b"
+    r"|\bdocumentos\s+(?:que\s+tengo\s+)?(?:en\s+(?:la|mi)\s+biblioteca|guardados|subidos)\b|\bque\s+hay\s+en\s+mi\s+biblioteca\b"
+    r"|\bmy\s+(?:documents|library)\b|\bwhat\s+documents\s+do\s+i\s+have\b"
+)
+
+
+def _asks_documents(text: str, question: str) -> bool:
+    return bool(_DOCS.search(text) and not _tickers_in(question)
+                and not re.search(r"\b(?:necesito|hacienda|para\s+declarar|need)\b", text))
+
+
+def _documents_answer(db: Session, tenant: int) -> ChatResponse:
+    from sqlalchemy import func
+
+    from app.models import KnowledgeDocument
+
+    english = _english()
+    ready = (KnowledgeDocument.tenant_id == tenant, KnowledgeDocument.status != "failed")
+    by_type = db.execute(select(KnowledgeDocument.document_type, func.count()).where(*ready)
+                         .group_by(KnowledgeDocument.document_type)).all()
+    sources = [_source("knowledge_document", None, "Biblioteca", "/knowledge")]
+    total = sum(int(n) for _, n in by_type)
+    if not total:
+        return _response("You have no documents in the library. You can upload them in Library." if english else
+                         "No tienes documentos en la biblioteca. Puedes subirlos en Biblioteca.",
+                         sources, "account_documents")
+    kinds = ", ".join(f"{kind or '?'} {n}" for kind, n in sorted(by_type, key=lambda row: str(row[0])))
+    latest = db.scalars(select(KnowledgeDocument).where(*ready)
+                        .order_by(KnowledgeDocument.publication_date.desc().nulls_last(),
+                                  KnowledgeDocument.id.desc()).limit(8)).all()
+    noun = ("document" if total == 1 else "documents") if english else ("documento" if total == 1 else "documentos")
+    lines = [f"You have {total} {noun} in the library ({kinds}). Latest:" if english else
+             f"Tienes {total} {noun} en la biblioteca ({kinds}). Los últimos:"]
+    for doc in latest:
+        bits = [b for b in (doc.ticker, (_date_en(doc.publication_date) if english else fecha_es(doc.publication_date))
+                            if doc.publication_date else None) if b]
+        lines.append(f"- «{doc.title}»" + (f" ({', '.join(bits)})" if bits else ""))
+    lines.append("To open them or upload more, go to Library." if english
+                 else "Para abrirlos o subir más, ve a Biblioteca.")
+    return _response("\n".join(lines), sources, "account_documents")
+
+
 def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     """Respuesta de datos de la cuenta, o None si la pregunta no es de este módulo."""
     tenant = _tenant(db)
@@ -1059,6 +1102,8 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
         return _history_answer(db, tenant, text)
     if _asks_sell_all_tax(text, question):
         return _sell_all_answer(db, tenant)
+    if _asks_documents(text, question):
+        return _documents_answer(db, tenant)
     if _asks_saved_screens(text, question):
         return _saved_screens_answer(db, tenant)
     if _asks_alert_rules(text, question):
