@@ -12,6 +12,7 @@
  */
 
 import { researchRequest } from '@/lib/research/client';
+import { getGrade } from '@/lib/utils/advancedStockScoring';
 import { moatChecksToScore, MOAT_V2_MAX_CHECKS } from '@/lib/propicks/moat-scale';
 import { PROPICKS_SCORING_WEIGHTS } from '@/lib/utils/propicksValidation';
 import type { ConfidenceReason, ProPick } from '@/lib/actions/proPicks.actions';
@@ -89,21 +90,6 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 const pct = (ratio: number) => round1(ratio * 100);
 /** Cifras de los motivos en formato es-ES (coma decimal), igual que el resto de la UI. */
 const esNum = (n: number) => new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 }).format(n);
-
-/** Bandas identicas a lib/utils/advancedStockScoring.ts getGrade (no exportada). */
-function gradeFor(score: number): string {
-  if (score >= 95) return 'A+';
-  if (score >= 90) return 'A';
-  if (score >= 85) return 'A-';
-  if (score >= 80) return 'B+';
-  if (score >= 75) return 'B';
-  if (score >= 70) return 'B-';
-  if (score >= 65) return 'C+';
-  if (score >= 60) return 'C';
-  if (score >= 55) return 'C-';
-  if (score >= 50) return 'D';
-  return 'F';
-}
 
 /**
  * Mapeo honesto candidato del embudo -> ProPick.
@@ -228,7 +214,7 @@ function funnelCandidateToProPick(c: FunnelCandidate, runAsOf: string): ProPick 
     symbol: c.ticker,
     company: c.name,
     score,
-    grade: gradeFor(score),
+    grade: getGrade(score),
     categoryScores,
     reasons: topReasons.map((r) => r.text),
     confidenceReasons: topReasons,

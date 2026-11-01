@@ -593,7 +593,7 @@ export async function calculateAdvancedStockScore(
     };
 }
 
-function getGrade(score: number): 'A+' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C+' | 'C' | 'C-' | 'D' | 'F' {
+export function getGrade(score: number): 'A+' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C+' | 'C' | 'C-' | 'D' | 'F' {
     if (score >= 95) return 'A+';
     if (score >= 90) return 'A';
     if (score >= 85) return 'A-';
