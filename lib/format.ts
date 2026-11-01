@@ -68,7 +68,8 @@ export type LocalizedNumberError = 'empty' | 'invalid' | 'ambiguous';
 
 const INT_PLAIN = /^\d+$/;
 // Miles es-ES estrictos: grupos de 3 tras el primero («1.234», «12.345.678»).
-const INT_GROUPS_ES = /^\d{1,3}(?:\.\d{3})+$/;
+// El primer grupo nunca es «0»: «0.125» es 0,125 y no 125 (factor 1000).
+const INT_GROUPS_ES = /^[1-9]\d{0,2}(?:\.\d{3})+$/;
 
 /**
  * Parsea números escritos por el usuario en formato es-ES sin adivinar.
@@ -109,7 +110,7 @@ export function parseLocalizedNumberDetailed(
     // («1,234», «1,234.56») y el punto es el decimal («32.5», «.5», «5.»).
     // Misma regla de honestidad que en es-ES: lo ambiguo se rechaza («32,5»,
     // «1.234,56», «1.234.567»), nunca se reinterpreta.
-    const match = /^(\d{1,3}(?:,\d{3})*|\d+)?(?:\.(\d*))?$/.exec(body);
+    const match = /^([1-9]\d{0,2}(?:,\d{3})+|\d+)?(?:\.(\d*))?$/.exec(body);
     if (match && (match[1] !== undefined || (match[2] ?? '') !== '')) {
       const intPart = (match[1] ?? '').replace(/,/g, '');
       const decPart = match[2] ?? '';

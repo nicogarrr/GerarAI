@@ -21,9 +21,11 @@ export type ParseResult = { ok: true; value: number } | { ok: false; error: Loca
 
 const INT_PLAIN = /^\d+$/;
 // Miles es-ES estrictos: grupos de 3 tras el primero («1.234», «12.345.678»).
-const INT_GROUPS_ES = /^\d{1,3}(?:\.\d{3})+$/;
+// El primer grupo de miles nunca empieza por 0: «0.125» (es) y «0,125» (en)
+// no son 125, como ya dice la cabecera (antes salía 125: factor 1000).
+const INT_GROUPS_ES = /^[1-9]\d{0,2}(?:\.\d{3})+$/;
 // Miles en-US estrictos: grupos de 3 tras el primero («1,234», «12,345,678»).
-const INT_GROUPS_EN = /^\d{1,3}(?:,\d{3})+$/;
+const INT_GROUPS_EN = /^[1-9]\d{0,2}(?:,\d{3})+$/;
 
 /** ¿El locale trabaja en inglés? Acepta «en», «en-US», «en-GB»... */
 export function isEnglishLocale(locale: string): boolean {
