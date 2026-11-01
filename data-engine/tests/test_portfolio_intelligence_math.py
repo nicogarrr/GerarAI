@@ -539,3 +539,29 @@ def test_xirr_unknown_position_value_is_not_zero(db, monkeypatch):
     assert result is None
     assert trace["status"] == "incomplete_missing_fx"
     assert trace["missing_fx"][0]["kind"] == "position"
+
+
+def test_xirr_gbp_subunit_position_value_in_pounds(db, monkeypatch):
+    """Posición en GBp (peniques) con base GBP: el valor final del XIRR va en libras.
+
+    Sin la conversión, market_value en peniques (425.500) se tomaba por libras:
+    el valor final se inflaba x100 y la rentabilidad salía ~+10.400 %.
+    """
+    from app.services.portfolio_fx_service import PortfolioFXService
+
+    today = _freeze_today(monkeypatch)
+    company = _company(db)
+    fx = PortfolioFXService()
+    portfolio = fx.ensure_portfolio(db)
+    portfolio.base_currency = "GBP"
+    db.add(Transaction(portfolio_id=portfolio.id, company_id=company.id,
+                       trade_date=today - timedelta(days=365), action="buy",
+                       quantity=1, price=4000, currency="GBP"))
+    position = Position(portfolio_id=portfolio.id, company_id=company.id,
+                        quantity=1, currency="GBp", market_value_base=None,
+                        market_value=425500, as_of=today)
+    db.add(position)
+    db.commit()
+    result, trace = PortfolioIntelligenceService()._xirr(db, [(position, company)])
+    assert trace["status"] == "calculated"
+    assert result == pytest.approx(0.06375, abs=1e-4)
