@@ -131,5 +131,42 @@
     "longCall": "Call comprada",
     "longPut": "Put comprada",
     "formula": "Call: max(precio - ejercicio, 0) - prima. Put: max(ejercicio - precio, 0) - prima. Antes del vencimiento el precio de la opción también depende del tiempo y la volatilidad."
+  },
+  "views": {
+    "aria": "Contenido del inversor",
+    "posiciones": "Cartera",
+    "distribucion": "Distribución",
+    "cambios": "Últimos movimientos",
+    "cartas": "Cartas",
+    "videos": "Vídeos"
+  },
+  "portfolio": {
+    "aria": "Cartera declarada",
+    "positionsOne": "{count} posición documentada",
+    "positionsMany": "{count} posiciones documentadas",
+    "noMovements": "Sin movimientos documentados",
+    "sharesChange": "Acciones · variación",
+    "sharesAfter": "Acciones después",
+    "price": "Precio",
+    "value": "Valor",
+    "weight": "Peso en cartera",
+    "shares": "Acciones",
+    "ownership": "Participación en emisor"
+  },
+  "publicProfile": {
+    "start": "Inicio {date}",
+    "facts": "Cifras publicadas",
+    "official": "Oficial",
+    "press": "Prensa",
+    "inferred": "Inferido",
+    "holdings": "Cartera",
+    "meetings": "Reuniones anuales",
+    "sources": "Fuentes:"
+  },
+  "detail": {
+    "metaTitle": "Inversores · {name}",
+    "notFound": "Inversor no encontrado",
+    "photo": "Foto:",
+    "via": "vía"
   }
 }

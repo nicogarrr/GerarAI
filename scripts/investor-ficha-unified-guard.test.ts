@@ -80,5 +80,5 @@ test('Munger: enlaces del perfil público no son cartas propias', async () => {
     assert.doesNotMatch(sections[0], /Comunicado de Berkshire|Todas las cartas de Berkshire|2023ltr.pdf/);
     assert.match(sections[1], /Fuentes sobre el inversor/);
     for (const source of publicLetters) assert.ok(sections[1].includes(source.url), source.title);
-    assert.match(read('app/(root)/inversores/_components/PublicProfile.tsx'), />Fuentes sobre el inversor<\/h2>/);
+    assert.match(read('app/(root)/inversores/_components/PublicProfile.tsx'), />\{t\('investors\.investorLetters\.publicSources'\)\}<\/h2>/);
 });

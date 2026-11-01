@@ -3,7 +3,9 @@ import type {
   InvestorPortfolio,
 } from "@/lib/actions/investors.actions";
 import { ownershipLimitations } from "@/lib/research/ownership-display";
-import { formatMarketCapUsd, formatNumber, formatPercent, NA } from "@/lib/format";
+import { createFormatters } from "@/lib/format";
+import type { Locale } from "@/lib/i18n/locale";
+import { getLocale, getT } from "@/lib/i18n/server";
 import { Pagination, paginate } from "./Pagination";
 import { periodLabel } from "./format";
 
@@ -23,13 +25,33 @@ const ACTIONS: Record<string, string> = {
   retencion: "Retención",
 };
 
+const ACTIONS_EN: Record<string, string> = {
+  compra: "Buy",
+  venta: "Sell",
+  nueva: "New",
+  cerrada: "Closed",
+  aumento: "Increased",
+  reduccion: "Reduced",
+  donacion: "Gift",
+  alta: "Added",
+  otro: "Other",
+  sin_datos: "Unavailable",
+  concesion: "Grant",
+  ejercicio: "Exercise",
+  retencion: "Tax withholding",
+};
+
 export function Datum({
   datum,
   kind = "number",
+  locale = "es",
 }: {
   datum: InvestorDatum;
   kind?: "number" | "usd" | "percent";
+  locale?: Locale;
 }) {
+  const fmt = createFormatters(locale);
+  const NA = fmt.na;
   // Fail closed even if a malformed payload claims OFICIAL without a dated source.
   const available =
     datum.value !== null &&
@@ -42,16 +64,16 @@ export function Datum({
   const text = !available
     ? NA
     : kind === "usd"
-      ? formatMarketCapUsd(datum.value)
+      ? fmt.formatMarketCapUsd(datum.value)
       : kind === "percent"
-        ? formatPercent(datum.value, { fromRatio: false })
-        : formatNumber(datum.value);
+        ? fmt.formatPercent(datum.value, { fromRatio: false })
+        : fmt.formatNumber(datum.value);
   return (
     <span className="flex flex-col gap-1">
       <span className="font-medium text-gray-100">{text}</span>
       {available ? (
         <span className="text-xs text-gray-500">
-          {periodLabel(datum.as_of)}
+          {periodLabel(datum.as_of, locale)}
         </span>
       ) : null}
     </span>
@@ -95,7 +117,7 @@ function derivedWeight(
   return declared;
 }
 
-export function Portfolio({
+export async function Portfolio({
   portfolio,
   view,
   pagina,
@@ -104,30 +126,32 @@ export function Portfolio({
   view: string;
   pagina?: string;
 }) {
+  const t = await getT();
+  const locale = await getLocale();
+  const actions = locale === "en" ? ACTIONS_EN : ACTIONS;
   const positions = paginate(portfolio.positions, pagina, 20);
   const movements = paginate(portfolio.movements, pagina, 20);
   const paged = view === "cambios" ? movements : positions;
   return (
-    <section aria-label="Cartera declarada" className="flex flex-col gap-6">
+    <section aria-label={t('investors.portfolio.aria')} className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <Datum datum={portfolio.total_value_usd} kind="usd" />
+        <Datum datum={portfolio.total_value_usd} kind="usd" locale={locale} />
         <span className="text-sm text-gray-500">
-          {portfolio.positions.length}{" "}
           {portfolio.positions.length === 1
-            ? "posición documentada"
-            : "posiciones documentadas"}
-          {portfolio.as_of ? ` · ${periodLabel(portfolio.as_of)}` : ""}
+            ? t('investors.portfolio.positionsOne', { count: 1 })
+            : t('investors.portfolio.positionsMany', { count: portfolio.positions.length })}
+          {portfolio.as_of ? ` · ${periodLabel(portfolio.as_of, locale)}` : ""}
         </span>
       </div>
       {portfolio.coverage === "partial" ? (
         <p role="status" className="text-sm text-amber-300">
-          Datos parciales
+          {t('investors.hub.partial')}
         </p>
       ) : null}
       {paged.items.length === 0 ? (
         <p className="text-sm text-gray-500">
-          {NA}
-          {view === "cambios" ? " · Sin movimientos documentados" : ""}
+          {createFormatters(locale).na}
+          {view === "cambios" ? ` · ${t('investors.portfolio.noMovements')}` : ""}
         </p>
       ) : view === "cambios" ? (
         <ul className="divide-y divide-gray-800">
@@ -139,23 +163,23 @@ export function Portfolio({
               <div className="flex flex-wrap justify-between gap-2">
                 <h3 className="text-sm text-gray-100">{row.issuer}</h3>
                 <span className="text-sm text-gray-400">
-                  {ACTIONS[row.action] ?? "Otro"} · {periodLabel(row.date)}
+                  {actions[row.action] ?? actions.otro} · {periodLabel(row.date, locale)}
                 </span>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
                   <p className="mb-1 text-xs text-gray-500">
-                    Acciones · variación
+                    {t('investors.portfolio.sharesChange')}
                   </p>
-                  <Datum datum={row.shares} />
+                  <Datum datum={row.shares} locale={locale} />
                 </div>
                 <div>
-                  <p className="mb-1 text-xs text-gray-500">Acciones después</p>
-                  <Datum datum={row.shares_after} />
+                  <p className="mb-1 text-xs text-gray-500">{t('investors.portfolio.sharesAfter')}</p>
+                  <Datum datum={row.shares_after} locale={locale} />
                 </div>
                 <div>
-                  <p className="mb-1 text-xs text-gray-500">Precio</p>
-                  <Datum datum={row.price_usd} kind="usd" />
+                  <p className="mb-1 text-xs text-gray-500">{t('investors.portfolio.price')}</p>
+                  <Datum datum={row.price_usd} kind="usd" locale={locale} />
                 </div>
               </div>
               {row.note ? (
@@ -184,22 +208,22 @@ export function Portfolio({
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <p className="mb-1 text-xs text-gray-500">Valor</p>
-                  <Datum datum={row.value_usd} kind="usd" />
+                  <p className="mb-1 text-xs text-gray-500">{t('investors.portfolio.value')}</p>
+                  <Datum datum={row.value_usd} kind="usd" locale={locale} />
                 </div>
                 <div>
-                  <p className="mb-1 text-xs text-gray-500">Peso en cartera</p>
-                  <Datum datum={weight} kind="percent" />
+                  <p className="mb-1 text-xs text-gray-500">{t('investors.portfolio.weight')}</p>
+                  <Datum datum={weight} kind="percent" locale={locale} />
                 </div>
                 <div>
-                  <p className="mb-1 text-xs text-gray-500">Acciones</p>
-                  <Datum datum={row.shares} />
+                  <p className="mb-1 text-xs text-gray-500">{t('investors.portfolio.shares')}</p>
+                  <Datum datum={row.shares} locale={locale} />
                 </div>
                 <div>
                   <p className="mb-1 text-xs text-gray-500">
-                    Participación en emisor
+                    {t('investors.portfolio.ownership')}
                   </p>
-                  <Datum datum={row.ownership_pct} kind="percent" />
+                  <Datum datum={row.ownership_pct} kind="percent" locale={locale} />
                 </div>
               </div>
               {view === "distribucion" &&
