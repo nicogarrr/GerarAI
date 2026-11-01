@@ -616,3 +616,46 @@ class PortfolioLedgerService:
         )
         db.flush()
         return position
+
+
+def trade_price_fallbacks(db: Session, positions: list[Position]) -> set[int]:
+    """Posiciones del ledger cuyo «precio de mercado» es el de una de sus operaciones.
+
+    Sin cotización guardada, rebuild_position valora con el precio de la última
+    compra/venta: con una sola compra la plusvalía sale exactamente 0, un dato
+    que parece real y no lo es (auditoría A3). Señal sin columna nueva: fuente
+    ledger, precio igual al de alguna operación y ninguna cotización
+    (MarketPrice) desde la última con ese precio. Un precio manual idéntico al de compra cae
+    aquí también; rotularlo «sin cotización real» es inocuo.
+    """
+    candidates = {
+        position.company_id: position
+        for position in positions
+        if position.source == "postgres_ledger" and not position.valuation_hold_reason
+    }
+    if not candidates:
+        return set()
+    # Última operación con el precio guardado: el rebuild anterior conservaba el
+    # de la PRIMERA operación como si fuera cotización, no solo el de la última.
+    matching_trade: dict[int, Transaction] = {}
+    for transaction in db.scalars(
+        select(Transaction)
+        .where(
+            *tenant_filters(db, Transaction),
+            Transaction.company_id.in_(candidates),
+            Transaction.action.in_(["buy", "sell"]),
+        )
+        .order_by(Transaction.trade_date, Transaction.created_at, Transaction.id)
+    ):
+        if candidates[transaction.company_id].market_price == transaction.price:
+            matching_trade[transaction.company_id] = transaction
+    fallbacks: set[int] = set()
+    for company_id, transaction in matching_trade.items():
+        quoted = db.scalar(
+            select(MarketPrice.id)
+            .where(MarketPrice.company_id == company_id, MarketPrice.date >= transaction.trade_date)
+            .limit(1)
+        )
+        if quoted is None:
+            fallbacks.add(company_id)
+    return fallbacks
