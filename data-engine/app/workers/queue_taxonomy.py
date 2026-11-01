@@ -115,6 +115,7 @@ ACTOR_CLASS: dict[str, str] = {
     "dispatch_insider_alerts": MANTENIMIENTO,
     "dispatch_macro_reminders": MANTENIMIENTO,
     "dispatch_source_health_watchdog": MANTENIMIENTO,
+    "dispatch_queue_watchdog": MANTENIMIENTO,
     "dispatch_tracked_news_alerts": MANTENIMIENTO,
     "evaluate_alert_rules": MANTENIMIENTO,
     "reconcile_alert_analyses": MANTENIMIENTO,

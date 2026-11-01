@@ -4828,6 +4828,44 @@ def sync_one_tenant_ibkr_dedicated(tenant_id: int, user_id: str) -> dict[str, An
     """Same revision/date validation, separate bounded read-only consumer."""
     return sync_one_tenant_ibkr.fn(tenant_id, user_id)
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=ALERT_QUEUE_NAME)
+def dispatch_queue_watchdog(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Alerta in-app al operador cuando una cola se atasca (no drena).
+
+    Mide profundidad y edad del mensaje listo mas antiguo por cola en Redis y
+    persiste una ResearchAlert por cola atascada y dia. Coste ~0 (HLEN +
+    lectura de la cabeza). Preparacion para la carga del lunes (Nico 1-nov).
+    """
+    actor_name = "dispatch_queue_watchdog"
+    db = None
+    lease = None
+    try:
+        from app.services.queue_watchdog import emit_queue_stuck_alerts
+
+        db = _session(tenant_id, user_id)
+        lease = acquire_job_lease(
+            f"dispatch_queue_watchdog:{tenant_id}",
+            ttl_seconds=120,
+            redis_url=_lease_redis_url(),
+        )
+        if lease is None:
+            return {"status": "skipped", "actor": actor_name, "reason": "lease_held"}
+        stats = emit_queue_stuck_alerts(db)
+        return {"status": "ok", "actor": actor_name, **stats}
+    except Exception as exc:
+        if db is not None:
+            _rollback(db)
+        return _handle_actor_error(actor_name, exc, tenant_id=tenant_id)
+    finally:
+        if lease is not None:
+            release_job_lease(
+                f"dispatch_queue_watchdog:{tenant_id}", lease, redis_url=_lease_redis_url()
+            )
+        if db is not None:
+            db.close()
 
 @dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=ALERT_QUEUE_NAME)
 def dispatch_source_health_watchdog(

@@ -35,11 +35,11 @@ from app.models.entities import (
     InsiderTransaction,
     NewsEvent,
     Position,
-    Transaction,
 )
 from app.services.connectors.finnhub import FinnhubClient
 from app.services.connectors.sec import SECClient
 from app.services.document_visibility import without_archive_duplicates
+from app.services.holding_period import current_holding_starts
 
 logger = logging.getLogger(__name__)
 
@@ -431,13 +431,9 @@ def stored_holding(db: Session, company: Company) -> dict[str, Any] | None:
     if qty <= 0:
         return None
     cost = sum((_timeline_float(p.quantity) or 0.0) * (_timeline_float(p.average_cost) or 0.0) for p in positions)
-    first_buy = db.scalar(
-        select(func.min(Transaction.trade_date)).where(
-            Transaction.company_id == company.id,
-            func.lower(Transaction.action) == "buy",
-            *tenant_filters(db, Transaction),
-        )
-    )
+    # La compra que abrió la tenencia actual: tras venderlo todo y recomprar,
+    # «Primera compra» y «Desde la compra» parten de la nueva compra.
+    first_buy = current_holding_starts(db, [company.id]).get(company.id)
     return {
         "average_cost": round(cost / qty, 4) if cost > 0 else None,
         "first_buy_date": first_buy.isoformat() if first_buy else None,

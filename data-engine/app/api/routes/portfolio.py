@@ -66,6 +66,7 @@ from app.services.connectors.ibkr import IBKRFlexClient
 from app.services.dividend_ingestion_service import DividendIngestionService
 from app.services.dividend_projection_service import DividendProjectionService
 from app.services.fx_attribution import split_unrealized_pnl
+from app.services.holding_period import current_holding_starts
 from app.services.ibkr_import_service import IBKRImportError, IBKRImportService, IBKRPnlNotReadyError
 from app.services.market_refresh_service import MarketRefreshService
 from app.services.portfolio_fx_service import TAX_CURRENCY, PortfolioFXService
@@ -121,16 +122,10 @@ LONG_TERM_HOLDING_DAYS = 365
 def _fiscal_info(db: Session, company_id: int, as_of: date) -> dict:
     """Antigüedad de la posición y bucket fiscal (corto/largo plazo).
 
-    La antigüedad se mide desde la primera compra registrada en el ledger;
-    sin compras registradas no hay bucket (None).
+    La antigüedad se mide desde la compra que abrió la tenencia actual (tras
+    vender todo y recomprar, la nueva); sin compras registradas no hay bucket.
     """
-    first_buy = db.scalar(
-        select(func.min(Transaction.trade_date)).where(
-            Transaction.company_id == company_id,
-            Transaction.action == "buy",
-            *tenant_filters(db, Transaction),
-        )
-    )
+    first_buy = current_holding_starts(db, [company_id]).get(company_id)
     if first_buy is None:
         return {"first_buy_date": None, "holding_days": None, "fiscal_bucket": None}
     holding_days = (as_of - first_buy).days
@@ -151,18 +146,7 @@ def _fiscal_info_batch(
     """
     if not as_of_by_company:
         return {}
-    first_buys = {
-        row[0]: row[1]
-        for row in db.execute(
-            select(Transaction.company_id, func.min(Transaction.trade_date))
-            .where(
-                Transaction.company_id.in_(set(as_of_by_company)),
-                Transaction.action == "buy",
-                *tenant_filters(db, Transaction),
-            )
-            .group_by(Transaction.company_id)
-        ).all()
-    }
+    first_buys = current_holding_starts(db, as_of_by_company)
     result: dict[int, dict] = {}
     for company_id, as_of in as_of_by_company.items():
         first_buy = first_buys.get(company_id)
