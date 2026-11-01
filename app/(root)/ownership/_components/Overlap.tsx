@@ -52,7 +52,7 @@ export async function Overlap({ pagina, compras }: { pagina?: string; compras?: 
         <span className="text-gray-400">Página {boughtPage.page} de {boughtPage.total}</span>
         {boughtPage.page < boughtPage.total ? <Link href={`/ownership?vista=solape&pagina=${paged.page}&compras=${boughtPage.page + 1}`}>Siguiente</Link> : <span className="text-gray-500">Siguiente</span>}
       </nav>}
-      {data.report_dates.length > 0 && <p className="text-xs text-gray-500">Periodos 13F: {data.report_dates.map(periodLabel).join(' · ')}</p>}
+      {data.report_dates.length > 0 && <p className="text-xs text-gray-500">Periodos 13F: {data.report_dates.map((date) => periodLabel(date)).join(' · ')}</p>}
     </section>
   </>;
 }

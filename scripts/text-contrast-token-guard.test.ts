@@ -34,7 +34,7 @@ const EXEMPT_LINE = /aria-hidden|aria-disabled/;
 
 /** Constantes de clase usadas solo en `<span aria-disabled="true">`. */
 const ALLOWLIST: readonly { file: string; why: string }[] = [
-    { file: 'app/(root)/inversores/_components/Pagination.tsx', why: '`offClass`: solo en el paginador aria-disabled (texto de control inactivo, exento de 1.4.3).' },
+    { file: 'app/(root)/inversores/_components/PaginationNav.tsx', why: '`offClass`: solo en el paginador aria-disabled (texto de control inactivo, exento de 1.4.3).' },
     { file: 'components/research/NewsEventsFlow.tsx', why: '`PAGER_OFF`: solo en el paginador aria-disabled (texto de control inactivo, exento de 1.4.3).' },
 ];
 

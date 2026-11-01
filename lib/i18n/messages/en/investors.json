@@ -1,1 +1,30 @@
-{}
+{
+  "hub": {
+    "title": "Investors",
+    "description": "Who invests best and what they hold, with the source and date of every figure.",
+    "noneSynced": "There are no portfolios downloaded in this account yet.",
+    "positions": "{count} positions",
+    "portfolioAt": "Portfolio as of {date}",
+    "partial": "Partial data",
+    "unsynced13f": "13F not synced",
+    "publicHoldings": "Public holdings · see profile",
+    "no13f": "Without a 13F · see profile",
+    "photosNote": "Photos under free licenses from Wikimedia Commons; author and license on each profile. Where there's no free photo, an initial.",
+    "sourceNote": "Source: SEC, Form 13F (EDGAR). Quarterly, with up to a 45-day lag; US long positions only. Values in dollars as filed. Other holdings: source and date on each profile."
+  },
+  "nav": {
+    "aria": "Investors sections",
+    "investors": "Investors",
+    "learn": "Learn"
+  },
+  "sync": {
+    "label": "Sync portfolios now",
+    "queued": "Sync in progress; reload the page in a few minutes to see the portfolios.",
+    "syncing": "Queuing sync...",
+    "error": "Couldn't queue the sync. Try again."
+  },
+  "pagination": {
+    "aria": "Pagination",
+    "pageOf": "Page {page} of {total}"
+  }
+}

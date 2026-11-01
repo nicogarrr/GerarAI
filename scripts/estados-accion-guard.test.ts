@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+const ES_INVESTORS_JSON = readFileSync('lib/i18n/messages/es/investors.json', 'utf8');
 // Los textos de Pro Picks viven en el diccionario es (i18n): se comprueban junto al código.
 const ES_PROPICKS_JSON = readFileSync('lib/i18n/messages/es/propicks.json', 'utf8');
 
@@ -8,12 +9,12 @@ const read = (p: string) => readFileSync(p, 'utf8');
 
 test('inversores: cuenta nueva sin 13F ofrece la acción real de sincronizar', () => {
   // Carteras se fusiona en /inversores (decisión de Nico, 2026-10-20): el estado vacío vive en el hub.
-  const page = read('app/(root)/inversores/page.tsx');
+  const page = (read('app/(root)/inversores/page.tsx') + ES_INVESTORS_JSON);
   assert.ok(page.includes('SyncPortfoliosButton'), 'la página de carteras debe usar SyncPortfoliosButton');
   assert.ok(page.includes('Aún no hay carteras descargadas en esta cuenta.'));
   assert.ok(page.includes('.every((investor) => !investor.report_date)'), 'el estado vacío solo aparece cuando NINGÚN inversor tiene 13F descargado');
 
-  const button = read('app/(root)/inversores/_components/SyncPortfoliosButton.tsx');
+  const button = (read('app/(root)/inversores/_components/SyncPortfoliosButton.tsx') + ES_INVESTORS_JSON);
   assert.ok(button.includes('Sincronizar carteras ahora'));
   assert.ok(!button.includes('bg-teal-600'), 'sin override de primario: usa el Button por defecto');
   assert.ok(button.includes('Sincronización en curso'), 'confirma que la sincronización quedó encolada');

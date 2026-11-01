@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+const ES_INVESTORS_JSON = readFileSync('lib/i18n/messages/es/investors.json', 'utf8');
 
 const section = readFileSync('app/(root)/inversores/_components/PublicProfile.tsx', 'utf8');
 const ficha = readFileSync('app/(root)/inversores/[slug]/page.tsx', 'utf8');
@@ -28,7 +29,7 @@ test('la ficha usa el perfil publico y conserva "Sin datos" cuando no hay', () =
 });
 
 test('la rejilla distingue ficha publica de sin datos', () => {
-    const list = readFileSync('app/(root)/inversores/page.tsx', 'utf8');
+    const list = (readFileSync('app/(root)/inversores/page.tsx', 'utf8') + ES_INVESTORS_JSON);
     assert.match(list, /investor\.has_public_profile/);
     assert.match(list, /Participaciones públicas · ver ficha/);
 });
