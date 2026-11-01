@@ -291,3 +291,21 @@ def test_lote_con_mis_n_acciones_que_compre_a():
 def test_porcentaje_de_venta_no_es_cantidad_del_lote():
     """«vendo 15 % de lo que compré a 100 €»: 15 es un porcentaje, no 15 acciones del lote."""
     assert parse_purchase_lots("si vendo 15% de las que compré a 100 € el 2 de enero de 2025") == []
+
+
+@pytest.mark.parametrize(("text", "expected"), [
+    ("1,234.56", D("1234.56")),
+    ("12,345,678.9", D("12345678.9")),
+    ("1.234,56", D("1234.56")),
+    ("100.000,00", D("100000.00")),
+])
+def test_con_los_dos_separadores_el_ultimo_es_el_decimal(text, expected):
+    """«1,234.56 $» (formato US) se leía 1,23456: el último separador es el decimal."""
+    assert parse_number(text) == expected
+
+
+def test_lote_con_precio_en_formato_us():
+    lots = parse_purchase_lots("si vendo 10 acciones de AAPL que compré a 1,234.56 $ el 3 de marzo de 2024")
+    assert [(lot.quantity, lot.price, lot.currency) for lot in lots] == [
+        (D("10"), D("1234.56"), "USD")
+    ]

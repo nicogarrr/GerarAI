@@ -32,7 +32,9 @@ from app.valuation.currency import listing_currency
 
 TAX_CURRENCY = "EUR"
 
-_NUM = r"\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?"
+# «1,234.56» (miles con coma y punto decimal, formato US) va primero: sin él la
+# cifra se cortaba en «1,234» y el precio del lote era 1,234.
+_NUM = r"\d{1,3}(?:,\d{3})+\.\d+|\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?"
 _CUR = r"€|euros?\b|eur\b|us\$|\$|d[oó]lares\b|usd\b|£|libras\b|gbp\b"
 _CURRENCY_MAP = {
     "€": "EUR", "euro": "EUR", "euros": "EUR", "eur": "EUR",
@@ -129,10 +131,14 @@ class HypoSale:
 
 
 def parse_number(text: str) -> Decimal | None:
-    """«1.234,5» → 1234.5; «150.5» → 150.5; «1.500» → 1500; «0.125» → 0.125."""
+    """«1.234,5» → 1234.5; «1,234.5» → 1234.5; «150.5» → 150.5; «1.500» → 1500; «0.125» → 0.125."""
     raw = text.strip()
     if "," in raw and "." in raw:
-        raw = raw.replace(".", "").replace(",", ".")
+        # El último separador es el decimal: «1.234,5» (es) y «1,234.5» (US).
+        if raw.rfind(".") > raw.rfind(","):
+            raw = raw.replace(",", "")
+        else:
+            raw = raw.replace(".", "").replace(",", ".")
     elif "," in raw:
         raw = raw.replace(",", ".")
     elif re.fullmatch(r"[1-9]\d{0,2}(?:\.\d{3})+", raw):
