@@ -155,6 +155,21 @@ const KNOWN: ReadonlyArray<readonly [RegExp, string]> = [
   // Calendario
   [/^fecha fuera de rango$/i, 'Date out of range.'],
   [/^"desde" no puede ser posterior a "hasta"$/, '"From" cannot be after "to".'],
+  // Tesis: criterios de invalidación medibles, exportación y fuentes oficiales
+  [/^Los criterios de invalidación deben ser una lista\.?$/, 'The invalidation criteria must be a list.'],
+  [/^Máximo (\d+) criterios de invalidación por tesis\.?$/, 'At most $1 invalidation criteria per thesis.'],
+  [/^Criterio (\d+): formato no válido \(métrica, operador y umbral\)\.?$/, 'Criterion $1: invalid format (metric, operator and threshold).'],
+  [/^Criterio (\d+): métrica no soportada «(.+)»\.?$/, 'Criterion $1: unsupported metric «$2».'],
+  [/^Criterio (\d+): operador no válido «(.+)»\.?$/, 'Criterion $1: invalid operator «$2».'],
+  [/^Criterio (\d+): el umbral debe ser un número finito\.?$/, 'Criterion $1: the threshold must be a finite number.'],
+  [/^No existe la empresa con ticker (\S+)$/, 'There is no company with ticker $1.'],
+  [/^No hay ninguna versión de tesis para (\S+)$/, 'There is no thesis version for $1.'],
+  [/^No se encontró la cartera con ID (\S+)$/, 'Portfolio with ID $1 not found.'],
+  [/^Ticker no encontrado$/, 'Ticker not found.'],
+  [/^Espacio de trabajo no disponible$/, 'Workspace not available.'],
+  [/^Ticket no encontrado para este ticker$/, 'Ticket not found for this ticker.'],
+  [/^Sin CIK para (\S+): este emisor no reporta a la SEC; usa la fuente de su mercado local \(ESEF para emisores de la UE\)$/, 'No CIK for $1: this issuer does not report to the SEC; use its local market source (ESEF for EU issuers).'],
+  [/^Sin snapshot ESEF local para (\S+): por ahora solo hay cobertura de emisores IBEX revisados$/, 'No local ESEF snapshot for $1: for now only reviewed IBEX issuers are covered.'],
 ];
 
 /** Traducción inglesa de un mensaje fijo del motor; `null` si no es uno conocido. */
