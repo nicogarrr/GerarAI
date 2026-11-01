@@ -177,6 +177,34 @@ def _fmt_period_es(period: str | None, fiscal_year: int | None = None,
     return text or "periodo sin fecha"
 
 
+def _price_display_en(value: Decimal | int | float, currency: str | None) -> str:
+    """_price_display en inglés: $80.00, 150.00 €, 30.00 GBP."""
+    magnitude = abs(Decimal(str(value)))
+    digits = max(2, -magnitude.adjusted() + 3) if 0 < magnitude < 1 else 2
+    text = f"{value:,.{digits}f}"
+    if currency == "USD":
+        return f"${text}"
+    if not currency or not currency.strip():
+        return f"{text} (currency not stated)"
+    return f"{text} {'€' if currency == 'EUR' else currency}"
+
+
+def _sale_question_es(question: str) -> str:
+    """Venta en inglés con la sintaxis que entiende el analizador de ventas.
+
+    «sell 10 UBER at $80» → «vendo 10 UBER a $80»; «sell half» → «vendo la
+    mitad»; «sell 50%» → «vendo 50 %». Solo para leer cantidad y precio.
+    """
+    text = re.sub(r"(?i)\b(?:sell|sold|selling)\b", "vendo", question or "")
+    text = re.sub(r"(?i)\bvendo\s+(?:only\s+|just\s+)?(?:my\s+)?half\b", "vendo la mitad", text)
+    text = re.sub(r"(?i)\bvendo\s+(?:only|just)\s+", "vendo ", text)
+    text = re.sub(r"(?i)\bvendo\s+(?:all\s+(?:of\s+)?)?my\b", "vendo mis", text)
+    text = re.sub(r"(?i)\bvendo\s+all\b", "vendo todo", text)
+    text = re.sub(r"(?i)\bshares\b", "acciones", text)
+    text = re.sub(r"(?i)\s+(?:per\s+cent|percent)\b", " %", text)
+    return re.sub(r"(?i)\bat\s+(?=[$€£]?\s*\d)", "a ", text)
+
+
 def _savings_scale_label(year: int) -> str:
     """Última escala del ahorro verificada: 2025 (Ley 7/2024).
 
@@ -806,6 +834,14 @@ _SALE_VERB_RE = re.compile(r"(?i)\b(?:vend\w*|venta)\b")
 _HYPO_SALE_RE = re.compile(r"(?i)\bsi\s+(?:las?\s+|los\s+)?vend\w*|\bvendi(?:era|ese)\w*")
 _HYPO_SALE_GAIN_RE = re.compile(
     r"(?i)\b(?:gan(?:o|as|ar[ií]a|ar[ií]as)|ganancias?|beneficio|me\s+quedar[ií]a|sacar[ií]a)\b"
+)
+# Inglés (solo con el inglés elegido): impuesto o ganancia de vender tu posición.
+_SALE_TAX_EN_RE = re.compile(r"(?i)\b(?:irpf|tax(?:es)?|capital\s+gains?)\b")
+_SALE_VERB_EN_RE = re.compile(r"(?i)\b(?:sell|sold|selling|sale)\b")
+_SALE_CONTEXT_EN_RE = re.compile(r"(?i)\b(?:I|my|would|I'd)\b")
+_HYPO_SALE_EN_RE = re.compile(r"(?i)\bif\s+I\s+(?:sell|sold)\b|\bwere\s+I\s+to\s+sell\b")
+_HYPO_SALE_GAIN_EN_RE = re.compile(
+    r"(?i)\b(?:gain|make|earn|profit|net|get|lose)\b"
 )
 _NO_POSITION_OFFER = "Si me dices cuántas acciones, a qué precio y cuándo las compraste, te hago la estimación."
 # Primera palabra de un nombre que no identifica a una empresa por sí sola.
@@ -1562,6 +1598,10 @@ class ChatService:
         if company is not None and _ORDER_VERB_RE.search(question or ""):
             return ChatResponse(
                 answer=(
+                    "I don't place orders: GerarAI doesn't buy or sell at your broker. "
+                    f"I can show you what I have saved for {company.ticker} "
+                    "(price, figures, thesis and news, with their sources) or your position in the portfolio."
+                ) if _english() else (
                     "No ejecuto órdenes: GerarAI no compra ni vende en tu bróker. "
                     f"Puedo enseñarte lo que tengo guardado de {company.ticker} "
                     "(precio, cifras, tesis y noticias, con sus fuentes) o tu posición en cartera."
@@ -2662,7 +2702,10 @@ class ChatService:
     def _no_position_sale_answer(self, label: str) -> ChatResponse:
         """Sin posición no hay IRPF real: se dice y se ofrece la estimación, sin cambiar de tema."""
         return ChatResponse(
-            answer=f"No tienes {label} en cartera, así que no puedo calcular tu IRPF real. {_NO_POSITION_OFFER}",
+            answer=(
+                f"You don't hold {label} in your portfolio, so I can't calculate your real IRPF "
+                "(Spanish income tax) on a sale. Add your purchases in Portfolio and ask me again."
+            ) if _english() else f"No tienes {label} en cartera, así que no puedo calcular tu IRPF real. {_NO_POSITION_OFFER}",
             sources=[],
             model="deterministic",
             prompt_version=_SALE_TAX_PROMPT_VERSION,
@@ -2676,6 +2719,20 @@ class ChatService:
     def _several_sales_answer(self, tickers: list[str]) -> ChatResponse:
         """Varias empresas en una venta: se piden una a una, sin elegir ni negar posiciones."""
         names = ", ".join(tickers[:-1]) + f" y {tickers[-1]}"
+        if _english():
+            return ChatResponse(
+                answer=(
+                    f"I calculate the IRPF of selling one stock at a time and you named "
+                    f"{', '.join(tickers[:-1])} and {tickers[-1]}. Ask me one at a time (for example, "
+                    f"«How much tax would I pay if I sell {tickers[0]}?») and I'll give you each "
+                    "calculation with your saved position."
+                ),
+                sources=[], model="deterministic", prompt_version=_SALE_TAX_PROMPT_VERSION, confidence=0.8,
+                llm_trace={
+                    "path": "portfolio_sale_tax", "generated": False, "provider_calls": 0,
+                    "clarification": "several_tickers", "tickers": tickers,
+                },
+            )
         return ChatResponse(
             answer=(
                 f"Calculo el IRPF de la venta de un valor cada vez y has nombrado {names}. "
@@ -2732,6 +2789,16 @@ class ChatService:
             and _SALE_VERB_RE.search(q)
             and _SALE_CONTEXT_RE.search(q)
         )
+        if not intent and _english():
+            # «How much tax would I pay if I sell 10 UBER?», «What would I gain
+            # if I sold MSFT?»: la misma simulación con tu posición, en inglés.
+            intent = bool(
+                (_SALE_TAX_EN_RE.search(q) or (_HYPO_SALE_EN_RE.search(q) and _HYPO_SALE_GAIN_EN_RE.search(q)))
+                and _SALE_VERB_EN_RE.search(q)
+                and _SALE_CONTEXT_EN_RE.search(q)
+            )
+            if intent:
+                lots = []
         offered: str | None = None
         if not intent:
             if not lots:
@@ -2956,9 +3023,32 @@ class ChatService:
         held = Decimal(pos.quantity)
         from app.services.sale_hypothetical import _sale_quantity, parse_sale_price
 
-        qty = _sale_quantity(question, held)
+        english = _english()
+        # En inglés se leen cantidad y precio con el mismo analizador («sell 10
+        # UBER at $80» → «vendo 10 UBER a $80»); los textos salen en inglés.
+        parse_q = _sale_question_es(question) if english else question
+        num = _fmt_number_en if english else _fmt_number_es
+        money = _fmt_money_en if english else _fmt_money_es
+        fdate = _fmt_date_en if english else _fmt_date_es
+        qty = _sale_quantity(parse_q, held)
         issue = None
-        if qty <= 0:
+        if qty <= 0 and english:
+            issue = (
+                "To estimate the IRPF (Spanish income tax) on a sale, the quantity has to be greater than 0: "
+                f"you hold {num(float(held), 4)} {company.ticker} shares. "
+                "Confirm the quantity; I haven't calculated any sale."
+            )
+        elif qty > held and english:
+            issue = (
+                f"You're asking to sell {num(float(qty), 4)} {company.ticker} shares, "
+                f"but you hold {num(float(held), 4)}. Confirm the quantity; I haven't calculated a different sale."
+            )
+        elif english and re.search(r"(?i)comisi[oó]n|comisiones|gastos|fees?\b", question):
+            issue = (
+                "You mentioned fees or costs: confirm the sale amount and its currency. "
+                "I haven't calculated a tax figure that ignores them."
+            )
+        elif qty <= 0:
             issue = (
                 "Para estimar el IRPF de una venta, la cantidad tiene que ser mayor que 0: "
                 f"tienes {_fmt_number_es(float(held), 4)} acciones de {company.ticker}. "
@@ -2977,13 +3067,19 @@ class ChatService:
                 confidence=0.8, llm_trace=trace,
             )
         share = qty / held
-        qty_text = _fmt_number_es(float(qty), 4)
+        qty_text = num(float(qty), 4)
         what = (
             f"todas tus {qty_text} acciones de {company.ticker}" if qty == held
             else f"{qty_text} de tus {_fmt_number_es(float(held), 4)} acciones de {company.ticker}"
         )
+        if english:
+            what = (
+                f"all your {qty_text} {company.ticker} shares" if qty == held
+                else f"{qty_text} of your {num(float(held), 4)} {company.ticker} shares"
+            )
         source = self._source_entry(
-            "position", pos.id, f"Posición {company.ticker}", url="/portfolio", as_of=str(pos.as_of)
+            "position", pos.id, f"{'Position' if english else 'Posición'} {company.ticker}",
+            url="/portfolio", as_of=str(pos.as_of),
         )
         today = local_today()
         fifo = simulate_fifo_sale(
@@ -3005,7 +3101,7 @@ class ChatService:
             sale_rate = Decimal("1")
         elif value_base is not None and native_value:
             sale_rate = Decimal(value_base) / Decimal(native_value)
-        explicit_sale = parse_sale_price(question)
+        explicit_sale = parse_sale_price(parse_q)
         if explicit_sale is not None:
             from app.services.portfolio_fx_service import PortfolioFXService
             from app.services.tax_report_service import MAX_FX_AGE_DAYS, _rate_not_older_than
@@ -3021,7 +3117,10 @@ class ChatService:
             )
             if rate is None:
                 return ChatResponse(
-                    answer=f"Has indicado un precio de venta en {currency}, pero falta el tipo de cambio de hoy para calcular el IRPF en euros. No he usado el valor guardado de la posición.",
+                    answer=(
+                        f"You gave a sale price in {currency}, but today's exchange rate is missing to calculate "
+                        "the IRPF in euros. I haven't used the saved value of the position."
+                    ) if english else f"Has indicado un precio de venta en {currency}, pero falta el tipo de cambio de hoy para calcular el IRPF en euros. No he usado el valor guardado de la posición.",
                     sources=[source], model="deterministic", prompt_version=_SALE_TAX_PROMPT_VERSION,
                     confidence=0.7, llm_trace=trace,
                 )
@@ -3079,6 +3178,23 @@ class ChatService:
                     f"{_fmt_money_es(float(abs(diff)))} {ccy}."
                 )
             answer += " Cuando la cartera tenga el coste en euros, te lo calculo con los tramos del ahorro."
+            if english:
+                answer = (
+                    f"I have your position: {num(float(held), 4)} {company.ticker} shares "
+                    + (f"at an average cost of {money(float(pos.average_cost))} {ccy}" if avg_known
+                       else "with no saved average cost")
+                    + ". But I can't estimate the IRPF in euros: the position's "
+                    + ("current value in euros" if value_base is None and (fifo_cost is not None or avg_cost is not None)
+                       else "cost in euros (exchange rate on the purchase date)")
+                    + " is missing, and the Spanish tax office calculates the gain in euros."
+                )
+                if native_value is not None and native_cost:
+                    diff = (Decimal(native_value) - Decimal(native_cost)) * share
+                    answer += (
+                        f" In {ccy} and at average cost, selling {what} would give you a "
+                        f"{'gain' if diff >= 0 else 'loss'} of {money(float(abs(diff)))} {ccy}."
+                    )
+                answer += " Once the portfolio has the cost in euros, I'll calculate it with the savings income brackets."
             return ChatResponse(
                 answer=answer,
                 sources=[source],
@@ -3091,13 +3207,16 @@ class ChatService:
         if fifo is not None and fifo_cost is not None:
             cost = fifo_cost
             lot_texts = [
-                f"{_fmt_date_es(lot.trade_date.isoformat() if lot.trade_date else None)}, "
-                f"{_fmt_number_es(float(lot.quantity), 4)} acciones, "
+                f"{fdate(lot.trade_date.isoformat() if lot.trade_date else None)}, "
+                f"{num(float(lot.quantity), 4)} {'shares' if english else 'acciones'}, "
                 # nosemgrep: gerarai-money-none-to-zero -- lote FIFO ya casado: con fifo_cost conocido cada lote tiene coste; solo es texto
-                f"coste {_fmt_money_es(float(lot.cost_eur_dgt(sale_ccy, sale_rate) or 0))} €"
+                f"{'cost' if english else 'coste'} {money(float(lot.cost_eur_dgt(sale_ccy, sale_rate) or 0))} €"
                 for lot in fifo.lots
             ]
             method = (
+                "FIFO method, required for IRPF (art. 37.2 LIRPF): the oldest shares are sold first. "
+                "Lots sold: " + "; ".join(lot_texts) + "."
+            ) if english else (
                 "Método FIFO, obligatorio en IRPF (art. 37.2 LIRPF): salen primero las acciones más antiguas. "
                 "Lotes vendidos: " + "; ".join(lot_texts) + "."
             )
@@ -3105,6 +3224,10 @@ class ChatService:
             # nosemgrep: gerarai-money-none-to-zero -- aqui avg_cost es conocido: la rama de arriba (avg_known/fifo_cost None) ya respondio sin cifra
             cost = Decimal(avg_cost or 0) * share
             method = (
+                "Note: there is no lot history, so this estimate uses the average cost and may differ from FIFO. "
+                "The tax office requires FIFO (art. 37.2 LIRPF): record your purchases in Portfolio and "
+                "I'll calculate it by lot."
+            ) if english else (
                 "Ojo: sin historial de lotes; estimación con coste medio, puede diferir de FIFO. "
                 "Hacienda exige FIFO (art. 37.2 LIRPF): registra tus compras en Cartera y te lo calculo por lotes."
             )
@@ -3150,7 +3273,16 @@ class ChatService:
                     " La pérdida compensa otras ganancias del año, siempre que no recompres "
                     f"{company.ticker} antes del {deadline} (regla de los dos meses)."
                 )
-        answer += f" {method} Es una estimación, no asesoría fiscal; el detalle está en Fiscal."
+        if english:
+            answer = self._sale_gain_text_en(
+                what, pos.as_of.isoformat(), value, cost, gain, year, company.ticker, today, fifo,
+                fifo_cost, qty, price_text=(
+                    _price_display_en(explicit_sale[0], currency) if explicit_sale is not None else None
+                ),
+            )
+            answer += f" {method} It's an estimate, not tax advice; the details are in Taxes."
+        else:
+            answer += f" {method} Es una estimación, no asesoría fiscal; el detalle está en Fiscal."
         return ChatResponse(
             answer=answer,
             sources=[source],
@@ -3159,6 +3291,54 @@ class ChatService:
             confidence=0.8 if fifo_cost is not None else 0.6,
             llm_trace=trace,
         )
+
+    @staticmethod
+    def _sale_gain_text_en(
+        what, as_of, value, cost, gain, year, ticker, today, fifo, fifo_cost, qty, price_text,
+    ) -> str:
+        """Cifras de _sale_tax_answer en inglés (mismo cálculo, mismo orden de frases)."""
+        from app.services.sale_simulation import repurchase_deadline
+        from app.services.tax_irpf_filing import calculate_savings_tax
+
+        head = (
+            f"If you sold {what} today (data as of {_fmt_date_en(as_of)}): "
+            f"value {_fmt_money_en(float(value))} €, cost {_fmt_money_en(float(cost))} €"
+        )
+        if price_text is not None:
+            head += f" (sale price given: {price_text})"
+        scale = (
+            f"{year} savings income scale" if year <= 2025
+            else f"2025 savings income scale (the latest verified; the {year} one isn't confirmed)"
+        )
+        if gain > 0:
+            tax = calculate_savings_tax(gain, year)
+            rate = (tax / gain * 100) if gain else Decimal("0")
+            return (
+                f"{head}, a gain of {_fmt_money_en(float(gain))} €. "
+                f"Estimated IRPF (Spanish income tax): {_fmt_money_en(float(tax))} € ({_fmt_number_en(float(rate), 1)}% "
+                f"of the gain, {scale}: 19% up to 6,000 €, 21% up to 50,000 €…). "
+                "I calculate it as if it were your only sale this year: if you already have other gains, "
+                "the bracket goes up, and this year's losses offset it."
+            )
+        loss = -gain
+        answer = f"{head}, a loss of {_fmt_money_en(float(loss))} €. You wouldn't pay IRPF on this sale."
+        if fifo is not None and fifo_cost is not None and fifo.blocking_qty > 0:
+            blocked = loss * fifo.blocking_qty / qty
+            dates = ", ".join(_fmt_date_en(d.isoformat()) for d in fifo.blocking_dates)
+            answer += (
+                f" But watch the two-month rule: you bought {ticker} on {dates} "
+                f"and those {_fmt_number_en(float(fifo.blocking_qty), 4)} shares stay in the portfolio after the sale, "
+                f"so {_fmt_money_en(float(blocked))} € of the loss can't be offset now: "
+                "it's deferred until you sell those shares."
+            )
+            if fifo.blocking_qty < qty:
+                answer += f" The rest, {_fmt_money_en(float(loss - blocked))} €, does offset other gains this year."
+        else:
+            answer += (
+                f" The loss offsets other gains this year, as long as you don't buy {ticker} back "
+                f"before {_fmt_date_en(repurchase_deadline(today).isoformat())} (two-month rule)."
+            )
+        return answer
 
     def _deterministic_answer(
         self, db: Session, question: str, scope: str, ticker: str | None
