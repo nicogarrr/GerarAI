@@ -198,3 +198,64 @@ def test_news_telegram_uses_source_metadata_without_machine_trace():
     assert "Documento 8-K asociado a Visa" in text
     assert "Abrir documento: https://www.sec.gov/x" in text
     assert "No structural thesis" not in text
+
+
+def test_news_telegram_in_english_when_alert_language_is_english():
+    from app.services.notification_service import NotificationService
+    base = {
+        "severity": "high", "title": "t", "message": "m", "company_name": "Visa", "ticker": "V",
+        "type": "news_material_update", "source_headline": "V 8-K filed 2025-10-28",
+        "event_date": datetime(2025, 10, 28, tzinfo=UTC), "event_date_source": "gdelt_first_seen",
+        "source_url": "https://www.sec.gov/x", "alert_id": 1, "company_id": 1, "language": "en",
+    }
+    text = NotificationService._telegram_text(base)
+    assert text.startswith("Visa · 8-K · detected 28/10/2025")
+    assert "8-K filing linked to Visa; check the source before changing the thesis." in text
+    assert "See affected thesis: V (in the app)" in text
+    assert "Open document: https://www.sec.gov/x" in text
+    news = NotificationService._telegram_text({**base, "type": "tracked_news", "source_headline": "Visa expands"})
+    assert news.startswith("Visa · News · detected 28/10/2025")
+    assert "News about Visa; check the source before drawing conclusions." in news
+    spanish = NotificationService._telegram_text({k: v for k, v in base.items() if k != "language"})
+    assert "Documento 8-K asociado a Visa" in spanish and "detectada 28/10/2025" in spanish
+
+
+def test_generic_alert_email_in_english_when_alert_language_is_english():
+    from app.services.email_delivery import generic_alert_content
+
+    payload = {"severity": "low", "title": "", "message": "UBER entered 3X DCA", "ticker": "UBER"}
+    english = generic_alert_content({**payload, "language": "en"})
+    assert english.subject == "[GerarAI] Alert"
+    assert "Open GerarAI to see the alert details." in english.text
+    assert "Open GerarAI to see the alert details." in english.html
+    spanish = generic_alert_content(payload)
+    assert spanish.subject == "[GerarAI] Alerta"
+    assert "Abre GerarAI para ver el detalle de la alerta." in spanish.text
+
+
+
+def test_dispatch_wraps_generic_email_in_saved_alert_language(monkeypatch):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from sqlalchemy.pool import StaticPool
+
+    from app.models import ResearchAlert, Tenant
+    from app.models.entities import Base
+
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    sent = []
+    monkeypatch.setattr(notification_service, "smtp_configured", lambda settings: True)
+    monkeypatch.setattr(notification_service, "send_email", lambda settings, c: sent.append(c) or {"status": "delivered"})
+    with Session(engine) as db:
+        db.add(Tenant(id=1, external_id="owner"))
+        db.commit()
+        db.info.update(tenant_id=1, user_id="owner")
+        for i, meta in enumerate(({"language": "en"}, {})):
+            alert = ResearchAlert(tenant_id=1, alert_type="price_rule", severity="low", status="open", title="",
+                                  message="UBER above 80", fingerprint=f"fp-{i}", channels=["email"], metadata_=meta)
+            db.add(alert)
+            db.commit()
+            notification_service.NotificationService().dispatch(db, alert)
+    engine.dispose()
+    assert [c.subject for c in sent] == ["[GerarAI] Alert", "[GerarAI] Alerta"]
