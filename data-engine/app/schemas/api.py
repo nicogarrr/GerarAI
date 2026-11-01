@@ -426,7 +426,8 @@ class ClaimEvidenceCreate(BaseModel):
     )
     summary: str = Field(min_length=3)
     quote: str | None = None
-    confidence: Decimal = Decimal("0.70")
+    # Confianza 0..1: 1.5 o -3 se guardaban tal cual (Numeric(5, 4) los admite).
+    confidence: Decimal = Field(default=Decimal("0.70"), ge=0, le=1)
     source_tier: str | None = None
 
 
@@ -455,7 +456,7 @@ class ClaimCreate(BaseModel):
     # pero Postgres rompe con DataError; el 422 por campo sale del schema.
     claim_type: str = Field(default="thesis", max_length=80)
     status: str = Field(default="unverified", max_length=40)
-    confidence: Decimal = Decimal("0.50")
+    confidence: Decimal = Field(default=Decimal("0.50"), ge=0, le=1)
     materiality_score: int = Field(default=5, ge=0, le=10)
     source_quality: str = Field(default="unknown", max_length=40)
     created_by: str = Field(default="user", max_length=80)
@@ -485,7 +486,7 @@ class ThesisSectionCreate(BaseModel):
     body: str = ""
     status: str = Field(default="draft", max_length=40)
     order_index: int = 0
-    confidence: Decimal = Decimal("0.70")
+    confidence: Decimal = Field(default=Decimal("0.70"), ge=0, le=1)
 
 
 class ThesisSectionOut(BaseModel):
