@@ -30,6 +30,7 @@ from app.models import (
 )
 from app.schemas.api import valuation_uses_inferred_inputs
 from app.services.fair_value_service import listed_value
+from app.valuation.currency import normalize_currency
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,20 @@ def _positive(raw: object) -> float | None:
     except (InvalidOperation, ValueError):
         return None
     return value if value > 0 else None
+
+
+def _unit_factor(trade_currency: str | None, company_currency: str | None) -> float | None:
+    """Factor exacto de la unidad de la operacion a la de la empresa.
+
+    Misma divisa principal: «GBp» (peniques) frente a «GBP» es 1/100, no 1
+    (``.upper()`` igualaba las dos y el margen salia con 2.650 p contra 30 £).
+    Otra divisa principal o desconocida: None (no se compara).
+    """
+    trade_major, trade_divisor = normalize_currency(trade_currency)
+    company_major, company_divisor = normalize_currency(company_currency)
+    if not trade_major or trade_major != company_major:
+        return None
+    return company_divisor / trade_divisor
 
 
 def resolve_trade(db: Session, company: Company, transaction_id: int) -> Transaction:
@@ -211,13 +226,13 @@ def fair_value_on(
         note = "Sin precio de ejecución: no se calcula el margen."
     elif not currency or not company.currency:
         note = "Divisa desconocida: no se calcula el margen."
-    elif currency.upper() != company.currency.upper():
+    elif (to_company := _unit_factor(currency, company.currency)) is None:
         note = (
             f"Operación en {currency.upper()} y valoración en {company.currency.upper()}: "
             "divisa distinta, no se calcula el margen."
         )
     else:
-        margin = reading["value"] / trade_price - 1
+        margin = reading["value"] / (trade_price * to_company) - 1
     reading["margin_vs_trade_price"] = margin
     reading["note"] = note
     return reading
@@ -282,9 +297,10 @@ def _price_compatible(
     trade_price = _positive(trade.price)
     if decision_price is None or trade_price is None:
         return True
-    if not company_currency or str(trade.currency or "").upper() != company_currency.upper():
+    to_company = _unit_factor(trade.currency, company_currency) if company_currency else None
+    if to_company is None:
         return True
-    return abs(trade_price / decision_price - 1) <= float(AUTO_LINK_MAX_PRICE_GAP)
+    return abs(trade_price * to_company / decision_price - 1) <= float(AUTO_LINK_MAX_PRICE_GAP)
 
 
 def auto_link_journal_trades(
