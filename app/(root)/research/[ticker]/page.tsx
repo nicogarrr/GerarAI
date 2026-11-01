@@ -1585,11 +1585,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
 
   const buildModelSection = async (): Promise<React.ReactNode> => {
     const t = await getT();
+    const locale = await getLocale();
     const model = await viewData('model');
     return (
       <div className="space-y-5">
         <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage={t('research.fichaModelGenerated')}><Button type="submit"><RefreshCcw className="mr-2 h-4 w-4" />{t('research.fichaGenerateModel')}</Button></MutationForm>
-        <LongTermModelPanel model={model?.status === 'not_generated' ? null : model} ticker={ticker} t={t} />
+        <LongTermModelPanel model={model?.status === 'not_generated' ? null : model} ticker={ticker} t={t} locale={locale} />
       </div>
     );
   };

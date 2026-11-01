@@ -2,7 +2,9 @@ import { impliedGrowthView } from '@/lib/research/implied-growth';
 import type { TranslateFn } from '@/lib/i18n/translate';
 import Link from 'next/link';
 import { modelConditionState } from '@/lib/research/coverage-state';
-import { formatCompact, formatMarketDate, formatNumber, formatPercent, NA } from '@/lib/format';
+import { createFormatters, type Formatters } from '@/lib/format';
+import type { Locale } from '@/lib/i18n/locale';
+import { t, type TranslationKey, type TranslationVars } from '@/lib/i18n/t';
 import { etiquetaTipoEvento } from '@/lib/labels';
 import { metricLabel } from '@/lib/research/metric-labels';
 import { financialFormula } from '@/lib/research/financial-display';
@@ -26,13 +28,18 @@ import {
   type ResearchLongTermModel,
 } from '@/lib/actions/research.actions';
 
-function compactNumber(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) return NA;
-  return formatCompact(value, { maximumFractionDigits: 1 });
+type TiFn = (key: TranslationKey, vars?: TranslationVars) => string;
+/** Fallback español sin RequestScope (tests y render directo). */
+const esT: TiFn = t;
+const esFormat = createFormatters('es');
+
+function compactNumber(value: number | null | undefined, fmt: Formatters = esFormat) {
+  if (value == null || !Number.isFinite(value)) return fmt.na;
+  return fmt.formatCompact(value, { maximumFractionDigits: 1 });
 }
 
-function percentage(value: number | null | undefined) {
-  return value == null || !Number.isFinite(value) ? NA : formatPercent(value);
+function percentage(value: number | null | undefined, fmt: Formatters = esFormat) {
+  return value == null || !Number.isFinite(value) ? fmt.na : fmt.formatPercent(value);
 }
 
 /** El WACC solo se muestra con base documentada (CalculatedMetric u
@@ -42,9 +49,9 @@ function waccHasSource(wacc: { source_type: string } | null | undefined) {
   return wacc != null && wacc.source_type !== 'model_policy';
 }
 
-function waccDisplay(wacc: { value: number | null; source_type: string } | null | undefined) {
-  if (!waccHasSource(wacc)) return NA;
-  return percentage(wacc?.value);
+function waccDisplay(wacc: { value: number | null; source_type: string } | null | undefined, fmt: Formatters = esFormat) {
+  if (!waccHasSource(wacc)) return fmt.na;
+  return percentage(wacc?.value, fmt);
 }
 
 /** Frases «what must be true» en español (F24). El backend las genera en
@@ -55,24 +62,27 @@ function conditionInSpanish(
   item: { id: string; condition: string; value?: number | null; comparison?: number | null },
   bindingConstraint: string | null | undefined,
   waccHasSource = true,
+  ti: TiFn = esT,
+  fmt: Formatters = esFormat,
+  locale: Locale = 'es',
 ): string {
   const pct = (v: number | null | undefined) =>
-    v == null || !Number.isFinite(v) ? 's/d' : formatPercent(v);
+    v == null || !Number.isFinite(v) ? ti('research.model.na') : fmt.formatPercent(v);
   switch (item.id) {
     case 'revenue_growth':
-      return `Los ingresos deben crecer al menos un ${pct(item.value)} anual`;
+      return ti('research.model.cond.revenueGrowth', { pct: pct(item.value) });
     case 'fcf_margin':
-      return `El margen FCF normalizado debe mantenerse al menos en un ${pct(item.value)}`;
+      return ti('research.model.cond.fcfMargin', { pct: pct(item.value) });
     case 'roic_above_wacc':
-      return `El ROIC (${pct(item.value)}) debe mantenerse por encima del WACC (${waccHasSource ? pct(item.comparison) : 'N/D, sin fuente'}) para crear valor`;
+      return ti('research.model.cond.roicAboveWacc', { roic: pct(item.value), wacc: waccHasSource ? pct(item.comparison) : ti('research.model.cond.waccNoSource') });
     case 'price_expectations':
-      return `El precio actual descuenta un crecimiento de ingresos de en torno al ${pct(item.value)}${item.comparison != null ? ` (con margen FCF normalizado ${pct(item.comparison)})` : ''}`;
+      return ti('research.model.cond.priceExpectations', { pct: pct(item.value), margin: item.comparison != null ? ti('research.model.cond.priceExpectationsMargin', { pct: pct(item.comparison) }) : '' });
     case 'share_count':
-      return `El número de acciones no debe crecer más rápido que lo asumido por el modelo (${pct(item.value)} anual)`;
+      return ti('research.model.cond.shareCount', { pct: pct(item.value) });
     case 'competitive_position':
-      return 'La cuota de mercado no debe deteriorarse materialmente';
+      return ti('research.model.cond.competitivePosition');
     case 'binding_constraint':
-      return `La restricción vinculante (${bindingConstraint ? metricLabel(bindingConstraint) : 'desconocida'}) debe soportar el escenario base`;
+      return ti('research.model.cond.bindingConstraint', { constraint: bindingConstraint ? metricLabel(bindingConstraint, locale) : ti('research.model.unknownConstraint') });
     default:
       return item.condition;
   }
@@ -83,15 +93,15 @@ function conditionInSpanish(
  *  (organic_growth, PREVIEW_ONLY, nombres de drivers/KPIs) se quedan como
  *  estan; lo que se traduce son etiquetas y prosa de presentacion. Los
  *  mapas tienen fallback al texto original: nunca se oculta informacion. */
-const SCENARIO_LABELS: Record<string, string> = { bear: 'Bajista', base: 'Base', bull: 'Alcista' };
-const QUALITY_LABELS: Record<string, string> = { high: 'alta', medium: 'media', unknown: 's/d' };
-const VERDICT_LABELS: Record<string, string> = {
-  unknown: 's/d',
-  reasonable: 'razonable',
-  aggressive_but_possible: 'agresivo pero posible',
-  unrealistic_without_new_evidence: 'irrealista sin nueva evidencia',
+const SCENARIO_LABELS: Record<string, TranslationKey> = { bear: 'research.model.scenarioName.bear', base: 'research.model.scenarioName.base', bull: 'research.model.scenarioName.bull' };
+const QUALITY_LABELS: Record<string, TranslationKey> = { high: 'research.model.quality.high', medium: 'research.model.quality.medium', unknown: 'research.model.na' };
+const VERDICT_LABELS: Record<string, TranslationKey> = {
+  unknown: 'research.model.na',
+  reasonable: 'research.model.verdict.reasonable',
+  aggressive_but_possible: 'research.model.verdict.aggressive',
+  unrealistic_without_new_evidence: 'research.model.verdict.unrealistic',
 };
-const IMPACT_LABELS: Record<string, string> = { positive: 'positivo', negative: 'negativo', neutral: 'neutro', none: 'sin impacto' };
+const IMPACT_LABELS: Record<string, TranslationKey> = { positive: 'research.model.impactName.positive', negative: 'research.model.impactName.negative', neutral: 'research.model.impactName.neutral', none: 'research.model.impactName.none' };
 const PROSE_ES: Record<string, string> = {
   'Growth quality is a partial assessment until price/volume/mix, M&A and working-capital drivers are sourced.':
     'La calidad del crecimiento es una evaluación parcial hasta que se contrasten los drivers de precio/volumen/mix, M&A y capital de trabajo.',
@@ -101,23 +111,30 @@ const PROSE_ES: Record<string, string> = {
 const DECISION_LABELS: Record<string, string> = {
   buy: 'Comprar', hold: 'Mantener', trim: 'Reducir', sell: 'Vender', watch: 'Vigilar', avoid: 'Evitar',
 };
-const MODEL_STATUS_LABELS: Record<string, string> = {
+const MODEL_STATUS_LABELS: Record<string, TranslationKey> = {
   // Catálogo cerrado de long_term_model_service: ok, insufficient_data,
   // missing_mandatory_drivers, preview_only.
-  ok: 'completo',
-  blocked: 'bloqueado',
-  insufficient_data: 'datos insuficientes',
+  ok: 'research.model.status.ok',
+  blocked: 'research.model.status.blocked',
+  insufficient_data: 'research.model.status.insufficient',
   // Estado de snapshots anteriores al 27/10/2026; hoy un KPI sin dato no bloquea.
-  missing_mandatory_drivers: 'con datos operativos pendientes',
-  preview_only: 'solo vista previa',
+  missing_mandatory_drivers: 'research.model.status.missingDrivers',
+  preview_only: 'research.model.status.preview',
 };
-function translate(map: Record<string, string>, value: string | null | undefined, fallback = 's/d'): string {
-  if (value == null || value === '') return fallback;
-  return map[value] ?? value;
+function translate(map: Record<string, TranslationKey>, value: string | null | undefined, ti: TiFn, fallback?: string): string {
+  if (value == null || value === '') return fallback ?? ti('research.model.na');
+  const key = map[value];
+  return key ? ti(key) : value;
+}
+
+/** Prosa del backend (en inglés): en español se traduce; en inglés se muestra tal cual. */
+function backendProse(text: string, locale: Locale): string {
+  return locale === 'en' ? text : (PROSE_ES[text] ?? text);
 }
 
 /** Fórmula del beneficio del propietario tal como llega del backend. */
-export function ownerEarningsFormulaLabel(formula: string): string {
+export function ownerEarningsFormulaLabel(formula: string, locale: Locale = 'es'): string {
+  if (locale === 'en') return formula;
   return PROSE_ES[formula] ?? financialFormula(formula);
 }
 
@@ -135,15 +152,19 @@ function ModelStat({ label, value, positive = false, hint }: { label: string; va
   );
 }
 
-export function LongTermModelPanel({ model, ticker, t }: { model: ResearchLongTermModel | null; ticker?: string; t: TranslateFn }) {
+export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }: { model: ResearchLongTermModel | null; ticker?: string; t?: TiFn; locale?: Locale }) {
+  const fmt = locale === 'es' ? esFormat : createFormatters(locale);
+  const term = (item: string) => termLabel(item, locale);
+  const num = (value: number | null | undefined) => compactNumber(value, fmt);
+  const pctv = (value: number | null | undefined) => percentage(value, fmt);
   if (!model) {
     return (
       <section className="rounded-lg border border-gray-800 bg-surface-1 p-5">
         <div className="flex items-center gap-2">
           <BrainCircuit aria-hidden="true" className="h-5 w-5 text-teal-300" />
-          <h2 className="text-lg font-semibold text-gray-100">Modelo fundamental a largo plazo</h2>
+          <h2 className="text-lg font-semibold text-gray-100">{ti('research.model.title')}</h2>
         </div>
-        <p className="mt-3 text-sm text-gray-500">No se pudo construir el modelo con los datos disponibles.</p>
+        <p className="mt-3 text-sm text-gray-500">{ti('research.model.buildFailed')}</p>
       </section>
     );
   }
@@ -159,53 +180,51 @@ export function LongTermModelPanel({ model, ticker, t }: { model: ResearchLongTe
       <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center">
         <div className="flex items-center gap-2">
           <BrainCircuit aria-hidden="true" className="h-5 w-5 text-teal-300" />
-          <h2 className="text-lg font-semibold text-gray-100">Modelo fundamental a largo plazo</h2>
+          <h2 className="text-lg font-semibold text-gray-100">{ti('research.model.title')}</h2>
         </div>
         <span className="text-xs uppercase tracking-wide text-gray-500 md:ml-auto">
           {/* La cobertura mide valores PRESENTES con fuente, no completitud:
               siempre con su alcance explícito y, si no es publicable
               (missing_inputs, bloqueos o cobertura <60), con la causa visible. */}
-          {model.horizon_years} años de proyección · {translate(MODEL_STATUS_LABELS, model.status, model.status)}
-          {` · valores con fuente ${formatNumber(model.source_coverage.coverage_percent, { maximumFractionDigits: 0 })} % de los presentes`}
-          {model.publishable ? '' : ' · modelo no publicable'}
+          {ti('research.model.horizon', { years: model.horizon_years, status: translate(MODEL_STATUS_LABELS, model.status, ti, model.status) })}
+          {ti('research.model.coverage', { pct: fmt.formatNumber(model.source_coverage.coverage_percent, { maximumFractionDigits: 0 }) })}
+          {model.publishable ? '' : ti('research.model.notPublishableTag')}
         </span>
       </div>
       <p className="mb-4 text-xs leading-5 text-gray-500">
-        El «valor por acción» de cada escenario es un cálculo interno del modelo
-        (versión {model.model_version}{model.as_of_period ? ` · datos a ${model.as_of_period}` : ' · fecha s/d'}).
+        {ti('research.model.noteIntro', { version: model.model_version, asOf: model.as_of_period ? ti('research.model.dataAsOf', { period: model.as_of_period }) : ti('research.model.dateNa') })}
         {/* Una sola fuente de verdad (WorldStocks punto 3): la valoración de
             referencia de la ficha es la vista Valoración (motor persistido y
             publicable). Este cálculo interno puede no coincidir con ella. */}
-        La valoración de referencia de la ficha es la de la vista Valoración
         {ticker ? (
           <>
             {' ('}
             <Link className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=valuation`}>
-              ver sus 3 escenarios
+              {ti('research.model.noteLink')}
             </Link>
             )
           </>
         ) : null}
-        : si no coincide con este cálculo interno, manda ella; compara versión y fecha antes de usarlo.
+        {ti('research.model.noteOutro')}
       </p>
 
       {model.missing_inputs.length ? (
         <div className="mb-4 rounded-md border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
-          Modelo no publicable: faltan {model.missing_inputs.map((item) => termLabel(item)).join(', ')}.
+          {ti('research.model.notPublishable', { items: model.missing_inputs.map(term).join(', ') })}
         </div>
       ) : null}
 
       <div className="mb-4 rounded-md border border-gray-800 bg-black/10 p-3 text-xs leading-5 text-gray-400">
-        <span className="font-semibold text-gray-300">Drivers:</span> {model.framework.revenue_drivers.map((item) => termLabel(item)).join(' · ')}
+        <span className="font-semibold text-gray-300">{ti('research.model.drivers')}</span> {model.framework.revenue_drivers.map(term).join(' · ')}
         <span aria-hidden="true" className="mx-2 text-gray-700">|</span>
-        <span className="font-semibold text-gray-300">KPIs:</span> {model.framework.kpis.map((item) => termLabel(item)).join(' · ')}
+        <span className="font-semibold text-gray-300">{ti('research.model.kpis')}</span> {model.framework.kpis.map(term).join(' · ')}
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <ModelStat label={`Ingresos ${year5?.year ?? 'año 5'}`} value={compactNumber(year5?.revenue)} />
-        <ModelStat label={`FCF ${year5?.year ?? 'año 5'}`} value={compactNumber(year5?.free_cash_flow)} positive />
-        <ModelStat label="Margen FCF" value={percentage(year5?.fcf_margin)} />
-        <ModelStat label="FCF / acción" value={compactNumber(year5?.fcf_per_share)} positive hint={year5?.fcf_per_share == null ? 'N/D: el modelo no proyecta el número de acciones cuando no puede determinar cómo se financia el hueco de caja.' : undefined} />
+        <ModelStat label={ti('research.model.revenueYear', { year: year5?.year ?? ti('research.model.year5') })} value={num(year5?.revenue)} />
+        <ModelStat label={ti('research.model.fcfYear', { year: year5?.year ?? ti('research.model.year5') })} value={num(year5?.free_cash_flow)} positive />
+        <ModelStat label={ti('research.model.fcfMargin')} value={pctv(year5?.fcf_margin)} />
+        <ModelStat label={ti('research.model.fcfPerShare')} value={num(year5?.fcf_per_share)} positive hint={year5?.fcf_per_share == null ? ti('research.model.fcfPerShareNa') : undefined} />
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr]">
@@ -218,34 +237,34 @@ export function LongTermModelPanel({ model, ticker, t }: { model: ResearchLongTe
             incompatibles a la vez. Se muestran solo cuando publishable. */}
         {model.publishable ? (
         <div className="min-w-0">
-          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Bajista / Base / Alcista</div>
+          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">{ti('research.model.scenariosHeading')}</div>
           {/* Móvil: cards sin scroll horizontal */}
           <div className="space-y-3 md:hidden">
             {Object.entries(model.scenarios).map(([name, scenario]) => {
               const point = scenario.terminal_year;
               return (
                 <div key={name} className="rounded-lg border border-gray-800 p-3">
-                  <div className="font-semibold capitalize text-gray-200">{translate(SCENARIO_LABELS, name)}</div>
+                  <div className="font-semibold capitalize text-gray-200">{translate(SCENARIO_LABELS, name, ti)}</div>
                   <dl className="mt-2 space-y-1.5 text-sm">
-                    <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">Ingresos</dt><dd className="text-gray-300">{compactNumber(point?.revenue)}</dd></div>
-                    <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">FCF</dt><dd className="text-gray-300">{compactNumber(point?.free_cash_flow)}</dd></div>
-                    <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">Margen FCF</dt><dd className="text-gray-300">{percentage(point?.fcf_margin)}</dd></div>
-                    <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">Valor/acción</dt><dd className="font-semibold text-teal-200">{compactNumber(scenario.valuation?.value_per_share)}</dd></div>
+                    <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.revenue')}</dt><dd className="text-gray-300">{num(point?.revenue)}</dd></div>
+                    <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.fcf')}</dt><dd className="text-gray-300">{num(point?.free_cash_flow)}</dd></div>
+                    <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.fcfMargin')}</dt><dd className="text-gray-300">{pctv(point?.fcf_margin)}</dd></div>
+                    <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.valuePerShare')}</dt><dd className="font-semibold text-teal-200">{num(scenario.valuation?.value_per_share)}</dd></div>
                   </dl>
                 </div>
               );
             })}
           </div>
-          <div aria-label="Escenarios del modelo" className="hidden overflow-x-auto md:block" role="region" tabIndex={0}>
+          <div aria-label={ti('research.model.scenariosLabel')} className="hidden overflow-x-auto md:block" role="region" tabIndex={0}>
             <table className="w-full min-w-[540px] text-left text-sm">
-              <caption className="sr-only">Escenarios bajista, base y alcista del modelo, con ingresos, FCF, margen FCF y valor por acción</caption>
+              <caption className="sr-only">{ti('research.model.scenariosCaption')}</caption>
               <thead className="text-xs uppercase text-gray-500">
                 <tr>
-                  <th className="border-b border-gray-800 py-2" scope="col">Escenario</th>
-                  <th className="border-b border-gray-800 py-2 text-right" scope="col">Ingresos</th>
-                  <th className="border-b border-gray-800 py-2 text-right" scope="col">FCF</th>
-                  <th className="border-b border-gray-800 py-2 text-right" scope="col">Margen FCF</th>
-                  <th className="border-b border-gray-800 py-2 text-right" scope="col">Valor/acción</th>
+                  <th className="border-b border-gray-800 py-2" scope="col">{ti('research.model.scenario')}</th>
+                  <th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('research.model.revenue')}</th>
+                  <th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('research.model.fcf')}</th>
+                  <th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('research.model.fcfMargin')}</th>
+                  <th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('research.model.valuePerShare')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -253,11 +272,11 @@ export function LongTermModelPanel({ model, ticker, t }: { model: ResearchLongTe
                   const point = scenario.terminal_year;
                   return (
                     <tr key={name} className="border-b border-gray-900 last:border-0">
-                      <th className="py-3 text-left text-sm font-semibold capitalize text-gray-200" scope="row">{translate(SCENARIO_LABELS, name)}</th>
-                      <td className="py-3 text-right text-gray-300">{compactNumber(point?.revenue)}</td>
-                      <td className="py-3 text-right text-gray-300">{compactNumber(point?.free_cash_flow)}</td>
-                      <td className="py-3 text-right text-gray-300">{percentage(point?.fcf_margin)}</td>
-                      <td className="py-3 text-right text-teal-200">{compactNumber(scenario.valuation?.value_per_share)}</td>
+                      <th className="py-3 text-left text-sm font-semibold capitalize text-gray-200" scope="row">{translate(SCENARIO_LABELS, name, ti)}</th>
+                      <td className="py-3 text-right text-gray-300">{num(point?.revenue)}</td>
+                      <td className="py-3 text-right text-gray-300">{num(point?.free_cash_flow)}</td>
+                      <td className="py-3 text-right text-gray-300">{pctv(point?.fcf_margin)}</td>
+                      <td className="py-3 text-right text-teal-200">{num(scenario.valuation?.value_per_share)}</td>
                     </tr>
                   );
                 })}
@@ -270,14 +289,14 @@ export function LongTermModelPanel({ model, ticker, t }: { model: ResearchLongTe
 
         <div className="space-y-3">
           <div className="rounded-md border border-gray-800 p-3">
-            <div className="text-xs font-semibold uppercase text-gray-500">Supuestos base</div>
+            <div className="text-xs font-semibold uppercase text-gray-500">{ti('research.model.baseAssumptions')}</div>
             <div className="mt-2 grid gap-2 text-sm">
-              <div className="flex justify-between gap-3"><span className="text-gray-400">CAGR de ingresos</span><span className="text-gray-200">{percentage(growthAssumption?.value)}</span></div>
-              <div className="flex justify-between gap-3"><span className="text-gray-400">Margen FCF normalizado</span><span className="text-gray-200">{percentage(marginAssumption?.value)}</span></div>
-              <div className="flex justify-between gap-3"><span className="text-gray-400"><GlossaryTerm k="roic" icon={false}>ROIC</GlossaryTerm> / <GlossaryTerm k="wacc" icon={false}>WACC</GlossaryTerm></span><span className="text-gray-200">{percentage(terminal?.roic)} / {waccDisplay(model.assumptions.wacc)}</span></div>
+              <div className="flex justify-between gap-3"><span className="text-gray-400">{ti('research.model.revenueCagr')}</span><span className="text-gray-200">{pctv(growthAssumption?.value)}</span></div>
+              <div className="flex justify-between gap-3"><span className="text-gray-400">{ti('research.model.normalizedFcfMargin')}</span><span className="text-gray-200">{pctv(marginAssumption?.value)}</span></div>
+              <div className="flex justify-between gap-3"><span className="text-gray-400"><GlossaryTerm k="roic" icon={false}>ROIC</GlossaryTerm> / <GlossaryTerm k="wacc" icon={false}>WACC</GlossaryTerm></span><span className="text-gray-200">{pctv(terminal?.roic)} / {waccDisplay(model.assumptions.wacc, fmt)}</span></div>
             </div>
             <p className="mt-3 text-xs leading-5 text-gray-500">
-              Fuentes ingresos: <AssumptionSources fuentes={growthAssumption?.fuentes} /> · FCF: <AssumptionSources fuentes={marginAssumption?.fuentes} />
+              {ti('research.model.revenueSources')} <AssumptionSources fuentes={growthAssumption?.fuentes} /> · {ti('research.model.fcfSources')} <AssumptionSources fuentes={marginAssumption?.fuentes} />
             </p>
           </div>
           <div className="rounded-md border border-gray-800 p-3 text-sm">
@@ -288,38 +307,38 @@ export function LongTermModelPanel({ model, ticker, t }: { model: ResearchLongTe
             </div>
             <p className="mt-2 text-gray-300">
               {model.reverse_dcf.status === 'ok'
-                ? `El precio actual exige ${percentage(model.reverse_dcf.required_revenue_growth)} de crecimiento; la base asume ${percentage(model.reverse_dcf.base_revenue_growth)}${model.reverse_dcf.fcf_margin != null ? `, con margen FCF normalizado ${percentage(model.reverse_dcf.fcf_margin)}` : ''}.`
-                : t('research.ficha.reverseDcfUnavailable', { inputs: (model.reverse_dcf.missing_inputs ?? []).map((item) => termLabel(item)).join(', ') || t('research.ficha.reverseDcfMissingInputs') })}
+                ? ti('research.model.reverseOk', { required: pctv(model.reverse_dcf.required_revenue_growth), base: pctv(model.reverse_dcf.base_revenue_growth), margin: model.reverse_dcf.fcf_margin != null ? ti('research.model.reverseMargin', { margin: pctv(model.reverse_dcf.fcf_margin) }) : '' })
+                : ti('research.ficha.reverseDcfUnavailable', { inputs: (model.reverse_dcf.missing_inputs ?? []).map(term).join(', ') || ti('research.ficha.reverseDcfMissingInputs') })}
             </p>
             <p className="mt-2 text-xs leading-5 text-gray-500">
-              El reverse DCF parte del precio de mercado y calcula qué crecimiento está descontando ya.
+              {ti('research.model.reverseHelp')}
             </p>
-            <ImpliedGrowthDetail reverse={model.reverse_dcf} t={t} />
+            <ImpliedGrowthDetail reverse={model.reverse_dcf} t={ti} />
           </div>
         </div>
       </div>
 
       <div className="mt-5 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-md border border-gray-800 p-3 text-sm">
-          <div className="text-xs font-semibold uppercase text-gray-500">Calidad del crecimiento</div>
-          <div className="mt-2 text-xl font-semibold capitalize text-gray-200">{translate(QUALITY_LABELS, model.quality_of_growth.quality)}</div>
-          <p className="mt-2 text-gray-400">CAGR de ingresos {percentage(model.quality_of_growth.revenue_cagr.value)} · cambio de margen FCF {percentage(model.quality_of_growth.fcf_margin_change.value)}</p>
-          <p className="mt-2 text-xs leading-5 text-gray-500">{translate(PROSE_ES, model.quality_of_growth.conclusion, model.quality_of_growth.conclusion)}</p>
+          <div className="text-xs font-semibold uppercase text-gray-500">{ti('research.model.growthQuality')}</div>
+          <div className="mt-2 text-xl font-semibold capitalize text-gray-200">{translate(QUALITY_LABELS, model.quality_of_growth.quality, ti)}</div>
+          <p className="mt-2 text-gray-400">{ti('research.model.growthLine', { cagr: pctv(model.quality_of_growth.revenue_cagr.value), change: pctv(model.quality_of_growth.fcf_margin_change.value) })}</p>
+          <p className="mt-2 text-xs leading-5 text-gray-500">{model.quality_of_growth.conclusion ? backendProse(model.quality_of_growth.conclusion, locale) : model.quality_of_growth.conclusion}</p>
         </div>
         <div className="rounded-md border border-gray-800 p-3 text-sm">
-          <div className="text-xs font-semibold uppercase text-gray-500">Beneficio del propietario</div>
-          <div className="mt-2 text-xl font-semibold text-gray-200">{compactNumber(model.owner_earnings.value)}</div>
-          <p className="mt-2 text-xs leading-5 text-gray-500">{model.owner_earnings.status === 'ok' ? ownerEarningsFormulaLabel(model.owner_earnings.formula) : `Insuficiente: ${(model.owner_earnings.missing_inputs ?? []).map((item) => termLabel(item)).join(', ')}.`}</p>
+          <div className="text-xs font-semibold uppercase text-gray-500">{ti('research.model.ownerEarnings')}</div>
+          <div className="mt-2 text-xl font-semibold text-gray-200">{num(model.owner_earnings.value)}</div>
+          <p className="mt-2 text-xs leading-5 text-gray-500">{model.owner_earnings.status === 'ok' ? ownerEarningsFormulaLabel(model.owner_earnings.formula, locale) : ti('research.model.insufficient', { items: (model.owner_earnings.missing_inputs ?? []).map(term).join(', ') })}</p>
         </div>
         <div className="rounded-md border border-gray-800 p-3 text-sm">
-          <div className="text-xs font-semibold uppercase text-gray-500">Motor de oportunidad de mercado</div>
-          <div className="mt-2 text-sm font-semibold text-gray-200">{frameworkLabel(model.framework.label)}</div>
-          <p className="mt-2 text-gray-400">TAM top-down {compactNumber(model.market_opportunity.top_down.tam.value)} · bottom-up {compactNumber(model.market_opportunity.bottom_up.value)}</p>
-          <p className="mt-2 text-gray-400">Restricción vinculante: {model.market_opportunity.constraints.binding_constraint ? termLabel(model.market_opportunity.constraints.binding_constraint) : 'desconocida'}</p>
+          <div className="text-xs font-semibold uppercase text-gray-500">{ti('research.model.opportunity')}</div>
+          <div className="mt-2 text-sm font-semibold text-gray-200">{locale === 'en' ? model.framework.label : frameworkLabel(model.framework.label)}</div>
+          <p className="mt-2 text-gray-400">{ti('research.model.tamLine', { tam: num(model.market_opportunity.top_down.tam.value), bottom: num(model.market_opportunity.bottom_up.value) })}</p>
+          <p className="mt-2 text-gray-400">{ti('research.model.binding', { constraint: model.market_opportunity.constraints.binding_constraint ? termLabel(model.market_opportunity.constraints.binding_constraint, locale) : ti('research.model.unknownConstraint') })}</p>
           <p className="mt-2 text-xs leading-5 text-gray-500">
-              {translate(VERDICT_LABELS, model.market_opportunity.verdict.label)} ·{' '}
+              {translate(VERDICT_LABELS, model.market_opportunity.verdict.label, ti)} ·{' '}
               {model.market_opportunity.verdict.conclusion.startsWith('Base revenue uses') && model.market_opportunity.verdict.base_revenue_to_binding_capacity != null
-                ? `El escenario base usa el ${formatPercent(model.market_opportunity.verdict.base_revenue_to_binding_capacity)} de la estimación de mercado/capacidad más restrictiva contrastada.`
+                ? ti('research.model.verdictBaseUses', { pct: fmt.formatPercent(model.market_opportunity.verdict.base_revenue_to_binding_capacity) })
                 : model.market_opportunity.verdict.conclusion}
             </p>
         </div>
@@ -327,32 +346,32 @@ export function LongTermModelPanel({ model, ticker, t }: { model: ResearchLongTe
 
       <div className="mt-5 grid gap-6 lg:grid-cols-2">
         <div>
-          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Lo que debe cumplirse</div>
+          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">{ti('research.model.mustBeTrue')}</div>
           <ul className="space-y-2 text-sm">
             {model.what_must_be_true.map((item) => (
               <li key={item.id} className="flex gap-2 text-gray-300">
                 <CircleHelp aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
-                <span><span className="block text-xs text-amber-300">{modelConditionState(item, waccHasSource(model.assumptions.wacc))}</span>{conditionInSpanish(item, model.market_opportunity?.constraints?.binding_constraint, waccHasSource(model.assumptions.wacc))}</span>
+                <span><span className="block text-xs text-amber-300">{modelConditionState(item, waccHasSource(model.assumptions.wacc))}</span>{conditionInSpanish(item, model.market_opportunity?.constraints?.binding_constraint, waccHasSource(model.assumptions.wacc), ti, fmt, locale)}</span>
               </li>
             ))}
           </ul>
         </div>
         <div>
-          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Cronología reciente de la empresa</div>
+          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">{ti('research.model.timeline')}</div>
           <div className="space-y-2 text-sm">
             {model.timeline.slice(0, 4).map((event, index) => (
               <div key={`${event.date}-${event.title}-${index}`} className="rounded-md border border-gray-800 p-2">
-                <div className="flex justify-between gap-3"><span className="font-medium text-gray-300">{event.title}</span><span className="text-xs text-gray-500">{event.date ? formatMarketDate(event.date.slice(0, 10)) : 's/d'}</span></div>
-                <div className="mt-1 text-xs text-gray-500">{etiquetaTipoEvento(event.type)} · {event.source} · impacto {translate(IMPACT_LABELS, event.thesis_impact, event.thesis_impact)}</div>
+                <div className="flex justify-between gap-3"><span className="font-medium text-gray-300">{event.title}</span><span className="text-xs text-gray-500">{event.date ? fmt.formatMarketDate(event.date.slice(0, 10)) : ti('research.model.na')}</span></div>
+                <div className="mt-1 text-xs text-gray-500">{etiquetaTipoEvento(event.type, locale)} · {event.source} · {ti('research.model.impact', { impact: translate(IMPACT_LABELS, event.thesis_impact, ti, event.thesis_impact) })}</div>
               </div>
             ))}
-            {!model.timeline.length ? <div className="text-sm text-gray-500">No hay eventos históricos almacenados.</div> : null}
+            {!model.timeline.length ? <div className="text-sm text-gray-500">{ti('research.model.noEvents')}</div> : null}
           </div>
         </div>
       </div>
 
       <p className="mt-5 border-t border-gray-800 pt-3 text-xs leading-5 text-gray-500">
-        Historial disponible: {model.historical_review.years_covered} {model.historical_review.years_covered === 1 ? 'año' : 'años'} ({model.historical_review.first_year ?? '—'}–{model.historical_review.last_year ?? '—'}), frente a los {model.horizon_years} años proyectados. Los números calculados conservan sus fact IDs; lo no disponible se muestra como unknown/insufficient_data.
+        {ti(model.historical_review.years_covered === 1 ? 'research.model.historyOne' : 'research.model.historyOther', { years: model.historical_review.years_covered, first: model.historical_review.first_year ?? '—', last: model.historical_review.last_year ?? '—', horizon: model.horizon_years })}
       </p>
     </section>
   );
@@ -438,7 +457,7 @@ export function DecisionAndRealityPanel({
           ) : decisions.slice(0, 8).map((entry) => (
             <div className="rounded-md border border-gray-800 p-3" key={entry.id}>
               <div className="flex items-center justify-between gap-3">
-                <Badge variant="outline">{translate(DECISION_LABELS, entry.decision, entry.decision)}</Badge>
+                <Badge variant="outline">{DECISION_LABELS[entry.decision] ?? entry.decision}</Badge>
                 <span className="text-xs text-gray-500">{entry.decision_date}</span>
               </div>
               <p className="mt-2 text-sm text-gray-300">{entry.rationale}</p>
@@ -567,16 +586,16 @@ function isSuggested(metadata: Record<string, unknown> | undefined): boolean {
   return (metadata?.auto_link as { status?: unknown } | undefined)?.status === 'suggested';
 }
 
-function ImpliedGrowthDetail({ reverse, t }: { reverse: Parameters<typeof impliedGrowthView>[0]; t: TranslateFn }) {
+function ImpliedGrowthDetail({ reverse, t: ti }: { reverse: Parameters<typeof impliedGrowthView>[0]; t: TranslateFn }) {
   const view = impliedGrowthView(reverse);
   if (!view.perpetual && !view.split.length && !view.grid) return null;
   return (
     <div className="mt-3 space-y-3 border-t border-gray-800 pt-3" data-testid="implied-growth">
-      <div className="text-xs font-semibold uppercase text-gray-500">{t('research.ficha.impliedGrowthTitle')}</div>
-      {view.perpetual ? <p className="text-gray-300">{t('research.ficha.impliedGrowthPerpetual', { value: view.perpetual })}</p> : null}
+      <div className="text-xs font-semibold uppercase text-gray-500">{ti('research.ficha.impliedGrowthTitle')}</div>
+      {view.perpetual ? <p className="text-gray-300">{ti('research.ficha.impliedGrowthPerpetual', { value: view.perpetual })}</p> : null}
       {view.split.length ? (
         <div>
-          <p className="text-xs text-gray-500">{t('research.ficha.impliedGrowthSplitTitle')}</p>
+          <p className="text-xs text-gray-500">{ti('research.ficha.impliedGrowthSplitTitle')}</p>
           <ul className="mt-1 space-y-1">
             {view.split.map((part) => (
               <li key={part.label} className="flex items-center gap-2 text-xs">
@@ -591,8 +610,8 @@ function ImpliedGrowthDetail({ reverse, t }: { reverse: Parameters<typeof implie
       {view.grid ? (
         // WCAG 2.1.1: el contenedor con scroll horizontal debe ser region
         // enfocable (con teclado no hay barra de scroll), como el de arriba.
-        <div aria-label={t('research.ficha.impliedGrowthGridLabel')} className="overflow-x-auto" role="region" tabIndex={0}>
-          <p className="text-xs text-gray-500">{t('research.ficha.impliedGrowthGridLabel')}</p>
+        <div aria-label={ti('research.ficha.impliedGrowthGridLabel')} className="overflow-x-auto" role="region" tabIndex={0}>
+          <p className="text-xs text-gray-500">{ti('research.ficha.impliedGrowthGridLabel')}</p>
           <table className="mt-1 w-full text-xs tabular-nums">
             <thead><tr><th className="text-left font-normal text-gray-500" scope="col"><span className="sr-only">WACC</span></th>{view.grid.columns.map((column) => <th key={column} scope="col" className="px-1 text-right font-normal text-gray-500">{column}</th>)}</tr></thead>
             <tbody>

@@ -3,8 +3,8 @@
 import { useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DcaSignalItem } from '@/lib/dca/types';
-import { useT } from '@/lib/i18n/client';
-import { DCA_STATUS_LABEL, dcaDataAge, dcaMissingBadge, dcaPrice, dcaRsi, dcaSignalMetric } from '@/lib/dca/format';
+import { useLocale, useT } from '@/lib/i18n/client';
+import { dcaDataAge, dcaMissingBadge, dcaPrice, dcaRsi, dcaSignalMetric, dcaStaleText, dcaStatusLabel } from '@/lib/dca/format';
 
 interface DcaLevelBadgeProps {
     item: DcaSignalItem | undefined;
@@ -20,10 +20,11 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
     const [open, setOpen] = useState(false);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const t = useT();
+    const locale = useLocale();
     const state = item?.state ?? null;
     if (!state) {
         if (compact) return null;
-        const missing = dcaMissingBadge(item);
+        const missing = dcaMissingBadge(item, t);
         const tone =
             missing.tone === 'error'
                 ? 'border-red-800 text-red-300'
@@ -38,13 +39,13 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
     }
     const forming = state.status === 'forming';
     const stale = state.stale === true;
-    const age = dcaDataAge(state.data_age_days);
-    const staleText = stale ? (age ? `desactualizado · ${age}` : 'desactualizado') : null;
-    const metric = dcaSignalMetric(state, signalMonths);
-    const rsi = dcaRsi(state.metrics?.rsi);
-    const close = dcaPrice(state.close, state.currency_label);
+    const age = dcaDataAge(state.data_age_days, t);
+    const staleText = stale ? dcaStaleText(age, t) : null;
+    const metric = dcaSignalMetric(state, signalMonths, t, locale);
+    const rsi = dcaRsi(state.metrics?.rsi, locale);
+    const close = dcaPrice(state.close, state.currency_label, locale);
     const prices = (['2x', '3x', '4x'] as const)
-        .map((key) => ({ key, value: dcaPrice(state.level_prices?.[key], state.currency_label) }))
+        .map((key) => ({ key, value: dcaPrice(state.level_prices?.[key], state.currency_label, locale) }))
         .filter((entry) => entry.value);
     const badge = (
         <Tooltip open={open} onOpenChange={setOpen}>
@@ -58,7 +59,7 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
                     onClick={(event) => { event.preventDefault(); setOpen((value) => !value); }}
                     className="relative before:absolute before:-inset-2.5 before:content-[''] inline-flex min-h-6 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap"
                     style={{ backgroundColor: state.color, color: state.fg, borderColor: state.color === '#FFFFFF' ? '#9CA3AF' : state.color }}
-                    aria-label={`${item?.symbol ?? ''}: ${state.label}, ${DCA_STATUS_LABEL[state.status] ?? state.status}${staleText ? `, ${staleText}` : ''}`}
+                    aria-label={`${item?.symbol ?? ''}: ${state.label}, ${dcaStatusLabel(state.status, t)}${staleText ? `, ${staleText}` : ''}`}
                 >
                     {state.label}
                     {forming ? <span className="font-normal opacity-80">{t('watchlist.dca.badge.provisional')}</span> : null}
@@ -70,7 +71,7 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
                 onPointerDownOutside={(event) => { if (triggerRef.current?.contains(event.target as Node)) event.preventDefault(); }}
             >
                 <p className="font-semibold">{state.zone}</p>
-                <p>{t('watchlist.dca.badge.status', { status: DCA_STATUS_LABEL[state.status] ?? state.status, period: state.period })}</p>
+                <p>{t('watchlist.dca.badge.status', { status: dcaStatusLabel(state.status, t), period: state.period })}</p>
                 {close ? <p>{t('watchlist.dca.badge.settledClose', { close, date: state.signal_date })}</p> : null}
                 {metric ? <p>{metric.label}: {metric.value}</p> : null}
                 {rsi ? <p>{t('watchlist.dca.badge.monthlyRsi', { rsi })}</p> : null}

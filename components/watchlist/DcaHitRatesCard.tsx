@@ -98,8 +98,8 @@ export default function DcaHitRatesCard({ data, compact = false, scope = 'full',
                         </div>
                         <div className="grid grid-cols-2 gap-1.5 sm:contents">
                             {row.cells.map((cell) => {
-                                const pct = dcaPercent(cell.pct_higher);
-                                const avg = dcaPercent(cell.avg_return);
+                                const pct = dcaPercent(cell.pct_higher, locale);
+                                const avg = dcaPercent(cell.avg_return, locale);
                                 return (
                                     <div key={cell.horizon_months} role="cell" className="rounded bg-gray-900/60 px-2 py-1 tabular-nums text-gray-200 sm:bg-transparent sm:px-1 sm:py-0 sm:text-right">
                                         <span className="block text-[10px] font-medium text-gray-500 sm:hidden">{ti('watchlist.hitRates.months', { count: cell.horizon_months })}</span>

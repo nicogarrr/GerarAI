@@ -14,9 +14,11 @@ const panel = readFileSync('components/research/FundamentalModelPanels.tsx', 'ut
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 
 test('drivers, KPIs y entradas faltantes pasan por metricLabel', () => {
-    assert.match(panel, /revenue_drivers\.map\(\(item\) => termLabel\(item\)\)/);
-    assert.match(panel, /kpis\.map\(\(item\) => termLabel\(item\)\)/);
-    assert.match(panel, /missing_inputs\.map\(\(item\) => termLabel\(item\)\)/);
+    // term = termLabel con el idioma elegido (i18n).
+    assert.match(panel, /const term = \(item: string\) => termLabel\(item, locale\)/);
+    assert.match(panel, /revenue_drivers\.map\(term\)/);
+    assert.match(panel, /kpis\.map\(term\)/);
+    assert.match(panel, /missing_inputs\.map\(term\)/);
     assert.match(page, /formula\.missing_inputs\.map\(\(item\) => termLabel\(item, locale\)\)/);
 });
 
