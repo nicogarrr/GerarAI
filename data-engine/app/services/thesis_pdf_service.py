@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.entities import Claim, Portfolio, Position, ThesisSection, ThesisVersion
 from app.services.company_resolver import resolve_company
 from app.services.thesis_publication_gate import archived_thesis_notice, thesis_withheld_reason
+from app.valuation.currency import normalize_currency
 
 
 @dataclass
@@ -380,7 +381,12 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
         cost_px = float(p.average_cost)
         price_is_cost = not held and not market_px and bool(cost_px)
         px = None if held else (market_px if market_px else cost_px)
-        native_ccy = (p.currency or "").upper()
+        # Subunidad (Londres en «GBp»): precio y valor nativo en la divisa
+        # principal; ``.upper()`` rotulaba 2.650 peniques como 2.650 «GBP».
+        major, divisor = normalize_currency(p.currency)
+        native_ccy = major or ""
+        if px is not None and divisor != 1:
+            px = px / divisor
         # Valor en divisa base si el libro lo tiene; si no, valor nativo estimado.
         base_val = None if held else (float(p.market_value_base) if p.market_value_base is not None else None)
         val = None if px is None else (base_val if base_val is not None else qty * px)
