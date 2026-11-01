@@ -21,7 +21,7 @@ from app.services.expert_team import (
 )
 
 
-def _tool(name: str, data_by_tenant: dict[str, dict] | None = None, *, table: str = "t"):
+def _tool(name: str, data_by_tenant: dict[int | str, dict] | None = None, *, table: str = "t"):
     def fn(ctx: RunContext) -> ToolOutput | None:
         data = (data_by_tenant or {}).get(ctx.tenant_id, {"ticker": ctx.ticker, "value": 10.0})
         return ToolOutput(source={"table": table, "date": "2026-10-31"}, data=data)
@@ -185,7 +185,10 @@ def test_no_evidence_means_no_llm_call():
 
 
 def test_per_user_isolation_in_concurrent_runs():
-    data = {"tenant-a": {"secret": "A-ONLY", "value": 1.0}, "tenant-b": {"secret": "B-ONLY", "value": 2.0}}
+    data: dict[int | str, dict] = {
+        "tenant-a": {"secret": "A-ONLY", "value": 1.0},
+        "tenant-b": {"secret": "B-ONLY", "value": 2.0},
+    }
     tools = {n: _tool(n, data) for n in TOOLS}
     calls: list = []
     team = ExpertTeam(_experts(), tools, _citing_reasoner(delay=0.01, calls=calls))

@@ -57,6 +57,11 @@ NAMES_WITH_EN = {
     "propicks_review_service",
     "public_headline_translation",
     "second_order_news_service",
+    "expert_fundamental",
+    "expert_valuation",
+    "expert_risk",
+    "expert_news",
+    "expert_tax",
 }
 
 # Prompts sin prosa visible o idioma-neutros: NO deben tener variante EN.

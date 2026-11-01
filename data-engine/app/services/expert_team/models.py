@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
@@ -15,7 +15,7 @@ ReportStatus = Literal["ok", "no_data", "timeout", "error"]
 class RunContext:
     """Quién pregunta y sobre qué. Lo fija el servidor, nunca el modelo."""
 
-    tenant_id: str
+    tenant_id: int | str
     user_id: str | None = None
     ticker: str | None = None
     question: str | None = None
@@ -32,7 +32,8 @@ class ToolOutput:
     data: Any
 
 
-ToolFn = Callable[[RunContext], "ToolOutput | None | Awaitable[ToolOutput | None]"]
+#: Una herramienta puede devolver una salida, varias (una por fila citable) o nada.
+ToolFn = Callable[[RunContext], Any]
 
 
 @dataclass(frozen=True)

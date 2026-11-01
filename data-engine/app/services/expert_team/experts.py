@@ -10,7 +10,7 @@ from typing import Any
 
 from app.llm.json import parse_json_response
 from app.services.expert_team.ledger import EvidenceLedger
-from app.services.expert_team.models import Claim, ExpertReport, RunContext, ToolSpec
+from app.services.expert_team.models import Claim, ExpertReport, RunContext, ToolOutput, ToolSpec
 
 #: ``(system, user, max_tokens, task) -> texto``. Inyectable: los tests usan uno falso.
 Reasoner = Callable[[str, str, int, str], Awaitable[str]]
@@ -77,14 +77,15 @@ async def gather_evidence(
         except Exception as exc:  # una herramienta rota no tumba al experto
             errors.append(f"{name}:{type(exc).__name__}")
             continue
-        if out is None:
-            continue
-        item = ledger.add(expert=spec.name, tool=name, source=out.source, data=out.data)
-        data: Any = item.data
-        raw = json.dumps(data, ensure_ascii=False, default=str)
-        if len(raw) > MAX_EVIDENCE_CHARS:
-            data = raw[:MAX_EVIDENCE_CHARS] + "…"
-        evidence.append({"id": item.id, "tool": name, "source": dict(item.source), "data": data})
+        for one in out if isinstance(out, list) else [out]:
+            if not isinstance(one, ToolOutput):
+                continue
+            item = ledger.add(expert=spec.name, tool=name, source=one.source, data=one.data)
+            data: Any = item.data
+            raw = json.dumps(data, ensure_ascii=False, default=str)
+            if len(raw) > MAX_EVIDENCE_CHARS:
+                data = raw[:MAX_EVIDENCE_CHARS] + "…"
+            evidence.append({"id": item.id, "tool": name, "source": dict(item.source), "data": data})
     return evidence, errors
 
 
