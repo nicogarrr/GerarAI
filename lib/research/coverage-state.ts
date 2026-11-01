@@ -24,6 +24,13 @@ export function researchValuability(snapshot: {
   return 'Revisar tesis y supuestos';
 }
 
+/** Texto visible del aviso de valorabilidad en el idioma elegido. */
+export function researchValuabilityLabel(value: string, ti: TiFn = esT): string {
+  if (value === NOT_VALUABLE) return ti('research.valuability.notValuable');
+  if (value === 'Revisar tesis y supuestos') return ti('research.valuability.review');
+  return value;
+}
+
 /** A forecast condition is not evidence that the condition was met. */
 export function modelConditionState(item: {
   id: string; value: number | null; comparison?: number | null; status: string;

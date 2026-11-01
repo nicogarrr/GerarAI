@@ -33,7 +33,7 @@ import { SectionLoadError } from '@/components/research/sections/SectionLoadErro
 import { QuickGlancePanel } from '@/components/research/QuickGlancePanel';
 import { getAnalystTargets } from '@/lib/research/analyst-targets';
 import { getKeyStats } from '@/lib/research/key-stats';
-import { researchValuability, visibleThesisRating } from '@/lib/research/coverage-state';
+import { researchValuability, researchValuabilityLabel, visibleThesisRating } from '@/lib/research/coverage-state';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getProfile } from '@/lib/actions/finnhub.actions';
@@ -1173,10 +1173,10 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             <p>{t('research.fichaMissingLayersHeading')}</p>
             <ul className="mt-2 space-y-1">
               {snapshot.research_health.missing.map((layer) => {
-                const action = missingLayerAction(ticker, layer);
+                const action = missingLayerAction(ticker, layer, t);
                 return (
                   <li key={layer}>
-                    {missingLayerLabel(layer)}
+                    {missingLayerLabel(layer, t)}
                     {action ? (
                       <>
                         {' — '}
@@ -1235,7 +1235,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         <OwnershipSignalsPanel locale={locale} signals={ownershipSignals} ticker={ticker} />
         {ticker === 'ASTS' ? <Panel collapsible="mobile" title={t('research.fichaSatellitesPanel')}><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=seguimiento#satellites`}>{t('research.fichaOrbitalSignal')}</Link></Panel> : null}
         <p role="status" className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
-          {researchValuability(snapshot)}
+          {researchValuabilityLabel(researchValuability(snapshot), t)}
         </p>
         {/* Price chart lives once in the company header, across all views. */}
         </div>
@@ -1395,7 +1395,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         <Panel title={t('research.fichaClaimsEvidence')}>
           <ResearchClaimForm action={createResearchClaim.bind(null, ticker)} locale={locale} />
           <div className="space-y-3">
-            {data.claims.length ? groupClaimsByVersion(data.claims, data.history).map((group) => (
+            {data.claims.length ? groupClaimsByVersion(data.claims, data.history, t).map((group) => (
               <details key={group.key} open={group.claims.some((claim) => claim.thesis_version_id === data.thesis?.id)} className="rounded-lg border border-gray-800 p-3">
                 <summary className="cursor-pointer text-sm font-semibold text-gray-300">{t('research.fichaGroupClaims', { label: group.label, count: group.claims.length })}</summary>
                 <PagedList
@@ -1683,9 +1683,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 id: document.id,
                 title: document.title,
                 url: safeHttpUrl(document.source_url),
-                tier: etiquetaTierFuente(document.source_tier),
+                tier: etiquetaTierFuente(document.source_tier, locale),
                 tierRank: tierRankFuente(document.source_tier),
-                type: label(document.source_type),
+                type: label(document.source_type, locale),
                 published: document.published_at ? formatDate(document.published_at) : t('research.fichaUnknownDate'),
                 publishedTs: document.published_at ?? null,
               }))}

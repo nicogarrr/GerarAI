@@ -1730,5 +1730,24 @@
     "providerDown": "Metrics provider unavailable",
     "ttm": "Finnhub · trailing 12 months",
     "notReported": "The provider doesn't report a P/E (e.g. negative earnings)"
+  },
+  "valuability": {
+    "notValuable": "Not valuable / missing evidence",
+    "review": "Review thesis and assumptions"
+  },
+  "claimGroups": {
+    "manual": "No linked thesis version",
+    "unknownVersion": "Linked thesis (ID {id}, version N/A)",
+    "version": "Thesis v{version}"
+  },
+  "missingLayer": {
+    "documents": "documents",
+    "financialFacts": "financial facts",
+    "thesis": "thesis",
+    "longTermModel": "long-term model",
+    "actionDocuments": "Import a primary source",
+    "actionFinancialFacts": "Refresh the financials",
+    "actionThesis": "Open the thesis to generate it",
+    "actionLongTermModel": "Generate the model"
   }
 }

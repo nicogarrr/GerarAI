@@ -42,7 +42,7 @@ test('la ficha muestra la atribucion de la foto', () => {
 });
 
 test('la lista atribuye las fotos (title en la miniatura y nota al pie)', () => {
-    assert.match(readFileSync('app/(root)/inversores/_components/Avatar.tsx', 'utf8'), /photoTitle=\{photo \? `Foto: \$\{photo\.author\}/);
+    assert.match(readFileSync('app/(root)/inversores/_components/Avatar.tsx', 'utf8'), /photoTitle=\{photo \? `\$\{t\('investors\.detail\.photo'\)\} \$\{photo\.author\}/);
     for (const file of ['app/(root)/inversores/page.tsx']) {
         assert.match(readFileSync(file, 'utf8'), /t\('investors\.hub\.photosNote'\)/, file);
     }

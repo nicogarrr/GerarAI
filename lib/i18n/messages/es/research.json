@@ -1730,5 +1730,24 @@
     "providerDown": "Proveedor de métricas no disponible",
     "ttm": "Finnhub · últimos 12 meses",
     "notReported": "El proveedor no informa PER (p. ej. beneficio negativo)"
+  },
+  "valuability": {
+    "notValuable": "No valorable / falta evidencia",
+    "review": "Revisar tesis y supuestos"
+  },
+  "claimGroups": {
+    "manual": "Sin versión de tesis vinculada",
+    "unknownVersion": "Tesis vinculada (ID {id}, versión N/D)",
+    "version": "Tesis v{version}"
+  },
+  "missingLayer": {
+    "documents": "documentos",
+    "financialFacts": "hechos financieros",
+    "thesis": "tesis",
+    "longTermModel": "modelo a largo plazo",
+    "actionDocuments": "Importa una fuente primaria",
+    "actionFinancialFacts": "Refresca los financieros",
+    "actionThesis": "Abre la tesis para generarla",
+    "actionLongTermModel": "Genera el modelo"
   }
 }
