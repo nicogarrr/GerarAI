@@ -201,7 +201,7 @@ describe('ThesisMemo: los importes de la tesis usan la divisa del listado', () =
         assert.ok(!/'USD'/.test(memo), 'ningún USD literal en la tesis');
         assert.match(memo, /isValidCurrencyCode\(currency\)/, 'la divisa se valida con el helper de lib/format');
         assert.match(memo, /currency\?: string \| null;/, 'la divisa entra como prop, no se supone');
-        assert.match(memo, /if \(!isValidCurrencyCode\(currency\)\) return NA;/, 'sin divisa válida el importe es NA, nunca USD');
+        assert.match(memo, /if \(!isValidCurrencyCode\(currency\)\) return naFor\(locale\);/, 'sin divisa válida el importe es NA, nunca USD');
     });
 
     it('la página le pasa la divisa de la compañía, la misma que usa la valoración', () => {

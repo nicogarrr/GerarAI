@@ -32,19 +32,23 @@ function pickListed(
   return out;
 }
 
-function adrLabel(ratio: number | null | undefined): string {
+function adrLabel(ratio: number | null | undefined, locale: 'es' | 'en' = 'es'): string {
+  const per = locale === 'en' ? 'per ADR' : 'por ADR';
   return typeof ratio === 'number' && Number.isFinite(ratio) && ratio > 0
-    ? ` (por ADR, ×${ratio})`
-    : ' (por ADR)';
+    ? ` (${per}, ×${ratio})`
+    : ` (${per})`;
 }
 
-const UNVERIFIED_BASIS = ' (base por acción no verificada)';
+const UNVERIFIED_BASIS: Record<'es' | 'en', string> = {
+  es: ' (base por acción no verificada)',
+  en: ' (per-share basis not verified)',
+};
 
 /** Hay ratio ADR distinto de 1 pero sin valores listados: la base no se puede afirmar. */
-function unlistedRatioLabel(basis: ValuationBasis): string {
+function unlistedRatioLabel(basis: ValuationBasis, locale: 'es' | 'en' = 'es'): string {
   const ratio = basis?.adr_ratio;
   return typeof ratio === 'number' && Number.isFinite(ratio) && ratio > 0 && ratio !== 1
-    ? UNVERIFIED_BASIS
+    ? UNVERIFIED_BASIS[locale]
     : '';
 }
 
@@ -55,19 +59,21 @@ function unlistedRatioLabel(basis: ValuationBasis): string {
 export function thesisScenarioDisplay(
   original: ScenarioValues,
   basis: ValuationBasis,
+  locale: 'es' | 'en' = 'es',
 ): ScenarioDisplay {
-  if (!basis) return { values: original, label: UNVERIFIED_BASIS };
+  if (!basis) return { values: original, label: UNVERIFIED_BASIS[locale] };
   const listed = pickListed(basis.listed_share_values);
-  if (listed) return { values: listed, label: adrLabel(basis.adr_ratio) };
-  return { values: original, label: unlistedRatioLabel(basis) };
+  if (listed) return { values: listed, label: adrLabel(basis.adr_ratio, locale) };
+  return { values: original, label: unlistedRatioLabel(basis, locale) };
 }
 
 /** Valoración en vivo: usa los campos de su propia respuesta. */
 export function valuationScenarioDisplay(
   original: ScenarioValues,
   basis: ValuationBasis,
+  locale: 'es' | 'en' = 'es',
 ): ScenarioDisplay {
   const listed = pickListed(basis?.listed_share_values);
-  if (listed) return { values: listed, label: adrLabel(basis?.adr_ratio) };
-  return { values: original, label: unlistedRatioLabel(basis) };
+  if (listed) return { values: listed, label: adrLabel(basis?.adr_ratio, locale) };
+  return { values: original, label: unlistedRatioLabel(basis, locale) };
 }

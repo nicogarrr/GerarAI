@@ -29,7 +29,7 @@ describe('marginOfSafetyDisplay', () => {
         assert.equal(marginOfSafetyDisplay(null, 100), NA);
     });
     it('la ficha usa el helper, no pct() directo sobre margin_of_safety', () => {
-        assert.match(memo, /marginOfSafetyDisplay\(knownMargin \? thesis\.margin_of_safety : archivedMargin, thesis\.base_value\)/);
+        assert.match(memo, /marginOfSafetyDisplay\(knownMargin \? thesis\.margin_of_safety : archivedMargin, thesis\.base_value, locale\)/);
         assert.doesNotMatch(memo, /pct\(thesis\.margin_of_safety\)/);
     });
 });
