@@ -1,6 +1,6 @@
 'use client';
 
-import { formatCompact, formatUserDateTime, formatMarketDate, formatMoney, formatNumber, formatPercent, formatPrice, isValidCurrencyCode, NA } from '@/lib/format';
+import { formatNumber as formatNumberFor, isValidCurrencyCode } from '@/lib/format';
 import {
     DCF_CANDIDATE_LIMIT,
     dcfScopeNote,
@@ -30,7 +30,7 @@ import { holdingDisplayMode } from '@/lib/portfolio/holding-display';
 import { alertCardDestination, alertThesisHref } from '@/lib/alerts/card-destination';
 import { alertCardCopy, alertSummaryIsSourceHeadline } from '@/lib/alerts/card-copy';
 import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
-import { useLocale, useT } from '@/lib/i18n/client';
+import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 import type { Locale } from '@/lib/i18n/locale';
 import type { TranslateFn } from '@/lib/i18n/translate';
 import { buildPortfolioInsight } from '@/lib/portfolio-insight';
@@ -73,6 +73,7 @@ interface UndervaluedStock {
 /** Valor justo único de una posición en el inicio: margen frente al precio y su fuente. */
 function HomeFairValueHint({ holding, signals }: { holding: PortfolioHolding; signals: ReturnType<typeof useHoldingSignals> }) {
     const t = useT();
+    const { formatNumber, formatPercent } = useFormat();
     if (signals === null) return null;
     const fair = signals.fairValues[holding.symbol.toUpperCase()];
     if (!fair) return <span className="text-[11px] text-gray-500">{t('home.fair.none')}</span>;
@@ -282,7 +283,7 @@ function alertRuleLabel(alert: Alert, tr: TranslateFn, locale: Locale): string {
     };
     if (alert.type === 'news' || alert.type === 'earnings') return `${alert.symbol}: ${labels[alert.type]}`;
     const value = typeof alert.condition.value === 'number'
-        ? formatNumber(alert.condition.value, { maximumFractionDigits: 2 }, undefined, locale)
+        ? formatNumberFor(alert.condition.value, { maximumFractionDigits: 2 }, undefined, locale)
         : String(alert.condition.value);
     return `${alert.symbol}: ${labels[alert.type]} ${value}`;
 }
@@ -297,6 +298,8 @@ function settle<T>(promise: Promise<T>, fallback: T): Promise<{ data: T; error: 
 
 export default function PersonalizedOverview({ userId, afterAlerts }: PersonalizedOverviewProps) {
     const t = useT();
+    // Cifras y fechas con el formato del idioma elegido (antes siempre es-ES).
+    const { formatCompact, formatUserDateTime, formatMarketDate, formatMoney, formatNumber, formatPercent, formatPrice, na: NA } = useFormat();
     const locale = useLocale();
     const [retryTokens, setRetryTokens] = useState<Record<SectionKey, number>>(EMPTY_RETRY_TOKENS);
     const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);

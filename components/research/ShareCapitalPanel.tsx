@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { CapitalFact, ShareCapital } from '@/lib/actions/share-capital.actions';
-import { formatCompact, formatNumber } from '@/lib/format';
 import { useFormat, useT } from '@/lib/i18n/client';
 import { Panel } from '@/components/ui/panel';
 import { Stat } from '@/components/ui/stat';
@@ -15,15 +14,23 @@ const ShareCapitalChart = dynamic(() => import('@/components/research/ShareCapit
   loading: () => <div className="h-full w-full animate-pulse rounded bg-slate-800/40" aria-hidden="true" />,
 });
 
-const compact = (value: number) => formatCompact(value);
-const percent = (value: number | null) => value == null ? 'N/D' : `${value > 0 ? '+' : ''}${formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+/** Cifras con el formato del idioma elegido (es-ES por defecto). */
+function useNums() {
+  const { formatCompact, formatNumber, na } = useFormat();
+  return {
+    na,
+    compact: (value: number) => formatCompact(value),
+    percent: (value: number | null) => value == null ? na : `${value > 0 ? '+' : ''}${formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`,
+  };
+}
 function Source({ fact }: { fact: CapitalFact }) {
   const t = useT();
   const { formatMarketDate } = useFormat();
   return <a href={fact.source_url} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-300">{fact.source} · {formatMarketDate(fact.date)}{fact.reported_on ? t('research.shareCapital.filed', { date: formatMarketDate(fact.reported_on) }) : ''}</a>;
 }
 function Fact({ fact }: { fact?: CapitalFact }) {
-  return fact ? <div><div>{compact(fact.value)}{fact.unit && fact.unit !== 'shares' ? ` ${fact.unit}` : ''}</div><Source fact={fact} /></div> : <span className="text-gray-500">N/D</span>;
+  const { compact, na } = useNums();
+  return fact ? <div><div>{compact(fact.value)}{fact.unit && fact.unit !== 'shares' ? ` ${fact.unit}` : ''}</div><Source fact={fact} /></div> : <span className="text-gray-500">{na}</span>;
 }
 function Pager({ page, pages, onChange }: { page: number; pages: number; onChange: (value: number) => void }) {
   const t = useT();
@@ -37,13 +44,14 @@ export function ShareCapitalPanel({ data }: { data: ShareCapital }) {
   const [tab, setTab] = useState<'balances' | 'flows'>('balances');
   const t = useT();
   const { formatMarketDate } = useFormat();
+  const { compact, percent, na } = useNums();
   const [page, setPage] = useState(1);
   const latest = data.series.at(-1);
   const count = tab === 'balances' ? data.series.length : data.annual_flows.length;
   const pages = Math.max(1, Math.ceil(count / 10));
   return <>
     <div className="grid gap-3 sm:grid-cols-2">
-      <Stat label={t('research.shareCapital.outstanding')} value={latest ? compact(latest.value) : 'N/D'} hint={latest ? <Source fact={latest} /> : t('research.shareCapital.noBalance')} />
+      <Stat label={t('research.shareCapital.outstanding')} value={latest ? compact(latest.value) : na} hint={latest ? <Source fact={latest} /> : t('research.shareCapital.noBalance')} />
       <Stat label={t('research.shareCapital.netChange')} value={percent(latest?.net_change_pct ?? null)} hint={latest?.net_change_pct != null ? t('research.shareCapital.calculated', { from: formatMarketDate(latest.previous_date), to: formatMarketDate(latest.date) }) : latest?.split_between_dates ? t('research.shareCapital.splitBetween') : latest?.abrupt_jump ? t('research.shareCapital.abruptJump') : t('research.shareCapital.noComparable')} />
     </div>
     <p className="text-xs text-gray-400">{t('research.shareCapital.unadjusted')}</p>
