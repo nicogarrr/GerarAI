@@ -130,20 +130,20 @@ ps` que **no queda ningun productor en pie**. No es literal que "solo quedan
 los servicios de datos": **caddy tambien sigue arriba** (no escribe en
 storage; dejarlo mantiene el TLS, aunque el backend parado no responde).
 
-> **`worker-knowledge` estaba omitido en la lista original del piloto.** No
-> monta `MINIO_*` (su configuracion por defecto cae a un `localhost` no
-> contactable, asi que no puede escribir en el storage de objetos), pero se
-> incluye en la parada: durante la ventana su dependencia `backend` esta
-> parada de todos modos, y pararlo cuesta cero y quita la duda. La lista de
-> la fase 3 de OBJECT_STORAGE_MIGRATION.md quedo corregida en este mismo PR.
+> **`worker-knowledge` estaba omitido en la lista original del piloto.** Hoy
+> hereda `MINIO_*` del ancla `x-app-env` como el resto de servicios; se
+> incluye en la parada por criterio conservador: durante la ventana su
+> dependencia `backend` esta parada de todos modos, y pararlo cuesta cero y
+> quita la duda. La lista de la fase 3 de OBJECT_STORAGE_MIGRATION.md quedo
+> corregida en este mismo PR.
 
 > **Mismo criterio para los seis workers de colas de datos**
 > (`worker-official-closes`, `worker-prices`, `worker-externa`,
 > `worker-finnhub`, `worker-yahoo`, `worker-dca-manual`): heredan `MINIO_*`
-> del ancla `x-app-env` pero no escriben en el storage de objetos (verificado:
-> `app/workers/dramatiq_app.py` no usa `document_store`). Se paran igualmente:
-> el `ps` de confirmacion tiene que quedar limpio de productores y pararlos
-> cuesta cero.
+> del ancla `x-app-env` igual que el resto, asi que se detienen todos por
+> criterio conservador. No se afirma que no escriban: un actor puede llegar
+> al storage transitivamente (p. ej. `process_document` -> ingesta ->
+> storage); la parada total es la garantia, no el analisis estatico.
 
 ## Paso 3 - Delta, verify-only y cambio de endpoint
 
