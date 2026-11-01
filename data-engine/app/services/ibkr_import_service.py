@@ -279,7 +279,15 @@ _CSV_COLUMN_ALIASES = {
     "fees": {"fees", "commission", "ibcommission"},
     "currency": {"currency", "currencyprimary"},
     "isin": {"isin"},
+    # Flex Query exportada como CSV: tipo de activo y multiplicador del contrato.
+    "asset_category": {"assetclass", "assetcategory"},
+    "multiplier": {"multiplier"},
+    "level_of_detail": {"levelofdetail"},
 }
+
+# En el CSV tambien se omiten los cambios de divisa (CASH, simbolo EUR.USD):
+# no son acciones y este importador no asienta conversiones.
+_CSV_NON_SHARE_ASSET_CATEGORIES = frozenset({"OPT", "FOP", "FUT", "BOND", "WAR", "IOPT", "CASH"})
 
 
 def _normalize_csv_header(cell: str) -> str:
@@ -2212,6 +2220,34 @@ class IBKRImportService:
             action = _csv_trade_action(_cell("action"))
             if action is None:
                 # La validación anterior ya marca y omite estas filas.
+                continue
+            level = _cell("level_of_detail").upper()
+            if level and level != "EXECUTION":
+                # La Flex Query con «Orders» o «Symbol Summary» marcados exporta,
+                # además de cada ejecución, una fila por orden y otra de resumen
+                # con la misma cantidad: importarlas duplicaba la compra.
+                rows_skipped += 1
+                notice = (
+                    f"Filas con LevelOfDetail {level} omitidas: solo se importan las "
+                    "ejecuciones (EXECUTION); las órdenes y los resúmenes repiten sus cantidades."
+                )
+                if notice not in row_errors:
+                    row_errors.append(notice)
+                continue
+            category = _cell("asset_category").upper()
+            multiplier = _cell("multiplier")
+            if category in _CSV_NON_SHARE_ASSET_CATEGORIES or (
+                multiplier and _is_number(multiplier) and _num(multiplier) != 1
+            ):
+                # Opciones, futuros, bonos, divisas...: cantidad x precio no es
+                # su coste (multiplicador 100, precio en % del nominal). Antes
+                # entraban como acciones, igual que en el Flex XML (#3877).
+                rows_skipped += 1
+                row_errors.append(
+                    f"Fila {line_number} del CSV ({symbol}): {category or 'contrato con multiplicador'} "
+                    "no se importa: el libro solo lleva acciones y fondos, y en derivados, bonos y "
+                    "divisas cantidad × precio no es el coste real."
+                )
                 continue
             # Provider IDs share identity with Flex XML. Without one, use the
             # canonical economic row plus occurrence count, preserving two
