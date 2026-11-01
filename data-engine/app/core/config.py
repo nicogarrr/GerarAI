@@ -674,6 +674,16 @@ class Settings(BaseSettings):
     # CHAT_GO_SUBSCRIPTION_ENABLED.
     chat_go_subscription_enabled: bool = True
     chat_go_subscription_base_url: str = "https://opencode.ai/zen/go/v1"
+    # Respaldo por la capa FREE de OpenCode Zen (/zen/v1), entre Go y Gemini,
+    # para los usuarios de plataforma: misma clave Go de GerarAI, modelo free
+    # (deepseek), gasto 0. La cuota free no tiene API publica: el breaker de
+    # cuota respeta el Retry-After del proveedor y el panel de Ajustes marca
+    # sus cifras como estimadas. true/false fuerzan; auto (por defecto) =
+    # activo si el primario Go esta activo y hay clave Go.
+    # Env: OPENCODE_FREE_CHAT_FALLBACK_ENABLED.
+    opencode_free_chat_fallback_enabled: bool | None = None
+    opencode_free_base_url: str = "https://opencode.ai/zen/v1"
+    opencode_free_model: str = "deepseek-v4.1-flash-free"
     # Modelos con razonamiento oculto: gastan tokens de salida pensando y con un
     # max_tokens bajo devuelven "no assistant message". Suelo de salida para ellos.
     llm_hidden_reasoning_models: str = "longcat-2.5-preview-free"
@@ -854,6 +864,7 @@ class Settings(BaseSettings):
         "groq_chat_fallback_enabled",
         "gemini_chat_fallback_enabled",
         "openrouter_chat_fallback_enabled",
+        "opencode_free_chat_fallback_enabled",
         mode="before",
     )
     @classmethod
@@ -906,6 +917,23 @@ class Settings(BaseSettings):
         if self.openrouter_chat_fallback_enabled is not None:
             return self.openrouter_chat_fallback_enabled
         return bool((self.openrouter_api_key or "").strip())
+
+    @property
+    def opencode_free_chat_fallback_active(self) -> bool:
+        """OpenCode free (Zen /zen/v1) tras Go y antes de Gemini.
+
+        ``true`` = activo, ``false`` = apagado, ``auto`` (por defecto) =
+        activo cuando el primario es OpenCode Go y hay clave Go de la
+        plataforma. Nunca usa la clave de un tenant: los BYOK salen antes
+        por su propio camino fail-closed.
+        """
+        if self.opencode_free_chat_fallback_enabled is not None:
+            return self.opencode_free_chat_fallback_enabled
+        return bool(
+            self._primary_is_opencode_go()
+            and self.chat_go_subscription_enabled
+            and (self.opencode_go_api_key or "").strip()
+        )
 
     @model_validator(mode="after")
     def validate_production_llm_model(self) -> Self:

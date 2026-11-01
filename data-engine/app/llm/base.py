@@ -21,6 +21,7 @@ from app.llm.errors import (
     StructuredOutputError,
 )
 from app.llm.json import parse_json_response
+from app.llm.opencode_usage import parse_retry_after
 from app.llm.run_guard import reserve_request
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,53 @@ _interactive_quota_breaker: dict[tuple[str, str], float] = {}
 # interactivos (chat/debate) usan su propio breaker de arriba.
 # Clave: (proveedor, modelo, huella de la credencial) - la cuota es de UNA clave.
 _free_quota_breaker: dict[tuple[str, str, str], float] = {}
-_QUOTA_429_BODY_MARKERS = ("exhausted", "quota", "insufficient credit", "billing")
+
+# Marca de pared (epoch UTC) de cuando reabre cada breaker: el monotonic de
+# arriba gobierna la logica, estas copias alimentan el panel de uso de
+# Ajustes (GET /api/settings/llm/usage) sin depender del reloj monotonico.
+_free_tier_breaker_until: dict[tuple[str, str], float] = {}
+_interactive_quota_breaker_until: dict[tuple[str, str], float] = {}
+_free_quota_breaker_until: dict[tuple[str, str, str], float] = {}
+
+
+def _set_breaker(registry, wallclock, key, seconds: float) -> None:
+    registry[key] = time.monotonic() + seconds
+    wallclock[key] = time.time() + seconds
+
+
+def breaker_snapshot() -> list[dict[str, object]]:
+    """Breakers abiertos ahora mismo, en hora de pared, para el panel de uso.
+
+    Cada entrada: kind (quota | interactive_quota | origin), provider, model,
+    until (epoch UTC) y seconds_remaining. Las llaves de cuota incluyen la
+    huella de credencial, que no se expone.
+    """
+    now_mono = time.monotonic()
+    now_wall = time.time()
+    out: list[dict[str, object]] = []
+
+    def collect(registry, wallclock, kind: str) -> None:
+        for key, mono_until in list(registry.items()):
+            if mono_until <= now_mono:
+                continue
+            out.append({
+                "kind": kind,
+                "provider": key[0],
+                "model": key[1],
+                "until": wallclock.get(key, now_wall + (mono_until - now_mono)),
+                "seconds_remaining": max(0.0, mono_until - now_mono),
+            })
+
+    collect(_free_quota_breaker, _free_quota_breaker_until, "quota")
+    collect(_interactive_quota_breaker, _interactive_quota_breaker_until, "interactive_quota")
+    collect(_free_tier_breaker, _free_tier_breaker_until, "origin")
+    return out
+_QUOTA_429_BODY_MARKERS = (
+    "exhausted", "quota", "insufficient credit", "billing",
+    # OpenCode: "GoUsageLimitError: weekly usage limit reached",
+    # "FreeUsageLimitError": la cuota semanal/diaria no vuelve con backoff.
+    "usage limit", "usagelimiterror",
+)
 
 
 def _is_free_tier_origin_error(response: httpx.Response) -> bool:
@@ -262,14 +309,20 @@ class LLMProvider(ABC):
                 return response
             self._log_http_error(response, headers, payload, attempt)
             if interactive_quota and response.status_code == 429:
-                _interactive_quota_breaker[breaker_key] = time.monotonic() + _FREE_TIER_BREAKER_SECONDS
+                # Cuota agotada: sin reintentos hasta el reset/ventana. El
+                # Retry-After del proveedor (OpenCode Go manda ~24 h en su
+                # reset semanal) fija el cooldown; sin cabecera, el corto
+                # historico de 120 s y una sonda real al expirar.
+                cooldown = parse_retry_after(response.headers.get("retry-after")) or _FREE_TIER_BREAKER_SECONDS
+                _set_breaker(_interactive_quota_breaker, _interactive_quota_breaker_until, breaker_key, cooldown)
                 raise ProviderHTTPError(self.name, 429)
             if _is_quota_exhausted_429(response):
-                _free_quota_breaker[quota_key] = time.monotonic() + _FREE_TIER_BREAKER_SECONDS
+                cooldown = parse_retry_after(response.headers.get("retry-after")) or _FREE_TIER_BREAKER_SECONDS
+                _set_breaker(_free_quota_breaker, _free_quota_breaker_until, quota_key, cooldown)
                 raise ProviderHTTPError(self.name, 429)
             if _is_free_tier_origin_error(response):
                 _free_tier_breaker_status[breaker_key] = 502
-                _free_tier_breaker[breaker_key] = time.monotonic() + _FREE_TIER_BREAKER_SECONDS
+                _set_breaker(_free_tier_breaker, _free_tier_breaker_until, breaker_key, _FREE_TIER_BREAKER_SECONDS)
                 raise ProviderHTTPError(self.name, 502)
             if response.status_code not in {408, 409, 429} and response.status_code < 500:
                 raise ProviderHTTPError(self.name, response.status_code)

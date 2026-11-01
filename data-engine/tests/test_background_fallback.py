@@ -1,4 +1,4 @@
-"""SequentialFallbackProvider: reintento transitorio único y cadena Groq -> Gemini."""
+"""SequentialFallbackProvider: reintento transitorio único y cadena OpenCode free -> Gemini."""
 import asyncio
 from functools import wraps
 
@@ -131,7 +131,7 @@ def test_factory_returns_primary_when_no_backup_configured():
         llm_enabled=True,
         llm_provider="opencode-go",
         opencode_go_api_key="sk-test",
-        groq_chat_fallback_enabled=False,
+        opencode_free_chat_fallback_enabled=False,
         gemini_chat_fallback_enabled=False,
     )
     provider = create_background_llm_provider(settings)
@@ -145,15 +145,12 @@ def test_factory_wraps_with_backups_when_configured():
         llm_enabled=True,
         llm_provider="opencode-go",
         opencode_go_api_key="sk-test",
-        groq_chat_fallback_enabled=True,
-        groq_api_key="gsk-test",
-        groq_free_plan_confirmed=True,
-        groq_zdr_confirmed=True,
         gemini_chat_fallback_enabled=False,
     )
     provider = create_background_llm_provider(settings)
     assert isinstance(provider, SequentialFallbackProvider)
-    assert provider.backup is not None and provider.backup2 is None
+    assert provider.backup is not None and provider.backup.name == "opencode-free"
+    assert provider.backup2 is None
 
 
 
@@ -169,10 +166,6 @@ def test_background_backups_use_long_call_budgets_not_chat_budgets():
         llm_enabled=True,
         llm_provider="opencode-go",
         opencode_go_api_key="sk-test",
-        groq_chat_fallback_enabled=True,
-        groq_api_key="gsk-test",
-        groq_free_plan_confirmed=True,
-        groq_zdr_confirmed=True,
         gemini_chat_fallback_enabled=True,
         gemini_api_key="gm-test",
         gemini_free_plan_confirmed=True,
@@ -184,5 +177,6 @@ def test_background_backups_use_long_call_budgets_not_chat_budgets():
     assert provider.backup2._total_timeout_seconds == 110.0  # noqa: SLF001
 
     chat = create_chat_llm_provider(settings)
-    assert chat.backup._timeout.read == 12.0  # noqa: SLF001
-    assert chat.backup2._timeout.read == 15.0  # noqa: SLF001
+    assert chat.backup._timeout.read == 15.0  # noqa: SLF001
+    gemini_chat = chat.extra_backups[0][0]
+    assert gemini_chat._timeout.read == 15.0  # noqa: SLF001

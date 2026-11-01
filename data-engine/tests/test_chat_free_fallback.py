@@ -100,31 +100,52 @@ async def test_truncated_primary_does_not_win_over_valid_backup():
     assert out.provider == "groq"
 
 
-@pytest.mark.parametrize("missing", ["groq_api_key", "groq_free_plan_confirmed", "groq_zdr_confirmed"])
-def test_factory_is_fail_closed(missing):
-    cfg = dict(llm_enabled=True, opencode_go_api_key="synthetic", groq_api_key="synthetic", groq_chat_fallback_enabled=True, groq_free_plan_confirmed=True, groq_zdr_confirmed=True)
-    cfg[missing] = None if missing.endswith("key") else False
-    with pytest.raises(ValueError, match="verified free plan"):
+def test_free_fallback_model_must_be_owner_approved():
+    # La pata free de la cadena (Go -> OpenCode free -> Gemini) solo acepta
+    # modelos free verificados: uno desconocido rompe la construccion.
+    cfg = dict(llm_enabled=True, opencode_go_api_key="synthetic",
+               opencode_free_model="paid-unknown")
+    with pytest.raises(ValueError, match="owner-approved free model"):
         create_chat_llm_provider(Settings(**cfg))
 
 
+def test_free_fallback_off_without_go_key_or_flag():
+    # Sin clave Go no hay pata free; con el flag en false tampoco, y en
+    # ambos casos la construccion no rompe.
+    base = dict(llm_enabled=True, chat_go_subscription_enabled=False,
+                opencode_go_model="deepseek-v4.1-flash-free")
+    assert create_chat_llm_provider(Settings(**base, opencode_go_api_key="synthetic")).name == "opencode-go"
+    cfg = dict(llm_enabled=True, opencode_go_api_key="synthetic",
+               opencode_free_chat_fallback_enabled=False)
+    provider = create_chat_llm_provider(Settings(**cfg))
+    assert getattr(provider, "backup", None) is None
+
+
 @run_async
-async def test_real_adapter_envelope_is_groq_not_deepseek():
+async def test_real_adapter_envelope_is_opencode_free_with_go_session():
+    # Go agota cuota (429 semanal): el respaldo es la capa free de Zen con
+    # la MISMA clave Go, cabecera de sesion y el modelo free fijado.
     seen = []
     def handler(req):
         import json
         body = json.loads(req.content)
         seen.append(body)
-        if req.url.host == "primary.invalid": return httpx.Response(429)
-        assert req.url.host == "api.groq.com"
-        assert req.headers["user-agent"] == "gerarai/1.0"
-        assert body["model"] == GROQ_MODEL and body["reasoning_effort"] == "low"
-        return httpx.Response(200, json={"model": GROQ_MODEL, "choices": [{"message": {"role": "assistant", "content": "Respuesta factual"}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}})
+        if req.url.host == "go.invalid":
+            return httpx.Response(429, json={"error": {"message": "GoUsageLimitError: weekly usage limit reached"}})
+        assert req.url.host == "free.invalid"
+        assert req.headers["x-opencode-session"] == "cavaai-prod"
+        assert req.headers["authorization"] == "Bearer synthetic"
+        assert body["model"] == "deepseek-v4.1-flash-free" and body["reasoning_effort"] == "low"
+        assert "response_format" not in body
+        return httpx.Response(200, json={"model": "deepseek-v4.1-flash-free", "choices": [{"message": {"role": "assistant", "content": "Respuesta factual"}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}})
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        cfg = Settings(llm_enabled=True, chat_go_subscription_enabled=False, opencode_go_model="deepseek-v4.1-flash-free", opencode_go_fallback_model="space-bunny-free", opencode_go_api_key="synthetic", opencode_go_base_url="https://primary.invalid/v1", llm_max_retries=0, groq_api_key="synthetic", groq_chat_fallback_enabled=True, groq_free_plan_confirmed=True, groq_zdr_confirmed=True)
+        cfg = Settings(llm_enabled=True, opencode_go_api_key="synthetic",
+                       chat_go_subscription_base_url="https://go.invalid/v1",
+                       opencode_free_base_url="https://free.invalid/v1",
+                       llm_max_retries=0)
         out = await create_chat_llm_provider(cfg, client=client).complete(LLMRequest([Message("user", "hola")], task="chat"))
-    assert out.provider == "groq" and len(seen) == 3
-    assert [row["model"] for row in seen[:2]] == ["deepseek-v4.1-flash-free", "space-bunny-free"]
+    assert out.provider == "opencode-free" and len(seen) == 2
+    assert seen[0]["model"] == "deepseek-v4.1-flash"  # primario Go suscripcion
 
 
 @run_async
@@ -445,7 +466,9 @@ def _gemini_cfg(**over):
 
 
 def test_gemini_disabled_by_default_and_factory_unchanged():
-    assert create_chat_llm_provider(_gemini_cfg()).backup2 is None
+    # Sin Gemini ni pata free (chat_go_subscription_enabled=False en esta
+    # config) la factory devuelve el primario a secas.
+    assert create_chat_llm_provider(_gemini_cfg()).name == "opencode-go"
 
 
 @pytest.mark.parametrize("missing", ["gemini_api_key", "gemini_free_plan_confirmed"])
@@ -457,9 +480,11 @@ def test_gemini_factory_is_fail_closed(missing):
 
 
 def test_gemini_enabled_builds_pinned_free_model_backup():
-    from app.llm.chat_provider import GEMINI_MODEL
+    from app.llm.chat_provider import GEMINI_MODEL, GEMINI_MODEL_2
     prov = create_chat_llm_provider(_gemini_cfg(gemini_chat_fallback_enabled=True, gemini_api_key="synthetic", gemini_free_plan_confirmed=True))
-    assert prov.backup2 is not None and prov.backup2.name == "gemini"
+    assert prov.backup is not None and prov.backup.name == "gemini"
+    assert prov.backup_model == GEMINI_MODEL
+    assert prov.extra_backups == ((prov.backup, GEMINI_MODEL_2),)
     assert GEMINI_MODEL == "gemini-3.5-flash-lite"
 
 

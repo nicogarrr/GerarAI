@@ -1,9 +1,11 @@
+from datetime import date, datetime, timezone
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.auth import MSG_IDENTITY_REQUIRED
@@ -15,8 +17,17 @@ from app.core.llm_settings_crypto import (
 )
 from app.core.rate_limit import enforce_llm_test_rate_limit
 from app.core.ui_errors import ui_error
+from app.llm.base import breaker_snapshot
+from app.llm.chat_provider import (
+    GEMINI_MODEL,
+    GEMINI_MODEL_2,
+    GO_SUBSCRIPTION_PROVIDER,
+    OPENCODE_FREE_PROVIDER,
+)
 from app.llm.factory import create_llm_provider
+from app.llm.opencode_usage import fetch_go_usage
 from app.llm.tenant_config import current_tenant_llm_config
+from app.models.entities import BudgetUsage
 from app.services.budget import BudgetController
 from app.services.jev_availability import credit_status
 from app.services.llm_router import route_table
@@ -113,6 +124,160 @@ def maf_version() -> str:
 @router.get("/llm", response_model=LLMSettingsResponse)
 def get_llm_settings(db: Session = Depends(get_db)) -> dict:
     return settings_view(db, get_settings())
+
+
+# Topes publicados del nivel gratuito de AI Studio (medidos 2026-11-01):
+# RPM/RPD/TPM por modelo. El consumo real no lo expone Google por API; el
+# panel lo estima con los contadores propios.
+GEMINI_FREE_PUBLISHED_LIMITS = {
+    GEMINI_MODEL: {"rpm": 15, "rpd": 500, "tpm": 250_000},
+    GEMINI_MODEL_2: {"rpm": 5, "rpd": 20},
+}
+
+
+class LlmUsageLeg(BaseModel):
+    id: str
+    label: str
+    provider: str
+    model: str | None = None
+    active: bool
+    state: str  # ok | limited | off
+    estimated: bool
+    limited_until: str | None = None
+    quota: dict | None = None
+    today: dict | None = None
+    published_limits: dict | None = None
+
+
+class LlmUsageResponse(BaseModel):
+    source: Literal["platform", "tenant"]
+    generated_at: str
+    legs: list[LlmUsageLeg]
+    message: str | None = None
+
+
+def _platform_usage_today(db: Session, models: list[str]) -> dict:
+    """Llamadas y tokens de hoy registrados para esos modelos (toda la plataforma).
+
+    La clave Go/Gemini de GerarAI sirve a todos los tenants, asi que el
+    agregado es global a proposito: lectura de operacion del panel de uso,
+    por eso ``include_all_tenants``. Son contadores PROPIOS (BudgetUsage),
+    la base de las cifras estimadas cuando el proveedor no expone su cuota.
+    """
+    today = date.today()
+    calls, tokens = db.execute(
+        select(
+            func.count(BudgetUsage.id),
+            func.coalesce(func.sum(BudgetUsage.token_count), 0),
+        )
+        .where(BudgetUsage.usage_date == today, BudgetUsage.model.in_(models))
+        .execution_options(include_all_tenants=True)
+    ).one()
+    return {"date": today.isoformat(), "calls": int(calls or 0), "tokens": int(tokens or 0)}
+
+
+@router.get("/llm/usage", response_model=LlmUsageResponse)
+async def get_llm_usage(db: Session = Depends(get_db)) -> dict:
+    """Panel de uso de la cadena de plataforma (Ajustes).
+
+    Go: cuota REAL del proveedor (GET /zen/go/v1/usage, verificado
+    2026-11-01). OpenCode free y Gemini: sin API de cuota publica, se
+    muestran los contadores propios marcados como estimados y el estado del
+    breaker de cuota (abierto hasta el reset/Retry-After del proveedor).
+    Tenants con clave propia (BYOK): su consumo es cosa de su proveedor.
+    """
+    app_settings = get_settings()
+    if current_tenant_llm_config() is not None:
+        return {
+            "source": "tenant",
+            "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "legs": [],
+            "message": "tenant_byok",
+        }
+    snapshot = breaker_snapshot()
+
+    def limited_until(provider: str) -> str | None:
+        entries = [b for b in snapshot if b["provider"] == provider]
+        if not entries:
+            return None
+        until = max(float(b["until"]) for b in entries)
+        return datetime.fromtimestamp(until, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+
+    legs: list[dict] = []
+
+    go_active = bool(
+        app_settings.chat_go_subscription_enabled
+        and (app_settings.opencode_go_api_key or "").strip()
+    )
+    quota = None
+    if go_active:
+        raw = await fetch_go_usage(
+            app_settings.chat_go_subscription_base_url,
+            app_settings.opencode_go_api_key or "",
+            session=app_settings.opencode_go_session,
+        )
+        if isinstance(raw, dict) and isinstance(raw.get("usage"), dict):
+            quota = raw["usage"]
+    go_until = limited_until(GO_SUBSCRIPTION_PROVIDER)
+    weekly = (quota or {}).get("weekly") or {}
+    go_state = "off"
+    if go_active:
+        go_state = (
+            "limited"
+            if go_until
+            or weekly.get("status") == "rate-limited"
+            or (weekly.get("percent") or 0) >= 100
+            else "ok"
+        )
+    legs.append({
+        "id": "opencode-go",
+        "label": "OpenCode Go",
+        "provider": GO_SUBSCRIPTION_PROVIDER,
+        "model": app_settings.opencode_go_model,
+        "active": go_active,
+        "state": go_state,
+        "estimated": False,
+        "limited_until": go_until,
+        "quota": quota,
+        "today": _platform_usage_today(db, [app_settings.opencode_go_model]),
+    })
+
+    free_active = app_settings.opencode_free_chat_fallback_active
+    free_model = (app_settings.opencode_free_model or "").strip()
+    free_until = limited_until(OPENCODE_FREE_PROVIDER)
+    legs.append({
+        "id": "opencode-free",
+        "label": "OpenCode free",
+        "provider": OPENCODE_FREE_PROVIDER,
+        "model": free_model,
+        "active": free_active,
+        "state": "off" if not free_active else ("limited" if free_until else "ok"),
+        "estimated": True,
+        "limited_until": free_until,
+        "today": _platform_usage_today(db, [free_model]) if free_model else None,
+    })
+
+    gemini_active = app_settings.gemini_chat_fallback_active
+    gemini_until = limited_until("gemini")
+    legs.append({
+        "id": "gemini",
+        "label": "Gemini (AI Studio)",
+        "provider": "gemini",
+        "model": GEMINI_MODEL,
+        "active": gemini_active,
+        "state": "off" if not gemini_active else ("limited" if gemini_until else "ok"),
+        "estimated": True,
+        "limited_until": gemini_until,
+        "today": _platform_usage_today(db, [GEMINI_MODEL, GEMINI_MODEL_2]),
+        "published_limits": GEMINI_FREE_PUBLISHED_LIMITS,
+    })
+
+    return {
+        "source": "platform",
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "legs": legs,
+        "message": None,
+    }
 
 
 @router.put("/llm", response_model=LLMSettingsResponse)
