@@ -40,7 +40,7 @@ flowchart TD
     end
 
     subgraph DataPersistence["Almacenamiento Persistente"]
-        Postgres[("PostgreSQL 16\n(Esquema Relacional + Alembic)")]
+        Postgres[("PostgreSQL 17\n(Esquema Relacional + Alembic)")]
         Qdrant[("Qdrant Vector DB\n(Embeddings de Tesis y Documentos)")]
         MinIO[("MinIO / Garage Object Storage\n(Informes, PDFs, Archivos)")]
     end
@@ -155,13 +155,13 @@ erDiagram
 |---|---|---|---|
 | **Salud** | `GET /api/health` | Estado del motor, Postgres, Scheduler y versión | Pública |
 | **Fuentes de Datos** | `GET /api/health/data-sources` | Circuit breaker y latencia de APIs externas | Requiere HMAC |
-| **Cartera** | `GET /api/portfolio/{id}/summary` | Resumen contable, valor de mercado y rentabilidad | Requiere HMAC (Tenant) |
+| **Cartera** | `GET /api/portfolio/summary` | Resumen contable, valor de mercado y rentabilidad | Requiere HMAC (Tenant) |
 | **Transacciones** | `POST /api/portfolio/transactions` | Registro y replay contable FIFO de transacciones | Requiere HMAC (Tenant) |
 | **Importación** | `POST /api/portfolio/import/preview` | Validación y parseo multiformato (CSV/Excel) | Requiere HMAC (Tenant) |
-| **Exportación PDF** | `GET /api/portfolio/{id}/pdf` | Generación de informe PDF institucional | Requiere HMAC (Tenant) |
-| **Fiscalidad** | `GET /api/taxes/reports/{year}` | Cálculo de casillas Modelo 100 y compensación IRPF | Requiere HMAC (Tenant) |
-| **DCA Engine** | `GET /api/dca/signals/{ticker}` | Niveles 1X-4X, zonas de compra y recortes | Requiere HMAC |
-| **Cerebro RAG** | `POST /api/chat/rag` | Búsqueda semántica híbrida con pool Qdrant | Requiere HMAC |
+| **Exportación PDF** | `GET /api/portfolio/{portfolio_id}/pdf` | Generación de informe PDF institucional | Requiere HMAC (Tenant) |
+| **Fiscalidad** | `GET /api/taxes/report/{fiscal_year}` | Cálculo de casillas Modelo 100 y compensación IRPF | Requiere HMAC (Tenant) |
+| **DCA Engine** | `GET /api/watchlist/dca-signals` | Niveles 1X-4X, zonas de compra y recortes de la watchlist | Requiere HMAC |
+| **Cerebro RAG** | `POST /api/chat` | Búsqueda semántica híbrida con pool Qdrant | Requiere HMAC |
 | **Caché** | `GET /api/cache/stats` | Métricas de acierto/fallo y latencia de Redis | Requiere HMAC |
 
 ---
