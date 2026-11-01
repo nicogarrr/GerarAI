@@ -10,8 +10,9 @@ Estos tests fijan:
 1. EQUIVALENCIA exacta de resultados frente a la semantica anterior (mismos
    grupos, mismos conteos, mismo max por fuente; mismas metricas de
    contexto, incluida la regla rara de tesis_publicada).
-2. FORMA rojo->verde: data-health emite el barrido perezoso (WITH RECURSIVE)
-   y metric-coverage deja de escalar con el numero de empresas (guardia de
+2. PLAN MEDIDO: data-health conserva GROUP BY tras descartar la CTE en
+   produccion (>96 s frente a 17-24 s, PR3929). metric-coverage conserva
+   el barrido perezoso medido mas rapido y no escala con empresas (guardia de
    nº de sentencias; el codigo anterior hacia 1 consulta por empresa con
    valoracion y la supera de lejos).
 """
@@ -115,16 +116,26 @@ def test_inventory_equivalencia_exacta_multifuente(db):
     assert docs[0]["status"] == "empty"
 
 
-def test_inventory_usa_barrido_perezoso(db):
-    """Rojo sin el cambio: el camino en frio debe ser la CTE recursiva."""
+def test_inventory_conserva_agregacion_medida_sin_cte_recursiva(db):
+    """PR3929: la CTE fue peor en prod. Una agregacion por capa, no N+1."""
     engine = db.get_bind()
-    sentencias = _contador(engine)
     db.add(_fact(1, 1, "SEC", datetime.now(UTC)))
     db.commit()
-    inventory(db)
-    assert any("WITH RECURSIVE" in s for s in sentencias), (
-        "el camino en frio sigue barriendo la tabla completa"
-    )
+    sentencias = _contador(engine)
+    result = inventory(db)
+    assert not any("WITH RECURSIVE" in statement for statement in sentencias)
+    aggregate_queries = [
+        statement for statement in sentencias
+        if "count(DISTINCT" in statement and "GROUP BY" in statement
+    ]
+    assert len(aggregate_queries) == 4, aggregate_queries
+    assert all("max(" in statement for statement in aggregate_queries)
+    for table in ("financial_facts", "documents", "news_events"):
+        query = next(statement for statement in aggregate_queries if f"FROM {table}" in statement)
+        assert f"{table}.tenant_id =" in query
+    facts = next(row for row in result["sources"]
+                 if row["layer"] == "Fundamentales" and row["source"] == "SEC")
+    assert facts["covered"] == 1
 
 
 def _montar_empresas_valoradas(db, n):

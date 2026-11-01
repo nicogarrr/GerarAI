@@ -5340,6 +5340,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/llm/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Llm Usage
+         * @description Panel de uso de la cadena de plataforma (Ajustes).
+         *
+         *     Go: cuota REAL del proveedor (GET /zen/go/v1/usage, verificado
+         *     2026-11-01). OpenCode free y Gemini: sin API de cuota publica, se
+         *     muestran los contadores propios marcados como estimados y el estado del
+         *     breaker de cuota (abierto hasta el reset/Retry-After del proveedor).
+         *     Tenants con clave propia (BYOK): su consumo es cosa de su proveedor.
+         */
+        get: operations["get_llm_usage_api_settings_llm_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sources/audits": {
         parameters: {
             query?: never;
@@ -9829,6 +9855,51 @@ export interface components {
             chat_id: string | null;
             /** Confirmed */
             confirmed: boolean;
+        };
+        /** LlmUsageLeg */
+        LlmUsageLeg: {
+            /** Active */
+            active: boolean;
+            /** Estimated */
+            estimated: boolean;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Limited Until */
+            limited_until?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Provider */
+            provider: string;
+            /** Published Limits */
+            published_limits?: {
+                [key: string]: unknown;
+            } | null;
+            /** Quota */
+            quota?: {
+                [key: string]: unknown;
+            } | null;
+            /** State */
+            state: string;
+            /** Today */
+            today?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** LlmUsageResponse */
+        LlmUsageResponse: {
+            /** Generated At */
+            generated_at: string;
+            /** Legs */
+            legs: components["schemas"]["LlmUsageLeg"][];
+            /** Message */
+            message?: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "platform" | "tenant";
         };
         /** ManagementExplanationUpdate */
         ManagementExplanationUpdate: {
@@ -26765,6 +26836,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LLMTestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_llm_usage_api_settings_llm_usage_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmUsageResponse"];
                 };
             };
             /** @description Validation Error */
