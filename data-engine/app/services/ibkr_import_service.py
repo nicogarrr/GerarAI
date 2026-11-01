@@ -612,6 +612,20 @@ def _date(value: str | None) -> date:
     return date.today()
 
 
+
+# Categorías de IBKR cuyo coste NO es cantidad x precio (multiplicador del
+# contrato o precio en % del nominal): opciones, opciones sobre futuros,
+# futuros, bonos, warrants y productos estructurados.
+_NON_SHARE_ASSET_CATEGORIES = frozenset({"OPT", "FOP", "FUT", "BOND", "WAR", "IOPT"})
+
+
+def _is_non_share_row(element: ElementTree.Element) -> bool:
+    """Fila de Flex que no es una acción ni un fondo (no cabe en el libro)."""
+    if (_attr(element, "assetCategory") or "").upper() in _NON_SHARE_ASSET_CATEGORIES:
+        return True
+    multiplier = _attr(element, "multiplier")
+    return multiplier is not None and _is_number(multiplier) and Decimal(multiplier) != 1
+
 def parse_fx_trade(element: ElementTree.Element) -> dict | None:
     """Cambio de divisa de un Trade con assetCategory CASH (simbolo ``EUR.USD``).
 
@@ -1388,6 +1402,21 @@ class IBKRImportService:
             if trades_only and tag == "Trade" and (_attr(element, "assetCategory") or "STK").upper() != "STK":
                 # Divisas (EUR.USD), opciones, etc.: no son compras de acciones del libro.
                 non_stock_skipped += 1
+                continue
+            if tag in ("Trade", "OpenPosition") and _is_non_share_row(element):
+                # Opciones, futuros, bonos...: cantidad x precio no es su coste
+                # (multiplicador 100, precio en % del nominal). El libro y el
+                # FIFO fiscal solo llevan acciones y fondos; antes entraban como
+                # acciones (1 call a 5 $ = 5 $ de coste en vez de 500 $).
+                non_stock_skipped += 1
+                category = (_attr(element, "assetCategory") or "?").upper()
+                notice = (
+                    f"{category} {_attr(element, 'symbol', 'underlyingSymbol') or '?'} no se importa: "
+                    "el libro solo lleva acciones y fondos, y en derivados y bonos cantidad × precio "
+                    "no es el coste real."
+                )
+                if notice not in row_errors:
+                    row_errors.append(notice)
                 continue
             if tag == "OpenPosition":
                 symbol = _attr(element, "symbol", "underlyingSymbol")
