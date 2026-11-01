@@ -1,3 +1,5 @@
+'use client';
+
 import type { ExpertName } from '@/lib/chat/expert-team';
 import { useT } from '@/lib/i18n/client';
 

@@ -13,6 +13,7 @@ export async function resolve(specifier, context, nextResolve) {
     ['@/lib/research/error-detail', new URL('../lib/research/error-detail.ts', import.meta.url).href],
     ['@/lib/research/client', new URL('../lib/research/client.ts', import.meta.url).href],
     ['@/lib/brain/history', new URL('../lib/brain/history.ts', import.meta.url).href],
+    ['@/lib/chat/expert-team', new URL('../lib/chat/expert-team.ts', import.meta.url).href],
     ['@/lib/chat/citations', new URL('../lib/chat/citations.ts', import.meta.url).href],
     ['@/lib/paginate-all', new URL('../lib/paginate-all.ts', import.meta.url).href],
     ['@/lib/paginated-backend', new URL('../lib/paginated-backend.ts', import.meta.url).href],
