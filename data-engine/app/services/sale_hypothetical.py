@@ -62,7 +62,11 @@ _BOUGHT_AT_RE = re.compile(
     rf"(?i)\bcompr\w*\s+(?:(?:las|los|todas|todo|todos)\s+)?(?:a|por)\s+(?:(?P<pre>{_CUR})\s*)?"
     rf"(?P<price>{_NUM})\s*(?P<cur>{_CUR})?"
 )
-_SALE_QTY_RE = re.compile(rf"(?i)\bvend\w*\s+(?:solo\s+|s[oó]lo\s+)?(?P<qty>-?(?:{_NUM}))\b")
+# «vendo mis 10», «las 10», «hoy 10», «unas 10»: sin estas palabras entre el
+# verbo y la cifra la cantidad no se leía y se simulaba la venta de TODO.
+_SALE_QTY_RE = re.compile(
+    rf"(?i)\bvend\w*\s+(?:(?:solo|s[oó]lo|mis|las|los|unas|unos|hoy|ahora)\s+)*(?P<qty>-?(?:{_NUM}))\b"
+)
 _SALE_HALF_RE = re.compile(r"(?i)\bvend\w*\s+(?:la\s+)?mitad\b")
 
 _MONTHS = {

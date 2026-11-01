@@ -537,3 +537,19 @@ def test_precio_en_euros_con_lotes_en_dolares_al_cambio_de_hoy(db):
     assert "coste 800,00 €" in resp.answer
     assert "ganancia de 700,00 €" in resp.answer
 
+
+
+# «si vendo mis 10 acciones» / «las 10» / «hoy 10»: un determinante o «hoy»
+# entre el verbo y la cifra hacia que la cantidad no se leyera y se simulara
+# la venta de TODA la posicion (30), con su IRPF, sin avisar.
+@pytest.mark.parametrize("question", [
+    "¿Cuánto IRPF pagaría si vendo mis 10 acciones de UBER?",
+    "Si vendo las 10 acciones de UBER, ¿cuánto pago a Hacienda?",
+    "¿Cuánto IRPF pagaría si vendo hoy 10 acciones de UBER?",
+    "IRPF si vendiera unas 10 acciones de UBER",
+])
+def test_venta_parcial_con_determinante_lee_la_cantidad(db, question):
+    _uber(db)
+    resp = _ask(db, question)
+    assert "10 de tus 30 acciones de UBER" in resp.answer
+    assert "valor 800,00 €" in resp.answer

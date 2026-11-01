@@ -276,3 +276,13 @@ def test_vender_un_ticker_sin_cantidad_a_un_precio_respeta_el_precio(question, e
 def test_vender_sin_precio_sigue_sin_precio():
     assert parse_sale_price("si vendo TEST mañana a las 10") is None
     assert parse_sale_price("cuánto IRPF si vendo todo TEST") is None
+
+
+def test_lote_con_mis_n_acciones_que_compre_a():
+    """«si vendo mis 50 acciones de AAPL que compré a 150 $»: el lote son 50, no se pierde."""
+    lots = parse_purchase_lots(
+        "cuánto pagaría si vendo mis 50 acciones de AAPL que compré a 150 $ el 3 de marzo de 2024"
+    )
+    assert [(lot.quantity, lot.price, lot.currency, lot.trade_date) for lot in lots] == [
+        (D("50"), D("150"), "USD", date(2024, 3, 3))
+    ]
