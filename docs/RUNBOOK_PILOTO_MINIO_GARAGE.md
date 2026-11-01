@@ -119,7 +119,9 @@ nuevos solo en MinIO con la base apuntando a Garage:
 ```bash
 docker compose -p cavaai -f docker-compose.prod.yml stop \
   backend worker worker-thesis worker-kpis worker-knowledge \
-  worker-alerts worker-gdelt scheduler
+  worker-alerts worker-gdelt scheduler \
+  worker-official-closes worker-prices worker-externa \
+  worker-finnhub worker-yahoo worker-dca-manual
 ```
 
 Postgres, Redis, Qdrant, MinIO y Garage siguen arriba; la app no responde hasta
@@ -134,6 +136,14 @@ storage; dejarlo mantiene el TLS, aunque el backend parado no responde).
 > incluye en la parada: durante la ventana su dependencia `backend` esta
 > parada de todos modos, y pararlo cuesta cero y quita la duda. La lista de
 > la fase 3 de OBJECT_STORAGE_MIGRATION.md quedo corregida en este mismo PR.
+
+> **Mismo criterio para los seis workers de colas de datos**
+> (`worker-official-closes`, `worker-prices`, `worker-externa`,
+> `worker-finnhub`, `worker-yahoo`, `worker-dca-manual`): heredan `MINIO_*`
+> del ancla `x-app-env` pero no escriben en el storage de objetos (verificado:
+> `app/workers/dramatiq_app.py` no usa `document_store`). Se paran igualmente:
+> el `ps` de confirmacion tiene que quedar limpio de productores y pararlos
+> cuesta cero.
 
 ## Paso 3 - Delta, verify-only y cambio de endpoint
 
