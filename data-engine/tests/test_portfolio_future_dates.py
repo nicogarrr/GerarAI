@@ -8,6 +8,7 @@ servidor: entre las 00:00 y las 01:00/02:00 de Madrid quedaba fechado «ayer».
 
 from datetime import date, timedelta
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.csrf import generate_csrf_token
@@ -52,12 +53,26 @@ def test_tipo_de_cambio_con_fecha_futura_es_422():
     assert client.post("/api/portfolio/fx-rates", json=body, headers=CSRF).status_code == 201
 
 
-def test_precio_manual_sin_fecha_usa_el_dia_de_madrid(monkeypatch):
+@pytest.mark.parametrize("older_positions", [0, 21])
+def test_precio_manual_sin_fecha_usa_el_dia_de_madrid(monkeypatch, older_positions):
     client = _client()
+    for index in range(older_positions):
+        _buy(client, f"AAMAD{index:02d}")
     _buy(client, "MADDAY")
     madrid_day = date.today() + timedelta(days=1)  # 00:30 en Madrid, aun «ayer» en UTC
     monkeypatch.setattr("app.services.portfolio_ledger_service.local_today", lambda: madrid_day)
     response = client.patch("/api/portfolio/prices", json={"ticker": "MADDAY", "price": "11"}, headers=CSRF)
     assert response.status_code == 200, response.text
-    positions = {p["ticker"]: p for p in client.get("/api/portfolio/positions").json()["items"]}
+    # The session database can contain more than one page of positions.
+    # Preserve the date assertion, but find this ticker across all pages.
+    positions = {}
+    offset = 0
+    while True:
+        page = client.get("/api/portfolio/positions", params={"limit": 20, "offset": offset})
+        assert page.status_code == 200, page.text
+        items = page.json()["items"]
+        positions.update({item["ticker"]: item for item in items})
+        if len(items) < 20:
+            break
+        offset += len(items)
     assert positions["MADDAY"]["as_of"] == madrid_day.isoformat()

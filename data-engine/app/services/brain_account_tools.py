@@ -54,7 +54,9 @@ def _num_en(value: float, digits: int = 2) -> str:
     return f"{value:,.{digits}f}"
 
 
-def _money(value: float, currency: str | None, *, signed: bool = False, english: bool = False) -> str:
+def _money(value: float | None, currency: str | None, *, signed: bool = False, english: bool = False) -> str:
+    if value is None:
+        return "N/A" if english else "N/D"
     if not english:
         return money_es(value, _symbol(currency), signed=signed)
     text = _num_en(value)
@@ -142,13 +144,13 @@ def _daily_change_answer(db: Session, tenant: int) -> ChatResponse:
         .limit(1)
     )
     currency = latest.base_currency
-    total = float(latest.total_value_base or 0)
+    total = float(latest.total_value_base) if latest.total_value_base is not None else None
     day = latest.snapshot_date
     is_today = day == local_today()
     when = (_date_en(day) if english else fecha_es(day))
     sources = [_source("portfolio_snapshot", latest.id, f"Cartera {fecha_es(day)}", "/portfolio")]
     ret = latest.daily_return
-    if ret is None or previous is None or not previous.total_value_base:
+    if total is None or ret is None or previous is None or not previous.total_value_base:
         if english:
             lead = f"Today ({when})" if is_today else f"There is no snapshot of your portfolio for today yet. Last saved day ({when})"
             text = (f"{lead}: value {_money(total, currency, english=True)}, but I can't calculate the change: "
@@ -305,9 +307,9 @@ def _year_gains_answer(db: Session, tenant: int, year: int) -> ChatResponse:
         elif gross:
             lines.append(
                 f"- Dividends received: {_money(gross, 'EUR', english=True)} gross, "
-                f"{_money(withheld or 0, 'EUR', english=True)} withheld at source." if english else
+                f"{_money(withheld, 'EUR', english=True)} withheld at source." if english else
                 f"- Dividendos cobrados: {_money(gross, 'EUR')} brutos, "
-                f"{_money(withheld or 0, 'EUR')} de retención en origen.")
+                f"{_money(withheld, 'EUR')} de retención en origen.")
     if year == today.year:
         latent = _unrealized(db, tenant)
         if latent is not None:
@@ -582,14 +584,15 @@ def _cash_answer(db: Session, tenant: int) -> ChatResponse:
         text = ("You have no cash balance saved. You can add it in Portfolio." if english
                 else "No tienes efectivo guardado. Puedes añadirlo en Cartera.")
         return _response(text, [], "account_cash")
-    totals: dict[str, Decimal] = {}
+    totals: dict[str, Decimal | None] = {}
     for row in rows:
-        totals[row.currency] = totals.get(row.currency, Decimal("0")) + Decimal(row.balance or 0)
+        known = totals.get(row.currency, Decimal("0"))
+        totals[row.currency] = None if known is None or row.balance is None else known + Decimal(row.balance)
     as_of = max(row.as_of for row in rows)
     day = _date_en(as_of) if english else fecha_es(as_of)
-    parts = [_money(float(v), c, english=english) for c, v in sorted(totals.items())]
+    parts = [_money(float(v) if v is not None else None, c, english=english) for c, v in sorted(totals.items())]
     text = (f"Your saved cash (as of {day}): " if english else f"Tu efectivo guardado (a {day}): ") + ", ".join(parts) + "."
-    if any(v < 0 for v in totals.values()):
+    if any(v is not None and v < 0 for v in totals.values()):
         text += (" A negative balance is margin debt." if english else " Un saldo negativo es deuda de margen.")
     if len(totals) > 1:
         text += (" Each currency is shown as is, not converted." if english
@@ -689,7 +692,7 @@ def _withholding_answer(db: Session, tenant: int, year: int | None, only: set[st
     english = _english()
     years = [year] if year is not None else _withholding_years(db, tenant, only)
     # (año o ticker, divisa) -> [retenido, bruto]
-    rows: dict[tuple[str, str], list[Decimal]] = {}
+    rows: dict[tuple[str, str], list[Decimal | None]] = {}
     for current in years:
         report = _tax_data(db, current) or {}
         for item in report.get("dividends") or []:
@@ -698,9 +701,12 @@ def _withholding_answer(db: Session, tenant: int, year: int | None, only: set[st
                 continue
             key = (ticker if year is not None else str(current), (item.get("currency") or "EUR").upper())
             bucket = rows.setdefault(key, [Decimal("0"), Decimal("0")])
-            bucket[0] += Decimal(str(item.get("withholding_native") or 0))
-            bucket[1] += Decimal(str(item.get("dividends_native") or 0))
+            for index, field in enumerate(("withholding_native", "dividends_native")):
+                value = item.get(field)
+                known = bucket[index]
+                bucket[index] = None if known is None or value is None else known + Decimal(str(value))
     sources = [_source("tax_report", None, "Impuestos", "/taxes")]
+
     names = ", ".join(sorted(only))
     if not rows:
         what = names or (str(year) if year is not None else "")
@@ -709,18 +715,19 @@ def _withholding_answer(db: Session, tenant: int, year: int | None, only: set[st
         else:
             text = f"No tienes dividendos ni retenciones guardados{' de ' + what if names else (' en ' + what if what else '')}."
         return _response(text, sources, "account_withholding")
-    totals: dict[str, list[Decimal]] = {}
+    totals: dict[str, list[Decimal | None]] = {}
     for (_, currency), (held, gross) in rows.items():
         total = totals.setdefault(currency, [Decimal("0"), Decimal("0")])
-        total[0] += held
-        total[1] += gross
+        for index, value in enumerate((held, gross)):
+            known = total[index]
+            total[index] = None if known is None or value is None else known + value
 
-    def part(held: Decimal, gross: Decimal, currency: str) -> str:
+    def part(held: Decimal | None, gross: Decimal | None, currency: str) -> str:
         on = "on" if english else "sobre"
-        return f"{_money(float(held), currency, english=english)} {on} {_money(float(gross), currency, english=english)}"
+        return f"{_money(float(held) if held is not None else None, currency, english=english)} {on} {_money(float(gross) if gross is not None else None, currency, english=english)}"
 
-    def rate(held: Decimal, gross: Decimal) -> str:
-        return f" ({_pct(float(held / gross), english=english)})" if gross > 0 else ""
+    def rate(held: Decimal | None, gross: Decimal | None) -> str:
+        return f" ({_pct(float(held / gross), english=english)})" if held is not None and gross is not None and gross > 0 else ""
 
     head = " + ".join(f"{part(h, g, c)} {'gross' if english else 'brutos'}{rate(h, g)}" for c, (h, g) in sorted(totals.items()))
     if names:
@@ -896,10 +903,15 @@ def _history_answer(db: Session, tenant: int, text: str) -> ChatResponse:
                         "que comparar.")
         return _response(text_out, sources, "portfolio_history")
     currency = latest.base_currency
-    now_value, then_value = float(latest.total_value_base or 0), float(past.total_value_base or 0)
+    if latest.total_value_base is None or past.total_value_base is None:
+        text_out = ("Portfolio comparison: N/A (a snapshot has an unknown total value)." if english else
+                    "Comparación de cartera: N/D (una foto tiene el valor total desconocido).")
+        return _response(text_out, sources, "portfolio_history")
+    now_value, then_value = float(latest.total_value_base), float(past.total_value_base)
     flows = db.scalars(same.where(PortfolioDailySnapshot.snapshot_date > past.snapshot_date,
                                   PortfolioDailySnapshot.snapshot_date <= latest.snapshot_date)).all()
-    flow = float(sum((Decimal(s.net_external_flow_base or 0) for s in flows), Decimal("0")))
+    flow = (None if any(s.net_external_flow_base is None for s in flows) else
+            float(sum((Decimal(s.net_external_flow_base) for s in flows), Decimal("0"))))
     change = now_value - then_value
     m = (lambda value, signed=False: _money(value, currency, signed=signed, english=english))
     if english:
@@ -908,6 +920,12 @@ def _history_answer(db: Session, tenant: int, text: str) -> ChatResponse:
     else:
         lines = [f"El {when(past.snapshot_date)} tu cartera valía {m(then_value)}; en la última foto "
                  f"({when(latest.snapshot_date)}), {m(now_value)}: {m(change, True)}."]
+    if flow is None:
+        lines.append("Net deposits/withdrawals: N/A; cannot separate cash flows from performance." if english else
+                     "Aportaciones/retiradas netas: N/D; no se pueden separar los flujos de la rentabilidad.")
+        lines.append("Saved daily snapshots, not live prices." if english else
+                     "Fotos diarias guardadas, no cotización en directo.")
+        return _response("\n".join(lines), sources, "portfolio_history")
     if latest.cumulative_twr is not None and past.cumulative_twr is not None:
         ret = (1 + float(latest.cumulative_twr)) / (1 + float(past.cumulative_twr)) - 1
         label = "TWR"
