@@ -112,6 +112,20 @@ def _dividend_line(company: Company, record: DividendRecord) -> str:
             f"ex-dividendo {_fecha_es(record.ex_date)}{pay} ({_source_label(record.source)}).")
 
 
+_YEAR_IN_QUESTION_RE = re.compile(r"\b(20\d{2})\b")
+_LAST_YEAR_IN_QUESTION_RE = re.compile(r"(?i)\b(?:a[nñ]o|ejercicio)\s+pasado\b")
+
+
+def _year_in_question(question: str, today: date) -> int:
+    """Año que pide la pregunta («2025», «el año pasado»); si no, el actual."""
+    explicit = _YEAR_IN_QUESTION_RE.search(question or "")
+    if explicit:
+        return int(explicit.group(1))
+    if _LAST_YEAR_IN_QUESTION_RE.search(question or ""):
+        return today.year - 1
+    return today.year
+
+
 def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | None:
     """Dividendos GUARDADOS (declarados por el proveedor); nada proyectado ni inventado."""
     today = local_today()  # año/día del usuario (Madrid), no el UTC del servidor
@@ -150,7 +164,10 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
     lines, sources, totals, without, uncertain_tickers = [], [], {}, [], []
     # Lote anti N+1: una consulta de dividendos del año para TODAS las
     # posiciones (misma ventana y orden por ex_date), agrupada por empresa.
-    year_start, year_end = date(today.year, 1, 1), date(today.year, 12, 31)
+    # «¿Cuántos dividendos he cobrado en 2025?» / «el año pasado»: antes
+    # respondía siempre con el año en curso («… para 2026»).
+    year = _year_in_question(question, today)
+    year_start, year_end = date(year, 1, 1), date(year, 12, 31)
     company_ids = sorted({comp.id for _, comp in rows})
     dividends_by_company: dict[int, list[DividendRecord]] = {cid: [] for cid in company_ids}
     if company_ids:
@@ -171,12 +188,12 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
             continue
         amount = sum((r.amount for r in records), Decimal("0")) * Decimal(str(position.quantity))
         totals[position.currency] = totals.get(position.currency, Decimal("0")) + amount
-        lines.append(f"- {comp.ticker}: {len(records)} pago(s) en {today.year}, {_money(amount, position.currency)} "
+        lines.append(f"- {comp.ticker}: {len(records)} pago(s) en {year}, {_money(amount, position.currency)} "
                      f"({_number(position.quantity)} acciones, importes brutos del proveedor; los de Yahoo van ajustados por splits).")
         sources.append(_source("dividend_record", records[-1].id, f"Dividendo {comp.ticker} · {records[-1].ex_date}", _link(comp)))
     if not lines and not uncertain_tickers:
-        return _response([f"No hay dividendos guardados de tus posiciones para {today.year}. No he consultado el proveedor en directo."], [], "portfolio_dividends")
-    head = f"Dividendos declarados guardados de tus posiciones abiertas en {today.year} (brutos, cantidad actual por acción según el proveedor):"
+        return _response([f"No hay dividendos guardados de tus posiciones para {year}. No he consultado el proveedor en directo."], [], "portfolio_dividends")
+    head = f"Dividendos declarados guardados de tus posiciones abiertas en {year} (brutos, cantidad actual por acción según el proveedor):"
     total = "Total: " + " · ".join(f"{_money(v, cur)}" for cur, v in sorted(totals.items())) + "."
     tail = [f"Sin dividendos guardados: {', '.join(without)}."] if without else []
     if uncertain_tickers:
