@@ -212,7 +212,7 @@ def build_thesis_pdf(data: ThesisPdfData) -> bytes:
                 ax1.text(
                     0.06,
                     current_y,
-                    "* Valorado al coste de adquisición por falta de cotización disponible.",
+                    "* Sin cotización disponible: valorado al coste de adquisición o al precio de la última operación.",
                     fontsize=7.5,
                     color="#64748b",
                     va="top",
@@ -372,6 +372,12 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
     # Una posicion con valoracion en suspenso (split sin precio verificado, coste
     # "Realized P/L not ready" de IBKR, etc.) NO tiene precio fiable: se muestra
     # n/d y se excluye del total, nunca se inventa un 0.
+    # Sin cotización guardada el ledger valora con el precio de la última
+    # operación (auditoría A3): tampoco es precio de mercado y se marca igual
+    # que el coste, como «sin cotización real» en /positions.
+    from app.services.portfolio_ledger_service import trade_price_fallbacks
+
+    quote_missing = trade_price_fallbacks(db, positions)
     holdings: list[HoldingItem] = []
     rows: list[tuple] = []
     for p in positions:
@@ -379,7 +385,9 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
         held = bool(p.valuation_hold_reason)
         market_px = float(p.market_price)
         cost_px = float(p.average_cost)
-        price_is_cost = not held and not market_px and bool(cost_px)
+        price_is_cost = not held and (
+            (not market_px and bool(cost_px)) or p.company_id in quote_missing
+        )
         px = None if held else (market_px if market_px else cost_px)
         # Subunidad (Londres en «GBp»): precio y valor nativo en la divisa
         # principal; ``.upper()`` rotulaba 2.650 peniques como 2.650 «GBP».
@@ -439,7 +447,10 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
 
     limitations: list[str] = []
     if cost_rows:
-        limitations.append(f"{cost_rows} posición(es) valorada(s) al coste de adquisición por falta de cotización")
+        limitations.append(
+            f"{cost_rows} posición(es) sin cotización real: valorada(s) al coste de adquisición "
+            "o al precio de su última operación"
+        )
     if held_rows:
         limitations.append(f"{held_rows} posición(es) con valoración en suspenso (sin precio verificado): n/d y excluida(s) del total")
     ccys = sorted({r[4] for r in rows if r[4]})

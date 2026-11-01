@@ -476,6 +476,9 @@ class Settings(BaseSettings):
     # X-GerarAI-Language (es/en) fija el idioma de generación de la petición.
     # Env: I18N_GENERATION_ENABLED.
     i18n_generation_enabled: bool = False
+    # Equipo de expertos con coordinador (app/services/expert_team). Apagado:
+    # tesis y chat siguen exactamente igual. Env: EXPERT_TEAM_ENABLED.
+    expert_team_enabled: bool = False
 
     # Invalidación GLOBAL de la caché de mercado (compartida entre tenants).
     # Las rutas POST /api/cache/invalidate/market-data e /invalidate/all la

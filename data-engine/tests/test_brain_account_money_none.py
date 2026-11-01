@@ -80,3 +80,26 @@ def test_missing_dividend_component_poison_totals_and_omit_rate(monkeypatch, eng
         assert ("150.00 USD" if english else "150,00 USD") in head
     else:
         assert ("15.00 USD" if english else "15,00 USD") in head
+
+
+@pytest.mark.parametrize("english,unknown", [(False, "N/D"), (True, "N/A")])
+@pytest.mark.parametrize("missing", ["latest", "past", "flow"])
+def test_history_missing_amount_does_not_invent_comparison(monkeypatch, english, unknown, missing):
+    monkeypatch.setattr(tools, "_english", lambda: english)
+    monkeypatch.setattr(tools, "local_today", lambda: date(2026, 11, 1))
+    latest = SimpleNamespace(id=2, portfolio_id=1, base_currency="EUR", total_value_base=Decimal("120"),
+                             snapshot_date=date(2026, 10, 30), cumulative_twr=None)
+    past = SimpleNamespace(id=1, portfolio_id=1, total_value_base=Decimal("100"),
+                           snapshot_date=date(2026, 10, 1), cumulative_twr=None)
+    if missing in ("latest", "past"):
+        setattr(latest if missing == "latest" else past, "total_value_base", None)
+    db = Mock()
+    db.scalar.side_effect = [latest, past]
+    db.scalars.return_value.all.return_value = [SimpleNamespace(
+        net_external_flow_base=None if missing == "flow" else Decimal("0"))]
+    answer = tools._history_answer(db, 1, "hace un mes").answer
+    assert unknown in answer
+    assert "0,00 €" not in answer.replace("100,00 €", "").replace("120,00 €", "").replace("+20,00 €", "")
+    assert "0.00 €" not in answer.replace("100.00 €", "").replace("120.00 €", "").replace("+20.00 €", "")
+    assert "aprox." not in answer and "approx." not in answer
+    assert "Sin aportaciones" not in answer and "No deposits" not in answer
