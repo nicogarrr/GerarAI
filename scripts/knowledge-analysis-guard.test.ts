@@ -57,6 +57,12 @@ describe('atajos y sugeridas', () => {
   it('las preguntas sugeridas caben en el límite del backend (3 a 1200)', () => {
     for (const q of SUGGESTED_QUESTIONS) assert.ok(q.length >= 3 && q.length <= 1200);
   });
+  it('el panel las pinta desde el diccionario: en español, las mismas', () => {
+    const es = JSON.parse(readFileSync('lib/i18n/messages/es/brain.json', 'utf8'));
+    const en = JSON.parse(readFileSync('lib/i18n/messages/en/brain.json', 'utf8'));
+    assert.deepEqual(Object.values(es.suggested.library), [...SUGGESTED_QUESTIONS]);
+    for (const q of Object.values(en.suggested.library) as string[]) assert.ok(q.length >= 3 && q.length <= 1200);
+  });
 });
 
 describe('componente y acción', () => {

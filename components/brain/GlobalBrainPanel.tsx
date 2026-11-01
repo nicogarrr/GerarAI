@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { X, Send, User, Bot, Loader2, Maximize2, Minimize2 } from 'lucide-react';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
 import { useT } from '@/lib/i18n/client';
-import { BRAIN_SUGGESTED_QUESTIONS } from '@/lib/brain/conversation';
 import { chatWithPortfolio } from '@/lib/actions/brain.actions';
 import { askResearchAssistantAction } from '@/lib/research/assistant-actions';
 import type { AssistantResponse } from '@/lib/research/assistant-contract';
@@ -29,7 +28,12 @@ const ReactMarkdown = dynamic(() => import('react-markdown'), {
 import type { PortfolioChatCitation } from '@/lib/chat/citations';
 import { BrainSources } from './BrainSources';
 import { askKnowledgeResult, type LibraryAnswer } from '@/lib/actions/knowledge-chat.actions';
-import { analysisToText, isSubmitShortcut, SUGGESTED_QUESTIONS } from '@/lib/knowledge/analysis';
+import { analysisLabels, analysisToText, isSubmitShortcut } from '@/lib/knowledge/analysis';
+
+/** Preguntas sugeridas en el idioma elegido (en español, las de BRAIN_SUGGESTED_QUESTIONS / SUGGESTED_QUESTIONS). */
+const BRAIN_SUGGESTION_KEYS = ['brain.suggested.general.q1', 'brain.suggested.general.q2', 'brain.suggested.general.q3', 'brain.suggested.general.q4'] as const;
+const LIBRARY_SUGGESTION_KEYS = ['brain.suggested.library.q1', 'brain.suggested.library.q2', 'brain.suggested.library.q3', 'brain.suggested.library.q4'] as const;
+
 const BrainLibraryAnswer = dynamic(() => import('./BrainLibraryAnswer').then(m => m.BrainLibraryAnswer));
 
 export interface BrainMessage {
@@ -281,7 +285,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                     return;
                 }
                 const result = outcome.answer;
-                const text = result.analysis ? analysisToText(result.analysis) : (result.answers ?? []).map(a => `${a.text ?? ''}\n«${a.citation.quote}» (${a.citation.author ?? t('brain.library.unregisteredAuthor')} · ${a.citation.title}${a.citation.page_number !== null ? ` · ${t('brain.library.pageN', { n: a.citation.page_number })}` : ''} · ${t('brain.library.chunkN', { n: a.citation.chunk_index + 1 })}${a.citation.publication_date ? ` · ${a.citation.publication_date}` : ''})`).join('\n\n');
+                const text = result.analysis ? analysisToText(result.analysis, analysisLabels(t)) : (result.answers ?? []).map(a => `${a.text ?? ''}\n«${a.citation.quote}» (${a.citation.author ?? t('brain.library.unregisteredAuthor')} · ${a.citation.title}${a.citation.page_number !== null ? ` · ${t('brain.library.pageN', { n: a.citation.page_number })}` : ''} · ${t('brain.library.chunkN', { n: a.citation.chunk_index + 1 })}${a.citation.publication_date ? ` · ${a.citation.publication_date}` : ''})`).join('\n\n');
                 setMessages(prev => [...prev, { role: 'assistant', content: text || result.message || t('brain.panel.noLibraryData'), library: result }]);
             } catch (error) {
                 const expired = typeof error === 'object' && error !== null && 'statusCode' in error && error.statusCode === 401;
@@ -501,7 +505,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                     ))}
                     {messages.length === 1 && !loading && (
                         <div className="flex flex-wrap gap-2" aria-label={t('brain.panel.suggestedAria')}>
-                            {(knowledge ? SUGGESTED_QUESTIONS : BRAIN_SUGGESTED_QUESTIONS).map((text) => (
+                            {(knowledge ? LIBRARY_SUGGESTION_KEYS : BRAIN_SUGGESTION_KEYS).map((key) => t(key)).map((text) => (
                                 <button
                                     key={text}
                                     type="button"
