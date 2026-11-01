@@ -24,6 +24,7 @@ fail-open (status skipped).
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 from dataclasses import dataclass
@@ -35,6 +36,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import ResearchAlert
+
+logger = logging.getLogger(__name__)
 
 VERSION = "queue-stuck-v2"
 ALERT_TYPE = "queue_stuck"
@@ -77,7 +80,11 @@ def watched_queues(broker: Any = None) -> tuple[str, ...]:
             if declared:
                 return declared
         except Exception:  # noqa: BLE001 - el fallback estatico siempre vale
-            pass
+            logger.warning(
+                "queue_watchdog: no se pudieron listar las colas declaradas del broker; "
+                "se usa la lista estatica",
+                exc_info=True,
+            )
     return DEFAULT_QUEUES
 
 
