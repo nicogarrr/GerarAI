@@ -995,6 +995,58 @@ def _alert_rules_answer(db: Session, tenant: int) -> ChatResponse:
     return _response("\n".join(lines), sources, "account_alert_rules")
 
 
+_SCREENS = re.compile(
+    r"\b(?:pantallas|screens?|screeners?|filtros)\s+(?:que\s+tengo\s+)?(?:guardad\w*|del\s+screener|en\s+el\s+screener)"
+    r"|\bmis\s+(?:pantallas|screens?|screeners?)\b|\btengo\s+guardad\w+\s+en\s+el\s+screener\b"
+    r"|\bmy\s+(?:saved\s+)?screens?\b|\bsaved\s+screens?\b"
+)
+
+
+def _asks_saved_screens(text: str, question: str) -> bool:
+    return bool(_SCREENS.search(text) and not _tickers_in(question)
+                and (re.search(r"\b(?:mis|mi|tengo|my|i)\b", text)))
+
+
+def _saved_screens_answer(db: Session, tenant: int) -> ChatResponse:
+    from app.models import Company, SavedScreen, SavedScreenMatch
+
+    english = _english()
+    screens = db.scalars(select(SavedScreen).where(SavedScreen.tenant_id == tenant, SavedScreen.active.is_(True))
+                         .order_by(SavedScreen.id)).all()
+    sources = [_source("saved_screen", None, "Screeners", "/screeners")]
+    if not screens:
+        return _response("You have no saved screens. You can create them in Screeners." if english else
+                         "No tienes pantallas guardadas en el screener. Puedes crearlas en Screeners.",
+                         sources, "account_saved_screens")
+    count = len(screens)
+    lines = [f"You have {count} saved screen{'s' if count != 1 else ''}:" if english else
+             f"Tienes {count} pantalla{'s' if count != 1 else ''} guardada{'s' if count != 1 else ''} en el screener:"]
+    for screen in screens[:15]:
+        tickers = list(db.scalars(
+            select(Company.ticker).join(SavedScreenMatch, SavedScreenMatch.company_id == Company.id)
+            .where(SavedScreenMatch.tenant_id == tenant, SavedScreenMatch.saved_screen_id == screen.id,
+                   SavedScreenMatch.active.is_(True))
+            .order_by(SavedScreenMatch.id)
+        ).all())
+        n = len(screen.criteria or [])
+        if english:
+            crit = f"{n} criteri{'a' if n != 1 else 'on'}"
+            match = (f"{len(tickers)} compan{'ies' if len(tickers) != 1 else 'y'} match now ({', '.join(tickers[:8])}"
+                     f"{', …' if len(tickers) > 8 else ''})" if tickers else "no company matches now")
+            ran = f"; last run {_date_en(screen.last_run_at.date())}" if screen.last_run_at else ""
+        else:
+            crit = f"{n} criterio{'s' if n != 1 else ''}"
+            match = (f"la cumple{'n' if len(tickers) != 1 else ''} ahora {len(tickers)} empresa"
+                     f"{'s' if len(tickers) != 1 else ''} ({', '.join(tickers[:8])}{', …' if len(tickers) > 8 else ''})"
+                     if tickers else "ninguna empresa la cumple ahora")
+            ran = f"; última ejecución el {fecha_es(screen.last_run_at.date())}" if screen.last_run_at else ""
+        lines.append(f"- «{screen.name}»: {crit}; {match}{ran}.")
+    if count > 15:
+        lines.append(f"And {count - 15} more in Screeners." if english else f"Y {count - 15} más en Screeners.")
+    lines.append("To see or change them, go to Screeners." if english else "Para verlas o cambiarlas, ve a Screeners.")
+    return _response("\n".join(lines), sources, "account_saved_screens")
+
+
 def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     """Respuesta de datos de la cuenta, o None si la pregunta no es de este módulo."""
     tenant = _tenant(db)
@@ -1007,6 +1059,8 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
         return _history_answer(db, tenant, text)
     if _asks_sell_all_tax(text, question):
         return _sell_all_answer(db, tenant)
+    if _asks_saved_screens(text, question):
+        return _saved_screens_answer(db, tenant)
     if _asks_alert_rules(text, question):
         return _alert_rules_answer(db, tenant)
     if _asks_plan(text, question):
