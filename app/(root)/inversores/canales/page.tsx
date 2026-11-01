@@ -2,21 +2,23 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
+import { getT } from '@/lib/i18n/server';
+
 import { INVESTOR_CHANNELS, type ChannelCategory } from './channels';
 
-export const metadata: Metadata = {
-    title: 'Canales de inversión',
-    description: 'Canales de YouTube de inversión con enlace directo, fuente y fecha de comprobación.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getT();
+    return { title: t('investors.channels.title'), description: t('investors.channels.description') };
+}
 
-const SECTIONS: { category: ChannelCategory; title: string }[] = [
-    { category: 'inversion', title: 'Inversión y finanzas' },
-    { category: 'negocio', title: 'Negocio y tecnología' },
-    { category: 'referencia', title: 'Referencias en inglés' },
-    { category: 'empresa', title: 'Empresas' },
-];
-
-export default function ChannelsPage() {
+export default async function ChannelsPage() {
+    const t = await getT();
+    const SECTIONS: { category: ChannelCategory; title: string }[] = [
+        { category: 'inversion', title: t('investors.channels.sectionInversion') },
+        { category: 'negocio', title: t('investors.channels.sectionNegocio') },
+        { category: 'referencia', title: t('investors.channels.sectionReferencia') },
+        { category: 'empresa', title: t('investors.channels.sectionEmpresa') },
+    ];
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-8 overflow-x-clip py-6">
             <Link
@@ -24,10 +26,10 @@ export default function ChannelsPage() {
                 href="/inversores/aprender"
             >
                 <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-                Volver a Aprender
+                {t('investors.channels.back')}
             </Link>
             <header className="flex flex-col gap-3">
-                <h1 className="text-3xl font-semibold text-gray-100">Canales de inversión</h1>
+                <h1 className="text-3xl font-semibold text-gray-100">{t('investors.channels.title')}</h1>
             </header>
             {SECTIONS.map((section) => {
                 const items = INVESTOR_CHANNELS.filter((channel) => channel.category === section.category);
@@ -46,7 +48,7 @@ export default function ChannelsPage() {
                                         {channel.name}
                                     </a>
                                     <p className="text-xs text-gray-500">
-                                        {channel.handle} · {channel.language === 'es' ? 'Español' : 'Inglés'} · {channel.source}
+                                        {channel.handle} · {channel.language === 'es' ? t('investors.channels.spanish') : t('investors.channels.english')} · {channel.source}
                                         {channel.note ? ` · ${channel.note}` : ''}
                                     </p>
                                 </li>

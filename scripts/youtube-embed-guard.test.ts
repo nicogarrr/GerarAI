@@ -52,7 +52,7 @@ describe('vídeos de inversores', () => {
         assert.match(embed, /https:\/\/www\.youtube-nocookie\.com\/embed\//);
         assert.match(embed, /title=\{title\}/);
         assert.match(embed, /isYouTubeVideoId\(videoId\)/);
-        const block = readFileSync('app/(root)/inversores/_components/InvestorVideos.tsx', 'utf8');
+        const block = readFileSync('app/(root)/inversores/_components/InvestorVideos.tsx', 'utf8') + readFileSync('lib/i18n/messages/es/investors.json', 'utf8');
         assert.match(block, /No hay vídeos verificados disponibles/);
         assert.match(block, /Fuente:/);
         assert.match(block, /video\.channel_kind === 'archive'/);

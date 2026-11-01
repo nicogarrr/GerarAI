@@ -155,6 +155,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/proPicks/DcaBacktestPanel.tsx': 'useState, useTransition, jsx-onSubmit, jsx-onChange',
   'app/(root)/inversores/_components/HubNav.tsx': 'usePathname',
   'app/(root)/inversores/_components/PaginationNav.tsx': 'useT',
+  'app/(root)/inversores/_components/InvestorVideos.tsx': 'useT, useLocale',
   'app/(root)/inversores/_components/IngestLettersButton.tsx': 'useState, jsx-onClick',
   'app/(root)/inversores/_components/SyncPortfoliosButton.tsx': 'useState, jsx-onClick',
   'app/(root)/ownership/SyncButton.tsx': 'useTransition, useState, jsx-onClick',
