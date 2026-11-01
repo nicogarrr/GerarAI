@@ -2274,7 +2274,17 @@ def refresh_portfolio_prices_intraday(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=COMPUTED_QUEUE_NAME)
+# Precios ProPicks: yfinance va simbolo a simbolo (~1-2 s cada uno) y el
+# universo llega a 500 aprobadas: 8-17 min, mas que los 10 min por defecto
+# (TimeLimitExceeded en prod, 1-nov). Limite explicito de 30 min, como
+# propicks_radar_scan en la misma cola, y presupuesto de 20 min con tandas
+# confirmadas: el corte no pierde lo ya descargado.
+PROPICKS_PRICES_TIME_LIMIT_MS = 30 * 60 * 1000
+PROPICKS_PRICES_BUDGET_SECONDS = 20 * 60
+
+
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=PROPICKS_PRICES_TIME_LIMIT_MS,
+                queue_name=COMPUTED_QUEUE_NAME)
 def refresh_propicks_prices(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -2306,7 +2316,7 @@ def refresh_propicks_prices(
             "reason": "lease_held",
         }
     try:
-        result = _refresh(db)
+        result = _refresh(db, budget_seconds=PROPICKS_PRICES_BUDGET_SECONDS)
         return {"actor": "refresh_propicks_prices", **result}
     except Exception as exc:
         _rollback(db)
@@ -2360,6 +2370,11 @@ def propicks_radar_scan(
         db.close()
 
 
+# Presupuesto por corrida: 50 min dentro del time_limit de 1 h (10 min de
+# margen para la empresa en vuelo). Agotado, sigue en otro mensaje con cursor.
+VALUATION_TIME_BUDGET_SECONDS = 50 * 60
+
+
 @dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000,
               queue_name=EXTERNA_QUEUE_NAME)
 @_coalesce_on_success("refresh_valuation_metrics", 20 * 3600, ("tenant_id",), stale_after_seconds=None)
@@ -2392,8 +2407,18 @@ def refresh_valuation_metrics(
     # reencola tras el Retry-After en vez de ocupar un hilo de default
     # martilleando (medido 31-oct-2026: 2 corridas asi bloqueaban los 2
     # hilos de la cola default con 1.077 HTTP 429 en 10 min).
+    from app.workers.rate_limit_retry import retries_exhausted
+
     blocked = finnhub_blocked_for()
     if blocked > 0:
+        if retries_exhausted():
+            # Otro Retry iria a dead-letter: el cursor (si lo hay) sigue en
+            # Redis y la corrida de manana reanuda desde el.
+            return {
+                "status": "skipped",
+                "actor": "refresh_valuation_metrics",
+                "reason": "rate_limited_retries_exhausted",
+            }
         delay_ms = int(blocked * 1000) + _retry_jitter_ms()
         raise dramatiq.Retry(
             f"Finnhub en cooldown 429: reintento tras {delay_ms // 1000}s",
@@ -2429,8 +2454,11 @@ def refresh_valuation_metrics(
             cursor = raw.decode() if isinstance(raw, bytes) else raw
         except Exception:  # noqa: BLE001 - sonda best-effort
             cursor = None
+    from app.services.ticker_news_lane import Deadline
+    from app.services.valuation_metrics_service import ValuationTimeBudgetExhausted
+
     try:
-        result = _refresh(db, start_after_ticker=cursor)
+        result = _refresh(db, start_after_ticker=cursor, deadline=Deadline(VALUATION_TIME_BUDGET_SECONDS))
         if client is not None and cursor is not None:
             try:
                 client.delete(cursor_key)
@@ -2446,6 +2474,13 @@ def refresh_valuation_metrics(
                 client.set(cursor_key, exc.last_completed_ticker, ex=20 * 3600)
             except Exception:  # noqa: BLE001 - expira por TTL solo
                 logger.warning("valuation cursor: no se pudo guardar el cursor en Redis; expira por TTL", exc_info=True)
+        if retries_exhausted():
+            return {
+                "status": "skipped",
+                "actor": "refresh_valuation_metrics",
+                "reason": "rate_limited_retries_exhausted",
+                "cursor": exc.last_completed_ticker,
+            }
         delay_seconds = exc.retry_after or finnhub_blocked_for() or 60.0
         delay_ms = int(delay_seconds * 1000) + _retry_jitter_ms()
         raise dramatiq.Retry(
@@ -2453,6 +2488,25 @@ def refresh_valuation_metrics(
             f"reintento tras {delay_ms // 1000}s",
             delay=delay_ms,
         ) from exc
+    except ValuationTimeBudgetExhausted as exc:
+        # Presupuesto agotado (antes: TimeLimit a mitad y reintento desde
+        # cero hasta dead-letter). Cursor + continuacion en un mensaje nuevo
+        # tras soltar el lease; lo hecho ya esta confirmado por empresa.
+        if client is not None and exc.last_completed_ticker:
+            try:
+                client.set(cursor_key, exc.last_completed_ticker, ex=20 * 3600)
+            except Exception:  # noqa: BLE001 - sin cursor la cache de 24h evita repetir
+                logger.warning("valuation cursor: no se pudo guardar el cursor en Redis", exc_info=True)
+        refresh_valuation_metrics.send_with_options(
+            kwargs={"tenant_id": tenant_id, "user_id": user_id},
+            delay=60_000 + _retry_jitter_ms(),
+        )
+        return {
+            "status": "partial",
+            "actor": "refresh_valuation_metrics",
+            "reason": "time_budget",
+            "cursor": exc.last_completed_ticker,
+        }
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("refresh_valuation_metrics", exc, tenant_id=tenant_id)

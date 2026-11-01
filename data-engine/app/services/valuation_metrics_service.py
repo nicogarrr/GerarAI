@@ -368,6 +368,19 @@ class ValuationUniverseRateSuspended(RuntimeError):
         )
 
 
+class ValuationTimeBudgetExhausted(RuntimeError):  # noqa: N818 - par de ValuationUniverseRateSuspended
+    """Presupuesto de tiempo agotado a mitad del universo: seguir en otro mensaje.
+
+    ``last_completed_ticker`` es el cursor: todo lo anterior ya esta
+    confirmado. Sin esto el TimeLimit mataba la corrida a mitad (prod, 1-nov)
+    y el reintento volvia a empezar hasta acabar en dead-letter.
+    """
+
+    def __init__(self, last_completed_ticker: str | None) -> None:
+        self.last_completed_ticker = last_completed_ticker
+        super().__init__(f"presupuesto de tiempo agotado; completado hasta {last_completed_ticker!r}")
+
+
 def compute_valuation_metrics(
     db: Session,
     companies: Sequence[Company],
@@ -376,6 +389,7 @@ def compute_valuation_metrics(
     dividend_fetcher: DividendFetcher | None = None,
     finnhub_yield_fetcher: FinnhubYieldFetcher | None = None,
     commit_per_company: bool = False,
+    deadline: Any | None = None,
 ) -> dict[str, Any]:
     """Calcula y persiste price_to_book y dividend_yield_ttm por empresa.
 
@@ -403,7 +417,15 @@ def compute_valuation_metrics(
         },
     }
     last_completed_ticker: str | None = None
+    last_seen_ticker: str | None = None
     for company in companies:
+        if deadline is not None and last_seen_ticker is not None and deadline.expired():
+            # Corte entre empresas: la anterior ya termino (completa o
+            # saltada); se confirma lo escrito y se sigue desde ella.
+            if commit_per_company:
+                db.commit()
+            raise ValuationTimeBudgetExhausted(last_seen_ticker)
+        last_seen_ticker = company.ticker
         price = _latest_price(db, company.id, as_of)
         if price is None:
             stats["skipped"]["sin_precio_fresco"] += 1
@@ -559,6 +581,7 @@ def refresh_valuation_metrics(
     dividend_fetcher: DividendFetcher | None = None,
     finnhub_yield_fetcher: FinnhubYieldFetcher | None = None,
     start_after_ticker: str | None = None,
+    deadline: Any | None = None,
 ) -> dict[str, Any]:
     """Job diario: metricas de valoracion de TODO el universo del tenant.
 
@@ -611,6 +634,7 @@ def refresh_valuation_metrics(
         commit_per_company=True,
         dividend_fetcher=dividend_fetcher,
         finnhub_yield_fetcher=finnhub_yield_fetcher,
+        deadline=deadline,
     )
     db.commit()
     return {
