@@ -9,10 +9,11 @@ import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import type { Formatters } from '@/lib/format';
 
 const DAYS_SHOWN = 7;
-// Logos grandes (como «Empresas seguidas»): con 120 px de tarjeta caben 2 de 36 px
-// y el «+N» (que enlaza al día completo); el resto de eventos se cuenta, no se
-// encoge el logo.
-const LOGOS_SHOWN = 2;
+// Logos apilados (referencia Quartr, pedido de Nico 1-nov-2026): hasta 3 de
+// 36 px superpuestos (-space-x) con anillo del color de la tarjeta para que
+// se lean por separado. El total lo dice el contador UNA sola vez: sin
+// «+N», que duplicaba la cuenta y era lo que se veía mal con 3+ empresas.
+const LOGOS_SHOWN = 3;
 
 function addUtcDays(isoDate: string, days: number): string {
     const date = new Date(`${isoDate}T00:00:00Z`);
@@ -27,7 +28,6 @@ function dayLabel(isoDate: string, todayIso: string, ti: TFunction): string {
 }
 
 function DayCard({ isoDate, todayIso, events, ti, f }: { isoDate: string; todayIso: string; events: FollowedEarningsEvent[]; ti: TFunction; f: Formatters }) {
-    const extra = events.length - LOGOS_SHOWN;
     return (
         // Sin aria-label: el nombre del enlace sale de lo que se ve (dia, «Hoy»,
         // eventos) más contexto solo para lector (WCAG 2.5.3, label-in-name). Con
@@ -54,16 +54,15 @@ function DayCard({ isoDate, todayIso, events, ti, f }: { isoDate: string; todayI
                         {events.length}{' '}
                         <span className="sr-only">{events.length === 1 ? ti('calendar.strip.eventSingular') : ti('calendar.strip.eventPlural')}</span>
                     </span>
-                    <span aria-hidden="true" className="flex items-center justify-center gap-1" title={events.map((event) => event.ticker).join(", ")}>
+                    <span aria-hidden="true" className="flex items-center justify-center -space-x-2 sm:-space-x-2.5" title={events.map((event) => event.ticker).join(", ")}>
                         {events.slice(0, LOGOS_SHOWN).map((event) => (
                             <CompanyLogo
                                 key={event.ticker}
                                 ticker={event.ticker}
                                 name={event.company || event.ticker}
-                                className="size-9 rounded-lg sm:size-10 2xl:size-12"
+                                className="size-9 rounded-lg ring-2 ring-surface-1 sm:size-10 2xl:size-12"
                             />
                         ))}
-                        {extra > 0 ? <span className="text-sm font-semibold text-gray-200">+{extra}</span> : null}
                     </span>
                 </>
             )}
