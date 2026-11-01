@@ -23,12 +23,15 @@ import asyncio
 import math
 import time
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
+
+from app.valuation.currency import normalize_currency
 
 DB_CLOSES_SOURCE = "Cierres diarios guardados en GerarAI"
 YAHOO_SOURCE = "Yahoo Finance (no oficial)"
@@ -126,6 +129,12 @@ def normalize_yahoo_info(info: dict[str, Any], today: date) -> dict[str, Any]:
     earnings = _epoch_date(info.get("earningsTimestamp") or info.get("earningsTimestampStart"))
     estimate = info.get("isEarningsDateEstimate")
     low, high = _positive(info.get("fiftyTwoWeekLow")), _positive(info.get("fiftyTwoWeekHigh"))
+    # Yahoo cotiza Londres en peniques («GBp»): el rango va a la divisa
+    # principal (GBP); ``.upper()`` a secas lo dejaba en peniques con «GBP».
+    currency, divisor = normalize_currency(str(info["currency"]) if info.get("currency") else None)
+    if divisor != 1:
+        low = low / divisor if low is not None else None
+        high = high / divisor if high is not None else None
     ex_dividend = _epoch_date(info.get("exDividendDate"))
     return {
         "beta": round(beta, 2) if beta is not None else None,
@@ -134,7 +143,7 @@ def normalize_yahoo_info(info: dict[str, Any], today: date) -> dict[str, Any]:
         "earnings_confirmed": (not estimate) if isinstance(estimate, bool) else None,
         "low_52w": low if low is not None and high is not None and low <= high else None,
         "high_52w": high if low is not None and high is not None and low <= high else None,
-        "currency": str(info["currency"]).strip().upper() if info.get("currency") else None,
+        "currency": currency,
     }
 
 
@@ -148,24 +157,33 @@ def _own_data(db: Session, ticker: str, today: date) -> dict[str, Any]:
     from app.models import MarketPrice
     from app.models.entities import EarningsDate
     from app.services.company_resolver import resolve_company
+    from app.services.price_units import listing_price
     from app.services.propicks_price_service import yahoo_symbol
+    from app.valuation.currency import listing_currency
 
     company = resolve_company(db, ticker)
     out: dict[str, Any] = {"found": company is not None, "yahoo": ticker.strip().upper(), "currency": None}
     if company is not None:
         out["yahoo"] = yahoo_symbol(company)
-        out["currency"] = (company.currency or "").upper() or None
-        rows = db.execute(
-            select(MarketPrice.date, MarketPrice.close).where(
+        # Cierres en la divisa principal del listado: Londres guarda peniques
+        # (``quote_currency`` «GBp») y el rango salia en peniques con «GBP».
+        out["currency"] = listing_currency(company.ticker, company.currency)
+        listed: list[tuple[date, float]] = []
+        for day, close, quote in db.execute(
+            select(MarketPrice.date, MarketPrice.close, MarketPrice.quote_currency).where(
                 MarketPrice.company_id == company.id,
                 MarketPrice.close.isnot(None),
                 MarketPrice.date > today - timedelta(days=365),
             )
-        ).all()
+        ).all():
+            got = listing_price(Decimal(str(close)), quote_currency=quote, company=company)
+            if got is not None and got[1] == out["currency"]:
+                listed.append((day, float(got[0])))
+        rows = listed
         from app.services.split_adjustment import split_events_by_company
 
         splits = [day for day, _ratio in split_events_by_company(db, [company.id]).get(company.id, [])]
-        out["range"] = range_from_closes([(row[0], row[1]) for row in rows], today, splits)
+        out["range"] = range_from_closes(rows, today, splits)
     symbol = (company.ticker if company is not None else ticker).strip().upper()
     nxt = db.scalars(
         select(EarningsDate)
