@@ -2522,7 +2522,13 @@ class ChatService:
 
         qty = _sale_quantity(question, held)
         issue = None
-        if not 0 < qty <= held:
+        if qty <= 0:
+            issue = (
+                "Para estimar el IRPF de una venta, la cantidad tiene que ser mayor que 0: "
+                f"tienes {_fmt_number_es(float(held), 4)} acciones de {company.ticker}. "
+                "Confirma la cantidad; no he calculado ninguna venta."
+            )
+        elif qty > held:
             issue = (
                 f"Pides vender {_fmt_number_es(float(qty), 4)} acciones de {company.ticker}, "
                 f"pero tienes {_fmt_number_es(float(held), 4)}. Confirma la cantidad; no he calculado otra venta."
