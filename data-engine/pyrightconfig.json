@@ -1,8 +1,7 @@
 {
   "include": [
     "app",
-    "main.py",
-    "routers"
+    "main.py"
   ],
   "exclude": [
     "**/__pycache__",
