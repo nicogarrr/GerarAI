@@ -17320,6 +17320,8 @@
           },
           "actor": {
             "default": "user",
+            "maxLength": 160,
+            "minLength": 1,
             "title": "Actor",
             "type": "string"
           },
@@ -22502,7 +22504,7 @@
           "symbol": {
             "maxLength": 20,
             "minLength": 1,
-            "pattern": "^[A-Za-z0-9.\\-]+$",
+            "pattern": "^[A-Za-z0-9]+(?:[.\\-][A-Za-z0-9]+)*$",
             "title": "Symbol",
             "type": "string"
           }

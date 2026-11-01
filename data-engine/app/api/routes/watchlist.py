@@ -1,7 +1,8 @@
+import unicodedata
 from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
@@ -42,8 +43,24 @@ router = APIRouter()
 
 
 class WatchItemCreate(BaseModel):
-    symbol: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]+$")
+    # Letras/cifras separadas por un solo «.» o «-» (BRK.B, BF-B, 0700.HK): «.»,
+    # «-» o «A..B» se daban de alta y encolaban análisis y siembra de la SEC
+    # para un símbolo que no existe.
+    symbol: str = Field(
+        min_length=1, max_length=20, pattern=r"^[A-Za-z0-9]+(?:[.\-][A-Za-z0-9]+)*$"
+    )
     company: str | None = Field(default=None, max_length=255)
+
+    @field_validator("company")
+    @classmethod
+    def _single_line_label(cls, value: str | None) -> str | None:
+        # Un NUL hace fallar el INSERT en Postgres (500) y un salto de línea
+        # rompe la fila del listado: la etiqueta es una sola línea de texto.
+        if value is not None and any(
+            unicodedata.category(char) in {"Cc", "Zl", "Zp"} for char in value
+        ):
+            raise ValueError("La etiqueta no puede llevar saltos de línea ni caracteres de control")
+        return value
 
 
 def _payload(item: WatchItem) -> dict:
