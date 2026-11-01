@@ -15,7 +15,6 @@
   "app/(root)/mercados/page.tsx": 3,
   "app/(root)/paper-trading/page.tsx": 2,
   "app/(root)/plan/page.tsx": 1,
-  "app/(root)/research/[ticker]/filings/page.tsx": 23,
   "app/(root)/research/[ticker]/not-found.tsx": 5,
   "app/(root)/research/[ticker]/page.tsx": 14,
   "app/(root)/research/[ticker]/shorts/page.tsx": 10,

@@ -15,7 +15,7 @@ import { researchRequest } from '@/lib/research/client';
 import { moatChecksToScore, MOAT_V2_MAX_CHECKS } from '@/lib/propicks/moat-scale';
 import { PROPICKS_SCORING_WEIGHTS } from '@/lib/utils/propicksValidation';
 import type { ConfidenceReason, ProPick } from '@/lib/actions/proPicks.actions';
-import { spanishBackendMessage } from '@/lib/research/backend-error-es';
+import { backendMessageForRequest } from '@/lib/research/backend-error-locale';
 
 interface FunnelRunSummary {
   id: number;
@@ -80,7 +80,7 @@ export async function generateFunnelRunNow(): Promise<FunnelRunSummary | { error
     return await researchRequest<FunnelRunSummary>('/api/propicks/runs', { method: 'POST' });
   } catch (error) {
     console.error('generateFunnelRunNow error:', error);
-    return { error: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo generar la selección.' };
+    return { error: error instanceof Error ? await backendMessageForRequest(error.message) : 'No se pudo generar la selección.' };
   }
 }
 

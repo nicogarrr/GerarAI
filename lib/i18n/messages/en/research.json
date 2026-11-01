@@ -1324,5 +1324,42 @@
     "chartSvgLabel": "{name}: {count} epochs, from {from} to {to}",
     "chartCaption": "Semi-major axis by orbital epoch (km)",
     "chartFootnote": "{count} saved epochs. The chart doesn't confirm a deployment."
+  },
+  "filingsYoy": {
+    "metaTitle": "SEC filings",
+    "metaDescription": "Forms and changes the company reported to the SEC, with their source.",
+    "kind": {
+      "added": "Added",
+      "removed": "Removed",
+      "modified": "Modified"
+    },
+    "perPageNote": "Each page is a different report, from newest to oldest.",
+    "perShare": "{amount} per share",
+    "shares": "{amount} shares",
+    "title": "Report vs. prior year · {ticker}",
+    "back": "Back to the company",
+    "reportTypeAria": "Report type",
+    "loadError": "The comparison could not be read. That does not mean “no changes”.",
+    "noData": "No data available.",
+    "periodLine": "{form} for the period {current} vs. {previous}",
+    "keyFigures": "Key figures",
+    "colMetric": "Metric",
+    "colCurrent": "Current",
+    "colPrevious": "Prior year",
+    "colChange": "Change",
+    "outflowNote": "cash outflow, absolute amount",
+    "calculated": "calculated",
+    "noFigures": "No figures saved for both periods.",
+    "textChanges": "Text changes",
+    "unchangedText": "No changes in the identified text.",
+    "noSectionData": "No data for this section.",
+    "changesCount": "{count} changes",
+    "truncated": " (showing the first 20)",
+    "before": "Before: “{text}”",
+    "after": "Now: “{text}”",
+    "noTextAnalysis": "No text analysis.",
+    "pagesAria": "Report pages",
+    "newer": "Newer",
+    "older": "Older"
   }
 }

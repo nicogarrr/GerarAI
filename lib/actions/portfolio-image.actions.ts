@@ -5,7 +5,7 @@ import { researchRequest, jsonBody } from '@/lib/research/client';
 import { requestCache } from '@/lib/cache/requestCache';
 import { AppError, getFriendlyErrorMessage } from '@/lib/types/errors';
 import type { ConfirmedImageRow, ImageActionResult, ImageInstrument, ImagePreview, ImageReview } from '@/lib/portfolio/image-import';
-import { spanishBackendMessage } from '@/lib/research/backend-error-es';
+import { backendMessageForRequest } from '@/lib/research/backend-error-locale';
 
 /**
  * El backend responde 403/422/503 con el motivo ya en español y accionable;
@@ -19,7 +19,7 @@ async function imageCall<T>(fn: () => Promise<T>): Promise<ImageActionResult<T>>
         const digest = (error as { digest?: unknown })?.digest;
         if (typeof digest === 'string' && digest.startsWith('NEXT_')) throw error;
         if (error instanceof AppError && error.code === 'RESEARCH_API_ERROR' && [403, 422, 503].includes(error.statusCode) && error.message) {
-            return { ok: false, error: spanishBackendMessage(error.message) };
+            return { ok: false, error: await backendMessageForRequest(error.message) };
         }
         return { ok: false, error: getFriendlyErrorMessage(error) };
     }
