@@ -570,3 +570,18 @@ def test_venta_por_porcentaje_o_fraccion(db, question, expected):
     answer = _ask(db, question).answer
     for fragment in expected:
         assert fragment in answer
+
+
+# «2 tercios», «1/3», «3/4»: la cifra del numerador se leía como cantidad
+# («si vendo 2 tercios» vendía 2 acciones; «1/3» vendía 1).
+@pytest.mark.parametrize(("question", "expected"), [
+    ("IRPF si vendo 2 tercios de UBER", ("20 de tus 30 acciones de UBER", "valor 1.600,00 €")),
+    ("IRPF si vendo 1/3 de UBER", ("10 de tus 30 acciones de UBER", "valor 800,00 €")),
+    ("IRPF si vendo 3/4 de mis UBER", ("22,5 de tus 30 acciones de UBER", "valor 1.800,00 €")),
+    ("IRPF si vendo 3 cuartos de UBER", ("22,5 de tus 30 acciones de UBER", "valor 1.800,00 €")),
+])
+def test_venta_por_fraccion_con_cifras(db, question, expected):
+    _uber(db)
+    answer = _ask(db, question).answer
+    for fragment in expected:
+        assert fragment in answer
