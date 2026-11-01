@@ -1,19 +1,30 @@
+// @ts-expect-error TS5097: node --test (--experimental-strip-types) necesita la extensión.
+import { t as esT, type TranslationKey, type TranslationVars } from '../i18n/t.ts';
+
+/** Traductor del idioma elegido; por defecto el español de referencia. */
+type TiFn = (key: TranslationKey, vars?: TranslationVars) => string;
+
 /** Provider diagnostics stay in stored job errors, never in product copy. */
-export function extractionFailureText(error: string | null): string {
-  if (/timeout|timed out|tiempo de espera/i.test(error ?? '')) return 'La extracción tardó demasiado. Vuelve a intentarlo.';
-  if (/quota|rate.?limit|429|credit|crédito/i.test(error ?? '')) return 'El servicio de extracción no está disponible ahora. Inténtalo más tarde.';
-  return 'No se pudo completar la extracción. Vuelve a intentarlo.';
+export function extractionFailureText(error: string | null, ti: TiFn = esT): string {
+  if (/timeout|timed out|tiempo de espera/i.test(error ?? '')) return ti('knowledge.jobFeedback.timeout');
+  if (/quota|rate.?limit|429|credit|crédito/i.test(error ?? '')) return ti('knowledge.jobFeedback.unavailable');
+  return ti('knowledge.jobFeedback.failed');
 }
 
 /** Count only recorded result IDs; an absent result is not zero. */
-export function extractionResultText(job: { status: string; result: Record<string, unknown>; error: string | null } | undefined): string | null {
+export function extractionResultText(
+  job: { status: string; result: Record<string, unknown>; error: string | null } | undefined,
+  ti: TiFn = esT,
+): string | null {
   if (!job) return null;
-  if (job.status === 'failed') return extractionFailureText(job.error);
+  if (job.status === 'failed') return extractionFailureText(job.error, ti);
   if (job.status !== 'completed' && job.status !== 'partial') return null;
   const ids = job.result.principle_ids;
   const count = Array.isArray(ids) ? ids.length : null;
-  const result = count === null ? 'Recuento no disponible.' : `${count} principios encontrados.`;
-  return `${job.status === 'partial' ? 'Extracción parcial' : 'Extracción completada'}: ${result}`;
+  const result = count === null
+    ? ti('knowledge.jobFeedback.countUnavailable')
+    : ti(count === 1 ? 'knowledge.jobFeedback.principlesFoundOne' : 'knowledge.jobFeedback.principlesFound', { count });
+  return ti(job.status === 'partial' ? 'knowledge.jobFeedback.partial' : 'knowledge.jobFeedback.completed', { result });
 }
 
 const DEFAULT_NAMES = ['Buffett & Munger', 'Howard Marks', 'Fundsmith', 'Numantia', 'Capital Allocation', 'Cyclicals', 'Compounders', 'Pre-revenue', 'Space Industry', 'Personal Mistakes'];
@@ -27,18 +38,19 @@ export function hasDefaultCollections(collections: { name: string }[]): boolean 
  *  "Ningún principio coincide" sin contexto. */
 export function noPrinciplesText(
   jobs: { status: string; result: Record<string, unknown>; error: string | null }[],
+  ti: TiFn = esT,
 ): string {
   const latest = jobs.find(
     (job) => job.status === 'completed' || job.status === 'partial' || job.status === 'failed',
   );
-  if (!latest) return 'Aún no hay principios extraídos.';
+  if (!latest) return ti('knowledge.jobFeedback.noPrinciples');
   if (latest.status === 'failed') {
-    return extractionFailureText(latest.error);
+    return extractionFailureText(latest.error, ti);
   }
   const ids = latest.result.principle_ids;
   const count = Array.isArray(ids) ? ids.length : null;
-  if (count !== null && count > 0) return 'Aún no hay principios extraídos.';
-  if (latest.status === 'partial') return 'La última extracción se quedó a medias y no dejó principios.';
-  if (count === 0) return 'La última extracción terminó sin encontrar principios.';
-  return 'Aún no hay principios extraídos.';
+  if (count !== null && count > 0) return ti('knowledge.jobFeedback.noPrinciples');
+  if (latest.status === 'partial') return ti('knowledge.jobFeedback.partialEmpty');
+  if (count === 0) return ti('knowledge.jobFeedback.completedEmpty');
+  return ti('knowledge.jobFeedback.noPrinciples');
 }

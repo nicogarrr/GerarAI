@@ -181,5 +181,18 @@
       "one": "{count} documento coincide con «{query}».",
       "other": "{count} documentos coinciden con «{query}»."
     }
+  },
+  "jobFeedback": {
+    "timeout": "La extracción tardó demasiado. Vuelve a intentarlo.",
+    "unavailable": "El servicio de extracción no está disponible ahora. Inténtalo más tarde.",
+    "failed": "No se pudo completar la extracción. Vuelve a intentarlo.",
+    "countUnavailable": "Recuento no disponible.",
+    "partial": "Extracción parcial: {result}",
+    "completed": "Extracción completada: {result}",
+    "noPrinciples": "Aún no hay principios extraídos.",
+    "partialEmpty": "La última extracción se quedó a medias y no dejó principios.",
+    "completedEmpty": "La última extracción terminó sin encontrar principios.",
+    "principlesFoundOne": "{count} principio encontrado.",
+    "principlesFound": "{count} principios encontrados."
   }
 }
