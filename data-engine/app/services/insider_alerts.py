@@ -39,6 +39,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.i18n import generation_language
 from app.models.entities import InsiderTransaction, ResearchAlert
 from app.services.company_resolver import resolve_company
 from app.services.insider_service import (
@@ -125,15 +126,24 @@ def _es_money(value: float) -> str:
     return f"${_es_num(value)}"
 
 
-def _es_date(raw: object) -> str:
+def _es_date(raw: object, language: str = "es") -> str:
     parsed = _parse_date(raw) if raw else None
     if parsed is None:
-        return str(raw or "fecha no indicada")
+        if raw:
+            return str(raw)
+        return "date not given" if language == "en" else "fecha no indicada"
+    if language == "en":
+        return f"{parsed.day} {_MONTHS_EN[parsed.month - 1]} {parsed.year}"
     return f"{parsed.day} {_MESES[parsed.month - 1]} {parsed.year}"
 
 
-def _purchase_phrase(group: list[InsiderTransaction], total: float) -> str:
-    """Frase en castellano para una o varias compras del mismo formulario (sin jerga de XML)."""
+_MONTHS_EN = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def _purchase_phrase(group: list[InsiderTransaction], total: float, language: str = "es") -> str:
+    """Frase en castellano (o ingles) para una o varias compras del mismo formulario (sin jerga de XML)."""
+    if language == "en":
+        return _purchase_phrase_en(group, total)
     dates = sorted({str(t.tx_date) for t in group if t.tx_date})
     when = (
         f"el {_es_date(dates[0])}" if len(dates) <= 1
@@ -152,9 +162,28 @@ def _purchase_phrase(group: list[InsiderTransaction], total: float) -> str:
             "abierto o privada.")
 
 
+def _purchase_phrase_en(group: list[InsiderTransaction], total: float) -> str:
+    dates = sorted({str(t.tx_date) for t in group if t.tx_date})
+    when = (
+        f"on {_es_date(dates[0], 'en')}" if len(dates) <= 1
+        else f"between {_es_date(dates[0], 'en')} and {_es_date(dates[-1], 'en')}"
+    )
+    if len(group) == 1:
+        t = group[0]
+        detail = f"{_es_num(float(t.shares))} shares at ${_es_num(float(t.price), 2)}" if t.shares and t.price else ""
+        head = f"bought shares worth {_es_money(total)}"
+        head += f" ({detail})" if detail else ""
+    else:
+        shares = sum(float(t.shares) for t in group if t.shares)
+        avg = f", average price ${_es_num(total / shares, 2)}" if shares else ""
+        head = f"bought shares in {len(group)} transactions worth {_es_money(total)} in total{avg}"
+    return f"{head}, {when}. Purchase reported on Form 4; it may be on the open market or private."
+
+
 def _build_alerts(
-    db: Session, purchases: list[InsiderTransaction]
+    db: Session, purchases: list[InsiderTransaction], language: str = "es"
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    en = language == "en"
     alerts: list[dict[str, Any]] = []
     coverage = {"skipped_missing_value": 0, "partial_cluster_totals": 0}
     # Una Form 4 (accession) puede traer decenas de lineas del mismo insider: una alerta
@@ -205,10 +234,11 @@ def _build_alerts(
                     **base,
                     "rule": "c_suite_buy",
                     "severity": "high" if is_big else "medium",
-                    "title": f"Compra C-suite — {first.issuer_ticker or '?'}",
+                    "title": f"{'C-suite purchase' if en else 'Compra C-suite'} — {first.issuer_ticker or '?'}",
                     "message": (
-                        f"{first.insider or 'Insider'} ({first.officer_title or first.role or 'directivo'}) "
-                        f"{_purchase_phrase(group, value)}"
+                        f"{first.insider or 'Insider'} "
+                        f"({first.officer_title or first.role or ('executive' if en else 'directivo')}) "
+                        f"{_purchase_phrase(group, value, language)}"
                     ),
                     "metadata": {**base["metadata"], "also_big_buy": is_big},
                 }
@@ -219,8 +249,8 @@ def _build_alerts(
                     **base,
                     "rule": "big_buy",
                     "severity": "high",
-                    "title": f"Compra insider grande — {first.issuer_ticker or '?'}",
-                    "message": f"{first.insider or 'Insider'} {_purchase_phrase(group, value)}",
+                    "title": f"{'Large insider purchase' if en else 'Compra insider grande'} — {first.issuer_ticker or '?'}",
+                    "message": f"{first.insider or 'Insider'} {_purchase_phrase(group, value, language)}",
                 }
             )
 
@@ -254,6 +284,11 @@ def _build_alerts(
                     f"${total:,.0f} total"
                     if not missing_value
                     else (
+                        f"at least ${total:,.0f}: {missing_value} of "
+                        f"{len(window)} purchases have no amount in the XML"
+                    )
+                    if en
+                    else (
                         f"${total:,.0f} como minimo: {missing_value} de "
                         f"{len(window)} compras sin cifra en el XML"
                     )
@@ -264,11 +299,19 @@ def _build_alerts(
                         "tx_fingerprint": hashlib.sha256(fp_source.encode()).hexdigest(),
                         "rule": "cluster_buy",
                         "severity": "high",
-                        "title": f"Cluster de compras insider — {ticker}",
+                        "title": f"{'Insider buying cluster' if en else 'Cluster de compras insider'} — {ticker}",
                         "message": (
-                            f"{len(insiders)} insiders distintos compraron {ticker} "
-                            f"en {CLUSTER_WINDOW_DAYS} dias ({total_phrase}). "
-                            "Codigo P: mercado abierto o privado."
+                            (
+                                f"{len(insiders)} different insiders bought {ticker} "
+                                f"within {CLUSTER_WINDOW_DAYS} days ({total_phrase}). "
+                                "Code P: open market or private."
+                            )
+                            if en
+                            else (
+                                f"{len(insiders)} insiders distintos compraron {ticker} "
+                                f"en {CLUSTER_WINDOW_DAYS} dias ({total_phrase}). "
+                                "Codigo P: mercado abierto o privado."
+                            )
                         ),
                         "metadata": {
                             "rule_version": RULE_VERSION,
@@ -321,7 +364,8 @@ def evaluate(
                 )
             ).all()
         }
-        alerts, coverage = _build_alerts(db, purchases)
+        # Idioma guardado del usuario (Ajustes); sin preferencia, espanol como siempre.
+        alerts, coverage = _build_alerts(db, purchases, generation_language(db))
         stats.update(coverage)
         for alert in alerts:
             fp = _alert_fingerprint(alert["rule"], alert["tx_fingerprint"])
