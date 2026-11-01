@@ -618,7 +618,9 @@ class PortfolioLedgerService:
         return position
 
 
-def trade_price_fallbacks(db: Session, positions: list[Position]) -> set[int]:
+def trade_price_fallbacks(
+    db: Session, positions: list[Position], tenant_id: int | None = None
+) -> set[int]:
     """Posiciones del ledger cuyo «precio de mercado» es el de una de sus operaciones.
 
     Sin cotización guardada, rebuild_position valora con el precio de la última
@@ -627,6 +629,9 @@ def trade_price_fallbacks(db: Session, positions: list[Position]) -> set[int]:
     ledger, precio igual al de alguna operación y ninguna cotización
     (MarketPrice) desde la última con ese precio. Un precio manual idéntico al de compra cae
     aquí también; rotularlo «sin cotización real» es inocuo.
+
+    ``tenant_id`` explícito (contexto del Cerebro) filtra por ese tenant en vez
+    del contexto de sesión.
     """
     candidates = {
         position.company_id: position
@@ -641,7 +646,11 @@ def trade_price_fallbacks(db: Session, positions: list[Position]) -> set[int]:
     for transaction in db.scalars(
         select(Transaction)
         .where(
-            *tenant_filters(db, Transaction),
+            *(
+                [Transaction.tenant_id == tenant_id]
+                if tenant_id is not None
+                else tenant_filters(db, Transaction)
+            ),
             Transaction.company_id.in_(candidates),
             Transaction.action.in_(["buy", "sell"]),
         )
