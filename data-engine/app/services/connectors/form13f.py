@@ -48,6 +48,9 @@ def _record_sec_outcome(registry, started: float) -> None:
 
 
 def _record_sec_http_failure(registry, exc) -> None:
+    from app.services.connectors.sec_pacing import rate_limited
+
+    rate_limited(exc.response)
     registry.record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
 
 

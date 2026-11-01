@@ -141,6 +141,29 @@ class GlobalPacer:
                 self._sleep(remaining)
             self._local_next = self._monotonic() + self.min_interval_seconds
 
+    def wait_sync(self) -> None:
+        """Synchronous consumers reserve the SAME Redis slots as async ones."""
+        client = self._client()
+        if client is not None:
+            try:
+                wait_ms = client.eval(
+                    _CLAIM_SLOT_LUA, 2, self._slot_key, self._cooldown_key,
+                    int(self._wall() * 1000), int(self.min_interval_seconds * 1000), self._slot_ttl_ms,
+                )
+                if float(wait_ms) > 0:
+                    self._sleep(float(wait_ms) / 1000.0)
+                return
+            except Exception:
+                logger.warning("global pacer %s: Redis unavailable, fallback local", self.key, exc_info=True)
+        if self._fallback_local:
+            with self._local_lock:
+                while True:
+                    remaining = max(self._local_next, self._local_blocked_until) - self._monotonic()
+                    if remaining <= 0:
+                        break
+                    self._sleep(remaining)
+                self._local_next = self._monotonic() + self.min_interval_seconds
+
     def cool_down(self, seconds: float) -> None:
         """Marca un cooldown 429 (extend-only) visible por TODOS los procesos."""
         if seconds <= 0:

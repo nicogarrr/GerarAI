@@ -11,6 +11,15 @@ from app.services.connectors.fred import FREDClient
 from app.services.financial_ingestion_service import _free_data_snapshot
 
 
+@pytest.fixture(autouse=True)
+def _clean_sec_pacer():
+    from app.services.connectors.sec_pacing import pacer
+
+    pacer.reset()
+    yield
+    pacer.reset()
+
+
 def run_async(coroutine):
     return asyncio.run(coroutine)
 
@@ -79,7 +88,7 @@ def test_sec_edgar_tolerates_429_with_backoff_then_succeeds(monkeypatch):
 
     assert run_async(probe()) == {"ok": True}
     assert calls["n"] == 3
-    assert len(sleeps) == 2  # dos reintentos con backoff
+    assert len([s for s in sleeps if s < 1]) == 2  # dos backoffs, ademas del pacing compartido
 
 
 def test_sec_edgar_recent_filings_filters_10k_10q():

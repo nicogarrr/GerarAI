@@ -165,7 +165,10 @@ async def _get_json(
     last_error: Exception | None = None
     registry = get_data_source_registry()
     started = time.perf_counter()
+    from app.services.connectors.sec_pacing import pacer
+
     for attempt in range(max_retries + 1):
+        await pacer.wait()
         try:
             if client is not None:
                 response = await client.get(url, headers=headers)
@@ -175,6 +178,9 @@ async def _get_json(
         except httpx.TransportError as exc:
             registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
             raise
+        from app.services.connectors.sec_pacing import rate_limited
+
+        rate_limited(response)
         if response.status_code == 429 and attempt < max_retries:
             retry_after = response.headers.get("retry-after")
             try:
