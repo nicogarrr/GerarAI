@@ -22,7 +22,7 @@ test('«Página x de y» nunca se parte en dos líneas', () => {
     ]) {
         const src = readFileSync(path, 'utf8');
         // El indice de research pinta la posicion por t('research.pageOf'): el texto ES verbatim se comprueba en el dict.
-        const migrated = path === 'app/(root)/research/page.tsx' || path === 'components/research/Pager.tsx' || path === 'app/(root)/research/sources/page.tsx';
+        const migrated = path === 'app/(root)/research/page.tsx' || path === 'components/research/Pager.tsx' || path === 'app/(root)/research/sources/page.tsx' || path === 'components/research/AnalystTargetsView.tsx';
         if (migrated) assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).pageOf, 'Página {current} de {total}');
         const i = src.indexOf(migrated ? 'research.pageOf' : 'Página');
         assert.ok(i > 0 && (src.slice(Math.max(0, i - 260), i).includes(NOWRAP) || src.slice(i, i + 400).includes(NOWRAP)), `${path}: «Página» sin nowrap`);

@@ -4,6 +4,8 @@ import { connectToDatabase } from '@/database/mongoose';
 import { AccountApproval } from '@/database/models/account-approval.model';
 import { verifyAdminListToken } from '@/lib/auth/account-approval';
 import { buildApprovalLinks } from '@/lib/auth/approval-notify';
+import { LOCALE_COOKIE, parseLocale, type Locale } from '@/lib/i18n/locale';
+import { createTranslator } from '@/lib/i18n/translate';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,9 +27,9 @@ function escapeHtml(value: string): string {
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-function page(title: string, bodyHtml: string, status: number): NextResponse {
+function page(title: string, bodyHtml: string, status: number, locale: Locale = 'es'): NextResponse {
     const html = [
-        '<!doctype html><html lang="es"><head><meta charset="utf-8">',
+        `<!doctype html><html lang="${locale}"><head><meta charset="utf-8">`,
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         `<title>${escapeHtml(title)} - GerarAI</title></head>`,
         '<body style="font-family: system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1rem;">',
@@ -42,12 +44,16 @@ function page(title: string, bodyHtml: string, status: number): NextResponse {
 }
 
 export async function GET(request: NextRequest) {
+    // Idioma: la cookie de Ajustes → Idioma si el navegador la lleva; si no, español.
+    const locale = parseLocale(request.cookies.get(LOCALE_COOKIE)?.value);
+    const t = createTranslator(locale);
+    const view = (title: string, bodyHtml: string, status: number) => page(title, bodyHtml, status, locale);
     const secret = process.env.BETTER_AUTH_SECRET;
     if (!verifyAdminListToken(request.nextUrl.searchParams.get('token'), secret)) {
-        return page('Enlace no válido o caducado', '<p>Este enlace del listado no es válido o ha caducado.</p>', 400);
+        return view(t('auth.approvals.invalidTitle'), `<p>${t('auth.approvals.invalidList')}</p>`, 400);
     }
     if (!secret) {
-        return page('Servicio no disponible', '<p>Falta la configuración del servidor.</p>', 503);
+        return view(t('auth.approvals.unavailableTitle'), `<p>${t('auth.approvals.missingConfig')}</p>`, 503);
     }
 
     await connectToDatabase();
@@ -59,20 +65,20 @@ export async function GET(request: NextRequest) {
         .lean();
 
     if (pendings.length === 0) {
-        return page('Cuentas pendientes', '<p>No hay cuentas pendientes de aprobación.</p>', 200);
+        return view(t('auth.approvals.listTitle'), `<p>${t('auth.approvals.listEmpty')}</p>`, 200);
     }
     const items = pendings.map((p) => {
         const links = buildApprovalLinks({ approvalId: String(p._id), secret });
         const email = escapeHtml(p.email);
-        const name = escapeHtml(p.name || '(sin nombre)');
+        const name = escapeHtml(p.name || t('auth.approvals.noName'));
         const date = p.createdAt ? new Date(p.createdAt).toISOString().slice(0, 16).replace('T', ' ') : '';
         if (p.decidedAt) {
             const apply = p.decision === 'approved' ? links.approve : links.reject;
             return `<li style="margin-bottom: 1.5rem;"><strong>${email}</strong> (${name}, ${date})<br>` +
-                `Ya ${p.decision === 'approved' ? 'aprobada' : 'rechazada'}, falta aplicar: <a href="${apply}">Aplicar la decisión</a></li>`;
+                `${t('auth.approvals.listDecided', { decision: p.decision === 'approved' ? t('auth.approvals.done.approved') : t('auth.approvals.done.rejected') })} <a href="${apply}">${t('auth.approvals.applyLink')}</a></li>`;
         }
         return `<li style="margin-bottom: 1.5rem;"><strong>${email}</strong> (${name}, ${date})<br>` +
-            `<a href="${links.approve}">Aprobar</a> &middot; <a href="${links.reject}">Rechazar</a></li>`;
+            `<a href="${links.approve}">${t('auth.approvals.approve')}</a> &middot; <a href="${links.reject}">${t('auth.approvals.reject')}</a></li>`;
     });
-    return page('Cuentas pendientes', `<ul style="list-style: none; padding: 0;">${items.join('')}</ul>`, 200);
+    return view(t('auth.approvals.listTitle'), `<ul style="list-style: none; padding: 0;">${items.join('')}</ul>`, 200);
 }

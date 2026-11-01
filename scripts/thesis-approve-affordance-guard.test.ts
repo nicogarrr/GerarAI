@@ -44,8 +44,12 @@ void test('el estado sin versiones se explica con una leyenda visible', () => {
     // Tooltip solo no basta: el motivo del disabled debe leerse en pantalla.
     assert.match(
         source,
-        /Sin versiones de tesis que aprobar o rechazar\./,
+        /t\('research\.thesisApprove\.noVersions'\)/,
         'debe existir la leyenda «Sin versiones de tesis que aprobar o rechazar.»',
+    );
+    assert.equal(
+        JSON.parse(readFileSync(new URL('../lib/i18n/messages/es/research.json', import.meta.url), 'utf8')).thesisApprove.noVersions,
+        'Sin versiones de tesis que aprobar o rechazar.',
     );
     assert.match(
         source,
@@ -67,7 +71,7 @@ void test('con la última versión publicada el botón dice «Publicada vX»', (
     );
     assert.match(
         approveSection,
-        /alreadyPublished\s*\?\s*`Publicada v\$\{latestVersion \?\? '\?'\}`/,
+        /alreadyPublished\s*\?\s*t\('research\.thesisApprove\.published', \{ version: latestVersion \?\? '\?' \}\)/,
         'el botón debe cambiar su etiqueta a «Publicada vX» tras publicar',
     );
 });

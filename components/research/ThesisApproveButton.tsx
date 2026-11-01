@@ -9,13 +9,14 @@ import { showErrorToast } from '@/lib/toast';
 import { preserveScrollPosition } from '@/lib/utils/scroll-anchor';
 import { isNextRedirectError } from '@/lib/types/errors';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n/client';
 
 /** Estados desde los que el backend rechaza publicar (409): no hay nada
  *  aprobable. Mismo criterio que NON_APPROVABLE_STATUSES del backend. */
-const NON_APPROVABLE: Record<string, string> = {
-    insufficient_data: 'datos insuficientes',
-    draft_failed_audit: 'no superó la auditoría de fuentes',
-};
+const NON_APPROVABLE = {
+    insufficient_data: 'research.thesisApprove.reason.insufficientData',
+    draft_failed_audit: 'research.thesisApprove.reason.failedAudit',
+} as const;
 
 /**
  * Aprobacion manual de la ultima tesis (POST /thesis/{ticker}/approve).
@@ -50,20 +51,22 @@ export default function ThesisApproveButton({
     olderPublishedVersion?: number | null;
 }) {
     const router = useRouter();
+    const t = useT();
     const [pending, setPending] = useState<'approved' | 'rejected' | null>(null);
     const [confirming, setConfirming] = useState(false);
 
     const alreadyPublished = latestStatus === 'published';
-    const notApprovableReason = latestStatus ? NON_APPROVABLE[latestStatus] : undefined;
+    const notApprovableKey = latestStatus && Object.hasOwn(NON_APPROVABLE, latestStatus) ? NON_APPROVABLE[latestStatus as keyof typeof NON_APPROVABLE] : undefined;
+    const notApprovableReason = notApprovableKey ? t(notApprovableKey) : undefined;
     const approveBlocked = disabled || alreadyPublished || notApprovableReason !== undefined;
     // Con la version ya publicada el estado lo dice el propio boton
     // («Publicada vX»): una leyenda al lado repetiria lo mismo.
     const blockNote = disabled
-        ? 'Sin versiones de tesis que aprobar o rechazar.'
+        ? t('research.thesisApprove.noVersions')
         : alreadyPublished
           ? null
           : notApprovableReason !== undefined
-            ? `La v${latestVersion ?? '?'} no se puede publicar: ${notApprovableReason}.`
+            ? t('research.thesisApprove.cannotPublish', { version: latestVersion ?? '?', reason: notApprovableReason })
             : null;
 
     const decide = async (decision: 'approved' | 'rejected', confirmed = false) => {
@@ -80,22 +83,22 @@ export default function ThesisApproveButton({
             if (result.decision === 'approved') {
                 const sync = result.knowledge_sync?.status;
                 if (sync === 'indexed') {
-                    toast.success(`Tesis v${result.version} aprobada y añadida a la Biblioteca`);
+                    toast.success(t('research.thesisApprove.approvedIndexed', { version: result.version }));
                 } else if (sync === 'unchanged') {
-                    toast.success(`Tesis v${result.version} aprobada; ya estaba en la Biblioteca`);
+                    toast.success(t('research.thesisApprove.approvedUnchanged', { version: result.version }));
                 } else if (sync === 'failed') {
-                    toast.warning(`Tesis v${result.version} aprobada, pero no se pudo indexar en la Biblioteca`);
+                    toast.warning(t('research.thesisApprove.approvedIndexFailed', { version: result.version }));
                 } else {
-                    toast.success(`Tesis v${result.version} aprobada`);
+                    toast.success(t('research.thesisApprove.approved', { version: result.version }));
                 }
             } else {
                 toast.success(
                     result.knowledge_sync?.status === 'removed'
-                        ? `Tesis v${result.version} rechazada y retirada de la Biblioteca`
-                        : `Tesis v${result.version} rechazada`,
+                        ? t('research.thesisApprove.rejectedRemoved', { version: result.version })
+                        : t('research.thesisApprove.rejected', { version: result.version }),
                 );
                 if (olderPublishedVersion !== null) {
-                    toast.info(`La v${olderPublishedVersion} sigue publicada: rechazar solo afecta a la última versión.`);
+                    toast.info(t('research.thesisApprove.olderStillPublished', { version: olderPublishedVersion }));
                 }
             }
             // F391: sin refresh el memo y el historial siguen mostrando el estado anterior.
@@ -112,7 +115,7 @@ export default function ThesisApproveButton({
     return (
         <div
             className="flex flex-wrap items-center gap-2"
-            title="Aprobación manual. La aprobación automática por Telegram es una mejora futura."
+            title={t('research.thesisApprove.manualTitle')}
         >
             <Button
                 type="button"
@@ -128,10 +131,10 @@ export default function ThesisApproveButton({
             >
                 <CheckCheck aria-hidden="true" className="mr-2 h-4 w-4" />
                 {pending === 'approved'
-                    ? 'Aprobando…'
+                    ? t('research.thesisApprove.approving')
                     : alreadyPublished
-                      ? `Publicada v${latestVersion ?? '?'}`
-                      : 'Aprobar tesis'}
+                      ? t('research.thesisApprove.published', { version: latestVersion ?? '?' })
+                      : t('research.thesisApprove.approve')}
             </Button>
             <Button
                 type="button"
@@ -142,28 +145,28 @@ export default function ThesisApproveButton({
                 aria-busy={pending !== null}
             >
                 <XCircle aria-hidden="true" className="mr-2 h-4 w-4" />
-                {pending === 'rejected' ? 'Rechazando…' : 'Rechazar'}
+                {pending === 'rejected' ? t('research.thesisApprove.rejecting') : t('research.thesisApprove.reject')}
             </Button>
             {blockNote ? (
                 <span className="text-xs text-gray-500">{blockNote}</span>
             ) : null}
             {confirming ? (
                 <div role="alert" className="w-full rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
-                    <p className="font-medium">Esta tesis aún no es una valoración final:</p>
+                    <p className="font-medium">{t('research.thesisApprove.notFinal')}</p>
                     <ul className="mt-1 list-disc pl-5">
                         {riskNotes.map((note) => (
                             <li key={note}>{note}</li>
                         ))}
                     </ul>
                     <p className="mt-2 text-xs text-amber-300/80">
-                        Al publicarla pasa a la Biblioteca y el Cerebro la usará como referencia.
+                        {t('research.thesisApprove.publishEffect')}
                     </p>
                     <div className="mt-2 flex gap-2">
                         <Button type="button" size="sm" onClick={() => decide('approved', true)} disabled={pending !== null}>
-                            Publicar igualmente
+                            {t('research.thesisApprove.publishAnyway')}
                         </Button>
                         <Button type="button" size="sm" variant="outline" onClick={() => setConfirming(false)}>
-                            Cancelar
+                            {t('research.thesisApprove.cancel')}
                         </Button>
                     </div>
                 </div>

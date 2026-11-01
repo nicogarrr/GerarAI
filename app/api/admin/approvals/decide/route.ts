@@ -7,6 +7,8 @@ import { connectToDatabase } from '@/database/mongoose';
 import { AccountApproval, type AccountApprovalDoc } from '@/database/models/account-approval.model';
 import { verifyDecisionToken, type ApprovalAction } from '@/lib/auth/account-approval';
 import { notifyAccountApproved } from '@/lib/auth/approval-notify';
+import { LOCALE_COOKIE, parseLocale, type Locale } from '@/lib/i18n/locale';
+import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,9 +42,15 @@ function escapeHtml(value: string): string {
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-function page(title: string, bodyHtml: string, status: number): NextResponse {
+/** Idioma de la página: la cookie de Ajustes → Idioma si el navegador la lleva; si no, español. */
+function requestT(request: NextRequest): { t: TranslateFn; locale: Locale } {
+    const locale = parseLocale(request.cookies.get(LOCALE_COOKIE)?.value);
+    return { t: createTranslator(locale), locale };
+}
+
+function page(title: string, bodyHtml: string, status: number, locale: Locale = 'es'): NextResponse {
     const html = [
-        '<!doctype html><html lang="es"><head><meta charset="utf-8">',
+        `<!doctype html><html lang="${locale}"><head><meta charset="utf-8">`,
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         `<title>${escapeHtml(title)} - GerarAI</title></head>`,
         '<body style="font-family: system-ui, sans-serif; max-width: 32rem; margin: 4rem auto; padding: 0 1rem;">',
@@ -56,13 +64,13 @@ function page(title: string, bodyHtml: string, status: number): NextResponse {
     });
 }
 
-const ACTION_COPY: Record<ApprovalAction, { verb: string; done: string }> = {
-    approve: { verb: 'aprobar', done: 'aprobada' },
-    reject: { verb: 'rechazar', done: 'rechazada' },
-};
+const ACTION_COPY = {
+    approve: { verb: 'auth.approvals.verb.approve', done: 'auth.approvals.done.approved' },
+    reject: { verb: 'auth.approvals.verb.reject', done: 'auth.approvals.done.rejected' },
+} as const satisfies Record<ApprovalAction, { verb: string; done: string }>;
 
-function decidedCopy(decision: unknown): string {
-    return decision === 'approved' ? 'aprobada' : 'rechazada';
+function decidedCopy(decision: unknown, t: TranslateFn): string {
+    return decision === 'approved' ? t('auth.approvals.done.approved') : t('auth.approvals.done.rejected');
 }
 
 type ApplyResult = 'applied' | 'already' | 'missing-user' | 'failed';
@@ -119,54 +127,58 @@ async function notifyApprovedOnce(record: AccountApprovalDoc): Promise<'sent' | 
     return 'sent';
 }
 
-function noticeCopy(notice: 'sent' | 'already' | 'failed'): string {
-    if (notice === 'sent') return ' Le hemos avisado por email.';
-    if (notice === 'failed') return ' No se le pudo avisar por email (SMTP sin configurar o caído): ya puede entrar igualmente.';
+function noticeCopy(notice: 'sent' | 'already' | 'failed', t: TranslateFn): string {
+    if (notice === 'sent') return t('auth.approvals.noticeSent');
+    if (notice === 'failed') return t('auth.approvals.noticeFailed');
     return '';
 }
 
 /** GET: solo confirmación (y, si procede, reconciliación). No decide nada. */
 export async function GET(request: NextRequest) {
+    const { t, locale } = requestT(request);
+    const view = (title: string, bodyHtml: string, status: number) => page(title, bodyHtml, status, locale);
     const token = request.nextUrl.searchParams.get('token');
     const payload = verifyDecisionToken(token, process.env.BETTER_AUTH_SECRET);
     if (!payload) {
-        return page('Enlace no válido o caducado', '<p>Este enlace de aprobación no es válido o ha caducado. Pide el listado de pendientes actualizado.</p>', 400);
+        return view(t('auth.approvals.invalidTitle'), `<p>${t('auth.approvals.invalidDecideGet')}</p>`, 400);
     }
     await connectToDatabase();
     const record = await AccountApproval.findById(payload.approvalId).catch(() => null);
     if (!record) {
-        return page('Solicitud no encontrada', '<p>No existe una solicitud de aprobación con ese identificador.</p>', 404);
+        return view(t('auth.approvals.notFoundTitle'), `<p>${t('auth.approvals.notFound')}</p>`, 404);
     }
     if (record.decidedAt) {
         if (record.appliedAt) {
-            return page('Solicitud ya decidida', `<p>La cuenta ${escapeHtml(record.email)} ya fue ${decidedCopy(record.decision)} antes. Este enlace era de un solo uso.</p>`, 410);
+            return view(t('auth.approvals.decidedTitle'), `<p>${t('auth.approvals.alreadyDecidedOnce', { email: escapeHtml(record.email), decision: decidedCopy(record.decision, t) })}</p>`, 410);
         }
         // Decidida pero sin aplicar (ventana de crash): ofrecer reconciliar.
         const form = [
-            `<p>La cuenta <strong>${escapeHtml(record.email)}</strong> quedó ${decidedCopy(record.decision)} en el registro, pero la decisión aún no se aplicó.</p>`,
+            `<p>${t('auth.approvals.recordedNotApplied', { email: escapeHtml(record.email), decision: decidedCopy(record.decision, t) })}</p>`,
             '<form method="post" action="/api/admin/approvals/decide">',
             `<input type="hidden" name="token" value="${escapeHtml(token ?? '')}">`,
-            '<button type="submit" style="font-size: 1rem; padding: 0.6rem 1.2rem;">Aplicar la decisión registrada</button>',
+            `<button type="submit" style="font-size: 1rem; padding: 0.6rem 1.2rem;">${t('auth.approvals.applyButton')}</button>`,
             '</form>',
         ].join('');
-        return page('Aplicar decisión registrada', form, 200);
+        return view(t('auth.approvals.applyTitle'), form, 200);
     }
     if (record.processingAt && Date.now() - new Date(record.processingAt).getTime() < CLAIM_STALE_MS) {
-        return page('Decisión en curso', '<p>Otro intento está decidiendo esta cuenta ahora mismo. Espera unos segundos y recarga.</p>', 409);
+        return view(t('auth.approvals.inProgressTitle'), `<p>${t('auth.approvals.inProgress')}</p>`, 409);
     }
-    const { verb } = ACTION_COPY[payload.action];
+    const verb = t(ACTION_COPY[payload.action].verb);
     const form = [
-        `<p>Vas a <strong>${verb}</strong> la cuenta <strong>${escapeHtml(record.email)}</strong>${record.name ? ` (${escapeHtml(record.name)})` : ''}.</p>`,
+        `<p>${t('auth.approvals.confirmBody', { verb, email: escapeHtml(record.email), name: record.name ? ` (${escapeHtml(record.name)})` : '' })}</p>`,
         '<form method="post" action="/api/admin/approvals/decide">',
         `<input type="hidden" name="token" value="${escapeHtml(token ?? '')}">`,
-        `<button type="submit" style="font-size: 1rem; padding: 0.6rem 1.2rem;">Confirmar: ${verb}</button>`,
+        `<button type="submit" style="font-size: 1rem; padding: 0.6rem 1.2rem;">${t('auth.approvals.confirmButton', { verb })}</button>`,
         '</form>',
     ].join('');
-    return page(`Confirmar ${verb} cuenta`, form, 200);
+    return view(t('auth.approvals.confirmTitle', { verb }), form, 200);
 }
 
 /** POST: decide de verdad. Claim CAS con fence; decisión persistida antes de tocar al usuario. */
 export async function POST(request: NextRequest) {
+    const { t, locale } = requestT(request);
+    const view = (title: string, bodyHtml: string, status: number) => page(title, bodyHtml, status, locale);
     const form = await request.formData().catch(() => null);
     const rawToken = form?.get('token');
     const payload = verifyDecisionToken(
@@ -174,9 +186,9 @@ export async function POST(request: NextRequest) {
         process.env.BETTER_AUTH_SECRET,
     );
     if (!payload) {
-        return page('Enlace no válido o caducado', '<p>Este enlace de aprobación no es válido o ha caducado.</p>', 400);
+        return view(t('auth.approvals.invalidTitle'), `<p>${t('auth.approvals.invalidDecidePost')}</p>`, 400);
     }
-    const { done } = ACTION_COPY[payload.action];
+    const done = t(ACTION_COPY[payload.action].done);
     const desired = payload.action === 'approve' ? 'approved' : 'rejected';
 
     await connectToDatabase();
@@ -196,16 +208,16 @@ export async function POST(request: NextRequest) {
     if (!claimed) {
         const existing = await AccountApproval.findById(payload.approvalId).catch(() => null);
         if (!existing) {
-            return page('Solicitud no encontrada', '<p>No existe una solicitud de aprobación con ese identificador.</p>', 404);
+            return view(t('auth.approvals.notFoundTitle'), `<p>${t('auth.approvals.notFound')}</p>`, 404);
         }
         if (!existing.decidedAt) {
-            return page('Decisión en curso', '<p>Otro intento está decidiendo esta cuenta ahora mismo. Espera unos segundos y recarga.</p>', 409);
+            return view(t('auth.approvals.inProgressTitle'), `<p>${t('auth.approvals.inProgress')}</p>`, 409);
         }
         // Ya decidida: reconciliar si la aplicación quedó a medias (el enlace
         // estaba consumido pero el usuario no reflejó la decisión).
         const applied = await applyDecisionToUser(existing);
         if (applied === 'failed') {
-            return page('Decisión registrada, aplicación pendiente', `<p>La cuenta quedó ${decidedCopy(existing.decision)} en el registro, pero no se pudo aplicar ahora. Vuelve a intentarlo en unos segundos.</p>`, 500);
+            return view(t('auth.approvals.pendingTitle'), `<p>${t('auth.approvals.pendingRetry', { decision: decidedCopy(existing.decision, t) })}</p>`, 500);
         }
         // El reintento reconciliador también avisa al usuario: si la primera
         // pasada aplicó pero el correo no salió, aquí sale (una sola vez).
@@ -214,14 +226,14 @@ export async function POST(request: NextRequest) {
         if (notice === 'failed') {
             console.warn(`[approvals] cuenta ${existing.userId} aprobada sin poder avisar al usuario por email`);
         }
-        const extra = noticeCopy(notice);
+        const extra = noticeCopy(notice, t);
         if (applied === 'applied') {
-            return page('Decisión aplicada', `<p>La cuenta ${escapeHtml(existing.email)} ya estaba ${decidedCopy(existing.decision)} en el registro y ahora también en su acceso.${extra}</p>`, 200);
+            return view(t('auth.approvals.appliedTitle'), `<p>${t('auth.approvals.appliedNow', { email: escapeHtml(existing.email), decision: decidedCopy(existing.decision, t), extra })}</p>`, 200);
         }
         if (notice !== 'already') {
-            return page('Solicitud ya decidida', `<p>La cuenta ${escapeHtml(existing.email)} ya estaba ${decidedCopy(existing.decision)} y aplicada.${extra}</p>`, 200);
+            return view(t('auth.approvals.decidedTitle'), `<p>${t('auth.approvals.alreadyApplied', { email: escapeHtml(existing.email), decision: decidedCopy(existing.decision, t), extra })}</p>`, 200);
         }
-        return page('Solicitud ya decidida', `<p>La cuenta ${escapeHtml(existing.email)} ya fue ${decidedCopy(existing.decision)} antes. Este enlace era de un solo uso.</p>`, 410);
+        return view(t('auth.approvals.decidedTitle'), `<p>${t('auth.approvals.alreadyDecidedOnce', { email: escapeHtml(existing.email), decision: decidedCopy(existing.decision, t) })}</p>`, 410);
     }
 
     // 2) Persistir la decisión PRIMERO, con fence: si matchedCount !== 1 este
@@ -231,7 +243,7 @@ export async function POST(request: NextRequest) {
         { $set: { decidedAt: new Date(), decision: desired }, $unset: { processingAt: '', processingAction: '', claimId: '' } },
     );
     if (finalized.matchedCount !== 1) {
-        return page('Decisión en curso', '<p>Otro intento más reciente está decidiendo esta cuenta. Este intento no ha escrito nada.</p>', 409);
+        return view(t('auth.approvals.inProgressTitle'), `<p>${t('auth.approvals.inProgressNewer')}</p>`, 409);
     }
 
     // 3) Decisión ya persistida: AHORA aplicar al usuario. Fallo = fail-closed
@@ -241,7 +253,7 @@ export async function POST(request: NextRequest) {
         Object.assign(claimed, { decision: desired, appliedAt: null }),
     );
     if (applied === 'failed') {
-        return page('Decisión registrada, aplicación pendiente', `<p>La cuenta quedó ${done} en el registro, pero no se pudo aplicar ahora. Vuelve a abrir el enlace para aplicarla.</p>`, 500);
+        return view(t('auth.approvals.pendingTitle'), `<p>${t('auth.approvals.pendingReopen', { decision: done })}</p>`, 500);
     }
 
     // 4) Aviso al usuario al aprobar (fail-closed honesto: si el SMTP no está,
@@ -252,12 +264,12 @@ export async function POST(request: NextRequest) {
         if (notice === 'failed') {
             console.warn(`[approvals] cuenta ${claimed.userId} aprobada sin poder avisar al usuario por email`);
         }
-        extra = noticeCopy(notice);
+        extra = noticeCopy(notice, t);
     }
 
-    return page(
-        payload.action === 'approve' ? 'Cuenta aprobada' : 'Cuenta rechazada',
-        `<p>${escapeHtml(claimed.email)} ha quedado ${done}.${extra}</p>`,
+    return view(
+        payload.action === 'approve' ? t('auth.approvals.approvedTitle') : t('auth.approvals.rejectedTitle'),
+        `<p>${t('auth.approvals.result', { email: escapeHtml(claimed.email), decision: done, extra })}</p>`,
         200,
     );
 }
