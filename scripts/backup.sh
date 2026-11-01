@@ -68,9 +68,12 @@ fi
 
 if [ "${STOP_STORAGE}" = "1" ]; then
   echo "[backup] parando backend, TODOS los workers, scheduler y minio para snapshot consistente…"
-  # Lista completa: con un worker vivo (thesis/kpis/alerts/gdelt/knowledge)
-  # el tar de MinIO puede capturar un original a medio escribir.
-  ${COMPOSE} stop backend worker worker-thesis worker-kpis worker-alerts worker-gdelt worker-knowledge scheduler minio
+  # Lista completa: con un worker vivo el tar de MinIO puede capturar un
+  # original a medio escribir. Criterio conservador: se para todo servicio
+  # que fusiona el ancla x-app-env del compose (hereda MINIO_*), lo escriba
+  # o no (un actor puede llegar al storage transitivamente). Lo ata al
+  # compose scripts/backup-stop-storage-coverage-guard.test.ts.
+  ${COMPOSE} stop backend worker worker-thesis worker-kpis worker-alerts worker-gdelt worker-knowledge worker-official-closes worker-prices worker-externa worker-finnhub worker-yahoo worker-dca-manual scheduler minio
 fi
 
 # 3) MinIO: tar del volumen (datos en reposo, consistencia garantizada si parado).
@@ -84,7 +87,7 @@ echo "[backup] duckdb…"
 docker run --rm -v "${DUCKDB_VOLUME}":/data:ro -v "$(pwd)/${DEST}":/out alpine sh -c 'cd /data && tar czf /out/duckdb.tar.gz . || true'
 
 if [ "${STOP_STORAGE}" = "1" ]; then
-  ${COMPOSE} start minio backend worker worker-thesis worker-kpis worker-alerts worker-gdelt worker-knowledge scheduler
+  ${COMPOSE} start minio backend worker worker-thesis worker-kpis worker-alerts worker-gdelt worker-knowledge worker-official-closes worker-prices worker-externa worker-finnhub worker-yahoo worker-dca-manual scheduler
 fi
 
 # 5) Manifest verificable: conteos por tabla, puntos qdrant, checksums y

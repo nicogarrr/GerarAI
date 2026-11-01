@@ -46,7 +46,7 @@ def _resolve_range(desde: date | None, hasta: date | None) -> tuple[date, date]:
     start = desde or _madrid_today()
     end = hasta or _plus_days(start, 7)
     if start > end:
-        raise HTTPException(status_code=400, detail="desde no puede ser posterior a hasta")
+        raise HTTPException(status_code=400, detail='"desde" no puede ser posterior a "hasta"')
     if (end - start).days + 1 > calendar_connector.MAX_DAYS_PER_REQUEST:
         raise HTTPException(
             status_code=400,
@@ -102,7 +102,7 @@ def followed_earnings_calendar(
     start = desde or _madrid_today()
     end = hasta or _plus_days(start, 60)
     if start > end:
-        raise HTTPException(status_code=400, detail="desde no puede ser posterior a hasta")
+        raise HTTPException(status_code=400, detail='"desde" no puede ser posterior a "hasta"')
     if (end - start).days > 366:
         raise HTTPException(status_code=400, detail="rango máximo: 366 días")
     return followed_calendar(db, start, end)
@@ -123,7 +123,7 @@ def portfolio_upcoming_dates(
     start = desde or _madrid_today()
     end = hasta or _plus_days(start, 90)
     if start > end:
-        raise HTTPException(status_code=400, detail="desde no puede ser posterior a hasta")
+        raise HTTPException(status_code=400, detail='"desde" no puede ser posterior a "hasta"')
     if (end - start).days > 366:
         raise HTTPException(status_code=400, detail="rango máximo: 366 días")
     return portfolio_upcoming(db, start, end)
