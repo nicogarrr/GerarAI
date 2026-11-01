@@ -7,10 +7,17 @@ test.describe('landing: tipografía y header compacto', () => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/');
       await page.evaluate(() => document.fonts.ready);
-      await expect(page.locator('h1')).toHaveCSS('font-family', /editorial/i);
+      // Titular estilo Kymatio (#rediseño 31-oct-2026, pedido de Nico): el h1
+      // va en la sans pública y solo la palabra destacada conserva la serif
+      // editorial en cursiva. El contrato de la serif no desaparece: se exige
+      // en el span del destacado.
+      await expect(page.locator('h1')).toHaveCSS('font-family', /publicsans/i);
+      const highlight = page.locator('h1 span').first();
+      await expect(highlight).toHaveCSS('font-family', /editorial/i);
+      await expect(highlight).toHaveCSS('font-style', 'italic');
       const loadedFamilies = await page.evaluate(() => {
         const normalize = (family: string) => family.replace(/["']/g, '').trim();
-        return [document.querySelector('.public-shell')!, document.querySelector('h1')!].map((element) => {
+        return [document.querySelector('.public-shell')!, document.querySelector('h1')!, document.querySelector('h1 span')!].map((element) => {
           const family = normalize(getComputedStyle(element).fontFamily.split(',')[0]);
           const faces = [...document.fonts].filter((face) => normalize(face.family) === family);
           return { family, statuses: faces.map((face) => face.status) };

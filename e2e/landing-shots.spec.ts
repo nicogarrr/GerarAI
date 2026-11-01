@@ -44,8 +44,9 @@ test("landing shots: ficha MSFT movil", async ({ page }) => {
 // mockups llegan tarde, y el mockup de móvil nace BAJO el fold (next/image lazy):
 // sin traerlo a vista puede no empezar a cargar nunca. Medir overflow o capturar
 // antes de que fuentes e imágenes asienten da resultados distintos por entorno.
-// `alts` son los mockups VISIBLES en ese viewport: el de tablet es `hidden lg:block`
-// por diseño y esperarlo en 390px es esperar lo imposible.
+// `alts` son los mockups VISIBLES en ese momento: la maqueta es un selector de
+// dispositivo (estilo Kymatio, rediseño del 31-oct-2026) que solo monta la
+// captura del modo elegido, así que hay que pulsar cada opción para verla.
 async function landingAsentada(page: import("@playwright/test").Page, alts: RegExp[]) {
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   for (const alt of alts) {
@@ -69,17 +70,32 @@ async function landingAsentada(page: import("@playwright/test").Page, alts: RegE
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
 }
 
+// Cambia la maqueta de dispositivo por su botón y espera a que la nueva
+// captura tenga píxeles de verdad (el selector monta la imagen al pulsar).
+async function seleccionaDispositivo(page: import("@playwright/test").Page, boton: string, alt: RegExp) {
+  await page.getByRole("button", { name: boton }).click();
+  await landingAsentada(page, [alt]);
+}
+
 test("landing shots: landing desktop fullpage", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
-  await landingAsentada(page, [/Ficha de empresa de GerarAI/, /GerarAI en tablet/, /GerarAI en móvil/]);
+  // Una maqueta visible cada vez: se recorren los tres modos del selector y
+  // se vuelve a PC, que es el estado por defecto que se captura.
+  await landingAsentada(page, [/Ficha de empresa de GerarAI/]);
+  await seleccionaDispositivo(page, "Ver en tablet", /GerarAI en tablet/);
+  await seleccionaDispositivo(page, "Ver en móvil", /GerarAI en móvil/);
+  await seleccionaDispositivo(page, "Ver en ordenador", /Ficha de empresa de GerarAI/);
   await page.screenshot({ path: "test-results/landing-page-desktop.png", fullPage: true });
 });
 
 test("landing shots: landing movil fullpage", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await landingAsentada(page, [/Ficha de empresa de GerarAI/, /GerarAI en móvil/]);
+  // Igual que en desktop: primero la maqueta por defecto (PC) y luego el modo
+  // móvil del selector, que es el que debe caber sin overflow a 390px.
+  await landingAsentada(page, [/Ficha de empresa de GerarAI/]);
+  await seleccionaDispositivo(page, "Ver en móvil", /GerarAI en móvil/);
   // Sin desbordamiento horizontal: el layout debe caber en 390px de verdad.
   // El mensaje nombra a los culpables: la próxima CI roja dice QUÉ se sale,
   // no solo cuánto.
