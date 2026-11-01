@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from scripts.ingest_load_lab.harness import LoadLab, Phase, run_scenario
+from scripts.ingest_load_lab.harness import LoadLab, Phase, render, run_scenario
 
 
 @pytest.fixture
@@ -76,3 +76,46 @@ def test_escenario_drenaje_suficiente_no_alerta(redis_client, monkeypatch):
     )
     assert timeline[-1].depth == 0
     assert all(not r.stuck for r in timeline)
+
+
+# --- Auditoría del piloto a #4021 ---------------------------------------------
+
+def test_throughput_con_start_ms_no_cero(redis_client, monkeypatch):
+    """El throughput divide por el tiempo transcurrido del escenario, no por
+    el timestamp absoluto: con start_ms != 0 la tasa sigue siendo la real."""
+    monkeypatch.setenv("QUEUE_WATCHDOG_MAX_AGE_SECONDS", "120")
+    lab = LoadLab(redis_client)
+    timeline = run_scenario(
+        lab, [Phase(ticks=5, ingress=10, drain=10)], tick_ms=1000, start_ms=5_000_000
+    )
+    out = render(timeline, tick_ms=1000)
+    # 50 mensajes en 5 s = 10 msg/s, no 50/5005 s.
+    assert "throughput_entrada=10.00 msg/s" in out
+    assert "throughput_salida=10.00 msg/s" in out
+
+
+def test_render_timeline_vacio(redis_client):
+    assert "sin ticks" in render([], tick_ms=1000)
+
+
+def test_un_solo_muestreo_por_tick(redis_client, monkeypatch):
+    """Un tick = un muestreo de Redis por cola, como prod (no dos)."""
+    monkeypatch.setenv("QUEUE_WATCHDOG_MAX_AGE_SECONDS", "120")
+
+    class CountingRedis:
+        def __init__(self, inner):
+            self._inner = inner
+            self.hlen_calls = 0
+
+        def hlen(self, *a, **k):
+            self.hlen_calls += 1
+            return self._inner.hlen(*a, **k)
+
+        def __getattr__(self, name):
+            return getattr(self._inner, name)
+
+    client = CountingRedis(redis_client)
+    lab = LoadLab(client)
+    run_scenario(lab, [Phase(ticks=3, ingress=5, drain=5)], tick_ms=1000)
+    # sample_queues hace 2 HLEN por cola (msgs + DQ.msgs): 2 x 1 cola x 3 ticks.
+    assert client.hlen_calls == 6

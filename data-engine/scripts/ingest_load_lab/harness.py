@@ -22,7 +22,6 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from typing import Any
 
 from app.services import queue_watchdog
@@ -136,19 +135,30 @@ def run_scenario(
             if phase.drain:
                 lab.drain(phase.queue, phase.drain)
             now_ms += tick_ms
-            samples = {
-                s.queue: s
-                for s in queue_watchdog.sample_queues(
-                    lab.client, namespace=lab.namespace, queues=queues, now_ms=now_ms
-                )
-            }
-            watchdog = queue_watchdog.sample_tick(
-                lab.client,
-                namespace=lab.namespace,
-                queues=queues,
-                now=datetime.fromtimestamp(now_ms / 1000, UTC),
+            # UN solo muestreo por tick, como prod (tick_result -> sample_tick
+            # muestrea una vez y reutiliza). Se orquesta con las funciones
+            # publicas del watchdog para poder reutilizar la misma muestra en
+            # la linea de tiempo: sample_queues + load_previous + detect_stuck
+            # + save_sample es exactamente el cuerpo de sample_tick.
+            samples = queue_watchdog.sample_queues(
+                lab.client, namespace=lab.namespace, queues=queues, now_ms=now_ms
             )
-            sample = samples[phase.queue]
+            previous = {
+                sample.queue: queue_watchdog.load_previous(lab.client, sample.queue)
+                for sample in samples
+            }
+            stuck = queue_watchdog.detect_stuck(
+                samples,
+                previous,
+                max_age=queue_watchdog.max_age_seconds(),
+                now=now_ms / 1000,
+            )
+            for sample in samples:
+                queue_watchdog.save_sample(
+                    lab.client, sample.queue, ts=now_ms / 1000, depth=sample.depth
+                )
+            samples_by_queue = {sample.queue: sample for sample in samples}
+            sample = samples_by_queue[phase.queue]
             timeline.append(
                 TickRecord(
                     tick=tick,
@@ -158,7 +168,7 @@ def run_scenario(
                     depth=sample.depth,
                     ready_age_seconds=sample.ready_age_seconds,
                     oldest_true_age_seconds=lab.oldest_true_age(phase.queue, now_ms=now_ms),
-                    stuck=[item["queue"] for item in watchdog["stuck"]],
+                    stuck=[item["queue"] for item in stuck],
                 )
             )
     return timeline
@@ -176,12 +186,19 @@ def render(timeline: list[TickRecord], *, tick_ms: int) -> str:
             f"{r.tick:>4} {r.ts_ms / 1000:>6.0f} {r.enqueued_total:>9} {r.drained_total:>8} "
             f"{r.depth:>6} {age:>13} {true_age:>11} {('SI' if r.stuck else ''):>8}"
         )
+    if not timeline:
+        lines.append("sin ticks")
+        return "\n".join(lines)
     peak = max(timeline, key=lambda r: r.depth)
     first_stuck = next((r for r in timeline if r.stuck), None)
+    # Tiempo transcurrido REAL del escenario (del primer al ultimo tick,
+    # ambos inclusive): dividir por el timestamp absoluto daria una tasa
+    # erronea con start_ms != 0.
+    elapsed_s = (timeline[-1].ts_ms - timeline[0].ts_ms + tick_ms) / 1000
     lines.append(
         f"pico_depth={peak.depth} (tick {peak.tick}) "
-        f"throughput_entrada={timeline[-1].enqueued_total / (timeline[-1].ts_ms / 1000):.2f} msg/s "
-        f"throughput_salida={timeline[-1].drained_total / (timeline[-1].ts_ms / 1000):.2f} msg/s"
+        f"throughput_entrada={timeline[-1].enqueued_total / elapsed_s:.2f} msg/s "
+        f"throughput_salida={timeline[-1].drained_total / elapsed_s:.2f} msg/s"
     )
     lines.append(
         "primera_alerta_watchdog="
@@ -191,8 +208,9 @@ def render(timeline: list[TickRecord], *, tick_ms: int) -> str:
 
 
 def monday_scenario() -> tuple[list[Phase], dict[str, int]]:
-    """Lunes: 20 min de precios entrando a 2 msg/s con drenaje de 1,5 msg/s
-    (cuota IP compartida), parada total de 5 min (worker caido) y recuperacion."""
+    """Lunes: 40 min de precios entrando a 2 msg/s con drenaje de 1,5 msg/s
+    (cuota IP compartida), parada total de 5 min (worker caido) y 35 min de
+    recuperacion (ticks de 60 s)."""
     phases = [
         Phase(ticks=40, ingress=120, drain=90),   # backlog crece 30/tick (min); drenaje parcial
         Phase(ticks=5, ingress=120, drain=0),     # worker caido: nada drena
