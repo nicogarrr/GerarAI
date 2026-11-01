@@ -167,6 +167,38 @@ def _shift_year(d: date, years: int = 1) -> date:
         return d.replace(month=2, day=28, year=d.year + years)
 
 
+#: Holgura para reconocer el MISMO cobro en dos años seguidos dentro de los
+#: 12 meses de historia (la ex-date se mueve unos días de un año a otro).
+_SAME_SLOT_MAX_DRIFT_DAYS = 45
+
+
+def _drop_superseded(records: list) -> list:
+    """Quita del historial los cobros que ya tienen su repetición de este año.
+
+    La historia son las ex-dates de los últimos 12 meses. Si la ex-date de
+    este año cae unos días antes que la del año pasado, el mismo cobro aparece
+    dos veces (p. ej. 3-nov-2025 y 30-oct-2026) y la proyección lo contaba
+    doble: 5 pagos de un trimestral, 2 de un anual. Un registro con otro
+    posterior a ~1 año (±media separación entre cobros, máx. 45 días) es el
+    cobro del año pasado de ese mismo hueco: se queda solo el más reciente.
+    """
+    ordered = sorted(records, key=lambda r: r.ex_date)
+    if len(ordered) < 2:
+        return ordered
+    gaps = sorted(
+        (b.ex_date - a.ex_date).days for a, b in zip(ordered, ordered[1:], strict=False)
+    )
+    tolerance = min(_SAME_SLOT_MAX_DRIFT_DAYS, gaps[len(gaps) // 2] // 2)
+    return [
+        record
+        for i, record in enumerate(ordered)
+        if not any(
+            (later.ex_date - record.ex_date).days >= 365 - tolerance
+            for later in ordered[i + 1:]
+        )
+    ]
+
+
 def _month_key(d: date) -> str:
     return f"{d.year:04d}-{d.month:02d}"
 
@@ -254,7 +286,7 @@ class DividendProjectionService:
             records = records_in_position_currency(
                 records_by_company.get(company.id, []), position.currency
             )
-            trailing = [r for r in records if cutoff < r.ex_date <= today]
+            trailing = _drop_superseded([r for r in records if cutoff < r.ex_date <= today])
             future = [r for r in records if r.ex_date > today]
             for record in future:
                 declared_future.append(
