@@ -393,7 +393,13 @@
     "confidence": "confianza: {value}",
     "bindingConstraint": "restricción ligante: {value}",
     "bottomUpTitle": "Fórmulas bottom-up",
-    "missingInputsShort": "Faltan entradas: {list}"
+    "missingInputsShort": "Faltan entradas: {list}",
+    "impliedGrowthTitle": "Crecimiento implícito",
+    "impliedGrowthPerpetual": "A este precio, el mercado descuenta un crecimiento perpetuo del flujo de caja de {value} (WACC − FCF / valor empresa).",
+    "impliedGrowthSplitTitle": "De dónde sale el valor que pagas hoy",
+    "impliedGrowthGridLabel": "Crecimiento exigido si cambian el WACC o el margen",
+    "reverseDcfUnavailable": "No disponible: {inputs}.",
+    "reverseDcfMissingInputs": "faltan inputs de mercado o financieros"
   },
   "identity": {
     "metaDescription": "Research de {subject}: tesis versionada, financieros canónicos, modelo a largo plazo, valoración y evidencia con fuentes trazables.",

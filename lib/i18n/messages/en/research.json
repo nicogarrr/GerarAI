@@ -393,7 +393,13 @@
     "confidence": "confidence: {value}",
     "bindingConstraint": "binding constraint: {value}",
     "bottomUpTitle": "Bottom-up formulas",
-    "missingInputsShort": "Missing inputs: {list}"
+    "missingInputsShort": "Missing inputs: {list}",
+    "impliedGrowthTitle": "Implied growth",
+    "impliedGrowthPerpetual": "At this price, the market is discounting perpetual cash-flow growth of {value} (WACC − FCF / enterprise value).",
+    "impliedGrowthSplitTitle": "Where the value you pay today comes from",
+    "impliedGrowthGridLabel": "Growth required if WACC or the margin changes",
+    "reverseDcfUnavailable": "Unavailable: {inputs}.",
+    "reverseDcfMissingInputs": "market or financial inputs are missing"
   },
   "identity": {
     "metaDescription": "Research on {subject}: versioned thesis, canonical financials, long-term model, valuation and evidence with traceable sources.",
