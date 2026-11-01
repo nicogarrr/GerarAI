@@ -6,12 +6,19 @@ import { AccessRequest } from '@/database/models/access-request.model';
 import { ACCESS_REQUEST_LIMITS, parseAccessRequest } from '@/lib/access-request';
 import { clientIp, hashIp } from '@/lib/access-request-ip';
 import { notifyAccessRequest } from '@/lib/access-request-notify';
+import { requestLocale } from '@/lib/research/backend-error-locale';
+import { createTranslator } from '@/lib/i18n/translate';
 
 export type AccessRequestResult =
     | { ok: true; message: string }
     | { ok: false; message: string; field?: 'name' | 'email' | 'note' };
 
-const RECEIVED = 'Solicitud recibida. Revisamos el acceso por tandas y te escribiremos al correo que has indicado.';
+const INVALID_KEYS = {
+    nameMissing: 'auth.accessRequest.errors.nameMissing',
+    nameTooLong: 'auth.accessRequest.errors.nameTooLong',
+    emailInvalid: 'auth.accessRequest.errors.emailInvalid',
+    noteTooLong: 'auth.accessRequest.errors.noteTooLong',
+} as const;
 
 /**
  * Guarda una solicitud de acceso. Orden deliberado: validar, limitar, GUARDAR y
@@ -19,10 +26,13 @@ const RECEIVED = 'Solicitud recibida. Revisamos el acceso por tandas y te escrib
  * Un bot (campo trampa relleno) recibe la misma respuesta y no se guarda nada.
  */
 export async function requestAccess(raw: unknown): Promise<AccessRequestResult> {
+    // Copia en el idioma de la petición (Ajustes → Idioma); en español, las frases de siempre.
+    const t = createTranslator(await requestLocale());
+    const RECEIVED = t('auth.accessRequest.received');
     const parsed = parseAccessRequest(raw);
     if (!parsed.ok) {
         if (parsed.reason === 'spam') return { ok: true, message: RECEIVED };
-        return { ok: false, message: parsed.message, field: parsed.field };
+        return { ok: false, message: t(INVALID_KEYS[parsed.code], { max: ACCESS_REQUEST_LIMITS.noteMax }), field: parsed.field };
     }
     const { name, email, note } = parsed.value;
 
@@ -44,7 +54,7 @@ export async function requestAccess(raw: unknown): Promise<AccessRequestResult> 
         const since = new Date(Date.now() - ACCESS_REQUEST_LIMITS.windowMs);
         const recent = await AccessRequest.countDocuments({ ipHash, createdAt: { $gte: since } });
         if (recent >= ACCESS_REQUEST_LIMITS.perIpPerHour) {
-            return { ok: false, message: 'Demasiadas solicitudes desde tu conexión. Inténtalo más tarde.' };
+            return { ok: false, message: t('auth.accessRequest.errors.tooManyRequests') };
         }
 
         const doc = await AccessRequest.create({ email, name, note, ipHash });
@@ -58,7 +68,7 @@ export async function requestAccess(raw: unknown): Promise<AccessRequestResult> 
         console.error('Access request failed:', error);
         return {
             ok: false,
-            message: 'No hemos podido guardar la solicitud ahora mismo. Inténtalo de nuevo en unos minutos.',
+            message: t('auth.accessRequest.errors.saveFailed'),
         };
     }
 }
