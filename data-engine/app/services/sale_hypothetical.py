@@ -68,8 +68,8 @@ _BOUGHT_AT_RE = re.compile(
 # verbo y la cifra la cantidad no se leía y se simulaba la venta de TODO.
 _SALE_QTY_RE = re.compile(
     rf"(?i)\bvend\w*\s+(?:(?:solo|s[oó]lo|mis|las|los|unas|unos|hoy|ahora)\s+)*(?P<qty>-?(?:{_NUM}))\b"
-    # «vendo 15 %» es un porcentaje, no 15 acciones.
-    r"(?![\d.,]*\s*(?:%|por\s*ciento))"
+    # «vendo 15 %», «2 tercios», «1/3»: parte de la posición, no acciones.
+    r"(?![\d.,]*\s*(?:%|por\s*ciento|/\s*\d|tercios\b|cuartos\b))"
 )
 # «vendo el 50 %», «un 20 por ciento»: parte de la posición, no una cantidad.
 _SALE_PCT_RE = re.compile(
@@ -77,10 +77,16 @@ _SALE_PCT_RE = re.compile(
 )
 # «vendo un tercio», «tres cuartos»: antes se simulaba la venta de TODO.
 _SALE_FRACTIONS = {
-    "un tercio": (1, 3), "dos tercios": (2, 3), "un cuarto": (1, 4), "tres cuartos": (3, 4),
+    "un tercio": (1, 3), "dos tercios": (2, 3), "2 tercios": (2, 3),
+    "un cuarto": (1, 4), "tres cuartos": (3, 4), "3 cuartos": (3, 4),
 }
 _SALE_FRACTION_RE = re.compile(
-    r"(?i)\bvend\w*\s+(?:(?:solo|s[oó]lo|hoy|ahora)\s+)*(?P<frac>un\s+tercio|dos\s+tercios|un\s+cuarto|tres\s+cuartos)\b"
+    r"(?i)\bvend\w*\s+(?:(?:solo|s[oó]lo|hoy|ahora)\s+)*"
+    r"(?P<frac>un\s+tercio|(?:dos|2)\s+tercios|un\s+cuarto|(?:tres|3)\s+cuartos)\b"
+)
+# «vendo 1/3», «3/4 de mis UBER»: antes vendía 1 o 3 acciones.
+_SALE_SLASH_RE = re.compile(
+    r"(?i)\bvend\w*\s+(?:(?:solo|s[oó]lo|hoy|ahora)\s+)*(?P<num>[1-9])\s*/\s*(?P<den>[2-9])\b"
 )
 _SALE_HALF_RE = re.compile(r"(?i)\bvend\w*\s+(?:la\s+)?mitad\b")
 
@@ -243,6 +249,9 @@ def _sale_quantity(text: str, held: Decimal) -> Decimal:
     if frac:
         num, den = _SALE_FRACTIONS[" ".join(frac.group("frac").lower().split())]
         return held * num / den
+    slash = _SALE_SLASH_RE.search(text)
+    if slash and int(slash.group("num")) < int(slash.group("den")):
+        return held * int(slash.group("num")) / int(slash.group("den"))
     m = _SALE_QTY_RE.search(text)
     if m:
         asked = parse_number(m.group("qty"))
