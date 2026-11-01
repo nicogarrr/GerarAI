@@ -651,7 +651,10 @@ _PERFORMANCE_RE = re.compile(
     # volcado de la empresa. Con «si …» es un escenario, no la cifra guardada.
     r"|\b(?:cu[aá]nto\s+(?:gano|pierdo|llevo\s+(?:ganado|perdido))|voy\s+(?:ganando|perdiendo)"
     # «¿cuánto he invertido (en MSFT)?»: es el coste de compra que da esta ruta.
-    r"|cu[aá]nto\s+(?:dinero\s+)?(?:he|tengo)\s+invertido)\b"
+    r"|cu[aá]nto\s+(?:dinero\s+)?(?:he|tengo)\s+invertido"
+    # «¿Qué tal va mi UBER?», «¿Gano o pierdo con UBER?», «¿Cuánto me ha
+    # costado MSFT?»: antes, el volcado de la empresa.
+    r"|qu[eé]\s+tal\s+van?\s+(?:mi|mis)|gano\s+o\s+pierdo|cu[aá]nto\s+me\s+ha\s+costado)\b"
     r"(?![^.!?\n]*\bsi\b)"
 )
 # "¿Qué es la rentabilidad?" / "¿cómo se calcula?" son preguntas de concepto:
