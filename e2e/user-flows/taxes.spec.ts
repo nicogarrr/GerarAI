@@ -1,4 +1,4 @@
-import { backendCall, expect, expectHealthyPage, runUiE2E, test, VIEWPORTS, visit } from "./support";
+import { backendTransactions, backendCall, expect, expectHealthyPage, runUiE2E, test, VIEWPORTS, visit } from "./support";
 
 // Operación en EUR (sin tipo de cambio): 100 a 30 € y venta de 40 a 40 €
 // en 2025 → ganancia 400 € (transmisión 1.600, adquisición 1.200).
@@ -9,8 +9,8 @@ const CSV_TAX = [
 ].join("\n");
 
 async function resetPortfolio() {
-  const { json } = await backendCall("GET", "/api/portfolio/transactions");
-  const rows = Array.isArray(json) ? (json as Array<{ id: number }>) : [];
+  const json = await backendTransactions();
+  const rows = json;
   for (const row of [...rows].sort((a, b) => b.id - a.id)) {
     await backendCall("DELETE", `/api/portfolio/transactions/${row.id}`);
   }
