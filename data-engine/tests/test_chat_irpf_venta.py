@@ -472,3 +472,34 @@ def test_lotes_en_peniques_al_cambio_de_la_venta(db):
     assert resp.llm_trace["method"] == "fifo"
     assert "coste 294,34 €" in resp.answer
     assert "ganancia de 5,66 €" in resp.answer
+
+
+def test_precio_en_libras_con_lotes_en_peniques(db):
+    """Precio de venta dado en libras («a 30 £») con lotes en peniques.
+
+    «GBP» y «GBp» son la misma divisa: el coste va al cambio de la venta,
+    como en el informe fiscal, no al de la compra. Compra 10 a 2.600 p
+    (1,10 €/£); hoy 1,15 €/£ y venta a 30 £: valor 345,00 €, coste
+    260 £ × 1,15 = 299,00 €, ganancia 46,00 € (antes 286,00 € y 59,00 €).
+    """
+    comp = Company(ticker="SHEL.L", name="Shell plc", exchange="LSE", company_type="standard",
+                   valuation_model="unassigned", currency="GBp")
+    db.add(comp)
+    db.flush()
+    db.add(FXRate(base_currency="EUR", quote_currency="GBP", rate_date=date(2026, 3, 2),
+                  rate=Decimal("1.10"), source="test"))
+    db.add(FXRate(base_currency="EUR", quote_currency="GBP", rate_date=date.today(),
+                  rate=Decimal("1.15"), source="test"))
+    _tx(db, comp, date(2026, 3, 2), "buy", 10, 2600, currency="GBp")
+    db.add(Position(
+        tenant_id=1, company_id=comp.id, quantity=Decimal("10"), average_cost=Decimal("2600"),
+        market_value=Decimal("26500"), market_value_native=Decimal("26500"), market_value_base=Decimal("300"),
+        cost_basis_native=Decimal("26000"), cost_basis_base=Decimal("286"),
+        currency="GBp", base_currency="EUR", as_of=date.today(),
+    ))
+    db.commit()
+    resp = _ask(db, "¿Cuánto IRPF pagaría si vendo 10 SHEL.L a 30 £?")
+    assert resp.llm_trace["method"] == "fifo"
+    assert resp.llm_trace["sale_price_source"] == "usuario"
+    assert "coste 299,00 €" in resp.answer
+    assert "ganancia de 46,00 €" in resp.answer
