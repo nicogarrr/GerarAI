@@ -50,7 +50,7 @@
 # un usuario sin privilegios exige un chown del volumen y probarlo sobre una COPIA
 # (el salto de version 2025-04-22 -> 2025-10-15 tambien esta sin probar). Se retira
 # con la migracion a Garage (ticket GARAGE-MIGRATION) con runbook #1112 y seguimiento todo-01M3Y8GAVX2XQKMVXQM6D77G68,
-# o a mas tardar el 2026-10-31 (caducidad corta; no se renueva automaticamente).
+# o a mas tardar el 2026-12-31 (caducidad corta; no se renueva automaticamente).
 # DS-0002 en Dockerfile.dev y .devcontainer/Dockerfile y DS-0029 en
 # data-engine/Dockerfile se arreglan en el Dockerfile, no se silencian.
 # ---------------------------------------------------------------------------
@@ -59,6 +59,6 @@ exceptions:
   - id: DS-0002
     scope: misconfig
     paths: [docker/minio/Dockerfile]
-    reason: "MinIO esta archivado y en retirada mediante migracion a Garage (runbook https://github.com/nicogarrr/gerarai/pull/1112, seguimiento todo-01M3Y8GAVX2XQKMVXQM6D77G68). Se conserva root solo en docker/minio/Dockerfile para no alterar permisos del volumen minio_data de produccion; USER no-root exige chown probado sobre copia y puede impedir acceso a datos. Excepcion temporal hasta 2026-10-31, sin renovacion automatica."
+    reason: "MinIO esta archivado y en retirada mediante migracion a Garage (runbook https://github.com/nicogarrr/gerarai/pull/1112, seguimiento todo-01M3Y8GAVX2XQKMVXQM6D77G68). Se conserva root solo en docker/minio/Dockerfile para no alterar permisos del volumen minio_data de produccion; USER no-root exige chown probado sobre copia y puede impedir acceso a datos. Excepcion temporal hasta 2026-12-31, sin renovacion automatica."
     ticket: "GARAGE-MIGRATION"
-    expires: "2026-10-31"
+    expires: "2026-12-31"
