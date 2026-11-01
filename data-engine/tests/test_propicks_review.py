@@ -111,3 +111,24 @@ def test_review_request_uses_registered_prompt_and_traces_it():
     request = Capturing.seen[0]
     assert request.messages[0].content == resolved.text
     assert request.metadata == resolved.trace_metadata()
+
+
+def test_outcome_ajusta_un_split_dentro_de_los_90_dias():
+    """Split 4:1 tras la revision: el cierre sin ajustar cae de 10 a 3.
+
+    Precio guardado 10 (2026-07-01); tras el split el adj_close de esa fecha es
+    2,5. A los 90 dias cierra 3 (adj 3): +20 % real, no -70 %.
+    """
+    with _db() as db:
+        c = _company("AAA")
+        db.add(c)
+        db.flush()
+        for day, close, adj in [(date(2026, 7, 1), "10", "2.5"), (date(2026, 10, 1), "3", "3")]:
+            db.add(MarketPrice(company_id=c.id, date=day, close=Decimal(close), adj_close=Decimal(adj), volume=1))
+        db.commit()
+        reviews = run(P({"verdicts": [_v()]}), [_cand()])
+        log_reviews(db, [_cand()], reviews, model="m", now=datetime(2026, 7, 1, tzinfo=UTC))
+        assert evaluate_outcomes(db, today=date(2026, 10, 19)) == 1
+        row = db.query(PropickReview).one()
+        assert abs(row.outcome_return - 0.2) < 1e-9
+        assert brier_report(db)["mean_return_kept"] == 0.2

@@ -229,6 +229,35 @@ def log_reviews(
     return n
 
 
+def _outcome_return(
+    db: Session, company_id: int, entry_price: float, entry_date: date, end_row: MarketPrice
+) -> float:
+    """Rentabilidad a 90 dias ajustada por splits, con la regla del track record.
+
+    El precio guardado en la revision y ``close`` no estan ajustados: un split 4:1
+    dentro de los 90 dias se leia como una caida del 75 % y falseaba la
+    calibracion (Brier, rentabilidad media de mantenidos y vetados). Con
+    ``adj_close`` en la entrada y al final, el precio guardado se lleva a la base
+    ajustada (adj_close/close de su fecha); sin ellos, el calculo de siempre.
+    """
+    if end_row.adj_close is not None and end_row.adj_close > 0:
+        entry_row = db.scalar(
+            select(MarketPrice)
+            .where(
+                MarketPrice.company_id == company_id,
+                MarketPrice.date <= entry_date,
+                MarketPrice.date >= entry_date - timedelta(days=7),
+                MarketPrice.close > 0,
+                MarketPrice.adj_close > 0,
+            )
+            .order_by(MarketPrice.date.desc())
+        )
+        if entry_row is not None:
+            factor = float(entry_row.adj_close) / float(entry_row.close)
+            return float(end_row.adj_close) / (entry_price * factor) - 1.0
+    return float(end_row.close) / entry_price - 1.0
+
+
 def evaluate_outcomes(db: Session, *, today: date | None = None) -> int:
     """Fill the 90-day price return for reviews that are old enough. Uses stored
     prices only; a missing or stale end price leaves the row open."""
@@ -256,7 +285,7 @@ def evaluate_outcomes(db: Session, *, today: date | None = None) -> int:
         )
         if px is None:
             continue
-        r.outcome_return = float(px.close) / r.price - 1.0
+        r.outcome_return = _outcome_return(db, company.id, r.price, r.price_date, px)
         r.outcome_date = px.date
         done += 1
     db.commit()
