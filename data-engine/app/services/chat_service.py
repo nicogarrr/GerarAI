@@ -799,6 +799,14 @@ _SALE_CONTEXT_RE = re.compile(
 # AAPL?» sin AAPL en cartera cambiaba a la información de la empresa sin
 # decir que no calculaba el impuesto.
 _SALE_VERB_RE = re.compile(r"(?i)\b(?:vend\w*|venta)\b")
+# «¿Cuánto ganaría si vendo todo UBER?» / «si vendiera UBER, ¿cuánto gano?»:
+# venta hipotética propia sin la palabra impuesto. Es la misma simulación que
+# la del IRPF; antes caía en «No ejecuto órdenes» o en el volcado de empresa.
+# «¿Cuánto he ganado vendiendo KO?» (pasado) no es hipotética y no entra.
+_HYPO_SALE_RE = re.compile(r"(?i)\bsi\s+(?:las?\s+|los\s+)?vend\w*|\bvendi(?:era|ese)\w*")
+_HYPO_SALE_GAIN_RE = re.compile(
+    r"(?i)\b(?:gan(?:o|as|ar[ií]a|ar[ií]as)|ganancias?|beneficio|me\s+quedar[ií]a|sacar[ií]a)\b"
+)
 _NO_POSITION_OFFER = "Si me dices cuántas acciones, a qué precio y cuándo las compraste, te hago la estimación."
 # Primera palabra de un nombre que no identifica a una empresa por sí sola.
 _GENERIC_NAME_WORDS = frozenset({"grupo", "banco", "compania", "compañía", "company", "corporation", "holdings"})
@@ -2558,7 +2566,11 @@ class ChatService:
         if type(tenant_id) is not int or tenant_id <= 0:
             return None
         lots = parse_purchase_lots(q)
-        intent = bool(_SALE_TAX_RE.search(q) and _SALE_VERB_RE.search(q) and _SALE_CONTEXT_RE.search(q))
+        intent = bool(
+            (_SALE_TAX_RE.search(q) or (_HYPO_SALE_RE.search(q) and _HYPO_SALE_GAIN_RE.search(q)))
+            and _SALE_VERB_RE.search(q)
+            and _SALE_CONTEXT_RE.search(q)
+        )
         offered: str | None = None
         if not intent:
             if not lots:
