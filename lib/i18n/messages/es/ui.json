@@ -84,5 +84,12 @@
     "session": "Tu sesión ha caducado. Vuelve a entrar para ver esta sección.",
     "server": "El servicio ha fallado. Reintenta en unos segundos.",
     "generic": "No se pudieron cargar los datos. Reintenta en unos segundos."
+  },
+  "rootError": {
+    "title": "No se pudo completar la operación",
+    "backendDown": "El motor de datos no está disponible ahora mismo. Si el backend se está arrancando, espera unos segundos y pulsa Reintentar.",
+    "unexpected": "Se produjo un error inesperado. Inténtalo de nuevo.",
+    "reference": "Referencia: {digest}",
+    "retry": "Reintentar"
   }
 }

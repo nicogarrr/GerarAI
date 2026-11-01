@@ -1651,5 +1651,32 @@
     "body": "We couldn't find data for this symbol. The ticker may be wrong, or it may not have research coverage yet.",
     "backResearch": "Back to Research",
     "watchlist": "Go to the watchlist"
+  },
+  "guideContext": {
+    "title": "Research guide",
+    "loadError": "Couldn't load the guide context.",
+    "openReviews": "Open reviews",
+    "askBrain": "Ask the Brain",
+    "noReviews": "No open reviews.",
+    "latestNews": "Latest attributed news",
+    "attributedNews": "Attributed news",
+    "sourceUnknown": "Source not available",
+    "detected": "Detected",
+    "ingested": "Added",
+    "published": "Published",
+    "recorded": "Recorded date",
+    "noNews": "No news data.",
+    "missingData": "Data missing from the context"
+  },
+  "companyNav": {
+    "aria": "Company sections"
+  },
+  "tabs": {
+    "resumen": "Overview",
+    "tesis": "Thesis",
+    "finanzas": "Financials",
+    "valoracion": "Valuation",
+    "seguimiento": "Tracking",
+    "fuentes": "Sources"
   }
 }
