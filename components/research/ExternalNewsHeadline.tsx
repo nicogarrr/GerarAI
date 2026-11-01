@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { isTranslatable } from '@/lib/news-language';
+import { useLocale, useT } from '@/lib/i18n/client';
 
 // Cola con concurrencia 2, como NewsHeadline: antes era serie de 1 y una fila
 // lenta (hasta 12 s de timeout) frenaba las traducciones de las demás filas.
@@ -30,6 +31,10 @@ function translate(headline: string): Promise<string | null> {
 
 /** Display only. The original source remains accessible, never overwritten. */
 export function ExternalNewsHeadline({headline, url, className = ''}: {headline: string; url?: string | null; className?: string}) {
+  const t = useT();
+  // Con Ajustes → Idioma en inglés no se traduce al español (antes un titular
+  // en inglés se pasaba a español): se pinta el original sin aviso.
+  const english = useLocale() === 'en';
   // La traducción se guarda con el titular al que pertenece: si el prop cambia,
   // no se pinta el texto de la fila anterior mientras llega la nueva.
   const [translation, setTranslation] = useState<{
@@ -41,7 +46,7 @@ export function ExternalNewsHeadline({headline, url, className = ''}: {headline:
   const text = current?.text ?? null;
   const translationState = current?.state ?? 'idle';
   const ref = useRef<HTMLDivElement>(null);
-  const canTranslate = headline.length <= 500 && headline.length >= 3 && isTranslatable(headline);
+  const canTranslate = !english && headline.length <= 500 && headline.length >= 3 && isTranslatable(headline);
   useEffect(() => {
     // Regla espejo de needs_translation (lib/news-language.ts), la misma que
     // NewsHeadline: un titular ya español no dispara petición (el backend
@@ -62,10 +67,10 @@ export function ExternalNewsHeadline({headline, url, className = ''}: {headline:
   }, [headline, canTranslate]);
   // Si el titular es extranjero y no hay traducción utilizable, se dice: el
   // texto visible es el original, no una versión en español.
-  const showOriginalLabel = isTranslatable(headline) && (translationState === 'original' || !canTranslate);
+  const showOriginalLabel = !english && isTranslatable(headline) && (translationState === 'original' || !canTranslate);
   return <div ref={ref}>
     <div className={className}>{url ? <a href={url} target="_blank" rel="noopener noreferrer" className="hover:text-teal-200">{text ?? headline}</a> : (text ?? headline)}</div>
-    {showOriginalLabel && <p className="mt-1 text-xs text-amber-300">Titular original (sin traducir)</p>}
-    {text && <details className="mt-1 text-xs text-gray-400"><summary className="relative z-10 cursor-pointer py-1">Traducción automática · ver original</summary><p className="relative z-10 mt-1 break-words">{url ? <a href={url} target="_blank" rel="noopener noreferrer" className="hover:underline">{headline}</a> : headline}</p></details>}
+    {showOriginalLabel && <p className="mt-1 text-xs text-amber-300">{t('research.translate.originalHeadline')}</p>}
+    {text && <details className="mt-1 text-xs text-gray-400"><summary className="relative z-10 cursor-pointer py-1">{t('research.translate.autoViewOriginal')}</summary><p className="relative z-10 mt-1 break-words">{url ? <a href={url} target="_blank" rel="noopener noreferrer" className="hover:underline">{headline}</a> : headline}</p></details>}
   </div>;
 }

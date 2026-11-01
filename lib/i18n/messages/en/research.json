@@ -232,7 +232,9 @@
     "viewTranslation": "View translation",
     "viewOriginal": "View original",
     "translating": "Translating…",
-    "translate": "Translate"
+    "translate": "Translate",
+    "originalHeadline": "Original headline (not translated)",
+    "autoViewOriginal": "Automatic translation · view original"
   },
   "newsMetaTitle": "News",
   "newsFeature": "The news section",

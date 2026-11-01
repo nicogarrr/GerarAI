@@ -84,7 +84,7 @@ test('la recuperación de contraseña no promete correo si falta SMTP', () => {
 
 test('un titular externo sin traducir se etiqueta como original', () => {
     const headline = read('components/research/ExternalNewsHeadline.tsx');
-    assert.ok(headline.includes('Titular original (sin traducir)'));
+    assert.ok(headline.includes("t('research.translate.originalHeadline')"));
     assert.ok(headline.includes("translationState === 'original'"));
 });
 
