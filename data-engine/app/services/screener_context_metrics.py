@@ -65,15 +65,25 @@ def _margin_of_safety(db: Session) -> dict[int, Any]:
         select(ValuationModel).order_by(ValuationModel.company_id, desc(ValuationModel.version))
     ).all():
         latest.setdefault(model.company_id, model)
+    candidates = [(cid, m) for cid, m in latest.items() if m.status != "insufficient_data"]
+    if not candidates:
+        return {}
+    # Outputs en consultas IN acotadas, no 1 por empresa (mismo patron que
+    # _any_margin_of_safety): con miles de modelos era 1 consulta por empresa
+    # por peticion de screener. El orden dentro de cada modelo se conserva
+    # (consulta sin ORDER BY, agrupacion en orden de llegada) y la logica por
+    # modelo es identica, asi la salida no cambia.
+    outputs_by_model: dict[int, list[ValuationOutput]] = {}
+    ids = [m.id for _cid, m in candidates]
+    for start in range(0, len(ids), 5000):
+        chunk = ids[start : start + 5000]
+        for out in db.scalars(
+            select(ValuationOutput).where(ValuationOutput.valuation_model_id.in_(chunk))
+        ).all():
+            outputs_by_model.setdefault(out.valuation_model_id, []).append(out)
     result: dict[int, Any] = {}
-    for company_id, model in latest.items():
-        if model.status == "insufficient_data":
-            continue
-        outputs = list(
-            db.scalars(
-                select(ValuationOutput).where(ValuationOutput.valuation_model_id == model.id)
-            ).all()
-        )
+    for company_id, model in candidates:
+        outputs = outputs_by_model.get(model.id, [])
         outputs.sort(key=lambda row: row.scenario != "base")
         value = None
         for output in outputs:
@@ -114,12 +124,20 @@ def _thesis_flags(db: Session, company_ids: Iterable[int]) -> dict[int, dict[str
     for company_id in company_ids:
         result[company_id] = {
             HAS_THESIS: Observation(
-                Decimal(1 if company_id in has else 0), Decimal("1"), None, "actual",
-                "tesis", [has[company_id]] if company_id in has else [],
+                Decimal(1 if company_id in has else 0),
+                Decimal("1"),
+                None,
+                "actual",
+                "tesis",
+                [has[company_id]] if company_id in has else [],
             ),
             PUBLISHED_THESIS: Observation(
-                Decimal(1 if company_id in published else 0), Decimal("1"), None, "actual",
-                "tesis", [published[company_id]] if company_id in published else [],
+                Decimal(1 if company_id in published else 0),
+                Decimal("1"),
+                None,
+                "actual",
+                "tesis",
+                [published[company_id]] if company_id in published else [],
             ),
         }
     return result
@@ -149,8 +167,13 @@ def _dca_levels(db: Session, companies: list[Company]) -> dict[int, Any]:
         sa.column("signal_date"),
     )
     statement = select(
-        table.c.id, table.c.symbol, table.c.company_id, table.c.level,
-        table.c.status, table.c.period, table.c.signal_date,
+        table.c.id,
+        table.c.symbol,
+        table.c.company_id,
+        table.c.level,
+        table.c.status,
+        table.c.period,
+        table.c.signal_date,
     )
     tenant_id = db.info.get("tenant_id")
     if tenant_id is not None:

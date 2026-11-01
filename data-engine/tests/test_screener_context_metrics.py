@@ -25,28 +25,57 @@ from app.services.screener_service import ScreenerService
 
 def _company(db: Session, ticker: str) -> Company:
     company = Company(
-        ticker=ticker, name=f"{ticker} Co", exchange="TEST", currency="USD",
-        sector="Test", industry="Test", company_type="standard",
-        valuation_model="standard_dcf", special_sources=[], special_risks=[], factor_tags=[],
+        ticker=ticker,
+        name=f"{ticker} Co",
+        exchange="TEST",
+        currency="USD",
+        sector="Test",
+        industry="Test",
+        company_type="standard",
+        valuation_model="standard_dcf",
+        special_sources=[],
+        special_risks=[],
+        factor_tags=[],
     )
     db.add(company)
     db.commit()
     return company
 
 
-def _valuation(db: Session, company: Company, *, version: int, status: str, mos, convention="discount_to_value_v1") -> None:
-    model = ValuationModel(company_id=company.id, model_type="standard_dcf", version=version,
-                           status=status, calculation_trace={})
+def _valuation(
+    db: Session, company: Company, *, version: int, status: str, mos, convention="discount_to_value_v1"
+) -> None:
+    model = ValuationModel(
+        company_id=company.id, model_type="standard_dcf", version=version, status=status, calculation_trace={}
+    )
     db.add(model)
     db.flush()
-    db.add(ValuationOutput(valuation_model_id=model.id, scenario="base", value_per_share=Decimal("100"),
-                           output_payload={"margin_of_safety": mos, "status": status, "trace": {"margin_of_safety_convention": convention}}))
+    db.add(
+        ValuationOutput(
+            valuation_model_id=model.id,
+            scenario="base",
+            value_per_share=Decimal("100"),
+            output_payload={
+                "margin_of_safety": mos,
+                "status": status,
+                "trace": {"margin_of_safety_convention": convention},
+            },
+        )
+    )
     db.commit()
 
 
 def _thesis(db: Session, company: Company, status: str, version: int = 1) -> None:
-    db.add(ThesisVersion(company_id=company.id, version=version, status=status,
-                         thesis_markdown="# T", executive_summary="R", rating="watch"))
+    db.add(
+        ThesisVersion(
+            company_id=company.id,
+            version=version,
+            status=status,
+            thesis_markdown="# T",
+            executive_summary="R",
+            rating="watch",
+        )
+    )
     db.commit()
 
 
@@ -68,8 +97,15 @@ def db():
 
 
 def _dca(db: Session, symbol: str, level: int, company_id=None) -> None:
-    db.add(_real_dca_row(tenant=db.info.get("tenant_id"), symbol=symbol, level=level,
-                         company_id=company_id, day=date(2026, 10, 26)))
+    db.add(
+        _real_dca_row(
+            tenant=db.info.get("tenant_id"),
+            symbol=symbol,
+            level=level,
+            company_id=company_id,
+            day=date(2026, 10, 26),
+        )
+    )
     db.commit()
 
 
@@ -128,11 +164,14 @@ def test_screener_combines_the_three_filters(db):
         _valuation(db, company, version=1, status="final", mos=mos)
         _thesis(db, company, "published")
         _dca(db, company.ticker, level, company_id=company.id)
-    result = ScreenerService().run(db, criteria=[
-        {"left": "margen_seguridad", "operator": ">", "right": "0.2"},
-        {"left": "tiene_tesis", "operator": "==", "right": "1"},
-        {"left": "nivel_dca", "operator": ">=", "right": "3"},
-    ])
+    result = ScreenerService().run(
+        db,
+        criteria=[
+            {"left": "margen_seguridad", "operator": ">", "right": "0.2"},
+            {"left": "tiene_tesis", "operator": "==", "right": "1"},
+            {"left": "nivel_dca", "operator": ">=", "right": "3"},
+        ],
+    )
     matched = [row["ticker"] for row in result["results"] if row["matched"]]
     assert matched == ["POOL"]
     assert result["metrics_without_data"] == []
@@ -147,8 +186,9 @@ def test_metric_coverage_lists_context_metrics_with_data(db):
     assert set(CONTEXT_METRICS) >= {"margen_seguridad", "tiene_tesis", "tesis_publicada", "nivel_dca"}
 
 
-def _real_dca_row(*, tenant, symbol, level, company_id=None, status="forming",
-                  period="2026-10", day=None, close="100"):
+def _real_dca_row(
+    *, tenant, symbol, level, company_id=None, status="forming", period="2026-10", day=None, close="100"
+):
     """Fila del modelo real (#2310): la tabla ya la crea Base.metadata."""
     from datetime import date as _d
     from decimal import Decimal as _D
@@ -156,9 +196,20 @@ def _real_dca_row(*, tenant, symbol, level, company_id=None, status="forming",
     from app.models.entities import DcaSignalState
 
     return DcaSignalState(
-        tenant_id=tenant, symbol=symbol, company_id=company_id, level=level, status=status,
-        period=period, signal_date=day or _d(2026, 10, 24), close=_D(close), currency="USD",
-        metrics={}, level_prices={}, sources=[], params_version="nico-v1", data_source="test",
+        tenant_id=tenant,
+        symbol=symbol,
+        company_id=company_id,
+        level=level,
+        status=status,
+        period=period,
+        signal_date=day or _d(2026, 10, 24),
+        close=_D(close),
+        currency="USD",
+        metrics={},
+        level_prices={},
+        sources=[],
+        params_version="nico-v1",
+        data_source="test",
     )
 
 
@@ -178,3 +229,29 @@ def test_unknown_margin_cannot_pass_screener_as_current(db, convention):
     # History remains untouched, and no fallback to the older verified version.
     latest = db.scalar(sa.select(ValuationOutput).order_by(ValuationOutput.id.desc()))
     assert latest.output_payload["margin_of_safety"] == 0.8
+
+
+def test_margin_of_safety_sin_n1_por_empresa(db):
+    """Perf: el margen de seguridad no hace 1 consulta por empresa valorada.
+
+    Antes: 1 (modelos) + 1 por empresa candidata (60 empresas = 61). Ahora:
+    1 (modelos) + consultas IN acotadas para los outputs (60 empresas = 2).
+    Salida identica: mismo ORDER BY de modelos, misma agrupacion por modelo y
+    misma logica de payload."""
+    from sqlalchemy import event
+
+    empresas = [_company(db, f"MOS{i:02d}") for i in range(60)]
+    for i, company in enumerate(empresas):
+        _valuation(db, company, version=1, status="final", mos=round(0.01 * (i + 1), 2))
+    engine = db.get_bind()
+    statements = []
+
+    @event.listens_for(engine, "before_cursor_execute")
+    def _cuenta(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    obs = context_observations(db, {"margen_seguridad"})
+    event.remove(engine, "before_cursor_execute", _cuenta)
+    assert len(obs) == 60
+    assert obs[empresas[7].id]["margen_seguridad"].value == Decimal("0.08")
+    assert len(statements) <= 4, f"{len(statements)} consultas (N+1 por empresa)"
