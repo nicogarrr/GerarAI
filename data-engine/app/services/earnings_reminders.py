@@ -36,6 +36,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.i18n import generation_language
 from app.models import AlertDelivery, ResearchAlert
 from app.services import earnings_alert_copy
 from app.services.earnings_dates_service import (
@@ -139,6 +140,8 @@ def emit_earnings_reminders(db: Session, *, now: datetime | None = None) -> dict
     if not settings.earnings_alerts_enabled:
         return summary
     created: list[ResearchAlert] = []
+    # Idioma guardado del usuario (Ajustes); sin preferencia, espanol como siempre.
+    language = generation_language(db)
     for payload, window, company_id in due_reminders(db, now):
         fingerprint = _fingerprint(tenant_id, payload["ticker"], date.fromisoformat(payload["event_date"]), window)
         if db.scalar(select(ResearchAlert.id).where(
@@ -152,12 +155,12 @@ def emit_earnings_reminders(db: Session, *, now: datetime | None = None) -> dict
             severity=SEVERITY_BY_WINDOW[window],
             status="open",
             alert_type=ALERT_TYPE,
-            title=earnings_alert_copy.title(payload)[:300],
-            message=earnings_alert_copy.message_text(payload),
+            title=earnings_alert_copy.title(payload, language)[:300],
+            message=earnings_alert_copy.message_text(payload, language),
             fingerprint=fingerprint,
             channels=alert_channels(settings),
             last_triggered_at=now,
-            metadata_={"earnings": payload},
+            metadata_={"earnings": payload, **({"language": language} if language != "es" else {})},
         )
         try:
             with db.begin_nested():
