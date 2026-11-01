@@ -1,7 +1,7 @@
 """Cuota OpenCode: parsing de Retry-After, consulta /usage y breaker reset-aware."""
 import asyncio
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
 from functools import wraps
 
@@ -29,10 +29,10 @@ def test_parse_retry_after_seconds():
 
 
 def test_parse_retry_after_http_date():
-    future = datetime.now(timezone.utc) + timedelta(seconds=600)
+    future = datetime.now(UTC) + timedelta(seconds=600)
     value = parse_retry_after(format_datetime(future, usegmt=True))
     assert value is not None and 550 < value <= 600
-    past = datetime.now(timezone.utc) - timedelta(seconds=60)
+    past = datetime.now(UTC) - timedelta(seconds=60)
     assert parse_retry_after(format_datetime(past, usegmt=True)) is None
 
 

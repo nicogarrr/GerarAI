@@ -20,7 +20,6 @@ import pytest
 from app.core.config import Settings
 from app.llm.chat_provider import (
     GEMINI_MODEL,
-    GROQ_MODEL,
     SequentialFallbackProvider,
     create_background_llm_provider,
     create_chat_llm_provider,

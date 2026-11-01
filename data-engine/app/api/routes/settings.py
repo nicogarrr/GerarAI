@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 from typing import Literal
@@ -190,7 +190,7 @@ async def get_llm_usage(db: Session = Depends(get_db)) -> dict:
     if current_tenant_llm_config() is not None:
         return {
             "source": "tenant",
-            "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "legs": [],
             "message": "tenant_byok",
         }
@@ -201,7 +201,7 @@ async def get_llm_usage(db: Session = Depends(get_db)) -> dict:
         if not entries:
             return None
         until = max(float(b["until"]) for b in entries)
-        return datetime.fromtimestamp(until, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+        return datetime.fromtimestamp(until, tz=UTC).isoformat().replace("+00:00", "Z")
 
     legs: list[dict] = []
 
@@ -274,7 +274,7 @@ async def get_llm_usage(db: Session = Depends(get_db)) -> dict:
 
     return {
         "source": "platform",
-        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "legs": legs,
         "message": None,
     }

@@ -17,7 +17,7 @@ nunca inventa cifras.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 
 import httpx
@@ -54,8 +54,8 @@ def parse_retry_after(value: str | None) -> float | None:
     if moment is None:
         return None
     if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=timezone.utc)
-    seconds = (moment - datetime.now(timezone.utc)).total_seconds()
+        moment = moment.replace(tzinfo=UTC)
+    seconds = (moment - datetime.now(UTC)).total_seconds()
     if seconds <= 0:
         return None
     return min(seconds, MAX_RETRY_AFTER_SECONDS)
