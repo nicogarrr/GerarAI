@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
 import logging
 import re
 import threading
 import time
+import zlib
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from urllib.parse import urlparse
@@ -106,6 +108,49 @@ def reset_sec_client_state() -> None:
     pacer.reset()
 
 
+class _Packed:
+    """Payload JSON grande guardado comprimido (bytes) en vez de como dict.
+
+    Un companyfacts de la SEC (varios MB de JSON) ocupa 10-15x en objetos
+    Python y la cache lo retenia entero (hasta 256 entradas, sin tope de
+    tamano). Comprimido pesa una fraccion y ``json.loads`` devuelve siempre
+    una copia propia, igual que el deepcopy anterior.
+    """
+
+    __slots__ = ("blob",)
+
+    def __init__(self, blob: bytes) -> None:
+        self.blob = blob
+
+
+# Payloads por debajo de este tamano serializado se guardan como dict (rapido).
+_PACK_MIN_JSON_BYTES = 256 * 1024
+# Presupuesto de bytes comprimidos de la cache; al pasarlo se expulsan las mas
+# antiguas. Una sola entrada mayor que el presupuesto no se cachea.
+_CACHE_MAX_PACKED_BYTES = 48 * 1024 * 1024
+
+
+def _pack(url: str, payload: dict) -> _Packed | None:
+    """Comprimido si el JSON es grande; None si debe quedarse como dict.
+
+    El mapa de tickers se queda como dict: ``_cache_entry`` lo lee sin copiar.
+    """
+    if url == SECClient.ticker_map_url:
+        return None
+    raw = json.dumps(payload, separators=(",", ":")).encode("ascii")
+    if len(raw) < _PACK_MIN_JSON_BYTES:
+        return None
+    return _Packed(zlib.compress(raw, 1))
+
+
+def _unpack(value):
+    if isinstance(value, _Packed):
+        return json.loads(zlib.decompress(value.blob))
+    # Copia: el llamador puede mutar el dict (p. ej. al normalizar) y eso
+    # no debe contaminar a los siguientes lectores de la misma URL.
+    return copy.deepcopy(value)
+
+
 def _cache_get(url: str) -> dict | None:
     with _cache_lock:
         hit = _json_cache.get(url)
@@ -114,9 +159,8 @@ def _cache_get(url: str) -> dict | None:
         if hit[0] <= time.monotonic():
             _json_cache.pop(url, None)
             return None
-        # Copia: el llamador puede mutar el dict (p. ej. al normalizar) y eso
-        # no debe contaminar a los siguientes lectores de la misma URL.
-        return copy.deepcopy(hit[1])
+        value = hit[1]
+    return _unpack(value)
 
 
 def _cache_entry(url: str) -> tuple[float, dict] | None:
@@ -125,16 +169,33 @@ def _cache_entry(url: str) -> tuple[float, dict] | None:
         hit = _json_cache.get(url)
         if hit is None or hit[0] <= time.monotonic():
             return None
+        if isinstance(hit[1], _Packed):
+            return None
         return hit
+
+
+def _packed_total() -> int:
+    return sum(len(v[1].blob) for v in _json_cache.values() if isinstance(v[1], _Packed))
 
 
 def _cache_put(url: str, payload: dict, ttl: float) -> None:
     if ttl <= 0:
         return
+    packed = _pack(url, payload)  # fuera del lock: serializar es lo caro
+    if packed is not None and len(packed.blob) > _CACHE_MAX_PACKED_BYTES:
+        return
+    value = packed if packed is not None else copy.deepcopy(payload)
     with _cache_lock:
+        now = time.monotonic()
+        for key in [k for k, v in _json_cache.items() if v[0] <= now]:
+            _json_cache.pop(key, None)  # las caducadas no se retienen hasta su siguiente lectura
+        _json_cache.pop(url, None)
         if len(_json_cache) >= _CACHE_MAX_ENTRIES:
             _json_cache.pop(next(iter(_json_cache)), None)
-        _json_cache[url] = (time.monotonic() + ttl, copy.deepcopy(payload))
+        if packed is not None:
+            while _json_cache and _packed_total() + len(packed.blob) > _CACHE_MAX_PACKED_BYTES:
+                _json_cache.pop(next(iter(_json_cache)), None)
+        _json_cache[url] = (now + ttl, value)
 
 
 class SECClient:
