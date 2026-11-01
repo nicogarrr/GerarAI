@@ -15,6 +15,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import math
 import re
 import unicodedata
 from datetime import date, datetime
@@ -265,6 +266,24 @@ def normalize_action(raw_action: Any) -> str:
     raise ValueError(f"Tipo de operación no reconocido: '{raw_action}' (se esperaba compra, venta o dividendo)")
 
 
+def _excel_cell_text(value: Any) -> str:
+    """Texto de una celda de Excel que el lector localizado lee sin ambigüedad.
+
+    Una celda numérica llega como float, sin separador de miles: ``str`` daría
+    «1.234» (que se lee como mil doscientos treinta y cuatro) o «1e-05» (que no
+    se lee). Se escribe en decimal fijo y, si queda con la forma ambigua
+    «d.ddd», con un cero más («1.2340»), que solo cabe como decimal.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, float) and math.isfinite(value):
+        text = format(Decimal(repr(value)), "f")
+        if _AMBIGUOUS_GROUP.match(_bare_number(text)):
+            text += "0"
+        return text
+    return str(value)
+
+
 def parse_file_rows(file_bytes: bytes, filename: str = "") -> tuple[list[str], list[list[str]]]:
     """Extrae cabeceras y filas de texto desde CSV o archivo Excel XLSX."""
     filename_lower = filename.lower()
@@ -287,7 +306,7 @@ def parse_file_rows(file_bytes: bytes, filename: str = "") -> tuple[list[str], l
             for sheet in sheets:
                 for r in sheet.iter_rows(values_only=True):
                     if any(v is not None for v in r):
-                        rows.append([str(v) if v is not None else "" for v in r])
+                        rows.append([_excel_cell_text(v) for v in r])
                 if rows:
                     break
         except Exception as exc:
