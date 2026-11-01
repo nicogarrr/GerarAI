@@ -1884,7 +1884,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             <p className="text-sm text-gray-400 sm:text-base">{company.name} · {sectorIndustryLine(company.sector, company.industry, locale)}</p>
             <p className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500"><Target className="h-3.5 w-3.5" />{holdingBadge}</p>
           </div>
-          <CompanyNavigation ticker={ticker} activeView={activeView} />
+          <CompanyNavigation ticker={ticker} activeView={activeView} locale={locale} />
           <Suspense fallback={null}><ListingStaleBanner exchange={company.exchange} priceAsOf={headerMarket?.quote?.priceAsOf ?? null} quote={headerQuotePromise} /></Suspense>
           {/* Ancla del comando GP del buscador (`ASTS GP` -> #grafico). */}
           {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton />}><CompanyHeaderQuote compact={activeView !== 'overview'} snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}

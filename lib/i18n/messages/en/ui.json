@@ -84,5 +84,12 @@
     "session": "Your session has expired. Sign in again to see this section.",
     "server": "The service has failed. Try again in a few seconds.",
     "generic": "The data could not be loaded. Try again in a few seconds."
+  },
+  "rootError": {
+    "title": "The operation couldn't be completed",
+    "backendDown": "The data engine isn't available right now. If the backend is starting up, wait a few seconds and press Retry.",
+    "unexpected": "Something unexpected went wrong. Please try again.",
+    "reference": "Reference: {digest}",
+    "retry": "Retry"
   }
 }

@@ -1651,5 +1651,32 @@
     "body": "No hemos encontrado datos para este símbolo. Puede que el ticker sea incorrecto o que aún no tenga cobertura de análisis.",
     "backResearch": "Volver a Análisis",
     "watchlist": "Ir a la watchlist"
+  },
+  "guideContext": {
+    "title": "Guía de investigación",
+    "loadError": "No se pudo cargar el contexto de guía.",
+    "openReviews": "Revisiones abiertas",
+    "askBrain": "Preguntar al Cerebro",
+    "noReviews": "Sin revisiones abiertas.",
+    "latestNews": "Últimas noticias atribuidas",
+    "attributedNews": "Noticia atribuida",
+    "sourceUnknown": "Fuente sin datos",
+    "detected": "Detectada",
+    "ingested": "Incorporada",
+    "published": "Publicada",
+    "recorded": "Fecha registrada",
+    "noNews": "Sin datos de noticias.",
+    "missingData": "Datos que faltan en el contexto"
+  },
+  "companyNav": {
+    "aria": "Secciones de la empresa"
+  },
+  "tabs": {
+    "resumen": "Resumen",
+    "tesis": "Tesis",
+    "finanzas": "Finanzas",
+    "valoracion": "Valoración",
+    "seguimiento": "Seguimiento",
+    "fuentes": "Fuentes"
   }
 }

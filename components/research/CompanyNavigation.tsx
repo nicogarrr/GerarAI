@@ -1,6 +1,18 @@
 import Link from 'next/link';
 
-import { TABS, tabHref, tabOfView, type View } from '@/lib/research/research-views';
+import type { Locale } from '@/lib/i18n/locale';
+import { createTranslator } from '@/lib/i18n/translate';
+import { TABS, tabHref, tabOfView, type TabKey, type View } from '@/lib/research/research-views';
+
+/** Nombre visible de cada pestaña (la clave y el `?view=` no cambian). */
+const TAB_LABEL_KEYS = {
+  resumen: 'research.tabs.resumen',
+  tesis: 'research.tabs.tesis',
+  finanzas: 'research.tabs.finanzas',
+  valoracion: 'research.tabs.valoracion',
+  seguimiento: 'research.tabs.seguimiento',
+  fuentes: 'research.tabs.fuentes',
+} as const satisfies Record<TabKey, string>;
 
 /**
  * Navegación de la ficha de empresa: UNA fila de seis pestañas (decisión de
@@ -15,11 +27,12 @@ import { TABS, tabHref, tabOfView, type View } from '@/lib/research/research-vie
  * 19-oct-2026). La marca teal fina dice «estás aquí», como la barra del
  * sidebar.
  */
-export function CompanyNavigation({ ticker, activeView }: { ticker: string; activeView: View }) {
+export function CompanyNavigation({ ticker, activeView, locale = 'es' }: { ticker: string; activeView: View; locale?: Locale }) {
   const activeTab = tabOfView(activeView);
+  const t = createTranslator(locale);
   return (
     <nav
-      aria-label="Secciones de la empresa"
+      aria-label={t('research.companyNav.aria')}
       className="-mx-1 flex gap-x-1 overflow-x-auto px-1 pb-px sm:gap-x-2"
       data-testid="company-navigation"
     >
@@ -31,7 +44,7 @@ export function CompanyNavigation({ ticker, activeView }: { ticker: string; acti
           key={tab.key}
           scroll={false}
         >
-          {tab.label}
+          {t(TAB_LABEL_KEYS[tab.key])}
         </Link>
       ))}
     </nav>

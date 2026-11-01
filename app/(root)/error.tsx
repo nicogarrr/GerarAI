@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useT } from '@/lib/i18n/client';
 
 
 // Comprueba si el error corresponde a una indisponibilidad de red / backend
@@ -30,6 +31,7 @@ export default function RootError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useT();
   useEffect(() => {
     console.error(error);
   }, [error]);
@@ -40,16 +42,16 @@ export default function RootError({
         <div className="flex items-start gap-3">
           <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 text-red-300" />
           <div className="flex-1">
-            <h1 className="text-lg font-semibold text-gray-100">No se pudo completar la operación</h1>
+            <h1 className="text-lg font-semibold text-gray-100">{t('ui.rootError.title')}</h1>
             <p className="mt-2 text-sm leading-6 text-gray-300">
               {isBackendUnavailable(error)
-                ? 'El motor de datos no está disponible ahora mismo. Si el backend se está arrancando, espera unos segundos y pulsa Reintentar.'
-                : 'Se produjo un error inesperado. Inténtalo de nuevo.'}
+                ? t('ui.rootError.backendDown')
+                : t('ui.rootError.unexpected')}
             </p>
-            {error.digest ? <p className="mt-2 text-xs text-gray-500">Referencia: {error.digest}</p> : null}
+            {error.digest ? <p className="mt-2 text-xs text-gray-500">{t('ui.rootError.reference', { digest: error.digest })}</p> : null}
             <Button className="mt-4" onClick={reset} type="button" variant="outline">
               <RotateCcw aria-hidden="true" className="h-4 w-4" />
-              Reintentar
+              {t('ui.rootError.retry')}
             </Button>
           </div>
         </div>

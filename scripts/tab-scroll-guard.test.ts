@@ -25,7 +25,7 @@ function navBlock(src: string, ariaLabelStart: string): string {
 describe('pestañas con estado en la URL conservan el scroll', () => {
     it('ficha: la fila de seis pestañas no resetea el scroll', () => {
         const page = readFileSync('components/research/CompanyNavigation.tsx', 'utf8');
-        const nav = navBlock(page, 'aria-label="Secciones de la empresa"');
+        const nav = navBlock(page, "aria-label={t('research.companyNav.aria')}");
         // Las seis pestañas son la MISMA ruta con otro ?view= (una fila,
         // 29-oct-2026): todas llevan scroll={false}.
         assert.ok(nav.includes('scroll={false}'), 'las pestañas llevan scroll={false}');

@@ -27,6 +27,7 @@ export const TABS = [
 
 export type TabKey = (typeof TABS)[number]['key'];
 
+
 /**
  * Módulos de la ficha. `tab` es la pestaña que lo contiene; `anchor` es el
  * id de su sección dentro de esa pestaña (los módulos de entrada no llevan:
