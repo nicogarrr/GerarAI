@@ -1290,6 +1290,17 @@ class ChatSynthesisService:
             else "No puedo responderte con fuentes ahora mismo; "
             "prueba de nuevo en un momento o dame un ticker para ir a datos concretos."
         )
+        from app.core.i18n import current_language
+
+        if current_language() == "en":
+            # Ajustes → Idioma = English: el mismo aviso, en inglés.
+            answer = (
+                "The configured model has reached its usage limit and I can't answer with sources right now; "
+                "try again in a couple of minutes or give me a ticker to go to specific data."
+                if reason == "quota"
+                else "I can't answer with sources right now; "
+                "try again in a moment or give me a ticker to go to specific data."
+            )
         return ChatResponse(
             answer=answer,
             sources=[],
