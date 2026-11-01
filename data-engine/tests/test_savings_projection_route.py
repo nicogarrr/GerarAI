@@ -111,3 +111,22 @@ def test_ok_branch_from_real_plan_row(monkeypatch) -> None:
     assert body["currency"] == "EUR"
     assert body["horizon_years"] == 20
     assert len(body["scenarios"]) >= 1
+
+
+def test_preview_rejects_currency_that_is_not_iso(monkeypatch) -> None:
+    """«QQQ» o «NaN» pasaban el patron de tres letras y la vista previa salia
+    «ok» rotulada en una divisa inexistente; «GBp» (peniques) se subia a «GBP»
+    y la cuota se leia en libras. Mismo contrato que la divisa del plan (#4060)."""
+    client, tenant, user, _ = _client(monkeypatch)
+    for bad in ("QQQ", "NaN", "GBp", "GBX"):
+        res = signed_request(
+            client, SECRET, tenant, user, "GET", "/api/plan/savings-projection",
+            params={"monthly": "100", "years": "10", "currency": bad},
+        )
+        assert res.status_code == 422, (bad, res.status_code, res.text)
+    ok = signed_request(
+        client, SECRET, tenant, user, "GET", "/api/plan/savings-projection",
+        params={"monthly": "100", "years": "10", "currency": "usd"},
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["currency"] == "USD"
