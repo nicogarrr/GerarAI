@@ -3,7 +3,7 @@
 import { useId } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { safeAssistantSourceUrl, type AssistantCitationKind, type AssistantResponse, type AssistantSectionKey } from '@/lib/research/assistant-contract';
+import { safeAssistantSourceUrl, type AssistantResponse } from '@/lib/research/assistant-contract';
 import { useT } from '@/lib/i18n/client';
 
 const SECTION_KEYS = {

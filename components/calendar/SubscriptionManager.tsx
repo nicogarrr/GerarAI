@@ -10,7 +10,6 @@ import {
     type CalendarFeedState,
 } from '@/lib/actions/calendar-feed.actions';
 import { useT, useFormat } from '@/lib/i18n/client';
-import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 
 type Provider = 'apple' | 'google' | 'outlook';
 

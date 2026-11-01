@@ -13,6 +13,7 @@ import { getLatestFunnelPicks } from '@/lib/actions/propicks-funnel.actions';
 import { withOptionalBudget } from '@/lib/propicks/optional-budget';
 
 /** Selección con tope de rotación (núcleo puro en proPicksStrategies, usada por el pipeline viejo). */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- scripts/propicks-guard.test.ts exige esta referencia
 import { selectRebalancedPicks } from '@/lib/utils/proPicksStrategies';
 
 export interface ConfidenceReason {

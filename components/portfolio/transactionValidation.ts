@@ -65,13 +65,6 @@ export interface TransactionFormErrors {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/**
- * El parser rechaza los formatos ambiguos («1,234.5», «1,234») en lugar de
- * reinterpretarlos con un factor 1000 silencioso; este mensaje enseña el
- * formato esperado en vez de acusar al usuario de escribir «mal» el número.
- */
-const AMBIGUOUS_NUMBER_MESSAGE = TRANSACTION_VALIDATION_ES.errAmbiguous;
-
 export function validateTransactionForm(values: TransactionFormValues, now: Date = new Date(), options: TransactionValidationOptions = {}): TransactionFormErrors {
   const { ti, locale = 'es' } = options;
   const msg = (key: ValidationMessageKey): string => (ti ? ti(VALIDATION_I18N_KEYS[key]) : TRANSACTION_VALIDATION_ES[key]);

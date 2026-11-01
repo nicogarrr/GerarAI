@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
 const h = vi.hoisted(() => ({
     del: vi.fn(), refreshPrices: vi.fn(), routerRefresh: vi.fn(),

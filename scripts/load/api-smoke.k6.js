@@ -15,7 +15,7 @@ export const options = {
 
 const BASE = __ENV.E2E_API_URL || 'http://127.0.0.1:8100';
 
-export default function () {
+export default function apiSmoke() {
   const health = http.get(`${BASE}/health`);
   check(health, { 'health 200': (r) => r.status === 200 });
   sleep(0.2);

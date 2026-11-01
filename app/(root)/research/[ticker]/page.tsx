@@ -123,7 +123,6 @@ import {
   refreshCompanyFinancialsSEC,
   refreshCompanyResearchModel,
   type ResearchCalculatedMetric,
-  type ResearchFact,
   type ResearchLongTermModel,
   type ResearchValuation,
   getMoatQualityScore,
