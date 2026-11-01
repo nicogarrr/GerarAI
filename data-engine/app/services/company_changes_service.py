@@ -27,19 +27,28 @@ def _aware(value: datetime) -> datetime:
 
 def changes_since(db: Session, company_id: int, since: datetime) -> dict[str, Any]:
     since = _aware(since)
-    docs = db.execute(
-        select(Document)
-        .where(Document.company_id == company_id, Document.created_at > since)
-        .order_by(Document.created_at.desc())
-        .limit(MAX_ITEMS)
-    ).scalars().all()
-    docs_total = db.scalar(
-        select(func.count()).select_from(Document).where(
-            Document.company_id == company_id,
-            Document.created_at > since,
-            *tenant_filters(db, Document),
+    docs = (
+        db.execute(
+            select(Document)
+            .where(Document.company_id == company_id, Document.created_at > since)
+            .order_by(Document.created_at.desc())
+            .limit(MAX_ITEMS)
         )
-    ) or 0
+        .scalars()
+        .all()
+    )
+    docs_total = (
+        db.scalar(
+            select(func.count())
+            .select_from(Document)
+            .where(
+                Document.company_id == company_id,
+                Document.created_at > since,
+                *tenant_filters(db, Document),
+            )
+        )
+        or 0
+    )
     fact_rows = db.execute(
         select(FinancialFact.metric, func.count())
         .where(
@@ -51,19 +60,28 @@ def changes_since(db: Session, company_id: int, since: datetime) -> dict[str, An
         .order_by(func.count().desc(), FinancialFact.metric)
         .limit(MAX_ITEMS)
     ).all()
-    facts_total = db.scalar(
-        select(func.count()).select_from(FinancialFact).where(
-            FinancialFact.company_id == company_id,
-            FinancialFact.created_at > since,
-            *tenant_filters(db, FinancialFact),
+    facts_total = (
+        db.scalar(
+            select(func.count())
+            .select_from(FinancialFact)
+            .where(
+                FinancialFact.company_id == company_id,
+                FinancialFact.created_at > since,
+                *tenant_filters(db, FinancialFact),
+            )
         )
-    ) or 0
-    changes = db.execute(
-        select(ThesisChange)
-        .where(ThesisChange.company_id == company_id, ThesisChange.created_at > since)
-        .order_by(ThesisChange.created_at.desc())
-        .limit(MAX_ITEMS)
-    ).scalars().all()
+        or 0
+    )
+    changes = (
+        db.execute(
+            select(ThesisChange)
+            .where(ThesisChange.company_id == company_id, ThesisChange.created_at > since)
+            .order_by(ThesisChange.created_at.desc())
+            .limit(MAX_ITEMS)
+        )
+        .scalars()
+        .all()
+    )
     return {
         "since": since.isoformat(),
         "documentos": {
@@ -89,35 +107,89 @@ def changes_since(db: Session, company_id: int, since: datetime) -> dict[str, An
 
 
 def _fact_value(fact: FinancialFact) -> dict[str, Any]:
-    return {"valor": float(fact.value), "periodo": fact.period, "fecha": fact.created_at.isoformat() if fact.created_at else None}
+    return {
+        "valor": float(fact.value),
+        "periodo": fact.period,
+        "fecha": fact.created_at.isoformat() if fact.created_at else None,
+    }
 
 
-def _metric_changes(db: Session, company_id: int, since: datetime, metrics: list[str]) -> list[dict[str, Any]]:
+def _metric_changes(
+    db: Session, company_id: int, since: datetime, metrics: list[str]
+) -> list[dict[str, Any]]:
     """Por métrica: el último dato guardado después de ``since`` y el que había antes.
 
     Si antes existía el mismo periodo, ese es el anterior (una revisión); si no, el último
     periodo que ya conocías. Sin dato previo, ``anterior`` es None (dato nuevo, no un cambio).
     """
+    if not metrics:
+        return []
+    # Dos consultas en total (no 1+2 por metrica): una para los datos nuevos y
+    # otra para el historico de solo esas metricas. El top-1 por metrica con
+    # desempate por id se reproduce en Python sobre el mismo ORDER BY, asi la
+    # salida es identica (medido: 40 metricas = 121 -> 2 consultas).
+    order = (FinancialFact.created_at.desc(), FinancialFact.id.desc())
+    new_rows = db.execute(
+        select(
+            FinancialFact.metric,
+            FinancialFact.period,
+            FinancialFact.value,
+            FinancialFact.unit,
+            FinancialFact.created_at,
+            FinancialFact.source_type,
+            FinancialFact.accession_number,
+        )
+        .where(
+            FinancialFact.company_id == company_id,
+            FinancialFact.metric.in_(metrics),
+            FinancialFact.created_at > since,
+            *tenant_filters(db, FinancialFact),
+        )
+        .order_by(FinancialFact.metric, *order)
+    ).all()
+    new_by_metric: dict[str, Any] = {}
+    for row in new_rows:
+        new_by_metric.setdefault(row.metric, row)  # primera = top-1 de su metrica
+    if not new_by_metric:
+        return []
+    old_rows = db.execute(
+        select(
+            FinancialFact.metric,
+            FinancialFact.period,
+            FinancialFact.value,
+            FinancialFact.unit,
+            FinancialFact.created_at,
+        )
+        .where(
+            FinancialFact.company_id == company_id,
+            FinancialFact.metric.in_(list(new_by_metric)),
+            FinancialFact.created_at <= since,
+            *tenant_filters(db, FinancialFact),
+        )
+        .order_by(FinancialFact.metric, *order)
+    ).all()
+    history: dict[str, list[Any]] = {}
+    for row in old_rows:
+        history.setdefault(row.metric, []).append(row)
     out: list[dict[str, Any]] = []
     for metric in metrics:
-        base = select(FinancialFact).where(
-            FinancialFact.company_id == company_id, FinancialFact.metric == metric, *tenant_filters(db, FinancialFact)
-        )
-        order = (FinancialFact.created_at.desc(), FinancialFact.id.desc())
-        new = db.scalars(base.where(FinancialFact.created_at > since).order_by(*order).limit(1)).first()
+        new = new_by_metric.get(metric)
         if new is None:
             continue
-        before = base.where(FinancialFact.created_at <= since)
-        old = db.scalars(before.where(FinancialFact.period == new.period).order_by(*order).limit(1)).first()
-        old = old or db.scalars(before.order_by(*order).limit(1)).first()
-        out.append({
-            "metric": metric,
-            "unidad": new.unit,
-            "anterior": _fact_value(old) if old is not None else None,
-            "nuevo": _fact_value(new),
-            "fuente": new.source_type,
-            "accession": new.accession_number,
-        })
+        hist = history.get(metric, [])
+        # Mismo criterio que antes: revision del mismo periodo si existe
+        # (primera en el orden), si no el ultimo dato conocido.
+        old = next((r for r in hist if r.period == new.period), None) or (hist[0] if hist else None)
+        out.append(
+            {
+                "metric": metric,
+                "unidad": new.unit,
+                "anterior": _fact_value(old) if old is not None else None,
+                "nuevo": _fact_value(new),
+                "fuente": new.source_type,
+                "accession": new.accession_number,
+            }
+        )
     return out
 
 
