@@ -84,10 +84,31 @@ export function mapDcaSignals(raw: unknown): Record<string, HoldingDcaLevel> | n
     return out;
 }
 
-/** Texto del nivel DCA para una posición: «4X DCA», «2X DCA (provisional)» o «Sin nivel». */
-export function dcaLevelText(level: HoldingDcaLevel | null | undefined): string {
-    if (!level) return NO_DCA_LEVEL;
-    return level.forming ? `${level.label} (provisional)` : level.label;
+/** Nivel sin traducir que manda el motor (dca_signal_engine) → inglés. */
+const DCA_LABELS_EN: Record<string, string> = { 'RECORTE LIGERO': 'LIGHT TRIM', 'RECORTE FUERTE': 'STRONG TRIM' };
+
+/** Texto del nivel DCA para una posición: «4X DCA», «2X DCA (provisional)» o «Sin nivel».
+ *  Con `locale` «en», «No level» y los recortes en inglés; el español no cambia. */
+export function dcaLevelText(level: HoldingDcaLevel | null | undefined, locale: string = 'es'): string {
+    const en = locale === 'en';
+    if (!level) return en ? 'No level' : NO_DCA_LEVEL;
+    const label = en ? (DCA_LABELS_EN[level.label] ?? level.label) : level.label;
+    return level.forming ? `${label} (provisional)` : label;
+}
+
+/** Fuente del valor justo tal y como la rotula el motor (fair_value_service), en inglés:
+ *  «Tesis publicada v3 (antigua)» → «Published thesis v3 (old)». En español, tal cual. */
+export function fairValueLabelText(label: string, locale: string = 'es'): string {
+    if (locale !== 'en') return label;
+    const thesis = /^Tesis publicada v(\d+)( \(antigua\))?$/.exec(label);
+    if (thesis) return `Published thesis v${thesis[1]}${thesis[2] ? ' (old)' : ''}`;
+    const known: Record<string, string> = {
+        'Motor de valoración': 'Valuation engine',
+        'Motor de valoración (orientativo)': 'Valuation engine (indicative)',
+        'Valor justo': 'Fair value',
+        'Sin valor justo': 'No fair value',
+    };
+    return known[label] ?? label;
 }
 
 /** Distancia del precio al valor justo en % (positivo = margen al alza).

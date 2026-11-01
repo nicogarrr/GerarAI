@@ -103,7 +103,7 @@
   "lib/paper-trading/messages-en.ts": 41,
   "lib/paper-trading/options.ts": 20,
   "lib/plan/contribution-split.ts": 2,
-  "lib/portfolio/holding-signals.ts": 2,
+  "lib/portfolio/holding-signals.ts": 8,
   "lib/research/analyst-rating-es.ts": 19,
   "lib/research/assistant-client.ts": 6,
   "lib/research/backend-error-en.ts": 5,

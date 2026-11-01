@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
     dcaLevelText,
+    fairValueLabelText,
     fairValueGapPercent,
     mapDcaSignals,
     mapFairValues,
@@ -90,5 +91,27 @@ describe('cableado en Cartera e Inicio', () => {
         assert.match(holdings, /<FairValueLine symbol=\{holding\.symbol\}/);
         assert.match(home, /<DcaLevelChip symbol=\{h\.symbol\}/);
         assert.match(home, /<HomeFairValueHint holding=\{h\}/);
+    });
+});
+
+describe('señales de la posición en inglés', () => {
+    it('nivel DCA: «No level» y recortes en inglés; el español no cambia', () => {
+        const trim = { level: -1, label: 'RECORTE LIGERO', forming: true, signalDate: null, color: null, fg: null };
+        const buy = { level: 3, label: '3X DCA', forming: false, signalDate: null, color: null, fg: null };
+        assert.equal(dcaLevelText(null, 'en'), 'No level');
+        assert.equal(dcaLevelText(trim, 'en'), 'LIGHT TRIM (provisional)');
+        assert.equal(dcaLevelText(buy, 'en'), '3X DCA');
+        assert.equal(dcaLevelText(trim), 'RECORTE LIGERO (provisional)');
+        assert.equal(dcaLevelText(null, 'es'), 'Sin nivel');
+    });
+
+    it('fuente del valor justo en inglés; el español no cambia', () => {
+        assert.equal(fairValueLabelText('Tesis publicada v3 (antigua)', 'en'), 'Published thesis v3 (old)');
+        assert.equal(fairValueLabelText('Tesis publicada v12', 'en'), 'Published thesis v12');
+        assert.equal(fairValueLabelText('Motor de valoración (orientativo)', 'en'), 'Valuation engine (indicative)');
+        assert.equal(fairValueLabelText('Motor de valoración', 'en'), 'Valuation engine');
+        assert.equal(fairValueLabelText('Valor justo', 'en'), 'Fair value');
+        assert.equal(fairValueLabelText('Otra cosa', 'en'), 'Otra cosa');
+        assert.equal(fairValueLabelText('Tesis publicada v3 (antigua)'), 'Tesis publicada v3 (antigua)');
     });
 });
