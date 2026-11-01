@@ -9,6 +9,7 @@ suggestions to stay inside the bands.
 from __future__ import annotations
 
 import os
+import unicodedata
 from calendar import monthrange
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -51,6 +52,66 @@ def plan_currency_enforced() -> bool:
     escrituras con divisa explicita se rechazan (409) en vez de ignorarse.
     """
     return os.getenv("PLAN_CURRENCY_ENFORCED") == "1"
+
+
+#: Nombres que ve el usuario en la web (lib/labels.ts SECTORES y
+#: plan.kind.cash) para los sectores y la caja, que aqui van en ingles. La
+#: etiqueta de un objetivo es texto libre: «Tecnología» o «Caja» deben leer el
+#: peso de «Technology» o «Cash», no un 0 % que sugiere comprar lo que ya hay.
+_SECTOR_DISPLAY_ES = {
+    "Technology": "Tecnología",
+    "Information Technology": "Tecnología",
+    "Healthcare": "Salud",
+    "Health Care": "Salud",
+    "Financial Services": "Servicios financieros",
+    "Financials": "Servicios financieros",
+    "Consumer Discretionary": "Consumo cíclico",
+    "Consumer Cyclical": "Consumo cíclico",
+    "Industrials": "Industriales",
+    "Consumer Staples": "Consumo básico",
+    "Energy": "Energía",
+    "Utilities": "Servicios públicos",
+    "Real Estate": "Inmobiliario",
+    "Materials": "Materiales",
+    "Communication Services": "Servicios de comunicación",
+    "Media": "Medios",
+    "Unknown": "Sin clasificar",
+}
+_ASSET_CLASS_ALIASES = {"Cash": ("Caja", "Efectivo", "Liquidez")}
+
+
+def _plain_label(value: str) -> str:
+    """Etiqueta comparable: sin tildes, sin mayusculas ni espacios extra."""
+    decomposed = unicodedata.normalize("NFKD", value)
+    return " ".join(
+        "".join(ch for ch in decomposed if not unicodedata.combining(ch)).casefold().split()
+    )
+
+
+def _weight_for_display_label(
+    current_weights: dict[str, float], kind: str, label: str
+) -> float | None:
+    """Peso de un objetivo de sector o clase de activo escrito como lo ve el usuario.
+
+    Suma los sectores que casan (Technology e Information Technology son los
+    dos «Tecnología»). None si ninguna etiqueta de la cartera casa.
+    """
+    wanted = _plain_label(label)
+    total: float | None = None
+    for key, weight in current_weights.items():
+        if kind == "asset_class":
+            if not key.startswith("asset_class:"):
+                continue
+            name = key.removeprefix("asset_class:")
+            names = (name, *_ASSET_CLASS_ALIASES.get(name, ()))
+        else:
+            if ":" in key:
+                continue
+            name = key
+            names = (name, _SECTOR_DISPLAY_ES.get(name, name))
+        if any(_plain_label(candidate) == wanted for candidate in names):
+            total = (total or 0.0) + weight
+    return round(total, 2) if total is not None else None
 
 
 class InvestmentPlanService:
@@ -527,6 +588,8 @@ class InvestmentPlanService:
             weight = current_weights.get(key)
             if weight is None and kind == "ticker":
                 weight = ticker_weights_ci.get(f"ticker:{str(label).strip().upper()}")
+            if weight is None and kind in ("sector", "asset_class"):
+                weight = _weight_for_display_label(current_weights, kind, str(label))
             current = Decimal(str(weight if weight is not None else 0))
             deviation = current - target_pct
             lower = target_pct - band_pct
