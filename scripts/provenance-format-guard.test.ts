@@ -53,7 +53,7 @@ describe("formatProvenanceValue", () => {
 describe("ThesisMemo", () => {
     const src = readFileSync("components/research/ThesisMemo.tsx", "utf8")
     it("pinta la etiqueta en español, no item.key crudo", () => {
-        assert.match(src, /metricLabel\(item\.key\)/)
+        assert.match(src, /metricLabel\(item\.key, locale\)/)
         assert.doesNotMatch(src, />\{item\.key\}</)
     })
     it("formatea con el valor y la unidad del input", () => {

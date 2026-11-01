@@ -2,11 +2,11 @@ import { canShowThesisText } from '@/components/research/ThesisSummary';
 import { frameworkTerm } from '@/lib/research/framework-terms';
 import { thesisMoney, thesisEps } from '@/lib/research/thesis-number-format';
 import { thesisScenarioDisplay } from '@/lib/research/listed-share-values';
-import { createFormatters, isValidCurrencyCode, type Formatters, marginOfSafetyDisplay, NA } from '@/lib/format';
+import { createFormatters, isValidCurrencyCode, type Formatters, marginOfSafetyDisplay, NA, naFor } from '@/lib/format';
 import type { Locale } from '@/lib/i18n/locale';
 import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 import type { TranslationKey } from '@/lib/i18n/t';
-import { PROVENANCE_GROUPS, provenanceBasisEs, provenanceGroup } from '@/lib/research/provenance-groups';
+import { PROVENANCE_GROUPS, provenanceBasis, provenanceGroup } from '@/lib/research/provenance-groups';
 import { isVerifiedOficial, provenanceUrls } from '@/lib/research/provenance-item';
 import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenance-format';
 import { metricLabel } from '@/lib/research/metric-labels';
@@ -117,11 +117,12 @@ function enumLabel(map: Record<string, string>, value: string | null | undefined
 function money(
   value: number | string | null | undefined,
   currency: string | null | undefined,
+  locale: Locale = 'es',
 ): string {
   const parsed = typeof value === 'string' ? Number(value) : value;
-  if (parsed === null || parsed === undefined || Number.isNaN(parsed)) return NA;
-  if (!isValidCurrencyCode(currency)) return NA;
-  return thesisMoney(parsed, currency);
+  if (parsed === null || parsed === undefined || Number.isNaN(parsed)) return naFor(locale);
+  if (!isValidCurrencyCode(currency)) return naFor(locale);
+  return thesisMoney(parsed, currency, locale);
 }
 
 function NarrativeText({ text, sourceLabel }: { text: string; sourceLabel: string }) {
@@ -160,8 +161,10 @@ function ScenarioCell({
   glossaryKey,
   caption,
   formatPercent,
+  locale = 'es',
 }: {
   formatPercent: Formatters['formatPercent'];
+  locale?: Locale;
   label: string;
   value: number | string | null | undefined;
   currency: string | null | undefined;
@@ -186,7 +189,7 @@ function ScenarioCell({
           label
         )}
       </div>
-      <div className="mt-1 text-base font-semibold text-gray-100">{money(value, currency)}</div>
+      <div className="mt-1 text-base font-semibold text-gray-100">{money(value, currency, locale)}</div>
       {probability !== null && probability !== undefined ? (
         <div className="mt-0.5 text-xs text-gray-500">p = {formatPercent(probability, { digits: 0 })}</div>
       ) : null}
@@ -267,6 +270,7 @@ export default function ThesisMemo({
       expected: thesis.expected_value,
     },
     thesis.valuation_basis,
+    locale,
   );
   const generatedLabel = formatGeneratedDate(thesis.created_at);
   const ratingBadge = modelBlocked ? t('research.memo.insufficientData') : keyedLabel(t, RATING_KEYS, thesis.rating) ?? enumLabel(RATING_LABELS, thesis.rating);
@@ -328,7 +332,7 @@ export default function ThesisMemo({
           </p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-300">
             {thesis.missing_inputs.map((item) => (
-              <li key={item}>{frameworkTerm(item) ?? metricLabel(item)}</li>
+              <li key={item}>{frameworkTerm(item, locale) ?? metricLabel(item, locale)}</li>
             ))}
           </ul>
         </section>
@@ -351,10 +355,10 @@ export default function ThesisMemo({
                   <dl className="mt-1 divide-y divide-gray-800/70">
                     {rows.map((item) => {
                       const urls = provenanceUrls(item);
-                      const basis = provenanceBasisEs(item.base_inferencia ?? item.method);
+                      const basis = provenanceBasis(item.base_inferencia ?? item.method, locale);
                       return (
                         <div key={item.key} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2 text-sm">
-                          <dt className="text-gray-300">{capitalizeLabel(metricLabel(item.key))}{item.key === 'fcf_margin' ? (item.label === 'derivado' ? ` ${t('research.memo.fcfNormalized')}` : item.label === 'dato' ? ` ${t('research.memo.fcfReported')}` : '') : ''}</dt>
+                          <dt className="text-gray-300">{capitalizeLabel(metricLabel(item.key, locale))}{item.key === 'fcf_margin' ? (item.label === 'derivado' ? ` ${t('research.memo.fcfNormalized')}` : item.label === 'dato' ? ` ${t('research.memo.fcfReported')}` : '') : ''}</dt>
                           <dd className="ml-auto font-medium tabular-nums text-gray-100">{formatProvenanceValue(item.value, item.unit)}</dd>
                           <dd className="basis-full text-xs text-gray-500">
                             {basis ?? t('research.memo.basisUndocumented')}
@@ -435,15 +439,16 @@ export default function ThesisMemo({
           {/* El precio guardado es el que usó el modelo al generar la versión,
               no la cotización de hoy; la fecha solo si quedó persistida. */}
           <ScenarioCell formatPercent={formatPercent}
+            locale={locale}
             label={t('research.memo.modelPrice')}
             value={thesis.current_price}
             currency={currency}
             caption={thesis.valuation_basis?.price_as_of ? t('research.memo.quoteAsOf', { date: formatUserDate(thesis.valuation_basis.price_as_of) }) : null}
           />
-          <ScenarioCell formatPercent={formatPercent} label={`Bear${scenarios.label}`} value={scenarios.values.bear} currency={currency} probability={probabilities['bear']} glossaryKey="bear" />
-          <ScenarioCell formatPercent={formatPercent} label={`Base${scenarios.label}`} value={scenarios.values.base} currency={currency} probability={probabilities['base']} highlight glossaryKey="base" />
-          <ScenarioCell formatPercent={formatPercent} label={`Bull${scenarios.label}`} value={scenarios.values.bull} currency={currency} probability={probabilities['bull']} glossaryKey="bull" />
-          <ScenarioCell formatPercent={formatPercent} label={`${t('research.memo.expectedValue')}${scenarios.label}`} value={scenarios.values.expected} currency={currency} />
+          <ScenarioCell formatPercent={formatPercent} locale={locale} label={`Bear${scenarios.label}`} value={scenarios.values.bear} currency={currency} probability={probabilities['bear']} glossaryKey="bear" />
+          <ScenarioCell formatPercent={formatPercent} locale={locale} label={`Base${scenarios.label}`} value={scenarios.values.base} currency={currency} probability={probabilities['base']} highlight glossaryKey="base" />
+          <ScenarioCell formatPercent={formatPercent} locale={locale} label={`Bull${scenarios.label}`} value={scenarios.values.bull} currency={currency} probability={probabilities['bull']} glossaryKey="bull" />
+          <ScenarioCell formatPercent={formatPercent} locale={locale} label={`${t('research.memo.expectedValue')}${scenarios.label}`} value={scenarios.values.expected} currency={currency} />
           <div className="rounded-lg border border-gray-800 bg-black/20 p-3">
             <div className="text-xs uppercase text-gray-500">
               <GlossaryTerm k="margen_seguridad" icon={false}>
@@ -451,7 +456,7 @@ export default function ThesisMemo({
               </GlossaryTerm>
             </div>
             <div className="mt-1 text-base font-semibold text-gray-100">
-              {marginOfSafetyDisplay(knownMargin ? thesis.margin_of_safety : archivedMargin, thesis.base_value)}
+              {marginOfSafetyDisplay(knownMargin ? thesis.margin_of_safety : archivedMargin, thesis.base_value, locale)}
             </div>
             <div className="mt-0.5 text-xs text-gray-500">
               {unknownMargin ? t('research.memo.marginUnverified') : knownMargin ? t('research.memo.marginFormula') : t('research.memo.marginNone')}
@@ -491,7 +496,7 @@ export default function ThesisMemo({
                     </span>
                   ) : null}
                   {catalyst.eps_forecast !== undefined ? (
-                    <span className="text-gray-500">· {t('research.memo.epsEstimate')} {thesisEps(catalyst.eps_forecast)}</span>
+                    <span className="text-gray-500">· {t('research.memo.epsEstimate')} {thesisEps(catalyst.eps_forecast, locale)}</span>
                   ) : null}
                 </li>
               ))}
