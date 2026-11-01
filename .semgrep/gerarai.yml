@@ -22,6 +22,7 @@
 #   llm/factory.py: LLM provider endpoint; custom URLs via egress_guard
 #   llm/free_interactive.py: LLM provider endpoint; custom URLs via egress_guard
 #   llm/jev.py: LLM provider endpoint; custom URLs via egress_guard
+#   llm/opencode_usage.py: exact https://opencode.ai/zen/go/v1 allowlist enforced before sending credentials; redirects disabled
 #   llm/thesis_go.py: LLM provider endpoint; custom URLs via egress_guard
 #   services/class_filer_eps_service.py: SEC EDGAR fixed host
 #   services/company_enrichment_service.py: fixed provider APIs (OpenFIGI/Finnhub)
@@ -99,6 +100,7 @@ rules:
     - /data-engine/app/llm/factory.py
     - /data-engine/app/llm/free_interactive.py
     - /data-engine/app/llm/jev.py
+    - /data-engine/app/llm/opencode_usage.py
     - /data-engine/app/llm/thesis_go.py
     - /data-engine/app/services/class_filer_eps_service.py
     - /data-engine/app/services/company_enrichment_service.py

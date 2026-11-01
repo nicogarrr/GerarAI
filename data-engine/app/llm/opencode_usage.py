@@ -76,6 +76,10 @@ async def fetch_go_usage(
     """
     key = (api_key or "").strip()
     base = (base_url or "").strip().rstrip("/")
+    # Only this provider origin may receive the platform credential.
+    # No redirects are followed (httpx default). Tenant/custom URLs never enter.
+    if base != "https://opencode.ai/zen/go/v1":
+        return None
     if not key or not base:
         return None
     headers = {"Authorization": f"Bearer {key}", "User-Agent": "GerarAI-usage/1.0"}
