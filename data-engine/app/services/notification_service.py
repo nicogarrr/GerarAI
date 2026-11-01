@@ -307,7 +307,7 @@ class NotificationService:
         elif alert.alert_type == "earnings_reminder" and isinstance(earnings, dict):
             from app.services.earnings_alert_copy import email_content
 
-            content = email_content(earnings)
+            content = email_content(earnings, str((alert.metadata_ or {}).get("language") or "es"))
         else:
             content = generic_alert_content(payload)
         outcome = send_email(settings, content)

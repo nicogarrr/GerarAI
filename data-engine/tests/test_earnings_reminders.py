@@ -325,3 +325,60 @@ def test_earnings_reminders_are_opt_in_by_default(monkeypatch):
     example = Path(__file__).resolve().parents[2] / "docker.env.example"
     assert "EARNINGS_ALERTS_ENABLED=false" in example.read_text()
     assert "EARNINGS_ALERTS_ENABLED=true" not in example.read_text()
+
+
+def _english(db, monkeypatch):
+    """Usuario con inglés guardado en Ajustes y generación multidioma encendida."""
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
+    get_settings.cache_clear()
+    db.get(Tenant, 1).metadata_ = {"language": "en"}
+    db.commit()
+
+
+def test_reminder_uses_saved_english_language(db, monkeypatch):
+    _english(db, monkeypatch)
+    _watch(db, "ZZG", name="Zeta Global")
+    _row(db, "ZZG", 1, confirmed=False, session="after_market")
+    er.emit_earnings_reminders(db, now=NOW)
+    alerts = _alerts(db)
+    assert [a.title for a in alerts] == ["ZZG reports earnings tomorrow"]
+    message = alerts[0].message
+    for text in ("Date: 3 Nov 2026", "after the close (session published by the source; no exact time)",
+                 "Date status: Date estimated by the source; it may change", "Tracked from: Your watchlist",
+                 "Source: Yahoo Finance (calendarEvents)", "Source link: https://finance.yahoo.com/quote/X",
+                 "Earnings calendar notice; not financial advice."):
+        assert text in message
+    assert "Fuente" not in message and "mañana" not in message
+    assert alerts[0].metadata_["language"] == "en"
+
+
+def test_reminder_stays_spanish_without_saved_language_or_flag(db, monkeypatch):
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
+    get_settings.cache_clear()
+    _watch(db, "ZZG")
+    _row(db, "ZZG", 1)
+    er.emit_earnings_reminders(db, now=NOW)
+    alert = _alerts(db)[0]
+    assert alert.title == "ZZG presenta resultados mañana"
+    assert "language" not in alert.metadata_
+
+
+def test_reminder_email_in_english_and_dispatch_reads_language(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.services import notification_service as ns
+
+    earnings = {"ticker": "ZZG", "event_date": "2026-11-03", "window": "day", "confirmed": True,
+                "source": "Yahoo", "source_url": "https://finance.yahoo.com/quote/X"}
+    content = earnings_alert_copy.email_content(earnings, "en")
+    assert content.subject == "ZZG reports earnings tomorrow"
+    assert '<html lang="en">' in content.html and ">Source: <a" in content.html.replace("\n", "")
+    assert "GerarAI&#x27;s earnings calendar" in content.html
+    week = earnings_alert_copy.title({**earnings, "window": "week"}, "en")
+    assert week == "ZZG reports earnings on 3 Nov 2026"
+    assert earnings_alert_copy.title({**earnings, "window": "week"}) == "ZZG presenta resultados el 3 nov 2026"
+    sent = []
+    monkeypatch.setattr(ns, "send_email", lambda settings, c: sent.append(c) or {"status": "delivered"})
+    for meta in ({"earnings": earnings, "language": "en"}, {"earnings": earnings}):
+        ns.NotificationService()._dispatch_email(None, SimpleNamespace(alert_type="earnings_reminder", metadata_=meta), {})
+    assert [c.subject for c in sent] == ["ZZG reports earnings tomorrow", "ZZG presenta resultados mañana"]
