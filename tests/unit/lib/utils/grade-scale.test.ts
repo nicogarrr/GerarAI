@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getGrade } from '@/lib/utils/advancedStockScoring';
+import { getGrade } from '@/lib/utils/grade-scale';
+import { getGrade as getGradeReexport } from '@/lib/utils/advancedStockScoring';
 
 // Escala única A+..F usada por el scoring avanzado y por el embudo de ProPicks.
 // Umbrales: 95/90/85/80/75/70/65/60/55/50; por debajo de 50 es F.
@@ -21,5 +22,11 @@ describe('getGrade (escala única A+..F)', () => {
         [0, 'F'],
     ] as const)('puntuación %s -> %s', (score, grade) => {
         expect(getGrade(score)).toBe(grade);
+    });
+});
+
+describe('reexportación desde advancedStockScoring', () => {
+    it('es la misma función (una sola fuente)', () => {
+        expect(getGradeReexport).toBe(getGrade);
     });
 });

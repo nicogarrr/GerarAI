@@ -19,6 +19,7 @@
  */
 
 import { getSectorAverages } from '@/lib/actions/sectorData.actions';
+import { getGrade } from '@/lib/utils/grade-scale';
 import { filterCandlesUpTo } from '@/lib/utils/candleCutoff';
 import { computeComparableCategoryScores } from '@/lib/utils/sectorMetrics';
 import { formatNumber, formatPercent } from '@/lib/format';
@@ -593,17 +594,4 @@ export async function calculateAdvancedStockScore(
     };
 }
 
-export function getGrade(score: number): 'A+' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C+' | 'C' | 'C-' | 'D' | 'F' {
-    if (score >= 95) return 'A+';
-    if (score >= 90) return 'A';
-    if (score >= 85) return 'A-';
-    if (score >= 80) return 'B+';
-    if (score >= 75) return 'B';
-    if (score >= 70) return 'B-';
-    if (score >= 65) return 'C+';
-    if (score >= 60) return 'C';
-    if (score >= 55) return 'C-';
-    if (score >= 50) return 'D';
-    return 'F';
-}
-
+export { getGrade };

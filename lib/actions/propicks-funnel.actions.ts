@@ -12,7 +12,7 @@
  */
 
 import { researchRequest } from '@/lib/research/client';
-import { getGrade } from '@/lib/utils/advancedStockScoring';
+import { getGrade } from '@/lib/utils/grade-scale';
 import { moatChecksToScore, MOAT_V2_MAX_CHECKS } from '@/lib/propicks/moat-scale';
 import { PROPICKS_SCORING_WEIGHTS } from '@/lib/utils/propicksValidation';
 import type { ConfidenceReason, ProPick } from '@/lib/actions/proPicks.actions';
