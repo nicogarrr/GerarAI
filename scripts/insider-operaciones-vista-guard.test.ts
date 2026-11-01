@@ -38,7 +38,7 @@ describe('Insider operaciones: vista del agregado por empresa', () => {
     assert.match(vista, /formatPrice\([^,]+, 'USD'/, 'importes USD con el formateador común (es-ES)');
     assert.match(vista, /formatNumber\(side\.shares/, 'acciones en es-ES, como los importes de la línea');
     assert.match(vista, /formatMarketCapUsd\(/, 'totales con formato compacto USD');
-    assert.match(vista, /insiderRole\(row\.role, row\.officer_title\)/, 'el cargo pasa por insiderRole');
+    assert.match(vista, /insiderRole\(row\.role, row\.officer_title[,)]/, 'el cargo pasa por insiderRole');
     assert.match(vista, /insiderName\(row\.insider\)/, 'el nombre SEC pasa por insiderName');
   });
 

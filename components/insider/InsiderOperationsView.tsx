@@ -95,7 +95,7 @@ export function CompanyCard({ company }: { company: InsiderOperationsCompany }) 
                         {company.insiders.map((row) => (
                             <TableRow key={`${row.insider ?? 'sin-nombre'}|${row.role ?? ''}|${row.officer_title ?? ''}`} className="border-gray-700/50">
                                 <TableCell className="text-sm text-gray-200">{insiderName(row.insider)}</TableCell>
-                                <TableCell className="text-sm text-gray-400">{insiderRole(row.role, row.officer_title)}</TableCell>
+                                <TableCell className="text-sm text-gray-400">{insiderRole(row.role, row.officer_title, f.locale)}</TableCell>
                                 <SideCells side={row.sell} />
                                 <SideCells side={row.buy} />
                                 <TableCell className="text-right text-sm tabular-nums text-gray-300">
@@ -117,7 +117,7 @@ export function CompanyCard({ company }: { company: InsiderOperationsCompany }) 
                         className="rounded-lg border border-gray-700/50 bg-gray-900/50 p-3 text-sm"
                     >
                         <p className="font-medium text-gray-200">{insiderName(row.insider)}</p>
-                        <p className="text-xs text-gray-500">{insiderRole(row.role, row.officer_title)}</p>
+                        <p className="text-xs text-gray-500">{insiderRole(row.role, row.officer_title, f.locale)}</p>
                         <dl className="mt-2 grid grid-cols-2 gap-2">
                             <div>
                                 <dt className="text-xs text-gray-500">{t('insider.operations.colSales')}</dt>
