@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -44,7 +45,12 @@ def _numeric_threshold(value: Any) -> float | None:
         return None
     if not number.is_finite():
         return None
-    return float(number)
+    result = float(number)
+    if not math.isfinite(result):
+        # «1e400» es un Decimal finito pero no cabe en un float: «avisar si baja
+        # de 1e400» se cumplía siempre (y «si sube» nunca).
+        return None
+    return result
 
 
 def _is_non_finite(value: Any) -> bool:

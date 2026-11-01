@@ -821,7 +821,8 @@ class AlertRuleOut(BaseModel):
 
 class ResearchAlertAction(BaseModel):
     action: Literal["acknowledge", "resolve", "snooze", "reopen"]
-    actor: str = "user"
+    # acknowledged_by es String(160): más largo, 500 en Postgres.
+    actor: str = Field(default="user", min_length=1, max_length=160)
     snoozed_until: datetime | None = None
 
 
