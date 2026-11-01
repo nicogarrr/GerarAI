@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
     usePathname: () => '/inicio',
@@ -12,6 +12,17 @@ vi.mock('@/lib/actions/finnhub.actions', () => ({
 vi.mock('@/lib/popular-stocks-loader', () => ({ loadPopularStocks: vi.fn(async () => []) }));
 
 import MobileNav from '@/components/MobileNav';
+
+// El drawer contiene el gatillo real del buscador (SearchCommand): su
+// onFocus precarga el chunk de SearchCommandDialog (TickerSearchInput ->
+// finnhub.actions) con un import() fire-and-forget, y los tests de la trampa
+// de foco enfocan los botones del drawer. Si ese chunk sigue cargando cuando
+// el archivo termina, Vitest reporta EnvironmentTeardownError como error no
+// manejado y la run falla con todos los tests en verde (visto en CI,
+// #3992/#3995). Drenar el chunk antes del teardown lo evita.
+afterAll(async () => {
+    await import('@/components/SearchCommandDialog');
+});
 
 beforeEach(() => {
     vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({

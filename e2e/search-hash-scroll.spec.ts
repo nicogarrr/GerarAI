@@ -12,10 +12,25 @@ async function warmUpPalette(page: Page) {
         await page.keyboard.press('Escape');
         await page.waitForTimeout(300);
     }
-    await expect(page.locator('[role="dialog"]')).toHaveCount(0);
+    await expectNoDialogs(page);
 }
 
-
+// Diagnóstico: si queda algún role="dialog", el error dice cuál es (nombre,
+// atributos y principio del texto) en vez de solo «recibido 1».
+async function expectNoDialogs(page: Page) {
+    try {
+        await expect(page.locator('[role="dialog"]')).toHaveCount(0);
+    } catch (error) {
+        const found = await page.locator('[role="dialog"]').evaluateAll((nodes) => nodes.map((node) => ({
+            label: node.getAttribute('aria-label') ?? node.getAttribute('aria-labelledby'),
+            state: node.getAttribute('data-state'),
+            id: node.id,
+            inShadow: node.getRootNode() instanceof ShadowRoot,
+            text: (node.textContent ?? '').trim().slice(0, 160),
+        })));
+        throw new Error(`Quedan diálogos abiertos: ${JSON.stringify(found)}\n${String(error)}`);
+    }
+}
 
 // Bug (22-oct-2026, prod): comandos de ficha con ancla desde la paleta
 // («MSFT GP») con la página YA abierta y desplazada abajo: location.hash
@@ -68,6 +83,6 @@ test.describe('paleta: comandos de ficha (ancla y destino)', () => {
         await expect(page.locator('[role="dialog"] [cmdk-item]').filter({ hasText: 'Tesis' }).first()).toBeVisible();
         await page.keyboard.press('Enter');
         await expect(page).toHaveURL(/\/research\/MSFT\/tesis$/);
-        await expect(page.locator('[role="dialog"]')).toHaveCount(0);
+        await expectNoDialogs(page);
     });
 });

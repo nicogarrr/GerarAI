@@ -37,6 +37,11 @@ vi.mock('@/components/portfolio/PortfolioForecast', () => ({
 vi.mock('@/components/portfolio/PortfolioDividends', () => ({
     default: ({ ti }: { ti: Ti }) => <div>dividends:{ti ? ti('portfolio.holdings.title') : 'sin-idioma'}</div>,
 }));
+// Igual que en PortfolioTabs.test.tsx: SavingsProjection real importa
+// plan.actions -> auth -> mongoose, y el loader fire-and-forget del mock de
+// next/dynamic puede seguir resolviéndolo tras el teardown del archivo
+// (EnvironmentTeardownError no manejado en CI).
+vi.mock('@/components/portfolio/SavingsProjection', () => ({ default: () => null }));
 
 import PortfolioTabs from '@/components/portfolio/PortfolioTabs';
 import { FilingSection } from '@/components/taxes/FilingSections';
