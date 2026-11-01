@@ -5955,6 +5955,9 @@ export interface paths {
         /**
          * Latest Expert Thesis
          * @description Última tesis guardada del equipo de expertos y un historial corto de las anteriores (404 sin flag).
+         *
+         *     Con ``?run=N`` abre entera esa corrida anterior (solo las tuyas, de este
+         *     ticker y completadas; si no, 404) y el historial trae las demás.
          */
         get: operations["latest_expert_thesis_api_thesis__ticker__experts_get"];
         put?: never;
@@ -8811,6 +8814,11 @@ export interface components {
             finished_at?: string | null;
             /** History */
             history?: components["schemas"]["ExpertThesisRunOut"][];
+            /**
+             * Is Latest
+             * @default true
+             */
+            is_latest: boolean;
             /** Plan */
             plan?: string[];
             /** Run Id */
@@ -28320,7 +28328,9 @@ export interface operations {
     };
     latest_expert_thesis_api_thesis__ticker__experts_get: {
         parameters: {
-            query?: never;
+            query?: {
+                run?: number | null;
+            };
             header?: {
                 "x-cavaai-user"?: string | null;
                 "x-cavaai-tenant"?: string | null;

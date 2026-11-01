@@ -70,6 +70,8 @@ class ExpertThesisOut(BaseModel):
     conflicts: list[str] = Field(default_factory=list)
     verdict: ExpertThesisVerdictOut | None = None
     history: list[ExpertThesisRunOut] = Field(default_factory=list)
+    #: False cuando se abrió una corrida anterior (``?run=``): la pantalla lo avisa.
+    is_latest: bool = True
 
 
 def _result_of(run: WorkflowRun) -> dict[str, Any] | None:
@@ -104,6 +106,29 @@ def expert_thesis_runs(db: Session, ticker: str, limit: int) -> list[tuple[Workf
         if len(found) >= limit:
             break
     return found
+
+
+def expert_thesis_run(db: Session, ticker: str, run_id: int) -> tuple[WorkflowRun, dict[str, Any]] | None:
+    """Una corrida concreta, con las MISMAS condiciones que el historial:
+    completada, del equipo, de este ticker y de este tenant (ORM + el tenant
+    grabado en la corrida). Si no cumple alguna, None (la ruta da 404)."""
+    symbol = ticker.strip().upper()
+    tenant = db.info.get("tenant_id")
+    run = db.scalars(
+        select(WorkflowRun).where(
+            WorkflowRun.id == run_id,
+            WorkflowRun.workflow_name == WORKFLOW_NAME,
+            WorkflowRun.status == "completed",
+            WorkflowRun.input_payload["ticker"].as_string() == symbol,
+        )
+    ).first()
+    result = _result_of(run) if run is not None else None
+    if run is None or result is None:
+        return None
+    owner = (result.get("context") or {}).get("tenant_id")
+    if tenant is not None and owner is not None and str(owner) != str(tenant):
+        return None
+    return run, result
 
 
 def latest_expert_thesis(db: Session, ticker: str) -> tuple[WorkflowRun, dict[str, Any]] | None:
@@ -156,6 +181,8 @@ def thesis_view(
     result: dict[str, Any],
     lang: str,
     earlier: list[tuple[WorkflowRun, dict[str, Any]]] | None = None,
+    *,
+    is_latest: bool = True,
 ) -> ExpertThesisOut:
     from app.services.expert_team.chat import _LABELS, _source_label
 
@@ -212,4 +239,5 @@ def thesis_view(
         conflicts=conflicts,
         verdict=verdict_out,
         history=[run_summary(r, res, lang) for r, res in earlier or []],
+        is_latest=is_latest,
     )

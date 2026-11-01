@@ -162,7 +162,9 @@
       "historyVerdict": "Verdict: {label}",
       "historyNoVerdict": "No verdict",
       "historyAnswered": "Answered: {experts}",
-      "historyTimedOut": "Did not answer in time: {experts}"
+      "historyTimedOut": "Did not answer in time: {experts}",
+      "olderRun": "You are viewing an earlier run ({date}).",
+      "backToLatest": "See the latest"
     }
   }
 }
