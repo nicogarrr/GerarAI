@@ -23,5 +23,7 @@
     "refresh": "Refresh now",
     "groupEmpty": "Data is not available right now. Retrying every minute.",
     "footer": "Each row shows the time reported by the provider and how old it was when the source was checked (Madrid time); the panel refreshes every minute. This is not official market data and is not meant for trading with guarantees."
-  }
+  },
+  "metaTitle": "Markets",
+  "metaDescription": "Indices, futures, IBEX 35 stocks, commodities and currencies, with the real time of each quote and its source."
 }

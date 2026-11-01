@@ -76,7 +76,10 @@ const SOURCE_TYPE_FILTER_OPTIONS = Object.entries(SOURCE_TYPE_LABELS)
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = { title: 'Fuentes' };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t('research.sourcesMetaTitle') };
+}
 
 export default async function ResearchSourcesPage({
   searchParams,

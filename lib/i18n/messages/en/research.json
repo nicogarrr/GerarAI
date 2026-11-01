@@ -1700,5 +1700,8 @@
     "reasonNotPublic": "the thesis is neither published nor approved",
     "reasonNotPublishable": "the model is not publishable",
     "reasonUnverified": "the model could not be verified as publishable"
-  }
+  },
+  "assistantMetaTitle": "Research assistant",
+  "assistantMetaDescription": "The research guide now lives in the Brain.",
+  "sourcesMetaTitle": "Sources"
 }
