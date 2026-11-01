@@ -491,3 +491,29 @@ def test_thesis_pdf_usa_imports_canonicos_de_matplotlib():
     for uso_privado in ("plt.Figure", "plt.Axes", "plt.Rectangle"):
         assert uso_privado not in source
     assert "add_axes((0, 0, 1, 1))" in source
+
+
+def test_portfolio_pdf_pence_position_not_labelled_as_pounds(env):
+    """Londres en peniques («GBp»): 10 acciones a 2.650 p son 265 £, no 26.500 «GBP»."""
+    client, factory, port_id = env
+    from app.models.entities import Company as C
+    from app.models.entities import Portfolio as Pf
+    from app.models.entities import Position as P
+
+    with factory() as s:
+        portfolio = s.query(Pf).filter(Pf.id == port_id).first()
+        s.query(P).filter(P.portfolio_id == port_id).delete()
+        s.add(C(ticker="SHEL.L", name="Shell plc", exchange="LSE", currency="GBp", sector="E", industry="I", company_type="operating", valuation_model="dcf"))
+        s.commit()
+        shel = s.query(C).filter(C.ticker == "SHEL.L").first()
+        s.add(P(tenant_id=portfolio.tenant_id, portfolio_id=port_id, company_id=shel.id,
+                quantity=10.0, average_cost=2600.0, market_price=2650.0, currency="GBp"))
+        s.commit()
+
+    res = client.get(f"/api/portfolio/{port_id}/pdf")
+    assert res.status_code == 200
+    page1, _ = _page_text(res.content)
+    assert "26.500,00 GBP" not in page1 and "26,500.00 GBP" not in page1
+    assert "2,650.00 GBP" not in page1 and "2.650,00 GBP" not in page1
+    assert "265,00 GBP" in page1 or "265.00 GBP" in page1
+    assert "26,50 GBP" in page1 or "26.50 GBP" in page1
