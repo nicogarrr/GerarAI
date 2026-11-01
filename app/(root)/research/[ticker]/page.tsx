@@ -1426,6 +1426,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
 
   const buildChangesContent = async (): Promise<React.ReactNode> => {
     const t = await getT();
+    const locale = await getLocale();
     const data = await viewData('changes');
     // Contexto de guía (revisiones anclables + noticias atribuidas): opcional,
     // su fallo no puede romper la pestaña Seguir.
@@ -1447,7 +1448,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           </Panel>
         )}
         <GuideContextPanel ticker={ticker} context={guideContext} hideReviews />
-        <DecisionAndRealityPanel ticker={ticker} decisions={data.decisions} reviews={data.expectations} trades={data.trades} />
+        <DecisionAndRealityPanel ticker={ticker} decisions={data.decisions} reviews={data.expectations} trades={data.trades} t={t} locale={locale} />
         <CompanyPaperTrades state={paperTrades} ticker={ticker} />
       </div>
     );

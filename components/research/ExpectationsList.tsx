@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { useT } from '@/lib/i18n/client';
 import { paginate } from '@/lib/research/change-events';
 import { Pager } from './Pager';
 
@@ -19,6 +20,7 @@ export type ExpectationRow = {
 const PAGE = 10;
 
 function Rows({ rows }: { rows: ExpectationRow[] }) {
+  const t = useT();
   return (
     <ul className="space-y-3">
       {rows.map((r) => (
@@ -28,8 +30,8 @@ function Rows({ rows }: { rows: ExpectationRow[] }) {
             <Badge variant="outline">{r.status}</Badge>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-400">
-            <span>Esperado <span className="text-gray-200">{r.expected}</span></span>
-            <span className="text-right">Real <span className="text-gray-200">{r.actual}</span></span>
+            <span>{t('research.expect.list.expected')} <span className="text-gray-200">{r.expected}</span></span>
+            <span className="text-right">{t('research.expect.list.actual')} <span className="text-gray-200">{r.actual}</span></span>
           </div>
         </li>
       ))}
@@ -44,6 +46,7 @@ function Rows({ rows }: { rows: ExpectationRow[] }) {
  * elimina ninguna: solo cambia dónde se ven.
  */
 export function ExpectationsList({ rows }: { rows: ExpectationRow[] }) {
+  const t = useT();
   const [page, setPage] = useState(1);
   const [pendingPage, setPendingPage] = useState(1);
   const main = useMemo(() => rows.filter((r) => !r.pending), [rows]);
@@ -57,24 +60,24 @@ export function ExpectationsList({ rows }: { rows: ExpectationRow[] }) {
   }, [pending]);
   return (
     <div>
-      <p className="mb-3 text-xs leading-5 text-gray-500">N/D significa que falta el dato esperado o real: no hay una comparación verificable, ni un acierto medido.</p>
+      <p className="mb-3 text-xs leading-5 text-gray-500">{t('research.expect.list.naHelp')}</p>
       {main.length ? (
         <>
           <Rows rows={view.items} />
-          <Pager label="comparaciones" onPage={setPage} page={view.page} pages={view.pages} total={main.length} />
+          <Pager label={t('research.expect.list.comparisons')} onPage={setPage} page={view.page} pages={view.pages} total={main.length} />
         </>
       ) : (
-        <p className="text-sm text-gray-500">Ninguna comparación verificable todavía.</p>
+        <p className="text-sm text-gray-500">{t('research.expect.list.none')}</p>
       )}
       {pending.length ? (
         <details className="mt-4 rounded-md border border-gray-800 p-3" data-testid="expectations-pending">
           <summary className="min-h-11 cursor-pointer text-sm text-gray-300 sm:min-h-0">
-            Pendientes de vencimiento ({pending.length})
+            {t('research.expect.list.pending', { count: pending.length })}
             <span className="block text-xs text-gray-500">{years.map(([y, n]) => `${y}: ${n}`).join(' · ')}</span>
           </summary>
           <div className="mt-3">
             <Rows rows={pview.items} />
-            <Pager label="previsiones" onPage={setPendingPage} page={pview.page} pages={pview.pages} total={pending.length} />
+            <Pager label={t('research.expect.list.forecasts')} onPage={setPendingPage} page={pview.page} pages={pview.pages} total={pending.length} />
           </div>
         </details>
       ) : null}

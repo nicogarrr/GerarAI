@@ -9,15 +9,21 @@
  * oculta) y una métrica desconocida se humaniza (`new_metric` → «new metric»).
  */
 
-/** Estados que el backend puede persistir en expectation_reviews.status. */
-export const REVIEW_STATUS_LABELS: Record<string, string> = {
-    beat: 'superado',
-    met: 'cumplido',
-    miss: 'no cumplido',
-    outside_tolerance: 'fuera de tolerancia',
-    pending_actual: 'a la espera de resultados',
-    pending: 'pendiente',
-    unavailable: 's/d',
+// @ts-expect-error TS5097: node --test (--experimental-strip-types) necesita la extensión.
+import { t as esT, type TranslationKey, type TranslationVars } from '../i18n/t.ts';
+
+/** Traductor del idioma elegido; por defecto el español de referencia. */
+type TiFn = (key: TranslationKey, vars?: TranslationVars) => string;
+
+/** Estados que el backend puede persistir en expectation_reviews.status (clave del diccionario). */
+const REVIEW_STATUS_KEYS: Record<string, TranslationKey> = {
+    beat: 'research.expect.status.beat',
+    met: 'research.expect.status.met',
+    miss: 'research.expect.status.miss',
+    outside_tolerance: 'research.expect.status.outsideTolerance',
+    pending_actual: 'research.expect.status.pendingActual',
+    pending: 'research.expect.status.pending',
+    unavailable: 'research.expect.status.unavailable',
 };
 
 /**
@@ -26,34 +32,41 @@ export const REVIEW_STATUS_LABELS: Record<string, string> = {
  * (fundamental_model_repository.py), que es la que puebla
  * ExpectationReview.metric vía forecast.metric.
  */
-export const EXPECTATION_METRIC_LABELS: Record<string, string> = {
-    revenue: 'Ingresos',
-    gross_profit: 'Beneficio bruto',
-    operating_income: 'Resultado de explotación',
-    ebitda: 'EBITDA',
-    net_income: 'Beneficio neto',
-    operating_cash_flow: 'Flujo de caja operativo',
-    free_cash_flow: 'Flujo de caja libre',
-    fcf_per_share: 'FCF por acción',
-    fcf_margin: 'Margen FCF',
-    roic: 'ROIC',
-    net_debt: 'Deuda neta',
-    shares_diluted: 'Acciones diluidas',
-    churn: 'Churn',
-    combined_ratio: 'Combined ratio',
-    working_capital_absorption: 'Absorción de capital circulante',
-    capital_expenditure: 'CapEx',
-    working_capital: 'Capital circulante',
+const EXPECTATION_METRIC_KEYS: Record<string, TranslationKey> = {
+    revenue: 'research.expect.metric.revenue',
+    gross_profit: 'research.expect.metric.grossProfit',
+    operating_income: 'research.expect.metric.operatingIncome',
+    ebitda: 'research.expect.metric.ebitda',
+    net_income: 'research.expect.metric.netIncome',
+    operating_cash_flow: 'research.expect.metric.operatingCashFlow',
+    free_cash_flow: 'research.expect.metric.freeCashFlow',
+    fcf_per_share: 'research.expect.metric.fcfPerShare',
+    fcf_margin: 'research.expect.metric.fcfMargin',
+    roic: 'research.expect.metric.roic',
+    net_debt: 'research.expect.metric.netDebt',
+    shares_diluted: 'research.expect.metric.sharesDiluted',
+    churn: 'research.expect.metric.churn',
+    combined_ratio: 'research.expect.metric.combinedRatio',
+    working_capital_absorption: 'research.expect.metric.workingCapitalAbsorption',
+    capital_expenditure: 'research.expect.metric.capitalExpenditure',
+    working_capital: 'research.expect.metric.workingCapital',
 };
 
-/** Estado de una revisión en español; desconocido se muestra tal cual. */
-export function reviewStatusLabel(status: string | null | undefined): string {
-    if (status == null || status === '') return 's/d';
-    return Object.hasOwn(REVIEW_STATUS_LABELS, status) ? REVIEW_STATUS_LABELS[status] : status;
+const inSpanish = (keys: Record<string, TranslationKey>): Record<string, string> =>
+    Object.fromEntries(Object.entries(keys).map(([id, key]) => [id, esT(key)]));
+
+/** Etiquetas en español (referencia; el guard comprueba la cobertura del catálogo). */
+export const REVIEW_STATUS_LABELS: Record<string, string> = inSpanish(REVIEW_STATUS_KEYS);
+export const EXPECTATION_METRIC_LABELS: Record<string, string> = inSpanish(EXPECTATION_METRIC_KEYS);
+
+/** Estado de una revisión en el idioma elegido; desconocido se muestra tal cual. */
+export function reviewStatusLabel(status: string | null | undefined, ti: TiFn = esT): string {
+    if (status == null || status === '') return ti('research.model.na');
+    return Object.hasOwn(REVIEW_STATUS_KEYS, status) ? ti(REVIEW_STATUS_KEYS[status]) : status;
 }
 
-/** Métrica en español; desconocida se humaniza sin inventar traducción. */
-export function expectationMetricLabel(metric: string | null | undefined): string {
-    if (metric == null || metric === '') return 's/d';
-    return Object.hasOwn(EXPECTATION_METRIC_LABELS, metric) ? EXPECTATION_METRIC_LABELS[metric] : metric.replaceAll('_', ' ');
+/** Métrica en el idioma elegido; desconocida se humaniza sin inventar traducción. */
+export function expectationMetricLabel(metric: string | null | undefined, ti: TiFn = esT): string {
+    if (metric == null || metric === '') return ti('research.model.na');
+    return Object.hasOwn(EXPECTATION_METRIC_KEYS, metric) ? ti(EXPECTATION_METRIC_KEYS[metric]) : metric.replaceAll('_', ' ');
 }

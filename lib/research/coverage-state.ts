@@ -1,3 +1,9 @@
+// @ts-expect-error TS5097: node --test (--experimental-strip-types) necesita la extensión.
+import { t as esT, type TranslationKey, type TranslationVars } from '../i18n/t.ts';
+
+/** Traductor del idioma elegido; por defecto el español de referencia. */
+type TiFn = (key: TranslationKey, vars?: TranslationVars) => string;
+
 export const NOT_VALUABLE = 'No valorable / falta evidencia';
 
 /** Coverage counts stored layers. It never establishes valuation quality. */
@@ -21,18 +27,18 @@ export function researchValuability(snapshot: {
 /** A forecast condition is not evidence that the condition was met. */
 export function modelConditionState(item: {
   id: string; value: number | null; comparison?: number | null; status: string;
-}, hasWaccSource: boolean): string {
-  if (item.status === 'out_of_bounds') return 'Fuera de rango';
+}, hasWaccSource: boolean, ti: TiFn = esT): string {
+  if (item.status === 'out_of_bounds') return ti('research.condState.outOfRange');
   if (item.id === 'roic_above_wacc' && (!hasWaccSource || item.comparison == null || !Number.isFinite(item.comparison))) {
-    return 'Pendiente: WACC sin datos';
+    return ti('research.condState.waccMissing');
   }
   if (item.id === 'fcf_margin' && item.value != null && item.value < -1) {
-    return 'No cumplida: margen FCF fuera de rango';
+    return ti('research.condState.fcfOutOfRange');
   }
   if (item.value == null || !Number.isFinite(item.value) || item.status.startsWith('blocked')) {
-    return 'Pendiente: falta evidencia';
+    return ti('research.condState.noEvidence');
   }
-  return 'Pendiente de contrastar';
+  return ti('research.condState.toVerify');
 }
 
 /** Ratings del motor de tesis que son un veredicto de valoración. */
