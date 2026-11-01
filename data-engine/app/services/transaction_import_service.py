@@ -251,6 +251,31 @@ def parse_flexible_date(raw_date: Any, *, month_first: bool = False) -> date:
     raise ValueError(f"Formato de fecha irreconocible: '{date_str}'")
 
 
+_CURRENCY_SYMBOLS = {"€": "EUR", "$": "USD", "US$": "USD", "USD$": "USD", "£": "GBP"}
+# Subunidades con minúscula significativa: «GBp» son peniques y en mayúsculas
+# («GBP») serían libras, cien veces más (GBX, ZAC e ILA ya son mayúsculas).
+_CASE_SENSITIVE_SUBUNITS = {"GBp"}
+
+
+def normalize_currency_cell(raw: Any) -> str:
+    """Código de divisa de la celda: ISO en mayúsculas, «GBp» intacto, «EUR» si vacía.
+
+    Los símbolos habituales («€», «$», «£») se leen como su código; cualquier
+    otro texto que no sea un código de tres letras es un error de la fila
+    (antes entraba tal cual y ningún tipo de cambio sabía convertirlo).
+    """
+    text = str(raw or "").strip()
+    if not text:
+        return "EUR"
+    if text in _CASE_SENSITIVE_SUBUNITS:
+        return text
+    if text.upper() in _CURRENCY_SYMBOLS:
+        return _CURRENCY_SYMBOLS[text.upper()]
+    if re.fullmatch(r"[A-Za-z]{3}", text):
+        return text.upper()
+    raise ValueError(f"Divisa no reconocida: '{text}' (se esperaba un código como EUR, USD o GBp)")
+
+
 def normalize_action(raw_action: Any) -> str:
     """Normaliza el tipo de acción a buy/sell/dividend/deposit/withdrawal."""
     act = _normalize_header(str(raw_action))
@@ -560,7 +585,12 @@ class TransactionImportService:
                     fees_num = float(abs(pf))
 
             # Divisa
-            currency_raw = get_val("currency").upper() or "EUR"
+            currency_raw = "EUR"
+            try:
+                currency_raw = normalize_currency_cell(get_val("currency"))
+            except ValueError as exc:
+                errors.append(RowValidationError(row_number=row_idx, field="currency", message=str(exc), raw_value=get_val("currency")))
+                row_has_error = True
 
             if not row_has_error:
                 row_key = (ticker_raw, parsed_date_str, parsed_action, qty_num, price_num, fees_num, currency_raw)
