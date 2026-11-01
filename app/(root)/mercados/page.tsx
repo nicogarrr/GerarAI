@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { getT } from '@/lib/i18n/server';
 import { getLiveMarkets } from '@/lib/actions/live-quotes.actions';
 import { LiveMarketsPanel } from '@/components/markets/LiveMarketsPanel';
 import { PageHeader } from '@/components/ui/page-header';
@@ -6,11 +7,10 @@ import { PageHeader } from '@/components/ui/page-header';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-    title: 'Mercados',
-    description:
-        'Índices, futuros, acciones del IBEX 35, materias primas y divisas con la hora real de cada cotización y su fuente.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getT();
+    return { title: t('markets.metaTitle'), description: t('markets.metaDescription') };
+}
 
 export default async function MercadosPage() {
     // Si Yahoo falla ahora, el panel arranca vacio y reintenta solo al minuto:

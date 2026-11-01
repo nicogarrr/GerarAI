@@ -1700,5 +1700,8 @@
     "reasonNotPublic": "la tesis no está publicada ni aprobada",
     "reasonNotPublishable": "el modelo no es publicable",
     "reasonUnverified": "no se pudo verificar que el modelo sea publicable"
-  }
+  },
+  "assistantMetaTitle": "Asistente de investigación",
+  "assistantMetaDescription": "La guía de investigación vive en el Cerebro.",
+  "sourcesMetaTitle": "Fuentes"
 }

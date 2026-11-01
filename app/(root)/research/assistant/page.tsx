@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
+import { getT } from '@/lib/i18n/server';
 import { AssistantRedirect } from '@/components/research/AssistantRedirect';
 
-export const metadata: Metadata = { title: 'Asistente de investigación', description: 'La guía de investigación vive en el Cerebro.' };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t('research.assistantMetaTitle'), description: t('research.assistantMetaDescription') };
+}
 
 const TICKER_RE = /^[A-Z0-9.\-]{1,20}$/;
 

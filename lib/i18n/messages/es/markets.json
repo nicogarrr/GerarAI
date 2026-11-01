@@ -23,5 +23,7 @@
     "refresh": "Actualizar ahora",
     "groupEmpty": "No hay datos disponibles ahora. Se reintenta cada minuto.",
     "footer": "Cada fila muestra la hora que informa el proveedor y su antigüedad al consultar la fuente (hora de Madrid); el panel se actualiza cada minuto. No son datos oficiales de mercado ni sirven para operar con garantías."
-  }
+  },
+  "metaTitle": "Mercados",
+  "metaDescription": "Índices, futuros, acciones del IBEX 35, materias primas y divisas con la hora real de cada cotización y su fuente."
 }

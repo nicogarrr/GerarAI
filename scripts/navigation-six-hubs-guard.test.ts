@@ -11,5 +11,5 @@ test('six primary destinations, contextual tools and a global alerts link',()=>{
  assert.equal(JSON.parse(source('lib/i18n/messages/es/shell.json')).header.alerts,'Alertas');
  assert.ok(source('app/(root)/layout.tsx').includes('<SectionNav />'));
  assert.ok(!source('components/layout/Sidebar.tsx').includes('FooterLink href="/security"'));
- assert.ok(source('app/(root)/discover/page.tsx').includes('Descubrir'));
+ assert.ok(source('app/(root)/discover/page.tsx').includes("t('discover.metaTitle')") && source('lib/i18n/messages/es/discover.json').includes('"Descubrir"'));
 });
