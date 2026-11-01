@@ -130,6 +130,17 @@
     "title": "Answer from the expert team",
     "note": "Each [n] is a data point an expert read for this question; you'll find it under «Sources».",
     "timedOut": "Did not answer in time: {experts}. The answer uses what the others did answer.",
+    "stance": {
+      "positive": "positive",
+      "negative": "negative",
+      "neutral": "neutral"
+    },
+    "confidence": {
+      "high": "high confidence",
+      "medium": "medium confidence",
+      "low": "low confidence"
+    },
+    "sourced": "{cited} of {total} claims sourced",
     "experts": {
       "fundamental": "Fundamentals",
       "valuation": "Valuation",

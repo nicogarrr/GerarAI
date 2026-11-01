@@ -110,6 +110,31 @@ def _source_label(src: dict[str, Any], lang: str = "es") -> str:
     return " · ".join(p for p in parts if p)
 
 
+def expert_confidence(cited: int, dropped: int) -> str | None:
+    """Confianza de un experto SOLO a partir de sus cuentas (no la dice el modelo):
+    alta = ≥3 afirmaciones con fuente y ≥80 % de lo que dijo; media = alguna con
+    fuente y ≥50 %; baja = el resto con alguna; None = ninguna con fuente."""
+    if cited <= 0:
+        return None
+    share = cited / (cited + max(0, dropped))
+    if cited >= 3 and share >= 0.8:
+        return "high"
+    return "medium" if share >= 0.5 else "low"
+
+
+def _expert_summary(report: Any) -> dict[str, Any]:
+    cited = sum(1 for c in report.claims if not c.reason)
+    dropped = len(report.dropped) + sum(1 for c in report.claims if c.reason)
+    return {
+        "expert": report.expert,
+        "status": report.status,
+        "stance": report.stance if cited else "neutral",
+        "cited": cited,
+        "dropped": dropped,
+        "confidence": expert_confidence(cited, dropped),
+    }
+
+
 def render(result: TeamResult, lang: str) -> ChatResponse | None:
     """Secciones por experto + fuentes numeradas. None si no queda ninguna afirmación válida."""
     t = _LABELS.get(lang, _LABELS["es"])
@@ -178,6 +203,8 @@ def render(result: TeamResult, lang: str) -> ChatResponse | None:
             "dropped": sum(len(r.dropped) for r in result.reports),
             "conflicts": len(result.conflicts),
             "judge": (result.verdict or {}).get("source"),
+            # Resumen compacto por experto (postura, afirmaciones con fuente, confianza) para el Cerebro.
+            "experts": [_expert_summary(r) for r in result.reports],
         }},
     )
 

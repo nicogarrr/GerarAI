@@ -130,6 +130,17 @@
     "title": "Respuesta del equipo de expertos",
     "note": "Cada [n] es un dato que leyó un experto en esta consulta; lo tienes en «Fuentes».",
     "timedOut": "No respondió a tiempo: {experts}. La respuesta usa lo que sí contestaron los demás.",
+    "stance": {
+      "positive": "a favor",
+      "negative": "en contra",
+      "neutral": "neutral"
+    },
+    "confidence": {
+      "high": "confianza alta",
+      "medium": "confianza media",
+      "low": "confianza baja"
+    },
+    "sourced": "{cited} de {total} afirmaciones con fuente",
     "experts": {
       "fundamental": "Fundamental",
       "valuation": "Valoración",
