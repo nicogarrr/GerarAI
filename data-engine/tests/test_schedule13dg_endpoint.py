@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from app.api.routes.ownership import schedule_13dg_sync
 from app.core.database import SessionLocal, init_db
-from app.models.entities import Company, Position, WatchItem
+from app.models.entities import Company, Position, Schedule13DGFiling, WatchItem
 from app.services import schedule13dg_monitor
 
 
@@ -17,6 +17,10 @@ def _db():
     db = SessionLocal()
     db.query(WatchItem).delete()
     db.query(Position).delete()
+    # Other suites persist ZZT filings: an empty-read test must own its fixture.
+    db.query(Schedule13DGFiling).filter(
+        Schedule13DGFiling.issuer_ticker.in_(["ZZT", "PFT"])
+    ).delete()
     db.query(Company).filter(Company.ticker.in_(["ZZT", "PFT"])).delete()
     db.commit()
     return db

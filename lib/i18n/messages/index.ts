@@ -15,6 +15,8 @@
  */
 import type { Locale } from '../locale.ts';
 
+import compactEn from './en.compact.json' with { type: 'json' };
+
 import alerts__es from './es/alerts.json' with { type: 'json' };
 import auth__es from './es/auth.json' with { type: 'json' };
 import bottlenecks__es from './es/bottlenecks.json' with { type: 'json' };
@@ -58,48 +60,6 @@ import ui__es from './es/ui.json' with { type: 'json' };
 import watchlist__es from './es/watchlist.json' with { type: 'json' };
 import workProducts__es from './es/workProducts.json' with { type: 'json' };
 
-import alerts__en from './en/alerts.json' with { type: 'json' };
-import auth__en from './en/auth.json' with { type: 'json' };
-import bottlenecks__en from './en/bottlenecks.json' with { type: 'json' };
-import brain__en from './en/brain.json' with { type: 'json' };
-import calendar__en from './en/calendar.json' with { type: 'json' };
-import chat__en from './en/chat.json' with { type: 'json' };
-import common__en from './en/common.json' with { type: 'json' };
-import corporateActions__en from './en/corporateActions.json' with { type: 'json' };
-import data__en from './en/data.json' with { type: 'json' };
-import discover__en from './en/discover.json' with { type: 'json' };
-import emails__en from './en/emails.json' with { type: 'json' };
-import errors__en from './en/errors.json' with { type: 'json' };
-import export__en from './en/export.json' with { type: 'json' };
-import help__en from './en/help.json' with { type: 'json' };
-import home__en from './en/home.json' with { type: 'json' };
-import insider__en from './en/insider.json' with { type: 'json' };
-import investors__en from './en/investors.json' with { type: 'json' };
-import knowledge__en from './en/knowledge.json' with { type: 'json' };
-import knowledgeGraph__en from './en/knowledgeGraph.json' with { type: 'json' };
-import landing__en from './en/landing.json' with { type: 'json' };
-import markets__en from './en/markets.json' with { type: 'json' };
-import movers__en from './en/movers.json' with { type: 'json' };
-import nav__en from './en/nav.json' with { type: 'json' };
-import ownership__en from './en/ownership.json' with { type: 'json' };
-import paperTrading__en from './en/paperTrading.json' with { type: 'json' };
-import plan__en from './en/plan.json' with { type: 'json' };
-import portfolio__en from './en/portfolio.json' with { type: 'json' };
-import propicks__en from './en/propicks.json' with { type: 'json' };
-import research__en from './en/research.json' with { type: 'json' };
-import risk__en from './en/risk.json' with { type: 'json' };
-import screener__en from './en/screener.json' with { type: 'json' };
-import search__en from './en/search.json' with { type: 'json' };
-import security__en from './en/security.json' with { type: 'json' };
-import settings__en from './en/settings.json' with { type: 'json' };
-import shell__en from './en/shell.json' with { type: 'json' };
-import signals__en from './en/signals.json' with { type: 'json' };
-import stocks__en from './en/stocks.json' with { type: 'json' };
-import taxes__en from './en/taxes.json' with { type: 'json' };
-import themes__en from './en/themes.json' with { type: 'json' };
-import ui__en from './en/ui.json' with { type: 'json' };
-import watchlist__en from './en/watchlist.json' with { type: 'json' };
-import workProducts__en from './en/workProducts.json' with { type: 'json' };
 
 /** Áreas registradas (el orden es el del contrato; no lo uses para pintar). */
 export const I18N_AREAS = ['alerts', 'auth', 'bottlenecks', 'brain', 'calendar', 'chat', 'common', 'corporateActions', 'data', 'discover', 'emails', 'errors', 'export', 'help', 'home', 'insider', 'investors', 'knowledge', 'knowledgeGraph', 'landing', 'markets', 'movers', 'nav', 'ownership', 'paperTrading', 'plan', 'portfolio', 'propicks', 'research', 'risk', 'screener', 'search', 'security', 'settings', 'shell', 'signals', 'stocks', 'taxes', 'themes', 'ui', 'watchlist', 'workProducts'] as const;
@@ -152,52 +112,25 @@ const es = {
 /** Diccionario del locale por defecto y referencia de claves. */
 export type Messages = typeof es;
 
-// Las áreas en pendientes son {} hasta que su carril las traduzca; el guard
-// check:i18n exige paridad exacta de claves por área en cuanto tiene contenido.
-const en = {
-    alerts: alerts__en,
-    auth: auth__en,
-    bottlenecks: bottlenecks__en,
-    brain: brain__en,
-    calendar: calendar__en,
-    chat: chat__en,
-    common: common__en,
-    corporateActions: corporateActions__en,
-    data: data__en,
-    discover: discover__en,
-    emails: emails__en,
-    errors: errors__en,
-    export: export__en,
-    help: help__en,
-    home: home__en,
-    insider: insider__en,
-    investors: investors__en,
-    knowledge: knowledge__en,
-    knowledgeGraph: knowledgeGraph__en,
-    landing: landing__en,
-    markets: markets__en,
-    movers: movers__en,
-    nav: nav__en,
-    ownership: ownership__en,
-    paperTrading: paperTrading__en,
-    plan: plan__en,
-    portfolio: portfolio__en,
-    propicks: propicks__en,
-    research: research__en,
-    risk: risk__en,
-    screener: screener__en,
-    search: search__en,
-    security: security__en,
-    settings: settings__en,
-    shell: shell__en,
-    signals: signals__en,
-    stocks: stocks__en,
-    taxes: taxes__en,
-    themes: themes__en,
-    ui: ui__en,
-    watchlist: watchlist__en,
-    workProducts: workProducts__en,
-} as Messages;
+// English shares Spanish's key structure: ship its values only, without a
+// second copy of every key. Source JSON remains readable for translators.
+function expandEnglish(reference: unknown, values: (string | null)[]): unknown {
+  let index = 0;
+  function visit(node: unknown): unknown {
+    if (typeof node === 'string') {
+      if (index >= values.length) throw new Error('Truncated compact English dictionary');
+      return values[index++] ?? undefined;
+    }
+    return Object.fromEntries(Object.entries(node as Record<string, unknown>)
+      .map(([key, value]) => [key, visit(value)]));
+  }
+  const expanded = visit(reference);
+  if (index !== values.length) throw new Error('Invalid compact English dictionary');
+  return expanded;
+}
+const en = Object.fromEntries(Object.entries(es).map(([area, reference]) => [
+  area, expandEnglish(reference, compactEn[area as keyof typeof compactEn]),
+])) as Messages;
 
 export const messages: Record<Locale, Messages> = { es, en };
 
