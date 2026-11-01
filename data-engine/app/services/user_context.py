@@ -53,6 +53,7 @@ from app.models import (
     ThesisVersion,
     WatchItem,
 )
+from app.services.portfolio_ledger_service import trade_price_fallbacks
 from app.services.price_units import listing_price
 from app.valuation.currency import normalize_currency
 
@@ -351,9 +352,13 @@ def _portfolio_block(
     if len(bases) == 1:
         base = next(iter(bases)) or base
     single_base = len(bases) == 1
+    # Sin cotización real el precio es el de la última operación (auditoría A3):
+    # su P&L latente no está medido, ni por posición ni en el total.
+    quote_missing = trade_price_fallbacks(db, [pos for pos, _ in rows], tenant_id=tenant)
     total = sum(value_of(pos) for pos, _ in rows)
-    total_cost = sum(_f(pos.cost_basis_base) or 0.0 for pos, _ in rows)
-    total_pnl = sum(_f(pos.unrealized_pnl_base) or 0.0 for pos, _ in rows)
+    known = [pos for pos, _ in rows if pos.company_id not in quote_missing]
+    total_cost = sum(_f(pos.cost_basis_base) or 0.0 for pos in known)
+    total_pnl = sum(_f(pos.unrealized_pnl_base) or 0.0 for pos in known)
     ordered = sorted(rows, key=lambda row: value_of(row[0]), reverse=True)
     as_of = min(pos.as_of for pos, _ in rows)
     header = f"- {len(rows)} posiciones; divisa base {base or 'sin fijar'}; datos a {_day(as_of)}."
@@ -371,6 +376,8 @@ def _portfolio_block(
         pnl = _f(pos.unrealized_pnl_base)
         if pnl is None:
             pnl = _f(pos.unrealized_pnl)
+        if pos.company_id in quote_missing:
+            pnl = None
         pnl_pct = pnl / cost if pnl is not None and cost else None
         dca, level = _dca_text(levels, comp.ticker, today)
         parts = [f"- {comp.ticker} ({_short(comp.name, 40)})"]
@@ -385,6 +392,8 @@ def _portfolio_block(
         price = _f(pos.market_price)
         if price:
             parts.append(f"precio {num_es(price)} {pos.currency}")
+        if pos.company_id in quote_missing:
+            parts.append("sin cotización real (precio de su última operación)")
         if pos.valuation_hold_reason:
             parts.append("valoración en suspenso")
         parts.append(dca)
