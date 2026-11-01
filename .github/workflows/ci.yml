@@ -362,10 +362,9 @@ jobs:
         if: ${{ steps.discover.outputs.present != '' }}
         with:
           python-version: "3.12"
-      # uv + lock congelado (mismo patron que los demas jobs): pip install
-      # media ~1 min 36 s en CI incluso con cache de pip; uv sync con cache
-      # caliente ~1 s. dep-parity garantiza requirements.txt ==
-      # [project].dependencies. El venv entra en PATH para que los pasos
+      # uv usa el arbol congelado, no los rangos resueltos por pip.
+      # dep-parity no prueba igualdad de versiones transitivas.
+      # El venv entra en PATH para que los pasos
       # siguientes (`python scripts/run_*.py`, precarga del modelo) lo usen
       # sin tocar sus comandos.
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
@@ -725,9 +724,8 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-      # uv + lock congelado: pip install media ~1 min 36 s en CI incluso con
-      # cache de pip; uv sync con cache caliente ~1 s. dep-parity garantiza
-      # requirements.txt == [project].dependencies. El venv entra en PATH:
+      # uv usa el arbol congelado, no los rangos resueltos por pip.
+      # El venv entra en PATH:
       # `python -m alembic` y el webServer de playwright.config.ts
       # (PYTHON_BIN ?? "python") usan el venv sin tocar sus comandos.
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
@@ -785,12 +783,11 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-      # uv + lock congelado (mismo patron que los demas jobs del repo):
-      # `pip install -r requirements.txt` media 1 min 36 s en CI (run
-      # 41101995078) incluso con cache de pip (la cache ahorra descargas, no
-      # la instalacion); uv sync con cache caliente ~1 s (medido en local).
-      # dep-parity garantiza requirements.txt == [project].dependencies, asi
-      # que el conjunto instalado es identico.
+      # uv instala el arbol congelado que validan backend/coverage.
+      # requirements.txt contiene rangos: pip puede resolver otro arbol.
+      # dep-parity compara dependencias directas, no versiones transitivas.
+      # Medicion local reportada: pip caliente 7s / uv 0.85s; no promete
+      # ese ahorro en CI, donde cache y disco son distintos.
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           version: "0.12.5"
