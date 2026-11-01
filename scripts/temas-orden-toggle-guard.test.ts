@@ -14,12 +14,14 @@ import { readFileSync } from 'node:fs';
 
 const toggle = readFileSync('app/(root)/temas/_components/ThemeOrderToggle.tsx', 'utf8');
 const pagina = readFileSync('app/(root)/temas/page.tsx', 'utf8');
+const toggleEs = JSON.parse(readFileSync('lib/i18n/messages/es/themes.json', 'utf8')).toggle;
 
 describe('Temas: el conmutador YTD/1M es un grupo de botones con estado', () => {
   it('botones reales con aria-pressed en un grupo nombrado', () => {
     assert.match(toggle, /<button\s/);
     assert.match(toggle, /aria-pressed=\{order === target\}/);
-    assert.match(toggle, /role="group"\s+aria-label="Ordenar temas por rentabilidad"/);
+    assert.match(toggle, /role="group"\s+aria-label=\{t\('themes\.toggle\.ariaLabel'\)\}/);
+    assert.equal(toggleEs.ariaLabel, 'Ordenar temas por rentabilidad');
   });
 
   it('el orden sigue en la URL sin perder el scroll', () => {

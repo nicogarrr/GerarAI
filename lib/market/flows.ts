@@ -1,3 +1,6 @@
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { DEFAULT_LOCALE, intlLocale, type Locale } from '../i18n/locale.ts';
+
 /**
  * Flujo de dinero por tema (quién gasta → a dónde va → quién cobra).
  *
@@ -83,12 +86,26 @@ export function flowSupplierKey(
  * formato español); otras divisas en es-ES con el código explícito (nunca se
  * asume USD cuando la fila dice otra cosa).
  */
-export function formatFlowAmount(value: number | null, unit = 'USD', fallback = 'N/D'): string {
+export function formatFlowAmount(
+  value: number | null,
+  unit = 'USD',
+  fallback = 'N/D',
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   if (value === null || !Number.isFinite(value)) return fallback;
   const abs = Math.abs(value);
   const scaled = abs >= 1e9 ? value / 1e9 : abs >= 1e6 ? value / 1e6 : value;
   const suffix = abs >= 1e9 ? 'B' : abs >= 1e6 ? 'M' : '';
   const digits = abs >= 1e6 ? 1 : 0;
+  if (locale === 'en') {
+    // English: «$35.7B» / «12.3M EUR» (inglés corriente, sin «mil M»).
+    if (unit === 'USD') {
+      const usd = new Intl.NumberFormat(intlLocale(locale), { style: 'currency', currency: 'USD', maximumFractionDigits: digits });
+      return `${usd.format(scaled)}${suffix}`;
+    }
+    const number = scaled.toLocaleString(intlLocale(locale), { maximumFractionDigits: digits });
+    return suffix ? `${number}${suffix} ${unit}` : `${number} ${unit}`;
+  }
   if (unit === 'USD') {
     const usdSuffix = abs >= 1e9 ? ' mil M' : abs >= 1e6 ? ' M' : '';
     return `${scaled.toLocaleString('es-ES', { maximumFractionDigits: digits, useGrouping: 'always' } as Intl.NumberFormatOptions)}${usdSuffix}\u00a0US$`;

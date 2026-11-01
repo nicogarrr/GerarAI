@@ -1,6 +1,7 @@
 'use client';
 
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
+import { useT } from '@/lib/i18n/client';
 
 type ThemeBrainButtonProps = {
   /** Pregunta de análisis ya escrita (con los datos actuales del tema). */
@@ -12,6 +13,7 @@ type ThemeBrainButtonProps = {
  * tema ya escrita; el usuario solo la envía (puede editarla antes).
  */
 export function ThemeBrainButton({ question }: ThemeBrainButtonProps) {
+  const t = useT();
   return (
     <button
       type="button"
@@ -21,7 +23,7 @@ export function ThemeBrainButton({ question }: ThemeBrainButtonProps) {
       className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-800 px-3 text-xs font-semibold text-teal-300 transition hover:border-teal-400/40 hover:text-teal-200"
     >
       <BrainGlassesIcon className="h-4 w-4" />
-      Analizar el tema
+      {t('themes.brain.button')}
     </button>
   );
 }

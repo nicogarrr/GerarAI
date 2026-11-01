@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 
+import { useT } from '@/lib/i18n/client';
 import type { ThemeOrder } from '@/lib/market/themes';
 
 /**
@@ -12,6 +13,7 @@ import type { ThemeOrder } from '@/lib/market/themes';
  */
 export function ThemeOrderToggle({ order }: { order: ThemeOrder }) {
     const router = useRouter();
+    const t = useT();
 
     const button = (target: ThemeOrder, label: string) => (
         <button
@@ -33,7 +35,7 @@ export function ThemeOrderToggle({ order }: { order: ThemeOrder }) {
     );
 
     return (
-        <div role="group" aria-label="Ordenar temas por rentabilidad" className="flex gap-1">
+        <div role="group" aria-label={t('themes.toggle.ariaLabel')} className="flex gap-1">
             {button('ytd', 'YTD')}
             {button('1m', '1M')}
         </div>

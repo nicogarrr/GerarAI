@@ -40,5 +40,41 @@
       "labels": "Caliente: los 3 primeros del orden elegido. Giro: YTD y 1M con signo contrario y 1M relevante; el giro sustituye a Caliente.",
       "contributes": "Aporta: peso × rentabilidad del valor, en puntos porcentuales."
     }
+  },
+  "flow": {
+    "unavailable": "Flujo de dinero N/D: el backend declara este flujo pero no lo ha devuelto (fuente no disponible o error temporal). Sin importes en lugar de inventarlos.",
+    "ariaLabel": "Flujo de dinero: {name}",
+    "title": "Flujo de dinero · {name}",
+    "spenders": "Quién gasta · reportado",
+    "total": "en total · {note}",
+    "destinations": "A dónde va",
+    "thirdParty": " · estimación de terceros",
+    "reported": " · reportado",
+    "suppliers": "Quién cobra",
+    "exposure": "Tu exposición: ",
+    "inPortfolio": "en cartera",
+    "inWatchlist": "en seguimiento"
+  },
+  "fundamentals": {
+    "ariaLabel": "Fundamentales: {title}",
+    "title": "{title} · fundamentales",
+    "checked": "Instantánea revisada el {date} · no es dato en vivo",
+    "periodCut": "{period} · corte {vintage}",
+    "officialSource": "Fuente oficial",
+    "monthly": "{value} · {unit} · {label} · vintage {vintage}",
+    "xlsSource": "{name} · XLS fuente",
+    "kindScenario": "Escenario atribuido · ",
+    "kindOfficialEstimate": "Estimación oficial · ",
+    "kindReported": "Reportado · ",
+    "cutPublished": "{unit} · corte {vintage} · publicado {published}",
+    "worldBankTerms": "Condiciones de uso del Banco Mundial",
+    "sourceMethod": "{name} · fuente y metodología",
+    "scope": "Alcance y límites"
+  },
+  "toggle": {
+    "ariaLabel": "Ordenar temas por rentabilidad"
+  },
+  "brain": {
+    "button": "Analizar el tema"
   }
 }

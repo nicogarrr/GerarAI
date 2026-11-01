@@ -2,7 +2,8 @@ import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
 import { flowSupplierKey, formatFlowAmount, type FlowSource, type MoneyFlow } from '@/lib/market/flows';
-import { NA } from '@/lib/format';
+import { naFor } from '@/lib/format';
+import { getLocale, getT } from '@/lib/i18n/server';
 
 type ThemeFlowProps = {
   flow: MoneyFlow;
@@ -42,16 +43,18 @@ function SourceLink({ source }: { source: FlowSource }) {
  * detalle no llega (fuente caida, 500, timeout): N/D visible con la causa,
  * nunca ausencia silenciosa ni importes inventados.
  */
-export function ThemeFlowUnavailable() {
+export async function ThemeFlowUnavailable() {
+  const t = await getT();
   return (
     <p className="mt-4 border-t border-gray-800 pt-3 text-xs text-gray-500">
-      Flujo de dinero N/D: el backend declara este flujo pero no lo ha devuelto (fuente no disponible o
-      error temporal). Sin importes en lugar de inventarlos.
+      {t('themes.flow.unavailable')}
     </p>
   );
 }
 
-export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
+export async function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
+  const NA = naFor(locale);
   const maxDestination = Math.max(
     ...flow.destinations.map((item) => item.amount ?? 0),
     0,
@@ -68,9 +71,9 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
   );
 
   return (
-    <section aria-label={`Flujo de dinero: ${flow.name}`} className="mt-4 border-t border-gray-800 pt-3">
+    <section aria-label={t('themes.flow.ariaLabel', { name: flow.name })} className="mt-4 border-t border-gray-800 pt-3">
       <h3 className="text-sm font-semibold text-gray-100">
-        Flujo de dinero · {flow.name}
+        {t('themes.flow.title', { name: flow.name })}
       </h3>
       <p className="mt-0.5 text-[11px] text-gray-500">{flow.tagline}</p>
       {flow.notes.map((note) => (
@@ -81,7 +84,7 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
 
       {/* 1 · Quién gasta: solo cifras reportadas con fuente oficial */}
       <h4 className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
-        Quién gasta · reportado
+        {t('themes.flow.spenders')}
       </h4>
       <ul className="mt-2 space-y-2">
         {flow.spenders.map((spender) => (
@@ -97,7 +100,7 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
                 )}
               </p>
               <p className="text-sm font-bold tabular-nums text-teal-300">
-                {spender.amount === null ? NA : formatFlowAmount(spender.amount, spender.unit)}
+                {spender.amount === null ? NA : formatFlowAmount(spender.amount, spender.unit, NA, locale)}
                 {spender.period_label ? (
                   <span className="ml-1 text-[11px] font-normal text-gray-500">{spender.period_label}</span>
                 ) : null}
@@ -112,7 +115,7 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
             {spender.note ? <p className="mt-1 text-[11px] text-gray-500">{spender.note}</p> : null}
             {spender.extra_amount !== null && spender.extra_label ? (
               <p className="mt-1 text-[11px] text-gray-400">
-                + {formatFlowAmount(spender.extra_amount, spender.unit)} {spender.extra_label}
+                + {formatFlowAmount(spender.extra_amount, spender.unit, NA, locale)} {spender.extra_label}
                 {spender.extra_source ? (
                   <>
                     {' · '}
@@ -127,9 +130,9 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
       {flow.spenders_total ? (
         <p className="mt-2 text-xs text-gray-400">
           <span className="font-semibold tabular-nums text-teal-300">
-            {formatFlowAmount(flow.spenders_total.amount, flow.spenders_total.unit)}
+            {formatFlowAmount(flow.spenders_total.amount, flow.spenders_total.unit, NA, locale)}
           </span>{' '}
-          en total · {flow.spenders_total.note}
+          {t('themes.flow.total', { note: flow.spenders_total.note })}
         </p>
       ) : null}
 
@@ -137,7 +140,8 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
       {flow.destinations.length > 0 ? (
         <>
           <h4 className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
-            A dónde va{attributed ? ' · estimación de terceros' : ' · reportado'}
+            {t('themes.flow.destinations')}
+            {attributed ? t('themes.flow.thirdParty') : t('themes.flow.reported')}
           </h4>
           {flow.destinations_note ? (
             <p className="mt-1 text-[11px] text-gray-500">{flow.destinations_note}</p>
@@ -165,7 +169,7 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
                         thirdParty ? 'text-amber-300' : 'text-teal-300'
                       }`}
                     >
-                      {formatFlowAmount(destination.amount, destination.unit)}
+                      {formatFlowAmount(destination.amount, destination.unit, NA, locale)}
                     </span>
                   </div>
                   <p className="mt-0.5 pl-1 text-[11px] text-gray-500">
@@ -183,7 +187,7 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
       {flow.suppliers.length > 0 ? (
         <>
           <h4 className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
-            Quién cobra
+            {t('themes.flow.suppliers')}
           </h4>
           {flow.suppliers_note ? (
             <p className="mt-1 text-[11px] text-gray-500">{flow.suppliers_note}</p>
@@ -204,7 +208,7 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
                   )}
                   {supplier.amount !== null ? (
                     <span className="text-xs font-bold tabular-nums text-teal-300">
-                      {formatFlowAmount(supplier.amount, supplier.unit)}
+                      {formatFlowAmount(supplier.amount, supplier.unit, NA, locale)}
                     </span>
                   ) : null}
                 </div>
@@ -227,10 +231,10 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
       {/* 4 · Tu exposición: solo si el dato llegó; si no, la sección no existe */}
       {!holdings.unavailable && (inPortfolio.length > 0 || inWatchlist.length > 0) ? (
         <p className="mt-4 rounded-lg border border-teal-400/25 bg-teal-400/10 px-3 py-2 text-xs text-gray-200">
-          <span className="font-semibold text-gray-100">Tu exposición: </span>
+          <span className="font-semibold text-gray-100">{t('themes.flow.exposure')}</span>
           {inPortfolio.length > 0 ? (
             <>
-              en cartera{' '}
+              {t('themes.flow.inPortfolio')}{' '}
               {inPortfolio.map((ticker, index) => (
                 <span key={ticker}>
                   {index > 0 ? ', ' : ''}
@@ -244,7 +248,7 @@ export function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
           {inPortfolio.length > 0 && inWatchlist.length > 0 ? ' · ' : ''}
           {inWatchlist.length > 0 ? (
             <>
-              en seguimiento{' '}
+              {t('themes.flow.inWatchlist')}{' '}
               {inWatchlist.map((ticker, index) => (
                 <span key={ticker}>
                   {index > 0 ? ', ' : ''}

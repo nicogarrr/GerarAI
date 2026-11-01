@@ -1,6 +1,6 @@
 'use client';
 
-import { formatNumber as formatNumberFor, isValidCurrencyCode } from '@/lib/format';
+import { formatNumber as formatNumberFor, isValidCurrencyCode, naFor } from '@/lib/format';
 import {
     DCF_CANDIDATE_LIMIT,
     dcfScopeNote,
@@ -543,7 +543,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                             <div className="flex items-center justify-between gap-3 text-sm">
                                 <span className="text-gray-400">{t('home.portfolio.gainLoss')}</span>
                                 <span className={`font-semibold ${insight.kind !== 'movement' ? 'text-gray-500' : portfolioSummary.totalGainPercent >= 0 ? 'text-good' : 'text-bad'}`}>
-                                    {insight.kind !== 'movement' ? 'N/D' : formatPercent(portfolioSummary.totalGainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
+                                    {insight.kind !== 'movement' ? naFor(locale) : formatPercent(portfolioSummary.totalGainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
                                 </span>
                             </div>
                             <p className="text-xs text-gray-400">{t('home.portfolio.weightsNote')}</p>
