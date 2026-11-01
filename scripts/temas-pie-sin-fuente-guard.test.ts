@@ -17,7 +17,9 @@ describe('Temas: pie sin etiqueta de fuente', () => {
     assert.doesNotMatch(pie, /data\.source/);
   });
   it('el pie conserva frescura, metodo y avisos de calidad del dato', () => {
-    const pie = pagina.slice(pagina.indexOf('<footer'), pagina.indexOf('</footer>'));
+    // Los avisos del pie viven en es/themes.json: solo se añade la sección de la página.
+    const pie = pagina.slice(pagina.indexOf('<footer'), pagina.indexOf('</footer>'))
+      + JSON.stringify(JSON.parse(readFileSync('lib/i18n/messages/es/themes.json', 'utf8')).page);
     assert.match(pie, /[Ii]ntradía/);
     assert.match(pie, /formatMarketDate\(data\.as_of\)/);
     assert.match(pie, /data\.method/);

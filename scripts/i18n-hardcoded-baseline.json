@@ -1,5 +1,4 @@
 {
-  "app/(root)/cuellos/page.tsx": 25,
   "app/(root)/error.tsx": 4,
   "app/(root)/insider/page.tsx": 1,
   "app/(root)/inversores/_components/Avatar.tsx": 1,
@@ -29,7 +28,6 @@
   "app/(root)/temas/_components/ThemeFlow.tsx": 6,
   "app/(root)/temas/_components/ThemeFundamentals.tsx": 5,
   "app/(root)/temas/_components/ThemeOrderToggle.tsx": 2,
-  "app/(root)/temas/page.tsx": 18,
   "app/api/[...rest]/route.ts": 1,
   "app/api/admin/approvals/decide/route.ts": 39,
   "app/api/admin/approvals/route.ts": 10,

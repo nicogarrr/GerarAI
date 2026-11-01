@@ -12,7 +12,8 @@ const pagina = readFileSync('app/(root)/temas/page.tsx', 'utf8');
 describe('Temas: paginacion y objetivos tactiles', () => {
   it('la pagina corta la lista con paginateThemes y pinta nav con enlaces prev/next', () => {
     assert.match(pagina, /paginateThemes\(sortedThemes, requestedPage\)/);
-    assert.match(pagina, /aria-label="Paginación de temas"/);
+    assert.match(pagina, /aria-label=\{t\('themes\.page\.pagerAria'\)\}/);
+    assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/themes.json', 'utf8')).page.pagerAria, 'Paginación de temas');
     assert.match(pagina, /rel="prev"/);
     assert.match(pagina, /rel="next"/);
   });

@@ -96,11 +96,16 @@ describe('página /temas', () => {
     // sigue viajando en la API). Frescura y método se conservan.
     assert.ok(!page.includes('data.source'));
     assert.ok(page.includes('data.method'));
-    assert.ok(page.includes("data.intraday ? 'Intradía' : 'Cierre'"));
+    // Intradía/Cierre viven en es/themes.json (page.intraday / page.close).
+    assert.ok(page.includes("data.intraday ? 'themes.page.intraday' : 'themes.page.close'"));
+    const esPage = JSON.parse(source('lib/i18n/messages/es/themes.json')).page;
+    assert.equal(esPage.intraday, 'Intradía del {date}');
+    assert.equal(esPage.close, 'Cierre del {date}');
   });
 
   it('QA 19: sin as_of el pie lo declara, no pinta «del —»', () => {
-    assert.ok(page.includes('Sin fecha de datos disponible'));
+    assert.ok(page.includes("t('themes.page.noDate')"));
+    assert.equal(JSON.parse(source('lib/i18n/messages/es/themes.json')).page.noDate, 'Sin fecha de datos disponible');
     assert.ok(page.includes('data.as_of'));
     assert.ok(!page.includes('del {formatMarketDate(data.as_of)}'));
   });

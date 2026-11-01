@@ -14,13 +14,14 @@ import {
 } from '@/lib/actions/bottlenecks.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { BOTTLENECK_TO_THEMES } from '@/lib/market/theme-bottleneck-map';
-import { NA, formatUserDate } from '@/lib/format';
+import { NA, type Formatters } from '@/lib/format';
+import { getFormat, getT } from '@/lib/i18n/server';
+import type { TranslateFn } from '@/lib/i18n/translate';
 
-export const metadata: Metadata = {
-  title: 'Cuellos de botella',
-  description:
-    'Escasez detectada en las fuentes guardadas y candidatos de empresas inferidos por el modelo, siempre etiquetados.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t('bottlenecks.page.metaTitle'), description: t('bottlenecks.page.metaDescription') };
+}
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -35,7 +36,7 @@ function parsePage(raw: string | string[] | undefined): number {
   return Number.isInteger(page) && page >= 1 ? page : 1;
 }
 
-function SignalCard({ signal, minSources }: { signal: Awaited<ReturnType<typeof getBottlenecks>>['signals'][number]; minSources: number }) {
+function SignalCard({ signal, minSources, t, fmt }: { signal: Awaited<ReturnType<typeof getBottlenecks>>['signals'][number]; minSources: number; t: TranslateFn; fmt: Formatters }) {
   const detected = signal.status === 'detectado';
   return (
     <li className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
@@ -43,25 +44,25 @@ function SignalCard({ signal, minSources }: { signal: Awaited<ReturnType<typeof 
         <h2 className="text-sm font-semibold text-gray-100">{signal.theme}</h2>
         {detected ? (
           <span className="rounded bg-teal-400/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-teal-300">
-            Detectado
+            {t('bottlenecks.page.detected')}
           </span>
         ) : (
           <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] font-bold uppercase text-gray-500">
-            {NA}
+            {fmt.na}
           </span>
         )}
       </div>
       <p className="mt-3 text-xs text-gray-400">
         {detected
-          ? `${signal.n_sources} fuentes independientes · última señal ${formatUserDate(signal.last_seen)}`
+          ? t('bottlenecks.page.sourcesDetected', { n: signal.n_sources, date: fmt.formatUserDate(signal.last_seen) })
           : /* Puede haber evidencias enlazables y aun asi N/D: el umbral cuenta
                FUENTES independientes, no evidencias (Tester 6: 2 evidencias de
                un mismo editor no detectan). El contador lo hace visible. */
-            `${signal.n_sources} de ${minSources} fuentes independientes · sin evidencia suficiente`}
+            t('bottlenecks.page.sourcesShort', { n: signal.n_sources, min: minSources })}
       </p>
       {signal.evidence?.length ? (
         <details className="mt-3 text-xs">
-          <summary className="min-h-11 cursor-pointer py-3 text-teal-300">Ver evidencias guardadas ({signal.evidence.length})</summary>
+          <summary className="min-h-11 cursor-pointer py-3 text-teal-300">{t('bottlenecks.page.showEvidence', { n: signal.evidence.length })}</summary>
           <ul className="mt-2 space-y-2">
             {signal.evidence.map((item) => (
               <li key={item.id}>
@@ -69,15 +70,15 @@ function SignalCard({ signal, minSources }: { signal: Awaited<ReturnType<typeof 
                   <a className="inline-flex min-h-11 min-w-0 items-center break-all text-teal-300 underline" href={item.url} rel="noopener noreferrer" target="_blank">
                     {item.title ?? item.url}
                   </a>
-                ) : <span className="text-gray-500">{item.title ?? 'Evidencia no disponible'} · sin enlace verificable</span>}
+                ) : <span className="text-gray-500">{item.title ?? t('bottlenecks.page.evidenceUnavailable')} · {t('bottlenecks.page.noVerifiableLink')}</span>}
               </li>
             ))}
           </ul>
         </details>
-      ) : detected ? <p className="mt-2 text-xs text-gray-500">Evidencias guardadas no disponibles para consultar.</p> : null}
+      ) : detected ? <p className="mt-2 text-xs text-gray-500">{t('bottlenecks.page.evidenceNotQueryable')}</p> : null}
       {BOTTLENECK_TO_THEMES[signal.theme]?.length ? (
         <p className="mt-3 border-t border-gray-800 pt-2 text-xs text-gray-400">
-          Temas relacionados:{' '}
+          {t('bottlenecks.page.relatedThemes')}{' '}
           <Link className="inline-flex min-h-11 min-w-11 items-center text-teal-300 underline hover:text-teal-200" href="/temas">
             {BOTTLENECK_TO_THEMES[signal.theme].map((theme) => theme.name).join(' · ')}
           </Link>
@@ -87,7 +88,7 @@ function SignalCard({ signal, minSources }: { signal: Awaited<ReturnType<typeof 
   );
 }
 
-function DiscoveryCard({ item }: { item: DiscoveryView }) {
+function DiscoveryCard({ item, t, fmt }: { item: DiscoveryView; t: TranslateFn; fmt: Formatters }) {
   const known = item.ticker !== NA;
   return (
     <li className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
@@ -100,7 +101,7 @@ function DiscoveryCard({ item }: { item: DiscoveryView }) {
             {item.ticker}
           </Link>
         ) : (
-          <span className="text-base font-semibold text-gray-300">Sin identificar</span>
+          <span className="text-base font-semibold text-gray-300">{t('bottlenecks.page.unidentified')}</span>
         )}
         <span className="text-xs text-gray-500">{item.theme}</span>
         <Badge className="border-amber-500/50 text-amber-300" variant="outline">
@@ -108,22 +109,22 @@ function DiscoveryCard({ item }: { item: DiscoveryView }) {
         </Badge>
         {!item.theme_detected ? (
           <Badge className="border-gray-600 text-gray-400" variant="outline">
-            Tema ya no detectado
+            {t('bottlenecks.page.themeNoLongerDetected')}
           </Badge>
         ) : null}
         {item.in_portfolio ? (
           <Badge className="border-teal-500/50 text-teal-300" variant="outline">
-            En tu cartera
+            {t('bottlenecks.page.inPortfolio')}
           </Badge>
         ) : null}
         {item.in_watchlist ? (
           <Badge className="border-sky-500/50 text-sky-300" variant="outline">
-            En tu lista de seguimiento
+            {t('bottlenecks.page.inWatchlist')}
           </Badge>
         ) : null}
         {item.recent_insider_activity ? (
           <Badge className="border-violet-500/50 text-violet-300" variant="outline">
-            Actividad insider reciente
+            {t('bottlenecks.page.insiderActivity')}
           </Badge>
         ) : null}
       </div>
@@ -144,7 +145,7 @@ function DiscoveryCard({ item }: { item: DiscoveryView }) {
                 </a>
               ) : (
                 <span className="text-gray-500">
-                  {evidence.title ?? 'Evidencia'} · {NA}
+                  {evidence.title ?? t('bottlenecks.page.evidence')} · {fmt.na}
                 </span>
               )}
             </li>
@@ -152,8 +153,8 @@ function DiscoveryCard({ item }: { item: DiscoveryView }) {
         </ul>
       ) : null}
       <p className="mt-3 text-[11px] text-gray-500">
-        {formatUserDate(item.created_at)} · modelo {item.model} · última señal del tema:{' '}
-        {item.theme_last_seen ? formatUserDate(item.theme_last_seen) : NA}
+        {t('bottlenecks.page.discoveryMeta', { date: fmt.formatUserDate(item.created_at), model: item.model })}{' '}
+        {item.theme_last_seen ? fmt.formatUserDate(item.theme_last_seen) : fmt.na}
       </p>
     </li>
   );
@@ -161,6 +162,7 @@ function DiscoveryCard({ item }: { item: DiscoveryView }) {
 
 export default async function CuellosPage({ searchParams }: PageProps) {
   const page = parsePage((await searchParams).pagina);
+  const [t, fmt] = await Promise.all([getT(), getFormat()]);
   let bottlenecks: Awaited<ReturnType<typeof getBottlenecks>>;
   let discoveries: Awaited<ReturnType<typeof getBottleneckDiscoveries>>;
   try {
@@ -170,7 +172,7 @@ export default async function CuellosPage({ searchParams }: PageProps) {
     ]);
   } catch (error) {
     if (isBackendUnavailableError(error)) {
-      return <BackendOffline feature="Cuellos de botella" retryHref="/cuellos" />;
+      return <BackendOffline feature={t('bottlenecks.page.title')} retryHref="/cuellos" />;
     }
     throw error;
   }
@@ -182,53 +184,56 @@ export default async function CuellosPage({ searchParams }: PageProps) {
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex max-w-6xl flex-col gap-6">
       <header>
-        <h1 className="text-3xl font-bold text-gray-100">Cuellos de botella</h1>
+        <h1 className="text-3xl font-bold text-gray-100">{t('bottlenecks.page.title')}</h1>
         <p className="mt-1 text-sm text-gray-400">
-          {detectedCount} de {bottlenecks.signals.length} temas con escasez detectada
+          {t('bottlenecks.page.summary', { detected: detectedCount, total: bottlenecks.signals.length })}
         </p>
       </header>
 
-      <section aria-label="Señales de escasez">
+      <section aria-label={t('bottlenecks.page.signalsAria')}>
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {bottlenecks.signals.map((signal) => (
-            <SignalCard key={signal.theme} signal={signal} minSources={bottlenecks.min_sources} />
+            <SignalCard key={signal.theme} signal={signal} minSources={bottlenecks.min_sources} t={t} fmt={fmt} />
           ))}
         </ul>
       </section>
 
-      <section aria-label="Candidatos inferidos">
-        <h2 className="mb-3 text-xl font-semibold text-gray-100">Candidatos inferidos</h2>
+      <section aria-label={t('bottlenecks.page.candidates')}>
+        <h2 className="mb-3 text-xl font-semibold text-gray-100">{t('bottlenecks.page.candidates')}</h2>
         <MutationForm action={runBottleneckDiscovery} showSuccessInline className="mb-3">
-          <Button type="submit" variant="outline">Buscar candidatos inferidos</Button>
-          <p className="mt-2 text-sm text-gray-400">Solo evidencias guardadas y modelos gratuitos. Las hipótesis no son hechos ni recomendaciones.</p>
+          <Button type="submit" variant="outline">{t('bottlenecks.page.searchCandidates')}</Button>
+          <p className="mt-2 text-sm text-gray-400">{t('bottlenecks.page.candidatesHint')}</p>
         </MutationForm>
         {discoveries.items.length === 0 && discoveries.total === 0 ? (
           <div className="rounded-xl border border-gray-800 bg-surface-1 p-5">
-            <p className="font-semibold text-gray-100">Sin candidatos todavía</p>
+            <p className="font-semibold text-gray-100">{t('bottlenecks.page.noCandidates')}</p>
             <p className="mt-1 text-sm text-gray-400">
-              No hay candidatos guardados. Puedes solicitar un barrido; si no hay evidencias suficientes o el modelo gratuito no está disponible, no se inventan resultados.
+              {t('bottlenecks.page.noCandidatesHint')}
             </p>
           </div>
         ) : discoveries.items.length === 0 ? (
           <div className="rounded-xl border border-gray-800 bg-surface-1 p-5">
-            <p className="font-semibold text-gray-100">Página fuera de rango</p>
+            <p className="font-semibold text-gray-100">{t('bottlenecks.page.outOfRange')}</p>
             <p className="mt-1 text-sm text-gray-400">
-              Hay {discoveries.total} candidatos en {totalPages}{' '}
-              {totalPages === 1 ? 'página' : 'páginas'}; esta página no existe.
+              {t('bottlenecks.page.outOfRangeHint', {
+                total: discoveries.total,
+                pages: totalPages,
+                pagesWord: totalPages === 1 ? t('bottlenecks.page.pageOne') : t('bottlenecks.page.pageMany'),
+              })}
             </p>
-            <nav aria-label="Volver al listado" className="mt-3 flex flex-wrap gap-2 text-sm">
+            <nav aria-label={t('bottlenecks.page.backAria')} className="mt-3 flex flex-wrap gap-2 text-sm">
               <Link
                 className="inline-flex min-h-11 items-center rounded-lg px-4 font-medium text-teal-300 hover:bg-gray-800"
                 href="/cuellos"
               >
-                Primera página
+                {t('bottlenecks.page.firstPage')}
               </Link>
               {totalPages > 1 ? (
                 <Link
                   className="inline-flex min-h-11 items-center rounded-lg px-4 font-medium text-teal-300 hover:bg-gray-800"
                   href={pageHref(totalPages)}
                 >
-                  Última página
+                  {t('bottlenecks.page.lastPage')}
                 </Link>
               ) : null}
             </nav>
@@ -237,25 +242,25 @@ export default async function CuellosPage({ searchParams }: PageProps) {
           <>
             <ul className="grid gap-3 sm:grid-cols-2">
               {discoveries.items.map((item) => (
-                <DiscoveryCard item={item} key={item.id} />
+                <DiscoveryCard item={item} key={item.id} t={t} fmt={fmt} />
               ))}
             </ul>
-            <nav aria-label="Paginar candidatos" className="mt-4 flex items-center gap-2 text-sm">
+            <nav aria-label={t('bottlenecks.page.pagerAria')} className="mt-4 flex items-center gap-2 text-sm">
               {page > 1 ? (
                 <Link
                   className="inline-flex min-h-11 items-center rounded-lg px-4 font-medium text-gray-400 hover:bg-gray-800 hover:text-gray-100"
                   href={pageHref(page - 1)}
                 >
-                  Anterior
+                  {t('bottlenecks.page.prev')}
                 </Link>
               ) : null}
-              <span className="px-2 text-gray-500">Página {page}</span>
+              <span className="px-2 text-gray-500">{t('bottlenecks.page.page', { page })}</span>
               {discoveries.has_more ? (
                 <Link
                   className="inline-flex min-h-11 items-center rounded-lg px-4 font-medium text-gray-400 hover:bg-gray-800 hover:text-gray-100"
                   href={pageHref(page + 1)}
                 >
-                  Siguiente
+                  {t('bottlenecks.page.next')}
                 </Link>
               ) : null}
             </nav>
