@@ -37,6 +37,12 @@ vi.mock('@/components/portfolio/PortfolioTearsheet', () => ({ default: () => nul
 vi.mock('@/components/portfolio/RefreshPortfolioButton', () => ({ default: () => null }));
 vi.mock('@/components/portfolio/PortfolioForecast', () => ({ default: () => <div>forecast-tab</div> }));
 vi.mock('@/components/portfolio/PortfolioDividends', () => ({ default: () => <div>dividends-tab</div> }));
+// SavingsProjection tira de plan.actions -> auth -> mongoose/nodemailer. Los
+// loaders del mock de next/dynamic se disparan al evaluar el módulo
+// (fire-and-forget): si ese grafo sigue importándose cuando el archivo
+// termina, Vitest reporta EnvironmentTeardownError como error no manejado y
+// la run falla aunque los tests pasen (visto en CI, #3992/#3995).
+vi.mock('@/components/portfolio/SavingsProjection', () => ({ default: () => <div>savings-tab</div> }));
 import PortfolioTabs from '@/components/portfolio/PortfolioTabs';
 
 type TabsProps = ComponentProps<typeof PortfolioTabs>;
@@ -106,6 +112,7 @@ describe('PortfolioTabs contenido', () => {
         nav.params = new URLSearchParams({ tab: 'prevision' });
         const { unmount } = renderTabs({ forecast: {} });
         expect(await screen.findByText('forecast-tab')).toBeInTheDocument();
+        expect(await screen.findByText('savings-tab')).toBeInTheDocument();
         unmount();
         nav.params = new URLSearchParams({ tab: 'dividendos' });
         renderTabs({ dividends: {} });
