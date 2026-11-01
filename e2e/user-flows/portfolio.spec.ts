@@ -1,4 +1,4 @@
-import { backendCall, expect, expectHealthyPage, runUiE2E, test, VIEWPORTS, visit } from "./support";
+import { backendTransactions, backendCall, expect, expectHealthyPage, runUiE2E, test, VIEWPORTS, visit } from "./support";
 import type { Page } from "@playwright/test";
 
 const CSV_EN = [
@@ -15,8 +15,8 @@ const CSV_ES = [
 
 async function resetPortfolio() {
   for (let page = 0; page < 5; page += 1) {
-    const { json } = await backendCall("GET", "/api/portfolio/transactions");
-    const rows = Array.isArray(json) ? (json as Array<{ id: number }>) : [];
+    const json = await backendTransactions();
+    const rows = json;
     if (rows.length === 0) return;
     // Ventas primero no aplica: se borran de la más nueva a la más vieja.
     for (const row of [...rows].sort((a, b) => b.id - a.id)) {
@@ -59,7 +59,7 @@ for (const vp of VIEWPORTS) {
       await expect(page.getByText(/Importación falló|cabecera del CSV/)).toHaveCount(0);
 
       // El backend tiene las tres operaciones con los importes exactos.
-      const { json } = await backendCall("GET", "/api/portfolio/transactions");
+      const json = await backendTransactions();
       const txs = (json as Array<{ ticker: string; quantity: string | number; price: string | number; fees: string | number }>)
         .map((t) => [t.ticker, Number(t.quantity), Number(t.price), Number(t.fees)])
         .sort();

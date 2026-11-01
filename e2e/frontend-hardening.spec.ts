@@ -37,7 +37,11 @@ test.describe("hardening frontend estático", () => {
     const errorBoundary = source("app", "(root)", "error.tsx");
 
     expect(errorBoundary).toContain('role="alert"');
-    expect(errorBoundary).toContain("Se produjo un error inesperado");
+    expect(errorBoundary).toContain("t('ui.rootError.unexpected')");
+    const es = JSON.parse(source("lib", "i18n", "messages", "es", "ui.json"));
+    const en = JSON.parse(source("lib", "i18n", "messages", "en", "ui.json"));
+    expect(es.rootError.unexpected).toContain("Se produjo un error inesperado");
+    expect(en.rootError.unexpected).toBeTruthy();
     // Leer el mensaje para clasificar no equivale a mostrarlo. En el JSX
     // sigue prohibida cualquier interpolación directa o fallback interno.
     const rendered = errorBoundary.slice(errorBoundary.indexOf('export default function RootError'));
