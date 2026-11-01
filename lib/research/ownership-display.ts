@@ -1,3 +1,4 @@
+import type { Locale } from '@/lib/i18n/locale';
 /** El backend publica las limitaciones del 13F como constante revisada en
  *  inglés; en UI van en español (F33). Texto desconocido: se muestra tal cual,
  *  nunca se oculta una limitación. */
@@ -13,9 +14,12 @@ const LIMITATION_LABELS: Record<string, string> = {
 };
 
 /** Traduce cada límite sin ocultar advertencias nuevas del proveedor. */
-export function ownershipLimitations(value: string | string[] | null | undefined): string {
+export function ownershipLimitations(value: string | string[] | null | undefined, locale: Locale = 'es', na = 'N/D'): string {
   if (!value) return '';
-  let text = (Array.isArray(value) ? value.join('. ') : value).replace(/\bSIN_DATOS\b/g, 'N/D');
+  const joined = Array.isArray(value) ? value.join('. ') : value;
+  // En inglés el texto del backend ya es inglés: solo se cambia el marcador.
+  if (locale === 'en') return joined.replace(/\bSIN_DATOS\b/g, na);
+  let text = joined.replace(/\bSIN_DATOS\b/g, na);
   for (const [original, translated] of Object.entries(LIMITATION_LABELS)) {
     text = text.replaceAll(original, translated);
   }

@@ -24,7 +24,9 @@ test('la lista de inversores marca "Datos parciales" en la tarjeta', () => {
 });
 
 // Movidas a vistas de /ownership (Movimientos 13F) por decision de Nico, WhatsApp 2026-10-20 00:59.
-const masCompradas = readFileSync('app/(root)/ownership/_components/MostBought.tsx', 'utf8');
+// El texto vive en es/ownership.json: solo se añade la sección de Más compradas.
+const masCompradas = readFileSync('app/(root)/ownership/_components/MostBought.tsx', 'utf8')
+    + JSON.stringify(JSON.parse(readFileSync('lib/i18n/messages/es/ownership.json', 'utf8')).mostBought);
 
 test('mas-compradas avisa de cuantos gestores comparados van parciales', () => {
     assert.match(actions, /managers_partial\?: number/);

@@ -1,1 +1,97 @@
-{}
+{
+  "page": {
+    "metaTitle": "Institutional ownership (13F)",
+    "metaDescription": "Institutional managers' portfolios as filed with the SEC (Form 13F, EDGAR), with quarter-over-quarter changes.",
+    "feature": "Institutional ownership (13F)",
+    "title": "13F moves",
+    "viewsAria": "13F moves views",
+    "views": {
+      "gestor": "By manager",
+      "masCompradas": "Most bought",
+      "solape": "Overlap with your portfolio"
+    },
+    "noManagers": "No reviewed managers in this version",
+    "report": "report {date}",
+    "publishedLag": "published up to 45 days later",
+    "coverage": "coverage {value}",
+    "holdingsAria": "Declared 13F positions",
+    "holdingsCaption": "Positions declared in the manager's latest 13F report, as recorded in EDGAR",
+    "col": {
+      "issuerDeclared": "Issuer (as declared)",
+      "class": "Class",
+      "value": "Value",
+      "shares": "Shares",
+      "type": "Type",
+      "issuer": "Issuer",
+      "change": "Change",
+      "sharesBefore": "Shares before",
+      "sharesNow": "Shares now",
+      "valueBefore": "Value before",
+      "valueNow": "Value now"
+    },
+    "amendment": "amendment",
+    "fetchedAt": "Data retrieved on {datetime}.",
+    "noData": "No 13F data yet",
+    "noDataHint": "Sync to see the latest report filed with the SEC.",
+    "sync": "Sync 13F",
+    "syncQueued": "Sync in progress; reload the page in a few minutes to see the report.",
+    "changesTitle": "Quarter-over-quarter changes ({from} → {to})",
+    "changesLag": "reports published up to 45 days after each quarter end",
+    "moves": "{n} moves",
+    "changesAria": "Quarter-over-quarter 13F changes",
+    "changesCaption": "Changes for each issuer between the two latest 13F reports, with shares and value before and now",
+    "change": {
+      "new": "new position",
+      "closed": "closed",
+      "increased": "increased",
+      "decreased": "decreased",
+      "unchanged": "unchanged"
+    },
+    "noMoves": "No moves between the two latest reports.",
+    "changesUnavailable": "Quarterly changes not available yet",
+    "needTwoReports": "Two stored 13F reports are needed to compare; it will be available after the next quarter.",
+    "syncToCompare": "Sync this manager to be able to compare reports.",
+    "limits": "Limits of this data"
+  },
+  "sync": {
+    "done": "Sync completed.",
+    "unknownError": "unknown error",
+    "failed": "Could not sync {manager}: {reason}",
+    "theManager": "the manager",
+    "error": "Could not complete the sync. Please try again.",
+    "syncing": "Syncing…"
+  },
+  "mostBought": {
+    "feature": "Most bought",
+    "intro": "What the most investors added to their portfolios last quarter.",
+    "empty": "No data yet: two synced quarters of 13F are needed.",
+    "buyers": "{n} buying",
+    "sellers": "{n} trimming",
+    "source": "Source: SEC, Form 13F (EDGAR){reports}. Quarterly, with up to a 45-day lag. Each investor is compared with their previous quarter ({n} compared{withoutHistory}{partial}). US long positions only; options do not count. The 13F has no ticker, so the issuer and its CUSIP are shown. Value = current position of those buying, in dollars.",
+    "reportsAt": ", reports as of {period}",
+    "withoutHistory": ", {n} without two quarters yet",
+    "partial": ", {n} with partial data"
+  },
+  "overlap": {
+    "feature": "Portfolio overlap",
+    "summary": "DERIVED · Matched by CUSIP · {withData} managers with data · {withoutData} without data · {partial} partial",
+    "note": "Historical 13F, not the current portfolio. Up to a 45-day lag; long positions declared in the US, without options.",
+    "noCusip": "No verified CUSIP: it cannot be matched.",
+    "noMatches": "No matches in the available reports.",
+    "portfolioAt": "Portfolio as of {period}",
+    "filed": "Filed {date}",
+    "noFilingDate": "no recorded date",
+    "partialData": "Partial data",
+    "original": "Original 13F",
+    "boughtTitle": "Bought by several, outside your portfolio",
+    "unresolved": "Comparison incomplete: {n} positions without a verified CUSIP.",
+    "noBought": "No matches with purchases by two or more managers.",
+    "buyers": "CUSIP {cusip} · {n} buyers",
+    "noPeriod": "Period not recorded",
+    "pagerAria": "Purchases pagination",
+    "prev": "Previous",
+    "next": "Next",
+    "page": "Page {page} of {total}",
+    "periods": "13F periods: {periods}"
+  }
+}

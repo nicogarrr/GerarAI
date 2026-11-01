@@ -5,7 +5,8 @@ import test from 'node:test';
 const read = (path: string) => readFileSync(path, 'utf8');
 test('solape has pagination, period and partial-data labels', () => {
   // Movidas a vistas de /ownership (Movimientos 13F) por decision de Nico, WhatsApp 2026-10-20 00:59.
-  const page = read('app/(root)/ownership/_components/Overlap.tsx');
+  // El texto vive en es/ownership.json: solo se añade la sección de Solape.
+  const page = read('app/(root)/ownership/_components/Overlap.tsx') + JSON.stringify(JSON.parse(read('lib/i18n/messages/es/ownership.json')).overlap);
   for (const text of ['Pagination', 'report_date', 'filing_date', 'Datos parciales', 'unresolved_positions', '13F histórico']) assert.ok(page.includes(text), text);
 });
 test('chat sends only signed server requests and renders quotes as plain text', () => {

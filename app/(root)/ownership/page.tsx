@@ -16,7 +16,11 @@ import {
 } from '@/lib/actions/ownership.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { form13fValueToUsd } from '@/lib/form13f-value';
-import { formatMarketCapUsd, formatDate, formatUserDateTime, formatNumber, NA } from '@/lib/format';
+import type { Formatters } from '@/lib/format';
+import { getFormat, getT } from '@/lib/i18n/server';
+import type { TranslateFn } from '@/lib/i18n/translate';
+
+type TranslationKey = Parameters<TranslateFn>[0];
 
 import SyncButton from './SyncButton';
 import { MostBought } from './_components/MostBought';
@@ -24,39 +28,39 @@ import { Overlap } from './_components/Overlap';
 import { holdingsVerificationNote, ownershipManagerName } from '@/lib/ownership-display';
 import { ownershipLimitations } from '@/lib/research/ownership-display';
 
-const CHANGE_LABELS: Record<string, string> = {
-    new: 'nueva posición',
-    closed: 'cerrada',
-    increased: 'aumentada',
-    decreased: 'reducida',
-    unchanged: 'sin cambios',
-};
+const CHANGE_LABELS = {
+    new: 'ownership.page.change.new',
+    closed: 'ownership.page.change.closed',
+    increased: 'ownership.page.change.increased',
+    decreased: 'ownership.page.change.decreased',
+    unchanged: 'ownership.page.change.unchanged',
+} as const satisfies Record<string, TranslationKey>;
+const isChangeKey = (value: string): value is keyof typeof CHANGE_LABELS => Object.hasOwn(CHANGE_LABELS, value);
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-    title: 'Propiedad institucional (13F)',
-    description:
-        'Carteras de gestores institucionales tal como se declaran ante la SEC (Form 13F, EDGAR), con cambios trimestre a trimestre.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getT();
+    return { title: t('ownership.page.metaTitle'), description: t('ownership.page.metaDescription') };
+}
 
 /** El <value> del 13F va en dolares desde 2023 y en miles antes: se normaliza por
  *  la fecha del informe y se muestra el importe en USD. */
-function formatValueUsd(raw: number | null, reportDate: string | null | undefined): string {
+function formatValueUsd(raw: number | null, reportDate: string | null | undefined, fmt: Formatters): string {
     const dollars = form13fValueToUsd(raw, reportDate);
-    return dollars === null ? NA : formatMarketCapUsd(dollars);
+    return dollars === null ? fmt.na : fmt.formatMarketCapUsd(dollars);
 }
 
-function formatShares(shares: number | null): string {
-    if (shares === null) return NA;
-    return formatNumber(shares, { maximumFractionDigits: 0 });
+function formatShares(shares: number | null, fmt: Formatters): string {
+    if (shares === null) return fmt.na;
+    return fmt.formatNumber(shares, { maximumFractionDigits: 0 });
 }
 
 /** Periodo 13F ("2026-06-30"): fecha en español; si el backend manda una
  *  etiqueta de trimestre, se muestra tal cual en vez de esconderla. */
-function reportLabel(value: string | null | undefined): string {
-    return value ? formatDate(value, { day: 'numeric', month: 'short', year: 'numeric' }, value) : NA;
+function reportLabel(value: string | null | undefined, fmt: Formatters): string {
+    return value ? fmt.formatDate(value, { day: 'numeric', month: 'short', year: 'numeric' }, value) : fmt.na;
 }
 
 type PageProps = {
@@ -66,14 +70,17 @@ type PageProps = {
 // Vistas de Movimientos 13F: el mismo dataset (SEC 13F, EDGAR) en tres cortes.
 // Antes eran páginas sueltas del hub Inversores (decisión de Nico, 2026-10-20).
 const VIEWS = [
-    ['gestor', 'Por gestor'],
-    ['mas-compradas', 'Más compradas'],
-    ['solape', 'Solape con tu cartera'],
-] as const;
+    ['gestor', 'ownership.page.views.gestor'],
+    ['mas-compradas', 'ownership.page.views.masCompradas'],
+    ['solape', 'ownership.page.views.solape'],
+] as const satisfies readonly (readonly [string, TranslationKey])[];
 type View = (typeof VIEWS)[number][0];
 
 export default async function OwnershipPage({ searchParams }: PageProps) {
     const { cik: selectedCik, vista, pagina, compras } = await searchParams;
+    const t = await getT();
+    const fmt = await getFormat();
+    const NA = fmt.na;
     const view: View = vista === 'mas-compradas' || vista === 'solape' ? vista : 'gestor';
     const activeHref = view === 'gestor'
         ? selectedCik
@@ -89,7 +96,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
         managersResult = await getOwnershipManagers();
     } catch (error) {
         if (isBackendUnavailableError(error)) {
-            return <BackendOffline feature="Propiedad institucional (13F)" retryHref={activeHref} />;
+            return <BackendOffline feature={t('ownership.page.feature')} retryHref={activeHref} />;
         }
         throw error;
     }
@@ -114,7 +121,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
         // Mismo backend para las tres lecturas: si alguna cae, el 13F entero no
         // es fiable y se dice, en vez de pintar tablas a medias como vacías.
         if (readError && isBackendUnavailableError(readError)) {
-            return <BackendOffline feature="Propiedad institucional (13F)" retryHref={activeHref} />;
+            return <BackendOffline feature={t('ownership.page.feature')} retryHref={activeHref} />;
         }
         holdings = holdingsRead.value;
         changes = changesRead.value;
@@ -123,19 +130,19 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-6 overflow-x-clip">
             <header className="flex items-center justify-between gap-3 border-b border-gray-800 pb-4">
-                <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">Movimientos 13F</h1>
+                <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">{t('ownership.page.title')}</h1>
                 <SyncButton />
             </header>
 
-            <nav aria-label="Vistas de Movimientos 13F" className="flex flex-nowrap gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {VIEWS.map(([id, label]) => (
+            <nav aria-label={t('ownership.page.viewsAria')} className="flex flex-nowrap gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {VIEWS.map(([id, labelKey]) => (
                     <Link
                         aria-current={view === id ? 'page' : undefined}
                         className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors md:min-h-0 ${view === id ? 'bg-teal-400/10 text-teal-300' : 'text-gray-400 hover:bg-gray-900 hover:text-gray-100'}`}
                         href={id === 'gestor' ? '/ownership' : `/ownership?vista=${id}`}
                         key={id}
                     >
-                        {label}
+                        {t(labelKey)}
                     </Link>
                 ))}
             </nav>
@@ -145,7 +152,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
 
             {view !== 'gestor' ? null : !managers.length ? (
                 <EmptyState
-                    title="No hay gestores revisados en esta versión"
+                    title={t('ownership.page.noManagers')}
                 />
             ) : (
                 <section className="flex flex-nowrap gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -167,27 +174,27 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
                         <div className="flex flex-col gap-2 md:flex-row md:items-center">
                             <h2 className="font-semibold text-gray-100">
-                                {ownershipManagerName(activeCik, holdings.manager ?? activeCik)} - informe {reportLabel(holdings.report_date)}
-                                <span className="ml-2 text-xs font-normal text-gray-500">publicado hasta 45 días después</span>
+                                {ownershipManagerName(activeCik, holdings.manager ?? activeCik)} - {t('ownership.page.report', { date: reportLabel(holdings.report_date, fmt) })}
+                                <span className="ml-2 text-xs font-normal text-gray-500">{t('ownership.page.publishedLag')}</span>
                             </h2>
                             <Badge className="md:ml-auto" variant="outline">
-                                cobertura {holdings.coverage}
+                                {t('ownership.page.coverage', { value: holdings.coverage ?? NA })}
                             </Badge>
                         </div>
                         {holdingsVerificationNote(holdings.status) ? (
                             <p className="mt-2 text-sm text-amber-300">{holdingsVerificationNote(holdings.status)}</p>
                         ) : null}
-                        <OverflowScrollRegion label="Posiciones 13F declaradas" className="mt-4">
+                        <OverflowScrollRegion label={t('ownership.page.holdingsAria')} className="mt-4">
                             <table className="w-full min-w-[820px] text-left text-sm [&_th]:px-2 [&_td]:px-2 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
-                                <caption className="sr-only">Posiciones declaradas en el último informe 13F del gestor, tal como constan en EDGAR</caption>
+                                <caption className="sr-only">{t('ownership.page.holdingsCaption')}</caption>
                                 <thead className="text-xs uppercase text-gray-500">
                                     <tr>
-                                        <th className="border-b border-gray-800 py-2" scope="col">Emisor (tal como se declaró)</th>
-                                        <th className="border-b border-gray-800 py-2" scope="col">Clase</th>
+                                        <th className="border-b border-gray-800 py-2" scope="col">{t('ownership.page.col.issuerDeclared')}</th>
+                                        <th className="border-b border-gray-800 py-2" scope="col">{t('ownership.page.col.class')}</th>
                                         <th className="border-b border-gray-800 py-2" scope="col">CUSIP</th>
-                                        <th className="border-b border-gray-800 py-2 text-right" scope="col">Valor</th>
-                                        <th className="border-b border-gray-800 py-2 text-right" scope="col">Acciones</th>
-                                        <th className="border-b border-gray-800 py-2" scope="col">Tipo</th>
+                                        <th className="border-b border-gray-800 py-2 text-right" scope="col">{t('ownership.page.col.value')}</th>
+                                        <th className="border-b border-gray-800 py-2 text-right" scope="col">{t('ownership.page.col.shares')}</th>
+                                        <th className="border-b border-gray-800 py-2" scope="col">{t('ownership.page.col.type')}</th>
                                         <th className="border-b border-gray-800 py-2" scope="col">Filing</th>
                                     </tr>
                                 </thead>
@@ -197,13 +204,13 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                             <th className="py-3 text-left text-sm font-normal text-gray-200" scope="row">
                                                 {row.name_of_issuer}
                                                 {row.is_amendment ? (
-                                                    <Badge className="ml-2" variant="outline">enmienda</Badge>
+                                                    <Badge className="ml-2" variant="outline">{t('ownership.page.amendment')}</Badge>
                                                 ) : null}
                                             </th>
                                             <td className="py-3 text-gray-400">{row.title_of_class || NA}</td>
                                             <td className="py-3 font-mono text-xs text-gray-400">{row.cusip ?? NA}</td>
-                                            <td className="py-3 text-right text-gray-200">{formatValueUsd(row.value_usd_thousands, holdings.report_date)}</td>
-                                            <td className="py-3 text-right text-gray-400">{formatShares(row.shares)}</td>
+                                            <td className="py-3 text-right text-gray-200">{formatValueUsd(row.value_usd_thousands, holdings.report_date, fmt)}</td>
+                                            <td className="py-3 text-right text-gray-400">{formatShares(row.shares, fmt)}</td>
                                             <td className="py-3 text-gray-400">{row.put_call ?? row.share_type}</td>
                                             <td className="py-3">
                                                 {row.filing_url ? (
@@ -228,15 +235,15 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                         </OverflowScrollRegion>
                         {holdings.provenance ? (
                             <p className="mt-3 text-xs text-gray-500">
-                                Datos obtenidos el {formatUserDateTime(holdings.provenance.fetched_at)}.
+                                {t('ownership.page.fetchedAt', { datetime: fmt.formatUserDateTime(holdings.provenance.fetched_at) })}
                             </p>
                         ) : null}
                     </section>
                 ) : (
                     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5 text-sm text-gray-400">
-                        <h2 className="font-semibold text-gray-100">Sin datos 13F todavía</h2>
-                        <p className="mt-2">Sincroniza para consultar el último informe declarado ante la SEC.</p>
-                        <SyncPortfoliosButton label="Sincronizar 13F" queuedText="Sincronización en curso; recarga la página en unos minutos para ver el informe." />
+                        <h2 className="font-semibold text-gray-100">{t('ownership.page.noData')}</h2>
+                        <p className="mt-2">{t('ownership.page.noDataHint')}</p>
+                        <SyncPortfoliosButton label={t('ownership.page.sync')} queuedText={t('ownership.page.syncQueued')} />
                     </section>
                 )
             ) : null}
@@ -245,26 +252,26 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
                         <div className="flex flex-col gap-2 md:flex-row md:items-center">
                             <h2 className="font-semibold text-gray-100">
-                                Cambios trimestre a trimestre ({reportLabel(changes.previous_report)} → {reportLabel(changes.latest_report)})
-                                <span className="ml-2 text-xs font-normal text-gray-500">informes publicados hasta 45 días después de cada cierre</span>
+                                {t('ownership.page.changesTitle', { from: reportLabel(changes.previous_report, fmt), to: reportLabel(changes.latest_report, fmt) })}
+                                <span className="ml-2 text-xs font-normal text-gray-500">{t('ownership.page.changesLag')}</span>
                             </h2>
                             <Badge className="md:ml-auto" variant="outline">
-                                {formatNumber(changes.changes.filter((c) => c.change !== 'unchanged').length, { maximumFractionDigits: 0 })} movimientos
+                                {t('ownership.page.moves', { n: fmt.formatNumber(changes.changes.filter((c) => c.change !== 'unchanged').length, { maximumFractionDigits: 0 }) })}
                             </Badge>
                         </div>
                         <p className="mt-2 text-xs text-gray-500">{changes.compared_accessions?.rule}</p>
-                        <OverflowScrollRegion label="Cambios 13F trimestre a trimestre" className="mt-4">
+                        <OverflowScrollRegion label={t('ownership.page.changesAria')} className="mt-4">
                             <table className="w-full min-w-[720px] text-left text-sm">
-                                <caption className="sr-only">Cambios de cada emisor entre los dos últimos informes 13F, con acciones y valor antes y ahora</caption>
+                                <caption className="sr-only">{t('ownership.page.changesCaption')}</caption>
                                 <thead className="text-xs uppercase text-gray-500">
                                     <tr>
-                                        <th className="border-b border-gray-800 py-2" scope="col">Emisor</th>
+                                        <th className="border-b border-gray-800 py-2" scope="col">{t('ownership.page.col.issuer')}</th>
                                         <th className="border-b border-gray-800 py-2" scope="col">CUSIP</th>
-                                        <th className="border-b border-gray-800 py-2" scope="col">Cambio</th>
-                                        <th className="border-b border-gray-800 py-2 text-right" scope="col">Acciones antes</th>
-                                        <th className="border-b border-gray-800 py-2 text-right" scope="col">Acciones ahora</th>
-                                        <th className="border-b border-gray-800 py-2 text-right" scope="col">Valor antes</th>
-                                        <th className="border-b border-gray-800 py-2 text-right" scope="col">Valor ahora</th>
+                                        <th className="border-b border-gray-800 py-2" scope="col">{t('ownership.page.col.change')}</th>
+                                        <th className="border-b border-gray-800 py-2 text-right" scope="col">{t('ownership.page.col.sharesBefore')}</th>
+                                        <th className="border-b border-gray-800 py-2 text-right" scope="col">{t('ownership.page.col.sharesNow')}</th>
+                                        <th className="border-b border-gray-800 py-2 text-right" scope="col">{t('ownership.page.col.valueBefore')}</th>
+                                        <th className="border-b border-gray-800 py-2 text-right" scope="col">{t('ownership.page.col.valueNow')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -273,28 +280,28 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                             <th className="py-3 text-left text-sm font-normal text-gray-200" scope="row">{row.name_of_issuer ?? NA}</th>
                                             <td className="py-3 font-mono text-xs text-gray-400">{row.cusip ?? NA}</td>
                                             <td className="py-3">
-                                                <Badge variant="outline">{CHANGE_LABELS[row.change]}</Badge>
+                                                <Badge variant="outline">{isChangeKey(row.change) ? t(CHANGE_LABELS[row.change]) : row.change}</Badge>
                                             </td>
-                                            <td className="py-3 text-right text-gray-400">{formatShares(row.shares_previous)}</td>
-                                            <td className="py-3 text-right text-gray-200">{formatShares(row.shares_latest)}</td>
-                                            <td className="py-3 text-right text-gray-400">{formatValueUsd(row.value_usd_thousands_previous, changes.previous_report)}</td>
-                                            <td className="py-3 text-right text-gray-200">{formatValueUsd(row.value_usd_thousands_latest, changes.latest_report)}</td>
+                                            <td className="py-3 text-right text-gray-400">{formatShares(row.shares_previous, fmt)}</td>
+                                            <td className="py-3 text-right text-gray-200">{formatShares(row.shares_latest, fmt)}</td>
+                                            <td className="py-3 text-right text-gray-400">{formatValueUsd(row.value_usd_thousands_previous, changes.previous_report, fmt)}</td>
+                                            <td className="py-3 text-right text-gray-200">{formatValueUsd(row.value_usd_thousands_latest, changes.latest_report, fmt)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </OverflowScrollRegion>
                         {changes.changes.every((c) => c.change === 'unchanged') ? (
-                            <p className="mt-3 text-sm text-gray-400">Sin movimientos entre los dos últimos informes.</p>
+                            <p className="mt-3 text-sm text-gray-400">{t('ownership.page.noMoves')}</p>
                         ) : null}
                     </section>
                 ) : (
                     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5 text-sm text-gray-400">
-                        <h2 className="font-semibold text-gray-100">Cambios trimestrales no disponibles todavía</h2>
+                        <h2 className="font-semibold text-gray-100">{t('ownership.page.changesUnavailable')}</h2>
                         <p className="mt-2">
                             {changes.status === 'insufficient_history'
-                                ? 'Hacen falta dos informes 13F almacenados para comparar; estará disponible tras el próximo trimestre.'
-                                : 'Sincroniza este gestor para poder comparar informes.'}
+                                ? t('ownership.page.needTwoReports')
+                                : t('ownership.page.syncToCompare')}
                         </p>
                     </section>
                 )
@@ -302,10 +309,10 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
             {limitations.length ? (
                 <details className="rounded-lg border border-gray-800 bg-surface-1 px-4 py-3 text-sm text-gray-500">
                     <summary className="min-h-11 cursor-pointer select-none py-3 text-xs font-medium text-gray-400 hover:text-gray-300">
-                        Límites de este dato
+                        {t('ownership.page.limits')}
                     </summary>
                     <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5">
-                        {limitations.map((item) => <li key={item}>{ownershipLimitations(item)}</li>)}
+                        {limitations.map((item) => <li key={item}>{ownershipLimitations(item, fmt.locale, NA)}</li>)}
                     </ul>
                 </details>
             ) : null}

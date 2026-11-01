@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const page = readFileSync('app/(root)/ownership/page.tsx', 'utf8');
+// El copy vive en es/ownership.json: solo se añade la sección de la página.
+const page = readFileSync('app/(root)/ownership/page.tsx', 'utf8')
+    + JSON.stringify(JSON.parse(readFileSync('lib/i18n/messages/es/ownership.json', 'utf8')).page);
 
 test('F327: la vista /ownership no pierde tildes en su copy', () => {
     assert.doesNotMatch(page, /nueva posicion/);
@@ -13,7 +15,8 @@ test('F327: la vista /ownership no pierde tildes en su copy', () => {
     assert.match(page, /se declaró\)/);
     // #1440: el estado vacío trae el botón real, no copy que lo anunciaba.
     assert.match(page, /el último informe declarado ante la SEC/);
-    assert.match(page, /label="Sincronizar 13F"/);
+    assert.match(page, /label=\{t\('ownership\.page\.sync'\)\}/);
+    assert.match(page, /"sync":"Sincronizar 13F"/);
 });
 
 test('F14: cabeceras y avisos de /ownership con tildes (límites, todavía, estará, próximo)', () => {
