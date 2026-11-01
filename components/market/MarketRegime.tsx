@@ -4,7 +4,10 @@ import BackendOffline from '@/components/system/BackendOffline';
 import type { MarketRegime, RegimeComputedMetric, RegimeObservedMetric, RegimeStatusBlock, RegimeTopTen } from '@/lib/actions/market-regime.actions';
 import { getMarketRegimeResult } from '@/lib/actions/market-regime.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
-import { formatMarketDate, formatNumber, formatPercent, formatUserDateTime } from '@/lib/format';
+import { formatNumber, type Formatters } from '@/lib/format';
+import { getFormat, getT } from '@/lib/i18n/server';
+import type { Locale } from '@/lib/i18n/locale';
+import type { TranslateFn } from '@/lib/i18n/translate';
 
 /**
  * Vista «Régimen» de la seccion Mercado: pinta el ultimo snapshot de
@@ -14,30 +17,32 @@ import { formatMarketDate, formatNumber, formatPercent, formatUserDateTime } fro
  */
 
 /** «1 sesión» / «N sesiones»: concordancia es-ES del conteo de entrenamiento. */
-export function trainingSessionsText(count: number): string {
-  return `${formatNumber(count, { maximumFractionDigits: 0 })} ${count === 1 ? 'sesión' : 'sesiones'}`;
+export function trainingSessionsText(count: number, locale: Locale = 'es'): string {
+  const n = formatNumber(count, { maximumFractionDigits: 0 }, undefined, locale);
+  if (locale === 'en') return `${n} ${count === 1 ? 'session' : 'sessions'}`;
+  return `${n} ${count === 1 ? 'sesión' : 'sesiones'}`;
 }
 
-const METRICAS: { key: keyof MarketRegime['metrics']; label: string }[] = [
-  { key: 'treasury_10y_us', label: 'Bono EE. UU. 10 años' },
-  { key: 'treasury_2y_us', label: 'Bono EE. UU. 2 años' },
-  { key: 'yield_curve_10y_2y_us', label: 'Curva 10 años − 2 años' },
-  { key: 'breakeven_10y_us', label: 'Inflación implícita 10 años' },
-  { key: 'high_yield_spread_us', label: 'Diferencial high yield' },
-  { key: 'vix_us', label: 'VIX' },
-  { key: 'mortgage_30y_us', label: 'Hipoteca 30 años EE. UU.' },
+const METRICAS: { key: keyof MarketRegime['metrics']; label: string; en: string }[] = [
+  { key: 'treasury_10y_us', label: 'Bono EE. UU. 10 años', en: 'US 10-year Treasury' },
+  { key: 'treasury_2y_us', label: 'Bono EE. UU. 2 años', en: 'US 2-year Treasury' },
+  { key: 'yield_curve_10y_2y_us', label: 'Curva 10 años − 2 años', en: '10-year − 2-year curve' },
+  { key: 'breakeven_10y_us', label: 'Inflación implícita 10 años', en: '10-year breakeven inflation' },
+  { key: 'high_yield_spread_us', label: 'Diferencial high yield', en: 'High-yield spread' },
+  { key: 'vix_us', label: 'VIX', en: 'VIX' },
+  { key: 'mortgage_30y_us', label: 'Hipoteca 30 años EE. UU.', en: 'US 30-year mortgage' },
 ];
 
 /** Valor con la unidad declarada; unidades desconocidas se muestran tal cual. */
-function valorMetrica(m: { value: number; unit: string }): string {
-  const n = formatNumber(m.value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (m.unit === 'porcentaje') return `${n} %`;
+function valorMetrica(m: { value: number; unit: string }, fmt: Formatters): string {
+  const n = fmt.formatNumber(m.value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (m.unit === 'porcentaje') return fmt.locale === 'en' ? `${n}%` : `${n} %`;
   if (m.unit === 'puntos porcentuales') return `${n} pp`;
   if (m.unit === 'índice') return n;
   return `${n} ${m.unit}`;
 }
 
-function TarjetaMetrica({ label, metrica }: { label: string; metrica?: RegimeObservedMetric | RegimeComputedMetric }) {
+function TarjetaMetrica({ label, metrica, t, fmt }: { label: string; metrica?: RegimeObservedMetric | RegimeComputedMetric; t: TranslateFn; fmt: Formatters }) {
   return (
     <Card className="min-w-0 border-gray-800">
       <CardHeader className="pb-2">
@@ -46,27 +51,27 @@ function TarjetaMetrica({ label, metrica }: { label: string; metrica?: RegimeObs
       <CardContent className="space-y-1">
         {metrica ? (
           <>
-            <p className="text-xl font-semibold text-gray-100">{valorMetrica(metrica)}</p>
-            <p className="text-xs text-gray-500">Dato del {formatMarketDate(metrica.date)}</p>
+            <p className="text-xl font-semibold text-gray-100">{valorMetrica(metrica, fmt)}</p>
+            <p className="text-xs text-gray-500">{t('movers.regime.dataOf', { date: fmt.formatMarketDate(metrica.date) })}</p>
             {'method' in metrica && metrica.method ? (
               <p className="text-xs text-gray-500">{metrica.method}</p>
             ) : null}
           </>
         ) : (
-          <p className="text-sm text-gray-500">Sin datos</p>
+          <p className="text-sm text-gray-500">{t('movers.regime.noData')}</p>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function TarjetaHmm({ regimen }: { regimen: MarketRegime }) {
+function TarjetaHmm({ regimen, t, fmt }: { regimen: MarketRegime; t: TranslateFn; fmt: Formatters }) {
   const hmm = regimen.metrics.hmm;
   const estados = Object.entries(regimen.probabilities ?? {});
   return (
     <Card className="min-w-0 border-gray-800">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base break-words">Modelo de estados (HMM)</CardTitle>
+        <CardTitle className="text-base break-words">{t('movers.regime.hmmTitle')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-1">
         {hmm?.status === 'disponible' && estados.length > 0 ? (
@@ -74,23 +79,23 @@ function TarjetaHmm({ regimen }: { regimen: MarketRegime }) {
             <ul className="space-y-1">
               {estados.map(([estado, prob]) => (
                 <li key={estado} className="flex items-baseline justify-between gap-2">
-                  <span className="text-sm text-gray-400">{estado.replace('state_', 'Estado ')}</span>
-                  <span className="text-lg font-semibold text-gray-100">{formatPercent(prob)}</span>
+                  <span className="text-sm text-gray-400">{estado.startsWith('state_') ? t('movers.regime.state', { n: estado.slice('state_'.length) }) : estado}</span>
+                  <span className="text-lg font-semibold text-gray-100">{fmt.formatPercent(prob)}</span>
                 </li>
               ))}
             </ul>
-            {hmm.date ? <p className="text-xs text-gray-500">Filtro al {formatMarketDate(hmm.date)}</p> : null}
+            {hmm.date ? <p className="text-xs text-gray-500">{t('movers.regime.filterAt', { date: fmt.formatMarketDate(hmm.date) })}</p> : null}
             {hmm.trained_through ? (
               <p className="text-xs text-gray-500">
-                Entrenado hasta el {formatMarketDate(hmm.trained_through)}
-                {typeof hmm.training_sessions === 'number' ? ` · ${trainingSessionsText(hmm.training_sessions)}` : ''}
+                {t('movers.regime.trainedThrough', { date: fmt.formatMarketDate(hmm.trained_through) })}
+                {typeof hmm.training_sessions === 'number' ? ` · ${trainingSessionsText(hmm.training_sessions, fmt.locale)}` : ''}
               </p>
             ) : null}
             {hmm.method ? <p className="text-xs text-gray-500">{hmm.method}</p> : null}
           </>
         ) : (
           <>
-            <p className="text-sm text-gray-500">Sin datos</p>
+            <p className="text-sm text-gray-500">{t('movers.regime.noData')}</p>
             {hmm?.reason ? <p className="text-xs text-gray-500">{hmm.reason}</p> : null}
           </>
         )}
@@ -99,36 +104,36 @@ function TarjetaHmm({ regimen }: { regimen: MarketRegime }) {
   );
 }
 
-function TarjetaConcentracion({ top }: { top?: RegimeTopTen }) {
+function TarjetaConcentracion({ top, t, fmt }: { top?: RegimeTopTen; t: TranslateFn; fmt: Formatters }) {
   const disponible = top?.status === 'disponible' && typeof top.weight_top_ten_pct === 'number';
   return (
     <Card className="min-w-0 border-gray-800">
       <CardHeader className="pb-2">
         <CardTitle className="text-base break-words">
-          Concentración top 10{top?.index ? ` · ${top.index}` : ''}
+          {t('movers.regime.concentrationTitle')}{top?.index ? ` · ${top.index}` : ''}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-1">
         {disponible ? (
           <>
             <p className="text-xl font-semibold text-gray-100">
-              {formatPercent(top.weight_top_ten_pct as number, { fromRatio: false })}
+              {fmt.formatPercent(top.weight_top_ten_pct as number, { fromRatio: false })}
             </p>
             {typeof top.weight_largest_pct === 'number' ? (
               <p className="text-xs text-gray-500">
-                Mayor peso: {formatPercent(top.weight_largest_pct, { fromRatio: false })}
+                {t('movers.regime.largestWeight', { value: fmt.formatPercent(top.weight_largest_pct, { fromRatio: false }) })}
               </p>
             ) : null}
             {top.snapshot_as_of ? (
-              <p className="text-xs text-gray-500">Snapshot del {formatMarketDate(top.snapshot_as_of)}</p>
+              <p className="text-xs text-gray-500">{t('movers.regime.snapshotOf', { date: fmt.formatMarketDate(top.snapshot_as_of) })}</p>
             ) : null}
           </>
         ) : (
           <>
-            <p className="text-sm text-gray-500">Sin datos</p>
-            {motivoConcentracionSinDatos(top)}
+            <p className="text-sm text-gray-500">{t('movers.regime.noData')}</p>
+            {motivoConcentracionSinDatos(top, fmt.locale)}
             {top?.snapshot_as_of ? (
-              <p className="text-xs text-gray-500">Snapshot consultado: {formatMarketDate(top.snapshot_as_of)}</p>
+              <p className="text-xs text-gray-500">{t('movers.regime.snapshotChecked', { date: fmt.formatMarketDate(top.snapshot_as_of) })}</p>
             ) : null}
           </>
         )}
@@ -151,42 +156,58 @@ const MOTIVO_CONCENTRACION_SIN_DATOS: Record<string, string> = {
   index_weights_not_published_by_source: 'El factsheet no publica el peso de los mayores constituyentes.',
 };
 
-function motivoConcentracionSinDatos(top?: RegimeTopTen) {
+// Mismos motivos en inglés (Ajustes → Idioma); las claves son las del backend.
+const MOTIVO_CONCENTRACION_SIN_DATOS_EN: Record<string, string> = {
+  no_snapshot_in_disk: 'The S&P 500 factsheet is not loaded yet; it will appear at the next sync.',
+  snapshot_dir_not_configured: 'The S&P 500 factsheet is not available right now.',
+  snapshot_integrity_failed: 'The S&P 500 factsheet failed its integrity check; no data until the next sync.',
+  snapshot_vintage_after_requested_date: 'The available factsheet is later than the requested date; it does not describe the index on that date.',
+  requested_date_invalid: 'Without a valid requested date the S&P 500 factsheet cannot be read.',
+  snapshot_too_stale_for_requested_date: 'The latest S&P 500 factsheet is too old for today; no data until it is updated.',
+  index_weights_not_published_by_source: 'The factsheet does not publish the weight of the largest constituents.',
+};
+
+function motivoConcentracionSinDatos(top?: RegimeTopTen, locale: Locale = 'es') {
   if (!top?.reason && !top?.detail) return null;
-  const motivo = (top.reason && MOTIVO_CONCENTRACION_SIN_DATOS[top.reason])
-    ?? 'El factsheet del S&P 500 no está disponible en este momento.';
+  const motivo = locale === 'en'
+    ? ((top.reason && MOTIVO_CONCENTRACION_SIN_DATOS_EN[top.reason]) ?? 'The S&P 500 factsheet is not available right now.')
+    : ((top.reason && MOTIVO_CONCENTRACION_SIN_DATOS[top.reason])
+    ?? 'El factsheet del S&P 500 no está disponible en este momento.');
   return <p className="text-xs text-gray-500">{motivo}</p>;
 }
 
-function TarjetaBeta({ beta }: { beta?: RegimeStatusBlock }) {
+function TarjetaBeta({ beta, t }: { beta?: RegimeStatusBlock; t: TranslateFn }) {
   return (
     <Card className="min-w-0 border-gray-800">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base break-words">Beta de cartera</CardTitle>
+        <CardTitle className="text-base break-words">{t('movers.regime.betaTitle')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-1">
-        <p className="text-sm text-gray-500">{beta?.status === 'no_disponible' ? 'No disponible' : 'Sin datos'}</p>
+        <p className="text-sm text-gray-500">{beta?.status === 'no_disponible' ? t('movers.regime.unavailable') : t('movers.regime.noData')}</p>
         {beta?.reason ? <p className="text-xs text-gray-500">{beta.reason}</p> : null}
       </CardContent>
     </Card>
   );
 }
 
-const ESTADO_BADGE: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
-  disponible: { label: 'Disponible', variant: 'default' },
-  obsoleto: { label: 'Obsoleto', variant: 'secondary' },
-  'sin datos': { label: 'Sin datos', variant: 'outline' },
-};
+function estadoBadge(status: string, t: TranslateFn): { label: string; variant: 'default' | 'secondary' | 'outline' } {
+  if (status === 'disponible') return { label: t('movers.regime.status.available'), variant: 'default' };
+  if (status === 'obsoleto') return { label: t('movers.regime.status.stale'), variant: 'secondary' };
+  if (status === 'sin datos') return { label: t('movers.regime.status.noData'), variant: 'outline' };
+  return { label: status, variant: 'outline' };
+}
 
 export async function MarketRegimeVista() {
   const { data: regimen, error } = await getMarketRegimeResult();
+  const t = await getT();
+  const fmt = await getFormat();
   if (error || !regimen) {
     if (error && isBackendUnavailableError(error)) {
-      return <BackendOffline as="section" feature="Mercado" retryHref="/screener?vista=regimen" />;
+      return <BackendOffline as="section" feature={t('movers.regime.feature')} retryHref="/screener?vista=regimen" />;
     }
     throw error ?? new Error('Sin respuesta de régimen de mercado');
   }
-  const estado = ESTADO_BADGE[regimen.status] ?? { label: regimen.status, variant: 'outline' as const };
+  const estado = estadoBadge(regimen.status, t);
   const sinSnapshot = !regimen.date;
   return (
     <div className="space-y-6">
@@ -194,31 +215,33 @@ export async function MarketRegimeVista() {
         <Badge variant={estado.variant}>{estado.label}</Badge>
         {regimen.date ? (
           <p className="text-sm text-gray-400">
-            Snapshot del {formatMarketDate(regimen.date)}
+            {t('movers.regime.snapshotOf', { date: fmt.formatMarketDate(regimen.date) })}
             {regimen.generated_at
-              ? ` · generado ${formatUserDateTime(regimen.generated_at, { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}`
+              ? ` · ${t('movers.regime.generated', { datetime: fmt.formatUserDateTime(regimen.generated_at, { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) })}`
               : ''}
           </p>
         ) : null}
       </div>
 
       {sinSnapshot ? (
-        <p className="text-sm text-gray-500">Sin datos todavía — en cuanto exista un snapshot de régimen aparecerá aquí.</p>
+        <p className="text-sm text-gray-500">{t('movers.regime.empty')}</p>
       ) : (
         <>
           <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-            {METRICAS.map(({ key, label }) => (
+            {METRICAS.map(({ key, label, en: labelEn }) => (
               <TarjetaMetrica
                 key={key}
-                label={label}
+                label={fmt.locale === 'en' ? labelEn : label}
+                t={t}
+                fmt={fmt}
                 metrica={regimen.metrics[key] as RegimeObservedMetric | RegimeComputedMetric | undefined}
               />
             ))}
           </div>
           <div className="grid min-w-0 grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-3">
-            <TarjetaHmm regimen={regimen} />
-            <TarjetaConcentracion top={regimen.metrics.top_ten_sp500} />
-            <TarjetaBeta beta={regimen.portfolio_beta ?? regimen.metrics.portfolio_beta} />
+            <TarjetaHmm regimen={regimen} t={t} fmt={fmt} />
+            <TarjetaConcentracion top={regimen.metrics.top_ten_sp500} t={t} fmt={fmt} />
+            <TarjetaBeta beta={regimen.portfolio_beta ?? regimen.metrics.portfolio_beta} t={t} />
           </div>
           {regimen.note ? <p className="text-xs text-gray-500">{regimen.note}</p> : null}
         </>

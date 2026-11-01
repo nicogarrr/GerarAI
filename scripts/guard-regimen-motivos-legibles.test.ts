@@ -9,7 +9,7 @@ const SRC = readFileSync('components/market/MarketRegime.tsx', 'utf8');
 
 test('existe el mapeo de motivos y se usa en vez del detail crudo', () => {
   assert.match(SRC, /MOTIVO_CONCENTRACION_SIN_DATOS/);
-  assert.match(SRC, /motivoConcentracionSinDatos\(top\)/);
+  assert.match(SRC, /motivoConcentracionSinDatos\(top[,)]/);
 });
 
 test('el detail del backend ya no se renderiza directamente', () => {

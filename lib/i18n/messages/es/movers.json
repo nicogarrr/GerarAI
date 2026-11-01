@@ -1,4 +1,36 @@
 {
   "gainers": "Subidas",
-  "losers": "Bajadas"
+  "losers": "Bajadas",
+  "table": {
+    "empty": "Sin datos todavía — en cuanto haya precios registrados aparecerán aquí.",
+    "company": "Empresa",
+    "price": "Precio",
+    "change": "Cambio",
+    "volume": "Volumen",
+    "volShort": "Vol.",
+    "dateOf": "del {date}",
+    "registered": "Registro: {datetime}"
+  },
+  "regime": {
+    "dataOf": "Dato del {date}",
+    "noData": "Sin datos",
+    "hmmTitle": "Modelo de estados (HMM)",
+    "state": "Estado {n}",
+    "filterAt": "Filtro al {date}",
+    "trainedThrough": "Entrenado hasta el {date}",
+    "concentrationTitle": "Concentración top 10",
+    "largestWeight": "Mayor peso: {value}",
+    "snapshotOf": "Snapshot del {date}",
+    "snapshotChecked": "Snapshot consultado: {date}",
+    "betaTitle": "Beta de cartera",
+    "unavailable": "No disponible",
+    "status": {
+      "available": "Disponible",
+      "stale": "Obsoleto",
+      "noData": "Sin datos"
+    },
+    "feature": "Mercado",
+    "generated": "generado {datetime}",
+    "empty": "Sin datos todavía — en cuanto exista un snapshot de régimen aparecerá aquí."
+  }
 }
