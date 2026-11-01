@@ -119,8 +119,17 @@ def list_claims(
 @router.post("/claims", response_model=ClaimOut)
 def create_claim(payload: ClaimCreate, db: Session = Depends(get_db)) -> Claim:
     company_id = _resolve_company_id(db, payload.ticker, payload.company_id)
-    if payload.thesis_version_id and not db.get(ThesisVersion, payload.thesis_version_id):
+    thesis = db.get(ThesisVersion, payload.thesis_version_id) if payload.thesis_version_id else None
+    if payload.thesis_version_id and thesis is None:
         raise HTTPException(status_code=404, detail="Thesis version not found")
+    if thesis is not None:
+        # Una afirmacion de A anclada a la tesis de B mezclaba ambas empresas
+        # al contradecirla (el cambio de tesis iba a A con la version de B).
+        if company_id is not None and thesis.company_id != company_id:
+            raise HTTPException(
+                status_code=422, detail="Thesis version belongs to another company"
+            )
+        company_id = thesis.company_id
 
     claim = Claim(
         company_id=company_id,
@@ -292,10 +301,20 @@ def list_thesis_changes(
 @router.post("/thesis/changes", response_model=ThesisChangeOut)
 def create_thesis_change(payload: ThesisChangeCreate, db: Session = Depends(get_db)) -> ThesisChange:
     company_id = _resolve_company_id(db, payload.ticker, payload.company_id)
-    if payload.from_version_id and not db.get(ThesisVersion, payload.from_version_id):
-        raise HTTPException(status_code=404, detail="From thesis version not found")
-    if payload.to_version_id and not db.get(ThesisVersion, payload.to_version_id):
-        raise HTTPException(status_code=404, detail="To thesis version not found")
+    for version_id, label in (
+        (payload.from_version_id, "From"), (payload.to_version_id, "To"),
+    ):
+        if not version_id:
+            continue
+        version = db.get(ThesisVersion, version_id)
+        if version is None:
+            raise HTTPException(status_code=404, detail=f"{label} thesis version not found")
+        # Mismo criterio que create_claim: no se mezcla la tesis de otra empresa.
+        if company_id is not None and version.company_id != company_id:
+            raise HTTPException(
+                status_code=422, detail="Thesis version belongs to another company"
+            )
+        company_id = version.company_id
 
     change = ThesisChange(
         company_id=company_id,
