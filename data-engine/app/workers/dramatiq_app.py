@@ -1911,6 +1911,27 @@ def ingest_class_shares_outstanding(
         db.close()
 
 
+# 429 de filings.xbrl.org en el build: 5 min, 10 min... (techo 1 h). El
+# Retry-After del servidor manda si es mayor.
+ESEF_RETRY_BASE_SECONDS = 300.0
+ESEF_RETRY_CAP_SECONDS = 3600.0
+# Snapshot global reutilizable durante la semana del cron (sab 6:30).
+ESEF_SNAPSHOT_FRESH_DAYS = 5
+
+
+def _esef_snapshot_fresh(base) -> bool:
+    """True si manifest.json se construyo hace menos de ESEF_SNAPSHOT_FRESH_DAYS."""
+    import json as _json
+    from datetime import date as _date
+
+    try:
+        manifest = _json.loads((base / "manifest.json").read_text())
+        built = _date.fromisoformat(str(manifest.get("fetched_at", ""))[:10])
+    except (OSError, ValueError, TypeError, AttributeError):
+        return False
+    return 0 <= (_date.today() - built).days < ESEF_SNAPSHOT_FRESH_DAYS
+
+
 @dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=1_800_000)
 @_coalesce_on_success("refresh_esef_fundamentals", 6 * 86400, ("tenant_id", "phase", "cursor"))
 def refresh_esef_fundamentals(
@@ -1955,19 +1976,45 @@ def refresh_esef_fundamentals(
             from build_esef_snapshots import _fetch_package as fetch_esef_package
             from build_esef_snapshots import build as build_esef
 
-            from app.services.connectors.esef import EsefClient
+            from app.services.connectors.esef import EsefClient, EsefRateLimited
 
-            manifest = run_from_any_context(
-                # ES + NL en un unico manifest (ASML reviewed; cada pais
-                # resuelve contra su tabla: CNMV / AFM-ESEF).
-                build_esef(
-                    _Path(base),
-                    ["ES", "NL"],
-                    _date.today().isoformat(),
-                    EsefClient(),
-                    package_fetcher=fetch_esef_package,
+            if _esef_snapshot_fresh(_Path(base)):
+                # El cron encola el job para todos los tenants a la vez y el
+                # snapshot es global: solo el primero reconstruye; el resto
+                # pasa a su ingesta sin volver a pedir filings.xbrl.org (N
+                # builds simultaneos eran los 429 del dead-letter de prod).
+                refresh_esef_fundamentals.send(tenant_id, user_id, phase="ingest", cursor=0)
+                return {
+                    "actor": "refresh_esef_fundamentals",
+                    "status": "ok",
+                    "phase": "build",
+                    "reason": "snapshot_fresh",
+                }
+            try:
+                manifest = run_from_any_context(
+                    # ES + NL en un unico manifest (ASML reviewed; cada pais
+                    # resuelve contra su tabla: CNMV / AFM-ESEF).
+                    build_esef(
+                        _Path(base),
+                        ["ES", "NL"],
+                        _date.today().isoformat(),
+                        EsefClient(),
+                        package_fetcher=fetch_esef_package,
+                    )
                 )
-            )
+            except EsefRateLimited as exc:
+                # 429 tras los reintentos en linea del cliente: reencolar con
+                # espera larga creciente; en el ultimo intento se descarta
+                # sin dead-letter (el cron de la semana siguiente lo repone).
+                from app.workers.rate_limit_retry import retry_or_drop
+
+                retry_or_drop(
+                    "ESEF",
+                    base=ESEF_RETRY_BASE_SECONDS,
+                    cap=ESEF_RETRY_CAP_SECONDS,
+                    # El cliente ya agoto sus reintentos cortos: la base es suelo.
+                    retry_after=max(exc.retry_after, ESEF_RETRY_BASE_SECONDS),
+                )
             refresh_esef_fundamentals.send(tenant_id, user_id, phase="ingest", cursor=0)
             return {
                 "actor": "refresh_esef_fundamentals",
@@ -2010,6 +2057,8 @@ def refresh_esef_fundamentals(
             "reviewed_total": len(tickers),
             "results": results,
         }
+    except dramatiq.Retry:
+        raise
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("refresh_esef_fundamentals", exc, tenant_id=tenant_id)
