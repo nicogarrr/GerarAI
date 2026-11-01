@@ -14,6 +14,7 @@ from sqlalchemy import and_, desc, select, tuple_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.i18n import generation_language
 from app.models import Company, NewsEvent, Position, ResearchAlert, WatchItem
 from app.services.notification_service import NotificationService
 from app.services.ticker_news_lane import _NAME_NOISE, VERIFIED_ALIASES
@@ -57,6 +58,21 @@ def _aware(value: datetime) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
+def _copy(language: str, ticker: str, headline: str, source: str, day: str, gdelt: bool) -> tuple[str, str]:
+    """(titulo, mensaje) del aviso en el idioma guardado del usuario; espanol por defecto."""
+    if language == "en":
+        date_phrase = f"detected by GDELT on {day}" if gdelt else f"dated {day} by {source}"
+        return (f"News about {ticker}: {headline}"[:300],
+                f"Article from {source}, {date_phrase}: {headline}. "
+                "Check the source; the GDELT date is not the publication date "
+                "and the headline alone does not confirm the facts.")
+    date_phrase = f"detectada por GDELT el {day}" if gdelt else f"fechada el {day} por {source}"
+    return (f"Noticia sobre {ticker}: {headline}"[:300],
+            f"Artículo de {source}, {date_phrase}: {headline}. "
+            "Revisa la fuente; la fecha de GDELT no es la fecha de publicación "
+            "y el titular no confirma por sí solo los hechos.")
+
+
 def _fingerprint(tenant_id: int, company_id: int, url: str) -> str:
     # Avoid mutable NewsEvent ID as dedup key: same URL can be re-ingested.
     return hashlib.sha256(f"{VERSION}|{tenant_id}|{company_id}|{url}".encode()).hexdigest()
@@ -67,6 +83,8 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
     tenant_id = db.info.get("tenant_id")
     if tenant_id is None:
         raise ValueError("Tenant context required")
+    # Idioma guardado del usuario (Ajustes); sin preferencia, espanol como siempre.
+    language = generation_language(db)
     now = now or datetime.now(UTC)
     if now.tzinfo is None:
         raise ValueError("Timezone-aware now required")
@@ -178,21 +196,19 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
                     continue
             membership = [kind for kind, match in (("cartera", company.id in held), ("watchlist", company.id in watched)) if match]
             headline = provenance["source_headline"].strip()
-            title = f"Noticia sobre {company.ticker}: {headline}"[:300]
             source_label = "detectada por GDELT" if date_source == "gdelt_first_seen" else "fechada por la fuente"
-            date_phrase = (f"detectada por GDELT el {published.date().isoformat()}" if date_source == "gdelt_first_seen"
-                           else f"fechada el {published.date().isoformat()} por {event.source}")
+            title, message = _copy(language, company.ticker, headline, str(event.source),
+                                   published.date().isoformat(), date_source == "gdelt_first_seen")
             alert = ResearchAlert(
                 tenant_id=tenant_id, company_id=company.id, severity="medium", status="open",
                 alert_type="tracked_news", title=title,
-                message=(f"Artículo de {event.source}, {date_phrase}: {headline}. "
-                         "Revisa la fuente; la fecha de GDELT no es la fecha de publicación "
-                         "y el titular no confirma por sí solo los hechos."),
+                message=message,
                 fingerprint=fp, channels=["in_app"], last_triggered_at=now,
                 metadata_={"news_event_id": event.id, "source_url": url, "source": event.source,
                            "published_at": published.isoformat(), "matching": membership,
                            "rule_version": VERSION, "date_source": date_source,
-                           "date_label": source_label, "source_headline": headline},
+                           "date_label": source_label, "source_headline": headline,
+                           **({"language": language} if language != "es" else {})},
             )
             try:
                 # Savepoint protects the tenant-scoped unique fingerprint in a
