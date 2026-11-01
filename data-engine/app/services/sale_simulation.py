@@ -41,6 +41,7 @@ from app.services.tax_report_service import (
     backward_repurchase_quantity,
     replay_tax_fifo,
 )
+from app.valuation.currency import normalize_currency
 
 TAX_CURRENCY = "EUR"
 
@@ -71,6 +72,14 @@ class ConsumedLot:
             return native
         if self.currency == sale_currency:
             return None if sale_rate is None else native * sale_rate
+        # Misma divisa en otra unidad (lote en «GBp», venta a «30 £»): solo
+        # cambia la unidad, exacto; antes se costeaba al cambio de la compra.
+        lot_major, lot_divisor = normalize_currency(self.currency)
+        sale_major, sale_divisor = normalize_currency(sale_currency)
+        if lot_major and lot_major == sale_major:
+            if sale_rate is None:
+                return None
+            return native * Decimal(sale_divisor) / Decimal(lot_divisor) * sale_rate
         return self.cost_eur
 
 
