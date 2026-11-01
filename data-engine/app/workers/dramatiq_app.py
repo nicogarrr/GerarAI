@@ -4704,10 +4704,21 @@ def sync_paper_dividends(tenant_id: int | None = None, user_id: str | None = Non
             ).all()
         ]
         service = DividendIngestionService()
-        synced, unavailable = [], []
+        synced, unavailable, failed = [], [], []
         for ticker in tickers:
             db.commit()  # sesion libre antes de la red
-            result = run_from_any_context(service.sync_company(db, ticker=ticker))
+            try:
+                result = run_from_any_context(service.sync_company(db, ticker=ticker))
+            except Exception as exc:
+                # Un ticker con un dato que no se puede guardar no deja sin
+                # dividendos al resto del paper book; lo transitorio (BD o red
+                # caidas) si relanza para que Dramatiq reintente todo.
+                if _is_transient(exc):
+                    raise
+                _rollback(db)
+                failed.append(ticker)
+                logger.warning("sync_paper_dividends: %s fallo: %s", ticker, type(exc).__name__)
+                continue
             (synced if result.get("status") == "ok" else unavailable).append(ticker)
         return {
             "actor": "sync_paper_dividends",
@@ -4715,6 +4726,7 @@ def sync_paper_dividends(tenant_id: int | None = None, user_id: str | None = Non
             "tickers": len(tickers),
             "synced": synced,
             "unavailable": unavailable,
+            "failed": failed,
         }
     except Exception as exc:
         _rollback(db)
