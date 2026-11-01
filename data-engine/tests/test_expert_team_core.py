@@ -235,7 +235,8 @@ def test_metric_conflict_reported_with_both_sources():
         )
 
     experts = _experts()[:2]
-    result = asyncio.run(ExpertTeam(experts, TOOLS, reason).run(RunContext(tenant_id="a", ticker="X")))
+    tools = {**TOOLS, "valuation": _tool("valuation", {"a": {"value": 20.0}})}
+    result = asyncio.run(ExpertTeam(experts, tools, reason).run(RunContext(tenant_id="a", ticker="X")))
     assert len(result.conflicts) == 1
     conflict = result.conflicts[0]
     assert conflict["type"] == "metric" and conflict["metric"] == "operating_margin"

@@ -154,6 +154,8 @@ async def run_expert(
     report.summary = str(parsed.get("summary") or "").strip()
     for claim in _parse_claims(parsed.get("claims")):
         claim.reason = validator(claim, ledger, spec)
-        (report.dropped if claim.reason else report.claims).append(claim)
+        # Motivo con prefijo «mark:» = se conserva marcada como «sin fuente».
+        kept = not claim.reason or claim.reason.startswith("mark:")
+        (report.claims if kept else report.dropped).append(claim)
     report.status = "ok"
     return report
