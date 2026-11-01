@@ -649,7 +649,9 @@ _PERFORMANCE_RE = re.compile(
     r"cu[aá]nto\s+(?:he\s+)?(?:ganado|perdido)|c[oó]mo\s+(?:me\s+)?va\s+(?:la|mi)\s+inversi[oó]n)\b"
     # «¿cuánto pierdo con ASTS?» / «¿voy ganando o perdiendo?»: antes iban al
     # volcado de la empresa. Con «si …» es un escenario, no la cifra guardada.
-    r"|\b(?:cu[aá]nto\s+(?:gano|pierdo|llevo\s+(?:ganado|perdido))|voy\s+(?:ganando|perdiendo))\b"
+    r"|\b(?:cu[aá]nto\s+(?:gano|pierdo|llevo\s+(?:ganado|perdido))|voy\s+(?:ganando|perdiendo)"
+    # «¿cuánto he invertido (en MSFT)?»: es el coste de compra que da esta ruta.
+    r"|cu[aá]nto\s+(?:dinero\s+)?(?:he|tengo)\s+invertido)\b"
     r"(?![^.!?\n]*\bsi\b)"
 )
 # "¿Qué es la rentabilidad?" / "¿cómo se calcula?" son preguntas de concepto:
@@ -676,6 +678,13 @@ _POSITION_QUERY_RE = re.compile(
     # verbal de peso tambien es pregunta de posicion.
     r"|\bcu[aá]nt[oa]\s+pesa[n]?\b"
     r"|\bqu[eé]\s+peso\s+tiene[n]?\b"
+    # «¿cuánto dinero tengo en UBER?», «¿tengo UBER?», «¿qué porcentaje de mi
+    # cartera es UBER?», «¿mi precio medio en ASTS?»: antes iban al volcado
+    # de la empresa con la posición guardada.
+    r"|\bcu[aá]nto\s+dinero\s+tengo\b"
+    r"|(?:^|¿)\s*tengo\s+(?!que\b)(?![^.!?\n]*\b(?:watchlist|lista|seguimiento|alertas?|avisos?|dividendos?)\b)"
+    r"|\bporcentaje\b[^.!?\n]{0,30}\b(?:cartera|tengo)\b"
+    r"|\bmi\s+(?:precio|coste)\s+medio\b"
 )
 # Impuesto de una venta de un ticker concreto («¿cuánto IRPF pagaría si vendo
 # todo UBER?»). Antes el verbo «vendo» la sacaba de la ruta de posición (es
