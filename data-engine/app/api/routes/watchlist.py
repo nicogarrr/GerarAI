@@ -195,6 +195,10 @@ async def watchlist_monitor(
     closes = ranked_prices(MarketPrice.date.desc())
     # Valor justo ÚNICO (tesis o motor, misma precedencia que inicio y screener).
     fair_values = resolve_fair_values(db, companies)
+    from decimal import Decimal
+
+    from app.services.price_units import close_in_company_currency
+
     items: dict[str, dict] = {}
     for company in companies:
         ticker = str(company.ticker).upper()
@@ -204,8 +208,16 @@ async def watchlist_monitor(
         fair_value = reading["value"]
         price = float(last_close.close) if last_close is not None else None
         side = None
-        if fair_value is not None and price is not None and fair_value > 0:
-            side = "infravalorada" if price < fair_value else "sobrevalorada"
+        if fair_value is not None and last_close is not None and fair_value > 0:
+            # El valor justo va en la divisa de la empresa y el cierre en la
+            # de la cotizacion: Londres guarda peniques (2.650 GBp frente a
+            # 30 £ salia siempre «sobrevalorada»). Sin tipo de cambio, sin juicio.
+            comparable = close_in_company_currency(
+                db, Decimal(str(last_close.close)), quote_currency=last_close.quote_currency,
+                company=company, on=last_close.date,
+            )
+            if comparable is not None:
+                side = "infravalorada" if float(comparable) < fair_value else "sobrevalorada"
         items[ticker] = {
             "low_52w": float(low_row.close) if low_row is not None else None,
             "low_52w_date": low_row.date.isoformat() if low_row is not None else None,
