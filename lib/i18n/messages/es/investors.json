@@ -26,5 +26,38 @@
   "pagination": {
     "aria": "Paginación",
     "pageOf": "Página {page} de {total}"
+  },
+  "videos": {
+    "metaTitle": "Vídeos de inversores",
+    "title": "Vídeos",
+    "channelsLink": "Canales de inversión",
+    "notFound": "Inversor no encontrado.",
+    "select": "Selecciona un inversor.",
+    "backToList": "Volver a la lista de inversores",
+    "empty": "No hay vídeos verificados disponibles para este inversor.",
+    "seeChannels": "Ver canales de inversión",
+    "archive": "Archivo, fuente no confirmada",
+    "source": "Fuente:",
+    "watchOnYoutube": "Ver en YouTube"
+  },
+  "channels": {
+    "title": "Canales de inversión",
+    "description": "Canales de YouTube de inversión con enlace directo, fuente y fecha de comprobación.",
+    "back": "Volver a Aprender",
+    "sectionInversion": "Inversión y finanzas",
+    "sectionNegocio": "Negocio y tecnología",
+    "sectionReferencia": "Referencias en inglés",
+    "sectionEmpresa": "Empresas",
+    "spanish": "Español",
+    "english": "Inglés"
+  },
+  "learn": {
+    "metaTitle": "Aprender - GerarAI",
+    "title": "Aprender",
+    "description": "Conceptos y canales de inversión.",
+    "concepts": "Conceptos",
+    "conceptsText": "Las ideas clave de value investing, explicadas.",
+    "channels": "Canales",
+    "channelsText": "Canales de análisis que merece la pena seguir."
   }
 }

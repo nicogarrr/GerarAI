@@ -3,12 +3,16 @@ import Link from "next/link";
 import BackendOffline from "@/components/system/BackendOffline";
 import { getInvestor, getInvestors } from "@/lib/actions/investors.actions";
 import { isBackendUnavailableError } from "@/lib/backend-offline";
+import { getT } from "@/lib/i18n/server";
 import { InvestorVideos } from "../_components/InvestorVideos";
 import { InvestorAvatar } from "../_components/Avatar";
 import { Pagination, paginate } from "../_components/Pagination";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Vídeos de inversores" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t('investors.videos.metaTitle') };
+}
 
 export default async function VideosPage({
   searchParams,
@@ -16,6 +20,7 @@ export default async function VideosPage({
   searchParams: Promise<{ inversor?: string; pagina?: string }>;
 }) {
   const { inversor, pagina } = await searchParams;
+  const t = await getT();
   let data: Awaited<ReturnType<typeof getInvestors>>;
   let detail: Awaited<ReturnType<typeof getInvestor>> = null;
   try {
@@ -27,7 +32,7 @@ export default async function VideosPage({
     if (isBackendUnavailableError(error))
       return (
         <BackendOffline
-          feature="Vídeos de inversores"
+          feature={t('investors.videos.metaTitle')}
           retryHref="/inversores/videos"
         />
       );
@@ -41,12 +46,12 @@ export default async function VideosPage({
       className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-8 overflow-x-clip py-6"
     >
       <header className="flex flex-wrap justify-between gap-3">
-        <h1 className="text-3xl font-semibold text-gray-100">Vídeos</h1>
+        <h1 className="text-3xl font-semibold text-gray-100">{t('investors.videos.title')}</h1>
         <Link
           className="inline-flex min-h-11 items-center text-sm text-teal-300 hover:underline"
           href="/inversores/canales"
         >
-          Canales de inversión
+          {t('investors.videos.channelsLink')}
         </Link>
       </header>
       <ul className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -81,8 +86,8 @@ export default async function VideosPage({
         </section>
       ) : (
         <div className="rounded-xl border border-gray-800 p-5 text-sm text-gray-400">
-          <p>{inversor ? "Inversor no encontrado." : "Selecciona un inversor."}</p>
-          {inversor ? <Link href="/inversores/videos" className="mt-2 inline-flex min-h-11 items-center text-teal-300">Volver a la lista de inversores</Link> : null}
+          <p>{inversor ? t('investors.videos.notFound') : t('investors.videos.select')}</p>
+          {inversor ? <Link href="/inversores/videos" className="mt-2 inline-flex min-h-11 items-center text-teal-300">{t('investors.videos.backToList')}</Link> : null}
         </div>
       )}
     </main>
