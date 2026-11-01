@@ -76,5 +76,24 @@
   },
   "brain": {
     "button": "Analyse the theme"
+  },
+  "basketNames": {
+    "semiconductors": "Semiconductors",
+    "quantum": "Quantum computing",
+    "ai": "AI and machine learning",
+    "dataCenters": "Data centers",
+    "cybersecurity": "Cybersecurity",
+    "health": "Healthcare innovation",
+    "cloudSaas": "Cloud and SaaS",
+    "robotics": "Robotics and automation",
+    "infrastructure": "Infrastructure",
+    "defense": "Defense and aerospace",
+    "materials": "Critical materials",
+    "adtech": "Digital advertising and adtech",
+    "utilities": "Energy and utilities",
+    "space": "Space",
+    "drones": "Drones",
+    "fintech": "Fintech",
+    "nuclear": "Nuclear"
   }
 }

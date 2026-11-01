@@ -30,7 +30,7 @@ import {
   type ThemeOrder,
 } from '@/lib/market/themes';
 import { paginateThemes, parseThemePage, themePageHref } from '@/lib/market/theme-pagination';
-import { THEME_TO_BOTTLENECK } from '@/lib/market/theme-bottleneck-map';
+import { THEME_TO_BOTTLENECK, basketName, bottleneckThemeName } from '@/lib/market/theme-bottleneck-map';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
@@ -91,8 +91,9 @@ function ThemeCard({
   const metrics: string[] = [];
   if (theme.ytd.pct !== null) metrics.push(`YTD ${pct(theme.ytd.pct)}`);
   if (theme.m1.pct !== null) metrics.push(`1M ${pct(theme.m1.pct)}`);
+  const name = basketName(theme.id, theme.name, t);
   const brainQuestion = t('themes.page.brainQuestion', {
-    name: theme.name,
+    name,
     metrics: metrics.length > 0 ? t('themes.page.brainMetrics', { metrics: metrics.join(', '), n: theme.n_total }) : '',
   });
   const rows = [...theme.constituents].sort(
@@ -120,7 +121,7 @@ function ThemeCard({
               </span>
             ) : null}
           </div>
-          <h2 className="text-sm font-semibold text-gray-100">{theme.name}</h2>
+          <h2 className="text-sm font-semibold text-gray-100">{name}</h2>
           {main.pct === null ? (
             <p className="text-lg font-semibold text-gray-500">{t('themes.page.notEnoughData')}</p>
           ) : (
@@ -142,7 +143,7 @@ function ThemeCard({
               tabla nunca se sale de la tarjeta ni pisa la vecina. */}
           <div className="@container overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <caption className="sr-only">{t('themes.page.composition', { name: theme.name })}</caption>
+              <caption className="sr-only">{t('themes.page.composition', { name })}</caption>
               <thead className="uppercase text-gray-500">
                 <tr>
                   <th className="py-1 pr-2 font-medium" scope="col">{t('themes.page.col.stock')}</th>
@@ -198,7 +199,7 @@ function ThemeCard({
             <p className="mt-3 border-t border-gray-800 pt-2 text-xs text-gray-400">
               {t('themes.page.bottleneck')}{' '}
               <Link className="text-teal-300 underline hover:text-teal-200" href="/cuellos">
-                {detectedBottleneck}
+                {bottleneckThemeName(detectedBottleneck, t)}
               </Link>
             </p>
           ) : null}

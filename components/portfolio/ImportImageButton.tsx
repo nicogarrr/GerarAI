@@ -54,7 +54,7 @@ export default function ImportImageButton() {
 
     async function selectFile(file: File) {
         setPreview(null); setReview(null); setDrafts([]); setMatches(null); generation.current++;
-        const invalid = imageFileError(file);
+        const invalid = imageFileError(file, ti);
         if (invalid) { setError(invalid); return; }
         await run(async () => {
             const encoded = await new Promise<string>((resolve, reject) => {
@@ -69,7 +69,7 @@ export default function ImportImageButton() {
         });
     }
 
-    const pending = imageRowsPending(drafts);
+    const pending = imageRowsPending(drafts, ti);
     const ready = pending === null;
     return <Dialog open={open} onOpenChange={next => { if (!busy) { setOpen(next); generation.current++; if (!next) { setPreview(null); setDrafts([]); setReview(null); setMatches(null); setError(null); } } }}>
         <DialogTrigger asChild><Button variant="outline" size="sm" className="min-h-11 border-gray-600 text-gray-200 sm:min-h-8"><ImagePlus className="mr-2 h-4 w-4" aria-hidden="true" />{ti('portfolio.importImage.cta')}</Button></DialogTrigger>

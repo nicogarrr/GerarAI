@@ -13,7 +13,7 @@ import {
   type DiscoveryView,
 } from '@/lib/actions/bottlenecks.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
-import { BOTTLENECK_TO_THEMES } from '@/lib/market/theme-bottleneck-map';
+import { BOTTLENECK_TO_THEMES, basketName, bottleneckThemeName } from '@/lib/market/theme-bottleneck-map';
 import { NA, type Formatters } from '@/lib/format';
 import { getFormat, getT } from '@/lib/i18n/server';
 import type { TranslateFn } from '@/lib/i18n/translate';
@@ -41,7 +41,7 @@ function SignalCard({ signal, minSources, t, fmt }: { signal: Awaited<ReturnType
   return (
     <li className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
       <div className="flex items-start justify-between gap-2">
-        <h2 className="text-sm font-semibold text-gray-100">{signal.theme}</h2>
+        <h2 className="text-sm font-semibold text-gray-100">{bottleneckThemeName(signal.theme, t)}</h2>
         {detected ? (
           <span className="rounded bg-teal-400/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-teal-300">
             {t('bottlenecks.page.detected')}
@@ -80,7 +80,7 @@ function SignalCard({ signal, minSources, t, fmt }: { signal: Awaited<ReturnType
         <p className="mt-3 border-t border-gray-800 pt-2 text-xs text-gray-400">
           {t('bottlenecks.page.relatedThemes')}{' '}
           <Link className="inline-flex min-h-11 min-w-11 items-center text-teal-300 underline hover:text-teal-200" href="/temas">
-            {BOTTLENECK_TO_THEMES[signal.theme].map((theme) => theme.name).join(' · ')}
+            {BOTTLENECK_TO_THEMES[signal.theme].map((theme) => basketName(theme.id, theme.name, t)).join(' · ')}
           </Link>
         </p>
       ) : null}

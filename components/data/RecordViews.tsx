@@ -33,6 +33,11 @@ function humanizeKey(key: string): string {
  * sin aviso. La profundidad está acotada: un anidamiento más profundo que
  * `depth` se marca como tal, no se serializa.
  */
+/** «+N más» / «+N more»: sin traductor (llamadas antiguas) se mantiene el español. */
+function moreItems(count: number, t?: TranslateFn): string {
+    return t ? t('data.moreItems', { count }) : `+${count} más`;
+}
+
 function describeValue(value: unknown, depth: number, t?: TranslateFn): string {
     if (value === null || value === undefined) return '—';
     if (typeof value === 'boolean') return value ? (t ? t('data.yes') : 'Sí') : (t ? t('data.no') : 'No');
@@ -44,7 +49,7 @@ function describeValue(value: unknown, depth: number, t?: TranslateFn): string {
         if (value.length === 0) return '—';
         const shown = value.slice(0, MAX_VALUE_ITEMS).map((item) => describeValue(item, depth - 1, t));
         const rest = value.length - shown.length;
-        return `${shown.join(' · ')}${rest > 0 ? ` · +${rest} más` : ''}`;
+        return `${shown.join(' · ')}${rest > 0 ? ` · ${moreItems(rest, t)}` : ''}`;
     }
     const entries = Object.entries(value as Record<string, unknown>);
     if (entries.length === 0) return '—';
@@ -52,7 +57,7 @@ function describeValue(value: unknown, depth: number, t?: TranslateFn): string {
         .slice(0, MAX_VALUE_ITEMS)
         .map(([key, item]) => `${humanizeKey(key)}: ${describeValue(item, depth - 1, t)}`);
     const rest = entries.length - shown.length;
-    return `${shown.join(' · ')}${rest > 0 ? ` · +${rest} más` : ''}`;
+    return `${shown.join(' · ')}${rest > 0 ? ` · ${moreItems(rest, t)}` : ''}`;
 }
 
 /** Convierte cualquier valor a texto plano legible en tabla/cards */

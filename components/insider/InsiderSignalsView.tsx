@@ -348,7 +348,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                             {moneyText(f, signal.value ?? signal.total_value)}
                                         </TableCell>
                                         <TableCell className="max-w-md text-sm text-gray-400">
-                                            <span className="line-clamp-3">{formatRecordValue(signal.detail)}</span>
+                                            <span className="line-clamp-3">{formatRecordValue(signal.detail, ti)}</span>
                                             <span className="mt-1 flex flex-wrap items-center gap-2">
                                                 {formBadge(ti, signal.form) ? (
                                                     <Badge variant="outline">{formBadge(ti, signal.form)!.label}</Badge>
@@ -390,7 +390,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                         </div>
                                     ) : null}
                                     <div className="mt-1 text-xs text-gray-500">{filingDateText(f, signal.date ?? signal.window_start)}</div>
-                                    <div className="mt-2 text-sm leading-6 text-gray-400"><span className="line-clamp-3">{formatRecordValue(signal.detail)}</span></div>
+                                    <div className="mt-2 text-sm leading-6 text-gray-400"><span className="line-clamp-3">{formatRecordValue(signal.detail, ti)}</span></div>
                                     <div className="mt-2 flex flex-wrap items-center gap-2">
                                         {formBadge(ti, signal.form) ? <Badge variant="outline">{formBadge(ti, signal.form)!.label}</Badge> : null}
                                         {signal.multi_reporter === true ? <span className="text-xs text-gray-500">{ti('insider.multiReporter')}</span> : null}

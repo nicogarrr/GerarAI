@@ -398,7 +398,17 @@
     "importedOne": "{n} posición importada",
     "importedMany": "{n} posiciones importadas",
     "errorGeneric": "No se pudo completar la importación",
-    "errorOpen": "No se pudo abrir la imagen"
+    "errorOpen": "No se pudo abrir la imagen",
+    "fileType": "Usa una imagen PNG, JPEG o WebP",
+    "fileSize": "La imagen debe ocupar como máximo 2 MB",
+    "pendingNoRows": "Añade al menos una fila.",
+    "pendingNoInstrumentOne": "{n} fila sin instrumento elegido",
+    "pendingNoInstrumentMany": "{n} filas sin instrumento elegido",
+    "pendingBadQuantityOne": "{n} cantidad no válida",
+    "pendingBadQuantityMany": "{n} cantidades no válidas",
+    "pendingUncheckedOne": "{n} fila sin marcar como revisada",
+    "pendingUncheckedMany": "{n} filas sin marcar como revisadas",
+    "pendingMissing": "Falta: {items}."
   },
   "savings": {
     "title": "Tu ahorro a largo plazo",

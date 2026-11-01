@@ -76,5 +76,24 @@
   },
   "brain": {
     "button": "Analizar el tema"
+  },
+  "basketNames": {
+    "semiconductors": "Semiconductores",
+    "quantum": "Computación cuántica",
+    "ai": "IA y aprendizaje automático",
+    "dataCenters": "Centros de datos",
+    "cybersecurity": "Ciberseguridad",
+    "health": "Innovación en salud",
+    "cloudSaas": "Cloud y SaaS",
+    "robotics": "Robótica y automatización",
+    "infrastructure": "Infraestructuras",
+    "defense": "Defensa y aeroespacial",
+    "materials": "Materiales críticos",
+    "adtech": "Publicidad digital y adtech",
+    "utilities": "Energía y utilities",
+    "space": "Espacio",
+    "drones": "Drones",
+    "fintech": "Fintech",
+    "nuclear": "Nuclear"
   }
 }
