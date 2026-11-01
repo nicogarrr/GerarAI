@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useT } from '@/lib/i18n/client';
 import {
     getRadarDcaOpportunities,
     type RadarDcaOpportunity,
@@ -21,6 +22,7 @@ const LEVEL_STYLES: Record<number, string> = {
 };
 
 function LevelBadge({ item }: { item: RadarDcaOpportunity }) {
+    const t = useT();
     if (item.level == null) return null;
     const style = LEVEL_STYLES[item.level] ?? LEVEL_STYLES[1];
     // Sin línea "Fuente X · barrido · versión" por tarjeta (petición de Nico:
@@ -31,7 +33,7 @@ function LevelBadge({ item }: { item: RadarDcaOpportunity }) {
     // (-1/-2) el label es "RECORTE LIGERO/FUERTE" y el prefijo "-1X" era un
     // artefacto. Sin label del backend: fallback derivado del nivel.
     const label =
-        item.level_label ?? (item.level > 0 ? `${item.level}X DCA` : 'RECORTE');
+        item.level_label ?? (item.level > 0 ? `${item.level}X DCA` : t('propicks.radarDca.cutFallback'));
     return (
         <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${style}`}>
             {label}
@@ -40,38 +42,40 @@ function LevelBadge({ item }: { item: RadarDcaOpportunity }) {
 }
 
 function StatusLine({ item }: { item: RadarDcaOpportunity }) {
+    const t = useT();
     return (
         <div className="flex flex-wrap items-center gap-2 text-xs">
             {item.status === 'forming' && (
-                <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-300">En formación</span>
+                <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-300">{t('propicks.radarDca.forming')}</span>
             )}
             {item.status === 'confirmed' && (
-                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-300">Confirmado</span>
+                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-300">{t('propicks.radarDca.confirmed')}</span>
             )}
             {item.confirmed_level != null && item.confirmed_period && (
                 <span className="text-gray-400">
-                    Último confirmado: {item.confirmed_level}X · {item.confirmed_period}
+                    {t('propicks.radarDca.lastConfirmed', { level: item.confirmed_level, period: item.confirmed_period })}
                 </span>
             )}
             {item.clear_price_signal === true && (
                 <span className="rounded-full bg-emerald-500/25 px-2 py-0.5 font-semibold text-emerald-200">
-                    4X claro
+                    {t('propicks.radarDca.clear4x')}
                 </span>
             )}
             {item.price_verified === false && (
                 <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-300">
-                    Precio sin verificación independiente
+                    {t('propicks.radarDca.priceUnverified')}
                 </span>
             )}
             {item.quality?.passed === true && (
                 <span className="rounded-full bg-teal-500/25 px-2 py-0.5 font-semibold text-teal-200">
-                    Calidad clara
+                    {t('propicks.radarDca.qualityClear')}
                 </span>
             )}
             {item.change?.status === 'compared' && item.change.changed === true && (
                 <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-violet-300">
-                    Cambio {item.change.from_level}X → {item.change.to_level}X
-                    {item.change.since_price_date ? ` desde ${item.change.since_price_date}` : ''}
+                    {item.change.since_price_date
+                        ? t('propicks.radarDca.changeSince', { from: item.change.from_level ?? '—', to: item.change.to_level ?? '—', date: item.change.since_price_date })
+                        : t('propicks.radarDca.change', { from: item.change.from_level ?? '—', to: item.change.to_level ?? '—' })}
                 </span>
             )}
         </div>
@@ -79,6 +83,7 @@ function StatusLine({ item }: { item: RadarDcaOpportunity }) {
 }
 
 function OpportunityCard({ item }: { item: RadarDcaOpportunity }) {
+    const t = useT();
     return (
         <li>
             <Card className="space-y-2 rounded-lg border border-gray-700 bg-gray-800/50 p-4">
@@ -94,11 +99,11 @@ function OpportunityCard({ item }: { item: RadarDcaOpportunity }) {
                 <div className="text-sm text-gray-300">
                     {item.close != null && (
                         <span>
-                            Cierre {item.close} {item.currency ?? ''}
+                            {t('propicks.radarDca.close', { price: item.close, currency: item.currency ?? '' })}
                             {item.price_date ? ` · ${item.price_date}` : ''}
                         </span>
                     )}
-                    {item.signal_date && <span className="text-gray-500"> · señal {item.signal_date}</span>}
+                    {item.signal_date && <span className="text-gray-500"> · {t('propicks.radarDca.signal', { date: item.signal_date })}</span>}
                 </div>
             </Card>
         </li>
@@ -106,6 +111,7 @@ function OpportunityCard({ item }: { item: RadarDcaOpportunity }) {
 }
 
 export default function RadarDcaView() {
+    const t = useT();
     const [page, setPage] = useState(1);
     const [level, setLevel] = useState<number | null>(null);
     const [sector, setSector] = useState('');
@@ -123,39 +129,38 @@ export default function RadarDcaView() {
             .then((data) => { if (!cancelled) setResult(data); })
             .catch(() => {
                 // Sin oportunidades inventadas ni cacheadas: error honesto.
-                if (!cancelled) setError('Radar DCA no disponible ahora mismo; no se han generado oportunidades.');
+                if (!cancelled) setError(t('propicks.radarDca.unavailable'));
             })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [page, level, sector, outsideTracked, qualityClear]);
+    }, [page, level, sector, outsideTracked, qualityClear, t]);
 
     return (
-        <section aria-label="Oportunidades DCA" className="space-y-4">
+        <section aria-label={t('propicks.radarDca.ariaLabel')} className="space-y-4">
             <p className="text-sm text-gray-400">
-                Señales de precio nico-v1 sobre el universo escaneado (hasta 1.000 empresas). Es una
-                zona de precio, no un veredicto de calidad de negocio.
+                {t('propicks.radarDca.intro')}
             </p>
 
             <div className="flex flex-wrap items-center gap-2">
                 <select
-                    aria-label="Nivel"
+                    aria-label={t('propicks.radarDca.levelAria')}
                     className="min-h-[44px] rounded-md border border-gray-700 bg-gray-800 px-2 text-base text-gray-200 sm:text-sm"
                     value={level == null ? '' : String(level)}
                     onChange={(e) => { setPage(1); setLevel(e.target.value === '' ? null : Number(e.target.value)); }}
                 >
-                    <option value="">Todos los niveles</option>
+                    <option value="">{t('propicks.radarDca.allLevels')}</option>
                     <option value="4">4X</option>
                     <option value="3">3X</option>
                     <option value="2">2X</option>
                     <option value="1">1X</option>
                 </select>
                 <select
-                    aria-label="Sector"
+                    aria-label={t('propicks.radarDca.sectorAria')}
                     className="min-h-[44px] rounded-md border border-gray-700 bg-gray-800 px-2 text-base text-gray-200 sm:text-sm"
                     value={sector}
                     onChange={(e) => { setPage(1); setSector(e.target.value); }}
                 >
-                    <option value="">Todos los sectores</option>
+                    <option value="">{t('propicks.radarDca.allSectors')}</option>
                     {(result?.sectors ?? []).map((s) => (
                         <option key={s} value={s}>{s}</option>
                     ))}
@@ -167,7 +172,7 @@ export default function RadarDcaView() {
                         checked={outsideTracked}
                         onChange={(e) => { setPage(1); setOutsideTracked(e.target.checked); }}
                     />
-                    Fuera de cartera y watchlist
+                    {t('propicks.radarDca.outsideTracked')}
                 </label>
                 <label className="flex min-h-[44px] items-center gap-2 text-sm text-gray-300">
                     <input
@@ -176,22 +181,26 @@ export default function RadarDcaView() {
                         checked={qualityClear}
                         onChange={(e) => { setPage(1); setQualityClear(e.target.checked); }}
                     />
-                    Solo calidad clara
+                    {t('propicks.radarDca.onlyQualityClear')}
                 </label>
             </div>
 
             {result && (
                 <p className="text-xs text-gray-500">
-                    Cobertura: {result.coverage.ok} vigentes · {result.coverage.evaluated} evaluadas de{' '}
-                    {result.coverage.universe} · {result.coverage.invalid} inválidas ·{' '}
-                    {result.coverage.stale} sin corrida reciente
+                    {t('propicks.radarDca.coverage', {
+                        ok: result.coverage.ok,
+                        evaluated: result.coverage.evaluated,
+                        universe: result.coverage.universe,
+                        invalid: result.coverage.invalid,
+                        stale: result.coverage.stale,
+                    })}
                 </p>
             )}
 
             {loading && (
                 <Card aria-busy="true" className="flex items-center justify-center gap-3 rounded-lg border border-gray-700 bg-gray-800/50 p-10 text-gray-400">
                     <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin text-teal-400" />
-                    <span>Cargando oportunidades…</span>
+                    <span>{t('propicks.radarDca.loading')}</span>
                 </Card>
             )}
 
@@ -204,7 +213,7 @@ export default function RadarDcaView() {
 
             {!loading && !error && result && result.items.length === 0 && (
                 <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-sm text-gray-400">
-                    Sin oportunidades vigentes con estos filtros.
+                    {t('propicks.radarDca.empty')}
                 </Card>
             )}
 
@@ -223,17 +232,17 @@ export default function RadarDcaView() {
                         disabled={page <= 1}
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                     >
-                        <ChevronLeft aria-hidden="true" className="h-4 w-4" /> Anterior
+                        <ChevronLeft aria-hidden="true" className="h-4 w-4" /> {t('propicks.radarDca.previous')}
                     </Button>
                     <span className="text-xs text-gray-500">
-                        Página {result.page} · {result.page_size} por página · {result.total} en total
+                        {t('propicks.radarDca.pageInfo', { page: result.page, size: result.page_size, total: result.total })}
                     </span>
                     <Button
                         className="min-h-[44px]"
                         disabled={!result.has_more}
                         onClick={() => setPage((p) => p + 1)}
                     >
-                        Siguiente <ChevronRight aria-hidden="true" className="h-4 w-4" />
+                        {t('propicks.radarDca.next')} <ChevronRight aria-hidden="true" className="h-4 w-4" />
                     </Button>
                 </div>
             )}
