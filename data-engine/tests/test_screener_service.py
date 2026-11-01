@@ -270,7 +270,6 @@ def test_metric_coverage_lists_only_metrics_with_data():
     assert "wacc" not in coverage
 
 
-
 def test_metric_coverage_caches_per_tenant(monkeypatch):
     # La lectura agrega sobre tablas grandes (>15 s en frio en prod): la
     # segunda llamada dentro del TTL no reconsulta.
@@ -299,9 +298,7 @@ def test_metric_coverage_caches_per_tenant(monkeypatch):
 
         # TTL expirado (reloj adelantado): reconsulta y ve el dato nuevo.
         real_monotonic = time.monotonic
-        monkeypatch.setattr(
-            screener_service.time, "monotonic", lambda: real_monotonic() + 3600
-        )
+        monkeypatch.setattr(screener_service.time, "monotonic", lambda: real_monotonic() + 3600)
         assert "fcf_yield" in service.metric_coverage(db)
     finally:
         screener_service._METRIC_COVERAGE_CACHE.clear()
@@ -314,15 +311,25 @@ def test_fcf_per_share_cagr_ignores_quarterly_rows_like_plain_cagr():
     `_cagr` ya filtraba los trimestres; `_ratio_cagr` no, así que el Q3 de
     2024 (50) sustituía al anual (200) y el CAGR salía negativo.
     """
+
     def fact(fid, metric, value, year, quarter):
         return FinancialFact(
-            id=fid, company_id=1, metric=metric, value=Decimal(value), period=f"{quarter}{year}",
-            fiscal_year=year, fiscal_quarter=quarter, confidence=Decimal("0.9"),
+            id=fid,
+            company_id=1,
+            metric=metric,
+            value=Decimal(value),
+            period=f"{quarter}{year}",
+            fiscal_year=year,
+            fiscal_quarter=quarter,
+            confidence=Decimal("0.9"),
         )
 
     # Orden de la consulta: fiscal_year DESC, id DESC (el más nuevo primero).
-    fcf = [fact(4, "free_cash_flow", "50", 2024, "Q3"), fact(3, "free_cash_flow", "200", 2024, "FY"),
-           fact(1, "free_cash_flow", "100", 2020, "FY")]
+    fcf = [
+        fact(4, "free_cash_flow", "50", 2024, "Q3"),
+        fact(3, "free_cash_flow", "200", 2024, "FY"),
+        fact(1, "free_cash_flow", "100", 2020, "FY"),
+    ]
     shares = [fact(5, "shares_diluted", "10", 2024, "FY"), fact(2, "shares_diluted", "10", 2020, "FY")]
 
     plain = ScreenerService._cagr(fcf)
@@ -333,13 +340,19 @@ def test_fcf_per_share_cagr_ignores_quarterly_rows_like_plain_cagr():
     assert ratio is not None and abs(ratio.value - expected) < Decimal("0.000001")
 
 
-
 def test_point_value_prefers_the_annual_row_over_a_later_quarter():
     """El valor puntual sigue la misma regla que `_cagr`: el anual manda."""
+
     def fact(fid, value, year, quarter):
         return FinancialFact(
-            id=fid, company_id=1, metric="free_cash_flow", value=Decimal(value), period=f"{quarter}{year}",
-            fiscal_year=year, fiscal_quarter=quarter, confidence=Decimal("0.9"),
+            id=fid,
+            company_id=1,
+            metric="free_cash_flow",
+            value=Decimal(value),
+            period=f"{quarter}{year}",
+            fiscal_year=year,
+            fiscal_quarter=quarter,
+            confidence=Decimal("0.9"),
         )
 
     service = ScreenerService()
@@ -347,5 +360,34 @@ def test_point_value_prefers_the_annual_row_over_a_later_quarter():
     assert mixed["free_cash_flow"].value == Decimal("200")
     assert mixed["free_cash_flow"].period == "FY2023"
     # Sin ninguna fila anual se usa la más reciente, como antes.
-    only_quarters = service._observations_from_rows([], [fact(3, "50", 2024, "Q3"), fact(1, "40", 2024, "Q2")])
+    only_quarters = service._observations_from_rows(
+        [], [fact(3, "50", 2024, "Q3"), fact(1, "40", 2024, "Q2")]
+    )
     assert only_quarters["free_cash_flow"].value == Decimal("50")
+
+
+def test_run_logs_stage_timings(caplog):
+    """Desglose por etapa del wall de run(): una línea INFO por corrida con
+    timings_ms para medir en prod qué etapa domina (companies, reads o loop).
+    Coste: unos pocos perf_counter (~ns) por corrida."""
+    import logging
+
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        tenant = Tenant(external_id="timings", name="Timings")
+        db.add(tenant)
+        db.flush()
+        db.info["tenant_id"] = tenant.id
+        company = _company("TIM")
+        db.add(company)
+        db.flush()
+        _metric(db, company, "roic", "0.18")
+        db.commit()
+        with caplog.at_level(logging.INFO, logger="app.services.screener_service"):
+            response = ScreenerService().run(db, criteria=[{"left": "roic", "operator": ">", "right": "0.1"}])
+        assert response["match_count"] == 1
+    record = next(r for r in caplog.records if "screener.run timings_ms=" in r.getMessage())
+    message = record.getMessage()
+    for stage in ("definitions", "companies", "calculated_read", "facts_read", "context_read", "eval_loop"):
+        assert f"'{stage}'" in message, f"falta etapa {stage} en {message}"

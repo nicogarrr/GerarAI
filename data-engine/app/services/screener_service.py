@@ -426,9 +426,14 @@ class ScreenerService:
         ranking_formula: str | None = None,
         ranking_direction: str = "desc",
     ) -> dict[str, Any]:
+        from time import perf_counter
+
+        timings: dict[str, float] = {}
+        t0 = perf_counter()
         normalized = [self._criterion(item) for item in criteria]
         ranking = SafeFormula(ranking_formula) if ranking_formula else None
         definitions = CustomMetricService.active(db)
+        timings["definitions"] = (perf_counter() - t0) * 1000
         # Parse every formula ONCE, outside the company loop: the set of names a
         # screen references is what decides which financial_facts rows are read.
         parsed_criteria = [
@@ -444,7 +449,10 @@ class ScreenerService:
         # company is missing it" with no hint that the metric itself is the
         # problem.
         names_with_data: set[str] = set()
+        t0 = perf_counter()
         companies = list(db.scalars(select(Company).order_by(Company.ticker)).all())
+        timings["companies"] = (perf_counter() - t0) * 1000
+        t0 = perf_counter()
         # Batch-fetch observations once: two queries per table instead of two
         # queries per company (2N -> 2 on every screener run).
         # Solo la ultima fila por (empresa, metrica) se usa (la primera en el
@@ -485,7 +493,11 @@ class ScreenerService:
             )
         ).all():
             calculated_by_company.setdefault(row.company_id, []).append(row)
+        timings["calculated_read"] = (perf_counter() - t0) * 1000
+        t0 = perf_counter()
         facts_by_company = self._facts_by_company(db, self._required_fact_metrics(used_names, definitions))
+        timings["facts_read"] = (perf_counter() - t0) * 1000
+        t0 = perf_counter()
         # Valoracion, tesis y nivel DCA como nombres del screener (tambien
         # dentro de metricas personalizadas). Solo se leen si se usan.
         context_names = set(used_names)
@@ -495,6 +507,8 @@ class ScreenerService:
             except ValueError:
                 continue
         context_by_company = context_observations(db, context_names, companies)
+        timings["context_read"] = (perf_counter() - t0) * 1000
+        t0 = perf_counter()
         for company in companies:
             observations = self._observations_from_rows(
                 calculated_by_company.get(company.id, []),
@@ -614,7 +628,16 @@ class ScreenerService:
             ordered_rank = rank_value if ranking_direction == "asc" else -rank_value
             return (not row["matched"], missing_rank, ordered_rank, row["ticker"])
 
+        timings["eval_loop"] = (perf_counter() - t0) * 1000
         results.sort(key=result_order)
+        # Desglose por etapa para medir el wall real en prod (A/B del piloto):
+        # una linea por corrida, ~ns de coste por perf_counter.
+        logger.info(
+            "screener.run timings_ms=%s companies=%d matched=%d",
+            {k: round(v, 1) for k, v in timings.items()},
+            len(companies),
+            sum(1 for row in results if row["matched"]),
+        )
         return {
             "criteria": normalized,
             "ranking_formula": ranking_formula,
