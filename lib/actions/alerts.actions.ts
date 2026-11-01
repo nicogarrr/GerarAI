@@ -6,7 +6,7 @@ import { requestCache } from '@/lib/cache/requestCache';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { AppError, isNextRedirectError, ValidationError } from '@/lib/types/errors';
 import { paginateAll } from '@/lib/paginate-all';
-import { spanishBackendMessage } from '@/lib/research/backend-error-es';
+import { backendMessageForRequest } from '@/lib/research/backend-error-locale';
 import type { components } from '@/lib/research/openapi.generated';
 
 export type AlertType = 'price_above' | 'price_below' | 'price_change' | 'news' | 'earnings';
@@ -137,7 +137,7 @@ export async function createAlertResult(input: CreateAlertInput): Promise<Create
             if (error.code === 'RESEARCH_API_ERROR' && [400, 404, 422].includes(error.statusCode)) {
                 const message = error.statusCode === 404
                     ? `Símbolo no reconocido: ${input.symbol.trim().toUpperCase()}. Comprueba que exista en bolsa.`
-                    : spanishBackendMessage(error.message);
+                    : await backendMessageForRequest(error.message);
                 return { ok: false, cause: 'validation', message };
             }
         }

@@ -1,7 +1,7 @@
 import ValuationSummaryGrid from '@/components/research/ValuationSummaryGrid';
 import type { Metadata } from 'next';
 import { redirectToSignIn } from '@/lib/auth/sign-in-redirect';
-import { getT } from '@/lib/i18n/server';
+import { getLocale, getT } from '@/lib/i18n/server';
 import { parseTransactionFilters } from '@/lib/portfolio/transaction-filters';
 import { getPortfolioSummary, getPortfolioTransactionPage, getPortfolioScores, getPortfolioForecast, getPortfolioTearsheet, getPortfolioDividendProjection } from '@/lib/actions/portfolio.actions';
 import PortfolioTabs from '@/components/portfolio/PortfolioTabs';
@@ -10,7 +10,7 @@ import BackendOffline from '@/components/system/BackendOffline';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { isAuthError } from '@/lib/types/errors';
 import { sectionErrorKey } from '@/lib/section-error';
-import { spanishBackendMessage } from '@/lib/research/backend-error-es';
+import { backendMessage } from '@/lib/research/backend-error-es';
 
 // Forzar renderizado dinámico
 export const dynamic = 'force-dynamic';
@@ -28,6 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function PortfolioPage({ searchParams }: { searchParams: Promise<{ transactionOffset?: string; ticker?: string; type?: string }> }) {
   const ti = await getT();
+  const locale = await getLocale();
   const query = await searchParams;
   const transactionFilters = parseTransactionFilters(query);
   const offset = Number.isSafeInteger(Number(query.transactionOffset)) && Number(query.transactionOffset) >= 0 ? Number(query.transactionOffset) : 0;
@@ -53,18 +54,18 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
     // oculte el resto de la cartera. Summary/positions son esenciales; scores,
     // transactions y tearsheet son lecturas tolerantes a falta de historial.
     const [summaryResult, transactionsResult, scoresResult, tearsheetResult, forecastResult, dividendsResult] = await Promise.all([
-      getPortfolioSummary(userId).then((value) => ({ value, error: null as string | null, cause: null as unknown })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : ti('portfolio.page.loadSummaryFailed'), cause: error as unknown })),
-      getPortfolioTransactionPage(userId, offset, transactionFilters).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { items: [], total: 0, offset, filters: transactionFilters } as Awaited<ReturnType<typeof getPortfolioTransactionPage>>, error: error instanceof Error ? spanishBackendMessage(error.message) : ti('portfolio.page.loadTransactionsFailed') })),
+      getPortfolioSummary(userId).then((value) => ({ value, error: null as string | null, cause: null as unknown })).catch((error) => ({ value: null, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadSummaryFailed'), cause: error as unknown })),
+      getPortfolioTransactionPage(userId, offset, transactionFilters).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { items: [], total: 0, offset, filters: transactionFilters } as Awaited<ReturnType<typeof getPortfolioTransactionPage>>, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadTransactionsFailed') })),
       // Un fallo al pedir los factores no son cinco ceros: son cinco fatores
       // desconocidos, y la UI los pinta como "no disponible" en vez de
       // "0,00", que es lo que se veia cuando el backend no respondia.
-      getPortfolioScores(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { quality: null, growth: null, value: null, dividend: null, cagr3y: null }, error: error instanceof Error ? spanishBackendMessage(error.message) : ti('portfolio.page.loadScoresFailed') })),
-      getPortfolioTearsheet(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : ti('portfolio.page.loadTearsheetFailed') })),
+      getPortfolioScores(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { quality: null, growth: null, value: null, dividend: null, cagr3y: null }, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadScoresFailed') })),
+      getPortfolioTearsheet(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadTearsheetFailed') })),
       // La previsión es lectura tolerante: un fallo deja la pestaña con aviso, nunca rompe la página.
-      getPortfolioForecast().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : ti('portfolio.page.loadForecastFailed') })),
+      getPortfolioForecast().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadForecastFailed') })),
       // La proyección de dividendos también es lectura tolerante: un fallo
       // deja la pestaña con aviso, nunca rompe la página.
-      getPortfolioDividendProjection().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : ti('portfolio.page.loadDividendsFailed') })),
+      getPortfolioDividendProjection().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadDividendsFailed') })),
     ]);
     if (!summaryResult.value) {
       // Antes se reconstruia un Error plano desde el mensaje: perdia code y

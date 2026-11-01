@@ -1324,5 +1324,42 @@
     "chartSvgLabel": "{name}: {count} épocas, de {from} a {to}",
     "chartCaption": "Semieje mayor por época orbital (km)",
     "chartFootnote": "{count} épocas guardadas. La gráfica no confirma despliegue."
+  },
+  "filingsYoy": {
+    "metaTitle": "Documentos SEC",
+    "metaDescription": "Formularios y cambios reportados por la empresa ante la SEC, con su fuente.",
+    "kind": {
+      "added": "Añadido",
+      "removed": "Eliminado",
+      "modified": "Modificado"
+    },
+    "perPageNote": "Cada página es un informe distinto, del más reciente al más antiguo.",
+    "perShare": "{amount} por acción",
+    "shares": "{amount} acciones",
+    "title": "Informe frente al año anterior · {ticker}",
+    "back": "Volver a la empresa",
+    "reportTypeAria": "Tipo de informe",
+    "loadError": "No se pudo leer la comparación. No equivale a «sin cambios».",
+    "noData": "Sin datos.",
+    "periodLine": "{form} del periodo {current} frente a {previous}",
+    "keyFigures": "Cifras clave",
+    "colMetric": "Métrica",
+    "colCurrent": "Actual",
+    "colPrevious": "Año anterior",
+    "colChange": "Variación",
+    "outflowNote": "salida de caja, importe absoluto",
+    "calculated": "calculado",
+    "noFigures": "Sin cifras guardadas para ambos periodos.",
+    "textChanges": "Cambios de texto",
+    "unchangedText": "Sin cambios en el texto identificado.",
+    "noSectionData": "Sin datos de esta sección.",
+    "changesCount": "{count} cambios",
+    "truncated": " (se muestran los primeros 20)",
+    "before": "Antes: «{text}»",
+    "after": "Ahora: «{text}»",
+    "noTextAnalysis": "Sin análisis de texto.",
+    "pagesAria": "Páginas de informes",
+    "newer": "Más reciente",
+    "older": "Anterior"
   }
 }

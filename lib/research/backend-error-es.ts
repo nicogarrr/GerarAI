@@ -127,3 +127,43 @@ export function spanishBackendMessage(message: string | null | undefined, fallba
   }
   return text;
 }
+
+/* ------------------------------------------------------------------ *
+ * Inglés (Ajustes → Idioma = English). El motor ya habla inglés: lo legible
+ * pasa tal cual (con mayúscula y punto); los códigos snake_case y los
+ * «500 Internal Server Error» se sustituyen por un aviso en inglés, y el
+ * español que devuelva el motor pasa intacto (no se traduce prosa).
+ * ------------------------------------------------------------------ */
+
+const EN_GENERIC = 'The operation could not be completed. Please retry.';
+const EN_ENGINE_DOWN = 'The analysis engine is not responding right now. Retry in a few seconds.';
+
+function englishByStatus(status: number): string {
+  if (status === 404) return 'What you are looking for could not be found (it may have been deleted). Reload the page.';
+  if (status === 401) return 'You need to sign in to continue.';
+  if (status === 403) return 'You do not have permission for this operation.';
+  if (status === 409) return 'The operation conflicts with the current state. Reload the page and check the data.';
+  if (status === 400 || status === 422) return 'The analysis engine rejected the data sent. Check the form and retry.';
+  if (status === 429) return 'Too many requests. Wait a moment and retry.';
+  if (status >= 500) return EN_ENGINE_DOWN;
+  return EN_GENERIC;
+}
+
+/** Mensaje del motor para el idioma de la interfaz; en español, lo mismo que `spanishBackendMessage`. */
+export function backendMessage(
+  message: string | null | undefined,
+  locale: 'es' | 'en' = 'es',
+  fallback?: string,
+): string {
+  if (locale !== 'en') return spanishBackendMessage(message, fallback);
+  const text = (message ?? '').trim();
+  const englishFallback = fallback ?? EN_GENERIC;
+  if (!text) return englishFallback;
+  const status = /^(\d{3})(\s+[A-Za-z' -]*)?$/.exec(text);
+  if (status) return englishByStatus(Number(status[1]));
+  if (/^research engine unavailable\b/i.test(text)) return EN_ENGINE_DOWN;
+  if (/^[a-z0-9]+(_[a-z0-9]+)+$/.test(text)) return englishFallback;
+  if (SPANISH_MARKS.test(text)) return text;
+  const sentence = text.charAt(0).toUpperCase() + text.slice(1);
+  return /[.!?)]$/.test(sentence) ? sentence : `${sentence}.`;
+}

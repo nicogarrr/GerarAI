@@ -9,7 +9,7 @@ import { researchErrorDetail } from '@/lib/research/error-detail';
 import { AppError, ExternalAPIError, ValidationError, isNextRedirectError } from '@/lib/types/errors';
 import { assertPositiveInt } from '@/lib/validation/pathParams';
 import { knowledgeTickerFormValue, libraryReadingsPath } from '@/lib/knowledge/document-ticker';
-import { spanishBackendMessage } from '@/lib/research/backend-error-es';
+import { backendMessageForRequest } from '@/lib/research/backend-error-locale';
 import type { components } from '@/lib/research/openapi.generated';
 
 const BACKEND_URL = process.env.FMP_BACKEND_URL ?? 'http://localhost:8000';
@@ -372,7 +372,7 @@ export async function ingestLettersCorpusNow(): Promise<CorpusIngestResult> {
     return { success: true };
   } catch (error) {
     console.error('ingestLettersCorpusNow error:', error);
-    return { success: false, message: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo encolar la descarga.' };
+    return { success: false, message: error instanceof Error ? await backendMessageForRequest(error.message) : 'No se pudo encolar la descarga.' };
   }
 }
 
@@ -427,7 +427,7 @@ export async function deleteKnowledgeDocument(documentId: number): Promise<Delet
     return { success: true };
   } catch (error) {
     console.error('deleteKnowledgeDocument error:', error);
-    return { success: false, message: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo eliminar el documento.' };
+    return { success: false, message: error instanceof Error ? await backendMessageForRequest(error.message) : 'No se pudo eliminar el documento.' };
   }
 }
 
@@ -439,7 +439,7 @@ export async function deleteKnowledgeCollection(collectionId: number): Promise<D
     return { success: true };
   } catch (error) {
     console.error('deleteKnowledgeCollection error:', error);
-    return { success: false, message: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo eliminar la colección.' };
+    return { success: false, message: error instanceof Error ? await backendMessageForRequest(error.message) : 'No se pudo eliminar la colección.' };
   }
 }
 
