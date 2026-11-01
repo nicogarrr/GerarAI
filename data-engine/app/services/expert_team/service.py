@@ -109,6 +109,11 @@ async def run_team(
     question: str | None = None,
     reasoner: Reasoner | None = None,
     provider: Any | None = None,
+    total_timeout_s: float | None = None,
 ) -> TeamResult:
     ctx = run_context(db, ticker=ticker, mode=mode, question=question)
-    return await build_team(db, reasoner=reasoner, provider=provider).run(ctx)
+    team = build_team(db, reasoner=reasoner, provider=provider)
+    if total_timeout_s is not None:
+        # El chat da menos tiempo que la tesis: el experto que no llegue sale como «timeout».
+        team.total_timeout_s = total_timeout_s
+    return await team.run(ctx)

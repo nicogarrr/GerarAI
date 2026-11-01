@@ -43,6 +43,7 @@ export interface BrainMessage {
     content: string;
     citations?: PortfolioChatCitation[];
     experts?: ExpertName[] | null;
+    expertsTimedOut?: ExpertName[] | null;
     guide?: AssistantResponse;
     library?: LibraryAnswer;
 }
@@ -331,7 +332,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
             const result = await chatWithPortfolio(userMsg, userId, page, history);
             if (result.context) setEcho(result.context);
             if (result.success) {
-                setMessages(prev => [...prev, { role: 'assistant', content: result.message, citations: result.citations, experts: result.experts }]);
+                setMessages(prev => [...prev, { role: 'assistant', content: result.message, citations: result.citations, experts: result.experts, expertsTimedOut: result.expertsTimedOut }]);
             } else {
                 setMessages(prev => [...prev, { role: 'assistant', content: result.message || t('brain.panel.unknownError') }]);
             }
@@ -488,7 +489,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                                             >
                                                 {m.content}
                                             </ReactMarkdown>
-                                            <BrainExpertTeam experts={m.experts} />
+                                            <BrainExpertTeam experts={m.experts} timedOut={m.expertsTimedOut} />
                                             <BrainSources citations={m.citations} />
                                         </div>
                                     ) : (

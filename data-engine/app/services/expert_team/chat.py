@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 MIN_EXPERTS = 2
 #: Tope propio del equipo en el chat; nunca más que lo que le queda a la petición.
 CHAT_TEAM_TIMEOUT_S = 45.0
+#: Margen para el juez y para pintar la respuesta dentro del tope del chat.
+_TEAM_MARGIN_S = 8.0
 PROMPT_VERSION = "expert-team-chat-v1"
 
 _LABELS = {
@@ -166,10 +168,19 @@ def render(result: TeamResult, lang: str) -> ChatResponse | None:
         llm_trace={"expert_team": {
             "plan": list(result.plan),
             "status": {r.expert: r.status for r in result.reports},
+            "answered": [r.expert for r in result.reports if any(not c.reason for c in r.claims)],
+            "timed_out": [r.expert for r in result.reports if r.status == "timeout"],
             "dropped": sum(len(r.dropped) for r in result.reports),
             "conflicts": len(result.conflicts),
         }},
     )
+
+
+def team_budget_s(timeout: float) -> float:
+    """Tiempo para los expertos, por debajo del tope del chat: un experto lento
+    sale como «no respondió a tiempo» y se contesta con lo que sí llegó, en vez
+    de perder la respuesta entera al vencer el tope."""
+    return timeout - _TEAM_MARGIN_S if timeout > 2 * _TEAM_MARGIN_S else timeout * 0.5
 
 
 async def answer_with_team(
@@ -181,7 +192,11 @@ async def answer_with_team(
         return None
     try:
         result = await asyncio.wait_for(
-            run_team(db, ticker=ticker, mode="chat", question=question, provider=provider), timeout=timeout
+            run_team(
+                db, ticker=ticker, mode="chat", question=question, provider=provider,
+                total_timeout_s=team_budget_s(timeout),
+            ),
+            timeout=timeout,
         )
         return render(result, current_language())
     except Exception as exc:  # noqa: BLE001 — el equipo nunca rompe el chat
