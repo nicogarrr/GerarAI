@@ -1,4 +1,36 @@
 {
   "gainers": "Gainers",
-  "losers": "Losers"
+  "losers": "Losers",
+  "table": {
+    "empty": "No data yet — it will show here as soon as prices are recorded.",
+    "company": "Company",
+    "price": "Price",
+    "change": "Change",
+    "volume": "Volume",
+    "volShort": "Vol.",
+    "dateOf": "as of {date}",
+    "registered": "Recorded: {datetime}"
+  },
+  "regime": {
+    "dataOf": "Data from {date}",
+    "noData": "No data",
+    "hmmTitle": "State model (HMM)",
+    "state": "State {n}",
+    "filterAt": "Filtered as of {date}",
+    "trainedThrough": "Trained through {date}",
+    "concentrationTitle": "Top-10 concentration",
+    "largestWeight": "Largest weight: {value}",
+    "snapshotOf": "Snapshot of {date}",
+    "snapshotChecked": "Snapshot checked: {date}",
+    "betaTitle": "Portfolio beta",
+    "unavailable": "Unavailable",
+    "status": {
+      "available": "Available",
+      "stale": "Stale",
+      "noData": "No data"
+    },
+    "feature": "Market",
+    "generated": "generated {datetime}",
+    "empty": "No data yet — it will show here as soon as there is a regime snapshot."
+  }
 }
