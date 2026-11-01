@@ -81,7 +81,6 @@
   "lib/ir-registry.ts": 1,
   "lib/knowledge-graph/graph-model.ts": 16,
   "lib/knowledge/analysis.ts": 8,
-  "lib/knowledge/job-feedback.ts": 3,
   "lib/labels.ts": 122,
   "lib/logos/site-icon.ts": 1,
   "lib/market/chart-ranges.ts": 2,

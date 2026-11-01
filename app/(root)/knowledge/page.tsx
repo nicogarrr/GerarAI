@@ -333,7 +333,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                   <td className="py-3 pr-4 text-gray-400">{documentTypeLabel(document.document_type, t)}</td>
                   <td className="py-3 pr-4 text-gray-500">{parserLabel(document.metadata.parser, t)}</td>
                   <td className="py-3 pr-4"><Badge className={statusTone(document.status)} variant="outline">{label(document.status, t)}</Badge></td>
-                  <td className="py-3"><div className="flex flex-wrap justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={documentReaderHref(document.id, documentOffset, searchQuery)}>{t('knowledge.fragments')}</Link></Button><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage={t('knowledge.extractQueued')}><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status, t) : t('knowledge.extract')}</Button></MutationForm><DeleteDocumentButton documentId={document.id} title={document.title} /></div>{extractionResultText(job) ? <p className="mt-1 max-w-xs text-right text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}</td>
+                  <td className="py-3"><div className="flex flex-wrap justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={documentReaderHref(document.id, documentOffset, searchQuery)}>{t('knowledge.fragments')}</Link></Button><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage={t('knowledge.extractQueued')}><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status, t) : t('knowledge.extract')}</Button></MutationForm><DeleteDocumentButton documentId={document.id} title={document.title} /></div>{extractionResultText(job, t) ? <p className="mt-1 max-w-xs text-right text-xs text-gray-400" role="status">{extractionResultText(job, t)}</p> : null}</td>
                 </tr>
                 );
               })}
@@ -354,7 +354,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                   <Badge className={statusTone(document.status)} variant="outline">{label(document.status, t)}</Badge>
                 </div>
                 <div className="mt-2 text-xs text-gray-500">{t('knowledge.parserLine', { parser: parserLabel(document.metadata.parser, t) })}</div>
-                {extractionResultText(job) ? <p className="mt-2 text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}
+                {extractionResultText(job, t) ? <p className="mt-2 text-xs text-gray-400" role="status">{extractionResultText(job, t)}</p> : null}
                 <div className="mt-4 grid grid-cols-1 gap-2">
                   <Button asChild className="h-11 w-full" size="sm" variant="outline"><Link href={documentReaderHref(document.id, documentOffset, searchQuery)}>{t('knowledge.fragments')}</Link></Button>
                   <MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage={t('knowledge.extractQueued')}>
@@ -538,7 +538,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                 <p className="text-sm text-gray-400">
                   {activeJobs.length
                     ? t('knowledge.extracting')
-                    : noPrinciplesText(jobs)}
+                    : noPrinciplesText(jobs, t)}
                 </p>
                 {!activeJobs.length ? (
                   <Button asChild className="mt-3 min-h-[44px]" size="sm" variant="outline">

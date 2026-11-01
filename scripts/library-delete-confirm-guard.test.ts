@@ -7,7 +7,7 @@ import ts from 'typescript';
 test('library refresh is active-job scoped and cleaned up; completion feedback remains',()=>{
  const page=readFileSync('app/(root)/knowledge/page.tsx','utf8');
  assert.match(page,/ExtractionRefresh active=\{activeJobs.length > 0\}/);
- assert.match(page,/extractionResultText\(job\)/);
+ assert.match(page,/extractionResultText\(job, t\)/);
  const refresh=readFileSync('components/knowledge/ExtractionRefresh.tsx','utf8');
  const code=ts.transpileModule(refresh,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
  const timers=new Map<number,{callback:()=>void;delay:number}>();

@@ -181,5 +181,18 @@
       "one": "{count} document matches “{query}”.",
       "other": "{count} documents match “{query}”."
     }
+  },
+  "jobFeedback": {
+    "timeout": "The extraction took too long. Try again.",
+    "unavailable": "The extraction service is not available right now. Try again later.",
+    "failed": "The extraction could not be completed. Try again.",
+    "countUnavailable": "Count not available.",
+    "partial": "Partial extraction: {result}",
+    "completed": "Extraction completed: {result}",
+    "noPrinciples": "No principles extracted yet.",
+    "partialEmpty": "The last extraction stopped halfway and left no principles.",
+    "completedEmpty": "The last extraction finished without finding any principles.",
+    "principlesFoundOne": "{count} principle found.",
+    "principlesFound": "{count} principles found."
   }
 }
