@@ -13,11 +13,11 @@ process-local store: if Redis is down, requests fail closed with 503.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import hmac
 import logging
 import math
+import threading
 import time
 import uuid
 from collections import deque
@@ -78,7 +78,9 @@ def is_exempt_path(path: str) -> bool:
     return stripped == "/health" or stripped.startswith("/health/")
 
 _local_hits: dict[str, deque[float]] = {}
-_local_lock = asyncio.Lock()
+# The process-local store is shared by ASGI loops in different threads.
+# Both guarded sections are synchronous and contain no await.
+_local_lock = threading.Lock()
 
 
 class RateLimitBackendUnavailable(RuntimeError):
@@ -168,7 +170,7 @@ async def _record_hit(
                     "rate-limit store unreachable"
                 ) from exc
 
-    async with _local_lock:
+    with _local_lock:
         hits = _local_hits.setdefault(key, deque())
         cutoff = now - window_seconds
         while hits and hits[0] <= cutoff:
@@ -365,7 +367,7 @@ async def _count_hits(key: str, *, use_redis: bool, redis_url: str) -> int:
             return int(await client.zcount(key, now - WINDOW_SECONDS, "+inf"))
         finally:
             await client.aclose()
-    async with _local_lock:
+    with _local_lock:
         hits = _local_hits.get(key)
         if not hits:
             return 0
