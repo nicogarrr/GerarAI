@@ -1232,7 +1232,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             ))}
           </div>
         </Panel>
-        <OwnershipSignalsPanel signals={ownershipSignals} ticker={ticker} />
+        <OwnershipSignalsPanel locale={locale} signals={ownershipSignals} ticker={ticker} />
         {ticker === 'ASTS' ? <Panel collapsible="mobile" title={t('research.fichaSatellitesPanel')}><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=seguimiento#satellites`}>{t('research.fichaOrbitalSignal')}</Link></Panel> : null}
         <p role="status" className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
           {researchValuability(snapshot)}

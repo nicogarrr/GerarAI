@@ -1510,5 +1510,42 @@
     "noBaseCost": "No cost in {currency}: a purchase is missing its exchange rate. The gain in {currency} can’t be calculated.",
     "recordTrade": "Record a buy or sell",
     "viewInPortfolio": "View in portfolio"
+  },
+  "publicShorts": {
+    "metaTitle": "Public short positions",
+    "metaDescription": "Short positions disclosed in public registers, with official dates and sources.",
+    "title": "Public short positions · {ticker}",
+    "back": "Back to the company",
+    "refreshDone": "Lookup finished",
+    "refresh": "Refresh source",
+    "noData": "No data",
+    "readError": "The stored lookup couldn’t be read. This is not a count of zero positions.",
+    "lastLookup": "Last lookup with data: {date}. At most one lookup per hour.",
+    "officialSource": "Official source · {source}",
+    "publicTotal": "Public total: {percent}",
+    "derived": "DERIVED",
+    "official": "OFFICIAL",
+    "noNotifications": "No disclosures in the public table checked. That doesn’t mean there are no short positions below the threshold.",
+    "positionDate": "Position date: {date}",
+    "pagesLabel": "Position pages",
+    "previous": "Previous",
+    "next": "Next",
+    "tradeDate": "Trade date",
+    "shortRatio": "Short volume / FINRA volume",
+    "shortVolume": "Short volume · OFFICIAL",
+    "finraVolume": "FINRA volume · OFFICIAL"
+  },
+  "ownershipSignals": {
+    "title": "What insiders and large funds are buying and selling",
+    "loadError": "The insider and 13F summary couldn’t be loaded right now.",
+    "viewOwners": "View owners",
+    "insidersLabel": "Insiders (Form 4)",
+    "insidersTitle": "Insider buys and sells (Form 4)",
+    "windowDays": " · {days} days",
+    "fundsLabel": "Funds (13F)",
+    "fundsTitle": "Large funds (13F filing)",
+    "manager": "manager",
+    "managers": "managers",
+    "footer": "Form 4 and 13F already synced. The 13F is quarterly, up to 45 days late and only covers long positions. This summary feeds the thesis."
   }
 }
