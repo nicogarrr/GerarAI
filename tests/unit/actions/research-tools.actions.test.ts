@@ -213,6 +213,31 @@ describe('búsqueda universal', () => {
         // devolvía su page_size por defecto (20) en vez de los 50 pedidos.
         expect(lastBody()).not.toHaveProperty('limit');
     });
+
+    it('lee la respuesta paginada del backend (items/page_info) como results/total', async () => {
+        // POST /api/search devuelve PaginatedResponse: { items, page_info, query, retrieval }.
+        // La página /search lee `results` y `total`: sin adaptarlo, `results.map`
+        // reventaba con cualquier búsqueda que encontrara algo.
+        const item = { entity_type: 'claim', entity_id: 1, title: 'Revenue grows', text: 'Revenue grows' };
+        fetchMock.mockResolvedValue(okJson({
+            items: [item],
+            page_info: { page: 1, page_size: 50, total_items: 7, total_pages: 1, has_next: false, has_previous: false },
+            query: 'revenue', filters: {}, retrieval: { fusion: 'reciprocal_rank_fusion' },
+        }));
+        const out = await searchResearchLibrary({ query: 'revenue' });
+        expect(out.results).toEqual([item]);
+        expect(out.total).toBe(7);
+        expect(out.query).toBe('revenue');
+        expect(out.retrieval).toEqual({ fusion: 'reciprocal_rank_fusion' });
+    });
+
+    it('sigue aceptando la forma antigua (results/total)', async () => {
+        const item = { entity_type: 'claim', entity_id: 2, title: 'x', text: 'x' };
+        fetchMock.mockResolvedValue(okJson({ query: 'x', total: 1, retrieval: {}, results: [item] }));
+        const out = await searchResearchLibrary({ query: 'x' });
+        expect(out.results).toEqual([item]);
+        expect(out.total).toBe(1);
+    });
 });
 
 describe('screeners', () => {
