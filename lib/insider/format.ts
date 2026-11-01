@@ -73,10 +73,25 @@ const TITLE_ABBREVIATIONS: Array<[RegExp, string]> = [
 const CONNECTORS = /\b(and|y)\b/gi;
 
 /** Cargo corto en español a partir del rol y el título que trae el Form 4. */
-export function insiderRole(role: string | null | undefined, officerTitle: string | null | undefined): string {
+/** Cargo en inglés: el título de la SEC ya llega en inglés y se muestra tal cual. */
+function insiderRoleEn(roleText: string, title: string): string {
+    if (roleText.includes('multiple insiders')) return 'Multiple insiders';
+    const parts: string[] = [];
+    if (roleText.includes('officer') || title) parts.push(title || 'Officer');
+    if (roleText.includes('director')) parts.push('Director');
+    if (roleText.includes('10% owner')) parts.push('10% owner');
+    return parts.length ? parts.join(' · ') : 'Insider';
+}
+
+export function insiderRole(
+    role: string | null | undefined,
+    officerTitle: string | null | undefined,
+    locale: 'es' | 'en' = 'es',
+): string {
     const title = (officerTitle ?? '').trim();
     const parts: string[] = [];
     const roleText = (role ?? '').toLowerCase();
+    if (locale === 'en') return insiderRoleEn(roleText, title);
     if (roleText.includes('multiple insiders')) return 'Varios insiders';
     if (roleText.includes('officer') || title) {
         // Cada patrón consume su trozo antes de probar el siguiente. Si al
@@ -162,10 +177,16 @@ const SIGNAL_LABELS: Record<string, string> = {
     big_buy: 'Gran compra',
 };
 
-export function signalLabel(signal: string | null | undefined): string {
+const SIGNAL_LABELS_EN: Record<string, string> = {
+    cluster_buy: 'Cluster buy',
+    c_suite_buy: 'CEO/CFO buy',
+    big_buy: 'Large buy',
+};
+
+export function signalLabel(signal: string | null | undefined, locale: 'es' | 'en' = 'es'): string {
     const key = (signal ?? '').trim();
     if (!key) return '—';
-    return SIGNAL_LABELS[key] ?? key;
+    return (locale === 'en' ? SIGNAL_LABELS_EN : SIGNAL_LABELS)[key] ?? key;
 }
 
 /** Tooltip con el umbral REAL del backend (insider_service.py): el guard lo
@@ -179,8 +200,14 @@ const SIGNAL_TOOLTIPS: Record<string, string> = {
     big_buy: 'Una compra supera 1 M$',
 };
 
-export function signalTooltip(signal: string | null | undefined): string | undefined {
+const SIGNAL_TOOLTIPS_EN: Record<string, string> = {
+    cluster_buy: '3 or more different insiders buy within 30 days',
+    c_suite_buy: 'The CEO or CFO buys shares',
+    big_buy: 'A single purchase above $1M',
+};
+
+export function signalTooltip(signal: string | null | undefined, locale: 'es' | 'en' = 'es'): string | undefined {
     const key = (signal ?? '').trim();
     if (!key) return undefined;
-    return SIGNAL_TOOLTIPS[key];
+    return (locale === 'en' ? SIGNAL_TOOLTIPS_EN : SIGNAL_TOOLTIPS)[key];
 }

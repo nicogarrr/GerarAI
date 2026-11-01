@@ -68,7 +68,7 @@ function SignalLine({ signal, children }: { signal: InsiderFeedSignal; children?
             </Link>
             {signal.insider ? <span className="text-gray-100">{insiderName(signal.insider)}</span> : null}
             {signal.role || signal.officer_title ? (
-                <span className="text-gray-400">{insiderRole(signal.role, signal.officer_title)}</span>
+                <span className="text-gray-400">{insiderRole(signal.role, signal.officer_title, f.locale)}</span>
             ) : null}
             {isInstitutionalInsiderName(signal.insider) ? (
                 <span className="rounded-full bg-indigo-950/60 px-2 py-0.5 text-xs font-semibold text-indigo-300">{t('insider.feed.institutional')}</span>
@@ -101,7 +101,7 @@ function OperationCard({ tx }: { tx: InsiderFeedTransaction }) {
                 <span className="ml-auto tabular-nums text-xs text-gray-500">{tx.date ? f.formatDate(tx.date) : '—'}</span>
             </div>
             <div className="mt-1.5 text-sm font-medium text-gray-100">{insiderName(tx.insider)}</div>
-            <div className="text-xs text-gray-500">{insiderRole(tx.role, tx.officer_title)}</div>
+            <div className="text-xs text-gray-500">{insiderRole(tx.role, tx.officer_title, f.locale)}</div>
             <dl className="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
                 <div>
                     <dt className="text-xs text-gray-500">{t('insider.feed.colShares')}</dt>
@@ -262,7 +262,7 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                                     {tx.form === 'CA-INSIDER' ? <span className="block text-xs font-normal text-gray-500">{t('insider.feed.canadaBadge')}</span> : null}
                                                 </td>
                                                 <td className="px-3 py-2 text-gray-100">{insiderName(tx.insider)}</td>
-                                                <td className="px-3 py-2 text-gray-400">{insiderRole(tx.role, tx.officer_title)}</td>
+                                                <td className="px-3 py-2 text-gray-400">{insiderRole(tx.role, tx.officer_title, f.locale)}</td>
                                                 <td className={`px-3 py-2 font-medium ${tx.side === 'compra' ? 'text-teal-300' : 'text-red-400'}`}>
                                                     {sideLabel(tx.side, t)}
                                                     {tx.rule_10b5_1 ? <span className="block text-xs font-normal text-gray-500">{t('insider.feed.plan10b51Badge')}</span> : null}

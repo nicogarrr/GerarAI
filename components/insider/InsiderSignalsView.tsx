@@ -324,9 +324,9 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                         <TableCell>
                                             <Badge
                                                 variant={signalTone(signal.signal)}
-                                                title={signalTooltip(typeof signal.signal === 'string' ? signal.signal : null)}
+                                                title={signalTooltip(typeof signal.signal === 'string' ? signal.signal : null, f.locale)}
                                             >
-                                                {signalLabel(typeof signal.signal === 'string' ? signal.signal : null)}
+                                                {signalLabel(typeof signal.signal === 'string' ? signal.signal : null, f.locale)}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-sm text-gray-200">
@@ -336,7 +336,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                     {/* Mismo mapa de cargos que el feed: aquí salía el título SEC en crudo (Tester 6). */}
                                                     {insiderRole(
                                                         typeof signal.role === 'string' ? signal.role : null,
-                                                        typeof signal.officer_title === 'string' ? signal.officer_title : null,
+                                                        typeof signal.officer_title === 'string' ? signal.officer_title : null, f.locale
                                                     )}
                                                 </span>
                                             ) : null}
@@ -377,7 +377,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                             {signals.map((signal) => (
                                 <article className="min-w-0 rounded-lg border border-gray-700/50 bg-gray-900/50 p-4 break-words" key={signalKey(signal)}>
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <Badge variant={signalTone(signal.signal)} title={signalTooltip(typeof signal.signal === 'string' ? signal.signal : null)}>{signalLabel(typeof signal.signal === 'string' ? signal.signal : null)}</Badge>
+                                        <Badge variant={signalTone(signal.signal)} title={signalTooltip(typeof signal.signal === 'string' ? signal.signal : null, f.locale)}>{signalLabel(typeof signal.signal === 'string' ? signal.signal : null, f.locale)}</Badge>
                                         <span className="ml-auto text-sm font-semibold text-gray-100">{moneyText(f, signal.value ?? signal.total_value)}</span>
                                     </div>
                                     <div className="mt-3 text-sm font-medium text-gray-200">{formatRecordValue(signal.insider)}</div>
@@ -385,7 +385,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                         <div className="text-xs text-gray-500">
                                             {insiderRole(
                                                 typeof signal.role === 'string' ? signal.role : null,
-                                                typeof signal.officer_title === 'string' ? signal.officer_title : null,
+                                                typeof signal.officer_title === 'string' ? signal.officer_title : null, f.locale
                                             )}
                                         </div>
                                     ) : null}
@@ -446,7 +446,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                             {filing.transactions.map((tx, index) => (
                                                 <li className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs" key={index}>
                                                     <span className="font-semibold text-gray-100">{insiderName(tx.insider)}</span>
-                                                    <span className="text-gray-400">{insiderRole(tx.role, tx.officer_title)}</span>
+                                                    <span className="text-gray-400">{insiderRole(tx.role, tx.officer_title, f.locale)}</span>
                                                     <span className={tx.code === 'P' ? 'text-teal-300' : tx.code === 'S' ? 'text-red-400' : 'text-gray-400'}>
                                                         {insiderCodeLabel(tx.code, ti)}
                                                         {tx.is_derivative ? ` · ${ti('insider.derivative')}` : ''}
