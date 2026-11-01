@@ -374,9 +374,13 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
             split_after_price,
             split_events_by_company,
         )
+        from app.valuation.currency import normalize_currency
 
         eps_ccy = _unit_currency(eps_row.unit)
-        list_ccy = (company.currency or "").upper()
+        # Ficha en subunidad (TSCO.L en «GBX» / «GBp»): se compara la divisa
+        # principal y el cierre se pasa a ella mas abajo («GBp».upper() era
+        # GBP con el cierre en peniques: PER x100; «GBX» daba N/D).
+        list_ccy, company_divisor = normalize_currency(company.currency)
         if eps_ccy and list_ccy and eps_ccy != list_ccy:
             sources.append(
                 f"PER: N/D: EPS {eps_row.metric} FY{eps_row.fiscal_year} en "
@@ -421,7 +425,7 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
                 f"a {company.currency} para {price_row.date.isoformat()}")
             return {"market_cap": market_cap, "per": None,
                     "currency": company.currency, "sources": sources}
-        per = float(close) / (float(eps_row.value) / float(split_factor))
+        per = float(close / Decimal(company_divisor)) / (float(eps_row.value) / float(split_factor))
         source = (f"PER: cierre {price_row.date.isoformat()} / "
                   f"{eps_row.metric} FY{eps_row.fiscal_year} ({eps_row.source_type})")
         if split_factor != 1:

@@ -23,6 +23,7 @@ from app.services.split_adjustment import (
     split_after_price,
     split_events_by_company,
 )
+from app.valuation.currency import normalize_currency
 from app.valuation.engines.base import ADR_TAG_PREFIX, adr_ratio
 
 _METRICS = {"eps_diluted", "total_equity", "shares_diluted", "net_income"}
@@ -162,6 +163,7 @@ def load_screener_ratios(
         if price is None and not use_live:
             output[company.ticker.upper()] = metrics
             continue
+        company_major, company_divisor = normalize_currency(company.currency)
         if use_live:
             close = live_close
         else:
@@ -175,6 +177,9 @@ def load_screener_ratios(
             if close is None:
                 output[company.ticker.upper()] = metrics
                 continue
+            # Ficha en subunidad (TSCO.L en «GBX» / «GBp») y hechos en GBP:
+            # el cierre va a la divisa principal o el PER sale x100 (o N/D).
+            close = close / Decimal(company_divisor)
         # Un ADR cotiza por ADR (N ordinarias) y el EPS / las acciones del
         # filing son por ORDINARIA: sin el ratio el PER y el P/B salian N
         # veces inflados. Precio por ordinaria = precio del ADR / N, como
@@ -190,7 +195,7 @@ def load_screener_ratios(
             if use_live
             else {"source": price.source, "date": price.date.isoformat(), "id": price.id}
         )
-        currency = (company.currency or "").upper()
+        currency = (company.currency or "").upper() if use_live else (company_major or "")
         # Fecha del precio usado: un split posterior a ese precio no lo cambia.
         price_cutoff = live_date if use_live else price.date
         years = sorted({year for year, _ in facts_for_company}, reverse=True)
