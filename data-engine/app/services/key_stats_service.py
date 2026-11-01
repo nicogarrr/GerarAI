@@ -91,9 +91,20 @@ def _epoch_date(value: Any) -> date | None:
     return datetime.fromtimestamp(number, tz=UTC).date()
 
 
-def range_from_closes(rows: list[tuple[date, float]], today: date) -> Range52w | None:
-    """Minimo y maximo de cierre de las ultimas 52 semanas (cierres propios)."""
+def range_from_closes(
+    rows: list[tuple[date, float]], today: date, split_dates: list[date] | tuple[date, ...] = (),
+) -> Range52w | None:
+    """Minimo y maximo de cierre de las ultimas 52 semanas (cierres propios).
+
+    ``close`` es el cierre cotizado: antes de un split esta en la base vieja
+    (un contrasplit 1:10 dejaba el minimo diez veces por debajo). Con un split
+    efectivo dentro de la ventana solo cuentan los cierres desde el ultimo
+    split; con pocas sesiones la ficha cae al rango de Yahoo (ya ajustado).
+    """
     cutoff = today - timedelta(days=365)
+    in_window = [day for day in split_dates if cutoff < day <= today]
+    if in_window:
+        cutoff = max(in_window) - timedelta(days=1)
     valid = [(day, float(close)) for day, close in rows if day > cutoff and _positive(close) is not None]
     if not valid:
         return None
@@ -151,7 +162,10 @@ def _own_data(db: Session, ticker: str, today: date) -> dict[str, Any]:
                 MarketPrice.date > today - timedelta(days=365),
             )
         ).all()
-        out["range"] = range_from_closes([(row[0], row[1]) for row in rows], today)
+        from app.services.split_adjustment import split_events_by_company
+
+        splits = [day for day, _ratio in split_events_by_company(db, [company.id]).get(company.id, [])]
+        out["range"] = range_from_closes([(row[0], row[1]) for row in rows], today, splits)
     symbol = (company.ticker if company is not None else ticker).strip().upper()
     nxt = db.scalars(
         select(EarningsDate)
