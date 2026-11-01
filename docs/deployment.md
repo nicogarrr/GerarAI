@@ -34,9 +34,10 @@ POSTGRES_PASSWORD=tu_password_segura_postgres
 POSTGRES_DB=cavaai_research
 DATABASE_URL=postgresql+psycopg://portfolio:tu_password_segura_postgres@postgres:5432/cavaai_research
 
-# Caché y Colas (Redis 7)
-REDIS_PASSWORD=tu_password_segura_redis
-REDIS_URL=redis://:tu_password_segura_redis@redis:6379/0
+# Caché y Colas (Redis 7). Obligatoria; solo letras y números
+# (Redis no arranca con otra cosa). Ej.: openssl rand -hex 32
+REDIS_PASSWORD=TuPasswordSeguraRedis
+REDIS_URL=redis://:TuPasswordSeguraRedis@redis:6379/0
 
 # Base de Datos Vectorial (Qdrant)
 QDRANT_URL=http://qdrant:6333
