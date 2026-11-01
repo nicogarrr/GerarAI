@@ -927,6 +927,74 @@ def _history_answer(db: Session, tenant: int, text: str) -> ChatResponse:
     return _response("\n".join(lines), sources, "portfolio_history")
 
 
+_RULES_ASK = re.compile(
+    r"\b(?:que|cuales|cuantas)\s+(?:alertas|avisos)\s+tengo\s+(?:configurad|puest|activ|cread|programad)\w*"
+    r"|\bmis\s+reglas\s+de\s+(?:aviso|alerta)s?\b|\blista\w*\s+(?:de\s+)?(?:mis\s+)?(?:alertas|avisos)\b"
+    r"|\bmis\s+(?:alertas|avisos)\s+(?:configurad|puest|activ|cread|programad)\w*"
+    r"|\bmy\s+alert\s+rules\b|\bwhat\s+alerts\s+(?:do\s+)?i\s+have\b|\blist\s+(?:all\s+)?my\s+alerts\b"
+)
+
+
+def _asks_alert_rules(text: str, question: str) -> bool:
+    return bool(_RULES_ASK.search(text) and not _tickers_in(question))
+
+
+def _rule_text(kind: str, condition: dict, currency: str | None, english: bool) -> str:
+    op = str((condition or {}).get("operator") or "")
+    raw = (condition or {}).get("value")
+    try:
+        value = float(str(raw))
+        number = _num_en(value, 2).rstrip("0").rstrip(".") if english else num_es(value, 2).rstrip("0").rstrip(",")
+    except (TypeError, ValueError):
+        value, number = None, str(raw)
+    cur = f" {currency}" if currency else ""
+    if kind == "price_below" or (kind.startswith("price") and kind != "price_change" and op in {"<", "<="}):
+        return f"price below {number}{cur}" if english else f"precio por debajo de {number}{cur}"
+    if kind == "price_above" or (kind.startswith("price") and kind != "price_change" and op in {">", ">="}):
+        return f"price above {number}{cur}" if english else f"precio por encima de {number}{cur}"
+    if kind == "price_change":
+        more = op in {">", ">="}
+        if english:
+            return f"daily change of {number}% or {'more' if more else 'less'}"
+        return f"variación del día de {number} % o {'más' if more else 'menos'}"
+    if kind in {"news", "news_event"}:
+        return "new news" if english else "noticias nuevas"
+    if kind in {"earnings", "earnings_run"}:
+        return "new earnings" if english else "resultados nuevos"
+    return f"{kind} {op} {number}".strip()
+
+
+def _alert_rules_answer(db: Session, tenant: int) -> ChatResponse:
+    from app.models import AlertRule, Company
+
+    english = _english()
+    rows = db.execute(
+        select(AlertRule, Company.ticker, Company.currency)
+        .outerjoin(Company, Company.id == AlertRule.company_id)
+        .where(AlertRule.tenant_id == tenant, AlertRule.active.is_(True))
+        .order_by(AlertRule.id)
+    ).all()
+    sources = [_source("alert_rule", None, "Alertas", "/alerts")]
+    if not rows:
+        return _response("You have no active alerts. You can create them in Alerts." if english
+                         else "No tienes alertas activas. Puedes crearlas en Alertas.", sources, "account_alert_rules")
+    count = len(rows)
+    lines = [(f"You have {count} active alert{'s' if count != 1 else ''}:" if english
+              else f"Tienes {count} alerta{'s' if count != 1 else ''} activa{'s' if count != 1 else ''}:")]
+    for rule, ticker, currency in rows[:20]:
+        line = f"- {ticker or '?'}: {_rule_text(rule.rule_type or '', rule.condition or {}, currency, english)}"
+        if rule.last_triggered_at is not None:
+            fired = rule.last_triggered_at.date()
+            line += (f" (last triggered {_date_en(fired)})" if english
+                     else f" (saltó por última vez el {fecha_es(fired)})")
+        lines.append(line)
+    if count > 20:
+        lines.append(f"And {count - 20} more in Alerts." if english else f"Y {count - 20} más en Alertas.")
+    lines.append("To create, pause or delete alerts, go to Alerts." if english
+                 else "Para crear, pausar o borrar alertas, ve a Alertas.")
+    return _response("\n".join(lines), sources, "account_alert_rules")
+
+
 def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     """Respuesta de datos de la cuenta, o None si la pregunta no es de este módulo."""
     tenant = _tenant(db)
@@ -939,6 +1007,8 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
         return _history_answer(db, tenant, text)
     if _asks_sell_all_tax(text, question):
         return _sell_all_answer(db, tenant)
+    if _asks_alert_rules(text, question):
+        return _alert_rules_answer(db, tenant)
     if _asks_plan(text, question):
         return _plan_answer(db, tenant, text)
     if _asks_return_ranking(text, question):
