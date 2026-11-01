@@ -625,6 +625,17 @@ def test_el_contexto_raiz_no_lleva_node_modules(path):
     assert is_excluded(path, read_patterns(DOCKERIGNORE_ROOT)), f"{path} entraria en la imagen"
 
 
+# Cachés de herramientas en cualquier nivel: `ruff check` o `pytest` lanzados
+# desde la raíz del repo dejan .ruff_cache/.pytest_cache ahí, y el .dockerignore
+# solo excluía las de data-engine/.
+@pytest.mark.parametrize("path", [
+    ".ruff_cache/CACHEDIR.TAG", ".pytest_cache/v/cache/lastfailed",
+    ".mypy_cache/3.12/app.json", "qa-e2e/.pytest_cache/README.md",
+])
+def test_el_contexto_raiz_no_lleva_caches_de_herramientas(path):
+    assert is_excluded(path, read_patterns(DOCKERIGNORE_ROOT)), f"{path} entraria en la imagen"
+
+
 @pytest.mark.parametrize(
     "path",
     [
@@ -641,16 +652,8 @@ def test_el_contexto_data_engine_no_lleva_env_ni_venv_ni_datos(path):
     assert is_excluded(path, read_patterns(DOCKERIGNORE_ENGINE)), f"{path} entraria en la imagen"
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Hallazgo de la auditoria E3: `COPY . .` en data-engine/Dockerfile.prod mete "
-        "tests/ y evals/ (321 ficheros de test) en la imagen de produccion. El "
-        ".dockerignore es compartido con el compose de desarrollo, que monta el "
-        "arbol por volumen, asi que excluir tests/ no rompe el desarrollo. "
-        "Arreglo en el PR de Dockerfiles (propiedad compartida)."
-    ),
-    strict=False,
-)
+# Hallazgo E3 (Dockerfile.prod metía tests/ y evals/ en la imagen): arreglado
+# en el .dockerignore de data-engine; antes era xfail y ya pasaba (XPASS).
 def test_los_tests_no_deberian_entrar_en_la_imagen_de_produccion():
     assert is_excluded("tests/test_main.py", read_patterns(DOCKERIGNORE_ENGINE))
 
@@ -666,16 +669,8 @@ def test_no_hay_fugas_en_los_contextos_reales():
         assert all(path.endswith(".pyc") for path in pyc)
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Hallazgo de la auditoria E3: `.env`, `.env.*`, `__pycache__`, `*.db` y "
-        "`*.py[cod]` en los .dockerignore son patrones anclados a la raiz del "
-        "contexto: NO son globs recursivos. Verificado contra el demonio, un "
-        "`sub/.env.production` si entra en el contexto. Arreglado en el PR de "
-        "Dockerfiles (propiedad compartida)."
-    ),
-    strict=False,
-)
+# Hallazgo E3 (patrones anclados a la raíz, no recursivos): arreglado con los
+# `**/` del .dockerignore; antes era xfail y ya pasaba (XPASS).
 def test_un_env_anidado_tampoco_deberia_entrar():
     assert is_excluded("sub/.env.production", read_patterns(DOCKERIGNORE_ENGINE))
 

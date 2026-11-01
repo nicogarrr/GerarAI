@@ -105,6 +105,10 @@ docker-compose*
 **/*.sqlite*
 **/*.duckdb
 **/*.tsbuildinfo
+# Cachés de herramientas (ruff/pytest/mypy lanzados desde cualquier carpeta).
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
 
 # Credenciales del compose de produccion. docker.env.example SI se versiona
 # (arriba hay `!docker.env.example`) y este fichero es su hermano con los
