@@ -1,9 +1,12 @@
 """One SEC egress quota per IP across sync/async connectors and processes."""
 import asyncio
+import logging
 import math
 from functools import lru_cache
 
 from app.services.connectors.global_pacing import _CLAIM_SLOT_LUA, GlobalPacer
+
+logger = logging.getLogger(__name__)
 
 
 def _redis():
@@ -50,7 +53,7 @@ class SecPacer(GlobalPacer):
                     int(self._wall() * 1000), int(self.min_interval_seconds * 1000), self._slot_ttl_ms,
                 )
             except Exception:  # noqa: BLE001 - Redis unavailable: shared local fallback
-                pass
+                logger.warning("SEC global quota Redis unavailable, using process-local pacing", exc_info=True)
             else:
                 if float(wait_ms) > 0:
                     await asyncio.sleep(float(wait_ms) / 1000.0)
