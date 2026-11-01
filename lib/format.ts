@@ -654,6 +654,29 @@ export function todayLocal(date: Date = new Date()): string {
 }
 
 /**
+ * Antigüedad compacta estilo feed («22 h», «1 d»), para la fila de noticias
+ * de Inicio (referencia Quartr, 1-nov-2026). `timestamp` viene en segundos.
+ * null = no representable (fecha inválida o más de 6 días: el caller pinta la
+ * fecha corta). `now` inyectable para no romper hidratación ni tests.
+ */
+export function formatAgeShort(
+  timestamp: number | null | undefined,
+  now: number = Date.now(),
+  locale: Locale = DEFAULT_LOCALE,
+): string | null {
+  const seconds = toFinite(timestamp);
+  if (seconds === null || seconds <= 0) return null;
+  const diffInMinutes = Math.max(0, Math.floor((now - seconds * 1000) / 60_000));
+  if (diffInMinutes < 1) return locale === 'en' ? 'now' : 'ahora';
+  if (diffInMinutes < 60) return `${diffInMinutes} min`;
+  const hours = Math.floor(diffInMinutes / 60);
+  if (hours < 24) return locale === 'en' ? `${hours}h` : `${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return locale === 'en' ? `${days}d` : `${days} d`;
+  return null;
+}
+
+/**
  * Tiempo relativo en español ("hace 3 días", "hace 12 minutos").
  * `timestamp` viene en segundos (formato de APIs de noticias).
  *
