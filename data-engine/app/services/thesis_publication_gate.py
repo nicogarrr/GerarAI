@@ -10,6 +10,25 @@ from app.models import FundamentalModelVersion, ThesisVersion
 from app.schemas.api import VALUATION_WITHHELD_REASON, valuation_uses_inferred_inputs
 
 MODEL_WITHHELD_REASON = "El modelo no es publicable; el texto y las cifras archivados no son análisis actual."
+NO_MODEL_WITHHELD_REASON = "No hay un modelo publicable verificado; el texto y las cifras archivados no son análisis actual."
+
+# Mismos motivos en inglés, para quien eligió inglés en Ajustes (el valor
+# guardado/comparado sigue siendo el castellano de arriba).
+_WITHHELD_REASONS_EN = {
+    MODEL_WITHHELD_REASON: "The model is not publishable; the archived text and figures are not current analysis.",
+    NO_MODEL_WITHHELD_REASON: (
+        "There is no verified publishable model; the archived text and figures are not current analysis."
+    ),
+    VALUATION_WITHHELD_REASON: (
+        "Valuation not available: sourced modelled revenue is missing. The model could only be "
+        "calculated with an unverified assumption, so no per-share value is published."
+    ),
+}
+
+
+def withheld_reason_en(reason: str) -> str:
+    """Motivo de retención en inglés; uno desconocido se devuelve tal cual (nunca inventado)."""
+    return _WITHHELD_REASONS_EN.get(reason, reason)
 
 
 # Estados con los que la propia tesis declara una valoración publicable o
@@ -41,7 +60,7 @@ def model_withheld_reason(thesis: ThesisVersion, model: FundamentalModelVersion 
             return VALUATION_WITHHELD_REASON
         return None
     if model is None:
-        return "No hay un modelo publicable verificado; el texto y las cifras archivados no son análisis actual."
+        return NO_MODEL_WITHHELD_REASON
     if not model.publishable:
         return MODEL_WITHHELD_REASON
     if valuation_uses_inferred_inputs(thesis.valuation_basis):

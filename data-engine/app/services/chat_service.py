@@ -242,6 +242,56 @@ def _english() -> bool:
     return current_language() == "en"
 
 
+# Textos de relleno del panel plegado `sections` de la ficha de empresa (es, en).
+_SECTION_TEXTS: dict[str, tuple[str, str]] = {
+    "no_facts": (
+        "- No hay hechos financieros fiables almacenados para esta empresa.",
+        "- There are no reliable stored financial facts for this company.",
+    ),
+    "no_new_calc": (
+        "- No se ha hecho un calculo nuevo en esta respuesta; los hechos almacenados se citan como entradas.",
+        "- No new calculation was made in this answer; the stored facts are cited as inputs.",
+    ),
+    "calc_blocked": (
+        "- Calculo bloqueado: faltan hechos financieros almacenados.",
+        "- Calculation blocked: stored financial facts are missing.",
+    ),
+    "no_memory": (
+        "- No se recupero memoria relevante del usuario.",
+        "- No relevant user memory was retrieved.",
+    ),
+    "no_unverified": (
+        "- No hay afirmaciones sin resolver en el contexto recuperado.",
+        "- There are no unresolved claims in the retrieved context.",
+    ),
+    "no_contradictions": (
+        "- No se encontraron contradicciones en las afirmaciones recuperadas.",
+        "- No contradictions were found in the retrieved claims.",
+    ),
+    "missing_inputs": (
+        "- Faltan entradas almacenadas: {metrics}.",
+        "- Missing stored inputs: {metrics}.",
+    ),
+    "no_missing_inputs": (
+        "- No falta ninguna entrada financiera clave en esta recuperacion.",
+        "- No key financial input is missing in this retrieval.",
+    ),
+    "review_thesis": (
+        "- Hay que revisar la tesis antes de cambiar supuestos.",
+        "- The thesis needs a review before changing assumptions.",
+    ),
+    "keep_monitoring": (
+        "- La evidencia recuperada no exige un cambio automatico de tesis; seguir monitorizando.",
+        "- The retrieved evidence does not require an automatic thesis change; keep monitoring.",
+    ),
+}
+
+
+def _section_text(key: str, english: bool) -> str:
+    es, en = _SECTION_TEXTS[key]
+    return en if english else es
+
+
 def _fmt_number_en(number: float, digits: int = 2) -> str:
     """1,234,567.89 al estilo en-US (comas de miles, punto decimal), sin ceros sobrantes."""
     return f"{number:,.{digits}f}".rstrip("0").rstrip(".")
@@ -3414,9 +3464,14 @@ class ChatService:
             ]
             sources.extend(own_documents)
             own_document_lines = [
-                f"- Documento propio del usuario sobre {company.ticker} ({item['title']}), "
-                f"no es un dato oficial: {' '.join(str(item['text']).split())[:700]} "
-                f"[knowledge_chunk:{item['id']}]"
+                (
+                    f"- User's own document about {company.ticker} ({item['title']}), "
+                    f"not official data: {' '.join(str(item['text']).split())[:700]} "
+                    if _english()
+                    else f"- Documento propio del usuario sobre {company.ticker} ({item['title']}), "
+                    f"no es un dato oficial: {' '.join(str(item['text']).split())[:700]} "
+                )
+                + f"[knowledge_chunk:{item['id']}]"
                 for item in own_documents
             ]
             evidence_suggestions = list(
@@ -3517,7 +3572,7 @@ class ChatService:
                     self._source_entry(
                         "rag_chunk",
                         chunk.get("point_id"),
-                        chunk.get("title") or "Fragmento de documento indexado",
+                        chunk.get("title") or ("Indexed document fragment" if _english() else "Fragmento de documento indexado"),
                         document_id=chunk.get("document_id"),
                         knowledge_document_id=chunk.get("knowledge_document_id"),
                         collection_id=chunk.get("collection_id"),
@@ -3623,19 +3678,37 @@ class ChatService:
                         reason=retrieved.reason,
                     )
                 )
+            en = _english()
             if not thesis:
-                proposed_actions.append(f"Crear la primera tesis para {company.ticker}")
-            if any(claim.status in {"unverified", "contradicted"} for claim in claims):
-                proposed_actions.append("Revisar afirmaciones no verificadas o contradichas")
-            if any(event.requires_update for event in news):
-                proposed_actions.append("Revisar cambios de tesis por noticias materiales")
-            if not facts:
                 proposed_actions.append(
-                    "Ingerir hechos financieros SEC/FMP antes de sacar conclusiones cuantitativas"
-                    if files_with_sec(company)
-                    else f"Ingerir hechos financieros de FMP o de los informes de {company.ticker} "
-                    "(la SEC no cubre ese mercado) antes de sacar conclusiones cuantitativas"
+                    f"Create the first thesis for {company.ticker}" if en
+                    else f"Crear la primera tesis para {company.ticker}"
                 )
+            if any(claim.status in {"unverified", "contradicted"} for claim in claims):
+                proposed_actions.append(
+                    "Review unverified or contradicted claims" if en
+                    else "Revisar afirmaciones no verificadas o contradichas"
+                )
+            if any(event.requires_update for event in news):
+                proposed_actions.append(
+                    "Review thesis changes from material news" if en
+                    else "Revisar cambios de tesis por noticias materiales"
+                )
+            if not facts:
+                if en:
+                    proposed_actions.append(
+                        "Ingest SEC/FMP financial facts before drawing quantitative conclusions"
+                        if files_with_sec(company)
+                        else f"Ingest financial facts from FMP or {company.ticker}'s reports "
+                        "(the SEC does not cover that market) before drawing quantitative conclusions"
+                    )
+                else:
+                    proposed_actions.append(
+                        "Ingerir hechos financieros SEC/FMP antes de sacar conclusiones cuantitativas"
+                        if files_with_sec(company)
+                        else f"Ingerir hechos financieros de FMP o de los informes de {company.ticker} "
+                        "(la SEC no cubre ese mercado) antes de sacar conclusiones cuantitativas"
+                    )
 
             facts_text = (
                 "\n".join(
@@ -3644,20 +3717,16 @@ class ChatService:
                     f"[financial_fact:{fact.id}]"
                     for fact in facts[:5]
                 )
-                or "- No hay hechos financieros fiables almacenados para esta empresa."
+                or _section_text("no_facts", en)
             )
-            calculations_text = (
-                "- No se ha hecho un calculo nuevo en esta respuesta; los hechos almacenados se citan como entradas."
-                if facts
-                else "- Calculo bloqueado: faltan hechos financieros almacenados."
-            )
+            calculations_text = _section_text("no_new_calc" if facts else "calc_blocked", en)
             assumptions_text = (
                 "\n".join(
                     f"- {_short(item.item.content, 180)} "
                     f"[memory_item:{item.item.id}]"
                     for item in retrieved_memory[:3]
                 )
-                or "- No se recupero memoria relevante del usuario."
+                or _section_text("no_memory", en)
             )
             claim_lines = [
                 f"- [{claim.status}] {_short(claim.statement, 180)} "
@@ -3665,17 +3734,22 @@ class ChatService:
                 for claim in claims[:5]
                 if claim.status != "supported"
             ]
-            unverified_text = "\n".join(claim_lines) or "- No hay afirmaciones sin resolver en el contexto recuperado."
-            thesis_text = (
-                f"{archived_thesis_notice(thesis, withheld_reason)} "
-                f"[thesis_version:{thesis.id}]"
-                if thesis and withheld_reason
-                else f"Tesis {company.ticker} v{thesis.version}: `{thesis.status}` con rating `{thesis.rating}`. "
-                f"Valor esperado={_decimal_to_float(thesis.expected_value)} frente a precio actual={_decimal_to_float(thesis.current_price)}. "
-                f"[thesis_version:{thesis.id}]"
-                if thesis
-                else f"Aun no hay tesis almacenada para {company.ticker}."
-            )
+            unverified_text = "\n".join(claim_lines) or _section_text("no_unverified", en)
+            if en:
+                from app.services.chat_company_en import thesis_section_text_en
+
+                thesis_text = thesis_section_text_en(company.ticker, thesis, withheld_reason)
+            else:
+                thesis_text = (
+                    f"{archived_thesis_notice(thesis, withheld_reason)} "
+                    f"[thesis_version:{thesis.id}]"
+                    if thesis and withheld_reason
+                    else f"Tesis {company.ticker} v{thesis.version}: `{thesis.status}` con rating `{thesis.rating}`. "
+                    f"Valor esperado={_decimal_to_float(thesis.expected_value)} frente a precio actual={_decimal_to_float(thesis.current_price)}. "
+                    f"[thesis_version:{thesis.id}]"
+                    if thesis
+                    else f"Aun no hay tesis almacenada para {company.ticker}."
+                )
             rag_evidence_lines = [
                 f"- {_short(chunk.get('text', ''), 180)} "
                 f"({chunk.get('source_type') or 'indexed'}) "
@@ -3704,22 +3778,22 @@ class ChatService:
                     f"[claim:{claim.id}]"
                     for claim in contradiction_claims
                 )
-                or "- No se encontraron contradicciones en las afirmaciones recuperadas."
+                or _section_text("no_contradictions", en)
             )
             found_metrics = {fact.metric for fact in facts}
             missing_metrics = [
                 metric for metric in KEY_FACT_METRICS if metric not in found_metrics
             ]
             insufficient_text = (
-                f"- Faltan entradas almacenadas: {', '.join(missing_metrics)}."
+                _section_text("missing_inputs", en).format(metrics=", ".join(missing_metrics))
                 if missing_metrics
-                else "- No falta ninguna entrada financiera clave en esta recuperacion."
+                else _section_text("no_missing_inputs", en)
             )
-            conclusion_text = (
-                "- Hay que revisar la tesis antes de cambiar supuestos."
-                if contradiction_claims
-                or any(event.requires_update for event in news)
-                else "- La evidencia recuperada no exige un cambio automatico de tesis; seguir monitorizando."
+            conclusion_text = _section_text(
+                "review_thesis"
+                if contradiction_claims or any(event.requires_update for event in news)
+                else "keep_monitoring",
+                en,
             )
 
             # La respuesta VISIBLE es prosa natural en castellano (pedido de
