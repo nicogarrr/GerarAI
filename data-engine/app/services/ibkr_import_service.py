@@ -57,6 +57,16 @@ def _is_number(value: str | None) -> bool:
     return parse_localized_number(value) is not None
 
 
+_MAX_NUMERIC_20_6 = Decimal("99999999999999.999999")
+_MAX_NUMERIC_20_2 = Decimal("999999999999999999.99")
+
+
+def _exceeds(value: str, ceiling: Decimal) -> bool:
+    """El valor (ya comprobado como número) no cabe en la columna."""
+    parsed = parse_localized_number(value)
+    return parsed is not None and abs(parsed[0]) > ceiling
+
+
 def _is_negative_number(value: str | None) -> bool:
     """Un precio de operación negativo no cabe en la cartera (la BD lo rechaza)."""
     if value in (None, ""):
@@ -480,6 +490,24 @@ def validate_ibkr_csv(csv_text: str) -> list[str]:
         if not _is_number(price):
             errors.append(
                 f"Fila {line_number} del CSV ({symbol}): el precio '{price}' no es un número. "
+                "Corrige el valor o elimina la fila."
+            )
+        # Topes de Transaction (los de POST /transactions, #2606): un importe
+        # que no cabe hacía fallar el INSERT en Postgres y se perdía el fichero.
+        for word, value, ceiling in (
+            ("la cantidad", quantity, _MAX_NUMERIC_20_6),
+            ("el precio", price, _MAX_NUMERIC_20_6),
+        ):
+            if _is_number(value) and _exceeds(value, ceiling):
+                errors.append(
+                    f"Fila {line_number} del CSV ({symbol}): {word} '{value}' es demasiado grande. "
+                    "Corrige el valor o elimina la fila."
+                )
+        fees_index = mapping.get("fees")
+        fees = row[fees_index].strip() if fees_index is not None and fees_index < len(row) else ""
+        if fees and (not _is_number(fees) or _exceeds(fees, _MAX_NUMERIC_20_2)):
+            errors.append(
+                f"Fila {line_number} del CSV ({symbol}): la comisión '{fees}' no es un importe válido. "
                 "Corrige el valor o elimina la fila."
             )
         day = row[mapping["date"]].strip() if mapping["date"] < len(row) else ""
