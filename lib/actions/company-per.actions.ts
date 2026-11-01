@@ -7,12 +7,13 @@ import { perState, type PerState } from '@/lib/research/per';
 export async function getCompanyPer(
     ticker: string,
     listing: { exchange?: string; currency?: string },
+    locale: 'es' | 'en' = 'es',
 ): Promise<PerState> {
     const normalized = ticker.trim().toUpperCase();
     const quoteSymbol = quoteSymbolFor(listing, normalized);
     const usLine = isUsQuoteLine(listing, normalized);
     if (!quoteSymbol || !usLine) {
-        return perState({ quoteSymbol, ticker: normalized, peTTM: undefined, providerAvailable: false, usLine });
+        return perState({ quoteSymbol, ticker: normalized, peTTM: undefined, providerAvailable: false, usLine }, locale);
     }
     const light = await getStockFinancialDataLight(normalized).catch(() => null);
     return perState({
@@ -21,5 +22,5 @@ export async function getCompanyPer(
         peTTM: light?.metrics?.metric?.peTTM,
         providerAvailable: light !== null,
         usLine,
-    });
+    }, locale);
 }

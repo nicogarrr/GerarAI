@@ -841,7 +841,8 @@
     "moveMaybe": "Puede explicarlo:",
     "moveNoNews": "Sin noticias ese día (ni el anterior ni el siguiente) entre los eventos guardados.",
     "moveTitle": "¿Por qué se movió? {parts}",
-    "moveSource": "Cálculo de GerarAI sobre los precios diarios"
+    "moveSource": "Cálculo de GerarAI sobre los precios diarios",
+    "loadingAria": "Cargando gráfico de precio"
   },
   "memo": {
     "ratingBuy": "compra",
@@ -1713,5 +1714,21 @@
     "affectsClaims": "Afecta a {count} afirmaciones y a estos apartados de la tesis: {areas}",
     "affectsNoClaim": "No afecta a ninguna afirmación concreta; toca estos apartados de la tesis: {areas}",
     "affectsOneClaim": "Afecta a 1 afirmación y a estos apartados de la tesis: {areas}"
+  },
+  "debateErrors": {
+    "freeExhausted": "LLM gratuito agotado, vuelve más tarde",
+    "freeUnavailable": "LLM gratuito no disponible, vuelve más tarde",
+    "budgetExhausted": "Presupuesto LLM agotado, vuelve más tarde",
+    "timeout": "El debate tardó demasiado; vuelve más tarde",
+    "invalidAnswer": "El debate devolvió una respuesta no válida; vuelve más tarde",
+    "generic": "No se pudo generar el debate; reinténtalo.",
+    "discarded": "El debate devolvió una respuesta no válida; se descarta."
+  },
+  "per": {
+    "noListing": "Sin listado de cotización verificado",
+    "nonUs": "Cotiza fuera de EE. UU.: sin PER verificable",
+    "providerDown": "Proveedor de métricas no disponible",
+    "ttm": "Finnhub · últimos 12 meses",
+    "notReported": "El proveedor no informa PER (p. ej. beneficio negativo)"
   }
 }

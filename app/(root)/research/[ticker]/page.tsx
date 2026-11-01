@@ -1026,7 +1026,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     // Conexión 10b: insiders + 13F en paralelo con el PER; si falla, el panel lo dice.
     // La posición real solo se pide si la empresa está en cartera (misma lectura que Cartera).
     const [per, ownershipSignals, holdingContext] = await Promise.all([
-      getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }).catch(() => ({ value: null, note: t('research.fichaPerUnavailable') })),
+      getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, locale).catch(() => ({ value: null, note: t('research.fichaPerUnavailable') })),
       getOwnershipSignals(ticker).catch(() => null),
       snapshot.in_portfolio
         ? getCompanyHolding(ticker).catch(() => ({ status: 'error' as const, message: t('research.fichaHoldingLoadError') }))

@@ -12,13 +12,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 // bundle inicial de /research/[ticker]. El gatillo queda eager con precarga
 // del chunk en pointerdown/focus; el contenido llega al abrir.
 const loadQuickAlertPopoverBody = () => import('./QuickAlertPopoverBody');
-const QuickAlertPopoverBody = dynamic(loadQuickAlertPopoverBody, {
-  loading: () => (
-    <div role="status" aria-label="Cargando el formulario de alerta" className="flex min-h-[120px] items-center justify-center">
+function QuickAlertLoading() {
+  const t = useT();
+  return (
+    <div role="status" aria-label={t('alerts.quick.loadingAria')} className="flex min-h-[120px] items-center justify-center">
       <span className="block h-4 w-1/3 animate-pulse rounded bg-gray-700/60" aria-hidden="true" />
     </div>
-  ),
-});
+  );
+}
+const QuickAlertPopoverBody = dynamic(loadQuickAlertPopoverBody, { loading: QuickAlertLoading });
 
 /**
  * Alerta rápida desde la ficha de research: botón campana que abre un
