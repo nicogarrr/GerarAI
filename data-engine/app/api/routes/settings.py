@@ -156,24 +156,58 @@ class LlmUsageResponse(BaseModel):
     message: str | None = None
 
 
-def _platform_usage_today(db: Session, models: list[str]) -> dict:
-    """Llamadas y tokens de hoy registrados para esos modelos (toda la plataforma).
+def _tenant_usage_today(db: Session, tenant_id: int, models: list[str]) -> dict:
+    """Llamadas y tokens de hoy del PROPIO tenant para esos modelos.
 
-    La clave Go/Gemini de GerarAI sirve a todos los tenants, asi que el
-    agregado es global a proposito: lectura de operacion del panel de uso,
-    por eso ``include_all_tenants``. Son contadores PROPIOS (BudgetUsage),
-    la base de las cifras estimadas cuando el proveedor no expone su cuota.
+    NUNCA el agregado global: BudgetUsage es dato de cada cliente y este
+    endpoint no tiene rol de operador, asi que la vista global entre
+    tenants seria una fuga (hallazgo de auditoria). Son contadores PROPIOS
+    (BudgetUsage), la base de las cifras estimadas cuando el proveedor no
+    expone su cuota. La cuota de Go, en cambio, la lee el proveedor sobre la
+    clave de plataforma y no contiene datos de ningun tenant.
     """
     today = date.today()
     calls, tokens = db.execute(
         select(
             func.count(BudgetUsage.id),
             func.coalesce(func.sum(BudgetUsage.token_count), 0),
+        ).where(
+            BudgetUsage.usage_date == today,
+            BudgetUsage.model.in_(models),
+            BudgetUsage.tenant_id == tenant_id,
         )
-        .where(BudgetUsage.usage_date == today, BudgetUsage.model.in_(models))
-        .execution_options(include_all_tenants=True)
     ).one()
     return {"date": today.isoformat(), "calls": int(calls or 0), "tokens": int(tokens or 0)}
+
+
+def _sanitize_go_quota(raw: object) -> dict | None:
+    """Cuota Go validada campo a campo; None si el payload no es el esperado.
+
+    OpenCode puede cambiar su JSON (weekly como lista, percent como string,
+    etc.): mejor mostrar "desconocido" que romper Ajustes con un 500. Solo
+    pasan ``percent`` numerico, ``status``/``resetsAt`` de texto y las
+    ventanas conocidas.
+    """
+    if not isinstance(raw, dict):
+        return None
+    usage = raw.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    clean: dict[str, dict] = {}
+    for window in ("rolling", "weekly", "monthly"):
+        data = usage.get(window)
+        if not isinstance(data, dict):
+            continue
+        entry: dict = {}
+        percent_value = data.get("percent")
+        if isinstance(percent_value, (int, float)) and not isinstance(percent_value, bool):
+            entry["percent"] = percent_value
+        for field in ("status", "resetsAt"):
+            value = data.get(field)
+            if isinstance(value, str):
+                entry[field] = value
+        clean[window] = entry
+    return clean
 
 
 @router.get("/llm/usage", response_model=LlmUsageResponse)
@@ -187,6 +221,7 @@ async def get_llm_usage(db: Session = Depends(get_db)) -> dict:
     Tenants con clave propia (BYOK): su consumo es cosa de su proveedor.
     """
     app_settings = get_settings()
+    tenant_id = _require_tenant(db)
     if current_tenant_llm_config() is not None:
         return {
             "source": "tenant",
@@ -216,8 +251,7 @@ async def get_llm_usage(db: Session = Depends(get_db)) -> dict:
             app_settings.opencode_go_api_key or "",
             session=app_settings.opencode_go_session,
         )
-        if isinstance(raw, dict) and isinstance(raw.get("usage"), dict):
-            quota = raw["usage"]
+        quota = _sanitize_go_quota(raw)
     go_until = limited_until(GO_SUBSCRIPTION_PROVIDER)
     weekly = (quota or {}).get("weekly") or {}
     go_state = "off"
@@ -239,7 +273,7 @@ async def get_llm_usage(db: Session = Depends(get_db)) -> dict:
         "estimated": False,
         "limited_until": go_until,
         "quota": quota,
-        "today": _platform_usage_today(db, [app_settings.opencode_go_model]),
+        "today": _tenant_usage_today(db, tenant_id, [app_settings.opencode_go_model]),
     })
 
     free_active = app_settings.opencode_free_chat_fallback_active
@@ -254,7 +288,7 @@ async def get_llm_usage(db: Session = Depends(get_db)) -> dict:
         "state": "off" if not free_active else ("limited" if free_until else "ok"),
         "estimated": True,
         "limited_until": free_until,
-        "today": _platform_usage_today(db, [free_model]) if free_model else None,
+        "today": _tenant_usage_today(db, tenant_id, [free_model]) if free_model else None,
     })
 
     gemini_active = app_settings.gemini_chat_fallback_active
@@ -268,7 +302,7 @@ async def get_llm_usage(db: Session = Depends(get_db)) -> dict:
         "state": "off" if not gemini_active else ("limited" if gemini_until else "ok"),
         "estimated": True,
         "limited_until": gemini_until,
-        "today": _platform_usage_today(db, [GEMINI_MODEL, GEMINI_MODEL_2]),
+        "today": _tenant_usage_today(db, tenant_id, [GEMINI_MODEL, GEMINI_MODEL_2]),
         "published_limits": GEMINI_FREE_PUBLISHED_LIMITS,
     })
 
