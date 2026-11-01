@@ -131,7 +131,15 @@ dev = ["ruff==0.17.3", "pyright==1.1.414"]
 # variante +cpu vive solo en el indice oficial de PyTorch. Sin este bloque uv
 # resolveria la wheel CUDA de PyPI (GB inservibles en CPU-only) y el lock
 # dejaria de ser equivalente a las imagenes de produccion.
-constraint-dependencies = ["torch==2.14.1+cpu"]
+# torchvision entra de forma transitiva (docling) pero transformers.image_utils
+# la importa al cargar sentence_transformers, y su wheel esta compilada contra
+# la ABI de torch: la de PyPI (torchvision==0.29.1 a secas) revienta contra
+# torch +cpu con RuntimeError "operator torchvision::nms does not exist"
+# (medido en el run 41259298388 del job Evals). Mismo tratamiento que torch:
+# pin CPU-only (TORCHVISION_CPU_PIN en scripts/sync_requirements.py) y source
+# al indice de PyTorch. pip no la necesita en requirements.txt porque prefiere
+# la wheel +cpu por orden de version local; uv si la fijaba de PyPI.
+constraint-dependencies = ["torch==2.14.1+cpu", "torchvision==0.29.1+cpu"]
 # Pillow 12.x tiene avisos criticos y 13.0.0 es el primer parche; fastembed (uso solo
 # texto/BM25) declara pillow<13. El override es DELIBERADO y esta probado solo en
 # imports/tests locales (ver PR). Las imagenes lo aplican con un pip --no-deps final.
@@ -144,6 +152,7 @@ explicit = true
 
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
 
 [tool.setuptools]
 py-modules = ["main"]

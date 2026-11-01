@@ -57,6 +57,12 @@ jobs:
           else
             python data-engine/scripts/sync_requirements.py --check
           fi
+      # verify_lockfile.py es stdlib-only, no instala nada. Sus checks de la
+      # familia torch (torch y torchvision con pin +cpu, indice de PyTorch y
+      # constraint registrada) son los que habrian cazado en PR el
+      # torchvision de PyPI que tumbo el job Evals en el run 41259298388.
+      - name: Verificar el lockfile (hashes, interprete, familia torch)
+        run: python data-engine/scripts/verify_lockfile.py --quiet
 
   dead-code:
     name: Dead code (alcanzabilidad, baseline E6)
@@ -382,25 +388,42 @@ jobs:
         if: ${{ steps.discover.outputs.present != '' }}
         run: for i in $(seq 1 30); do curl -fs http://localhost:6333/collections && break || sleep 2; done
       # run_rag_evals mide el RAG de verdad y se niega a correr con un stub
-      # (fail-closed). Necesita el modelo de embeddings: se cachea y se
-      # precarga con reintentos. Si ni asi se puede descargar, el eval sigue
-      # fallando con motivo explicito; nunca se sustituye por un stub.
-      - name: Cache del modelo de embeddings (RAG evals)
+      # (fail-closed). El harness corre con HF_HUB_OFFLINE=1: lo que no este
+      # en cache NO existe para el. Y necesita DOS caches calientes: el ONNX
+      # de fastembed (backend denso primario, /tmp/fastembed_cache, que es el
+      # default de fastembed) y el ST de fallback (~/.cache/huggingface). El
+      # run 41259298388 cayo tambien por esto: solo se precargaba el fallback.
+      # Clave v2: las entradas v1 se guardaron sin el ONNX de fastembed y un
+      # hit de cache no se re-guarda, asi que la v1 nunca se curaria sola.
+      - name: Cache de los modelos de embeddings (RAG evals)
         if: ${{ steps.discover.outputs.present != '' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/.cache/huggingface
             /tmp/fastembed_cache
-          key: embeddings-all-MiniLM-L6-v2-v1
-      - name: Precargar el modelo de embeddings (con reintentos)
+          key: embeddings-all-MiniLM-L6-v2-v2
+      # El chequeo de import va SIN reintentos a proposito: un arbol roto
+      # (torchvision de PyPI contra torch +cpu, run 41259298388) no lo arregla
+      # ninguna descarga, y reintentarlo 4 veces solo quema minutos y esconde
+      # el motivo. Los reintentos son para la descarga (red), no para el
+      # import. Si el import falla se anota y se sigue: el eval fallara
+      # cerrado con el motivo real y los demas evals corren igual.
+      - name: Precargar los modelos de embeddings (con reintentos)
         if: ${{ steps.discover.outputs.present != '' }}
         run: |
+          if ! python -c "from sentence_transformers import SentenceTransformer"; then
+            echo "::error title=Entorno de embeddings roto::el import de sentence_transformers falla; no es un fallo de red, revisa el lock (torch/torchvision). No se reintentan descargas."
+            exit 0
+          fi
           for i in 1 2 3 4; do
-            python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')" && exit 0
-            echo "::warning::intento $i de descargar el modelo de embeddings fallo"; sleep $((i * 10))
+            if python -c "from fastembed import TextEmbedding; TextEmbedding('sentence-transformers/all-MiniLM-L6-v2')" \
+            && python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"; then
+              exit 0
+            fi
+            echo "::warning::intento $i de descargar los modelos de embeddings fallo"; sleep $((i * 10))
           done
-          echo "::warning title=Modelo de embeddings no disponible::run_rag_evals fallara cerrado (sin stub)"
+          echo "::warning title=Modelos de embeddings no disponibles::run_rag_evals fallara cerrado (sin stub)"
       - name: "Evals presentes (fail-closed: nada se auto-skipea)"
         if: ${{ steps.discover.outputs.present != '' }}
         env:

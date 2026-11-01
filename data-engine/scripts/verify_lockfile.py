@@ -26,8 +26,10 @@ Falla (exit 1) si:
      ninguna distribucion fijada: sin hash no hay verificacion de integridad.
   6. La version de interprete que declara el lock no es la fijada en
      `.python-version`, o `requires-python` de pyproject no la contiene.
-  7. torch no queda en el pin CPU-only (`TORCH_CPU_PIN`): el lock tiene que ser
-     equivalente a lo que instalan Dockerfile / Dockerfile.prod.
+  7. la familia torch (torch y torchvision) no queda en su pin CPU-only
+     (`TORCH_CPU_PIN` / `TORCHVISION_CPU_PIN`): torchvision compila contra la
+     ABI de torch y la wheel de PyPI revienta con "operator torchvision::nms
+     does not exist" sobre un torch +cpu (run 41259298388 del job Evals).
 
 Ademas AVISA (no falla, exit 0) si el interprete que ejecuta el script no es el
 fijado: el diagnostico de este repo se hace sobre 3.11 mientras el runtime
@@ -52,6 +54,27 @@ LOCK = ROOT / "uv.lock"
 PYPROJECT_VERSION_FILE = ROOT / ".python-version"
 TORCH_INDEX = "https://download.pytorch.org/whl/cpu"
 TORCH_PINNED = sr.TORCH_CPU_PIN.split("==", 1)[1]
+TORCHVISION_PINNED = sr.TORCHVISION_CPU_PIN.split("==", 1)[1]
+
+# La familia torch va entera al indice CPU de PyTorch: torch porque es el
+# runtime (TORCH_CPU_PIN, el mismo de los Dockerfile) y torchvision porque
+# compila contra la ABI de torch. torchvision es transitiva (docling): nadie
+# mas la fija, y el run 41259298388 del job Evals cayo justo por eso (uv la
+# resolvio de PyPI y el import de sentence_transformers reventaba).
+TORCH_FAMILY = (
+    (
+        "torch",
+        TORCH_PINNED,
+        "TORCH_CPU_PIN",
+        "Dockerfile, Dockerfile.prod y sync_requirements.py usan ese pin",
+    ),
+    (
+        "torchvision",
+        TORCHVISION_PINNED,
+        "TORCHVISION_CPU_PIN",
+        "compila contra la ABI de torch; ver sync_requirements.py",
+    ),
+)
 
 _COMPARATOR_RE = re.compile(r"(===|==|~=|!=|>=|<=|>|<)\s*([^,;\s]+)")
 
@@ -354,30 +377,26 @@ def check_hashes(lock: dict, errors: list[str]) -> tuple[int, int]:
 
 
 def check_torch_cpu(lock: dict, errors: list[str]) -> None:
-    """El lock tiene que equivaler a lo que instalan los Dockerfiles."""
+    """La familia torch del lock tiene que salir entera del indice CPU de PyTorch."""
     index = locked_index(lock)
-    torch = index.get("torch")
-    if torch is None:
-        errors.append("torch: AUSENTE del lock (las imagenes lo instalan CPU-only siempre)")
-        return
-    if torch["version"] != TORCH_PINNED:
-        errors.append(
-            f"torch: el lock fija {torch['version']} pero TORCH_CPU_PIN es {TORCH_PINNED} "
-            "(Dockerfile.prod y sync_requirements.py usan ese pin)"
-        )
-    src = (torch.get("source") or {}).get("registry")
-    if src != TORCH_INDEX:
-        errors.append(f"torch: el lock lo saca de {src!r}, no del indice CPU de PyTorch ({TORCH_INDEX})")
-    constraints = {
-        sr.norm(c["name"]): c for c in (lock.get("manifest") or {}).get("constraints") or []
-    }
-    got = constraints.get("torch", {}).get("specifier")
-    if got != f"=={TORCH_PINNED}":
-        errors.append(
-            f"torch: el lock no registra la constraint '=={TORCH_PINNED}' "
-            f"(manifest.constraints dice {got!r}); sin ella un 'uv lock --upgrade' "
-            "flotaria torch por encima del pin de las imagenes"
-        )
+    constraints = {sr.norm(c["name"]): c for c in (lock.get("manifest") or {}).get("constraints") or []}
+    for name, pinned, pin_const, why in TORCH_FAMILY:
+        pkg = index.get(name)
+        if pkg is None:
+            errors.append(f"{name}: AUSENTE del lock (la familia torch se instala CPU-only siempre)")
+            continue
+        if pkg["version"] != pinned:
+            errors.append(f"{name}: el lock fija {pkg['version']} pero {pin_const} es {pinned} ({why})")
+        src = (pkg.get("source") or {}).get("registry")
+        if src != TORCH_INDEX:
+            errors.append(f"{name}: el lock lo saca de {src!r}, no del indice CPU de PyTorch ({TORCH_INDEX})")
+        got = constraints.get(name, {}).get("specifier")
+        if got != f"=={pinned}":
+            errors.append(
+                f"{name}: el lock no registra la constraint '=={pinned}' "
+                f"(manifest.constraints dice {got!r}); sin ella un 'uv lock --upgrade' "
+                f"flotaria {name} por encima del pin CPU-only"
+            )
 
 
 def check_interpreter(lock: dict, pyproject: dict, errors: list[str], warns: list[str]) -> tuple[int, int]:
