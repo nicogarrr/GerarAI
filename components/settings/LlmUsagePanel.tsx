@@ -12,6 +12,13 @@ const DATE_TIME_OPTS: Intl.DateTimeFormatOptions = {
     day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
 };
 
+/** Claves literales: el chequeo de huérfanas de check-i18n no ve plantillas. */
+const STATE_KEYS = {
+    ok: 'settings.llm.usage.state.ok',
+    limited: 'settings.llm.usage.state.limited',
+    off: 'settings.llm.usage.state.off',
+} as const;
+
 function percent(value: unknown): number | null {
     return typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : null;
 }
@@ -45,7 +52,7 @@ export function LegCard({ leg, t = esT, locale = 'es' as const }: {
             <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold text-gray-100">{leg.label}</span>
                 <span className={`rounded px-2 py-0.5 text-xs ${stateClass}`}>
-                    {t(`settings.llm.usage.state.${stateKey}`)}
+                    {t(STATE_KEYS[stateKey])}
                     {stateKey === 'limited' && until ? ` · ${t('settings.llm.usage.limitedUntil', { date: until })}` : ''}
                 </span>
                 <span className="rounded bg-gray-800 px-2 py-0.5 text-xs text-gray-400">
