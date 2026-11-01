@@ -40,5 +40,41 @@
       "labels": "Hot: the top 3 in the chosen order. Turning: YTD and 1M with opposite signs and a meaningful 1M; a turn replaces Hot.",
       "contributes": "Contributes: weight × the stock's return, in percentage points."
     }
+  },
+  "flow": {
+    "unavailable": "Money flow N/A: the backend lists this flow but has not returned it (source unavailable or a temporary error). Amounts are left out rather than made up.",
+    "ariaLabel": "Money flow: {name}",
+    "title": "Money flow · {name}",
+    "spenders": "Who spends · reported",
+    "total": "in total · {note}",
+    "destinations": "Where it goes",
+    "thirdParty": " · third-party estimate",
+    "reported": " · reported",
+    "suppliers": "Who gets paid",
+    "exposure": "Your exposure: ",
+    "inPortfolio": "in your portfolio",
+    "inWatchlist": "on your watchlist"
+  },
+  "fundamentals": {
+    "ariaLabel": "Fundamentals: {title}",
+    "title": "{title} · fundamentals",
+    "checked": "Snapshot reviewed on {date} · not live data",
+    "periodCut": "{period} · cut-off {vintage}",
+    "officialSource": "Official source",
+    "monthly": "{value} · {unit} · {label} · vintage {vintage}",
+    "xlsSource": "{name} · source XLS",
+    "kindScenario": "Attributed scenario · ",
+    "kindOfficialEstimate": "Official estimate · ",
+    "kindReported": "Reported · ",
+    "cutPublished": "{unit} · cut-off {vintage} · published {published}",
+    "worldBankTerms": "World Bank terms of use",
+    "sourceMethod": "{name} · source and methodology",
+    "scope": "Scope and limits"
+  },
+  "toggle": {
+    "ariaLabel": "Sort themes by return"
+  },
+  "brain": {
+    "button": "Analyse the theme"
   }
 }
