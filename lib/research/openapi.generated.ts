@@ -8032,6 +8032,11 @@ export interface components {
             metrics?: {
                 [key: string]: number | string | null;
             };
+            /**
+             * Params Outdated
+             * @default false
+             */
+            params_outdated: boolean;
             /** Params Version */
             params_version: string;
             /** Period */

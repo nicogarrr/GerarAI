@@ -4127,6 +4127,11 @@
             "title": "Metrics",
             "type": "object"
           },
+          "params_outdated": {
+            "default": false,
+            "title": "Params Outdated",
+            "type": "boolean"
+          },
           "params_version": {
             "title": "Params Version",
             "type": "string"
