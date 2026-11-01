@@ -127,7 +127,8 @@ describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
         assert.match(modelView, /await viewData\('model'\)/, 'sigue leyendo el modelo real');
         assert.match(modelView, /<LongTermModelPanel model=\{model\?\.status === 'not_generated' \? null : model\} ticker=\{ticker\}/, 'conserva el panel completo y su estado vacío');
         const richPanel = readFileSync('components/research/FundamentalModelPanels.tsx', 'utf8');
-        assert.match(richPanel, />Modelo fundamental a largo plazo<\/h2>/, 'conserva el título en la vista rica');
+        assert.match(richPanel, />\{ti\('research\.model\.title'\)\}<\/h2>/, 'conserva el título en la vista rica');
+        assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).model.title, 'Modelo fundamental a largo plazo');
         assert.match(richPanel, /model\.horizon_years/, 'conserva el horizonte');
         assert.match(richPanel, /frameworkLabel\(model\.framework\.label\)/, 'conserva el framework');
         assert.match(richPanel, /model\.publishable/, 'conserva el estado publicable');

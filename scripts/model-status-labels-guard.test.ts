@@ -6,7 +6,10 @@ const panels = readFileSync('components/research/FundamentalModelPanels.tsx', 'u
 const risk = readFileSync('components/risk/RiskDashboardView.tsx', 'utf8');
 
 test('F306: la cabecera del modelo distingue horizonte de proyección y traduce el estado', () => {
-    assert.match(panels, /\{model\.horizon_years\} años de proyección · \{translate\(MODEL_STATUS_LABELS, model\.status, model\.status\)\}/);
+    // El texto vive en el diccionario (i18n): clave en el panel, redacción en es.json.
+    const es = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).model;
+    assert.match(panels, /ti\('research\.model\.horizon', \{ years: model\.horizon_years, status: translate\(MODEL_STATUS_LABELS, model\.status, ti, model\.status\) \}\)/);
+    assert.equal(es.horizon, '{years} años de proyección · {status}');
     assert.doesNotMatch(panels, /\{model\.horizon_years\} años · \{model\.status\}/);
 });
 
@@ -17,8 +20,11 @@ test('F306: el mapa cubre el catálogo cerrado de estados del servicio', () => {
 });
 
 test('F306: el pie distingue cobertura histórica y respeta la concordancia 1 año/N años', () => {
-    assert.match(panels, /Historial disponible: \{model\.historical_review\.years_covered\} \{model\.historical_review\.years_covered === 1 \? 'año' : 'años'\}/);
-    assert.match(panels, /frente a los \{model\.horizon_years\} años proyectados/);
+    const es = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).model;
+    assert.match(panels, /model\.historical_review\.years_covered === 1 \? 'research\.model\.historyOne' : 'research\.model\.historyOther'/);
+    assert.match(es.historyOne, /^Historial disponible: \{years\} año \(/);
+    assert.match(es.historyOther, /^Historial disponible: \{years\} años \(/);
+    assert.match(es.historyOther, /frente a los \{horizon\} años proyectados/);
     assert.doesNotMatch(panels, /El modelo cubre \{model\.historical_review\.years_covered\} años/);
 });
 

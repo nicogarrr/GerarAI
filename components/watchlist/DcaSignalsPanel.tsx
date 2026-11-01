@@ -34,7 +34,7 @@ export default function DcaSignalsPanel({ data, unavailable, ti = esT, locale = 
             </Card>
         );
     }
-    const runSummary = dcaRunSummary(data.last_run);
+    const runSummary = dcaRunSummary(data.last_run, ti, locale);
     const runTone = { ok: 'text-emerald-400', warn: 'text-amber-300', error: 'text-red-300', neutral: 'text-gray-400' }[runSummary.tone];
     const channels = data.channels.map((channel) => (channel === 'in_app' ? 'app' : channel === 'email' ? ti('watchlist.dca.panel.channelEmail') : channel));
     return (

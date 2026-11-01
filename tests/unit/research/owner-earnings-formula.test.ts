@@ -22,4 +22,9 @@ describe('Modelo a largo plazo · beneficio del propietario', () => {
         expect(text).toContain('mínimo(valor absoluto(');
         expect(text).not.toMatch(/\b(?:negative|working capital|absorbed|reported|estimated|when not|separately|letter|cash-flow)\b/);
     });
+
+    it('en inglés muestra la fórmula del backend tal cual', () => {
+        const formula = backendOwnerEarningsFormula();
+        expect(ownerEarningsFormulaLabel(formula, 'en')).toBe(formula);
+    });
 });

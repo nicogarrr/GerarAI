@@ -46,5 +46,5 @@ test('las 12 etiquetas de marco estan traducidas', () => {
 test('el panel traduce framework.label y binding_constraint', () => {
     const panel = readFileSync('components/research/FundamentalModelPanels.tsx', 'utf8');
     assert.match(panel, /frameworkLabel\(model\.framework\.label\)/);
-    assert.match(panel, /termLabel\(model\.market_opportunity\.constraints\.binding_constraint\)/);
+    assert.match(panel, /termLabel\(model\.market_opportunity\.constraints\.binding_constraint, locale\)/);
 });

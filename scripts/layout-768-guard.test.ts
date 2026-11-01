@@ -33,7 +33,7 @@ test('F319: la pista del grid de escenarios puede encoger para que la tabla haga
     // expandía el grid por encima del contenedor entre 768 y 1279px en vez
     // de dejar que el wrapper overflow-x-auto recortara.
     assert.match(modelPanels, /lg:grid-cols-\[1\.2fr_0\.8fr\]">[\s\S]{0,900}<div className="min-w-0">/);
-    assert.match(modelPanels, /aria-label="Escenarios del modelo" className="hidden overflow-x-auto md:block"/);
+    assert.match(modelPanels, /aria-label=\{ti\('research\.model\.scenariosLabel'\)\} className="hidden overflow-x-auto md:block"/);
     // F27: la pista de escenarios solo se renderiza si el modelo es publicable
     // (sin WACC publicable no se muestran escenarios; regla de Nico 2026-10-16).
     assert.match(modelPanels, /\{model\.publishable \? \(/);
