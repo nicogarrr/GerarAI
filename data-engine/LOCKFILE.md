@@ -104,8 +104,9 @@ mismo fallo (desfase) sin depender de Python.
 6. La versión de intérprete del lock **no es** la de `.python-version`, o
    `requires-python` de `pyproject.toml` no la contiene, o el lock admite más de
    una minor.
-7. `torch` no queda en el pin CPU-only, no sale del índice de PyTorch, o el lock
-   no registra la constraint que lo protege.
+7. la familia `torch` (`torch` y `torchvision`) no queda en su pin CPU-only
+   (`TORCH_CPU_PIN` / `TORCHVISION_CPU_PIN`), no sale del índice de PyTorch, o
+   el lock no registra la constraint que la protege.
 
 Además **avisa** (sin fallar) si el intérprete que ejecuta el verificador no es
 el fijado: el `.venv` local del repo es 3.11.16 y el runtime declarado es 3.12,
@@ -133,7 +134,7 @@ uv sync --frozen --extra test --extra dev --no-install-project
 los `Dockerfile`, que no tienen uv. Es la diferencia entre "reproducible" (lock) y
 "coherente con la intención" (rangos).
 
-## El caso de `torch`, que casi se cuela
+## El caso de la familia `torch`, que casi se cuela (dos veces)
 
 `pyproject.toml` declara `torch>=2.5`, que es portable: la variante `+cpu` **no
 existe en PyPI**, solo en el índice oficial de PyTorch. Los `Dockerfile` la
@@ -146,6 +147,23 @@ Está donde tiene que estar, y `verify_lockfile.py` **importa `TORCH_CPU_PIN` de
 sitio, el verificador lo detecta en el otro. Sin esa constraint, `uv lock`
 resuelve `torch 2.14.1` (medido) y el lock deja de ser equivalente a la imagen de
 producción.
+
+**`torchvision` se coló de verdad (run 41259298388, 2026-11-01).** Entra
+transitiva vía `docling`, así que nadie la declaraba, y `uv` la resolvió de
+PyPI: `torchvision==0.29.1` a secas, compilada contra el `torch` de PyPI. Con
+`torch==2.14.1+cpu` el import
+`sentence_transformers` -> `transformers.image_utils` -> `torchvision` revienta
+con `RuntimeError: operator torchvision::nms does not exist` y el job Evals de
+CI cayó cerrado. pip no sufre esto: con `--extra-index-url` prefiere la wheel
+`+cpu` del índice de PyTorch (misma versión con sufijo local ordena por
+encima), así que los Dockerfiles ya instalaban la buena. `uv` no: necesita la
+constraint (`TORCHVISION_CPU_PIN` en `sync_requirements.py`, registrada en
+`constraint-dependencies`) **y** la entrada en `[tool.uv.sources]`, las dos.
+El índice CPU de PyTorch no publica wheels de macOS (para torch tampoco, así
+que esto no cambia nada): el árbol fijado cubre linux x86_64/aarch64 y Windows.
+Al subir torch, subir torchvision a su pareja de la matriz de compatibilidad
+(torch 2.N.x <-> torchvision 0.(N+15).x); el test
+`tests/test_lock_torch_family.py` lo exige.
 
 ## `ragas` no entra aquí, y tampoco es solo una pelea de versiones
 
@@ -253,12 +271,15 @@ rangos sigue siendo válido) o pasar a auditar el lock.
 
 ## Números del lock actual
 
-- **171 paquetes** en `uv.lock`: el proyecto raíz más **170** de registro.
-- **1175 distribuciones** hasheadas (sdist + wheels).
-- **42 dependencias directas** (las de `requirements.txt`), + extras `test`
-  (3 paquetes) y `dev` (2).
-- En `win32` instala **168**: los 2 que no bajan son `uvloop 0.23.0`
-  (`sys_platform != "win32"`, viene de `uvicorn[standard]`) y `httpx2-jsfetch 1.0`.
+- **272 paquetes** en `uv.lock`: el proyecto raíz más **271** de registro.
+- **1382 distribuciones** hasheadas (sdist + wheels).
+- **51 dependencias directas** (las de `requirements.txt`), + extras `test`
+  (5 paquetes) y `dev` (2).
+- En `win32` instala **270**: `uvloop 0.23.0` no publica wheel de Windows
+  (viene de `uvicorn[standard]`) y es el único que no baja.
+- En macOS no instala `torch` ni `torchvision`: el índice CPU de PyTorch no
+  publica wheels de macOS. CI y producción son linux y el desarrollo
+  soportado es Windows, así que el árbol fijado cubre lo que el repo usa.
 ## Override de Pillow (2026-10-24)
 
 `pyproject.toml` fija `override-dependencies = ["pillow==13.0.0"]`. Pillow 12.x tiene avisos

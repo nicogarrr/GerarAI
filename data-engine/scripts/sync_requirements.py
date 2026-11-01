@@ -14,6 +14,9 @@ Reglas:
 - ``torch`` es especial: pyproject declara el rango portable (``torch>=2.5``)
   y requirements.txt fija el pin CPU-only (``torch==X.Y.Z+cpu``) que solo
   existe en el indice de PyTorch (--extra-index-url de la cabecera).
+- ``torchvision`` es transitiva (docling) y no sale aqui: su pin CPU-only
+  (``TORCHVISION_CPU_PIN``) vive en ``[tool.uv] constraint-dependencies`` y lo
+  verifica ``verify_lockfile.py``, no este script.
 - Paquetes solo en requirements.txt (o viceversa) => error en --check.
 """
 from __future__ import annotations
@@ -31,6 +34,17 @@ REQUIREMENTS = ROOT / "requirements.txt"
 # de PyTorch). Al subirlo, actualizar tambien Dockerfile y Dockerfile.prod.
 # 2.14.1: combo verificado con docling 2.132 + fastembed 0.8.1 (Fase B).
 TORCH_CPU_PIN = "torch==2.14.1+cpu"
+
+# torchvision NO es dependencia directa (entra transitiva via docling), asi que
+# no aparece en requirements.txt: pip prefiere siempre la wheel +cpu del indice
+# de PyTorch (misma version con sufijo local ordena por encima). uv no: sin
+# constraint la resolvia de PyPI, compilada contra el torch de PyPI, y el
+# import reventaba con RuntimeError "operator torchvision::nms does not exist"
+# (run 41259298388 del job Evals, 2026-11-01). El pin vive en
+# pyproject.toml [tool.uv] constraint-dependencies; verify_lockfile.py lo exige
+# en el lock. Al subir torch, subir torchvision a la pareja de su matriz de
+# compatibilidad (torch 2.N.x <-> torchvision 0.(N+15).x).
+TORCHVISION_CPU_PIN = "torchvision==0.29.1+cpu"
 
 _REQ_RE = re.compile(
     r"^\s*([A-Za-z0-9_.\-]+(?:\[[A-Za-z0-9_.\-, ]+\])?)"
