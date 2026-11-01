@@ -1635,7 +1635,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     // El panel ya degrada solo cuando no hay datos; aquí la lectura llega del
     // lote en paralelo (null si degradó, igual que antes).
     const satellites = ticker === 'ASTS' ? await viewData('satellites') : null;
-    return ticker === 'ASTS' ? <AstOrbitPanel data={satellites?.orbits ?? null} analysis={satellites?.analysis ?? null} /> : <EmptyState title={t('research.fichaOrbitalOnlyAsts')} />;
+    return ticker === 'ASTS' ? <AstOrbitPanel analysis={satellites?.analysis ?? null} data={satellites?.orbits ?? null} locale={locale} /> : <EmptyState title={t('research.fichaOrbitalOnlyAsts')} />;
   };
 
   const buildPeersSection = async (): Promise<React.ReactNode> => {
