@@ -31,16 +31,26 @@ Backend, desde `data-engine/`:
 uv sync --frozen --extra test --extra dev --no-install-project
 uv run ruff check .
 uv run pyright                       # 0 errores
-APP_ENV=test uv run pytest -q -p no:warnings
+APP_ENV=test uv run pytest -n 2 -m "not services"
 ```
 
-Frontend, desde la raíz:
+Frontend, desde la raíz (los mismos pasos que el job de CI):
 
 ```bash
 npm ci
 npm run lint
 npm run typecheck
+npm run test:routes
+npm run test:contract
+npm run check:i18n                   # textos en los diccionarios es/en
+npm run test:guards
+npm run test:unit                    # Vitest
+npm run build
 ```
+
+Contrato OpenAPI: `npm run generate:openapi` no debe dejar cambios en
+`data-engine/openapi.json` ni en `lib/research/openapi.generated.ts`.
+La puesta en marcha completa está en [docs/development-setup.md](docs/development-setup.md).
 
 Si cambias dependencias de Python, `requirements.txt` se regenera con
 `data-engine/scripts/sync_requirements.py --write` (nunca a mano).
