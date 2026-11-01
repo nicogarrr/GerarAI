@@ -159,12 +159,14 @@ const secret = process.env.RESEARCH_AUTH_SECRET ?? "cavaai-e2e-research-secret-a
 const browserUser = "e2e-browser-user";
 
 export async function backendCall(method: string, path: string, body?: unknown) {
+  // The auth bridge signs the pathname, never query parameters.
+  const signedPath = new URL(path, backendURL).pathname;
   const payload = body === undefined ? Buffer.alloc(0) : Buffer.from(JSON.stringify(body));
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const nonce = randomUUID().replaceAll("-", "");
   const bodyHash = createHash("sha256").update(payload).digest("hex");
   const signature = createHmac("sha256", secret)
-    .update(`${browserUser}:${browserUser}:${timestamp}:${nonce}:${method}:${path}:${bodyHash}`)
+    .update(`${browserUser}:${browserUser}:${timestamp}:${nonce}:${method}:${signedPath}:${bodyHash}`)
     .digest("hex");
   const res = await fetch(backendURL + path, {
     method,
@@ -176,7 +178,7 @@ export async function backendCall(method: string, path: string, body?: unknown) 
       "X-CavaAI-Timestamp": timestamp,
       "X-CavaAI-Nonce": nonce,
       "X-CavaAI-Method": method,
-      "X-CavaAI-Path": path,
+      "X-CavaAI-Path": signedPath,
       "X-CavaAI-Body-Hash": bodyHash,
       "X-CavaAI-Signature": signature,
     },
@@ -189,4 +191,10 @@ export async function backendCall(method: string, path: string, body?: unknown) 
     json = text;
   }
   return { status: res.status, json };
+}
+
+/** Full paginated transaction list for the isolated E2E tenant. */
+export async function backendTransactions() {
+  const { readTransactions } = await import('../../scripts/e2e-transactions');
+  return readTransactions(backendCall);
 }

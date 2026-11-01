@@ -1,4 +1,4 @@
-import { backendCall, expect, expectHealthyPage, runUiE2E, test, VIEWPORTS, visit } from "./support";
+import { backendTransactions, backendCall, expect, expectHealthyPage, runUiE2E, test, VIEWPORTS, visit } from "./support";
 
 /**
  * Primer uso: desde «Primeros pasos» de Inicio, «Añadir» abre directamente el
@@ -9,16 +9,16 @@ import { backendCall, expect, expectHealthyPage, runUiE2E, test, VIEWPORTS, visi
 const SYMBOL = "KO";
 
 async function deleteTransactionsOf(symbol: string) {
-  const { json } = await backendCall("GET", "/api/portfolio/transactions");
-  const rows = Array.isArray(json) ? (json as Array<{ id: number; ticker: string }>) : [];
+  const json = await backendTransactions();
+  const rows = json;
   for (const row of rows.filter((r) => r.ticker === symbol).sort((a, b) => b.id - a.id)) {
     await backendCall("DELETE", `/api/portfolio/transactions/${row.id}`);
   }
 }
 
 async function resetAll() {
-  const { json } = await backendCall("GET", "/api/portfolio/transactions");
-  const rows = Array.isArray(json) ? (json as Array<{ id: number }>) : [];
+  const json = await backendTransactions();
+  const rows = json;
   for (const row of [...rows].sort((a, b) => b.id - a.id)) {
     await backendCall("DELETE", `/api/portfolio/transactions/${row.id}`);
   }
@@ -64,7 +64,7 @@ for (const vp of VIEWPORTS) {
       await expect(page.getByText("Transacción registrada")).toBeVisible({ timeout: 30_000 });
       await expect(dialog).toBeHidden();
 
-      const { json } = await backendCall("GET", "/api/portfolio/transactions");
+      const json = await backendTransactions();
       const mine = (json as Array<{ ticker: string; quantity: string | number; price: string | number }>).filter((t) => t.ticker === SYMBOL);
       expect(mine.map((t) => [Number(t.quantity), Number(t.price)])).toEqual([[12, 58.25]]);
       await expectHealthyPage(page, "tras registrar la compra");
@@ -79,8 +79,8 @@ for (const vp of VIEWPORTS) {
       await edit.getByRole("button", { name: "Guardar cambios" }).click();
       await expect(page.getByText("Transacción actualizada")).toBeVisible({ timeout: 30_000 });
       await expect(edit).toBeHidden();
-      const edited = await backendCall("GET", "/api/portfolio/transactions");
-      expect((edited.json as Array<{ ticker: string; quantity: string | number }>).filter((t) => t.ticker === SYMBOL).map((t) => Number(t.quantity))).toEqual([15]);
+      const edited = await backendTransactions();
+      expect((edited as Array<{ ticker: string; quantity: string | number }>).filter((t) => t.ticker === SYMBOL).map((t) => Number(t.quantity))).toEqual([15]);
 
       // Y se borra desde Movimientos (con confirmación), también por la UI: así
       // la caché de lecturas de cartera se invalida igual que en uso real.
@@ -91,8 +91,8 @@ for (const vp of VIEWPORTS) {
       await expect(confirm).toContainText(`15 ${SYMBOL}`);
       await confirm.getByRole("button", { name: "Eliminar" }).click();
       await expect(page.getByText("Transacción eliminada")).toBeVisible({ timeout: 30_000 });
-      const after = await backendCall("GET", "/api/portfolio/transactions");
-      expect((after.json as Array<{ ticker: string }>).filter((t) => t.ticker === SYMBOL)).toEqual([]);
+      const after = await backendTransactions();
+      expect((after as Array<{ ticker: string }>).filter((t) => t.ticker === SYMBOL)).toEqual([]);
       await expectHealthyPage(page, "tras borrar la compra");
     });
 
