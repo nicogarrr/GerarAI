@@ -270,22 +270,26 @@ def test_gdelt_retry_helper_never_retries_before_the_window(monkeypatch):
     # Ventana normal: se honra exacta.
     with pytest.raises(dramatiq.Retry) as excinfo:
         _raise_gdelt_retry(GdeltRateLimited(45.0))
-    assert excinfo.value.delay == 45_000
+    # Jitter: nunca antes de la ventana, como mucho un 20 % despues.
+    assert 45_000 <= excinfo.value.delay < (45_000) * 1.2
 
     # Ventana larga: NO se trunca a ningun cap (truncar = reintentar antes).
     with pytest.raises(dramatiq.Retry) as excinfo:
         _raise_gdelt_retry(GdeltRateLimited(3_600.0))
-    assert excinfo.value.delay == 3_600_000
+    # Jitter: nunca antes de la ventana, como mucho un 20 % despues.
+    assert 3_600_000 <= excinfo.value.delay < (3_600_000) * 1.2
 
     # Ventana 0 o ausente: suelo de 60s para no buclear contra el 429.
     with pytest.raises(dramatiq.Retry) as excinfo:
         _raise_gdelt_retry(GdeltRateLimited(0.0))
-    assert excinfo.value.delay == int(GDELT_RETRY_FLOOR_SECONDS * 1000)
+    # Jitter: nunca antes de la ventana, como mucho un 20 % despues.
+    assert int(GDELT_RETRY_FLOOR_SECONDS * 1000) <= excinfo.value.delay < (int(GDELT_RETRY_FLOOR_SECONDS * 1000)) * 1.2
 
     # Ventana presente aunque sea corta: se honra exacta (el suelo no la pisa).
     with pytest.raises(dramatiq.Retry) as excinfo:
         _raise_gdelt_retry(GdeltRateLimited(30.0))
-    assert excinfo.value.delay == 30_000
+    # Jitter: nunca antes de la ventana, como mucho un 20 % despues.
+    assert 30_000 <= excinfo.value.delay < (30_000) * 1.2
 
 
 def test_gdelt_lane_backoff_config():
