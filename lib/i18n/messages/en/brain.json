@@ -135,6 +135,17 @@
       "risk": "Risk",
       "news": "News",
       "tax": "Tax"
+    },
+    "thesis": {
+      "title": "Expert team thesis",
+      "generatedAt": "Generated on {date}",
+      "note": "Each expert only uses data it read in that run; each [n] links to its source.",
+      "statusTimeout": "Did not answer in time.",
+      "statusNoData": "Not enough data.",
+      "statusError": "Unavailable.",
+      "conflicts": "Disagreements between experts",
+      "verdict": "Judge's verdict",
+      "sources": "Sources"
     }
   }
 }

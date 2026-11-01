@@ -24,6 +24,8 @@ import { readingSections } from '@/lib/research/thesis-reading-sections';
 import { isValidCurrencyCode } from '@/lib/format';
 import PrintButton from '@/components/research/PrintButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
+import { ExpertThesisPanel } from '@/components/research/ExpertThesisPanel';
+import { getExpertThesis } from '@/lib/actions/expert-thesis.actions';
 import { PROVENANCE_GROUPS, provenanceBasis, provenanceGroup } from '@/lib/research/provenance-groups';
 import { isVerifiedOficial, provenanceUrls } from '@/lib/research/provenance-item';
 import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenance-format';
@@ -208,7 +210,7 @@ export default async function ThesisReadingPage({ params }: PageProps) {
   const { ticker: rawTicker } = await params;
   const ticker = rawTicker.toUpperCase();
 
-  const [snapshotRead, workspace] = await Promise.all([
+  const [snapshotRead, workspace, expertThesis] = await Promise.all([
     // null = 404 «compañía ausente del master» (getResearchCompanySnapshot
     // solo devuelve null ahí); cualquier otro fallo es `failed`. Antes ambos
     // eran null y un ticker fuera del master se contaba como caída del servicio.
@@ -217,6 +219,8 @@ export default async function ThesisReadingPage({ params }: PageProps) {
       () => ({ value: null, failed: true }),
     ),
     getResearchThesisWorkspace(ticker).catch(() => null),
+    // Tesis del equipo de expertos (EXPERT_TEAM_ENABLED): null si está apagado o no hay.
+    getExpertThesis(ticker),
   ]);
   const snapshot = snapshotRead.value;
   const company = snapshot?.company ?? null;
@@ -652,6 +656,11 @@ export default async function ThesisReadingPage({ params }: PageProps) {
           <ThesisToc items={toc} variant="aside" t={t} />
           </div>
         )}
+        {!companyMissing && !loadFailed ? (
+          <div className="max-w-[40rem]">
+            <ExpertThesisPanel thesis={expertThesis} t={t} formatDate={formatUserDate} />
+          </div>
+        ) : null}
       </div>
     </main>
   );

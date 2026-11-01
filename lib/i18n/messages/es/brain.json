@@ -135,6 +135,17 @@
       "risk": "Riesgo",
       "news": "Noticias",
       "tax": "Fiscal"
+    },
+    "thesis": {
+      "title": "Tesis del equipo de expertos",
+      "generatedAt": "Generada el {date}",
+      "note": "Cada experto solo usa datos que leyó en esa corrida; cada [n] lleva a su fuente.",
+      "statusTimeout": "No respondió a tiempo.",
+      "statusNoData": "Sin datos suficientes.",
+      "statusError": "No disponible.",
+      "conflicts": "Choques entre expertos",
+      "verdict": "Veredicto del juez",
+      "sources": "Fuentes"
     }
   }
 }
