@@ -18,7 +18,9 @@ async function render(patch: Partial<PaperTradeView> = {}) {
     mkdirSync(dir, { recursive: true });
     writeFileSync(`${dir}/view.mjs`, ts.transpileModule(readFileSync('components/proPicks/PaperProposalCard.tsx', 'utf8'), {
         compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
-    }).outputText.replaceAll("from '@/lib/format'", `from '${pathToFileURL(`${process.cwd()}/lib/format.ts`).href}'`));
+    }).outputText
+        // Alias @/ → fichero real (la tarjeta lee formato e idioma de lib/).
+        .replace(/from '@\/([^']+)'/g, (_m, p) => `from '${pathToFileURL(`${process.cwd()}/${p}.ts`).href}'`));
     const mod = await import(`${process.cwd()}/${dir}/view.mjs`);
     return renderToStaticMarkup(createElement(mod.PaperProposalCard, { trade: { ...trade, ...patch } }));
 }

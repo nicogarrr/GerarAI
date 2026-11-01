@@ -6,6 +6,7 @@ import { BarChart3, Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useLocale } from '@/lib/i18n/client';
 import EnhancedProPicksContent from './EnhancedProPicksContent';
 import { STRATEGY_CATALOG, mergeStrategies } from './monthlyRebalance';
 import { runWalkForwardBacktest, type WalkForwardBacktestResult } from '@/lib/actions/propicks-backtest.actions';
@@ -45,6 +46,7 @@ interface ProPicksTabsProps {
 }
 
 export default function ProPicksTabs({ strategies, initialPicks, generatedAt, passedCount = null, initialTab = 'picks' }: ProPicksTabsProps) {
+    const locale = useLocale();
     const merged = mergeStrategies(strategies);
     const [activeTab, setActiveTab] = useState<string>(initialTab);
     const [currentStrategy, setCurrentStrategy] = useState<string>(merged[0]?.id ?? 'adaptive');
@@ -171,7 +173,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                 <TabsTrigger value="oportunidades" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Oportunidades DCA</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="paper" className="mt-6"><PaperTradingView /></TabsContent>
+            <TabsContent value="paper" className="mt-6"><PaperTradingView locale={locale} /></TabsContent>
             <TabsContent value="radar" className="mt-6">
                 {activeTab === 'radar' && <RadarGlobalView />}
             </TabsContent>
