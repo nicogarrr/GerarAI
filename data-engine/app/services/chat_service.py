@@ -2462,6 +2462,24 @@ class ChatService:
             value_base = price * held * rate
             sale_ccy, sale_rate = canonical_currency_code(currency), rate
             trace["sale_price_source"] = "usuario"
+            # Precio en otra divisa que el valor («AAPL a 150 €»): como en el
+            # informe fiscal, la ganancia va en la divisa del valor y se pasa a
+            # euros al cambio de la venta, así que el coste nativo va al cambio
+            # de HOY de esa divisa (antes, al de la compra).
+            from app.valuation.currency import normalize_currency
+
+            pos_ccy = canonical_currency_code(pos.currency or company.currency or "EUR")
+            pos_major = normalize_currency(pos_ccy)[0]
+            if pos_major not in {normalize_currency(sale_ccy)[0], "EUR"}:
+                pos_rate = _rate_not_older_than(
+                    PortfolioFXService().fx_table(
+                        db, currencies={pos_ccy}, base_currency="EUR", as_of_max=today,
+                    ),
+                    quote_currency=pos_ccy, base_currency="EUR", as_of=today,
+                    max_age_days=MAX_FX_AGE_DAYS,
+                )
+                if pos_rate is not None:
+                    sale_ccy, sale_rate = pos_ccy, pos_rate
         fifo_cost = fifo.cost_eur_dgt(sale_ccy, sale_rate) if fifo is not None else None
         avg_cost = pos.cost_basis_base if (pos.base_currency or "EUR") == "EUR" else None
         trace["method"] = "fifo" if fifo_cost is not None else "average_cost"
