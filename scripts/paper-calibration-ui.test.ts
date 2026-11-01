@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { pathToFileURL } from 'node:url';
 import type { PaperCalibration } from '../lib/actions/paper-trading.actions';
 
 const payload: PaperCalibration = {
@@ -19,7 +20,9 @@ async function render(data?: PaperCalibration): Promise<string> {
     try {
         writeFileSync(`${dir}/view.mjs`, ts.transpileModule(readFileSync('components/proPicks/PaperCalibrationView.tsx', 'utf8'), {
             compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
-        }).outputText);
+        }).outputText
+            // Alias @/ → fichero real (formato e idioma de lib/).
+            .replace(/from '@\/([^']+)'/g, (_m, p) => `from '${pathToFileURL(`${process.cwd()}/${p}.ts`).href}'`));
         const mod = await import(`${process.cwd()}/${dir}/view.mjs`);
         return renderToStaticMarkup(createElement(mod.PaperCalibrationView, { data }));
     } finally { rmSync(dir, { recursive: true, force: true }); }

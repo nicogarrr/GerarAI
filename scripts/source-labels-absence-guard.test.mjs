@@ -49,8 +49,12 @@ test('screener: lectura offline sin nombre de proveedor', () => {
 
 test('paper trading: nota de dividendos sin Yahoo/FMP', () => {
     const view = read('components/proPicks/PaperTradingView.tsx');
+    // La nota vive en el diccionario (Ajustes → Idioma); el literal español no cambia.
+    const note = JSON.parse(read('lib/i18n/messages/es/propicks.json')).paper.basisText;
     assert.doesNotMatch(view, /Yahoo\/FMP|fuente Yahoo/i);
-    assert.match(view, /fuente no oficial; eventos inciertos excluidos/);
+    assert.doesNotMatch(note, /Yahoo\/FMP|fuente Yahoo/i);
+    assert.match(view, /t\('propicks\.paper\.basisText'\)/);
+    assert.match(note, /fuente no oficial; eventos inciertos excluidos/);
 });
 
 test('deep value: desacuerdo de fuentes sin nombrar la fuente', () => {

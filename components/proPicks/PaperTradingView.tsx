@@ -4,12 +4,14 @@ import { Button } from '@/components/ui/button';
 import { PaperProposalCard } from './PaperProposalCard';
 import { PaperCalibrationView } from './PaperCalibrationView';
 import { feedPaperProposalsNow, getPaperTrading, type PaperState } from '@/lib/actions/paper-trading.actions';
+import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locale';
+import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 
-const number = (value: string | number | null) => value === null ? 'Sin datos' : Number(value).toLocaleString('es-ES', { maximumFractionDigits: 2 });
-const horizon = (value: string) => value === 'five_years' ? 'Tesis 5 años' : 'Operación a 30 días';
+const numberFor = (t: TranslateFn, locale: Locale) => (value: string | number | null) => value === null ? t('propicks.paper.noData') : Number(value).toLocaleString(locale === 'en' ? 'en-US' : 'es-ES', { maximumFractionDigits: 2 });
+const horizon = (value: string, t: TranslateFn) => t(value === 'five_years' ? 'propicks.paper.horizonFive' : 'propicks.paper.horizonShort');
 
 
-function PaperFeedButton() {
+function PaperFeedButton({ t }: { t: TranslateFn }) {
     const [state, setState] = useState<'idle' | 'feeding' | 'queued' | 'error'>('idle');
     const handleFeed = async () => {
         setState('feeding');
@@ -32,53 +34,56 @@ function PaperFeedButton() {
                 disabled={loading || state === 'queued'}
                 aria-busy={loading}
             >
-                {loading ? 'Encolando generación...' : 'Generar propuestas simuladas'}
+                {loading ? t('propicks.paper.feeding') : t('propicks.paper.generate')}
             </Button>
             {state === 'queued' ? (
-                <p className="text-sm text-teal-300">Generación en curso; recarga la página en unos minutos para ver las propuestas.</p>
+                <p className="text-sm text-teal-300">{t('propicks.paper.queued')}</p>
             ) : null}
             {state === 'error' ? (
-                <p className="text-sm text-red-400">No se pudo encolar la generación. Inténtalo de nuevo.</p>
+                <p className="text-sm text-red-400">{t('propicks.paper.feedError')}</p>
             ) : null}
         </div>
     );
 }
 
-export function PaperTradingContent({ data }: { data: PaperState }) {
+export function PaperTradingContent({ data, locale = DEFAULT_LOCALE }: { data: PaperState; locale?: Locale }) {
+    const t = createTranslator(locale);
+    const number = numberFor(t, locale);
     if (data.error) return <p role="alert" className="text-red-300">{data.error}</p>;
-    return <section className="min-w-0 space-y-4" aria-label="Cartera simulada LLM">
-        <h2 className="text-xl font-semibold text-gray-100">Resultados simulados de la IA</h2>
-        <p className="text-sm text-gray-400">Seguimiento de propuestas simuladas del modelo, no de tus operaciones manuales. <Link href="/paper-trading" className="text-teal-300 hover:underline">Ir a mi cuenta demo</Link>.</p>
+    return <section className="min-w-0 space-y-4" aria-label={t('propicks.paper.sectionLabel')}>
+        <h2 className="text-xl font-semibold text-gray-100">{t('propicks.paper.heading')}</h2>
+        <p className="text-sm text-gray-400">{t('propicks.paper.intro')} <Link href="/paper-trading" className="text-teal-300 hover:underline">{t('propicks.paper.demoLink')}</Link>.</p>
         <div className="grid gap-3 sm:grid-cols-2">
             {data.score.groups.map(group => <article key={`${group.horizon}-${group.currency}`} className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
-                <h3 className="font-medium text-teal-300">{horizon(group.horizon)} · {group.currency === 'sin_datos' ? 'Sin divisa' : group.currency}</h3>
+                <h3 className="font-medium text-teal-300">{horizon(group.horizon, t)} · {group.currency === 'sin_datos' ? t('propicks.paper.noCurrency') : group.currency}</h3>
                 <dl className="mt-3 grid grid-cols-2 gap-2 text-sm text-gray-300">
-                    <dt>Aciertos / cerradas</dt><dd>{group.wins} / {group.closed}</dd>
-                    <dt>Tasa de acierto</dt><dd>{group.hit_rate === null ? 'Sin datos' : `${number(group.hit_rate * 100)} %`}</dd>
-                    <dt>Errores / neutras</dt><dd>{group.losses} / {group.flat}</dd>
-                    <dt>Resultado bruto cerrado</dt><dd>{number(group.realized_pnl)}</dd>
-                    <dt>Resultado bruto abierto</dt><dd>{number(group.unrealized_pnl)}</dd>
-                    <dt>Abiertas sin precio</dt><dd>{group.missing_marks}</dd>
-                    <dt>Resultado neto cerrado</dt><dd>{group.realized_pnl_net === null || group.realized_pnl_net === undefined ? 'Sin datos' : number(group.realized_pnl_net)}</dd>
-                    <dt>Cerradas con neto</dt><dd>{group.closed_net ?? 0} de {group.closed}</dd>
-                    <dt>Excluidas por acción corporativa</dt><dd>{group.closed_distorted ?? 0}</dd>
+                    <dt>{t('propicks.paper.winsClosed')}</dt><dd>{group.wins} / {group.closed}</dd>
+                    <dt>{t('propicks.paper.hitRate')}</dt><dd>{group.hit_rate === null ? t('propicks.paper.noData') : `${number(group.hit_rate * 100)}${locale === 'en' ? '%' : ' %'}`}</dd>
+                    <dt>{t('propicks.paper.lossesFlat')}</dt><dd>{group.losses} / {group.flat}</dd>
+                    <dt>{t('propicks.paper.grossClosed')}</dt><dd>{number(group.realized_pnl)}</dd>
+                    <dt>{t('propicks.paper.grossOpen')}</dt><dd>{number(group.unrealized_pnl)}</dd>
+                    <dt>{t('propicks.paper.openNoPrice')}</dt><dd>{group.missing_marks}</dd>
+                    <dt>{t('propicks.paper.netClosed')}</dt><dd>{group.realized_pnl_net === null || group.realized_pnl_net === undefined ? t('propicks.paper.noData') : number(group.realized_pnl_net)}</dd>
+                    <dt>{t('propicks.paper.closedWithNet')}</dt><dd>{t('propicks.paper.closedNetOf', { net: group.closed_net ?? 0, closed: group.closed })}</dd>
+                    <dt>{t('propicks.paper.excludedCorporate')}</dt><dd>{group.closed_distorted ?? 0}</dd>
                 </dl>
             </article>)}
         </div>
-        <PaperCalibrationView data={data.score.calibracion} />
+        <PaperCalibrationView data={data.score.calibracion} locale={locale} />
         {data.trades.length === 0 && (
             <div className="flex flex-col items-center gap-3 rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-center">
-                <p className="text-gray-400">Sin propuestas del modelo registradas. No se ha generado una operación simulada para mostrar.</p>
-                <PaperFeedButton />
+                <p className="text-gray-400">{t('propicks.paper.empty')}</p>
+                <PaperFeedButton t={t} />
             </div>
         )}
-        {data.trades.map(trade => <PaperProposalCard key={trade.id} trade={trade} />)}
-        <details className="text-xs text-gray-400"><summary>Base de medición</summary><p className="mt-2">Acierto = resultado bruto positivo al cerrar. Divisas separadas. El neto descuenta costes modelados (supuesto: comisión fija + spread, persistido por operación) y suma dividendos declarados (fuente no oficial; eventos inciertos excluidos; otra divisa nunca convertida). Splits: posiciones abiertas ajustadas con fuente; una cerrada con split no se reescribe y queda excluida del acierto. Sin financiación de cortos, FX, cash ledger ni capital. Una salida anticipada no valida una tesis a 5 años. Cantidad simulada: supuesto.</p></details>
+        {data.trades.map(trade => <PaperProposalCard key={trade.id} trade={trade} locale={locale} />)}
+        <details className="text-xs text-gray-400"><summary>{t('propicks.paper.basisTitle')}</summary><p className="mt-2">{t('propicks.paper.basisText')}</p></details>
     </section>;
 }
 
-export default function PaperTradingView() {
+export default function PaperTradingView({ locale = DEFAULT_LOCALE }: { locale?: Locale }) {
+    const t = createTranslator(locale);
     const [data, setData] = useState<PaperState | null>(null);
-    useEffect(() => { let alive = true; getPaperTrading().then(result => { if (alive) setData(result); }).catch(() => { if (alive) setData({ trades: [], score: { groups: [] }, error: 'No se pudo cargar la cartera simulada.' }); }); return () => { alive = false; }; }, []);
-    return data ? <PaperTradingContent data={data} /> : <p role="status" className="text-gray-400">Cargando cartera simulada…</p>;
+    useEffect(() => { let alive = true; getPaperTrading().then(result => { if (alive) setData(result); }).catch(() => { if (alive) setData({ trades: [], score: { groups: [] }, error: createTranslator(locale)('propicks.paper.loadError') }); }); return () => { alive = false; }; }, [locale]);
+    return data ? <PaperTradingContent data={data} locale={locale} /> : <p role="status" className="text-gray-400">{t('propicks.paper.loading')}</p>;
 }
