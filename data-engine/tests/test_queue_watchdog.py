@@ -95,19 +95,39 @@ def test_edad_por_persistencia_no_message_timestamp(redis_client):
     assert 395 <= sample.ready_age_seconds <= 405
 
 
-def test_cabeza_nueva_reinicia_edad_y_cola_vacia_la_borra(redis_client):
+def test_drenaje_parcial_conserva_la_edad_del_mas_antiguo(redis_client):
+    """El agujero del lunes: la cabeza avanza (drenaje parcial) pero el
+    mensaje que la releva YA fue visto listo: su edad no vuelve a 0."""
+    _push(redis_client, "prices")
+    _push(redis_client, "prices")
+    t0 = NOW.timestamp() * 1000
+    wd.sample_queues(redis_client, queues=("prices",), now_ms=t0)  # avistamiento
+    # Se consume SOLO la cabeza (drenaje parcial): el relevo ya era conocido.
+    mid = redis_client.lpop("dramatiq:prices")
+    redis_client.hdel("dramatiq:prices.msgs", mid)
+    (sample,) = wd.sample_queues(redis_client, queues=("prices",), now_ms=t0 + 400_000)
+    assert sample.ready_age_seconds == 400.0  # no 0: el relevo llevaba 400 s listo
+
+
+def test_mensaje_joven_no_reinicia_la_edad_del_mas_antiguo(redis_client):
+    _push(redis_client, "prices")
+    t0 = NOW.timestamp() * 1000
+    wd.sample_queues(redis_client, queues=("prices",), now_ms=t0)
+    _push(redis_client, "prices")  # mensaje nuevo al final (FIFO)
+    (sample,) = wd.sample_queues(redis_client, queues=("prices",), now_ms=t0 + 60_000)
+    assert sample.ready_age_seconds == 60.0  # manda el más antiguo
+
+
+def test_cola_vacia_borra_la_anotacion(redis_client):
     _push(redis_client, "prices")
     wd.sample_queues(redis_client, queues=("prices",), now_ms=NOW.timestamp() * 1000)
-    _push(redis_client, "prices")  # nueva cabeza (LIFO no: RPUSH -> la vieja sigue en cabeza)
-    (sample,) = wd.sample_queues(redis_client, queues=("prices",), now_ms=NOW.timestamp() * 1000 + 60_000)
-    assert sample.ready_age_seconds == 60.0  # la cabeza original sigue
-    # Consumir ambas: cola vacía -> edad None y anotación borrada.
-    redis_client.lrange("dramatiq:prices", 0, -1) and [
-        redis_client.lrem("dramatiq:prices", 1, mid) for mid in redis_client.lrange("dramatiq:prices", 0, -1)
-    ]
-    (sample,) = wd.sample_queues(redis_client, queues=("prices",), now_ms=NOW.timestamp() * 1000 + 120_000)
+    mid = redis_client.lpop("dramatiq:prices")
+    redis_client.hdel("dramatiq:prices.msgs", mid)
+    (sample,) = wd.sample_queues(
+        redis_client, queues=("prices",), now_ms=NOW.timestamp() * 1000 + 120_000
+    )
     assert sample.ready_age_seconds is None
-    assert redis_client.get(f"{wd._HEAD_PREFIX}prices") is None
+    assert redis_client.get(f"{wd._SEEN_PREFIX}prices") is None
 
 
 # --- Detección pura: variación neta de profundidad, no completados ------------
@@ -145,7 +165,10 @@ def test_detect_stuck_no_alerta_si_decrece_joven_o_sin_previa():
 
 # --- Punto 1: una medición por tick aunque el actor corra por tenant ---------
 
-def test_una_medicion_por_tick_los_demas_tenants_reusan(db, redis_client):
+def test_una_medicion_por_tick_los_demas_tenants_reusan(db, redis_client, monkeypatch):
+    # Ticks separados 1000 s: hueco maximo por encima para que el avistamiento
+    # no expire entre ticks (el default 600 cortaria la continuidad).
+    monkeypatch.setenv("QUEUE_WATCHDOG_MAX_SAMPLE_GAP_SECONDS", "3600")
     t0 = NOW - timedelta(seconds=1000)
     # Tick anterior: siembra muestra y cabeza (edad 0 entonces).
     stats = wd.emit_queue_stuck_alerts(db, client=redis_client, now=t0)
@@ -183,7 +206,10 @@ def test_tenant_sin_resultado_cacheado_difiere_sin_alerta_falsa(db, redis_client
 
 # --- Alerta idempotente con lo medido -----------------------------------------
 
-def test_emit_crea_alerta_idempotente_con_lo_medido(db, redis_client):
+def test_emit_crea_alerta_idempotente_con_lo_medido(db, redis_client, monkeypatch):
+    # Ticks separados 1000 s: hueco maximo por encima para que el avistamiento
+    # no expire (el default 600 cortaria la continuidad entre ambos ticks).
+    monkeypatch.setenv("QUEUE_WATCHDOG_MAX_SAMPLE_GAP_SECONDS", "3600")
     _push(redis_client, "prices")
     # Tick previo (siembra): cabeza vista por primera vez hace 1000 s.
     wd.sample_tick(redis_client, namespace="dramatiq", queues=("prices",),
@@ -249,3 +275,62 @@ def test_emit_con_redis_roto_fail_open(db):
     assert stats["status"] == "skipped"
     assert stats["reason"] == "redis_unavailable"
     assert stats["created"] == []
+
+
+# --- Auditoría v3: huecos de muestreo y backlog > ventana --------------------
+
+def test_hueco_de_muestreo_expira_el_avistamiento(redis_client, monkeypatch):
+    """Watchdog apagado un rato: no se afirma 'ready continuo' durante el hueco.
+
+    Si entre dos ticks pasa más que el hueco máximo, el avistamiento previo no
+    prueba continuidad (el mensaje pudo consumirse y reinsertarse con el mismo
+    id): la edad vuelve a empezar en la reanudación.
+    """
+    monkeypatch.setenv("QUEUE_WATCHDOG_MAX_SAMPLE_GAP_SECONDS", "600")
+    _push(redis_client, "prices")
+    t0 = NOW.timestamp() * 1000
+    wd.sample_queues(redis_client, queues=("prices",), now_ms=t0)
+    # Hueco de 1200 s (> 600): la edad NO es 1200, reinicia.
+    (sample,) = wd.sample_queues(redis_client, queues=("prices",), now_ms=t0 + 1_200_000)
+    assert sample.ready_age_seconds == 0.0
+    # Y a partir de la reanudación acumula normal.
+    (sample,) = wd.sample_queues(redis_client, queues=("prices",), now_ms=t0 + 1_200_000 + 60_000)
+    assert sample.ready_age_seconds == 60.0
+
+
+def test_reinsertado_mismo_id_tras_ausencia_reinicia_edad(redis_client):
+    """Extraído y reinsertado con el mismo id: si faltó en un tick, su
+    avistamiento se podó y vuelve como avistamiento nuevo (edad 0)."""
+    mid = _push(redis_client, "prices")
+    t0 = NOW.timestamp() * 1000
+    wd.sample_queues(redis_client, queues=("prices",), now_ms=t0)
+    # Ausente un tick entero (consumido).
+    redis_client.lrem("dramatiq:prices", 1, mid)
+    redis_client.hdel("dramatiq:prices.msgs", mid)
+    wd.sample_queues(redis_client, queues=("prices",), now_ms=t0 + 300_000)
+    # Reinsertado con el MISMO id (retry que conserva message_id).
+    redis_client.hset("dramatiq:prices.msgs", mid, json.dumps({"message_id": mid, "message_timestamp": 1}))
+    redis_client.rpush("dramatiq:prices", mid)
+    (sample,) = wd.sample_queues(redis_client, queues=("prices",), now_ms=t0 + 600_000)
+    assert sample.ready_age_seconds == 0.0
+
+
+def test_backlog_mayor_que_la_ventana_subestima_documentado(redis_client, monkeypatch):
+    """Con backlog > K, un id más allá de la ventana no se avista hasta entrar:
+    su edad empieza al entrar (subestimación mayor que un tick, documentada).
+    El más antiguo siempre está en la ventana y su edad es continua."""
+    monkeypatch.setattr(wd, "_SEEN_WINDOW", 3)
+    t0 = NOW.timestamp() * 1000
+    ids = [_push(redis_client, "prices") for _ in range(5)]
+    wd.sample_queues(redis_client, queues=("prices",), now_ms=t0)  # avista los 3 más viejos
+    # Drenar 3: los dos jóvenes entran en la ventana por primera vez a los 300 s.
+    for mid in ids[:3]:
+        redis_client.lrem("dramatiq:prices", 1, mid)
+        redis_client.hdel("dramatiq:prices.msgs", mid)
+    (sample,) = wd.sample_queues(redis_client, queues=("prices",), now_ms=t0 + 300_000)
+    # El más antiguo restante (4º) entra ahora en ventana: edad 0 aunque
+    # llevaba 300 s listo (subestimación > 1 tick por backlog > K).
+    assert sample.ready_age_seconds == 0.0
+    # Y desde ahí acumula.
+    (sample,) = wd.sample_queues(redis_client, queues=("prices",), now_ms=t0 + 360_000)
+    assert sample.ready_age_seconds == 60.0

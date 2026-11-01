@@ -4,9 +4,10 @@ Motivo (Nico, 1-nov-2026): el lunes entra la carga de noticias y precios y no
 puede haber colas atascadas silenciosas. Una cola se declara atascada por lo
 MEDIDO, no por su profundidad:
 
-- el mismo mensaje lleva >= umbral en CABEZA de la lista ready (persistencia
-  del ready id, no message_timestamp: ese incluye el tiempo de RetryAfter en
-  la cola diferida y alertaria en un cooldown normal), y
+- el mensaje listo MAS ANTIGUO lleva >= umbral sin consumir (primer
+  avistamiento en la lista ready de los K ids mas viejos, no
+  message_timestamp: ese incluye el tiempo de RetryAfter en la cola
+  diferida y alertaria en un cooldown normal), y
 - la variacion neta de profundidad entre ticks es <= 0: no decrece. Es la
   diferencia de pendientes entre muestras (msgs + DQ.msgs, como
   kpi_queue_depth), NO mensajes completados: si entran 50 y salen 50 la
@@ -50,7 +51,12 @@ DEFAULT_QUEUES = (
 )
 
 _SAMPLE_PREFIX = "queue_watchdog:sample:"  # {ts, depth} del ultimo tick muestreador
-_HEAD_PREFIX = "queue_watchdog:head:"      # "<ready_id>:<ts_ms>": desde cuando es cabeza
+_SEEN_PREFIX = "queue_watchdog:seen:"      # hash ready_id -> primer avistamiento (ms)
+# Ventana de avistamiento: los K ids listos MAS ANTIGUOS por cola. La cola es
+# FIFO (RPUSH/LPOP), asi que el mas viejo siempre esta dentro; un id sale de
+# la ventana al consumirse (o cuando la cola supera K, los mas jovenes, que
+# no definen la edad del mas antiguo).
+_SEEN_WINDOW = 1000
 _TICK_LOCK_KEY = "queue_watchdog:tick_lock"
 _RESULT_KEY = "queue_watchdog:last_result"
 
@@ -58,6 +64,19 @@ _RESULT_KEY = "queue_watchdog:last_result"
 # siguiente tick vuelva a muestrear; los tenants del mismo tick reutilizan.
 TICK_LOCK_SECONDS = 240
 _RESULT_TTL_SECONDS = 900
+
+
+def max_sample_gap_seconds() -> float:
+    """Hueco maximo entre muestreos para afirmar presencia continua en ready.
+
+    Pasado este hueco (watchdog apagado, ticks perdidos) el avistamiento
+    previo no prueba continuidad: el mensaje pudo consumirse y reinsertarse
+    con el mismo id. La edad reinicia en la reanudacion.
+    """
+    try:
+        return max(60.0, float(os.getenv("QUEUE_WATCHDOG_MAX_SAMPLE_GAP_SECONDS", "600")))
+    except ValueError:
+        return 600.0
 
 
 def max_age_seconds() -> float:
@@ -100,25 +119,61 @@ def _as_str(raw: Any) -> str:
 
 
 def _ready_head_age(client: Any, base: str, queue: str, now_ms: float) -> float | None:
-    """Segundos que el mensaje en cabeza lleva listo sin consumir.
+    """Segundos que el mensaje listo MAS ANTIGUO lleva sin consumir.
 
-    Persistencia del ready id: la primera vez que un id es cabeza se anota su
-    instante; mientras siga siendo cabeza, su edad crece. Cola vacia: se borra
-    la anotacion (None). Nunca usa message_timestamp (incluye RetryAfter).
+    Primer avistamiento como ready: cada tick se anota el instante en que
+    cada id de la ventana (los K mas viejos) se vio por primera vez en la
+    lista ready, y la edad es la del avistamiento mas antiguo presente.
+    Nunca usa message_timestamp (incluye RetryAfter). Persistir solo la
+    cabeza subestimaba la edad real con drenaje parcial: la cabeza avanza
+    cada tick y su "edad como cabeza" vuelve a 0 aunque el mensaje que la
+    releva llevara minutos listo (medido con scripts/ingest_load_lab: edad
+    real 840 s, edad de cabeza 0, alerta NUNCA).
+
+    Cotas honestas. Nunca SOBREestima la edad... salvo que un mensaje salga
+    y se reinserte con el mismo id DENTRO de un mismo intervalo de muestreo
+    (indistinguible de presencia continua: el avistamiento no se poda entre
+    ticks); los avistamientos expiran tras un hueco de muestreo
+    (QUEUE_WATCHDOG_MAX_SAMPLE_GAP_SECONDS) para no afirmar "ready continuo"
+    durante huecos mas largos. Puede SUBestimar: con backlog <= K, como
+    mucho un tick (avistamiento discreto); con backlog > K, ademas el tiempo
+    que el id paso fuera de la ventana antes de entrar en los K mas viejos
+    (sin cota fija; el id mas viejo siempre esta en la ventana, asi que la
+    edad reportada del mas antiguo solo arrastra el lag de su propia entrada
+    en ventana).
     """
-    ids = client.lrange(base, 0, 0)
-    key = f"{_HEAD_PREFIX}{queue}"
+    ids = client.lrange(base, 0, _SEEN_WINDOW - 1)
+    key = f"{_SEEN_PREFIX}{queue}"
     if not ids:
         client.delete(key)
         return None
-    head = _as_str(ids[0])
-    raw = client.get(key)
-    if raw is not None:
-        stored_id, _, stored_ts = _as_str(raw).partition(":")
-        if stored_id == head:
-            return max(0.0, (now_ms - float(stored_ts)) / 1000.0)
-    client.set(key, f"{head}:{now_ms}")
-    return 0.0
+    seen = client.hgetall(key)
+    max_gap_ms = max_sample_gap_seconds() * 1000
+    pipe = client.pipeline()
+    for mid in seen:
+        if mid not in ids:
+            pipe.hdel(key, mid)  # consumido o fuera de la ventana: se poda
+    first_seen: list[float] = []
+    for mid in ids:
+        raw = seen.get(mid)
+        first_ms = None
+        if raw is not None:
+            first_raw, _, last_raw = _as_str(raw).partition(":")
+            first_ms = float(first_raw)
+            if now_ms - float(last_raw) > max_gap_ms:
+                # Hueco de muestreo: sin evidencia de presencia continua
+                # durante el hueco (pudo salir y reinsertarse con el mismo
+                # id). El avistamiento reinicia; no se afirma "ready continuo".
+                first_ms = None
+        if first_ms is None:
+            first_ms = now_ms
+        pipe.hset(key, mid, f"{int(first_ms)}:{int(now_ms)}")
+        first_seen.append(first_ms)
+    pipe.execute()
+    if all(t == now_ms for t in first_seen):
+        # Toda la ventana es nueva en este tick (o reiniciada por hueco).
+        return 0.0
+    return max(0.0, (now_ms - min(first_seen)) / 1000.0)
 
 
 def sample_queues(client: Any, *, namespace: str = "dramatiq", queues: tuple[str, ...] = DEFAULT_QUEUES,
