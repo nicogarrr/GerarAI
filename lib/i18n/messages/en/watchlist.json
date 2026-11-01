@@ -220,5 +220,23 @@
   },
   "lazy": {
     "loading": "Loading the control"
+  },
+  "analysisStatus": {
+    "running": "Analyzing",
+    "retryPending": "Analysis waiting to retry",
+    "failed": "The analysis couldn't be completed",
+    "missing": "Analysis: missing data",
+    "missingWithReason": "Analysis: missing data ({reason})",
+    "done": "Analysis complete",
+    "unavailable": "Analysis status not available",
+    "pair": "{a} and {b}",
+    "pairMore": "{a}, {b} and {count} more",
+    "missingRevenueHistory": "revenue for two fiscal years",
+    "missingFcfMargin": "FCF margin",
+    "missingShares": "shares outstanding",
+    "missingNoRevenue": "no reported revenue yet",
+    "missingAnnualRevenue": "annual revenue",
+    "missingFiscalYear": "fiscal year end",
+    "missingAssumptions": "model assumptions"
   }
 }

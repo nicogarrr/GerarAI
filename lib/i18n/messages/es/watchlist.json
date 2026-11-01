@@ -220,5 +220,23 @@
   },
   "lazy": {
     "loading": "Cargando el control"
+  },
+  "analysisStatus": {
+    "running": "Analizando",
+    "retryPending": "Análisis pendiente de reintento",
+    "failed": "No se pudo completar el análisis",
+    "missing": "Análisis: faltan datos",
+    "missingWithReason": "Análisis: faltan datos ({reason})",
+    "done": "Análisis completado",
+    "unavailable": "Estado de análisis no disponible",
+    "pair": "{a} y {b}",
+    "pairMore": "{a} y {b} y {count} más",
+    "missingRevenueHistory": "ingresos de dos ejercicios",
+    "missingFcfMargin": "margen FCF",
+    "missingShares": "acciones en circulación",
+    "missingNoRevenue": "aún sin ingresos reportados",
+    "missingAnnualRevenue": "ingresos anuales",
+    "missingFiscalYear": "cierre de ejercicio",
+    "missingAssumptions": "supuestos del modelo"
   }
 }
