@@ -20,6 +20,7 @@ from app.workers.dramatiq_app import (
     dispatch_earnings_reminders,
     dispatch_insider_alerts,
     dispatch_macro_reminders,
+    dispatch_queue_watchdog,
     dispatch_source_health_watchdog,
     dispatch_tracked_news_alerts,
     evaluate_alert_rules,
@@ -493,6 +494,10 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # proceso y este actor lo lee en el worker de alertas.
     _register(scheduler, partial(enqueue_for_all_tenants, dispatch_source_health_watchdog),
               "interval", job_id="source_health_watchdog", minutes=5)
+    # Watchdog de colas: alerta in-app si una cola no drena (edad del mas
+    # antiguo + tasa de drenaje medida entre ticks). Cada 5 min.
+    _register(scheduler, partial(enqueue_for_all_tenants, dispatch_queue_watchdog),
+              "interval", job_id="queue_watchdog", minutes=5)
     # F17: precios intradia de la cartera (Yahoo, retardo ~15 min declarado
     # en la UI) durante la sesion US. Ventana 13-21 UTC cubre EDT y EST.
     _register(
