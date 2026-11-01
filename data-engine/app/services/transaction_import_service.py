@@ -277,11 +277,19 @@ def parse_file_rows(file_bytes: bytes, filename: str = "") -> tuple[list[str], l
         try:
             import openpyxl
             wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
-            sheet = wb.active
+            # La pestaña activa puede ser un gráfico (Chartsheet, sin filas) si
+            # el libro se guardó con ella seleccionada: entonces se leen las
+            # hojas de cálculo en orden y gana la primera con datos.
+            active = wb.active
+            sheets = [active] if active in wb.worksheets else []
+            sheets += [ws for ws in wb.worksheets if ws is not active]
             rows: list[list[str]] = []
-            for r in sheet.iter_rows(values_only=True):
-                if any(v is not None for v in r):
-                    rows.append([str(v) if v is not None else "" for v in r])
+            for sheet in sheets:
+                for r in sheet.iter_rows(values_only=True):
+                    if any(v is not None for v in r):
+                        rows.append([str(v) if v is not None else "" for v in r])
+                if rows:
+                    break
         except Exception as exc:
             raise ValueError(f"Error al leer el archivo Excel: {exc}") from exc
         # Fuera del try: el límite de filas y el archivo vacío llegan con su
