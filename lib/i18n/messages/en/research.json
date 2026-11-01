@@ -1056,5 +1056,32 @@
     "optUserText": "User-provided text",
     "open": "open",
     "emptyTicker": "No documents for {ticker}."
+  },
+  "auditDetail": {
+    "viewThesis": "View thesis",
+    "moreItems": "and {count} more",
+    "blockedWeakOnly": "Blocked by low-confidence claims (details below).",
+    "blockedNoReason": "This audit did not record why it was blocked. Regenerate the thesis to get the reason.",
+    "unsupportedClaims": "Unsourced claims",
+    "dataConflicts": "Conflicting data",
+    "lowConfidence": "Low confidence",
+    "reconciliation": "SEC/FMP reconciliation",
+    "reconciliationMissing": "The reported financial figures have not been reconciled with SEC/FMP."
+  },
+  "blockedValuation": {
+    "ariaLabel": "Valuation blocked",
+    "title": "Valuation blocked: {model}",
+    "negativeFcf": "The recorded free cash flow margin is negative. This DCF model cannot value the company without misrepresenting its cash burn. Look at a financing and dilution model instead; do not force a positive margin.",
+    "missingInputs": "This model cannot publish a valuation with the inputs available: {inputs}.",
+    "missingUnspecified": "the engine does not say which inputs are missing",
+    "inputSource": "Input source: {source}.",
+    "sourceUnspecified": "not specified in this valuation",
+    "periods": "Periods: {periods}.",
+    "periodsNone": "not recorded",
+    "facts": "Recorded facts: {facts}.",
+    "navAria": "Review blocked valuation",
+    "reviewData": "Review data and sources",
+    "reviewAssumptions": "Review assumptions",
+    "viewModel": "View long-term model"
   }
 }

@@ -33,8 +33,8 @@ test('el estado se llama «bloqueada» en ambas páginas (nunca «fallida»)', (
     assert.equal(auditStatusLabel(false), 'bloqueada');
     assert.equal(auditStatusLabel(true), 'superada');
     assert.ok(!/'fallida'/.test(tickerPage), 'la ficha de empresa aún dice «fallida»');
-    assert.match(sourcesPage, /auditStatusLabel\(audit\.passed\)/);
-    assert.match(tickerPage, /auditStatusLabel\(audit\.passed\)/);
+    assert.match(sourcesPage, /auditStatusLabel\(audit\.passed(, locale)?\)/);
+    assert.match(tickerPage, /auditStatusLabel\(audit\.passed(, locale)?\)/);
 });
 
 test('ambas páginas componen la puntuación con auditScoreText', () => {

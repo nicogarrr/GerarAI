@@ -386,7 +386,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
     );
   }
   if (valuation.status === 'insufficient_data') {
-    return <BlockedValuation valuation={valuation} ticker={ticker} />;
+    return <BlockedValuation valuation={valuation} ticker={ticker} locale={locale} />;
   }
   const engine = typeof valuation.trace?.engine === 'string' ? valuation.trace.engine : null;
   const method = typeof valuation.trace?.method === 'string' ? valuation.trace.method : null;
@@ -1736,7 +1736,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 idénticas que se leía como bug). */}
             {(() => {
               const ordered = sortAuditsRecentFirst(audits);
-              const renderAudit = (audit: (typeof ordered)[number]) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">{audit.thesis_version != null ? t('research.fichaThesisVersionShort', { version: audit.thesis_version }) : t('research.fichaThesisVersionMissing')}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>;
+              const renderAudit = (audit: (typeof ordered)[number]) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed, locale)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String, locale)}</Badge><Badge variant="outline">{audit.thesis_version != null ? t('research.fichaThesisVersionShort', { version: audit.thesis_version }) : t('research.fichaThesisVersionMissing')}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} locale={locale} /></div>;
               const previous = ordered.slice(1, 100);
               return <>
                 {renderAudit(ordered[0])}
