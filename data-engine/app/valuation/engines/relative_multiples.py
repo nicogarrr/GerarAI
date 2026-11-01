@@ -38,6 +38,7 @@ from sqlalchemy import select
 
 from app.models import Company, FinancialFact, MarketPrice
 from app.services.price_units import close_in_company_currency
+from app.valuation.currency import normalize_currency
 from app.valuation.engines.base import (
     MODEL_VERSION,
     ValuationContext,
@@ -216,7 +217,9 @@ def _latest_price(db, company: Company) -> tuple[float | None, str | None]:
     )
     if converted is None:
         return None, None
-    price = float(converted)
+    # Ficha en subunidad («GBX» / «GBp»): el cierre queda en peniques y los
+    # hechos (EPS, ventas por accion) van en libras; a la divisa principal.
+    price = float(converted / Decimal(normalize_currency(company.currency)[1]))
     if price <= 0:
         return None, None
     return price, row.date.isoformat()
