@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import cast, exists, func, select
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -32,6 +33,18 @@ from app.models import (
 from app.services.source_hierarchy_service import classify_source
 
 TOKEN_RE = re.compile(r"[\w.-]+", re.UNICODE)
+
+
+def json_list_contains(column: Any, value: int, dialect_name: str | None) -> Any:
+    """``value`` está en la lista JSON ``column``.
+
+    ``JSON.contains`` genera un LIKE: en Postgres rompe («operator does not exist:
+    json ~~ text», 500) y en SQLite solo casaba listas de un único elemento.
+    """
+    if dialect_name == "postgresql":
+        return cast(column, JSONB).contains([value])
+    items = func.json_each(column).table_valued("value")
+    return exists(select(items.c.value).where(items.c.value == value))
 RRF_K = 60
 
 
@@ -656,7 +669,13 @@ class UniversalSearchService:
         if collection_id is not None:
             statement = statement.where(InvestmentPrinciple.collection_id == collection_id)
         if company_id is not None:
-            statement = statement.where(InvestmentPrinciple.applies_to_company_ids.contains([company_id]))
+            statement = statement.where(
+                json_list_contains(
+                    InvestmentPrinciple.applies_to_company_ids,
+                    company_id,
+                    db.bind.dialect.name if db.bind else None,
+                )
+            )
         statement = self._fts(statement, InvestmentPrinciple.principle, query, db).limit(300)
         result = []
         for row, document, collection in _rows(db, statement):

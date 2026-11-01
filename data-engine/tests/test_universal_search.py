@@ -223,3 +223,79 @@ def test_vector_only_hit_is_hydrated_when_fts_returns_no_candidate(monkeypatch):
         assert response["results"][0]["entity_id"] == chunk.id
         assert response["results"][0]["scores"]["lexical"] == 0
         assert response["results"][0]["scores"]["vector"] == 0.91
+
+
+def _principle_db_for_scope():
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    db = Session(engine)
+    tenant = Tenant(external_id="scope-test", name="Scope test")
+    db.add(tenant)
+    db.flush()
+    db.info["tenant_id"] = tenant.id
+    companies = []
+    for ticker in ("SCPA", "SCPB"):
+        company = Company(
+            ticker=ticker, name=f"{ticker} Co", exchange="TEST", currency="USD",
+            sector="Industrials", industry="Test", company_type="standard",
+            valuation_model="standard_dcf", special_sources=[], special_risks=[], factor_tags=[],
+        )
+        db.add(company)
+        companies.append(company)
+    collection = KnowledgeCollection(name="Letters", slug="letters-scope")
+    db.add(collection)
+    db.flush()
+    document = KnowledgeDocument(
+        collection_id=collection.id, title="Letter", author="Investor",
+        document_type="fund_letter", status="ready",
+    )
+    db.add(document)
+    db.flush()
+    chunk = KnowledgeChunk(
+        knowledge_document_id=document.id, chunk_index=0,
+        content="Capital allocation discipline.", source_locator={"page": 1},
+    )
+    db.add(chunk)
+    db.flush()
+    a, b = companies
+    for n, applies in enumerate(([b.id, a.id], [b.id])):
+        db.add(
+            InvestmentPrinciple(
+                knowledge_document_id=document.id, knowledge_chunk_id=chunk.id,
+                collection_id=collection.id,
+                principle=f"Capital allocation discipline rule {n}.",
+                principle_fingerprint=str(n) * 64, category="capital_allocation",
+                exact_fragment="Capital allocation discipline.", author="Investor",
+                confidence=Decimal("0.9"), status="approved",
+                applies_to_company_ids=applies,
+            )
+        )
+    db.commit()
+    return db, a
+
+
+def test_busqueda_de_una_empresa_encuentra_principios_que_la_incluyen_entre_varias():
+    """El filtro por empresa usaba LIKE sobre la lista JSON: en Postgres daba 500
+    («operator does not exist: json ~~ text») y en SQLite solo casaba listas de un
+    único id."""
+    db, company = _principle_db_for_scope()
+    response = UniversalSearchService().search(
+        db, "capital allocation discipline", ticker=company.ticker,
+        entity_types={"investment_principle"}, include_vector=False,
+    )
+    principles = [row["title"] for row in response["results"] if row["entity_type"] == "investment_principle"]
+    texts = [row["text"] for row in response["results"]]
+    assert len(principles) == 1
+    assert any("rule 0" in text for text in texts)
+    assert not any("rule 1" in text for text in texts)
+
+
+def test_filtro_de_principios_por_empresa_en_postgres_usa_jsonb():
+    from sqlalchemy import select
+    from sqlalchemy.dialects import postgresql
+
+    from app.services.universal_search_service import json_list_contains
+
+    expr = json_list_contains(InvestmentPrinciple.applies_to_company_ids, 7, "postgresql")
+    sql = str(select(InvestmentPrinciple.id).where(expr).compile(dialect=postgresql.dialect()))
+    assert "@>" in sql and "LIKE" not in sql.upper()
