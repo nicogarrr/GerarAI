@@ -72,7 +72,7 @@ function WithholdingNote({ position, ti = esT, f = esF }: { position: DividendPo
 
 function FiscalYearCard({ year, data, baseCurrency, ti = esT, f = esF }: { year: string; data: PortfolioDividendProjection['fiscal_by_year'][string]; baseCurrency: string; ti?: TFunction; f?: Formatters }) {
     const money = (value: number | null) => f.formatMoney(value, baseCurrency);
-    const rows = fiscalCardRows(data);
+    const rows = fiscalCardRows(data, f.locale === 'en' ? 'en' : 'es');
     const note = fiscalYearNote(data);
     return (
         <div className="rounded-lg border border-gray-800 p-4">

@@ -728,5 +728,25 @@
     "rmReasonFallback": "sin datos suficientes",
     "rmColWeightIncluded": "Peso en la matriz",
     "rmCoverageNote": "Contribuciones calculadas solo sobre las {n} posiciones incluidas: sus pesos se renormalizan para sumar 100 %. Las excluidas se listan abajo con su motivo."
+  },
+  "ledgerRejection": {
+    "deleteInsufficient": "No se puede borrar: una venta posterior se quedaría sin acciones. Borra o corrige antes esa venta.",
+    "sellInsufficient": "No puedes vender más acciones de las que tienes en cartera. Revisa la cantidad o registra antes la compra.",
+    "mixedCurrency": "Esta posición ya tiene movimientos en otra divisa: registra este en la misma divisa que los anteriores.",
+    "notFound": "Ese movimiento ya no existe (quizá se borró en otra pestaña). Recarga la página.",
+    "invalidDate": "La fecha de la operación no es válida: comprueba que existe y que no es posterior a hoy."
+  },
+  "valuationHold": {
+    "withDate": "Valoración pendiente: split del {date} sin precio post-split verificado",
+    "noDate": "Valoración pendiente: sin precio post-split verificado"
+  },
+  "dividendFiscal": {
+    "gross": "Bruto",
+    "sourceWithheld": "Retenido en origen",
+    "doubleTaxRelief": "Deducción doble imposición",
+    "spanishWithholding": "A cuenta (ES)",
+    "irpfScenario": "IRPF (escenario)",
+    "taxDue": "Cuota pendiente estimada",
+    "netScenario": "Neto (escenario)"
   }
 }

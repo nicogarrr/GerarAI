@@ -728,5 +728,25 @@
     "rmReasonFallback": "not enough data",
     "rmColWeightIncluded": "Weight in matrix",
     "rmCoverageNote": "Contributions computed only over the {n} included positions: their weights are renormalized to sum to 100%. Excluded ones are listed below with their reason."
+  },
+  "ledgerRejection": {
+    "deleteInsufficient": "It can't be deleted: a later sale would be left without shares. Delete or fix that sale first.",
+    "sellInsufficient": "You can't sell more shares than you hold. Check the quantity or record the purchase first.",
+    "mixedCurrency": "This position already has transactions in another currency: record this one in the same currency as the earlier ones.",
+    "notFound": "That transaction no longer exists (it may have been deleted in another tab). Reload the page.",
+    "invalidDate": "The trade date isn't valid: check that it exists and isn't later than today."
+  },
+  "valuationHold": {
+    "withDate": "Valuation pending: split on {date} without a verified post-split price",
+    "noDate": "Valuation pending: no verified post-split price"
+  },
+  "dividendFiscal": {
+    "gross": "Gross",
+    "sourceWithheld": "Withheld at source",
+    "doubleTaxRelief": "Double taxation relief",
+    "spanishWithholding": "Spanish withholding (on account)",
+    "irpfScenario": "IRPF (Spanish income tax, scenario)",
+    "taxDue": "Estimated tax still due",
+    "netScenario": "Net (scenario)"
   }
 }
