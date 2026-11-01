@@ -57,6 +57,14 @@ def _is_number(value: str | None) -> bool:
     return parse_localized_number(value) is not None
 
 
+def _is_negative_number(value: str | None) -> bool:
+    """Un precio de operación negativo no cabe en la cartera (la BD lo rechaza)."""
+    if value in (None, ""):
+        return False
+    parsed = parse_localized_number(value)
+    return parsed is not None and parsed[0] < 0
+
+
 # Orden de las fechas «nn/nn/aaaa» del Flex que se está leyendo. IBKR deja
 # elegir el formato de fecha de la Flex Query (MM/dd/yyyy por defecto, pero
 # también dd/MM/yyyy, el natural en España). Se decide por fichero en
@@ -217,6 +225,11 @@ def _validate_flex_xml(xml_text: str) -> list[str]:
                 errors.append(
                     f"Fila {index} (Trade {symbol or '?'}): el precio '{raw_price}' no es un número. "
                     "Corrige el valor o excluye la fila."
+                )
+            elif _is_negative_number(raw_price):
+                errors.append(
+                    f"Fila {index} (Trade {symbol or '?'}): el precio '{raw_price}' es negativo. "
+                    "Esa operación se omite; revísala a mano."
                 )
             raw_date = _attr(element, "tradeDate", "dateTime", "date")
             if raw_date is not None and not _is_date(raw_date):
@@ -1552,6 +1565,7 @@ class IBKRImportService:
                 if (
                     (raw_qty is not None and not _is_number(raw_qty))
                     or (raw_price is not None and not _is_number(raw_price))
+                    or _is_negative_number(raw_price)
                     # A missing or invalid date is never replaced with today:
                     # the row is skipped (a fabricated trade_date would poison
                     # the FIFO tax ledger).
