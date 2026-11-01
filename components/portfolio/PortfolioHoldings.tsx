@@ -340,7 +340,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                         <Trash2 aria-hidden="true" className="h-4 w-4" />
                       </Button>
                     </div>
-                    <TrackedAnalysisStatus analysis={holding.analysis} />
+                    <TrackedAnalysisStatus analysis={holding.analysis} locale={locale} />
                     {holding.costReviewMessage ? <p role="status" className="mt-2 text-sm text-amber-300">{holding.costReviewMessage}</p> : null}
                     <dl className="mt-3 space-y-1.5 text-sm">
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colQuantity')}</dt><dd className="text-gray-200">{formatQuantity(holding.quantity)}</dd></div>
@@ -434,7 +434,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <CompanyLogo ticker={holding.symbol} name={holding.symbol} className="size-8 shrink-0 rounded-lg" />
-                          <Link href={`/research/${holding.symbol}`} className="font-mono font-bold text-teal-400 hover:text-teal-300 transition-colors">{holding.symbol}</Link><TrackedAnalysisStatus analysis={holding.analysis} />
+                          <Link href={`/research/${holding.symbol}`} className="font-mono font-bold text-teal-400 hover:text-teal-300 transition-colors">{holding.symbol}</Link><TrackedAnalysisStatus analysis={holding.analysis} locale={locale} />
                           <details className="relative">
                             <summary className="min-h-9 cursor-pointer rounded px-2 py-2 text-xs text-gray-400 hover:text-gray-100" aria-label={ti('portfolio.holdings.optionsAria', { symbol: holding.symbol })}>{ti('portfolio.holdings.options')}</summary>
                             <div className="mt-1 min-w-36 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
