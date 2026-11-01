@@ -90,6 +90,7 @@ from app.services.peer_comparison_service import DEFAULT_PEER_METRICS, PeerCompa
 from app.services.red_team_service import RedTeamService
 from app.services.ttm_service import build_company_ttm
 from app.services.wacc_input_service import WaccInputService
+from app.valuation.currency import canonical_currency_code, is_currency_code
 
 logger = logging.getLogger(__name__)
 
@@ -369,6 +370,17 @@ def _trust_client_identity() -> bool:
     return not get_settings().is_production
 
 
+def _client_currency(raw: str | None) -> str:
+    """Divisa del cliente (solo local/test) lista para guardar, o "" si no vale.
+
+    Sin ``.upper()`` a secas: ``GBp`` son peniques y ``GBP`` libras. Un texto
+    que no es ISO 4217 ni subunidad («NaN», «XYZ») cuenta como no enviado y
+    ``fill_default_currency`` pone la del listado."""
+    if raw and is_currency_code(raw):
+        return canonical_currency_code(raw)
+    return ""
+
+
 @router.post("/ensure", response_model=CompanyOut)
 def ensure_company(payload: CompanyEnsureRequest, db: Session = Depends(get_db)) -> Company:
     ticker = payload.ticker.strip().upper()
@@ -380,7 +392,7 @@ def ensure_company(payload: CompanyEnsureRequest, db: Session = Depends(get_db))
             ticker=ticker,
             name=(payload.name or ticker).strip(),
             exchange=(payload.exchange or "UNKNOWN").strip().upper(),
-            currency=(payload.currency or "").strip().upper(),
+            currency=_client_currency(payload.currency),
             sector=(payload.sector or "Unknown").strip(),
             industry=(payload.industry or "Unknown").strip(),
             domicile_country=(
