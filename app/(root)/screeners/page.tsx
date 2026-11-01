@@ -1,8 +1,10 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Calculator, ChevronDown, Filter, Play, Save } from 'lucide-react';
 
 import { MutationForm } from '@/components/forms/MutationForm';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +26,8 @@ import { SubmitButton } from '@/components/screeners/SubmitButton';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getErrorMessage } from '@/lib/types/errors';
 import { formatDate, formatNumber, formatPercent, NA, NO_CORRIDO } from '@/lib/format';
-import { t } from '@/lib/i18n/t';
+import { getT } from '@/lib/i18n/server';
+import type { TranslateFn } from '@/lib/i18n/translate';
 import { formatScreenCriterionRight, formatScreenCriterionValue, formatScreenRank, screenCriterionMetricLabel, screenMissingFieldsLabel } from '@/lib/screener-results';
 
 export const dynamic = 'force-dynamic';
@@ -41,7 +44,7 @@ const operators: ScreenCriterion['operator'][] = ['>', '>=', '<', '<=', '==', '!
 
 const RESULTS_PAGE_SIZE = 25;
 
-function Results({ result, page, pageHref }: { result: ScreenResult; page: number; pageHref: (target: number) => string }) {
+function Results({ result, page, pageHref, t }: { result: ScreenResult; page: number; pageHref: (target: number) => string; t: TranslateFn }) {
   const newMatches = new Set(result.new_match_company_ids ?? []);
   const matchedRows = result.results.filter(row => row.matched);
   // Paginación (preferencia del usuario) en vez de una tabla sin fin: el
@@ -75,46 +78,19 @@ function Results({ result, page, pageHref }: { result: ScreenResult; page: numbe
   );
 }
 
-export default async function ScreenersPage({ searchParams }: PageProps) {
-  const query = await searchParams;
-  // Página de resultados (?pagina=N); los enlaces conservan el filtro intacto.
-  const parsedPage = Number(query.pagina);
-  const requestedPage = Number.isInteger(parsedPage) && parsedPage >= 1 ? Math.floor(parsedPage) : 1;
-  const resultsPageHref = (target: number) => {
-    const params = new URLSearchParams();
-    for (const key of ['left', 'operator', 'right', 'ranking', 'direction'] as const) {
-      const value = query[key];
-      if (value) params.set(key, value);
-    }
-    if (target > 1) params.set('pagina', String(target));
-    const qs = params.toString();
-    return qs ? `/screeners?${qs}` : '/screeners';
-  };
-  const operator = operators.includes(query.operator as ScreenCriterion['operator']) ? query.operator as ScreenCriterion['operator'] : '>=';
-  let workspace: Awaited<ReturnType<typeof getScreenerWorkspace>>;
-  try {
-    workspace = await getScreenerWorkspace();
-  } catch (error) {
-    if (isBackendUnavailableError(error)) {
-      return <BackendOffline feature="Screeners" retryHref="/screeners" />;
-    }
-    throw error;
-  }
-  const { metrics, screens } = workspace;
-  // Métricas con datos para sugerir en los datalist; null (engine caído o sin
-  // endpoint) mantiene la lista estática completa.
-  const metricCoverage = await getScreenerMetricCoverage();
 
+async function ResultsSection({ query, operator, incompleteRun, requestedPage, resultsPageHref }: {
+  query: { left?: string; operator?: string; right?: string; ranking?: string; direction?: string };
+  operator: ScreenCriterion['operator'];
+  incompleteRun: boolean;
+  requestedPage: number;
+  resultsPageHref: (target: number) => string;
+}) {
+  const t = await getT();
   // El screener ad-hoc con fórmula inválida debe mostrar el error en un
   // banner visible en español, nunca escalar al boundary global.
   let result: ScreenResult | null = null;
   let screenError: string | null = null;
-  // Envío con la condición incompleta (sin métrica o sin valor): el usuario
-  // sí intentó ejecutar (la URL trae los parámetros del formulario) pero
-  // runAdHocScreen no llega a consultar. Antes la página se recargaba sin
-  // resultados y sin ningún aviso (bug QA live 21-oct-2026).
-  const attemptedRun = query.left !== undefined || query.right !== undefined || query.ranking !== undefined;
-  const incompleteRun = attemptedRun && (!query.left || !query.right);
   try {
     result = incompleteRun ? null : await runAdHocScreen({
       left: query.left ?? '',
@@ -130,24 +106,62 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
     screenError = getErrorMessage(error) || 'La fórmula del screener no es válida. Revisa la sintaxis y reintenta.';
   }
 
-  return (
-    <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6 pb-28">
-      <header className="border-b border-gray-800 pb-5"><p className="text-sm font-semibold uppercase text-teal-300">Descubrimiento de empresas</p><h1 className="mt-1 text-3xl font-bold text-gray-100">Screeners</h1></header>
 
-      {/*
-        Orden por lo que el usuario viene a ver: primero los resultados, luego
-        el formulario que los produce. Antes los dos formularios de creación
-        (ad-hoc y métrica) ocupaban la pantalla antes de cualquier resultado.
-      */}
+  return (
+    <>
       {screenError ? (
         <div className="rounded-xl border border-red-800 bg-red-950/40 p-4 text-sm text-red-200" role="alert">
           <p className="font-semibold">No se pudo ejecutar el screener.</p>
           <p className="mt-1">{screenError}</p>
         </div>
       ) : null}
-      {result ? <Results page={requestedPage} pageHref={resultsPageHref} result={result} /> : null}
+      {result ? <Results page={requestedPage} pageHref={resultsPageHref} result={result} t={t} /> : null}
+    </>
+  );
+}
 
-      <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
+function ScreenersBodySkeleton() {
+  return (
+    <>
+      <section aria-hidden="true" className="rounded-xl border border-gray-800 bg-surface-1 p-5">
+        <Skeleton className="h-5 w-56" />
+        <Skeleton className="mt-4 h-11 w-full" />
+        <Skeleton className="mt-3 h-11 w-full" />
+        <Skeleton className="mt-3 h-11 w-2/3" />
+      </section>
+      <section aria-hidden="true" className="rounded-xl border border-gray-800 bg-surface-1 p-5">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="mt-4 h-24 w-full" />
+      </section>
+    </>
+  );
+}
+
+async function WorkspaceSections({ query, operator, incompleteRun }: {
+  query: { left?: string; operator?: string; right?: string; ranking?: string; direction?: string };
+  operator: ScreenCriterion['operator'];
+  incompleteRun: boolean;
+}) {
+  // Las dos peticiones se disparan a la vez (antes eran secuenciales: la
+  // cobertura esperaba a que terminara todo el workspace).
+  const workspacePromise = getScreenerWorkspace();
+  const coveragePromise = getScreenerMetricCoverage();
+  let workspace: Awaited<ReturnType<typeof getScreenerWorkspace>>;
+  try {
+    workspace = await workspacePromise;
+  } catch (error) {
+    if (isBackendUnavailableError(error)) {
+      return <BackendOffline feature="Screeners" retryHref="/screeners" />;
+    }
+    throw error;
+  }
+  const { metrics, screens } = workspace;
+  // Métricas con datos para sugerir en los datalist; null (engine caído o sin
+  // endpoint) mantiene la lista estática completa.
+  const metricCoverage = await coveragePromise;
+  return (
+    <>
+   <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
         <div className="mb-4 flex items-center gap-2"><Filter aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Ejecutar un filtro ad-hoc</h2></div>
         {incompleteRun ? (
           <p role="alert" className="mb-4 rounded-lg border border-amber-800 bg-amber-950/40 p-3 text-sm text-amber-200">
@@ -166,7 +180,7 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
             <input type="hidden" name="screen_id" value={screen.id} />
             <label className="text-sm">Nombre<Input name="name" defaultValue={screen.name} required /></label>
             <label className="text-sm">Descripción<Input name="description" defaultValue={screen.description} /></label>
-            <label className="text-sm">Criterios (JSON)<textarea className="mt-1 w-full rounded border border-gray-700 bg-black p-2 font-mono text-xs" name="criteria_json" defaultValue={JSON.stringify(screen.criteria, null, 2)} rows={6} required /></label>
+            <label className="text-sm">Criterios (JSON)<textarea className="mt-1 w-full rounded border border-gray-700 bg-black p-2 font-mono text-base sm:text-xs" name="criteria_json" defaultValue={JSON.stringify(screen.criteria, null, 2)} rows={6} required /></label>
             <label className="text-sm">Ordenar por<Input name="ranking_formula" defaultValue={screen.ranking_formula ?? ''} /></label>
             <label className="text-sm">Dirección<select className="ml-3 rounded bg-black p-2" name="ranking_direction" defaultValue={screen.ranking_direction}><option value="desc">Mayor primero</option><option value="asc">Menor primero</option></select></label>
             <label className="text-sm"><input type="checkbox" name="alerts_enabled" defaultChecked={screen.alerts_enabled} /> Avisar de nuevas coincidencias</label>
@@ -190,7 +204,7 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
               <div><label className="mb-1.5 block text-sm font-medium text-gray-200" htmlFor="screen-desc">Qué buscas (opcional)</label><Input className="min-h-11" id="screen-desc" name="description" placeholder="Empresas rentables con retorno superior al coste de capital" /></div>
             </div>
             <div className="mt-4 space-y-4">{([['', true], ['_2', false], ['_3', false]] as const).map(([suffix, required], index) => <CriterionFields availableMetrics={metricCoverage ?? undefined} customMetrics={metrics} key={suffix || 'one'} number={index + 1} required={required} suffix={suffix} />)}</div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(150px,190px)]"><FormulaField availableMetrics={metricCoverage ?? undefined} customMetrics={metrics} name="ranking_formula" title="Métrica para ordenar" /><div><label className="mb-1.5 block text-sm font-medium text-gray-200" htmlFor="saved-order">Dirección del orden</label><select className="min-h-11 w-full rounded-md border border-gray-700 bg-black px-3 text-sm text-gray-200" id="saved-order" name="ranking_direction" defaultValue="desc"><option value="desc">Mayor primero</option><option value="asc">Menor primero</option></select></div></div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(150px,190px)]"><FormulaField availableMetrics={metricCoverage ?? undefined} customMetrics={metrics} name="ranking_formula" title="Métrica para ordenar" /><div><label className="mb-1.5 block text-sm font-medium text-gray-200" htmlFor="saved-order">Dirección del orden</label><select className="min-h-11 w-full rounded-md border border-gray-700 bg-black px-3 text-base text-gray-200 sm:text-sm" id="saved-order" name="ranking_direction" defaultValue="desc"><option value="desc">Mayor primero</option><option value="asc">Menor primero</option></select></div></div>
             <label className="mt-4 flex items-center gap-2 text-sm text-gray-300"><input name="alerts_enabled" type="checkbox" />Avisar de nuevas coincidencias</label>
             <Button className="mt-4" type="submit"><Save aria-hidden="true" className="h-4 w-4" />Guardar filtro</Button>
           </MutationForm>
@@ -208,6 +222,50 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
       </details>
 
       <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><h2 className="font-semibold text-gray-100">Métricas personalizadas activas</h2><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{metrics.map((metric) => <article className="rounded-lg border border-gray-800 bg-black/30 p-4" key={metric.id}><div className="flex items-center justify-between gap-3"><span className="font-semibold text-gray-200">{metric.name}</span><Badge variant="outline">v{metric.version}</Badge></div><code className="mt-3 block text-sm text-teal-300">{metric.metric_key} = {metric.formula}</code><p className="mt-2 text-xs text-gray-500">{metric.unit} · {metric.description || 'Sin descripción'}</p></article>)}{!metrics.length ? <p className="text-sm text-gray-500">Aún no hay métricas personalizadas.</p> : null}</div></section>
+    </>
+  );
+}
+
+
+export default async function ScreenersPage({ searchParams }: PageProps) {
+  const query = await searchParams;
+  // Página de resultados (?pagina=N); los enlaces conservan el filtro intacto.
+  const parsedPage = Number(query.pagina);
+  const requestedPage = Number.isInteger(parsedPage) && parsedPage >= 1 ? Math.floor(parsedPage) : 1;
+  const resultsPageHref = (target: number) => {
+    const params = new URLSearchParams();
+    for (const key of ['left', 'operator', 'right', 'ranking', 'direction'] as const) {
+      const value = query[key];
+      if (value) params.set(key, value);
+    }
+    if (target > 1) params.set('pagina', String(target));
+    const qs = params.toString();
+    return qs ? `/screeners?${qs}` : '/screeners';
+  };
+  const operator = operators.includes(query.operator as ScreenCriterion['operator']) ? query.operator as ScreenCriterion['operator'] : '>=';
+  const attemptedRun = query.left !== undefined || query.right !== undefined || query.ranking !== undefined;
+  const incompleteRun = attemptedRun && (!query.left || !query.right);
+
+  // La cabecera y el layout pintan en el primer chunk; los datos del backend
+  // llegan por streaming dentro de sus <Suspense> (antes el primer byte
+  // útil esperaba a workspace + cobertura: LCP medido 15,5 s en prod).
+  return (
+    <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6 pb-28">
+      <header className="border-b border-gray-800 pb-5"><p className="text-sm font-semibold uppercase text-teal-300">Descubrimiento de empresas</p><h1 className="mt-1 text-3xl font-bold text-gray-100">Screeners</h1></header>
+
+      {/*
+        Orden por lo que el usuario viene a ver: primero los resultados, luego
+        el formulario que los produce. Antes los dos formularios de creación
+        (ad-hoc y métrica) ocupaban la pantalla antes de cualquier resultado.
+      */}
+      {attemptedRun && !incompleteRun ? (
+        <Suspense fallback={null}>
+          <ResultsSection incompleteRun={incompleteRun} operator={operator} query={query} requestedPage={requestedPage} resultsPageHref={resultsPageHref} />
+        </Suspense>
+      ) : null}
+      <Suspense fallback={<ScreenersBodySkeleton />}>
+        <WorkspaceSections incompleteRun={incompleteRun} operator={operator} query={query} />
+      </Suspense>
     </main>
   );
 }

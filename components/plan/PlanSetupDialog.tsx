@@ -16,8 +16,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { upsertPlan, type PlanTargetInput } from '@/lib/actions/plan.actions';
-import { formatNumber, formatNumberForInput, parseLocalizedNumber, todayLocal } from '@/lib/format';
-import { t } from '@/lib/i18n/t';
+import { todayLocal } from '@/lib/format';
+import { parseLocalizedNumber } from '@/lib/i18n/parse-number';
+import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 import { overallocatedDimension } from '@/lib/plan/target-totals';
 import { showErrorToast } from '@/lib/toast';
 import { toast } from 'sonner';
@@ -38,19 +39,10 @@ type PlanInitial = {
 };
 
 // Sin `required` nativo: el aviso propio (role=alert) es el que se ve y se anuncia.
-const CURRENCY_REQUIRED_ERROR = 'Elige la divisa de la aportación mensual.';
 const CURRENCY_OPTIONS = ['EUR', 'USD', 'GBP', 'CHF', 'JPY'];
 
-function asText(value: unknown): string {
-    // Números del backend en gramática es-ES (el parser del formulario la
-    // espera): String(300.5) daría «300.5» con punto; las fechas y demás
-    // cadenas pasan intactas.
-    if (typeof value === 'number') return formatNumberForInput(value);
-    return typeof value === 'string' ? value : '';
-}
-
 export default function PlanSetupDialog({
-    triggerLabel = 'Configurar plan',
+    triggerLabel,
     initial,
     onSaved,
 }: {
@@ -60,6 +52,18 @@ export default function PlanSetupDialog({
     onSaved?: () => void;
 }) {
     const router = useRouter();
+    const t = useT();
+    const f = useFormat();
+    const locale = useLocale();
+    const triggerText = triggerLabel ?? t('plan.setup.trigger');
+    const currencyRequiredError = t('plan.setup.currencyRequired');
+    function asText(value: unknown): string {
+        // Números del backend en la gramática del locale activo (el parser
+        // del formulario la espera): String(300.5) daría «300.5» con punto;
+        // las fechas y demás cadenas pasan intactas.
+        if (typeof value === 'number') return f.formatNumberForInput(value);
+        return typeof value === 'string' ? value : '';
+    }
     const [open, setOpen] = useState(false);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -97,46 +101,53 @@ export default function PlanSetupDialog({
         event.preventDefault();
         setError(null);
 
-        const monthlyContribution = parseLocalizedNumber(monthly);
+        const monthlyContribution = parseLocalizedNumber(monthly, locale);
         if (monthlyContribution === null || monthlyContribution <= 0) {
-            setError('La aportación mensual debe ser un número mayor que 0.');
+            setError(t('plan.setup.errorMonthly'));
             return;
         }
         if (currencyEnabled && !currency) {
-            setError(CURRENCY_REQUIRED_ERROR);
+            setError(currencyRequiredError);
             return;
         }
         // parseInt truncaba "30,5" a 30 en silencio: solo se aceptan enteros exactos (F388).
         const horizonYears = /^\d+$/.test(horizon.trim()) ? Number(horizon.trim()) : Number.NaN;
         if (!Number.isInteger(horizonYears) || horizonYears < 1 || horizonYears > 80) {
-            setError('El horizonte debe ser un entero entre 1 y 80 años.');
+            setError(t('plan.setup.errorHorizon'));
             return;
         }
         const allocations: PlanTargetInput[] = [];
         for (const row of rows) {
             const label = row.kind === 'ticker' ? row.label.trim().toUpperCase() : row.label.trim();
             if (!label && !row.target_pct.trim()) continue;
-            const pct = parseLocalizedNumber(row.target_pct);
+            const pct = parseLocalizedNumber(row.target_pct, locale);
             if (!label || pct === null || pct < 0 || pct > 100) {
-                setError('Cada asignación necesita una etiqueta y un porcentaje entre 0 y 100.');
+                setError(t('plan.setup.errorAllocation'));
                 return;
             }
-            const band = parseLocalizedNumber(row.band_pct);
+            const band = parseLocalizedNumber(row.band_pct, locale);
             if (band === null || band < 0 || band > 50) {
-                setError('La banda debe estar entre 0 y 50 puntos porcentuales.');
+                setError(t('plan.setup.errorBand'));
                 return;
             }
             if (allocations.some((allocation) => allocation.kind === row.kind && allocation.label.toUpperCase() === label.toUpperCase())) {
-                setError('No repitas el mismo objetivo dentro de una categoría.');
+                setError(t('plan.setup.errorDuplicate'));
                 return;
             }
             allocations.push({ kind: row.kind, label, target_pct: pct, band_pct: band });
         }
         const overallocated = overallocatedDimension(allocations);
         if (overallocated) {
-            const labels = { ticker: 'tickers', sector: 'sectores', asset_class: 'clases de activo' };
+            const labels = {
+                ticker: t('plan.setup.dimensionTicker'),
+                sector: t('plan.setup.dimensionSector'),
+                asset_class: t('plan.setup.dimensionAssetClass'),
+            };
             setError(
-                `Los objetivos de ${labels[overallocated.kind]} suman ${formatNumber(overallocated.total, { maximumFractionDigits: 2 })}%: no pueden superar el 100% dentro de esa categoría.`,
+                t('plan.setup.overallocated', {
+                    dimension: labels[overallocated.kind],
+                    total: f.formatNumber(overallocated.total, { maximumFractionDigits: 2 }),
+                }),
             );
             return;
         }
@@ -154,12 +165,12 @@ export default function PlanSetupDialog({
                 // Rechazo del contrato de divisa: nada se guardo; aviso inline y diálogo abierto.
                 setError(
                     result.code === 'plan_currency_required_for_amount_change'
-                        ? 'Este plan tiene la divisa registrada. Para cambiar el importe hay que actualizar la aplicación y elegir la divisa: no se ha guardado nada.'
-                        : 'La divisa de la aportación todavía no está disponible en el servidor: no se ha guardado nada.',
+                        ? t('plan.setup.errorCurrencyChange')
+                        : t('plan.setup.errorCurrencyUnavailable'),
                 );
                 return;
             }
-            toast.success('Plan de inversión guardado');
+            toast.success(t('plan.setup.savedToast'));
             setOpen(false);
             router.refresh();
             onSaved?.();
@@ -181,15 +192,14 @@ export default function PlanSetupDialog({
             <DialogTrigger asChild>
                 <Button type="button" className="gap-2">
                     <Target className="h-4 w-4" />
-                    {triggerLabel}
+                    {triggerText}
                 </Button>
             </DialogTrigger>
-            <DialogContent className="border-gray-700 bg-gray-900 text-gray-100 sm:max-w-xl">
+            <DialogContent className="border-gray-700 bg-gray-900 text-gray-100 sm:max-w-xl max-h-[90dvh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Configurar plan de inversión</DialogTitle>
+                    <DialogTitle>{t('plan.setup.title')}</DialogTitle>
                     <DialogDescription className="text-gray-400">
-                        Aportación mensual, horizonte y asignación objetivo. Cada categoría (tickers,
-                        sectores o clases de activo) puede sumar hasta el 100%.
+                        {t('plan.setup.description')}
                     </DialogDescription>
                 </DialogHeader>
                 <form id="plan-setup-form" onSubmit={handleSubmit} className="space-y-4">
@@ -197,7 +207,7 @@ export default function PlanSetupDialog({
                     de diálogo y el campo quedaba 14 px más bajo que Inicio/Horizonte. */}
                     <div className="grid items-end gap-4 sm:grid-cols-3">
                         <div className="space-y-1.5">
-                            <Label htmlFor="plan-monthly" className="text-gray-300">{currencyEnabled ? 'Aportación mensual' : 'Aportación mensual (€)'}</Label>
+                            <Label htmlFor="plan-monthly" className="text-gray-300">{currencyEnabled ? t('plan.setup.monthlyLabel') : t('plan.setup.monthlyLabelEur')}</Label>
                             <Input
                                 id="plan-monthly"
                                 inputMode="decimal"
@@ -209,7 +219,7 @@ export default function PlanSetupDialog({
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="plan-start" className="text-gray-300">Inicio</Label>
+                            <Label htmlFor="plan-start" className="text-gray-300">{t('plan.setup.startLabel')}</Label>
                             <Input
                                 id="plan-start"
                                 type="date"
@@ -220,7 +230,7 @@ export default function PlanSetupDialog({
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="plan-horizon" className="text-gray-300">Horizonte (años)</Label>
+                            <Label htmlFor="plan-horizon" className="text-gray-300">{t('plan.setup.horizonLabel')}</Label>
                             <Input
                                 id="plan-horizon"
                                 inputMode="numeric"
@@ -234,61 +244,61 @@ export default function PlanSetupDialog({
 
                     {currencyEnabled ? (
                         <div className="space-y-1.5">
-                            <Label htmlFor="plan-currency" className="text-gray-300">Divisa de la aportación</Label>
+                            <Label htmlFor="plan-currency" className="text-gray-300">{t('plan.setup.currencyLabel')}</Label>
                             <select
                                 id="plan-currency"
                                 value={currency}
                                 onChange={(e) => setCurrency(e.target.value)}
-                                aria-invalid={error === CURRENCY_REQUIRED_ERROR}
-                                className="h-9 w-full rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-100"
+                                aria-invalid={error === currencyRequiredError}
+                                className="h-11 w-full rounded-md border border-gray-700 bg-gray-800 px-2 text-base text-gray-100 sm:h-9 sm:text-sm"
                             >
-                                <option value="" disabled>Elige una divisa</option>
+                                <option value="" disabled>{t('plan.setup.currencyPlaceholder')}</option>
                                 {/* Una divisa registrada fuera de la lista se conserva como opción: nunca se muestra otra. */}
                                 {(currency && !CURRENCY_OPTIONS.includes(currency) ? [currency, ...CURRENCY_OPTIONS] : CURRENCY_OPTIONS).map((code) => (
                                     <option key={code} value={code}>{code}</option>
                                 ))}
                             </select>
                             {legacyWithoutCurrency ? (
-                                <p className="text-xs text-amber-300">Divisa no registrada: confirma en qué divisa introdujiste esta aportación.</p>
+                                <p className="text-xs text-amber-300">{t('plan.setup.currencyLegacyNote')}</p>
                             ) : null}
                         </div>
                     ) : null}
 
                     <div className="space-y-2">
-                        <p className="text-sm font-medium text-gray-300">Asignación objetivo</p>
+                        <p className="text-sm font-medium text-gray-300">{t('plan.setup.allocationTitle')}</p>
                         {rows.map((row, index) => (
                             <div key={index} className="grid grid-cols-2 items-center gap-2 rounded-md border border-gray-800 p-2 sm:grid-cols-[9.5rem_1fr_5rem_5rem_auto]">
                                 {/* 9.5rem fijos: con 1fr «Clase de activo» quedaba truncado («Clase de a»). */}
                                 <select
-                                    aria-label={`Categoría ${index + 1}`}
+                                    aria-label={t('plan.setup.categoryAria', { n: index + 1 })}
                                     value={row.kind}
                                     onChange={(e) => updateRow(index, { kind: e.target.value as AllocationRow['kind'] })}
-                                    className="h-9 min-w-0 rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-100"
+                                    className="h-11 min-w-0 rounded-md border border-gray-700 bg-gray-800 px-2 text-base text-gray-100 sm:h-9 sm:text-sm"
                                 >
-                                    <option value="ticker">Ticker</option>
-                                    <option value="sector">Sector</option>
-                                    <option value="asset_class">Clase de activo</option>
+                                    <option value="ticker">{t('plan.setup.kindTicker')}</option>
+                                    <option value="sector">{t('plan.setup.kindSector')}</option>
+                                    <option value="asset_class">{t('plan.setup.kindAssetClass')}</option>
                                 </select>
                                 {row.kind === 'ticker' ? (
                                 <TickerSearchInput
-                                    ariaLabel={`Objetivo ${index + 1}`}
+                                    ariaLabel={t('plan.setup.targetAria', { n: index + 1 })}
                                     value={row.label}
                                     onValueChange={(value) => updateRow(index, { label: value })}
                                     onSelect={(stock) => updateRow(index, { label: stock.symbol })}
-                                    placeholder="Buscar por ticker o empresa"
+                                    placeholder={t('plan.setup.searchPlaceholder')}
                                     className="border-gray-700 bg-gray-800 text-gray-100"
                                 />
                                 ) : (
                                 <Input
-                                    aria-label={`Objetivo ${index + 1}`}
+                                    aria-label={t('plan.setup.targetAria', { n: index + 1 })}
                                     value={row.label}
                                     onChange={(e) => updateRow(index, { label: e.target.value })}
-                                    placeholder="Etiqueta"
+                                    placeholder={t('plan.setup.labelPlaceholder')}
                                     className="border-gray-700 bg-gray-800 text-gray-100"
                                 />
                                 )}
                                 <Input
-                                    aria-label={`Porcentaje objetivo ${index + 1}`}
+                                    aria-label={t('plan.setup.targetPctAria', { n: index + 1 })}
                                     inputMode="decimal"
                                     value={row.target_pct}
                                     onChange={(e) => updateRow(index, { target_pct: e.target.value })}
@@ -296,11 +306,11 @@ export default function PlanSetupDialog({
                                     className="min-w-0 border-gray-700 bg-gray-800 text-gray-100"
                                 />
                                 <Input
-                                    aria-label={`Banda en puntos porcentuales ${index + 1}`}
+                                    aria-label={t('plan.setup.bandAria', { n: index + 1 })}
                                     inputMode="decimal"
                                     value={row.band_pct}
                                     onChange={(e) => updateRow(index, { band_pct: e.target.value })}
-                                    placeholder="Banda"
+                                    placeholder={t('plan.setup.bandPlaceholder')}
                                     className="min-w-0 border-gray-700 bg-gray-800 text-gray-100"
                                 />
                                 <Button
@@ -309,7 +319,7 @@ export default function PlanSetupDialog({
                                     size="sm"
                                     onClick={() => removeRow(index)}
                                     disabled={rows.length === 1}
-                                    aria-label="Quitar fila"
+                                    aria-label={t('plan.setup.removeRow')}
                                     className="text-gray-400 hover:text-red-400"
                                 >
                                     <Trash2 className="h-4 w-4" />
@@ -328,10 +338,10 @@ export default function PlanSetupDialog({
 
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-gray-600 text-gray-300">
-                            Cancelar
+                            {t('plan.setup.cancel')}
                         </Button>
                         <Button type="submit" disabled={pending}>
-                            {pending ? 'Guardando…' : 'Guardar plan'}
+                            {pending ? t('plan.setup.saving') : t('plan.setup.save')}
                         </Button>
                     </div>
                 </form>

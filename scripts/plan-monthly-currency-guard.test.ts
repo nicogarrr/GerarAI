@@ -27,7 +27,7 @@ describe('aportación mensual visible sin cartera', () => {
         assert.match(view, /monthly_contribution: planMonthly/);
     });
     it('sin cartera muestra el importe en la divisa del input (EUR), nunca N/D con dato presente', () => {
-        const formatter = view.match(/const planMonthly[\s\S]*?\n};/);
+        const formatter = view.match(/const planMonthly[\s\S]*?\n    \};/);
         assert.ok(formatter, 'planMonthly no encontrado');
         assert.match(formatter[0], /formatMoney\([^)]*'EUR'\)/);
         // El tramo sin divisa registrada ni contrato (cartera ausente) nunca da N/D.
@@ -41,9 +41,11 @@ describe('aportación mensual visible sin cartera', () => {
         assert.match(group[1], /gap_base/);
     });
     it('plan legacy con divisa NULL no se pinta en EUR aunque el contrato este apagado', () => {
-        const formatter = view.match(/const planMonthly[\s\S]*?\n};/);
+        const formatter = view.match(/const planMonthly[\s\S]*?\n    \};/);
         assert.ok(formatter, 'planMonthly no encontrado');
         assert.match(formatter[0], /monthly_currency_recorded === false/);
-        assert.match(formatter[0], /divisa no registrada/);
+        assert.match(formatter[0], /plan\.values\.currencyNotRegistered/);
+        const esPlan = JSON.parse(readFileSync('lib/i18n/messages/es/plan.json', 'utf8'));
+        assert.match(esPlan.values.currencyNotRegistered, /divisa no registrada/);
     });
 });

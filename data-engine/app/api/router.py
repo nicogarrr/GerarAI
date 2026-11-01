@@ -3,13 +3,16 @@ from fastapi import APIRouter
 from app.api.routes import (
     alerts,
     asts,
+    audit,
     bottlenecks,
+    cache,
     calendar,
     chat,
     companies,
     company_events,
     corporate_actions,
     data_health,
+    db_metrics,
     earnings,
     export,
     filing_intelligence,
@@ -34,6 +37,7 @@ from app.api.routes import (
     portfolio_moves,
     privacy,
     propicks,
+    propicks_radar,
     research_assistant,
     reviews,
     risk,
@@ -58,8 +62,11 @@ from app.api.routes import (
 # en api_router lo haría heredar la auth de main.py.
 
 api_router = APIRouter()
+api_router.include_router(audit.router, tags=["audit"])
 api_router.include_router(bottlenecks.router, prefix="/bottlenecks", tags=["bottlenecks"])
+api_router.include_router(cache.router, prefix="/cache", tags=["cache"])
 api_router.include_router(data_health.router, prefix="/data-health", tags=["data-health"])
+api_router.include_router(db_metrics.router, tags=["admin"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 api_router.include_router(telegram_link.router, prefix="/alerts", tags=["alerts"])
 api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
@@ -76,6 +83,7 @@ api_router.include_router(portfolio_images.router, prefix="/portfolio", tags=["p
 api_router.include_router(portfolio_moves.router, prefix="/portfolio", tags=["portfolio"])
 api_router.include_router(privacy.router, prefix="/privacy", tags=["privacy"])
 api_router.include_router(propicks.router, prefix="/propicks", tags=["propicks"])
+api_router.include_router(propicks_radar.router, prefix="/propicks", tags=["propicks"])
 api_router.include_router(plan.router, prefix="/plan", tags=["plan"])
 api_router.include_router(ownership.router, prefix="/ownership", tags=["ownership"])
 api_router.include_router(investors.router, prefix="/investors", tags=["investors"])

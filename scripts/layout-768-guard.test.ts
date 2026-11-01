@@ -33,7 +33,7 @@ test('F319: la pista del grid de escenarios puede encoger para que la tabla haga
     // expandía el grid por encima del contenedor entre 768 y 1279px en vez
     // de dejar que el wrapper overflow-x-auto recortara.
     assert.match(modelPanels, /lg:grid-cols-\[1\.2fr_0\.8fr\]">[\s\S]{0,900}<div className="min-w-0">/);
-    assert.match(modelPanels, /aria-label="Escenarios del modelo" className="hidden overflow-x-auto md:block"/);
+    assert.match(modelPanels, /aria-label=\{ti\('research\.model\.scenariosLabel'\)\} className="hidden overflow-x-auto md:block"/);
     // F27: la pista de escenarios solo se renderiza si el modelo es publicable
     // (sin WACC publicable no se muestran escenarios; regla de Nico 2026-10-16).
     assert.match(modelPanels, /\{model\.publishable \? \(/);
@@ -42,8 +42,8 @@ test('F319: la pista del grid de escenarios puede encoger para que la tabla haga
 test('F320: el nombre de métrica irrompible no empuja el badge fuera de la tarjeta a 768px', () => {
     // net_debt_to_ebitda es un token largo sin puntos de corte: min-w-0 +
     // break-all dejan que envuelva y shrink-0 protege el badge de estado.
-    assert.match(researchPage, /min-w-0 break-all font-medium text-gray-200">\{metricLabel\(metric\.metric\)\}<\/span>/);
-    assert.match(researchPage, /<Badge className="shrink-0" variant="outline">\{label\(metric\.status\)\}<\/Badge>/);
+    assert.match(researchPage, /min-w-0 break-all font-medium text-gray-200">\{metricLabel\(metric\.metric, locale\)\}<\/span>/);
+    assert.match(researchPage, /<Badge className="shrink-0" variant="outline">\{label\(metric\.status, locale\)\}<\/Badge>/);
 });
 
 test('F290: los KPIs de /portfolio dimensionan por ancho de contenido (sidebar en md)', () => {

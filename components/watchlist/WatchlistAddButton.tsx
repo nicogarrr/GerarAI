@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
+import { useT } from '@/lib/i18n/client';
 import { useOpenFromQuery } from '@/hooks/useOpenFromQuery';
 import { Plus } from 'lucide-react';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
@@ -22,6 +23,7 @@ const WatchlistAddDialog = dynamic(loadWatchlistAddDialog, { loading: () => null
  */
 export default function WatchlistAddButton({ followedSymbols }: { followedSymbols: string[] }) {
     const [open, setOpen] = useState(false);
+    const t = useT();
     // Una vez abierto por primera vez, el diálogo se queda montado (oculto
     // por Radix al cerrar) para conservar lo escrito si se cierra sin añadir.
     const [openedOnce, setOpenedOnce] = useState(false);
@@ -47,7 +49,7 @@ export default function WatchlistAddButton({ followedSymbols }: { followedSymbol
                     className="min-h-[44px] gap-1.5 border-teal-400/30 text-sm text-teal-300 hover:bg-teal-950/40 hover:text-teal-200"
                 >
                     <Plus aria-hidden="true" className="h-4 w-4" />
-                    Añadir empresa
+                    {t('watchlist.add.button')}
                 </Button>
             </DialogTrigger>
             {openedOnce && <WatchlistAddDialog followedSymbols={followedSymbols} />}

@@ -34,7 +34,7 @@ test('no avisa cuando el dato es reciente, histórico o no es de balance', () =>
 });
 
 test('las tarjetas y la tabla de hechos muestran el aviso junto al valor', () => {
-  const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
+  const page = readFileSync('components/research/FactsPanels.tsx', 'utf8');
   assert.match(page, /factStalenessNotice\(fact, \{ isLatestForMetric:/);
   assert.match(page, /staleness=\{stalenessOf\(fact\)\}/);
   assert.match(page, /\{stalenessOf\(fact\) \? <span className="mt-1 block text-xs text-amber-300">/);

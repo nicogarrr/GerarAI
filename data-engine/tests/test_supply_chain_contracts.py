@@ -24,6 +24,8 @@ despues se borre el fichero).
 from __future__ import annotations
 
 import json
+import os
+import re
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -746,3 +748,89 @@ def test_single_star_does_not_cross_directories():
 
     assert is_excluded("one/file.js", parse_patterns("*/file.js"))
     assert not is_excluded("one/two/file.js", parse_patterns("*/file.js"))
+# ---------------------------------------------------------------------------
+# los imports relativos / @/ del build de Next apuntan a ficheros del contexto
+# ---------------------------------------------------------------------------
+#
+# npm run build (= next build) typechequea **/*.ts (tsconfig) DENTRO de la
+# imagen frontend-prod del SBOM. playwright.config.ts importa
+# ./e2e/fixtures/e2e-env y tests/unit/e2e/e2e-env-config.test.ts importa
+# ../../../e2e/fixtures/e2e-env, y el .dockerignore dejaba e2e/fixtures/ fuera
+# del contexto: TS2307 solo en docker, con el repo en verde (medido 2026-10-30,
+# run 41144668084, Build frontend-prod). Es la segunda vez: warmup-routes.ts
+# cayo por lo mismo. Regla: todo import relativo o de alias @/ desde un
+# .ts/.tsx que SI entra en el contexto tiene que resolverse a un fichero que
+# TAMBIEN entra.
+
+_PATRON_IMPORT_TS = re.compile(r"(?:\bfrom|\bimport|\brequire)\s*\(?\s*['\"](\.[^'\"]+|@/[^'\"]+)['\"]")
+_EXTENSIONES_MODULO_TS = ("", ".ts", ".tsx", ".d.ts", ".js", ".jsx", ".json")
+
+
+def _ficheros_ts_del_contexto() -> list[str]:
+    """.ts/.tsx que entran en el contexto de build de la raiz (misma poda que
+    el demonio: un directorio excluido no se recorre)."""
+    patterns = read_patterns(DOCKERIGNORE_ROOT)
+    ficheros: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(REPO):
+        relative = Path(dirpath).relative_to(REPO)
+        dirnames[:] = sorted(
+            name
+            for name in dirnames
+            if not is_excluded((relative / name).as_posix(), patterns)
+        )
+        for name in sorted(filenames):
+            if name.endswith((".ts", ".tsx")):
+                path = (relative / name).as_posix()
+                if not is_excluded(path, patterns):
+                    ficheros.append(path)
+    return ficheros
+
+
+def _resuelve_modulo_ts(base: Path) -> Path | None:
+    """Resolucion de modulo de TS para imports relativos, sobre el repo."""
+    for ext in _EXTENSIONES_MODULO_TS:
+        candidato = Path(str(base) + ext)
+        if candidato.is_file():
+            return candidato
+    if base.is_dir():
+        for ext in _EXTENSIONES_MODULO_TS[1:]:
+            candidato = base / f"index{ext}"
+            if candidato.is_file():
+                return candidato
+    return None
+
+
+def test_los_imports_del_build_apuntan_a_ficheros_del_contexto():
+    patterns = read_patterns(DOCKERIGNORE_ROOT)
+    rotos: list[str] = []
+    for fichero in _ficheros_ts_del_contexto():
+        texto = (REPO / fichero).read_text(encoding="utf-8", errors="replace")
+        for espec in _PATRON_IMPORT_TS.findall(texto):
+            if espec.startswith("@/"):
+                base = REPO / espec[2:]
+            else:
+                base = (REPO / fichero).parent / espec
+            resuelto = _resuelve_modulo_ts(base)
+            if resuelto is None:
+                # No existe ni en el repo: eso lo pillan tsc y el CI de frontend.
+                continue
+            rel = resuelto.relative_to(REPO).as_posix()
+            if is_excluded(rel, patterns):
+                rotos.append(f"{fichero} importa '{espec}' -> {rel} queda FUERA del contexto de build")
+    assert not rotos, "\n".join(rotos[:10])
+
+
+def test_todo_dockerfile_con_npm_ci_copia_antes_el_prepare():
+    # package.json declara "prepare": "node scripts/install-hooks.mjs": npm ci lo
+    # ejecuta siempre, tambien en Docker. Si el Dockerfile no copia ese script
+    # antes del `RUN npm ci`, el build falla con "Cannot find module" (le paso a
+    # frontend-dev cuando el prepare aterrizo: prod lo tenia y dev no).
+    rotos: list[str] = []
+    for dockerfile in (REPO / "Dockerfile", REPO / "Dockerfile.dev"):
+        lineas = dockerfile.read_text(encoding="utf-8").splitlines()
+        for i, linea in enumerate(lineas):
+            if re.match(r"\s*RUN\s+npm ci\b", linea):
+                antes = "\n".join(lineas[:i])
+                if "scripts/install-hooks.mjs" not in antes:
+                    rotos.append(f"{dockerfile.name}: `RUN npm ci` (linea {i + 1}) sin copiar antes scripts/install-hooks.mjs")
+    assert not rotos, "\n".join(rotos)

@@ -9,9 +9,11 @@ const PAGE = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 const BTN = readFileSync('components/research/ThesisGenerateButton.tsx', 'utf8');
 
 test('el copy de vacío solo entra por la prop emptyCopy del componente cliente', () => {
-    const occurrences = PAGE.split('Sin tesis todavía.').length - 1;
+    const occurrences = PAGE.split('fichaNoThesisYet').length - 1;
     assert.equal(occurrences, 1, 'una sola mención en la página');
-    assert.ok(PAGE.includes('emptyCopy="Sin tesis todavía."'), 'entra como prop, no como JSX hermano');
+    assert.ok(PAGE.includes("emptyCopy={t('research.fichaNoThesisYet')}"), 'entra como prop, no como JSX hermano');
+    const ES = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8'));
+    assert.equal(ES.fichaNoThesisYet, 'Sin tesis todavía.', 'el copy visible se conserva en la clave ES');
     assert.ok(BTN.includes('emptyCopy && !succeededHere'), 'el componente oculta el copy al completar');
 });
 

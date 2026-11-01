@@ -58,6 +58,19 @@ jobs:
             python data-engine/scripts/sync_requirements.py --check
           fi
 
+  dead-code:
+    name: Dead code (alcanzabilidad, baseline E6)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # Sin cache ni install: el escaner es estatico puro (git ls-files +
+      # parsing), solo necesita el arbol y node, que la imagen ya trae.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+      - name: Alcanzabilidad contra baseline de inertes conocidos
+        run: node scripts/find-dead-code.mjs --fail --baseline scripts/baselines/dead-code.txt
+
   frontend:
     name: Frontend quality
     runs-on: ubuntu-24.04
@@ -81,6 +94,11 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:routes
+          # contract-drift: deriva front<->back sobre el OpenAPI comiteado
+          # (la frescura del propio openapi.json se verifica en su job).
+          # Llevaba verde pero SIN cablear en CI: una deriva nueva no
+          # rompia nada. Hallazgos conocidos: contract-drift.allowlist.json.
+      - run: npm run test:contract
       - run: npm run check:i18n
       - name: ProPicks guard (R1-R5 + turnover cap)
         run: node --experimental-strip-types --test scripts/propicks-guard.test.ts
@@ -195,6 +213,9 @@ jobs:
         working-directory: data-engine
     env:
       APP_ENV: test
+      # El redis-server del job es desechable: sin este opt-in el conftest no
+      # limpia claves ni reasigna DB (un REDIS_URL heredado no se toca).
+      TEST_REDIS_EPHEMERAL: "1"
       DATABASE_URL: sqlite:///./cavaai_ci.db
       CAVAAI_ENABLE_VECTOR_INGEST: "0"
       CAVAAI_ENABLE_VECTOR_CHAT: "0"
@@ -804,6 +825,7 @@ jobs:
       - evals
       - e2e
       - browser-e2e
+      - dead-code
     # always(): sin esto el gate se saltaria en cuanto un `needs` fallara, que
     # es justo el caso en el que tiene que ejecutarse.
     if: ${{ always() }}

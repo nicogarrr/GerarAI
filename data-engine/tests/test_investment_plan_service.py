@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models.entities import Base
 from app.services.investment_plan_service import InvestmentPlanService
 
@@ -79,7 +80,7 @@ def test_plan_metrics_track_expected_vs_actual(db):
 
     metrics = service.plan_metrics(db)
     assert metrics["plan_exists"] is True
-    today = date.today()
+    today = local_today()  # misma base que plan_metrics (hoy en Madrid)
     months = (today.year - 2026) * 12 + (today.month - 7)
     assert metrics["months_elapsed"] == months
     assert metrics["expected_contributions_base"] == pytest.approx(300 * months)

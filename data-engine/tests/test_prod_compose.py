@@ -104,6 +104,7 @@ APP_SERVICES = (
     "worker-gdelt",
     "worker-knowledge",
     "worker-official-closes",
+    "worker-prices",
     "worker-dca-manual",
     "scheduler",
 )
@@ -154,15 +155,20 @@ def test_scheduler_receives_retention_and_storage_configuration():
     assert env.get("QDRANT_URL") == "http://qdrant:6333"
 
 
-def test_memory_limits_fit_the_12gb_vm():
-    """La suma anterior (~23,5 GiB) hacia OOM en una VM de 12 GB."""
+def test_memory_limits_fit_the_24gb_vm_with_host_reserve():
+    """24 GB host verified 2026-10-30; reserve at least 8 GiB outside this stack.
+
+    Old 10 GiB ceiling described the replaced 12 GB host and contradicted the
+    documented 24 GB deployment. Keep a bounded 16 GiB stack ceiling rather
+    than deriving the budget from the configured limits themselves.
+    """
     compose = _load_compose()
     total = 0
     for name, service in compose["services"].items():
         limit = service.get("deploy", {}).get("resources", {}).get("limits", {})
         assert "memory" in limit, f"{name} sin limite de memoria"
         total += _memory_mib(limit["memory"])
-    assert total <= 10240, f"los limites suman {total} MiB (> 10 GiB)"
+    assert total <= 16384, f"los limites suman {total} MiB (> 16 GiB; host reserve < 8 GiB)"
 
 
 def test_every_service_has_cpu_limits_and_rotated_logs():
@@ -200,7 +206,14 @@ def test_postgres_accepts_the_pool_budget_and_redis_has_headroom():
     assert backend_env.get("DB_MAX_OVERFLOW") == "${DB_MAX_OVERFLOW:-10}"
     for service in APP_SERVICES[1:]:
         env = _service_env(compose, service)
-        assert env.get("DB_POOL_SIZE") == "${WORKER_DB_POOL_SIZE:-4}", service
+        # El carril default (4 hilos) sube el defecto del mismo knob a 8; ver
+        # test_default_worker_db_pool_covers_its_threads.
+        expected_pool = (
+            "${WORKER_DB_POOL_SIZE:-8}"
+            if service == "worker"
+            else "${WORKER_DB_POOL_SIZE:-4}"
+        )
+        assert env.get("DB_POOL_SIZE") == expected_pool, service
         assert env.get("DB_MAX_OVERFLOW") == "${WORKER_DB_MAX_OVERFLOW:-2}", service
 
 
@@ -252,3 +265,43 @@ def test_prod_redis_requires_auth_and_all_clients_switch_together():
     for service in APP_SERVICES:
         url = _service_env(compose, service).get("REDIS_URL", "")
         assert url.startswith("redis://:${REDIS_PASSWORD:?") and url.endswith("@redis:6379/0"), service
+
+def _command_parts(compose: dict, service: str) -> list[str]:
+    command = compose["services"][service]["command"]
+    return [str(part) for part in command]
+
+
+def test_default_worker_scales_io_bound_threads_via_env():
+    """Cola default: 8.709 pendientes, edad p50 39 h, CPU del worker 0,17 %.
+
+    El cuello de botella es espera de E/S (HTTP externo), no CPU: un solo
+    knob WORKER_THREADS (defecto 4 aqui) permite el despliegue gradual
+    2 -> 4 -> 8 sin editar el fichero.
+    """
+    compose = _load_compose()
+    parts = _command_parts(compose, "worker")
+    threads = parts[parts.index("--threads") + 1]
+    assert threads == "${WORKER_THREADS:-4}", parts
+
+
+def test_prices_queue_has_a_dedicated_worker():
+    """prices (frescura intradia de 15 min) esperaba detras del backlog de
+    default en el mismo hilo: pasa a carril dedicado con el mismo knob de
+    hilos (defecto 2), patron official-closes/dca-manual."""
+    compose = _load_compose()
+    default_parts = _command_parts(compose, "worker")
+    assert default_parts[default_parts.index("-Q") + 1 :] == ["default"], default_parts
+    assert "worker-prices" in compose["services"], "falta el carril dedicado de prices"
+    prices_parts = _command_parts(compose, "worker-prices")
+    assert prices_parts[prices_parts.index("-Q") + 1 :] == ["prices"], prices_parts
+    threads = prices_parts[prices_parts.index("--threads") + 1]
+    assert threads == "${WORKER_THREADS:-2}", prices_parts
+
+
+def test_default_worker_db_pool_covers_its_threads():
+    """4 hilos comparten el pool del proceso: 4+2 conexiones los serializaban;
+    el carril default sube a 8+2 con el mismo knob WORKER_DB_POOL_SIZE."""
+    compose = _load_compose()
+    env = _service_env(compose, "worker")
+    assert env.get("DB_POOL_SIZE") == "${WORKER_DB_POOL_SIZE:-8}"
+

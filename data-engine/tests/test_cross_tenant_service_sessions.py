@@ -227,13 +227,31 @@ def test_screener_items_cache_does_not_leak_ratios_between_tenants(monkeypatch):
 
     def _refetch(vendor=None, tenant_id=None):
         # El store publica solo simbolos del universo real (merge LKG).
+        # Forma completa de ScreenerRealItemOut (response_model desde #3698):
+        # el marcador de tenant viaja en `name`, campo declarado que SI
+        # sobrevive a la serializacion (un campo extra se descartaria).
         return [
             {
                 "symbol": universe_symbol,
+                "name": f"co-{tenant_id}",
                 "price": 1.0,
+                "priceAsOf": None,
+                "priceTimestampKind": "quote",
+                "priceDate": None,
+                "currency": None,
+                "change": None,
+                "changePercent": None,
                 "marketCap": 1.0,
+                "volume": None,
+                "prevClose": None,
                 "sector": "S",
-                "ratiosForTenant": tenant_id,
+                "exchange": "X",
+                "type": "Stock",
+                "pe": None,
+                "pb": None,
+                "roe": None,
+                "has_fundamentals": False,
+                "beta": None,
             }
         ]
 
@@ -272,8 +290,8 @@ def test_screener_items_cache_does_not_leak_ratios_between_tenants(monkeypatch):
     items_a = _real_as(f"tenant-a-{suffix}", f"user-a-{suffix}")
     items_b = _real_as(f"tenant-b-{suffix}", f"user-b-{suffix}")
     assert items_a and items_b, "el refresh propio debe poblar el bucket"
-    assert items_a[0]["ratiosForTenant"] != items_b[0]["ratiosForTenant"], (
-        "el tenant B leyo del items-LKG los ratios calculados para el tenant A"
+    assert items_a[0]["name"] != items_b[0]["name"], (
+        "el tenant B leyo del items-LKG los items calculados para el tenant A"
     )
 
 

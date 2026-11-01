@@ -98,7 +98,7 @@ def test_long_term_bucket_after_one_year():
             )
         )
         _position(db, company, date(2026, 9, 21))
-        rows = portfolio_route.positions(db=db)
+        rows = portfolio_route.positions(db=db)["items"]  # sobre paginado {items, page_info}
     finally:
         db.close()
     assert len(rows) == 1
@@ -129,7 +129,7 @@ def test_short_term_bucket_within_one_year():
             )
         )
         _position(db, company, date(2026, 9, 21))
-        rows = portfolio_route.positions(db=db)
+        rows = portfolio_route.positions(db=db)["items"]  # sobre paginado {items, page_info}
     finally:
         db.close()
     assert rows[0]["fiscal_bucket"] == "corto_plazo"
@@ -141,7 +141,7 @@ def test_no_bucket_without_buy_history():
     try:
         company = _company(db, "NOHIST")
         _position(db, company, date(2026, 9, 21))
-        rows = portfolio_route.positions(db=db)
+        rows = portfolio_route.positions(db=db)["items"]  # sobre paginado {items, page_info}
     finally:
         db.close()
     assert rows[0]["fiscal_bucket"] is None
@@ -173,7 +173,7 @@ def test_open_position_counts_to_today_even_with_stale_price():
         company = _company(db, "STALE")
         _tx(db, company, date(2024, 10, 20), "buy")
         _position(db, company, date(2024, 10, 20))
-        rows = portfolio_route.positions(db=db)
+        rows = portfolio_route.positions(db=db)["items"]  # sobre paginado {items, page_info}
     finally:
         db.close()
     assert rows[0]["holding_days"] == (TODAY - date(2024, 10, 20)).days
@@ -188,7 +188,7 @@ def test_closed_position_counts_to_close_date():
         _tx(db, company, date(2025, 1, 10), "buy")
         _tx(db, company, date(2025, 6, 10), "sell")
         _position(db, company, date(2025, 6, 10), quantity="0")
-        rows = portfolio_route.positions(db=db)
+        rows = portfolio_route.positions(db=db)["items"]  # sobre paginado {items, page_info}
     finally:
         db.close()
     assert rows[0]["holding_days"] == (date(2025, 6, 10) - date(2025, 1, 10)).days

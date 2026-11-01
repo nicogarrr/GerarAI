@@ -171,6 +171,21 @@ def sync(
     }
 
 
+DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "instruments"
+
+
+def refresh_weekly() -> dict:
+    """Refresco semanal sin argumentos para el scheduler (APScheduler llama sin args).
+
+    Descarga los CSV por defecto de FinanceDatabase (1 GET por bolsa y
+    semana, gratis) y upserta instrument_references de forma idempotente.
+    OpenFIGI queda fuera a proposito: sin key son 25 req/min y el universo
+    sin FIGI agotaria la cuota; el enriquecido sigue disponible manual con
+    --enrich-openfigi y OPENFIGI_API_KEY.
+    """
+    return sync(data_dir=DEFAULT_DATA_DIR, as_of=date.today())
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--exchanges", nargs="*", default=None)

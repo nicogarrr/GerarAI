@@ -26,6 +26,8 @@ from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.core.database import SessionLocal, schema_migration_issues
+from app.services.connectors.alpha_vantage import get_alpha_vantage_client
+from app.services.data_source_health import get_data_source_registry
 
 router = APIRouter(tags=["health"])
 
@@ -151,3 +153,28 @@ async def health() -> dict:
         "version": version,
         "schema": [{"error": issue.get("error", "MigrationError")} for issue in schema_issues],
     }
+
+
+@router.get("/health/data-sources")
+@router.get("/data-sources")
+def data_sources_health() -> dict:
+    """Estado, latencia y circuit breakers de las fuentes de datos externas."""
+    registry = get_data_source_registry()
+    summary = registry.summary()
+    # Alpha Vantage: presupuesto diario del free tier (25 req/día). El health
+    # check es SOLO lectura local del contador: una sonda aquí nunca gasta
+    # cuota del proveedor (cero llamadas HTTP).
+    quota = get_alpha_vantage_client().quota_status()
+    for source in summary["sources"]:
+        if source["name"] == "Alpha Vantage":
+            source["quota"] = quota
+    # Frenos por proveedor (429) abiertos, con TTL restante. Solo lectura en
+    # Redis (cero llamadas HTTP); incluye los breakers legacy de gdelt y sec.
+    try:
+        from app.core.cache import _redis_client
+        from app.services.provider_brake import open_brakes
+
+        summary["provider_brakes"] = open_brakes(_redis_client())
+    except Exception:  # noqa: BLE001 - el estado del freno nunca tumba el health
+        summary["provider_brakes"] = []
+    return summary

@@ -30,6 +30,12 @@ from decimal import Decimal, InvalidOperation
 
 import httpx
 
+from app.services.data_source_health import get_data_source_registry
+
+# Clave en el registry de salud de fuentes. La URL es fija (un xlsx mensual):
+# cualquier fallo de descarga o un xlsx sin filas validas es de la fuente.
+REGISTRY_KEY = "damodaran"
+
 logger = logging.getLogger("gerarai.damodaran")
 
 DAMODARAN_ERP_URL = "https://pages.stern.nyu.edu/~adamodar/pc/implprem/ERPbymonth.xlsx"
@@ -105,9 +111,7 @@ def parse_implied_erp_xlsx(content: bytes) -> list[ImpliedErp]:
         out[month] = ImpliedErp(
             month=month,
             erp=erp,
-            erp_t12m=_decimal(row[t12m_index])
-            if t12m_index is not None and t12m_index < len(row)
-            else None,
+            erp_t12m=_decimal(row[t12m_index]) if t12m_index is not None and t12m_index < len(row) else None,
             tbond=_decimal(row[tbond_index]) if tbond_index is not None and tbond_index < len(row) else None,
         )
     return [out[month] for month in sorted(out)]
@@ -131,12 +135,19 @@ async def implied_erp_series() -> list[ImpliedErp]:
     cached = _cache.get(DAMODARAN_ERP_URL)
     if cached and time.monotonic() - cached[0] < CACHE_TTL_SECONDS:
         return cached[1]
+    registry = get_data_source_registry()
+    started = time.monotonic()
     try:
         content = await _download(DAMODARAN_ERP_URL)
-    except Exception:  # noqa: BLE001 - red caida o 4xx/5xx: el WACC usa settings
+    except Exception as exc:  # noqa: BLE001 - red caida o 4xx/5xx: el WACC usa settings
+        registry.record_failure(REGISTRY_KEY, f"descarga fallida: {type(exc).__name__}")
         logger.warning("Damodaran ERP: descarga fallida", exc_info=True)
         return []
     rows = parse_implied_erp_xlsx(content)
     if rows:
         _cache[DAMODARAN_ERP_URL] = (time.monotonic(), rows)
+        registry.record_success(REGISTRY_KEY, (time.monotonic() - started) * 1000)
+    else:
+        # Descarga OK pero sin filas validas: el fichero cambio de formato.
+        registry.record_failure(REGISTRY_KEY, "xlsx sin filas validas (formato cambiado)")
     return rows

@@ -22,6 +22,7 @@ from decimal import Decimal, InvalidOperation
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models.entities import Company, MarketPrice
 from app.services.price_units import price_in_currency
 from app.services.sale_simulation import FifoSale, apply_backward_repurchase, consume_fifo
@@ -237,7 +238,7 @@ def simulate_hypothetical_sale(
     today: date | None = None,
 ) -> HypoSale:
     """Ganancia FIFO en euros e IRPF de vender los lotes dados (o parte)."""
-    today = today or date.today()
+    today = today or local_today()
     from app.services.tax_sale_intent import sale_intent_issue
 
     issue = sale_intent_issue(question)

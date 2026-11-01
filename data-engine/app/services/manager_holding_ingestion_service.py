@@ -14,6 +14,7 @@ real evidence for theses and watchlists. Boundaries (parent-approved):
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from fractions import Fraction
@@ -24,6 +25,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
+
+logger = logging.getLogger(__name__)
 from app.core.tenancy import tenant_filters
 from app.models import FundManager, ManagerHolding
 from app.services.connectors import form13f
@@ -234,6 +237,50 @@ def _latest_accession(rows: list) -> str:
     )
 
 
+
+def _snapshot_holdings_payload(fallback: dict) -> dict:
+    """Payload de lectura para holdings servidos desde el snapshot edgartools.
+
+    Mismo contrato de claves que la via persistida; lo que el snapshot no
+    tiene queda en None. status="snapshot" (nunca "ok"): el snapshot no
+    contrasta totales contra el filing, asi que no es "verified".
+    """
+    holdings = []
+    for h in fallback.get("holdings") or []:
+        value = h.get("value_usd_thousands")
+        shares = h.get("ssh_prnamt")
+        holdings.append(
+            {
+                "accession_number": None,
+                "is_amendment": False,
+                "name_of_issuer": h.get("name_of_issuer"),
+                "name_of_issuer_filed": h.get("name_of_issuer"),
+                "title_of_class": h.get("title_of_class"),
+                "cusip": h.get("cusip"),
+                "value_usd_thousands": float(value) if value is not None else None,
+                "shares": float(shares) if shares is not None else None,
+                "share_type": h.get("ssh_prnamt_type"),
+                "put_call": h.get("put_call") or None,
+                "investment_discretion": h.get("investment_discretion"),
+                "filing_url": None,
+            }
+        )
+    return {
+        "cik": fallback.get("cik"),
+        "manager": REVIEWED_MANAGERS.get(str(fallback.get("cik") or "").zfill(10)),
+        "status": "snapshot",
+        "verification": "snapshot_unverified",
+        "report_date": fallback.get("report_date"),
+        "coverage": "snapshot",
+        "holdings": holdings,
+        "errors": fallback.get("errors") or [],
+        "limitations": fallback.get("limitations") or list(LIMITATIONS),
+        "transport": fallback.get("transport"),
+        "snapshot_synced_at": fallback.get("snapshot_synced_at"),
+        "provenance": fallback.get("provenance"),
+    }
+
+
 class ManagerHoldingIngestionService:
     def __init__(self, client: httpx.Client | None = None) -> None:
         self.client = client
@@ -259,6 +306,12 @@ class ManagerHoldingIngestionService:
         try:
             filings = form13f.recent_13f_filings(cik, client=self.client)
         except Exception as exc:  # noqa: BLE001 - honest unavailable, never break
+            # Detalle completo al log (redactado); la respuesta solo lleva un
+            # codigo estable: texto de excepcion al cliente = py/stack-trace-exposure.
+            logger.warning(
+                "13F sync %s: no se pudieron listar filings (%s: %s)",
+                cik, type(exc).__name__, redact_secrets(str(exc))[:300],
+            )
             manager.coverage = Coverage.UNAVAILABLE.value
             manager.synced_at = datetime.now(UTC)
             db.add(manager)
@@ -267,7 +320,7 @@ class ManagerHoldingIngestionService:
                 "cik": cik,
                 "manager": manager.name,
                 "status": "unavailable",
-                "reason": redact_secrets(f"{type(exc).__name__}: {exc}"),
+                "reason": "fuente_no_disponible",
                 "provenance": provenance(SOURCE, SourceKind.OFFICIAL, coverage=Coverage.UNAVAILABLE),
             }
 
@@ -307,7 +360,11 @@ class ManagerHoldingIngestionService:
                     continue
                 rows = form13f.fetch_information_table(url, client=self.client)
             except Exception as exc:  # noqa: BLE001 - partial coverage, keep going
-                errors.append({"accession": accession, "error": redact_secrets(f"{type(exc).__name__}: {exc}")})
+                logger.warning(
+                    "13F infotable %s/%s: %s: %s",
+                    cik, accession, type(exc).__name__, redact_secrets(str(exc))[:300],
+                )
+                errors.append({"accession": accession, "error": "filing_no_legible"})
                 continue
             summary = form13f.fetch_primary_summary(cik, accession, client=self.client)
             if filing["is_amendment"] and summary is None:
@@ -681,6 +738,17 @@ class ManagerHoldingIngestionService:
         cik = str(cik).strip().zfill(10)
         manager = db.scalar(select(FundManager).where(FundManager.cik == cik))
         if manager is None or manager.last_report_date is None:
+            # Sin sync en vivo todavia (o la via principal fallo): servir el
+            # snapshot edgartools si existe, marcado como tal y sin persistir.
+            # Import perezoso: edgartools_ingestion_service importa LIMITATIONS
+            # de este modulo.
+            from app.services.edgartools_ingestion_service import (
+                refresh_13f_from_edgartools,
+            )
+
+            fallback = refresh_13f_from_edgartools(cik)
+            if fallback.get("status") == "ok":
+                return _snapshot_holdings_payload(fallback)
             return {
                 "cik": cik,
                 "status": "unavailable",

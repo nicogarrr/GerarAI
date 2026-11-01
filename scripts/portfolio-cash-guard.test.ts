@@ -42,9 +42,15 @@ describe('sumCashByCurrency: respuesta real del backend { EUR: 100 }', () => {
 describe('contrato y mapeo del resumen', () => {
     it('el contrato declara cash como diccionario por moneda, no como número', () => {
         const actions = source('lib/actions/portfolio.actions.ts');
-        const block = actions.slice(actions.indexOf('type ResearchPortfolioSummaryResponse'), actions.indexOf('};', actions.indexOf('type ResearchPortfolioSummaryResponse')));
-        assert.ok(block.includes('cash: Record<string, number>'), 'cash tipado como diccionario por moneda');
-        assert.ok(!block.includes('cash: number'), 'cash no puede tiparse como número: con el payload real la línea no se mostraría');
+        // El contrato del resumen es el schema generado desde el OpenAPI del
+        // backend (response_model en la ruta), no un tipo manuscrito.
+        assert.ok(actions.includes("components['schemas']['PortfolioSummaryOut']"), 'el resumen usa el tipo generado desde el OpenAPI');
+        const generated = source('lib/research/openapi.generated.ts');
+        const start = generated.indexOf('PortfolioSummaryOut: {');
+        const block = generated.slice(start, start + 2000);
+        const cashField = /cash: \{\s*\[key: string\]: number;\s*\}/;
+        assert.ok(cashField.test(block), 'cash tipado como diccionario por moneda');
+        assert.ok(!/cash: number/.test(block), 'cash no puede tiparse como número: con el payload real la línea no se mostraría');
     });
 
     it('getPortfolioSummary deriva el importe con sumCashByCurrency', () => {
@@ -57,9 +63,12 @@ describe('línea Caja en las tablas de posiciones', () => {
     it('móvil y escritorio muestran la línea Caja solo con caja distinta de 0', () => {
         const holdings = source('components/portfolio/PortfolioHoldings.tsx');
         assert.ok(holdings.includes("typeof cash === 'number' && cash !== 0"), 'condición explícita sobre el importe derivado');
-        assert.ok(holdings.includes('Caja'), 'etiqueta de la línea');
         assert.ok(holdings.includes('border-dashed'), 'tarjeta móvil de caja diferenciada');
-        assert.ok((holdings.match(/>Caja</g) ?? []).length >= 2, 'una línea Caja en móvil y otra en escritorio');
+        // La etiqueta vive en el diccionario i18n; el componente referencia la clave
+        // en móvil y escritorio y el valor es 'Caja'.
+        assert.ok((holdings.match(/portfolio\.holdings\.cash/g) ?? []).length >= 2, 'una línea Caja en móvil y otra en escritorio');
+        const dict = JSON.parse(readFileSync(join(root, 'lib/i18n/messages/es/portfolio.json'), 'utf8'));
+        assert.equal(dict.holdings.cash, 'Caja', 'etiqueta de la línea en el diccionario es');
     });
 
     it('PortfolioTabs pasa cash y moneda base a la tabla', () => {
@@ -99,7 +108,9 @@ describe('buildAllocationSlices: datos del donut', () => {
 
     it('la etiqueta declara la base y el panel no se esconde con cartera solo-caja', () => {
         const allocation = source('components/portfolio/PortfolioAllocation.tsx');
-        assert.ok(allocation.includes('Pesos sobre el valor bruto de las posiciones'), 'etiqueta que declara la base (pesos sobre RV)');
+        assert.ok(allocation.includes('portfolio.allocation.weightsNote'), 'etiqueta que declara la base vía i18n');
+        const dictBase = JSON.parse(readFileSync(join(root, 'lib/i18n/messages/es/portfolio.json'), 'utf8'));
+        assert.equal(dictBase.allocation.weightsNote, 'Pesos sobre el valor bruto de las posiciones', 'valor es de la etiqueta de base');
         assert.ok(allocation.includes('holdings.length === 0 && !hasCash'), 'estado vacío solo cuando tampoco hay caja');
         assert.ok(allocation.includes('buildAllocationSlices(knownHoldings)'), 'datos vía el helper probado');
     });
@@ -118,13 +129,18 @@ describe('buildAllocationSlices: datos del donut', () => {
             allocation.includes('!holding.valueMissing && !holding.valuationHold'),
             'el panel filtra posiciones sin valor conocido antes de repartir',
         );
-        assert.ok(allocation.includes('Distribución incompleta'), 'aviso visible cuando falta alguna');
-        assert.ok(allocation.includes('Distribución N/D'), 'abstención cuando ninguna tiene valor');
+        const dictAv = JSON.parse(readFileSync(join(root, 'lib/i18n/messages/es/portfolio.json'), 'utf8'));
+        assert.ok(allocation.includes('portfolio.allocation.incomplete'), 'aviso visible cuando falta alguna (clave i18n)');
+        assert.ok(dictAv.allocation.incomplete.includes('Distribución incompleta'), 'valor es del aviso');
+        assert.ok(allocation.includes('portfolio.allocation.noValues'), 'abstención cuando ninguna tiene valor (clave i18n)');
+        assert.ok(dictAv.allocation.noValues.includes('Distribución N/D'), 'valor es de la abstención');
     });
 
     it('la caja/margen va en línea aparte con su signo real, fuera del donut', () => {
         const allocation = source('components/portfolio/PortfolioAllocation.tsx');
-        assert.ok(allocation.includes("Caja (margen)"), 'etiqueta de margen cuando la caja es negativa');
+        const dictCaja = JSON.parse(readFileSync(join(root, 'lib/i18n/messages/es/portfolio.json'), 'utf8'));
+        assert.ok(allocation.includes('portfolio.allocation.cashMargin'), 'etiqueta de margen cuando la caja es negativa (clave i18n)');
+        assert.equal(dictCaja.allocation.cashMargin, 'Caja (margen)', 'valor es de la etiqueta de margen');
         assert.ok(allocation.includes('formatMoney(cash,'), 'importe real formateado, sin suavizar el signo');
         assert.ok(allocation.includes("typeof cash === 'number' && cash !== 0"), 'la línea aparece con cualquier signo');
     });
@@ -160,6 +176,15 @@ describe('AllocationTooltip montado con react-dom/server', () => {
         assert.ok(html.includes('/research/AAPL'), 'la acción enlaza su ficha');
         assert.ok(html.includes('G/P'), 'la acción muestra su G/P');
         assert.ok(html.includes('€'), 'importe en la moneda base recibida');
+    });
+
+    it('las etiquetas por defecto del tooltip coinciden con el diccionario es', async () => {
+        const { readFileSync } = await import('node:fs');
+        const dict = JSON.parse(readFileSync(new URL('../lib/i18n/messages/es/portfolio.json', import.meta.url), 'utf8'));
+        const src = source('components/portfolio/AllocationTooltip.ts');
+        for (const [key, value] of Object.entries(dict.allocationTooltip)) {
+            assert.ok(src.includes(`'${value}'`), `DEFAULT_LABELS.${key} debe ser '${value}' del diccionario es`);
+        }
     });
 
     it('la moneda base llega desde el summary hasta el tooltip', () => {

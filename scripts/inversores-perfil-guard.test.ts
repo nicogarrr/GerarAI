@@ -11,10 +11,9 @@ test('el tipo de hecho exige fuente, fecha y tipo', () => {
     assert.match(actions, /as_of: string;\s+source_url: string;\s+kind: 'oficial' \| 'inferido' \| 'prensa';/);
 });
 
-test('cada cifra se muestra con tipo, fecha y enlace a la fuente', () => {
+test('cada cifra se muestra con tipo y fecha (el enlace de fuente se retiro en #3527)', () => {
     assert.match(section, /fact\.kind === 'oficial'/);
     assert.match(section, /fact\.as_of/);
-    assert.match(section, /href=\{fact\.source_url\}/);
 });
 
 test('la cartera sin datos explica el motivo', () => {

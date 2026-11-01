@@ -31,7 +31,10 @@ describe('el entregable se muestra como documento legible', () => {
 describe('el botón conserva su texto mientras genera', () => {
     it('la etiqueta es un nodo propio, siempre presente', () => {
         const source = readFileSync(COMPONENT, 'utf8');
-        assert.match(source, /<span>\{loading \? 'Generando\.\.\.' : 'Generar documento'\}<\/span>/, 'la etiqueta no desaparece con el spinner');
+        assert.match(source, /<span>\{loading \? t\('workProducts\.generating'\) : t\('workProducts\.generate'\)\}<\/span>/, 'la etiqueta no desaparece con el spinner');
+        const wpDict = JSON.parse(readFileSync('lib/i18n/messages/es/workProducts.json', 'utf8'));
+        assert.equal(wpDict.generating, 'Generando...', 'texto de carga verbatim');
+        assert.equal(wpDict.generate, 'Generar documento', 'texto del boton verbatim');
         assert.doesNotMatch(source, /bg-teal-600/, 'sin override de primario: usa el Button por defecto');
     });
 });

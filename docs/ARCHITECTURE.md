@@ -1,138 +1,174 @@
-# Arquitectura de GerarAI
+# Arquitectura del Sistema GerarAI
 
-> Estado: consolidación de backend completada (agosto 2026; revisado septiembre 2026). La API legacy
-> (`data-engine/routers/`) fue retirada del servicio; el único API del data
-> engine es el research API bajo el prefijo `/api`.
+Fulfills: VAL-DOC-001 (document-architecture)
 
-## 1. Visión general
+GerarAI es una plataforma integral de análisis fundamental, gestión de carteras y ejecución sistemática DCA, orientada a inversores particulares e institucionales. Cumple con estrictas premisas de seguridad multitenant, rendimiento en tiempo real y coste cero de infraestructura en modelos LLM (EUR0).
 
-```
-┌────────────────────────── Next.js (frontend) ──────────────────────────┐
-│  App Router · Server Actions · better-auth con sesiones en MongoDB      │
-│                                                                         │
-│  lib/research/client.ts  ── researchRequest(path) ──►  FMP_BACKEND_URL  │
-│       │  headers firmados:                                              │
-│       │  X-CavaAI-User / X-CavaAI-Tenant / X-CavaAI-Timestamp /        │
-│       │  X-CavaAI-Signature (HMAC-SHA256 con RESEARCH_AUTH_SECRET,      │
-│       │  tenant = user.id, TTL 300s)                                    │
-└───────┼─────────────────────────────────────────────────────────────────┘
-        ▼
-┌────────────────────────── FastAPI data-engine ─────────────────────────┐
-│  main.py · lifespan (seed, model aliases, scheduler si WORKERS_ENABLED) │
-│                                                                         │
-│  /api/*              research API privado  → auth HMAC → tenant scope   │
-│  /api/health         público (sin firma): BD + scheduler + versión      │
-│  /health /live /ready liveness/readiness clásicos                       │
-│                                                                         │
-│  Postgres (DATABASE_URL) — migraciones Alembic (alembic/versions/)      │
-│  Worker scheduler (APScheduler → Dramatiq/Redis)                        │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+---
 
-## 2. Frontend → investigación (identidad y tenant)
+## 1. Diagrama de Componentes y Flujo de Datos
 
-- **Sesión**: `better-auth` (`lib/better-auth/auth.ts`) con adaptador MongoDB
-  (`@/database/mongoose`). La sesión vive en MongoDB, no en la BD del engine.
-- **Puente al backend**: `lib/research/client.ts` (`researchRequest`) firma la
-  identidad del usuario autenticado con `RESEARCH_AUTH_SECRET`
-  (HMAC-SHA256 sobre `{tenant}:{user}:{timestamp}`) y la envía en los headers
-  `X-CavaAI-*`. El navegador nunca construye estos headers: solo el servidor
-  Next.js los genera (server actions).
-- **Tenant**: el tenant del backend ES el `user.id` de better-auth
-  (`lib/auth/research-identity.ts`, `tenantId = user.id`). FastAPI lo valida en
-  `app/core/auth.py` (`get_research_principal`) y lo usa para aislar datos por
-  tenant en `app/core/database.py` (queries e inserts con scope de tenant).
+```mermaid
+flowchart TD
+    subgraph Client["Cliente / Navegador"]
+        UI["Next.js Web UI\n(App Router + Tailwind)"]
+    end
 
-## 3. FastAPI data-engine
+    subgraph Edge["Capa Frontend & Auth (Next.js Node.js Server)"]
+        NextServer["Next.js Server Actions\n& API Routes"]
+        BetterAuth["Better-Auth Engine\n(Sesiones de Usuario)"]
+        MongoAuth["MongoDB\n(Colección Sesiones/Usuarios)"]
+        HMACSigner["Firma Criptográfica HMAC-SHA256\n(RESEARCH_AUTH_SECRET)"]
+    end
 
-- **Bootstrap** (`main.py`): lifespan arranca seed de company master (no en
-  producción), configura aliases de modelos LLM, valida configuración y — si
-  `WORKERS_ENABLED=true` — arranca el scheduler de workers.
-- **Routers**:
-  - Todo el research API vive en `app/api/router.py`, montado en `/api` con
-    auth obligatoria (`Depends(get_research_principal)`). Incluye companies,
-    portfolio, watchlist, thesis, news, risk, chat, knowledge, screeners, etc.
-  - `/api/health` se monta en `main.py` **fuera** del router autenticado y es
-    público: `{status, database (SELECT 1), scheduler {enabled, running, jobs,
-    last_run_at}, version: "main-<sha corto>"}`.
-  - `/health`, `/health/live`, `/health/ready` públicos (liveness/readiness
-    clásicos con checks de BD/Redis/Qdrant/MinIO).
-- **BD**: Postgres (`postgresql+psycopg://…`) en dev/producción; SQLite en
-  tests (`cavaai_test.db`, hermético, `APP_ENV=test`). Migraciones con Alembic
-  (`alembic upgrade head`; última: `0029_manager_holding_filing_date`).
-- **Rate limiting**: `RateLimitMiddleware` global (120 req/min; 20/min para
-  endpoints caros).
+    subgraph CoreBackend["Motor de Datos: FastAPI Data-Engine"]
+        FastAPI["FastAPI REST API\n(/api/v1 y endpoints de salud)"]
+        AuthMiddleware["Tenant Scope & HMAC Verifier\n(Isolation db.info['tenant_id'])"]
+        
+        subgraph EngineServices["Servicios Especializados"]
+            PortfolioSvc["Portfolio & Ledger Service\n(FIFO Contable LIRPF)"]
+            TaxSvc["Tax Report Service\n(Modelo 100 / Casillas / Retenciones)"]
+            DCASvc["DCA Signal Engine\n(1X-4X / Zonas / Recortes)"]
+            CerebroRAG["Cerebro RAG & HyDE\n(Qdrant Client Pool + FastEmbed)"]
+            PDFGen["Thesis & Portfolio PDF Generator\n(Matplotlib + PyPDF EUR0)"]
+            ImportSvc["Transaction Multi-Format Importer\n(CSV / Excel XLSX)"]
+        end
 
-## 4. Fuentes de datos de mercado
+        subgraph Caching["Capa de Rendimiento"]
+            RedisCache["Redis 7 (LRU Caching)\nTTL 5m-10m / Claves SHA256"]
+        end
+    end
 
-| Fuente | Uso | Dónde |
-|---|---|---|
-| **Finnhub** | Quotes de acciones vía frontend (`lib/actions/finnhub.actions.ts`, `FINNHUB_API_KEY`) | Next.js |
-| **Yahoo Finance** | Índices (S&P 500, Nasdaq, BTC, oro, plata) vía `GET /api/market/indices` (`app/api/routes/market.py`), sin key, con cache en memoria de 60 s | data-engine |
-| **FMP** (opcional) | Fuente secundaria: perfiles, dividendos, splits y contraste de hechos financieros (conflict detection SEC) vía `app/services/connectors/fmp.py`; solo activa con `FMP_API_KEY`. Los errores de proveedor se propagan para marcar la cobertura como no disponible, nunca se fabrican datos | data-engine |
+    subgraph DataPersistence["Almacenamiento Persistente"]
+        Postgres[("PostgreSQL 16\n(Esquema Relacional + Alembic)")]
+        Qdrant[("Qdrant Vector DB\n(Embeddings de Tesis y Documentos)")]
+        MinIO[("MinIO / Garage Object Storage\n(Informes, PDFs, Archivos)")]
+    end
 
-## 5. Trabajos programados (workers)
+    subgraph ExternalSources["Fuentes Externas (EUR0)"]
+        FMP["Financial Modeling Prep API"]
+        AlphaVantage["Alpha Vantage Connector\n(Rate-Limited Free Tier)"]
+        ECB["BCE (Banco Central Europeo)\nHistórico FX Diario Oficial"]
+        SEC["SEC EDGAR / CNMV\n(Filings 10-K, 10-Q, Hechos Relevantes)"]
+    end
 
-- **Fuente de verdad — backend**: `app/workers/scheduler.py` construye un
-  scheduler APScheduler (`build_scheduler`) con jobs que encolan actores
-  Dramatiq (`app/workers/dramatiq_app.py`, broker Redis) para cada tenant:
-  refresh de market/noticias/RSS/SEC/IR, consolidación de memoria, revisión de
-  tesis, investigación diaria y escaneo de contradicciones. Se arranca en el
-  lifespan de FastAPI solo si `WORKERS_ENABLED=true` (desactivado en tests).
-- **Canal de alertas**: Telegram es el ÚNICO canal de notificaciones
-  (`TELEGRAM_ENABLED`, `notification_service`), usado por los flujos del
-  backend. El stack de email del frontend (Inngest + nodemailer) se eliminó:
-  los emails están desactivados por decisión del usuario.
+    UI -->|"HTTPS / JSON"| NextServer
+    NextServer --> BetterAuth
+    BetterAuth <--> MongoAuth
+    NextServer --> HMACSigner
+    HMACSigner -->|"X-CavaAI-Signature / Headers"| FastAPI
 
-## 5b. Grafo de ciclo de vida de tesis (etapa 6, límite final)
-
-- **Plano de control durable**: `app/workflows/thesis_graph/` (LangGraph)
-  gobierna el ciclo de vida de la tesis: reanudación ante fallos con
-  checkpointer, `interrupt()` de aprobación real (6c), reintento idempotente
-  y sondas de lectura que registran el estado persistido por la vía clásica
-  (resolve_company, ensure_ingestion_complete, build_fundamental_model,
-  deterministic_valuation, source_audit, deterministic_red_team) más la
-  huella de freeze_input_snapshot.
-- **Ejecutor único**: la vía clásica `ThesisService` sigue siendo el ÚNICO
-  ejecutor LLM/escritura. `draft_synthesis`, `optional_bull_bear_debate`,
-  `assemble_candidate` y `publish` son marcadores de control deliberados
-  (`pending:<nodo>`): mantienen el flujo completo y reanudable sin duplicar
-  coste LLM ni arriesgar dobles escrituras, y nunca ejecutan trabajo de
-  negocio dentro del grafo.
-- **Validación shadow**: `ThesisShadowService` compara en cada ejecución el
-  orden de nodos, el reintento idempotente y cada observación de las sondas
-  contra el estado persistido clásico; las divergencias quedan registradas
-  explícitamente en el WorkflowRun durable. El shadow nunca muta artefactos
-  de dominio.
-
-## 6. Ejecución local
-
-```bash
-# Backend (data-engine/)
-cd data-engine
-python -m venv .venv && ./.venv/Scripts/pip install -r requirements.txt
-# .env con DATABASE_URL (Postgres local), RESEARCH_AUTH_SECRET (≥32 chars), etc.
-./.venv/Scripts/alembic upgrade head
-./.venv/Scripts/python -m uvicorn main:app --reload --port 8000
-
-# Frontend (raíz)
-npm install
-npm run dev            # http://localhost:3000 (FMP_BACKEND_URL=http://localhost:8000)
-
-# Tests del backend
-./.venv/Scripts/python -m pytest tests/ -q
+    FastAPI --> AuthMiddleware
+    AuthMiddleware --> EngineServices
+    EngineServices <--> RedisCache
+    EngineServices <--> Postgres
+    CerebroRAG <--> Qdrant
+    PDFGen --> MinIO
+    ImportSvc --> Postgres
+    EngineServices <--> ExternalSources
 ```
 
-## 7. Despliegue — variables de entorno requeridas
+---
 
-| Variable | Obligatoria | Notas |
-|---|---|---|
-| `DATABASE_URL` | sí | Postgres; migraciones vía Alembic antes de arrancar |
-| `RESEARCH_AUTH_SECRET` | sí (producción) | ≥32 chars; compartida con el frontend; sin ella el API autenticado da 503/401 |
-| `WORKERS_ENABLED` | no (default true) | `false` desactiva el scheduler (tests, workers aparte) |
-| `FINNHUB_API_KEY` | según features | quotes del frontend |
-| `OPENCODE_GO_API_KEY` / `OPENCODE_GO_MODEL` | sí (LLM) | provider LLM principal (`llm_provider=opencode-go`); cascada gratuita opt-in con `LLM_PROVIDER=cascade` y fallback Groq solo para chat (docs/AI_PROVIDER_STRATEGY.md) |
-| `MINIO_*` | sí (producción) | almacenamiento de documentos originales |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | según features | canal de alertas primario |
-| `REDIS_URL`, `QDRANT_URL` | según features | broker Dramatiq y vectores |
-| `APP_ENV` | sí | `test` / `local` / `production` (valida secretos en prod) |
+## 2. Aislamiento Multitenant y Seguridad Criptográfica
+
+1. **Identidad Unificada**: Cada usuario autenticado en Next.js posee un `user.id`. El servidor Next.js firma las peticiones hacia el backend FastAPI mediante HMAC-SHA256 utilizando la clave simétrica `RESEARCH_AUTH_SECRET` con ventana temporal de validez (300 segundos para prevenir replay attacks).
+2. **Contexto de Sesión en Base de Datos**: FastAPI valida la firma en `app/core/auth.py`. Al validarse, se inyecta el `tenant_id` en `db.info["tenant_id"]`.
+3. **Filtros Estrictos de Aislamiento**: Cada consulta y mutación sobre entidades sensibles (`Portfolio`, `Transaction`, `Position`, `InvestmentPlan`, `TaxReport`) aplica obligatoriamente los predicados `*tenant_filters(db, Entity)` impidiendo cualquier fuga cross-tenant.
+
+---
+
+## 3. Esquema Relacional de Base de Datos (PostgreSQL)
+
+```mermaid
+erDiagram
+    TENANTS ||--o{ PORTFOLIOS : owns
+    PORTFOLIOS ||--o{ TRANSACTIONS : records
+    PORTFOLIOS ||--o{ POSITIONS : aggregates
+    PORTFOLIOS ||--o{ INVESTMENT_PLANS : guides
+    PORTFOLIOS ||--o{ TAX_REPORTS : generates
+    COMPANIES ||--o{ TRANSACTIONS : referenced_by
+    COMPANIES ||--o{ POSITIONS : targets
+    COMPANIES ||--o{ THESIS_VERSIONS : documented_in
+    COMPANIES ||--o{ DCA_SIGNALS : evaluated_by
+
+    TENANTS {
+        string id PK
+        string email
+        string plan_tier
+        datetime created_at
+    }
+
+    PORTFOLIOS {
+        uuid id PK
+        string tenant_id FK
+        string name
+        string base_currency
+        boolean is_default
+        datetime created_at
+    }
+
+    COMPANIES {
+        int id PK
+        string ticker UK
+        string name
+        string exchange
+        string currency
+        string sector
+        string industry
+        string company_type
+        string valuation_model
+    }
+
+    TRANSACTIONS {
+        uuid id PK
+        string tenant_id FK
+        uuid portfolio_id FK
+        int company_id FK
+        date trade_date
+        string action
+        decimal quantity
+        decimal price
+        decimal fees
+        string currency
+    }
+
+    POSITIONS {
+        uuid id PK
+        string tenant_id FK
+        uuid portfolio_id FK
+        int company_id FK
+        decimal quantity
+        decimal average_cost
+        decimal market_price
+        decimal market_value
+        decimal unrealized_pnl
+        decimal realized_pnl
+    }
+```
+
+---
+
+## 4. Puntos de Integración del API
+
+| Módulo | Endpoint Principal | Propósito | Autenticación |
+|---|---|---|---|
+| **Salud** | `GET /api/health` | Estado del motor, Postgres, Scheduler y versión | Pública |
+| **Fuentes de Datos** | `GET /api/health/data-sources` | Circuit breaker y latencia de APIs externas | Requiere HMAC |
+| **Cartera** | `GET /api/portfolio/{id}/summary` | Resumen contable, valor de mercado y rentabilidad | Requiere HMAC (Tenant) |
+| **Transacciones** | `POST /api/portfolio/transactions` | Registro y replay contable FIFO de transacciones | Requiere HMAC (Tenant) |
+| **Importación** | `POST /api/portfolio/import/preview` | Validación y parseo multiformato (CSV/Excel) | Requiere HMAC (Tenant) |
+| **Exportación PDF** | `GET /api/portfolio/{id}/pdf` | Generación de informe PDF institucional | Requiere HMAC (Tenant) |
+| **Fiscalidad** | `GET /api/taxes/reports/{year}` | Cálculo de casillas Modelo 100 y compensación IRPF | Requiere HMAC (Tenant) |
+| **DCA Engine** | `GET /api/dca/signals/{ticker}` | Niveles 1X-4X, zonas de compra y recortes | Requiere HMAC |
+| **Cerebro RAG** | `POST /api/chat/rag` | Búsqueda semántica híbrida con pool Qdrant | Requiere HMAC |
+| **Caché** | `GET /api/cache/stats` | Métricas de acierto/fallo y latencia de Redis | Requiere HMAC |
+
+---
+
+## 5. Estrategia de Rendimiento y Escalabilidad
+
+- **Pool de Conexiones**: SQLAlchemy gestiona un pool con reciclaje automático (`pool_pre_ping=True`, tamaño 10, overflow 20).
+- **Qdrant Client Pool**: Los clientes Qdrant se reutilizan de forma thread-safe evitando desconexiones y re-aperturas de sockets gRPC/HTTP.
+- **Redis Multi-Layer Caching**: Claves deterministas SHA256 para cotizaciones (TTL 5 min), valoraciones de cartera (TTL 10 min) y señales DCA (TTL 5 min), con invalidación reactiva mediante eventos SQLAlchemy.
+- **Generación PDF Zero-Cost**: Procesamiento asíncrono y en memoria de PDFs mediante matplotlib y pypdf, sin dependencias externas pesadas como Chromium/Puppeteer.

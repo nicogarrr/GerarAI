@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { formatCountEs } from '@/lib/format';
+import { useLocale, useT } from '@/lib/i18n/client';
 import { useRouter } from 'next/navigation';
 import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,6 +14,8 @@ import { showErrorToast } from '@/lib/toast';
 /** Evaluación manual de las señales DCA (el backend la limita a una tanda de diez pendientes cada cinco minutos). */
 export default function DcaEvaluateButton() {
     const router = useRouter();
+    const t = useT();
+    const locale = useLocale();
     const [loading, setLoading] = useState(false);
 
     const alive = useRef(true);
@@ -24,10 +27,10 @@ export default function DcaEvaluateButton() {
         try {
             const accepted = await startDcaManualJob();
             if (!accepted.success || !accepted.runId) {
-                showErrorToast(accepted.message ?? 'No se pudo iniciar la evaluación');
+                showErrorToast(accepted.message ?? t('watchlist.dca.run.startFailed'));
                 return;
             }
-            setStatus('Tanda aceptada. Puedes salir: continúa en segundo plano.');
+            setStatus(t('watchlist.dca.run.accepted'));
             // Bounded polling. A pending job is not a failed evaluation.
             let res: Awaited<ReturnType<typeof getDcaManualJob>> = { success: true, status: 'running' };
             for (let attempt = 0; attempt < 60 && alive.current; attempt++) {
@@ -38,30 +41,30 @@ export default function DcaEvaluateButton() {
             }
             if (!alive.current) return;
             if (res.success && res.status === 'running') {
-                setStatus('Sigue en segundo plano. Consulta el resultado en la watchlist.');
+                setStatus(t('watchlist.dca.run.background'));
                 router.refresh();
                 return;
             }
             if (res.status === 'interrupted') {
-                setStatus('Ejecución interrumpida. Revisa su estado antes de repetir.');
+                setStatus(t('watchlist.dca.run.interrupted'));
                 router.refresh();
                 return;
             }
             if (res.success && res.summary) {
                 const { evaluated, alerted, skipped, errors = [] } = res.summary;
-                const parts = [formatCountEs(evaluated, 'evaluado', 'evaluados'), formatCountEs(alerted.length, 'aviso nuevo', 'avisos nuevos')];
-                if (skipped.length > 0) parts.push(`${skipped.length} sin datos suficientes`);
-                if (res.summary.pending_remaining) parts.push(`${res.summary.pending_remaining} pendientes de otra tanda`);
+                const parts = [formatCountEs(evaluated, t('watchlist.dca.run.evaluatedOne'), t('watchlist.dca.run.evaluatedOther'), locale), formatCountEs(alerted.length, t('watchlist.dca.run.newAlertOne'), t('watchlist.dca.run.newAlertOther'), locale)];
+                if (skipped.length > 0) parts.push(t('watchlist.dca.run.skipped', { count: skipped.length }));
+                if (res.summary.pending_remaining) parts.push(t('watchlist.dca.run.pending', { count: res.summary.pending_remaining }));
                 if (errors.length > 0) {
-                    parts.push(formatCountEs(errors.length, 'empresa con errores', 'empresas con errores'));
-                    toast.warning(`Evaluación DCA parcial: ${parts.join(' · ')}`);
+                    parts.push(formatCountEs(errors.length, t('watchlist.dca.run.errorsOne'), t('watchlist.dca.run.errorsOther'), locale));
+                    toast.warning(t('watchlist.dca.run.partial', { parts: parts.join(' · ') }));
                 } else {
-                    toast.success(`Señales DCA actualizadas: ${parts.join(' · ')}`);
+                    toast.success(t('watchlist.dca.run.updated', { parts: parts.join(' · ') }));
                 }
                 setStatus(null);
                 router.refresh();
             } else {
-                showErrorToast(res.message ?? 'No se pudieron evaluar las señales DCA');
+                showErrorToast(res.message ?? t('watchlist.dca.run.failed'));
             }
         } catch (error) {
             showErrorToast(error);
@@ -82,11 +85,11 @@ export default function DcaEvaluateButton() {
             className="min-h-[44px] border-gray-700 text-xs text-gray-300"
         >
             <RefreshCw aria-hidden="true" className={`mr-1 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            {loading ? 'Evaluando…' : 'Ejecutar pendientes ahora'}
+            {loading ? t('watchlist.dca.run.evaluating') : t('watchlist.dca.run.runNow')}
         </Button>
         {status && <p role="status" className="max-w-sm text-xs text-gray-300">{status}</p>}
-        <p className="max-w-sm text-xs text-gray-400">Solo faltantes o desactualizadas. Hasta 10 empresas por tanda, 5 min entre tandas. Sin LLM de pago; no activa correos ni realiza compras.</p>
-        <Link href="/plan" className="inline-flex min-h-[44px] items-center text-xs text-teal-300">Ver mi plan, reparto DCA y ahorro →</Link>
+        <p className="max-w-sm text-xs text-gray-400">{t('watchlist.dca.run.help')}</p>
+        <Link href="/plan" className="inline-flex min-h-[44px] items-center text-xs text-teal-300">{t('watchlist.dca.run.planLink')}</Link>
         </div>
     );
 }

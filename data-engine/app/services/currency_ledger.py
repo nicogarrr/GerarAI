@@ -163,12 +163,18 @@ def compute_currency_ledger(
         key=lambda e: (e[0], e[1]),
     )
 
-    def consume(amount: Decimal, day: date):
+    def consume(amount: Decimal, day: date, time: str = ""):
         remaining, cost, ok = amount, Decimal("0"), True
         for q in queue:
             if remaining <= 0:
                 break
             if q[0] > day or q[1] <= 0:
+                continue
+            if q[0] == day and time and q[4] and q[4] > time:
+                # Con ambas horas conocidas, un lote adquirido DESPUES del
+                # evento el mismo dia no existia aun: no es consumible. Sin
+                # saldo anterior la conversion queda incomplete antes que
+                # tributar con la base de divisa recibida en el futuro.
                 continue
             take = min(q[1], remaining)
             if q[2] is None:
@@ -195,7 +201,7 @@ def compute_currency_ledger(
                 )
             continue
         conv = ev
-        cost, ok, rest = consume(conv.amount, day)
+        cost, ok, rest = consume(conv.amount, day, conv.time)
         row_ok = ok and rest <= 0 and conv.ecb_rate is not None
         if conv.ecb_rate is None:
             reasons.append(f"falta cambio BCE del {day}")

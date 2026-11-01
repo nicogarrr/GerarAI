@@ -2,13 +2,13 @@ from contextlib import contextmanager
 from decimal import Decimal
 from uuid import uuid4
 
-from fastapi.testclient import TestClient
 from sqlalchemy import delete, or_, select
 
 import main
 from app.core.database import SessionLocal, get_db, init_db
 from app.models import Company, ExternalClaim, NewsEvent, Position, Tenant, ThesisChange
 from app.services.source_hierarchy_service import classify_source
+from tests.auth_helpers import csrf_client
 
 TARGET_TICKER = "MATBIG"
 OTHER_TICKER = "MATOTH"
@@ -146,7 +146,7 @@ def test_news_materiality_uses_portfolio_weight_and_source_hierarchy():
             db.commit()
         finally:
             db.close()
-        _assert_news_materiality(TestClient(main.app))
+        _assert_news_materiality(csrf_client(main.app))
 
 
 def _assert_news_materiality(client) -> None:

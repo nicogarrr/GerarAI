@@ -1,7 +1,6 @@
 """DELETE /api/knowledge/documents/{id}: cascada y aislamiento de tenant."""
 from uuid import uuid4
 
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
@@ -18,7 +17,7 @@ from app.models import (
 )
 from app.seed import seed
 from app.services.knowledge_library_service import KnowledgeLibraryService
-from tests.auth_helpers import auth_settings, signed_request
+from tests.auth_helpers import auth_settings, csrf_client, signed_request
 
 
 def _document(title: str) -> KnowledgeDocument:
@@ -140,7 +139,7 @@ def test_delete_document_cross_tenant_devuelve_404(monkeypatch):
     suffix = uuid4().hex[:8]
     tenant_a = f"tenant-a-{suffix}"
     tenant_b = f"tenant-b-{suffix}"
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
 
     # Documento del tenant A creado con el contexto de tenant de la sesion,
     # como lo haria cualquier escritura real.
@@ -207,7 +206,7 @@ def test_delete_collection_vacia_y_aislamiento(monkeypatch):
     suffix = uuid4().hex[:8]
     tenant_a = f"tenant-a-col-{suffix}"
     tenant_b = f"tenant-b-col-{suffix}"
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
 
     db = SessionLocal()
     tenant_row = Tenant(external_id=tenant_a, name="Tenant A col")

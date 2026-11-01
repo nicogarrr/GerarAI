@@ -127,14 +127,14 @@ def _fake_fastembed(monkeypatch, dense_vectors=None, sparse_vectors=None):
             self.model = model
             FakeDense.instances.append(self)
 
-        def embed(self, texts):
+        def embed(self, texts, batch_size=None):
             return iter(dense_vectors if dense_vectors is not None else [[0.1] * 4 for _ in texts])
 
     class FakeSparse:
         def __init__(self, model):
             self.model = model
 
-        def embed(self, texts):
+        def embed(self, texts, batch_size=None):
             return iter(
                 sparse_vectors
                 if sparse_vectors is not None

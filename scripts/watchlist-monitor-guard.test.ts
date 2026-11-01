@@ -14,8 +14,9 @@ test('watchlist page consume el endpoint monitor del backend', () => {
 });
 
 test('proximos resultados y chip 52 semanas vienen del monitor, no hardcodeados', () => {
-    assert.match(page, /Próx\. resultados/);
-    assert.match(page, /Mínimo 52 sem/);
+    const wl = JSON.parse(readFileSync('lib/i18n/messages/es/watchlist.json', 'utf8')).page;
+    assert.ok(page.includes("t('watchlist.page.sort.earnings')") && wl.sort.earnings === 'Próx. resultados');
+    assert.ok(page.includes("t('watchlist.page.low52')") && wl.low52 === 'Mínimo 52 sem');
     assert.match(route, /fetch_earnings_range/);
     assert.match(route, /MarketPrice/);
 });
@@ -28,15 +29,19 @@ test('el recuento sobre/infravaloradas usa el valor justo ÚNICO con su proceden
     // El monitor no calcula su propio valor justo: lee el servicio compartido.
     assert.match(route, /resolve_fair_values\(db, companies\)/);
     assert.match(route, /"fair_value_source": reading\["source"\]/);
-    assert.match(page, /Según el valor justo \(\{fairValueSourceNote\}\)/);
-    assert.match(page, /con tesis publicada/);
+    assert.match(page, /t\('watchlist\.page\.fairValue\.summary', \{ source: fairValueSourceNote,/);
+    const fv = JSON.parse(readFileSync('lib/i18n/messages/es/watchlist.json', 'utf8')).page.fairValue;
+    assert.match(fv.summary, /^Según el valor justo \(\{source\}\)/);
+    assert.match(fv.byThesis, /con tesis publicada/);
 });
 
 test('inicio y screener leen el mismo valor justo único, con etiqueta', () => {
     const screener = readFileSync('lib/actions/screener.actions.ts', 'utf8');
     const home = readFileSync('components/PersonalizedOverview.tsx', 'utf8');
     assert.match(screener, /\/fair-value`/);
-    assert.match(home, /Fuente: \{op\.fairValueLabel\}/);
+    assert.match(home, /home\.opportunities\.source/);
+    const dict = JSON.parse(readFileSync('lib/i18n/messages/es/home.json', 'utf8'));
+    assert.equal(dict.opportunities.source, 'Fuente: {label}');
 });
 
 test('sin URLs de proveedor construidas a mano en el frontend', () => {

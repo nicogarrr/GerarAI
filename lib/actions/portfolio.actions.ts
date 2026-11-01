@@ -1,6 +1,8 @@
 'use server';
 
 import type { TrackedAnalysisStatus } from '@/lib/tracked-analysis-status';
+import type { components } from '@/lib/research/openapi.generated';
+import { BACKEND_PAGE_SIZE, fetchAllBackendPages, type PaginatedBackendResponse } from '@/lib/paginated-backend';
 
 import { qualifiedHistoricalMetrics, verifiedPortfolioHistory, type PortfolioSnapshotPoint } from '@/lib/portfolio-history';
 
@@ -12,7 +14,7 @@ import { AppError, AuthorizationError, ValidationError } from '@/lib/types/error
 import { sumCashByCurrency } from '@/lib/portfolio-cash';
 import { buildAllocationSlices } from '@/lib/portfolio-allocation';
 import { partitionSettledRefreshes } from '@/lib/portfolio/refresh-settled';
-import { importRejection } from '@/lib/portfolio/import-rejection';
+import { importRejection, type ImportRejection } from '@/lib/portfolio/import-rejection';
 import { ledgerRejection } from '@/lib/portfolio/ledger-rejection';
 import { transactionFiltersQuery, type TransactionFilters } from '@/lib/portfolio/transaction-filters';
 
@@ -123,72 +125,13 @@ export type PortfolioSummary = {
     quality?: PortfolioDataQuality | null;
 };
 
-export type PortfolioFxRate = { scope: 'cash' | 'positions'; currency: string; rate: number; as_of: string };
+export type PortfolioFxRate = components['schemas']['PortfolioFxRateOut'];
 
-type ResearchPortfolioTransaction = {
-    id: number;
-    ticker: string;
-    action: 'buy' | 'sell';
-    quantity: number;
-    price: number;
-    fees: number;
-    currency: string;
-    trade_date: string;
-    notes?: string | null;
-    created_at: string;
-    updated_at: string;
-};
+type ResearchPortfolioTransaction = components['schemas']['PortfolioTransactionOut'];
 
-type ResearchPortfolioPosition = {
-    analysis?: TrackedAnalysisStatus | null;
-    ticker: string;
-    quantity: number;
-    average_cost: number | null;
-    cost_reconciliation?: { status: string; message?: string | null } | null;
-    // null = valoración en suspenso (p. ej. split sin precio post-split verificado).
-    market_price: number | null;
-    market_value: number | null;
-    unrealized_pnl: number | null;
-    valuation_hold?: { reason: string; effective_date: string | null; since: string | null } | null;
-    currency: string;
-    native_currency: string;
-    base_currency: string;
-    realized_pnl: number;
-    cost_basis: number | null;
-    as_of: string;
-    market_value_native: number;
-    market_value_base: number | null;
-    cost_basis_native: number | null;
-    unrealized_pnl_native?: number | null;
-    cost_basis_base: number | null;
-    unrealized_pnl_base: number | null;
-    realized_pnl_base: number | null;
-    fx_rate: number | null;
-    pnl_price_effect_base?: number | null;
-    pnl_fx_effect_base?: number | null;
-    first_buy_date: string | null;
-    holding_days: number | null;
-    fiscal_bucket: 'corto_plazo' | 'largo_plazo' | null;
-    // A3: el precio es el de la última operación (sin cotización real); plusvalía null.
-    quote_missing?: boolean;
-};
+type ResearchPortfolioPosition = components['schemas']['PortfolioPositionItemOut'];
 
-type ResearchPortfolioSummaryResponse = {
-    total_value: number;
-    equity_value: number;
-    cash_assets_base?: number;
-    margin_debt_base?: number;
-    /** Diccionario por moneda ya en divisa base: { EUR: 1234.56 }. */
-    cash: Record<string, number>;
-    status: 'ok' | 'incomplete_fx' | 'incomplete_valuation';
-    base_currency: string;
-    missing_fx: Array<Record<string, unknown>>;
-    valuation_hold?: Array<{ ticker: string; reason: string; effective_date: string | null }>;
-    fx_rates?: PortfolioFxRate[];
-    cash_as_of?: string | null;
-    data_as_of?: string | null;
-    valuation_dates_differ?: boolean;
-};
+type ResearchPortfolioSummaryResponse = components['schemas']['PortfolioSummaryOut'];
 
 export async function addTransaction(
     userId: string,
@@ -209,7 +152,9 @@ export async function addTransaction(
         throw new ValidationError('Las comisiones no pueden ser negativas.');
     }
     try {
-        await researchRequest<ResearchPortfolioTransaction>('/api/portfolio/transactions', {
+        // El POST admite acciones de caja (dividend/interest/fee/cash_misc):
+        // su contrato es PortfolioTransactionCreateOut, mas amplio que el del listado.
+        await researchRequest<components['schemas']['PortfolioTransactionCreateOut']>('/api/portfolio/transactions', {
             method: 'POST',
             body: jsonBody({
                 ticker: symbol.toUpperCase(),
@@ -233,11 +178,15 @@ export async function addTransaction(
 
 export async function getPortfolioTransactions(userId: string) {
     const canonicalUserId = await resolveUserId(userId);
-    const transactions = await cachedFetch(
+    const raw = await cachedFetch(
         `portfolio:${canonicalUserId}:transactions`,
-        () => researchRequest<ResearchPortfolioTransaction[]>('/api/portfolio/transactions', { fast: true }),
+        () => fetchAllBackendPages(
+            (page) => researchRequest<PaginatedBackendResponse<ResearchPortfolioTransaction>>(`/api/portfolio/transactions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true }),
+            (transaction) => String(transaction.id),
+        ),
         15,
     );
+    const transactions = raw;
     return transactions.map((transaction) => ({
         _id: String(transaction.id),
         symbol: transaction.ticker,
@@ -259,7 +208,7 @@ export async function getPortfolioTransactionPage(userId: string, offset = 0, fi
     // backend con la sesión.
     await resolveUserId(userId);
     const safeOffset = Number.isSafeInteger(offset) && offset >= 0 ? offset : 0;
-    const page = await researchRequest<{ items: ResearchPortfolioTransaction[]; total: number }>(
+    const page = await researchRequest<components['schemas']['PortfolioTransactionPageOut']>(
         `/api/portfolio/transactions/page?limit=50&offset=${safeOffset}${transactionFiltersQuery(filters)}`, { fast: true },
     );
     const items = page.items.map((transaction) => ({
@@ -302,10 +251,13 @@ export async function getPortfolioFxContext(userId: string): Promise<{ fxRates: 
 
 export async function getPortfolioSummary(userId: string): Promise<PortfolioSummary> {
     const canonicalUserId = await resolveUserId(userId);
-    const [positions, backendSummary, quality] = await Promise.all([
+    const [rawPositions, backendSummary, quality] = await Promise.all([
         cachedFetch(
             `portfolio:${canonicalUserId}:positions`,
-            () => researchRequest<ResearchPortfolioPosition[]>('/api/portfolio/positions', { fast: true }),
+            () => fetchAllBackendPages(
+                (page) => researchRequest<PaginatedBackendResponse<ResearchPortfolioPosition>>(`/api/portfolio/positions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true }),
+                (position) => position.ticker,
+            ),
             15,
         ),
         cachedFetch(
@@ -315,6 +267,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
         ),
         getPortfolioDataQuality(canonicalUserId),
     ]);
+    const positions = rawPositions;
     const holdings = positions.map((position): PortfolioHolding => {
         const held = Boolean(position.valuation_hold);
         const currentPrice = held ? null : position.market_price;
@@ -570,35 +523,40 @@ export async function getPortfolioScores(userId: string): Promise<PortfolioScore
         // métrica que la alimenta no existe: un 0 seria una medición.
         const clamp100 = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
         const sheet = await getPortfolioTearsheet(canonicalUserId);
-        const snapshots = await cachedFetch(
+        const rawSnapshots = await cachedFetch(
             `portfolio:${canonicalUserId}:snapshots`,
-            () => researchRequest<PortfolioSnapshotPoint[]>('/api/portfolio/snapshots', { fast: true }),
+            () => fetchAllBackendPages(
+                (page) => researchRequest<PaginatedBackendResponse<PortfolioSnapshotPoint>>(`/api/portfolio/snapshots?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true }),
+                (snapshot) => snapshot.snapshot_date,
+            ),
             15,
         ).catch(() => [] as PortfolioSnapshotPoint[]);
+        const snapshots = rawSnapshots;
         const history = verifiedPortfolioHistory(snapshots, summary.baseCurrency);
         // Real dividend score: trailing-12M declared-dividend yield from
         // GET /api/portfolio/dividends (FMP-ingested records, provenance
         // attached). Linear band documented here: 0% yield -> 0, 6% -> 100.
         // Sin posiciones con dividendos ingeridos la puntuación es null, no 0:
         // un yield de 0% es un hecho ("no reparte") y "no lo sabemos" no lo es.
+        // portfolio_yield es el yield de las posiciones CUBIERTAS: con la
+        // mitad del valor sin datos, puntuarlo como si fuera de toda la
+        // cartera inflaría el score. Se pondera por covered_value_fraction:
+        // el resultado es el límite inferior del yield del libro completo
+        // (lo desconocido no suma). Sin el campo (backend viejo) el yield
+        // ya venía diluido sobre el valor total: fracción 1 es consistente.
         let dividendScore: number | null = null;
         try {
-            const dividends = await cachedFetch<{
-                portfolio_yield: number | null;
-                coverage: { positions_with_dividend_data: number };
-            }>(
+            const dividends = await cachedFetch<PortfolioDividendYields>(
                 `portfolio:${canonicalUserId}:dividends`,
-                () => researchRequest<{
-                    portfolio_yield: number | null;
-                    coverage: { positions_with_dividend_data: number };
-                }>('/api/portfolio/dividends', { fast: true }),
+                () => researchRequest<PortfolioDividendYields>('/api/portfolio/dividends', { fast: true }),
                 30,
             );
             if (
                 dividends.coverage.positions_with_dividend_data > 0 &&
                 dividends.portfolio_yield != null
             ) {
-                dividendScore = clamp100((dividends.portfolio_yield / 0.06) * 100);
+                const coveredFraction = dividends.coverage.covered_value_fraction ?? 1;
+                dividendScore = clamp100(((dividends.portfolio_yield * coveredFraction) / 0.06) * 100);
             }
         } catch {
             // Endpoint unavailable: the yield is unknown, not zero.
@@ -813,32 +771,15 @@ export async function updateAllPortfolioPrices(userId: string): Promise<{
     return { summary, scores };
 }
 
-export type IBKRImportResult = {
-    status: string;
-    positions_imported: number;
-    cash_imported: number;
-    trades_imported: number;
-    dividends_imported: number;
-    fees_imported: number;
-    cash_transactions_imported: number;
-    rows_skipped?: number;
-    row_errors?: string[];
-    duplicate_trades?: number;
-    identity_warning?: string | null;
-    /** Motivo del rechazo (status 'rejected'), en español. */
-    message?: string;
-    portfolio_snapshot_id: number | null;
-};
-
 /**
  * Dispara la descarga del Flex statement de IBKR (via IBKR_FLEX_TOKEN /
  * IBKR_FLEX_QUERY_ID) y la importación en el research backend.
  */
-export async function importFromIBKR(userId: string): Promise<IBKRImportResult> {
+export async function importFromIBKR(userId: string): Promise<IBKRDownloadImportResult | ImportRejection> {
     const canonicalUserId = await resolveUserId(userId);
-    let result: IBKRImportResult;
+    let result: IBKRDownloadImportResult;
     try {
-        result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr', {
+        result = await researchRequest<IBKRDownloadImportResult>('/api/portfolio/import/ibkr', {
             method: 'POST',
         });
     } catch (error) {
@@ -853,11 +794,11 @@ export async function importFromIBKR(userId: string): Promise<IBKRImportResult> 
 /**
  * Importa un Flex XML crudo (por si el usuario lo descarga a mano).
  */
-export async function importIBKRXml(userId: string, xml: string): Promise<IBKRImportResult> {
+export async function importIBKRXml(userId: string, xml: string): Promise<IBKRXmlImportResult | ImportRejection> {
     const canonicalUserId = await resolveUserId(userId);
-    let result: IBKRImportResult;
+    let result: IBKRXmlImportResult;
     try {
-        result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr/xml', {
+        result = await researchRequest<IBKRXmlImportResult>('/api/portfolio/import/ibkr/xml', {
             method: 'POST',
             body: jsonBody({ xml }),
         });
@@ -873,11 +814,11 @@ export async function importIBKRXml(userId: string, xml: string): Promise<IBKRIm
 /**
  * Importa un CSV de actividad de IBKR (symbol, quantity, price, date + action/fees/currency opcionales).
  */
-export async function importIBKRCsv(userId: string, csv: string): Promise<IBKRImportResult> {
+export async function importIBKRCsv(userId: string, csv: string): Promise<IBKRCsvImportResult | ImportRejection> {
     const canonicalUserId = await resolveUserId(userId);
-    let result: IBKRImportResult;
+    let result: IBKRCsvImportResult;
     try {
-        result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr/csv', {
+        result = await researchRequest<IBKRCsvImportResult>('/api/portfolio/import/ibkr/csv', {
             method: 'POST',
             body: jsonBody({ csv }),
         });
@@ -890,33 +831,20 @@ export async function importIBKRCsv(userId: string, csv: string): Promise<IBKRIm
     return result;
 }
 
-export type PortfolioTearsheetMetrics = {
-    status: string;
-    n_observations: number;
-    cumulative_return: number | null;
-    sharpe: number | null;
-    sortino: number | null;
-    max_drawdown: number | null;
-    win_rate: number | null;
-    best_day: number | null;
-    worst_day: number | null;
-    periods_per_year: number;
-};
+// Tipos generados desde el OpenAPI del backend (response_model en la ruta);
+// regenerar con `npx openapi-typescript data-engine/openapi.json`.
+// El CSV de IBKR tiene su propio contrato en el backend (no devuelve
+// positions_imported ni portfolio_snapshot_id: esos son del Flex XML).
+export type IBKRCsvImportResult = components['schemas']['PortfolioIbkrCsvImportOut'];
+// /import/ibkr devuelve el importado Flex o la variante not_configured
+// (discriminado por status; response_model + exclude_unset en la ruta).
+export type IBKRDownloadImportResult = components['schemas']['PortfolioIbkrImportOut'];
 
-export type PortfolioTearsheet = {
-    status: string;
-    metrics: PortfolioTearsheetMetrics | null;
-    exposure: {
-        snapshot_date: string;
-        base_currency: string;
-        total_value_base: number;
-        equity_weight: number | null;
-        cash_weight: number | null;
-        n_positions: number;
-        top_1_weight: number | null;
-        top_5_weight: number | null;
-    } | null;
-};
+export type IBKRXmlImportResult = components['schemas']['PortfolioIbkrXmlImportOut'];
+
+export type PortfolioTearsheetMetrics = components['schemas']['TearsheetMetricsOut'];
+
+export type PortfolioTearsheet = components['schemas']['PortfolioTearsheetOut'];
 
 /**
  * Tearsheet del portfolio (Sharpe, drawdown, win rate) desde los snapshots persistidos.
@@ -938,75 +866,19 @@ export async function getPortfolioTearsheet(userId: string): Promise<PortfolioTe
 
 // Tipos + fetcher para lib/actions/portfolio.actions.ts
 
-export type PortfolioForecastScenario = {
-  contribution_cagr: number;
-  contribution_total_return: number;
-  coverage: number;
-  horizon_scope: 'uniform' | 'mixed';
-};
+// Tipos generados desde el OpenAPI del backend (response_model en la ruta);
+// regenerar con `npx openapi-typescript data-engine/openapi.json`. El tipo
+// manuscrito no contemplaba reason_code "valuation_hold" ni intrinsic con
+// escenarios null.
+export type PortfolioForecastScenario = components['schemas']['ForecastScenarioOut'];
 
-export type PortfolioForecastCoveredScenario = {
-  cagr: number;
-  total_return: number;
-  coverage: number;
-  horizon_scope: 'uniform' | 'mixed';
-};
+export type PortfolioForecastCoveredScenario = components['schemas']['ForecastCoveredScenarioOut'];
 
-export type PortfolioForecastPosition = {
-  ticker: string;
-  name: string;
-  weight: number;
-  currency: string;
-  price: number;
-  price_as_of: string;
-  price_source: string;
-  intrinsic: { bear: number | null; base: number | null; bull: number | null };
-  probabilities: Record<string, number> | null;
-  horizon_years: number;
-  thesis_version: number;
-  thesis_status: string;
-  model_version: number | null;
-  cagr: Partial<Record<'bear' | 'base' | 'bull', number>>;
-  total_return: Partial<Record<'bear' | 'base' | 'bull', number>>;
-  expected_cagr: number | null;
-  partial_expected_cagr: number | null;
-  contribution_expected: number | null;
-  weight_scope: 'total_portfolio' | 'valued_subset';
-  price_veracity: 'OFICIAL' | 'MANUAL/NO OFICIAL' | 'NO VERIFICADA';
-  probability_mass: number | null;
-  comparison_basis?: string;
-};
+export type PortfolioForecastPosition = components['schemas']['ForecastPositionOut'];
 
-export type PortfolioForecastExcluded = {
-  ticker: string;
-  name: string;
-  weight: number | null;
-  currency: string;
-  reason: string;
-  reason_code?: 'no_base_value' | 'no_published_thesis' | 'valuation_basis_unverified' | 'no_computable_intrinsic';
-};
+export type PortfolioForecastExcluded = components['schemas']['ForecastExcludedOut'];
 
-export type PortfolioForecast = {
-  as_of: string | null;
-  base_currency: string | null;
-  portfolio: {
-    total_value_base: number;
-    position_count: number;
-    covered_count: number;
-    excluded_count: number;
-    covered_weight: number | null;
-    scenarios: Partial<Record<'bear' | 'base' | 'bull', PortfolioForecastScenario>> | null;
-    expected_cagr: number | null;
-    expected_coverage: number | null;
-    covered_only: {
-      scenarios: Partial<Record<'bear' | 'base' | 'bull', PortfolioForecastCoveredScenario>>;
-      expected_cagr: number | null;
-    };
-  } | null;
-  positions: PortfolioForecastPosition[];
-  excluded: PortfolioForecastExcluded[];
-  assumptions: string[];
-};
+export type PortfolioForecast = components['schemas']['PortfolioForecastOut'];
 
 export async function getPortfolioForecast(): Promise<PortfolioForecast> {
   // Sin cache: la prevision depende de la ultima sincronizacion IBKR y de
@@ -1017,94 +889,21 @@ export async function getPortfolioForecast(): Promise<PortfolioForecast> {
 // Proyección mecánica de dividendos (idea 5 del listado 0-31: mes a mes, con
 // retención de origen e IRPF). Toda cifra viene del endpoint determinista
 // /api/portfolio/dividends/projection; los null del backend se propagan como
-// null (N/D en pantalla), nunca como 0.
+// null (N/D en pantalla), nunca como 0. Tipos generados desde el OpenAPI del
+// backend (response_model en las dos rutas); regenerar con
+// `npx openapi-typescript data-engine/openapi.json`.
 
-export type DividendProjectionMonth = {
-  month: string;
-  gross_base: number;
-  source_withheld_base: number;
-  /** Bruto con FX conocido de posiciones sin retención verificada (nunca neto). */
-  gross_unverified_base?: number;
-  gross_total_base?: number;
-  covered_tickers: string[];
-  excluded_tickers: string[];
-  note: string | null;
-};
+export type DividendProjectionMonth = components['schemas']['DividendProjectionMonthOut'];
 
-export type DividendProjectionFiscalYear = {
-  gross_base: number | null;
-  irpf_scenario: number | null;
-  source_withheld_foreign: number | null;
-  retencion_a_cuenta_es: number | null;
-  double_tax_deduction: number | null;
-  cuota_pendiente_estimada: number | null;
-  net_scenario: number | null;
-  effective_avg_rate?: number;
-  per_position?: Record<
-    string,
-    {
-      gross_base: number;
-      source_withheld_foreign_base: number;
-      retencion_a_cuenta_base: number;
-      double_tax_deduction_base: number;
-    }
-  >;
-  covered_tickers: string[];
-  excluded_tickers: string[];
-  note: string;
-};
+export type DividendProjectionFiscalYear = components['schemas']['DividendProjectionFiscalYearOut'];
 
-export type DividendProjectionPosition = {
-  ticker: string;
-  currency: string;
-  quantity: number;
-  frequency_last_year: number;
-  gross_native: number;
-  gross_base: number | null;
-  domicile_country: string | null;
-  source_withholding_rate: number | null;
-  source_withheld_base: number | null;
-  withholding_basis?: 'emisor_verificado' | 'domicilio_bd';
-  withholding_kind?: 'techo_convenio' | 'escenario_convenio' | 'sin_impuesto_origen_escenario' | null;
-  unverified_reason?: string | null;
-  scenario_conditions?: string | null;
-  months: Record<string, number>;
-};
+export type DividendProjectionPosition = components['schemas']['DividendProjectionPositionOut'];
 
-export type DividendProjectionDeclaredFuture = {
-  ticker: string;
-  ex_date: string;
-  pay_date: string | null;
-  amount_per_share: number;
-  currency: string;
-  label: string;
-  source: string;
-  projection_as_of: string;
-  note: string;
-};
+export type DividendProjectionDeclaredFuture = components['schemas']['DividendProjectionDeclaredFutureOut'];
 
-export type PortfolioDividendProjection = {
-  as_of: string;
-  base_currency: string;
-  horizon_months: number;
-  label: string;
-  method: string;
-  fiscal_conditions: string[];
-  sources: Record<string, string>;
-  months: DividendProjectionMonth[];
-  fiscal_by_year: Record<string, DividendProjectionFiscalYear>;
-  positions: DividendProjectionPosition[];
-  gross_summary?: { label: string; gross_total_base: number; gross_unverified_base: number; net_irpf: string; excluded_no_fx?: string[]; excluded_no_dividends?: string[]; excluded_uncertain_dividends?: string[]; complete?: boolean };
-  declared_future: DividendProjectionDeclaredFuture[];
-  coverage: {
-    with_data: number;
-    sin_datos: string[];
-    uncertain_dividends?: string[];
-    fx_missing: string[];
-    unknown_source_withholding: string[];
-    unverified_reasons?: Record<string, string>;
-  };
-};
+export type PortfolioDividendYields = components['schemas']['PortfolioDividendYieldsOut'];
+
+export type PortfolioDividendProjection = components['schemas']['PortfolioDividendProjectionOut'];
 
 export async function getPortfolioDividendProjection(): Promise<PortfolioDividendProjection> {
   // Sin cache: la proyección depende de la última sincronización IBKR y de
@@ -1112,22 +911,7 @@ export async function getPortfolioDividendProjection(): Promise<PortfolioDividen
   return researchRequest<PortfolioDividendProjection>('/api/portfolio/dividends/projection', { fast: true });
 }
 
-export type PortfolioDataQuality = {
-    status: string;
-    positions: number;
-    missing_cost_positions: number;
-    position_dates: string[];
-    cash_dates: string[];
-    position_sources: string[];
-    cash_sources: string[];
-    cash_native: Record<string, number>;
-    snapshots: number;
-    complete_snapshots: number;
-    return_observations: number;
-    latest_snapshot_date: string | null;
-    latest_pricing_coverage: number | null;
-    reasons: string[];
-};
+export type PortfolioDataQuality = components['schemas']['PortfolioDataQualityOut'];
 
 export async function getPortfolioDataQuality(userId: string): Promise<PortfolioDataQuality | null> {
     const canonicalUserId = await resolveUserId(userId);

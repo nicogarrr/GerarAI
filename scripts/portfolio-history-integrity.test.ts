@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 // @ts-expect-error TS5097: Node strip-types requires explicit extension.
 import { qualifiedHistoricalMetrics, verifiedPortfolioHistory, type PortfolioSnapshotPoint } from '../lib/portfolio-history.ts';
 const row=(day:string,overrides:Partial<PortfolioSnapshotPoint>={}):PortfolioSnapshotPoint=>({
- snapshot_date:`2026-10-${day}`,base_currency:'EUR',total_value_base:10000 * Math.pow(1.01, Number(day)-1),net_external_flow_base:0,pricing_coverage:1,daily_return:0.01,cumulative_twr:Math.pow(1.01,Number(day))-1,...overrides,
+ id:0,portfolio_id:1,snapshot_date:`2026-10-${day}`,base_currency:'EUR',positions_value_base:0,cash_value_base:0,total_value_base:10000 * Math.pow(1.01, Number(day)-1),net_external_flow_base:0,pricing_coverage:1,daily_return:0.01,cumulative_twr:Math.pow(1.01,Number(day))-1,source:'market_refresh',metadata:{},...overrides,
 });
 test('real complete return-qualified series is wired, sorted and never backfilled',()=>{
  const result=verifiedPortfolioHistory([row('02'),row('01')],'EUR');

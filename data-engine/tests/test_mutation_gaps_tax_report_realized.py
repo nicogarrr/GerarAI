@@ -183,3 +183,17 @@ def test_dividends_on_the_first_and_last_day_of_the_year_count(db):
     [bucket] = _report(db)["dividends"]
     assert [p["date"] for p in bucket["payments"]] == ["2026-01-01", "2026-12-31"]
     assert bucket["dividends_native"] == pytest.approx(30.0)
+
+
+def test_over_sell_warning_matches_measured_behavior(db):
+    # MEDIDO (sonda 31-10-2026): ante un over_sell el informe NO valua el
+    # exceso a coste cero: deja cost y gain de TODA la venta en None. El
+    # aviso no puede prometer una valoracion que no ocurre.
+    company = _company(db)
+    _tx(db, company, "2026-01-05", "buy", "5", "10")
+    _tx(db, company, "2026-04-01", "sell", "10", "12")
+    bucket = _realized(_report(db))
+    [sale] = bucket["sales"]
+    assert sale["cost_base"] is None and sale["gain_base"] is None
+    assert "zero cost" not in sale["warning"]
+    assert "unknown" in sale["warning"] or "not computed" in sale["warning"]

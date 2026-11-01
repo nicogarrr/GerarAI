@@ -238,3 +238,39 @@ describe('fetchSiteIcon (anti-SSRF DNS y redirecciones)', () => {
         expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(3 * 4);
     });
 });
+
+describe('presupuesto de tiempo: la señal corta también el DNS', () => {
+    it('un lookup DNS que nunca resuelve se corta al abortar (no cuelga fetchSiteIcon)', async () => {
+        const hangingLookup: LookupLike = () => new Promise(() => {});
+        const fetchImpl = vi.fn(async () => res(png(180)));
+        const t0 = Date.now();
+        const icon = await fetchSiteIcon('acme.com', fetchImpl as never, hangingLookup, AbortSignal.timeout(150));
+        const elapsed = Date.now() - t0;
+        expect(icon).toBeNull();
+        expect(elapsed).toBeLessThan(2000);
+        // El DNS colgó antes de cualquier fetch HTTP.
+        expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    it('tras el abort el bucle de candidatos no sigue resolviendo DNS', async () => {
+        let lookups = 0;
+        const controller = new AbortController();
+        const countingLookup: LookupLike = async () => {
+            lookups += 1;
+            if (lookups === 1) controller.abort();
+            return [{ address: '93.184.216.34', family: 4 }];
+        };
+        // El primer lookup aborta; el bucle debe salir sin pedir más DNS ni fetch.
+        const fetchImpl = vi.fn(async () => res(png(180)));
+        const icon = await fetchSiteIcon('acme.com', fetchImpl as never, countingLookup, controller.signal);
+        expect(icon).toBeNull();
+        expect(lookups).toBe(1);
+        expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    it('sin señal todo sigue funcionando igual (compat)', async () => {
+        const fetchImpl = vi.fn(async () => res(png(180), { url: 'https://acme.com/favicon.ico', type: 'image/png' }));
+        const icon = await fetchSiteIcon('acme.com', fetchImpl as never, publicLookup);
+        expect(icon?.contentType).toBe('image/png');
+    });
+});

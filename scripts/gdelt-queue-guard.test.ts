@@ -33,11 +33,24 @@ test('la cola gdelt la consume EXACTAMENTE UN proceso dedicado (pacing por IP in
     assert.ok(workerCmd && !workerCmd.includes('gdelt'), 'el worker general NO consume gdelt');
 });
 
-test('el worker default usa 3 hilos (6 agotaba el limite de 3G por OOM de cgroup)', () => {
+test('el worker default acota la evidencia pesada: hilos por env con defecto 4 medido', () => {
+    // Mitigacion OOM original: 1 hilo. Medida 2026-10-31 (piloto): CPU 0,17 %
+    // con 8.709 pendientes y edad p50 39 h -> el cuello es E/S, no CPU. El
+    // solape de escaneos pesados lo corta la coalescencia (#3677): los hilos
+    // extra solo paralelizan esperas HTTP. Defecto 4 con escalado gradual
+    // (WORKER_THREADS) y pool propio (8+2) para no serializar conexiones.
     assert.match(
         compose,
-        /worker:\n[\s\S]{0,200}"--processes", "1", "--threads", "3", "-Q", "default", "prices"/,
+        /worker:\n[\s\S]{0,200}"--processes", "1", "--threads", "\$\{WORKER_THREADS:-4\}", "-Q", "default"/,
     );
+});
+
+test('el worker default conserva margen de memoria acotado (4G con 4 hilos)', () => {
+    // 3G era el suelo medido con 1 hilo (OOM previo); con 4 hilos
+    // concurrentes se deja 1G de margen. El techo del stack (16 GiB de 24)
+    // lo vigila test_prod_compose.py.
+    const block = compose.slice(compose.indexOf('  worker:'), compose.indexOf('  worker-gdelt:'));
+    assert.match(block, /memory: 4G/);
 });
 
 test('los jobs periodicos de ingesta llevan coalescencia contra re-encolados redundantes', () => {

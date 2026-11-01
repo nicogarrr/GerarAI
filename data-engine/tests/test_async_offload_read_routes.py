@@ -7,13 +7,12 @@ event loop en su hilo va contra el hallazgo; sin loop, va por el pool.
 import asyncio
 from types import SimpleNamespace
 
-from fastapi.testclient import TestClient
-
 import main
 from app.core.database import init_db
 from app.schemas import ChatResponse
+from tests.auth_helpers import csrf_client
 
-client = TestClient(main.app)
+client = csrf_client(main.app)
 
 
 def _off_loop() -> bool:
@@ -67,7 +66,17 @@ def test_sync_portfolio_dividends_off_the_event_loop(monkeypatch):
         calls.append(_off_loop())
 
         async def _result():
-            return {"status": "ok", "ingested": 0}
+            # Misma forma que devuelve sync_portfolio de verdad (la respuesta
+            # pasa por response_model=PortfolioDividendSyncOut desde #3660).
+            return {
+                "companies": 0, "synced": 0, "unavailable": 0,
+                "currency_unknown": 0, "results": [],
+                "provenance": {
+                    "source": "yahoo", "source_kind": "unofficial",
+                    "source_url": None, "coverage": "ok",
+                    "fetched_at": "2026-10-31T00:00:00+00:00", "note": None,
+                },
+            }
 
         return _result()
 
@@ -177,35 +186,61 @@ def test_import_ibkr_owner_check_off_the_event_loop(monkeypatch):
 
 
 def test_chat_hard_deadline_cuts_a_worker_that_blocks_the_thread(monkeypatch, caplog):
-    """Un paso que bloquea el hilo no puede alargar la respuesta mas alla del muro."""
-    import time
+    """Un paso que bloquea el hilo no puede alargar la respuesta mas alla del muro.
+
+    Sin reloj de pared en la asercion: el hilo queda bloqueado en un Event que
+    solo se suelta DESPUES de recibir la respuesta. Si la respuesta llega con el
+    hilo aun bloqueado, el muro corto. (Medir con time.monotonic() alrededor de
+    client.post contaba tambien la primera construccion de la tabla de rutas de
+    FastAPI, ~1,5 s con la maquina cargada, y fallaba sin que el muro fallara.)
+    """
+    import threading
+
+    import app.api.routes.chat as chat_route
 
     init_db()
-    monkeypatch.setattr("app.api.routes.chat.CHAT_HARD_GRACE_SECONDS", 0.3)
+    monkeypatch.setattr(chat_route, "CHAT_HARD_GRACE_SECONDS", 0.3)
     monkeypatch.setattr(
-        "app.api.routes.chat.get_settings",
-        lambda: SimpleNamespace(chat_total_timeout_seconds=0.4),
+        chat_route, "get_settings", lambda: SimpleNamespace(chat_total_timeout_seconds=0.4)
     )
+    entered = threading.Event()
+    release = threading.Event()
+    finished = threading.Event()
+    latencies: list[int] = []
+    real_record = chat_route.record_chat_event
+
+    def spy_record(**kwargs):
+        latencies.append(kwargs["latency_ms"])
+        return real_record(**kwargs)
+
+    monkeypatch.setattr(chat_route, "record_chat_event", spy_record)
 
     def blocking_answer(self, db, question, scope, ticker, enable_debate=False, page=None, history=None):  # noqa: ARG001
         async def _result():
-            time.sleep(3)  # bloquea el hilo y su loop: ningun wait_for interno puede cortarlo
+            entered.set()
+            release.wait(30)  # bloquea el hilo y su loop: ningun wait_for interno puede cortarlo
+            finished.set()
             return ChatResponse(answer="tarde", sources=[])
 
         return _result()
 
     monkeypatch.setattr("app.services.chat_service.ChatService.answer", blocking_answer)
-    started = time.monotonic()
-    with caplog.at_level("WARNING"):
-        response = client.post("/api/chat", json={"question": "que es el wacc"})
-    elapsed = time.monotonic() - started
+    try:
+        with caplog.at_level("WARNING"):
+            response = client.post("/api/chat", json={"question": "que es el wacc"})
+        worker_still_blocked = entered.is_set() and not finished.is_set()
+    finally:
+        release.set()  # suelta el hilo abandonado para no dejarlo vivo al siguiente test
     assert response.status_code == 200, response.text
+    assert worker_still_blocked, "la respuesta espero al hilo bloqueado: el muro no corto"
     body = response.json()
-    assert elapsed < 1.5, elapsed
     assert body["llm_trace"]["fallback_reason"] == "chat_hard_deadline"
     assert body["model"] == "deterministic"
+    # Latencia medida por el propio endpoint (sin la construccion de rutas): el muro
+    # es 0,7 s; margen amplio para maquinas cargadas, muy por debajo de los 30 s del hilo.
+    assert latencies and latencies[-1] < 10_000, latencies
     assert "worker thread stack" in caplog.text
-    assert "time.sleep" in caplog.text or "_result" in caplog.text
+    assert "_result" in caplog.text
 
 
 def test_chat_stuck_workers_are_capped_and_released(monkeypatch):

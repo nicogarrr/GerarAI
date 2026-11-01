@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { RecordList } from '@/components/data/RecordViews';
 import TmePreviewForm from '@/components/taxes/TmePreviewForm';
-import { formatUserDate, formatCountEs } from '@/lib/format';
+import { useT, useFormat } from '@/lib/i18n/client';
+import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
+import type { Formatters } from '@/lib/format';
 import { Landmark, FileDown, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { formatMoney, NA } from '@/lib/format';
 import { humanizeTaxText } from '@/lib/taxes/humanize-text';
 import { filingSectionKey } from '@/lib/taxes/section-keys';
 
@@ -23,22 +24,9 @@ import { filingSectionKey } from '@/lib/taxes/section-keys';
 
 type DataRecord = Record<string, unknown>;
 
-const CATEGORY_LABELS: Record<string, string> = {
-    valores: 'Valores en el extranjero',
-    cuentas: 'Cuentas en el extranjero',
-    inmuebles: 'Inmuebles en el extranjero',
-};
-
-const STATUS_CHIP: Record<string, { label: string; className: string }> = {
-    supera: { label: 'Supera el umbral de 50.000 €', className: 'border-amber-700 text-amber-300' },
-    por_debajo: { label: 'Por debajo del umbral', className: 'border-teal-800 text-teal-300' },
-    desconocido: { label: 'No concluyente (faltan datos)', className: 'border-gray-600 text-gray-300' },
-    no_evaluable: { label: 'No evaluable con datos de bróker', className: 'border-gray-700 text-gray-500' },
-};
-
-function money(value: unknown): string {
-    if (value === null || value === undefined) return NA;
-    return formatMoney(value as number | string, 'EUR');
+function money(value: unknown, f: Formatters, t: TFunction): string {
+    if (value === null || value === undefined) return t('common.na');
+    return f.formatMoney(value as number | string, 'EUR');
 }
 
 /**
@@ -93,19 +81,34 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
     );
 }
 
+const CHIP_CLASS: Record<string, string> = {
+    supera: 'border-amber-700 text-amber-300',
+    por_debajo: 'border-teal-800 text-teal-300',
+    desconocido: 'border-gray-600 text-gray-300',
+    no_evaluable: 'border-gray-700 text-gray-500',
+};
+
+const CHIP_LABEL_KEYS: Record<string, Parameters<TFunction>[0]> = {
+    supera: 'taxes.modelo720.chipSupera',
+    por_debajo: 'taxes.modelo720.chipPorDebajo',
+    desconocido: 'taxes.modelo720.chipDesconocido',
+    no_evaluable: 'taxes.modelo720.chipNoEvaluable',
+};
+
 function Chip({ status }: { status: string }) {
-    const chip = STATUS_CHIP[status] ?? STATUS_CHIP.desconocido;
+    const t = useT();
+    const known = CHIP_LABEL_KEYS[status] ? status : 'desconocido';
     return (
-        <span className={`inline-block rounded-full border px-2 py-0.5 text-xs ${chip.className}`}>
-            {chip.label}
+        <span className={`inline-block rounded-full border px-2 py-0.5 text-xs ${CHIP_CLASS[known]}`}>
+            {t(CHIP_LABEL_KEYS[known])}
         </span>
     );
 }
 
-function percent(value: unknown): string {
+function percent(value: unknown, f: Formatters, t: TFunction): string {
     return typeof value === 'number' && Number.isFinite(value)
-        ? `${(value * 100).toLocaleString('es-ES', { maximumFractionDigits: 2 })} %`
-        : NA;
+        ? f.formatPercent(value, { digits: 2 })
+        : t('common.na');
 }
 
 /**
@@ -114,26 +117,32 @@ function percent(value: unknown): string {
  * ahorro aplicado al dividendo ÍNTEGRO. Sin TME no se inventa el límite.
  */
 function DoubleTaxationByCountry({ countries }: { countries: DataRecord[] }) {
+    const t = useT();
+    const f = useFormat();
     if (countries.length === 0) return null;
     return (
         <div className="mt-3 space-y-1 text-xs leading-5 text-gray-400">
-            <p>
-                Límite de la deducción (art. 80 LIRPF, como lo aplica Hacienda): por país, el menor entre la retención
-                soportada con el tope del convenio y el TME del ahorro aplicado al dividendo íntegro (bruto).
-            </p>
-            <ul aria-label="Deducción 0588 por país" className="space-y-1">
+            <p>{t('taxes.filing.doubleTaxation.limitNote')}</p>
+            <ul aria-label={t('taxes.filing.doubleTaxation.listAria')} className="space-y-1">
                 {countries.map((c) => {
                     const tmeLimit = c.tme_limit_base == null
-                        ? 'falta el TME'
-                        : money(c.tme_limit_base);
+                        ? t('taxes.filing.doubleTaxation.tmeMissing')
+                        : money(c.tme_limit_base, f, t);
                     const applied = c.limit_applied === 'bruto_x_tme'
-                        ? ' (manda bruto × TME)'
-                        : c.limit_applied === 'tope_convenio' ? ' (manda el tope del convenio)' : '';
+                        ? t('taxes.filing.doubleTaxation.appliedGross')
+                        : c.limit_applied === 'tope_convenio' ? t('taxes.filing.doubleTaxation.appliedTreaty') : '';
                     return (
                         <li key={String(c.country)}>
-                            {String(c.country)}: bruto {money(c.gross_base)} · retenido {money(c.withheld_base)} · tope
-                            convenio ({percent(c.treaty_rate)}) {money(c.treaty_cap_base)} · bruto × TME {tmeLimit} ·
-                            deducción {c.deduction_base == null ? NA : money(c.deduction_base)}{applied}
+                            {t('taxes.filing.doubleTaxation.row', {
+                                country: String(c.country),
+                                gross: money(c.gross_base, f, t),
+                                withheld: money(c.withheld_base, f, t),
+                                rate: percent(c.treaty_rate, f, t),
+                                cap: money(c.treaty_cap_base, f, t),
+                                tme: tmeLimit,
+                                deduction: c.deduction_base == null ? t('common.na') : money(c.deduction_base, f, t),
+                                applied,
+                            })}
                         </li>
                     );
                 })}
@@ -162,17 +171,19 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
     onPreview: (report: DataRecord) => void;
     onReset: () => void;
 }) {
+    const t = useT();
+    const f = useFormat();
     if (!filing) return (
-        <Section title="Declaración (Modelo 100)" description="Ayuda de cálculo del IRPF."
+        <Section title={t('taxes.filing.title')} description={t('taxes.filing.descHelp')}
             icon={<Landmark className="h-5 w-5 text-teal-400" />}>
-            <p className="text-sm text-gray-400">N/D: genera el informe fiscal para consultar las casillas.</p>
+            <p className="text-sm text-gray-400">{t('taxes.filing.ndGenerate')}</p>
         </Section>
     );
     if (filing.available === false) {
         return (
             <Section
-                title="Declaración (Modelo 100)"
-                description="Casillas orientativas del IRPF calculadas desde tu cartera."
+                title={t('taxes.filing.title')}
+                description={t('taxes.filing.descBoxes')}
                 icon={<Landmark className="h-5 w-5 text-teal-400" />}
             >
                 {/* El backend explica el bloqueo (hoy: la cartera no usa EUR
@@ -181,7 +192,7 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
                 <p className="text-sm text-gray-400">
                     {typeof filing.reason === 'string' && filing.reason
                         ? humanizeTaxText(filing.reason)
-                        : 'GerarAI no ha calculado las casillas del Modelo 100 para esta cartera y el motor no ha devuelto el motivo del bloqueo. Las casillas son importes en euros: hace falta que la cartera use EUR como divisa base y que el ejercicio tenga su mapeo verificado contra la orden ministerial vigente.'}
+                        : t('taxes.filing.fallbackReason')}
                 </p>
             </Section>
         );
@@ -190,22 +201,22 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
     if (casillas.available === false) {
         return (
             <Section
-                title="Declaración (Modelo 100)"
-                description="Casillas orientativas del IRPF calculadas desde tu cartera."
+                title={t('taxes.filing.title')}
+                description={t('taxes.filing.descBoxes')}
                 icon={<Landmark className="h-5 w-5 text-teal-400" />}
             >
                 <p className="text-sm text-gray-400">
                     {typeof casillas.unavailable_reason === 'string' && casillas.unavailable_reason
                         ? humanizeTaxText(casillas.unavailable_reason)
-                        : 'Las casillas solo se publican para ejercicios cuyo mapeo está verificado contra la orden ministerial de ese año. Para el resto no se muestran números: haría falta verificar ese mapeo antes de darlos por buenos.'}
+                        : t('taxes.filing.fallbackBoxes')}
                 </p>
             </Section>
         );
     }
     if (filing.available !== true || casillas.available !== true) return (
-        <Section title="Declaración (Modelo 100)" description="Ayuda de cálculo del IRPF."
+        <Section title={t('taxes.filing.title')} description={t('taxes.filing.descHelp')}
             icon={<Landmark className="h-5 w-5 text-teal-400" />}>
-            <p className="text-sm text-gray-400">N/D: el motor no ha confirmado el mapeo de este ejercicio.</p>
+            <p className="text-sm text-gray-400">{t('taxes.filing.ndUnconfirmed')}</p>
         </Section>
     );
     const acciones = (casillas.acciones_negociadas ?? {}) as DataRecord;
@@ -223,62 +234,62 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
     const warnings: string[] = [
         ...manualReview.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: ${humanizeTaxText(String(item.reason ?? ''))}`),
         ...(specialTickers.length > 0
-            ? [`Pagos especiales fuera de los dividendos ordinarios (revisión manual): ${specialTickers.join(', ')}`]
+            ? [t('taxes.filing.specialPayments', { tickers: specialTickers.join(', ') })]
             : []),
     ];
     return (
         <Section
-            title="Declaración (Modelo 100)"
-            description="Casillas orientativas del IRPF calculadas desde tu cartera. Ayuda de cómputo: no apto para declarar sin la validación de un asesor fiscal."
+            title={t('taxes.filing.title')}
+            description={t('taxes.filing.descBoxesFull')}
             icon={<Landmark className="h-5 w-5 text-teal-400" />}
         >
             <div className="grid gap-1">
-                <Row label="0328 · Transmisión global" value={money(acciones['0328_transmision_global'])} />
-                <Row label="0331 · Adquisición global" value={money(acciones['0331_adquisicion_global'])} />
-                <Row label="0339 · Suma de ganancias" value={money(acciones['0339_suma_ganancias'])} />
-                <Row label="0340 · Suma de pérdidas" value={money(acciones['0340_suma_perdidas'])} />
-                <Row label="0029 · Dividendos íntegros" value={money(dividendos['0029_ingresos_integros'])} />
+                <Row label={t('taxes.filing.row0328')} value={money(acciones['0328_transmision_global'], f, t)} />
+                <Row label={t('taxes.filing.row0331')} value={money(acciones['0331_adquisicion_global'], f, t)} />
+                <Row label={t('taxes.filing.row0339')} value={money(acciones['0339_suma_ganancias'], f, t)} />
+                <Row label={t('taxes.filing.row0340')} value={money(acciones['0340_suma_perdidas'], f, t)} />
+                <Row label={t('taxes.filing.row0029')} value={money(dividendos['0029_ingresos_integros'], f, t)} />
                 <Row
-                    label="0027 · Intereses cobrados (cuenta del bróker)"
+                    label={t('taxes.filing.row0027')}
                     value={
                         intereses.received?.amount_base == null
-                            ? 'Sin datos: hay intereses sin tipo de cambio de su fecha (revisión manual)'
-                            : money(intereses.received.amount_base)
+                            ? t('taxes.filing.row0027NoData')
+                            : money(intereses.received.amount_base, f, t)
                     }
                 />
                 {Number(intereses.margin_interest_paid?.amount_base ?? 0) > 0 && (
                     <Row
-                        label="Intereses de margen pagados (no deducibles)"
-                        value={`${money(intereses.margin_interest_paid?.amount_base)} · no se restan en la declaración`}
+                        label={t('taxes.filing.marginInterest')}
+                        value={`${money(intereses.margin_interest_paid?.amount_base, f, t)} · ${t('taxes.filing.marginInterestNote')}`}
                     />
                 )}
-                <Row label="0597 · Retenciones españolas" value={
+                <Row label={t('taxes.filing.row0597')} value={
                     (dt.spanish_withholding_base as DataRecord | undefined)?.amount == null
-                        ? 'Sin datos: retenciones españolas incompletas'
-                        : money((dt.spanish_withholding_base as DataRecord | undefined)?.amount)
+                        ? t('taxes.filing.row0597NoData')
+                        : money((dt.spanish_withholding_base as DataRecord | undefined)?.amount, f, t)
                 } />
                 <Row
-                    label="0588 · Deducción por doble imposición"
+                    label={t('taxes.filing.row0588')}
                     value={
                         dt.status === 'pendiente_tme'
-                            ? 'Falta el tipo medio efectivo: introduce el TME de la base liquidable del ahorro de tu borrador para calcular la deducción'
-                            : money(dt.total_deduction_base)
+                            ? t('taxes.filing.row0588Pending')
+                            : money(dt.total_deduction_base, f, t)
                     }
                 />
                 {lc && Object.keys(lc).length > 0 && (
                     <Row
-                        label="Compensación de pérdidas de años anteriores"
+                        label={t('taxes.filing.lossComp')}
                         value={
                             lc.estimativo === true
-                                ? `Estimativa (no trasladable a casillas): restan ${money(lc.remaining_to_carry_base)} por arrastrar`
-                                : `Aplicada: ${money(lc.applied_to_gains_total_base)} a ganancias y ${money(lc.applied_to_income_total_base)} a rendimientos`
+                                ? t('taxes.filing.lossCompEstimative', { amount: money(lc.remaining_to_carry_base, f, t) })
+                                : t('taxes.filing.lossCompApplied', { gains: money(lc.applied_to_gains_total_base, f, t), income: money(lc.applied_to_income_total_base, f, t) })
                         }
                     />
                 )}
             </div>
             <DoubleTaxationByCountry countries={Array.isArray(dt.countries) ? dt.countries as DataRecord[] : []} />
-            {dt.partial === true && <p className="mt-2 text-xs text-amber-300">N/D en la deducción total: hay pagos que requieren revisión manual.</p>}
-            {typeof filing.tme_percent_manual === 'number' && <Row label="TME manual aplicado (%)" value={String(filing.tme_percent_manual)} />}
+            {dt.partial === true && <p className="mt-2 text-xs text-amber-300">{t('taxes.filing.partialNote')}</p>}
+            {typeof filing.tme_percent_manual === 'number' && <Row label={t('taxes.filing.tmeManual')} value={String(filing.tme_percent_manual)} />}
             <TmePreviewForm key={filingSectionKey('tme-preview', year)} year={year} onPreview={onPreview} onReset={onReset} />
             <SaleCasillas key={filingSectionKey('sale-casillas', year)} rows={Array.isArray(acciones.rows) ? acciones.rows as DataRecord[] : []} />
             <WarningList items={warnings} />
@@ -287,40 +298,50 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
 }
 
 function SaleCasillas({ rows }: { rows: DataRecord[] }) {
+    const t = useT();
+    const f = useFormat();
     const [page, setPage] = useState(0);
     const pages = Math.max(1, Math.ceil(rows.length / 10));
     const current = Math.min(page, pages - 1);
     return <div className="mt-4 space-y-2">
-        <RecordList key={current} title="Casillas por venta" records={rows.slice(current * 10, (current + 1) * 10)}
+        <RecordList key={current} title={t('taxes.filing.saleCasillasTitle')} records={rows.slice(current * 10, (current + 1) * 10)}
             fetchRecords={async () => rows.slice(current * 10, (current + 1) * 10)}
             columns={['ticker', 'date', 'transmission_base', 'acquisition_base', 'gain_base']}
-            columnLabels={{ ticker: 'Valor', date: 'Fecha', transmission_base: 'Transmisión (€)', acquisition_base: 'Adquisición (€)', gain_base: 'Resultado computable (€)' }}
-            formatColumns={{ date: (value) => typeof value === 'string' ? formatUserDate(value) : NA,
-                transmission_base: money, acquisition_base: money, gain_base: money }}
-            emptyMessage="No hay ventas con casillas para este ejercicio." />
-        {pages > 1 && <nav aria-label="Páginas de casillas por venta" className="flex items-center justify-between gap-2">
-            <Button type="button" size="sm" variant="outline" disabled={current === 0} onClick={() => setPage(current - 1)}>Anterior</Button>
-            <span className="text-xs text-gray-400">{current + 1} / {pages} · {rows.length} ventas</span>
-            <Button type="button" size="sm" variant="outline" disabled={current + 1 >= pages} onClick={() => setPage(current + 1)}>Siguiente</Button>
+            columnLabels={{ ticker: t('taxes.filing.colValor'), date: t('taxes.filing.colFecha'), transmission_base: t('taxes.filing.colTransmission'), acquisition_base: t('taxes.filing.colAcquisition'), gain_base: t('taxes.filing.colGain') }}
+            formatColumns={{ date: (value) => typeof value === 'string' ? f.formatUserDate(value) : t('common.na'),
+                transmission_base: (value) => money(value, f, t), acquisition_base: (value) => money(value, f, t), gain_base: (value) => money(value, f, t) }}
+            emptyMessage={t('taxes.filing.emptySales')} />
+        {pages > 1 && <nav aria-label={t('taxes.filing.navAria')} className="flex items-center justify-between gap-2">
+            <Button type="button" size="sm" variant="outline" disabled={current === 0} onClick={() => setPage(current - 1)}>{t('taxes.filing.prev')}</Button>
+            <span className="text-xs text-gray-400">{current + 1} / {pages} · {t('taxes.filing.sales', { n: rows.length })}</span>
+            <Button type="button" size="sm" variant="outline" disabled={current + 1 >= pages} onClick={() => setPage(current + 1)}>{t('taxes.filing.next')}</Button>
         </nav>}
     </div>;
 }
+
+const CATEGORY_LABEL_KEYS: Record<string, Parameters<TFunction>[0]> = {
+    valores: 'taxes.modelo720.categoryValores',
+    cuentas: 'taxes.modelo720.categoryCuentas',
+    inmuebles: 'taxes.modelo720.categoryInmuebles',
+};
 
 export function Modelo720Section({ thresholds, file720, unavailable }: {
     thresholds: DataRecord | null;
     file720: DataRecord | null;
     unavailable?: boolean;
 }) {
+    const t = useT();
+    const f = useFormat();
     if (!thresholds) {
         if (!unavailable) return null;
         return (
             <Section
-                title="Modelo 720 (bienes en el extranjero)"
-                description="Chequeo orientativo del umbral de 50.000 € por categoría."
+                title={t('taxes.modelo720.title')}
+                description={t('taxes.modelo720.descCheck')}
                 icon={<Landmark className="h-5 w-5 text-teal-400" />}
             >
                 <p className="text-sm text-amber-200/80">
-                    El chequeo 720 no está disponible ahora mismo (error del motor). No significa que no te aplique: inténtalo de nuevo más tarde.
+                    {t('taxes.modelo720.unavailable')}
                 </p>
             </Section>
         );
@@ -338,17 +359,17 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
     const fiscalYear = thresholds.fiscal_year;
     const file720Name = `modelo720-${typeof fiscalYear === 'number' ? String(fiscalYear) : 'ejercicio'}.720`;
     const warnings: string[] = [
-        ...(missingIsin.length > 0 ? [`Sin ISIN (necesario para declarar el valor): ${missingIsin.join(', ')}`] : []),
+        ...(missingIsin.length > 0 ? [t('taxes.modelo720.missingIsin', { tickers: missingIsin.join(', ') })] : []),
         ...foreignUnverified.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: ${humanizeTaxText(String(item.reason ?? ''))}`),
-        ...shortPositions.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: posición corta, no cuenta como bien en el 720`),
+        ...shortPositions.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: ${t('taxes.modelo720.shortPosition')}`),
         ...unvalued.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: ${humanizeTaxText(String(item.reason ?? ''))}`),
         // A17: una cuenta a 0 a 31/12 que no entra en el total se nombra con su motivo.
         ...zeroBalance.map((item) => `${String(item.account ?? item.ticker ?? '')}: ${humanizeTaxText(String(item.reason ?? ''))}`),
     ];
     return (
         <Section
-            title="Modelo 720 (bienes en el extranjero)"
-            description="Chequeo orientativo del umbral de 50.000 € por categoría. Un «no concluyente» no es un «no»: falta algún dato para afirmarlo."
+            title={t('taxes.modelo720.title')}
+            description={t('taxes.modelo720.descCheckFull')}
             icon={<Landmark className="h-5 w-5 text-teal-400" />}
         >
             <div className="grid gap-1">
@@ -358,9 +379,9 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                     return (
                         <div key={key} className="border-b border-gray-800/60 py-2 text-sm last:border-0">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                                <span className="text-gray-400">{CATEGORY_LABELS[key]}</span>
+                                <span className="text-gray-400">{t(CATEGORY_LABEL_KEYS[key])}</span>
                                 <span className="flex items-center gap-3">
-                                    <span className="text-gray-200">{(category.status === 'desconocido' || category.status === 'no_evaluable') && !Number(category.total_base) ? NA : money(category.total_base)}</span>
+                                    <span className="text-gray-200">{(category.status === 'desconocido' || category.status === 'no_evaluable') && !Number(category.total_base) ? t('common.na') : money(category.total_base, f, t)}</span>
                                     <Chip status={String(category.status ?? 'desconocido')} />
                                 </span>
                             </div>
@@ -380,12 +401,13 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                     {file720.available === true ? (
                         <div className="space-y-3">
                             <p className="text-sm text-gray-400">
-                                Borrador de fichero generado ({typeof file720.detail_records === 'number' ? formatCountEs(file720.detail_records, 'registro de detalle', 'registros de detalle') : `${String(file720.detail_records)} registros de detalle`}
-                                {typeof file720.record_length === 'number' ? ` de ${String(file720.record_length)} bytes` : ''}
-                                {typeof file720.encoding === 'string' ? `, en ${file720.encoding}` : ''}). Es el
-                                contenido real que produce el generador, no una estimación: puedes descargarlo y
-                                revisarlo, pero es una ayuda de cómputo y no un fichero oficial listo para
-                                presentar.
+                                {t('taxes.modelo720.fileNote', {
+                                    records: typeof file720.detail_records === 'number'
+                                        ? f.formatCount(file720.detail_records, t('taxes.modelo720.recordUnit'), t('taxes.modelo720.recordUnitPlural'))
+                                        : t('taxes.modelo720.recordsFallback', { n: String(file720.detail_records) }),
+                                    length: typeof file720.record_length === 'number' ? t('taxes.modelo720.fileNoteLength', { n: String(file720.record_length) }) : '',
+                                    encoding: typeof file720.encoding === 'string' ? t('taxes.modelo720.fileNoteEncoding', { encoding: file720.encoding }) : '',
+                                })}
                             </p>
                             {content720 ? (
                                 <Button
@@ -395,19 +417,16 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                                     className="gap-2 border-teal-800 text-teal-300 hover:border-teal-600"
                                 >
                                     <FileDown className="h-4 w-4" />
-                                    Descargar borrador del 720
+                                    {t('taxes.modelo720.download')}
                                 </Button>
                             ) : (
                                 <p className="text-sm text-amber-200/80">
-                                    El generador informa del número de registros ({String(file720.detail_records)}) pero
-                                    no su contenido, así que no hay nada que descargar: es una lectura fallida, no
-                                    un fichero esperando permiso. Vuelve a cargar la página; si el contador
-                                    aparece sin contenido otra vez, no hay forma de obtenerlo desde aquí.
+                                    {t('taxes.modelo720.noContent', { count: String(file720.detail_records) })}
                                 </p>
                             )}
                             {Array.isArray(file720.notas) && (file720.notas as string[]).length > 0 && (
                                 <div>
-                                    <p className="text-xs font-semibold uppercase text-gray-500">Lo que hay que revisar antes de usarlo</p>
+                                    <p className="text-xs font-semibold uppercase text-gray-500">{t('taxes.modelo720.reviewTitle')}</p>
                                     <ul className="mt-1 space-y-1 text-xs leading-5 text-gray-400">
                                         {(file720.notas as string[]).map((nota, i) => (
                                             <li key={`nota-${i}`}>{humanizeTaxText(nota)}</li>
@@ -417,7 +436,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                             )}
                             {Array.isArray(file720.excluded) && (file720.excluded as DataRecord[]).length > 0 && (
                                 <div>
-                                    <p className="text-xs font-semibold uppercase text-gray-500">Registros excluidos del fichero</p>
+                                    <p className="text-xs font-semibold uppercase text-gray-500">{t('taxes.modelo720.excludedTitle')}</p>
                                     <ul className="mt-1 space-y-1 text-xs leading-5 text-amber-200/80">
                                         {(file720.excluded as DataRecord[]).map((item, i) => (
                                             <li key={`${String(item.ticker ?? 'item')}-${i}`}>
@@ -429,7 +448,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                             )}
                             {Array.isArray(file720.manual_review) && (file720.manual_review as DataRecord[]).length > 0 && (
                                 <div>
-                                    <p className="text-xs font-semibold uppercase text-gray-500">Revisión manual necesaria</p>
+                                    <p className="text-xs font-semibold uppercase text-gray-500">{t('taxes.modelo720.manualReviewTitle')}</p>
                                     <ul className="mt-1 space-y-1 text-xs leading-5 text-amber-200/80">
                                         {(file720.manual_review as DataRecord[]).map((item, i) => (
                                             <li key={`${String(item.ticker ?? 'item')}-${i}`}>
@@ -444,10 +463,10 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                         <p className="text-sm text-gray-400">
                             {typeof file720.reason === 'string' && file720.reason
                                 ? humanizeTaxText(file720.reason)
-                                : 'El generador no ha producido fichero y no ha devuelto el motivo del bloqueo; revisa los registros excluidos y la revisión manual de arriba para saber qué falta.'}
+                                : t('taxes.modelo720.noFileReason')}
                             {' '}
                             <Link className="inline-flex min-h-[44px] items-center text-teal-300 underline underline-offset-2 sm:min-h-0" href="/settings">
-                                Completar datos fiscales
+                                {t('taxes.modelo720.completeData')}
                             </Link>
                         </p>
                     )}

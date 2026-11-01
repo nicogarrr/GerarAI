@@ -47,15 +47,7 @@ const root = join(here, '..');
  * PortfolioTabs / ProPicksTabs / TaxesView.
  */
 const COMPONENTS_EXCEPTIONS: Record<string, string> = {
-  'components/portfolio/PortfolioScores.tsx':
-    "Lo importa components/portfolio/PortfolioTabs.tsx ('use client'), asi que ya viaja en el paquete del cliente por herencia. Quitar la directiva NO ahorra un byte (sigue siendo cliente) y solo anade ruido al diff. Sin senal propia de cliente: solo pinta datos que recibe por props.",
-  'components/portfolio/PortfolioSummary.tsx':
-    "Lo importa components/portfolio/PortfolioTabs.tsx ('use client'): cliente por herencia, quitar la directiva no ahorra un byte. Se deja tal cual para no ensuciar el diff de un fichero sin ganancia real.",
-  'components/portfolio/PortfolioTearsheet.tsx':
-    "Lo importa components/portfolio/PortfolioTabs.tsx ('use client'): cliente por herencia, quitar la directiva no ahorra un byte. Se deja tal cual para no ensuciar el diff de un fichero sin ganancia real.",
   'components/proPicks/StrategyFactsheet.tsx':
-    "Lo importa components/proPicks/ProPicksTabs.tsx ('use client'): cliente por herencia, quitar la directiva no ahorra un byte. Se deja tal cual para no ensuciar el diff de un fichero sin ganancia real.",
-  'components/proPicks/WalkForwardResults.tsx':
     "Lo importa components/proPicks/ProPicksTabs.tsx ('use client'): cliente por herencia, quitar la directiva no ahorra un byte. Se deja tal cual para no ensuciar el diff de un fichero sin ganancia real.",
 };
 
@@ -85,10 +77,19 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+  'components/LoadingState.tsx': 'useT lee el contexto de locale para estados de carga accesibles',
+  'components/brain/BrainGuideAnswer.tsx': 'useT lee locale para el copy de respuestas guía (vacía/insuficiente) del Cerebro',
+  'components/brain/BrainLibraryAnswer.tsx': 'useT lee locale para el copy de respuestas de biblioteca del Cerebro',
+  'components/brain/BrainSources.tsx': 'useT lee locale para las etiquetas de fuentes del Cerebro',
+  'components/ui/methodology-disclosure.tsx': 'useT lee locale para título predeterminado; también usado desde componentes client',
+  'components/ui/name-avatar.tsx': 'useT lee locale para el texto alternativo de la foto',
+  'components/proPicks/WalkForwardResults.tsx': 'importa MethodologyDisclosure client, que ahora consume contexto React de locale',
+
   'components/settings/LanguageForm.tsx':
     'selector de idioma: escribe la cookie de locale y router.refresh() (transición)',
   'lib/i18n/client.tsx':
     'provider y hooks de locale (useT/useLocale/useFormat): contexto React de cliente por definición',
+  'components/forms/SelectField.tsx': 'usa useId, Controller (react-hook-form) y el hook useT de i18n',
   'components/research/ValuationSummaryGrid.tsx': 'useState y useEffect para carga batch asíncrona y descarte de respuestas de selección anterior',
   'components/alerts/PushNotifications.tsx': 'useState/useEffect para permiso Notification, registro serviceWorker, PushManager y preferencias opt-in del navegador',
   'components/research/ChangesFeed.tsx': 'useState y useMemo para filtros y paginación interactiva de sucesos',
@@ -97,6 +98,9 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/ExpectationsList.tsx': 'useState para paginación de comparaciones y previsiones',
   'components/research/Pager.tsx': 'jsx-onClick para avanzar y retroceder páginas',
   'components/insider/PagedInsiderCompanies.tsx': 'useState para la página actual del paginador de empresas insider',
+  'components/insider/InsiderFeed.tsx': 'useT/useLocale/useFormat de @/lib/i18n/client para copy y formato localizables (i18n)',
+  'components/insider/InsiderOperationsView.tsx': 'useT/useLocale/useFormat de @/lib/i18n/client para copy y formato localizables (i18n)',
+  'components/plan/ContributionSplitCard.tsx': 'useT/useFormat de @/lib/i18n/client para copy y formato localizables (i18n)',
   'components/HomeAttention.tsx':
     'useEffect loads independent attention sources; useState controls retries and bounded pagination',
   'app/(root)/inversores/_components/LibraryChat.tsx':
@@ -109,6 +113,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
         'filtros controlados con useState/useEffect/useCallback y server actions al cambiar criterios',
     'components/proPicks/RadarGlobalView.tsx':
         'radar interactivo con useState y onClick que consulta candidatos mediante server action', 
+    'components/proPicks/RadarDcaView.tsx':
+        'vista interactiva del radar DCA: useState/useEffect para filtros y paginación (onClick/onChange) consultando oportunidades via server action',
     'components/pwa/ServiceWorkerRegister.tsx':
         'registro del service worker: useEffect + navigator.serviceWorker (API del navegador); sustituye al script inline del layout para la CSP con nonce',
     // Directivas reales que faltaban en la lista (QA 27-oct, fallo #20):
@@ -128,6 +134,12 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
         'formulario controlado del ticket manual (estado, validacion y envio)',
     'components/paper-trading/FxTicket.tsx':
         'formulario controlado de la conversion de divisa manual',
+    'components/paper-trading/AccountSummary.tsx':
+        'hooks i18n (useT/useFormat) dentro del arbol cliente de ManualDemoPanel',
+    'components/paper-trading/LedgerTable.tsx':
+        'hooks i18n (useT/useFormat) dentro del arbol cliente de ManualDemoPanel',
+    'components/paper-trading/PositionsTable.tsx':
+        'hooks i18n (useT/useLocale/useFormat) dentro del arbol cliente de ManualDemoPanel',
 
   // selector de inversor y contenido con navegación por URL.
   'app/(root)/inversores/_components/InvestorSelector.tsx': 'useRouter, jsx-onChange',
@@ -185,6 +197,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/knowledge/DeleteCollectionButton.tsx': 'useState, jsx-onClick, jsx-onOpenChange, importa cliente: components/ui/confirm-dialog.tsx',
   'components/knowledge/DeleteDocumentButton.tsx': 'useState, jsx-onClick, jsx-onOpenChange, importa cliente: components/ui/confirm-dialog.tsx',
   'components/knowledge/ExtractionRefresh.tsx': 'useRouter, useEffect, browser:window, browser:document',
+  'components/landing/LandingMockup.tsx': 'useState, jsx-onClick',
   'components/layout/BottomNav.tsx': 'usePathname, jsx-onClick, browser:window',
   'components/layout/ScrollPreserver.tsx': 'usePathname, useSearchParams, useEffect+useRef, browser:document/window',
   'components/layout/Breadcrumbs.tsx': 'usePathname',
@@ -206,6 +219,13 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/portfolio/ImportIBKRButton.tsx': 'useState, useRef, useRouter, jsx-onChange, jsx-onClick, libreria cliente: sonner',
   'components/portfolio/PortfolioAllocation.tsx': 'dynamic-ssr-false, importa cliente: components/portfolio/PortfolioAllocationChart.tsx',
   'components/portfolio/PortfolioAllocationChart.tsx': 'libreria cliente: recharts',
+  'components/portfolio/PortfolioScores.tsx': 'hooks i18n: useT/useFormat de @/lib/i18n/client',
+  'components/portfolio/PortfolioSummary.tsx': 'hooks i18n: useT/useFormat de @/lib/i18n/client',
+  'components/portfolio/PortfolioTearsheet.tsx': 'hooks i18n: useT/useFormat de @/lib/i18n/client',
+  'components/portfolio/PortfolioDataNotice.tsx':
+    "Lo importa components/portfolio/PortfolioTabs.tsx ('use client'): cliente por herencia, quitar la directiva no ahorra un byte. Necesita hooks de i18n (useT/useFormat).",
+  'components/portfolio/PortfolioValueBreakdown.tsx':
+    "Lo importa components/portfolio/PortfolioTabs.tsx ('use client'): cliente por herencia, quitar la directiva no ahorra un byte. Necesita hooks de i18n (useT/useFormat).",
   'components/portfolio/PortfolioHoldings.tsx': 'useRouter, useState, useEffect, jsx-onClick, libreria cliente: sonner',
   'components/portfolio/PortfolioNavChart.tsx': 'libreria cliente: recharts',
   'components/portfolio/PortfolioTabs.tsx': 'dynamic-ssr-false, useSearchParams, useRouter, usePathname, useState, useEffect, jsx-onValueChange, jsx-onClick, importa cliente: components/ui/tabs.tsx, importa cliente: components/portfolio/PortfolioSummary.tsx, importa cliente: components/portfolio/PortfolioHoldings.tsx, importa cliente: components/portfolio/PortfolioTransactions.tsx, importa cliente: components/portfolio/PortfolioAllocation.tsx, importa cliente: components/portfolio/PortfolioNavChart.tsx, importa cliente: components/portfolio/PortfolioScores.tsx, importa cliente: components/portfolio/PortfolioTearsheet.tsx, importa cliente: components/portfolio/AddTransactionButton.tsx, importa cliente: components/portfolio/RefreshPortfolioButton.tsx, importa cliente: components/portfolio/ImportIBKRButton.tsx',
@@ -242,7 +262,6 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/QuickAlertButton.tsx': 'useState, jsx-onOpenChange, jsx-onPointerDown, jsx-onFocus, importa cliente: components/ui/popover.tsx, dynamic (cuerpo del popover diferido en QuickAlertPopoverBody)',
   'components/research/LazyMemoControls.tsx': 'dynamic (frontera perezosa de las islas del memorando: ThesisHumanInputForm, ThesisInvalidationRulesForm, ThesisDebatePanel)',
   'components/research/QuickAlertPopoverBody.tsx': 'useSyncExternalStore, useState, jsx-onValueChange, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/select.tsx (chunk diferido: solo se descarga al abrir el popover de alerta)',
-  'components/research/ScrollToOnMount.tsx': 'useEffect, browser:document',
   'components/research/ShareCapitalPanel.tsx': 'jsx-onClick, useState, jsx-onChange, importa cliente: components/ui/panel.tsx, dynamic (gráfica recharts diferida en ShareCapitalChart)',
   'components/research/ShareCapitalChart.tsx': 'libreria cliente: recharts (chunk diferido: solo se descarga al cargar la gráfica de evolución)',
   'components/research/ThesisApproveButton.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner',
@@ -262,6 +281,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/security/TwoFactorSettings.tsx': 'useState, browser:navigator, jsx-onSubmit, jsx-onClick, libreria cliente: sonner, libreria cliente: react-hook-form, dynamic (QR qrcode.react diferido: solo se usa al activar 2FA)',
   'components/security/PrivacySettings.tsx': 'useState, useRouter, jsx-onSubmit, jsx-onClick, libreria cliente: sonner',
   'components/security/ChangePassword.tsx': 'useState, jsx-onSubmit, jsx-onClick, libreria cliente: sonner',
+  'components/auth/AccountStatusNotice.tsx': 'useT lee locale para el aviso de cuenta pendiente/rechazada y jsx-onClick para volver al formulario',
   'components/auth/ForgotPasswordForm.tsx': 'useState, jsx-onSubmit, jsx-onClick, libreria cliente: sonner',
   'components/auth/ResetPasswordForm.tsx': 'useState, useRouter, jsx-onSubmit, jsx-onClick, libreria cliente: sonner',
   'components/settings/TaxDeclarantForm.tsx': 'useState, jsx-onSubmit, jsx-onChange, libreria cliente: sonner',

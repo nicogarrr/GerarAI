@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.schemas.pagination import PaginatedResponse
 from app.services.universal_search_service import UniversalSearchService
 
 router = APIRouter()
@@ -19,7 +20,8 @@ class UniversalSearchRequest(BaseModel):
     statuses: set[str] = Field(default_factory=set, max_length=20)
     date_from: date | None = None
     date_to: date | None = None
-    limit: int = Field(default=20, ge=1, le=100)
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=100)
     include_vector: bool = True
 
 
@@ -29,7 +31,7 @@ def universal_search(
     db: Session = Depends(get_db),
 ) -> dict:
     try:
-        return UniversalSearchService().search(
+        result = UniversalSearchService().search(
             db,
             payload.query,
             ticker=payload.ticker,
@@ -39,8 +41,23 @@ def universal_search(
             statuses=payload.statuses or None,
             date_from=payload.date_from,
             date_to=payload.date_to,
-            limit=payload.limit,
+            limit=payload.page_size,
             include_vector=payload.include_vector,
         )
+        # Wrap in paginated response: search doesn't do SQL pagination,
+        # it returns top N results after ranking
+        paginated = PaginatedResponse.create(
+            items=result["results"],
+            total=result["total"],
+            page=payload.page,
+            page_size=payload.page_size,
+        ).model_dump()
+        # Preserve original search metadata
+        paginated["query"] = result.get("query", payload.query)
+        paginated["filters"] = result.get("filters", {})
+        paginated["retrieval"] = result.get("retrieval", {})
+        if "status" in result:
+            paginated["status"] = result["status"]
+        return paginated
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

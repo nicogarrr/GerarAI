@@ -5,6 +5,8 @@ Cache en memoria de 60s para no golpear Yahoo en cada carga de la home.
 """
 from __future__ import annotations
 
+import json
+import logging
 import math
 import threading
 import time
@@ -14,6 +16,7 @@ from typing import Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -129,6 +132,8 @@ def close_shared_yahoo_client() -> None:
 # La conversión de clases US punto->guion (BRK.B -> BRK-B) vive en el
 # conector Yahoo (fuente única); aquí se reexporta con el nombre histórico.
 from app.services.connectors.yahoo import yahoo_chart_symbol as _yahoo_chart_symbol
+
+logger = logging.getLogger(__name__)
 
 
 def _bar_in_open_session(meta: dict, bar_ts, *, now_ts: float | None = None) -> bool:
@@ -297,6 +302,107 @@ def market_quote(symbol: str) -> dict:
             _quote_cache.clear()
         _quote_cache[normalized] = {"at": now, "data": data}
     return data
+
+
+# --- Lote para el sondeo de oportunidades del Inicio ---------------------
+# El Inicio probaba N candidatas con N fetches desde Vercel (cache en
+# memoria de 45s por instancia serverless: cada instancia fria era un miss).
+# El lote concentra la lectura en el backend con cache Redis compartida de
+# 60s (MISMA frescura que la cache en memoria del single de arriba): una
+# llamada por carga en vez de N, y los misses se comparten entre usuarios y
+# workers de gunicorn. Redis caido -> fail-open al fetch directo.
+_QUOTES_BATCH_MAX = 30
+_QUOTE_REDIS_PREFIX = "cavaai:market:quote:"
+
+
+def _quote_redis_key(symbol: str) -> str:
+    return f"{_QUOTE_REDIS_PREFIX}{symbol}"
+
+
+def _batch_redis_client():
+    """Cliente Redis del cache layer (backoff interno); None si no disponible."""
+    try:
+        from app.core.cache import _redis_client
+
+        return _redis_client()
+    except Exception:  # noqa: BLE001 - cache best-effort
+        return None
+
+
+class MarketQuotesBatchIn(BaseModel):
+    symbols: list[str]
+
+
+def _normalize_batch_symbols(symbols: list[str]) -> list[str]:
+    seen: dict[str, None] = {}
+    for raw in symbols:
+        normalized = raw.strip().upper()
+        # Misma regla que el single: nada de controles ni longitudes locas.
+        if not normalized or not normalized.isprintable() or len(normalized) > 32:
+            continue
+        seen.setdefault(normalized)
+    return list(seen)
+
+
+@router.post("/quotes/batch")
+def market_quotes_batch(body: MarketQuotesBatchIn) -> dict:
+    """Cotizaciones por lote (shape Finnhub via Yahoo), cache Redis 60s.
+
+    Respuesta por simbolo: payload o null (sin dato NUNCA es error global).
+    """
+    if len(body.symbols) > _QUOTES_BATCH_MAX:
+        raise HTTPException(
+            status_code=400,
+            detail=ui_error(400, "quotes_batch_too_large").detail,
+        )
+    symbols = _normalize_batch_symbols(body.symbols)
+    if not symbols:
+        return {"quotes": {}}
+
+    redis_client = _batch_redis_client()
+    now = time.monotonic()
+    quotes: dict[str, dict | None] = {}
+    misses: list[str] = []
+    for symbol in symbols:
+        # L1: la cache en memoria del single (60s), misma frescura.
+        with _quote_cache_lock:
+            cached = _quote_cache.get(symbol)
+        if cached and now - cached["at"] < _QUOTE_CACHE_TTL:
+            quotes[symbol] = cached["data"]
+            continue
+        # L2: Redis compartida entre workers y usuarios.
+        if redis_client is not None:
+            try:
+                raw = redis_client.get(_quote_redis_key(symbol))
+                if raw:
+                    quotes[symbol] = json.loads(raw)
+                    continue
+            except Exception:  # noqa: BLE001 - fail-open al fetch
+                logger.warning("quote cache: lectura Redis fallo; fail-open al fetch", exc_info=True)
+        misses.append(symbol)
+
+    if misses:
+        client = _shared_yahoo_client()
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            fetched = list(pool.map(lambda s: _fetch_yahoo_quote(client, s), misses))
+        for symbol, data in zip(misses, fetched):
+            quotes[symbol] = data
+            if not data:
+                continue
+            with _quote_cache_lock:
+                if len(_quote_cache) >= _QUOTE_CACHE_MAX:
+                    _quote_cache.clear()
+                _quote_cache[symbol] = {"at": now, "data": data}
+            if redis_client is not None:
+                try:
+                    redis_client.set(
+                        _quote_redis_key(symbol),
+                        json.dumps(data),
+                        ex=int(_QUOTE_CACHE_TTL),
+                    )
+                except Exception:  # noqa: BLE001 - no cachear nunca rompe la lectura
+                    logger.warning("quote cache: escritura Redis fallo; se sirve sin cache", exc_info=True)
+    return {"quotes": quotes}
 
 
 _CANDLES_CACHE_TTL = 900.0

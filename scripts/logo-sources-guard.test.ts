@@ -157,7 +157,7 @@ describe('ruta /api/logo', () => {
     assert.match(route, /TICKER_RE\.test\(ticker\)/);
     assert.match(route, /'private, max-age=86400'/);
     assert.doesNotMatch(route, /s-maxage|'public/, 'respuesta con sesión: sin caché compartida/CDN');
-    assert.match(route, /companyDomainFor\(key\) \?\? \(await finnhubDomain\(key\)\)/);
+    assert.match(route, /companyDomainFor\(key\) \?\? \(await finnhubDomain\(key, controller\.signal\)\)/);
     assert.doesNotMatch(route, /searchParams/, 'ni ?url= ni ?domain=: sin proxy abierto');
     assert.match(route, /X-Content-Type-Options/);
     assert.match(route, /sandbox/);

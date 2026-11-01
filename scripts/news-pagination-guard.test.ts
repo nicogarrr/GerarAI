@@ -5,13 +5,15 @@ import { test } from 'node:test';
 const flow = readFileSync('components/research/NewsEventsFlow.tsx', 'utf8');
 const page = readFileSync('app/(root)/research/news/page.tsx', 'utf8');
 const actions = readFileSync('lib/actions/research.actions.ts', 'utf8');
+const flowEs = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).flow;
 const route = readFileSync('data-engine/app/api/routes/news.py', 'utf8');
 
 test('el flujo de noticias pagina dentro de la pagina, sin scroll infinito', () => {
   assert.doesNotMatch(flow, /IntersectionObserver/);
   assert.doesNotMatch(flow, /Cargar más/);
   assert.doesNotMatch(actions, /loadMoreResearchNews/);
-  assert.match(flow, /label="Paginación"/);
+  assert.match(flow, /label=\{t\('research\.flow\.paginationAria'\)\}/);
+  assert.equal(flowEs.paginationAria, 'Paginación');
   assert.match(flow, /rel="prev"/);
   assert.match(flow, /rel="next"/);
   assert.match(flow, /'pagina'/);
@@ -34,14 +36,17 @@ test('el carril cambia de pagina conservando lane y la API acota limit/offset en
 
 test('el móvil alcanza la siguiente página sin bajar treinta tarjetas',()=>{
  assert.match(readFileSync('lib/news-paging.ts','utf8'),/NEWS_PAGE_SIZE = 10/);
- assert.ok(flow.indexOf('<NewsPager label="Paginación"')<flow.indexOf('Filtrar por carril'));
- assert.match(flow,/label="Paginación inferior"/);
+ assert.ok(flow.indexOf("label={t('research.flow.paginationAria')}")<flow.indexOf("t('research.flow.laneFilterAria')"));
+ assert.match(flow,/label=\{t\('research\.flow\.paginationBottomAria'\)\}/);
+ assert.equal(flowEs.paginationBottomAria,'Paginación inferior');
+ assert.equal(flowEs.laneFilterAria,'Filtrar por carril');
 });
 
 test('solo quedan carriles de fuentes: Gobierno se conserva y Social desaparece', () => {
   assert.doesNotMatch(flow, /SocialChip|key: 'social'|StockTwits/);
   assert.doesNotMatch(page, /query\.lane === 'social'/);
   assert.doesNotMatch(actions, /lane === 'social'/);
-  assert.match(flow, /key: 'gobierno', label: 'Gobierno'/);
+  assert.match(flow, /key: 'gobierno', labelKey: 'research\.flow\.lane\.government'/);
+  assert.equal(flowEs.lane.government, 'Gobierno');
   assert.match(route, /retired_lane != "social"/);
 });

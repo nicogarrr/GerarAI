@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let pathname = '/calendar';
 vi.mock('next/navigation', () => ({ usePathname: () => pathname }));
+// EarningsDayStrip es un server component traducido con getT(): lib/i18n/server
+// lee la cookie de locale vía next/headers; sin cookie el locale es «es».
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 
 const getFollowedEarnings = vi.fn();
 vi.mock('@/lib/actions/catalysts.actions', () => ({ getFollowedEarnings: (...a: unknown[]) => getFollowedEarnings(...a) }));
@@ -13,14 +16,13 @@ vi.mock('@/lib/actions/calendar-feed.actions', () => ({
     revokeCalendarFeed: (...a: unknown[]) => revokeCalendarFeed(...a),
 }));
 vi.mock('@/components/calendar/CompanyLogo', () => ({
-    CompanyLogo: ({ ticker }: { ticker: string }) => <span data-testid="logo">{ticker}</span>,
+    CompanyLogo: ({ ticker, className }: { ticker: string; className?: string }) => <span data-testid="logo" className={className}>{ticker}</span>,
 }));
 
 import { CalendarTabs } from '@/components/calendar/CalendarTabs';
 import EarningsDayStrip from '@/components/calendar/EarningsDayStrip';
 import SubscriptionManager, { SubscribeButtons } from '@/components/calendar/SubscriptionManager';
 import {
-    FollowedDaySources,
     FollowedEarningsRow,
     EventMaterialsLine,
     IrLine,
@@ -143,7 +145,7 @@ describe('EarningsDayStrip', () => {
         getFollowedEarnings.mockResolvedValue({ followed_count: 0, days: [] });
         expect(await EarningsDayStrip()).toBeNull();
     });
-    it('pinta 7 días con Hoy/Mañana, cuenta eventos y resume los logos sobrantes', async () => {
+    it('pinta 7 días con Hoy/Mañana y cuenta eventos (sin «+N»: el contador dice el total una sola vez)', async () => {
         getFollowedEarnings.mockResolvedValue({
             followed_count: 3,
             days: [
@@ -157,7 +159,7 @@ describe('EarningsDayStrip', () => {
         expect(screen.getByText('Mañana')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /4 eventos$/ })).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /1 evento$/ })).toBeInTheDocument();
-        expect(screen.getByText('+2')).toBeInTheDocument();
+        expect(screen.queryByText(/^\+\d+$/)).toBeNull();
         expect(screen.getAllByText('Sin eventos')).toHaveLength(5);
         expect(screen.getByRole('link', { name: 'Ver todo' })).toHaveAttribute('href', '/calendar/resultados');
     });
@@ -173,19 +175,33 @@ describe('EarningsDayStrip', () => {
         // Días sin eventos conservan el enlace (sin ancla destino, no pasa nada).
         expect(screen.getAllByRole('link', { name: /Sin eventos$/ })[0]).toHaveAttribute('href', expect.stringMatching(/^\/calendar\/resultados#d-\d{4}-\d{2}-\d{2}$/));
     });
-    it('el «+N» es visible de verdad y los logos no se encogen cuando sobran eventos', async () => {
+    it('un día con 3 empresas enseña los 3 logos apilados a tamaño completo (pedido de Nico 1-nov-2026)', async () => {
         getFollowedEarnings.mockResolvedValue({
             followed_count: 3,
             days: [{ date: today, events: [ev({ ticker: 'A' }), ev({ ticker: 'B' }), ev({ ticker: 'C' })] }],
         });
         render(await EarningsDayStrip());
-        // 3 eventos: 2 logos a tamaño completo (size-9) y «+1» con jerarquía
-        // (text-sm semibold, no el gris tenue de antes que pasaba desapercibido).
-        const more = screen.getByText('+1');
-        expect(more.className).toMatch(/\btext-sm\b/);
-        expect(more.className).toMatch(/\bfont-semibold\b/);
+        // 3 eventos: los 3 logos a tamaño completo (size-9), superpuestos con
+        // anillo para leerse por separado; sin «+N» (el contador ya dice 3).
         const logos = screen.getAllByTestId('logo');
-        expect(logos).toHaveLength(2);
+        expect(logos).toHaveLength(3);
+        const fila = logos[0].parentElement as HTMLElement;
+        expect(fila.className).toMatch(/-space-x-/);
+        for (const logo of logos) {
+            expect(logo.className).toMatch(/\bsize-9\b/);
+            expect(logo.className).toMatch(/\bring-2\b/);
+        }
+        expect(screen.queryByText(/^\+\d+$/)).toBeNull();
+    });
+    it('con 4+ empresas se apilan 3 logos y el contador sigue diciendo el total', async () => {
+        getFollowedEarnings.mockResolvedValue({
+            followed_count: 4,
+            days: [{ date: today, events: [ev({ ticker: 'A' }), ev({ ticker: 'B' }), ev({ ticker: 'C' }), ev({ ticker: 'D' })] }],
+        });
+        render(await EarningsDayStrip());
+        expect(screen.getAllByTestId('logo')).toHaveLength(3);
+        expect(screen.getByRole('link', { name: /4 eventos$/ })).toBeInTheDocument();
+        expect(screen.queryByText(/^\+\d+$/)).toBeNull();
     });
     it('la tira ancla el scroll a tarjetas enteras (sin descansos a media tarjeta)', async () => {
         // Captura de prod 30-oct-2026 (390 px): la primera tarjeta aparecía
@@ -286,20 +302,20 @@ describe('IrLine', () => {
     });
 });
 
-describe('FollowedEarningsRow / FollowedDaySources', () => {
+describe('FollowedEarningsRow', () => {
     it('muestra sesión, cierre, fuente y enlace a la ficha con el ticker codificado', () => {
         render(<ul><FollowedEarningsRow event={ev({ ticker: 'BRK.B' })} /></ul>);
         expect(screen.getByText('Antes de apertura')).toBeInTheDocument();
         expect(screen.getByText('Cierre Sep 2026')).toBeInTheDocument();
         expect(screen.queryByText('Estimada')).not.toBeInTheDocument();
-        expect(screen.getByRole('link', { name: 'Fuente de la fecha de BRK.B: Nasdaq' })).toHaveAttribute('href', 'https://example.com/ko');
+        expect(screen.getByRole('link', { name: 'Abrir el documento de la fecha de BRK.B (enlace externo)' })).toHaveAttribute('href', 'https://example.com/ko');
         expect(screen.getByRole('link', { name: 'Abrir Coca-Cola' })).toHaveAttribute('href', '/research/BRK.B');
     });
     it('sin sesión: hora por confirmar; estimada marcada; sin fuente no hay enlace de fuente; sin empresa usa el ticker', () => {
         render(<ul><FollowedEarningsRow event={ev({ session: null, confirmed: false, source_url: null, fiscal_label: null, company: '' })} materialsSlot={<span>slot</span>} /></ul>);
         expect(screen.getByText('Hora por confirmar')).toBeInTheDocument();
         expect(screen.getByText('Estimada')).toBeInTheDocument();
-        expect(screen.queryByRole('link', { name: /Fuente de la fecha/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /documento de la fecha/ })).not.toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Abrir KO' })).toBeInTheDocument();
         expect(screen.getByText('slot')).toBeInTheDocument();
     });
@@ -308,15 +324,10 @@ describe('FollowedEarningsRow / FollowedDaySources', () => {
         expect(screen.getByText('Tras el cierre')).toBeInTheDocument();
         expect(screen.queryByText('Estimada')).not.toBeInTheDocument();
     });
-    it('FollowedDaySources: sin eventos nada; deduplica fuentes y pluraliza', () => {
-        expect(render(<FollowedDaySources events={[]} />).container).toBeEmptyDOMElement();
-        const { container } = render(<FollowedDaySources events={[ev(), ev({ ticker: 'X' }), ev({ source: 'Zacks', source_url: null })]} />);
-        expect(container.textContent).toBe('Fuentes: Nasdaq · Zacks');
-        expect(screen.getAllByRole('link')).toHaveLength(1);
-    });
-    it('FollowedDaySources: una sola fuente va en singular', () => {
-        const { container } = render(<FollowedDaySources events={[ev()]} />);
-        expect(container.textContent).toBe('Fuente: Nasdaq');
+    it('sin etiquetas de fuente visibles (decisión de producto 2026-10-31)', () => {
+        const { container } = render(<ul><FollowedEarningsRow event={ev()} /></ul>);
+        expect(container.textContent).not.toMatch(/Fuente/);
+        expect(container.querySelector('[title*="Fuente"]')).toBeNull();
     });
 });
 

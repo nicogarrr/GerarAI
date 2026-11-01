@@ -336,11 +336,62 @@ jobs:
         run: uv run --frozen python -m pytest tests/test_backup_contracts.py -q
 
       - name: Lint the backup and restore scripts
-        # Los scripts viven dentro de data-engine/ para que este `ruff check .`
-        # los cubra; si alguien los mueve a scripts/ del repo, esto deja de
-        # revisar el codigo que produce los backups.
+        # Acotado a los scripts del drill a proposito: el lint de TODO
+        # data-engine ya corre en el job `backend-lint` de ci.yml
+        # (`uv run --frozen ruff check .` en cada PR y push a main). Cuando
+        # este paso era repo-wide, 12 errores de ruff en modulos ajenos
+        # (acumulados en main por merges sin esperar CI) dejaban el drill
+        # rojo sin que los scripts de backup hubieran cambiado: una alerta
+        # falsa sobre la pieza que este workflow existe para proteger.
+        # Aqui solo importa que el codigo que produce y verifica los backups
+        # pase lint; el resto es responsabilidad de ci.yml.
         working-directory: data-engine
-        run: uv run --frozen ruff check .
+        run: uv run --frozen ruff check scripts/backup scripts/restore
+
+  drill-script:
+    name: Drill reproducible local/VM (disaster_drill.py)
+    # El job restore-drill ejerce el ciclo con los services de GitHub, paso a
+    # paso. Este job ejecuta EL MISMO ciclo a traves del script reproducible
+    # que se documenta para local y para la VM (`python -m
+    # scripts.backup.disaster_drill`), con sus propios contenedores aislados
+    # cavaai-drill-*: si el script se rompe (drift con la CLI de
+    # backup/restore, una imagen que ya no se publica, un puerto), este job lo
+    # dice en rojo. Un drill que solo existe como documentacion no existe.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      # Mismo motivo que en restore-drill: readiness pide un LLM configurado.
+      OPENCODE_GO_API_KEY: ci-placeholder
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.12.5"
+          enable-cache: true
+          cache-dependency-glob: "data-engine/uv.lock"
+      - name: Install data-engine dependencies
+        working-directory: data-engine
+        run: uv sync --frozen --extra test --extra dev --no-install-project
+      - name: Construir la imagen MinIO fijada (la de produccion)
+        # El drill levanta el pin de _kit.MINIO_IMAGE, que es una imagen LOCAL
+        # compilada desde docker/minio/Dockerfile (la de produccion y la VM):
+        # en el runner hay que construirla antes. El tag sale de _kit, no de
+        # una copia a mano, para que el dia que se suba la release este paso
+        # siga construyendo la correcta. Un sustituto de registro NO vale: la
+        # familia bitnamilegacy no acepta el comando `server ...` de la imagen
+        # oficial (medido 2026-10-31, job 124386414236) y el drill esperaria
+        # 300 s a un contenedor muerto.
+        working-directory: data-engine
+        run: |
+          IMAGE="$(uv run --frozen python -c 'from scripts.backup._kit import MINIO_IMAGE; print(MINIO_IMAGE)')"
+          echo "Construyendo $IMAGE desde docker/minio/Dockerfile"
+          docker build -t "$IMAGE" ../docker/minio
+      - name: Drill reproducible (contenedores propios cavaai-drill-*)
+        working-directory: data-engine
+        run: uv run --frozen python -m scripts.backup.disaster_drill
 
   block-on-main:
     name: Require the drill in main
@@ -350,7 +401,7 @@ jobs:
     # push a main; el nombre del check que ve el branch protection es este.
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
-    needs: restore-drill
+    needs: [restore-drill, drill-script]
     timeout-minutes: 5
     steps:
       - name: The drill has to have passed to reach main
@@ -359,4 +410,8 @@ jobs:
             echo "::error::el restore drill fallo en main: el backup verificado no es de fiar"
             exit 1
           fi
-          echo "restore drill OK en main"
+          if [ "${{ needs.drill-script.result }}" != "success" ]; then
+            echo "::error::el drill reproducible (disaster_drill.py) fallo en main: el drill documentado para local/VM no es de fiar"
+            exit 1
+          fi
+          echo "restore drill y drill reproducible OK en main"

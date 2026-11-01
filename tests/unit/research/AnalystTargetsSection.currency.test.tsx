@@ -15,7 +15,7 @@ describe('analyst target units come from their response, not the company master'
         vi.mocked(researchRequest).mockResolvedValue({ ...response, currency });
         render(await AnalystTargetsSection({ symbol: 'FIXTURE.L', currency: 'GBP' }));
         const section = screen.getByTestId('analyst-targets');
-        expect(section).toHaveTextContent('Divisa no declarada por Yahoo: importes sin unidad verificada y potencial N/D.');
+        expect(section).toHaveTextContent('Divisa no declarada: importes sin unidad verificada y potencial N/D.');
         expect(section).not.toHaveTextContent('GBP');
         expect(section).not.toHaveTextContent('£');
         expect(section).not.toHaveTextContent('30,1');

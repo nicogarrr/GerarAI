@@ -8,6 +8,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Inbox, Loader2, RefreshCw } from 'lucide-react';
 import { showErrorToast } from '@/lib/toast';
+import { useT } from '@/lib/i18n/client';
+import type { TranslateFn } from '@/lib/i18n/translate';
 import { Pager } from '@/components/research/Pager';
 
 export type DataRecord = Record<string, unknown>;
@@ -31,16 +33,16 @@ function humanizeKey(key: string): string {
  * sin aviso. La profundidad está acotada: un anidamiento más profundo que
  * `depth` se marca como tal, no se serializa.
  */
-function describeValue(value: unknown, depth: number): string {
+function describeValue(value: unknown, depth: number, t?: TranslateFn): string {
     if (value === null || value === undefined) return '—';
-    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+    if (typeof value === 'boolean') return value ? (t ? t('data.yes') : 'Sí') : (t ? t('data.no') : 'No');
     if (typeof value === 'number') return String(value);
     if (typeof value === 'string') return value;
     if (value instanceof Date) return value.toISOString();
     if (depth <= 0) return Array.isArray(value) ? `[${value.length}]` : '{…}';
     if (Array.isArray(value)) {
         if (value.length === 0) return '—';
-        const shown = value.slice(0, MAX_VALUE_ITEMS).map((item) => describeValue(item, depth - 1));
+        const shown = value.slice(0, MAX_VALUE_ITEMS).map((item) => describeValue(item, depth - 1, t));
         const rest = value.length - shown.length;
         return `${shown.join(' · ')}${rest > 0 ? ` · +${rest} más` : ''}`;
     }
@@ -48,17 +50,17 @@ function describeValue(value: unknown, depth: number): string {
     if (entries.length === 0) return '—';
     const shown = entries
         .slice(0, MAX_VALUE_ITEMS)
-        .map(([key, item]) => `${humanizeKey(key)}: ${describeValue(item, depth - 1)}`);
+        .map(([key, item]) => `${humanizeKey(key)}: ${describeValue(item, depth - 1, t)}`);
     const rest = entries.length - shown.length;
     return `${shown.join(' · ')}${rest > 0 ? ` · +${rest} más` : ''}`;
 }
 
 /** Convierte cualquier valor a texto plano legible en tabla/cards */
-export function formatRecordValue(value: unknown): string {
+export function formatRecordValue(value: unknown, t?: TranslateFn): string {
     if (value === null || value === undefined) return '—';
-    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+    if (typeof value === 'boolean') return value ? (t ? t('data.yes') : 'Sí') : (t ? t('data.no') : 'No');
     if (typeof value === 'object') {
-        const text = describeValue(value, 2);
+        const text = describeValue(value, 2, t);
         return text.length > MAX_VALUE_CHARS ? `${text.slice(0, MAX_VALUE_CHARS - 1)}…` : text;
     }
     return String(value);
@@ -170,7 +172,7 @@ export function RecordList({
     records: initialRecords,
     fetchRecords,
     columns,
-    emptyMessage = 'No hay datos disponibles todavía',
+    emptyMessage,
     emptyAction,
     rowActions,
     linkColumns,
@@ -178,8 +180,11 @@ export function RecordList({
     columnLabels,
     footer,
     pageSize,
-    paginationLabel = 'registros',
+    paginationLabel,
 }: RecordListProps) {
+    const t = useT();
+    const resolvedEmptyMessage = emptyMessage ?? t('data.emptyDefault');
+    const resolvedPaginationLabel = paginationLabel ?? t('data.records');
     const [records, setRecords] = useState<DataRecord[]>(initialRecords);
     const [loading, setLoading] = useState(false);
 
@@ -204,13 +209,13 @@ export function RecordList({
     const pageStart = pageSize ? (currentPage - 1) * pageSize : 0;
     const visibleRecords = pageSize ? records.slice(pageStart, pageStart + pageSize) : records;
     const pager = pages > 1 ? (
-        <Pager label={paginationLabel} onPage={setPage} page={currentPage} pages={pages} total={records.length} />
+        <Pager label={resolvedPaginationLabel} onPage={setPage} page={currentPage} pages={pages} total={records.length} />
     ) : null;
 
     const visibleColumns = pickColumns(records, columns);
     const cellText = (record: DataRecord, column: string) => {
         const format = formatColumns?.[column];
-        return format ? format(record[column], record) : formatRecordValue(record[column]);
+        return format ? format(record[column], record) : formatRecordValue(record[column], t);
     };
     const cellHref = (record: DataRecord, index: number, column: string) =>
         linkColumns?.[column]?.(record, index) ?? null;
@@ -241,16 +246,16 @@ export function RecordList({
                     className="gap-2 text-gray-400 hover:text-teal-400"
                 >
                     <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
-                    Refrescar
+                    {t('data.refresh')}
                 </Button>
             </CardHeader>
             <CardContent className="pt-4">
                 {loading && records.length === 0 ? (
                     <div className="flex items-center justify-center py-10 text-gray-500">
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" /> Cargando...
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" /> {t('common.states.loading')}
                     </div>
                 ) : records.length === 0 ? (
-                    <EmptyState action={emptyAction} icon={Inbox} title={emptyMessage} />
+                    <EmptyState action={emptyAction} icon={Inbox} title={resolvedEmptyMessage} />
                 ) : visibleColumns.length === 0 ? (
                     <div className="space-y-2">
                         {records.map((record, index) => (
@@ -273,7 +278,7 @@ export function RecordList({
                                                 {columnLabels?.[column] ?? column}
                                             </TableHead>
                                         ))}
-                                        {rowActions && <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">Acciones</TableHead>}
+                                        {rowActions && <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">{t('data.actions')}</TableHead>}
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -393,7 +398,7 @@ export function RecordDetail({
     icon,
     record,
     fetchRecord,
-    emptyMessage = 'No hay datos disponibles todavía',
+    emptyMessage,
     emptyAction,
     actions,
     maxKeys = 24,
@@ -401,6 +406,8 @@ export function RecordDetail({
     columnLabels,
     formatColumns,
 }: RecordDetailProps) {
+    const t = useT();
+    const resolvedEmptyMessage = emptyMessage ?? t('data.emptyDefault');
     const [data, setData] = useState<DataRecord | null>(record);
 
     // F387: router.refresh() entrega un `record` nuevo; sin este sync la tarjeta
@@ -453,7 +460,7 @@ export function RecordDetail({
                             className="gap-2 text-gray-400 hover:text-teal-400"
                         >
                             <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                            Refrescar
+                            {t('data.refresh')}
                         </Button>
                     )}
                     {actions}
@@ -461,14 +468,14 @@ export function RecordDetail({
             </CardHeader>
             <CardContent className="pt-4">
                 {!data || entries.length === 0 ? (
-                    <EmptyState action={emptyAction} icon={Inbox} title={emptyMessage} />
+                    <EmptyState action={emptyAction} icon={Inbox} title={resolvedEmptyMessage} />
                 ) : (
                     <div className="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-gray-700/50 bg-gray-700/40 sm:grid-cols-2">
                         {entries.map(([key, value]) => (
                             <div key={key} className="flex flex-col gap-1 bg-surface-0/60 p-3">
                                 <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">{columnLabels?.[key] ?? key}</span>
                                 <span className="break-words text-sm text-gray-200">
-                                    <span className={formatColumns?.[key] ? "whitespace-pre-line" : "line-clamp-4"}>{formatColumns?.[key] ? formatColumns[key](value, data!) : formatRecordValue(value)}</span>
+                                    <span className={formatColumns?.[key] ? "whitespace-pre-line" : "line-clamp-4"}>{formatColumns?.[key] ? formatColumns[key](value, data!) : formatRecordValue(value, t)}</span>
                                 </span>
                             </div>
                         ))}

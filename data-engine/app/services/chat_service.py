@@ -8,6 +8,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.local_date import local_today
 from app.llm.base import LLMProvider
 from app.llm.chat_provider import create_chat_llm_provider
 from app.llm.errors import ProviderTransportError
@@ -37,6 +38,7 @@ from app.services.brain_service import (
 )
 from app.services.chat_synthesis_service import ChatSynthesisService
 from app.services.claim_scope import latest_thesis_version, live_claims
+from app.services.company_catalog import all_companies
 from app.services.company_resolver import resolve_company
 from app.services.library_context import company_library_context, retrieve_library_context
 from app.services.memory_service import MemoryService, remember_note
@@ -787,7 +789,7 @@ class ChatService:
         - Con varias empresas distintas nombradas no se elige ninguna: la
           ambiguedad se deja al flujo general en vez de adivinar.
         """
-        companies = list(db.scalars(select(Company)).all())
+        companies = list(all_companies(db))
         by_ticker = {company.ticker.upper(): company for company in companies}
         found: dict[str, Company] = {}
         has_cue = bool(_COMPANY_CUE_RE.search(question))
@@ -961,21 +963,33 @@ class ChatService:
             tenant_id = db.info.get("tenant_id")
             if type(tenant_id) is not int or tenant_id <= 0:
                 return []
+            # Hidratacion en lote (anti N+1): una consulta para todos los
+            # candidatos con los mismos filtros (tenant, empresa); el orden y
+            # el cap se siguen decidiendo al recorrer los hits.
+            candidate_ids = [
+                hit["entity_id"]
+                for hit in hits
+                if hit.get("entity_type") == "document_chunk" and type(hit.get("entity_id")) is int
+            ]
+            hydrated: dict[int, tuple[DocumentChunk, Document]] = {}
+            if candidate_ids:
+                statement = (
+                    select(DocumentChunk, Document)
+                    .join(Document, Document.id == DocumentChunk.document_id)
+                    .where(DocumentChunk.id.in_(candidate_ids), DocumentChunk.tenant_id == tenant_id,
+                           Document.tenant_id == tenant_id)
+                )
+                if company:
+                    statement = statement.where(Document.company_id == company.id)
+                for row in db.execute(statement).all():
+                    hydrated[row[0].id] = (row[0], row[1])
             rows = []
             seen = set()
             for hit in hits:
                 chunk_id = hit.get("entity_id")
                 if hit.get("entity_type") != "document_chunk" or type(chunk_id) is not int or chunk_id in seen:
                     continue
-                statement = (
-                    select(DocumentChunk, Document)
-                    .join(Document, Document.id == DocumentChunk.document_id)
-                    .where(DocumentChunk.id == chunk_id, DocumentChunk.tenant_id == tenant_id,
-                           Document.tenant_id == tenant_id)
-                )
-                if company:
-                    statement = statement.where(Document.company_id == company.id)
-                row = db.execute(statement).first()
+                row = hydrated.get(chunk_id)
                 if not row:
                     continue
                 chunk, document = row
@@ -1013,6 +1027,12 @@ class ChatService:
         page: ChatPageContext | None = None,
         history: list[ChatTurn] | None = None,
     ) -> ChatResponse:
+        # Idioma de generacion (i18n B): esta corrutina puede correr en un
+        # hilo puente sin el contextvar de la peticion; la sesion es el
+        # canal robusto (chat.py copia db.info al hilo worker).
+        from app.core.i18n import language_from_db, reset_language_scope, set_language_scope
+
+        _lang_token = set_language_scope(language_from_db(db))
         try:
             return await self._answer_impl(
                 db, question, scope, ticker,
@@ -1033,6 +1053,8 @@ class ChatService:
                     "deadline_seconds": get_settings().chat_total_timeout_seconds,
                 },
             )
+        finally:
+            reset_language_scope(_lang_token)
 
     @bounded_chat
     async def _answer_impl(
@@ -1180,7 +1202,7 @@ class ChatService:
             )
             from app.services.company_names import ambiguous_name_answer, companies_named_in
 
-            named = companies_named_in(question, db.scalars(select(Company)).all())
+            named = companies_named_in(question, all_companies(db))
             if named.ambiguous and not named.companies and not doctrine_question:
                 word, candidates = named.ambiguous[0]
                 return ChatResponse(
@@ -2128,7 +2150,7 @@ class ChatService:
         """Empresa nombrada por su nombre («mis acciones de Apple»), solo si es única."""
         words = {w.lower() for w in re.findall(r"[A-Za-zÀ-ÿ]{4,}", question or "")}
         found: dict[int, Company] = {}
-        for company in db.scalars(select(Company)).all():
+        for company in all_companies(db):
             first = re.findall(r"[A-Za-zÀ-ÿ]{4,}", company.name or "")
             if first and first[0].lower() in words and first[0].lower() not in _GENERIC_NAME_WORDS:
                 found[company.id] = company
@@ -2299,7 +2321,7 @@ class ChatService:
             f"{intro} Si vendieras {sale_text}: valor {_fmt_money_es(float(res.value_eur))} €, "
             f"coste {_fmt_money_es(float(res.cost_eur))} €"
         )
-        year = date.today().year
+        year = local_today().year
         if res.gain_eur > 0 and res.tax_eur is not None:
             rate = res.tax_eur / res.gain_eur * 100
             answer = (
@@ -2397,7 +2419,7 @@ class ChatService:
         source = self._source_entry(
             "position", pos.id, f"Posición {company.ticker}", url="/portfolio", as_of=str(pos.as_of)
         )
-        today = date.today()
+        today = local_today()
         fifo = simulate_fifo_sale(
             db, tenant_id=tenant_id, company_id=company.id, quantity=qty, held_quantity=held, sale_date=today,
         )

@@ -18,8 +18,13 @@ describe('ajustes', () => {
   it('la pagina ofrece datos fiscales, modelo de IA y Telegram', () => {
     assert.match(route, /requireAuthenticatedUser/);
     assert.match(route, /SettingsContent/);
-    assert.match(page, /Datos fiscales del declarante/);
-    assert.match(page, /title="Modelo de IA"/);
+    assert.ok(page.includes("title={t('settings.tax.title')}"));
+    assert.ok(page.includes("title={t('settings.llm.title')}"));
+    for (const [locale, tax, llm] of [['es', 'Datos fiscales del declarante', 'Modelo de IA'], ['en', 'Declarant tax details', 'AI model']]) {
+      const messages = JSON.parse(read(`lib/i18n/messages/${locale}/settings.json`));
+      assert.equal(messages.tax.title, tax);
+      assert.equal(messages.llm.title, llm);
+    }
     assert.match(page, /id="llm"/);
     assert.match(page, /LlmSettingsForm/);
     assert.match(page, /href="\/alerts"/);
@@ -42,7 +47,10 @@ describe('ajustes', () => {
     assert.match(llmForm, /type="password"/);
     assert.doesNotMatch(llmForm, /initial\.api_key\b/);
     assert.doesNotMatch(llmForm, /defaultValue=\{[^}]*api[_-]?key/i);
-    assert.match(llmForm, /Los proveedores de pago los paga el usuario/);
+    assert.ok(llmForm.includes("t('settings.llm.paidNote')"));
+    for (const [locale, paid] of [['es', /Los proveedores de pago los paga el usuario/], ['en', /Paid providers are paid by the user/]] as const) {
+      assert.match(JSON.parse(read(`lib/i18n/messages/${locale}/settings.json`)).llm.paidNote, paid);
+    }
     assert.match(llmForm, /href="\/privacidad"/);
   });
   it('la accion solo devuelve la vista del backend (sin clave)', () => {

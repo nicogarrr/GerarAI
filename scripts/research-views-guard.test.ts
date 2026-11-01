@@ -108,15 +108,18 @@ describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
             assert.ok(inline || optional, `sección ${anchor} presente`);
         }
         // Sumario local de la pestaña: nunca otra barra global.
-        assert.match(page, /aria-label="En esta página"/);
+        const esResearch = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8'));
+        assert.ok(page.includes("aria-label={t('research.fichaOnThisPage')}"), 'sumario local via i18n');
+        assert.equal(esResearch['fichaOnThisPage'], 'En esta página', 'el literal ES visible no cambia');
         // Las secciones no principales degradan a aviso inline, nunca a vacío.
-        assert.match(page, /optionalSection\('terminal', 'Terminal financiero'/);
+        assert.ok(page.includes("optionalSection('terminal', t('research.fichaSecTerminal')"), 'terminal con título i18n');
+        assert.equal(esResearch['fichaSecTerminal'], 'Terminal financiero', 'el literal ES visible no cambia');
         assert.match(page, /<SectionLoadError retryHref=/);
     });
 
     it('el resumen conserva el acceso al modelo completo en su ancla canónica', () => {
         const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        assert.match(page, /\?view=valoracion#modelo`\}[^>]*>\{snapshot\.model_summary\.publishable \? 'publicable' : 'bloqueado'\}/, 'el estado sigue enlazando al modelo');
+        assert.match(page, /\?view=valoracion#modelo`\}[^>]*>\{snapshot\.model_summary\.publishable \? t\('research\.fichaModelPublishable'\) : t\('research\.fichaModelBlocked'\)\}/, 'el estado sigue enlazando al modelo');
         const modelStart = page.indexOf('const buildModelSection');
         const modelEnd = page.indexOf('const buildMarketOpportunitySection', modelStart);
         assert.ok(modelStart > 0 && modelEnd > modelStart, 'sección Modelo identificada');
@@ -124,7 +127,8 @@ describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
         assert.match(modelView, /await viewData\('model'\)/, 'sigue leyendo el modelo real');
         assert.match(modelView, /<LongTermModelPanel model=\{model\?\.status === 'not_generated' \? null : model\} ticker=\{ticker\}/, 'conserva el panel completo y su estado vacío');
         const richPanel = readFileSync('components/research/FundamentalModelPanels.tsx', 'utf8');
-        assert.match(richPanel, />Modelo fundamental a largo plazo<\/h2>/, 'conserva el título en la vista rica');
+        assert.match(richPanel, />\{ti\('research\.model\.title'\)\}<\/h2>/, 'conserva el título en la vista rica');
+        assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).model.title, 'Modelo fundamental a largo plazo');
         assert.match(richPanel, /model\.horizon_years/, 'conserva el horizonte');
         assert.match(richPanel, /frameworkLabel\(model\.framework\.label\)/, 'conserva el framework');
         assert.match(richPanel, /model\.publishable/, 'conserva el estado publicable');
@@ -132,14 +136,17 @@ describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
 
     it('los paneles del resumen van plegados por defecto en móvil (feedback Nico)', () => {
         const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        for (const title of ['Últimas noticias', 'Calidad financiera según la empresa', 'Últimos cambios', 'Por dónde seguir', 'Satélites AST']) {
-            const i = page.indexOf(`title="${title}"`);
+        const expectedTitles = { fichaLatestNews: 'Últimas noticias', fichaFinancialQuality: 'Calidad financiera según la empresa', fichaLatestChanges: 'Últimos cambios', fichaWhereNext: 'Por dónde seguir', fichaSatellitesPanel: 'Satélites AST' };
+        const ES = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8'));
+        for (const [key, title] of Object.entries(expectedTitles)) {
+            assert.equal(ES[key], title, `clave ${key} conserva el título visible`);
+            const i = page.indexOf(`title={t('research.${key}')}`);
             assert.ok(i > 0, `panel ${title} existe`);
             const openTag = page.slice(page.lastIndexOf('<Panel', i), i);
             assert.ok(openTag.includes('collapsible="mobile"'), `panel ${title} plegable en móvil`);
         }
         // «Última tesis» es lo esencial de la ficha: abierta en móvil, con veredicto y cifras clave.
-        const tesis = page.indexOf('title="Última tesis"');
+        const tesis = page.indexOf("title={t('research.fichaLatestThesis')}");
         assert.ok(!page.slice(page.lastIndexOf('<Panel', tesis), tesis).includes('collapsible'), 'Última tesis no se pliega');
     });
 });

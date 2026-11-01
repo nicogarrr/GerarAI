@@ -8,7 +8,7 @@ import test from 'node:test';
 const SRC = readFileSync('components/PersonalizedOverview.tsx', 'utf8');
 
 test('fecha del hecho omitida cuando coincide con la de entrega', () => {
-    assert.ok(SRC.includes('alertHeading(copy.heading, item.createdAt)'));
+    assert.ok(SRC.includes('alertHeading(copy.heading, copy.dateSuffix, item.createdAt, locale)'));
 });
 
 test('el badge de severidad solo sale en alta o crítica', () => {

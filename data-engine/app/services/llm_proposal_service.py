@@ -104,6 +104,16 @@ SYSTEM = _PROMPT.text
 PROPOSAL_TASK = _PROMPT.task
 
 
+def _prompt():
+    """i18n B: resuelve el prompt en el idioma activo de la peticion.
+
+    La constante de modulo queda en espanol (los tests la fijan); cada
+    llamada pasa por ``get_prompt`` para heredar el idioma del scope.
+    """
+    return get_prompt("paper_trade_proposal", allow_remote=False)
+
+
+
 class ProposalRejected(Exception):
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
@@ -167,14 +177,14 @@ def build_request(
     }
     return LLMRequest(
         messages=[
-            Message("system", SYSTEM),
+            Message("system", _prompt().text),
             Message("user", json.dumps(payload, ensure_ascii=False, default=str)),
         ],
-        task=PROPOSAL_TASK,
+        task=_prompt().task,
         temperature=0.2,
         max_tokens=900,
         response_format=ResponseFormat.json_schema(_SCHEMA, name="paper_proposal"),
-        metadata=_PROMPT.trace_metadata(),
+        metadata=_prompt().trace_metadata(),
     )
 
 

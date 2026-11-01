@@ -162,6 +162,8 @@ def test_403_degrades_to_snapshot_with_explicit_state(db, monkeypatch):
         raise RuntimeError("SEC EDGAR request failed (403 Forbidden)")
 
     monkeypatch.setattr(service, "_fetch_live_entity_facts", _blocked)
+    # La via live exige edgartools instalado; sin el pin el test depende del entorno.
+    monkeypatch.setattr(client, "is_installed", lambda: True)
     client.default_breaker().reset_for_tests()
     company = _company(db)
     result = refresh_from_edgartools(db, company, force=True, snapshot_root=FIXTURES)
@@ -181,6 +183,9 @@ def test_429_feeds_breaker_and_degrades(db, monkeypatch):
         raise RuntimeError("Client error '429 Too Many Requests' for url")
 
     monkeypatch.setattr(service, "_fetch_live_entity_facts", _limited)
+    # La via live exige edgartools instalado: sin este pin, en un entorno sin
+    # edgar el servicio nunca llama al stub y el breaker no recibe los 429.
+    monkeypatch.setattr(client, "is_installed", lambda: True)
     breaker = client.default_breaker()
     breaker.reset_for_tests()
     company = _company(db)

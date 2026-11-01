@@ -5,41 +5,44 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { saveTaxDeclarant, type TaxCustodyEntity, type TaxDeclarant } from '@/lib/actions/taxes.actions';
+import { useT } from '@/lib/i18n/client';
+import type { TranslateFn } from '@/lib/i18n/translate';
 import { spanishTaxIdWarning } from '@/lib/nif';
 import { showErrorToast } from '@/lib/toast';
 
 const FIELDS = [
-    { key: 'apellidos_nombre', label: 'Apellidos y nombre', autoComplete: 'name' },
-    { key: 'nif', label: 'NIF', autoComplete: 'off' },
-    { key: 'numero_declaracion', label: 'Número de declaración (720)', autoComplete: 'off' },
-    { key: 'telefono', label: 'Teléfono', autoComplete: 'tel' },
+    { key: 'apellidos_nombre', label: 'settings.tax.fields.fullName', autoComplete: 'name' },
+    { key: 'nif', label: 'settings.tax.fields.nif', autoComplete: 'off' },
+    { key: 'numero_declaracion', label: 'settings.tax.fields.returnNumber', autoComplete: 'off' },
+    { key: 'telefono', label: 'settings.tax.fields.phone', autoComplete: 'tel' },
 ] as const;
 
 const FILED = [
-    { value: '', label: 'Sin indicar' },
-    { value: 'true', label: 'Sí' },
-    { value: 'false', label: 'No' },
+    { value: '', label: 'settings.tax.filed.unset' },
+    { value: 'true', label: 'settings.tax.filed.yes' },
+    { value: 'false', label: 'settings.tax.filed.no' },
 ] as const;
 
-const ENTITY_FIELDS: { key: keyof TaxCustodyEntity; label: string }[] = [
-    { key: 'name', label: 'Entidad depositaria' },
-    { key: 'nif', label: 'NIF de la entidad' },
-    { key: 'street', label: 'Domicilio' },
-    { key: 'complement', label: 'Complemento' },
-    { key: 'city', label: 'Ciudad' },
-    { key: 'region', label: 'Región' },
-    { key: 'zip', label: 'Código postal' },
-    { key: 'country', label: 'País (ISO)' },
+const ENTITY_FIELDS: { key: keyof TaxCustodyEntity; label: `settings.tax.entity.${keyof TaxCustodyEntity}` }[] = [
+    { key: 'name', label: 'settings.tax.entity.name' },
+    { key: 'nif', label: 'settings.tax.entity.nif' },
+    { key: 'street', label: 'settings.tax.entity.street' },
+    { key: 'complement', label: 'settings.tax.entity.complement' },
+    { key: 'city', label: 'settings.tax.entity.city' },
+    { key: 'region', label: 'settings.tax.entity.region' },
+    { key: 'zip', label: 'settings.tax.entity.zip' },
+    { key: 'country', label: 'settings.tax.entity.country' },
 ];
 
 const EMPTY_ENTITY: TaxCustodyEntity = { name: '', nif: '', street: '', city: '', zip: '', country: '', complement: '', region: '' };
 const ISIN = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
 
-function partidaLabel(key: string): string {
-    return key.startsWith('cash:') ? `Cuenta ${key.slice(5)}` : key;
+function partidaLabel(key: string, t: TranslateFn): string {
+    return key.startsWith('cash:') ? t('settings.tax.cashAccount', { currency: key.slice(5) }) : key;
 }
 
 export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant }) {
+    const t = useT();
     const [values, setValues] = useState({
         apellidos_nombre: initial.apellidos_nombre,
         nif: initial.nif,
@@ -76,7 +79,7 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
             setCustody(saved.custody);
             setEntities(saved.custody_entities);
             setDates(saved.first_acquisition_dates);
-            toast.success('Datos guardados');
+            toast.success(t('settings.tax.saved'));
         } catch (cause) {
             showErrorToast(cause);
         } finally {
@@ -89,13 +92,13 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
             <div className="grid gap-4 md:grid-cols-2">
                 {FIELDS.map((field) => (
                     <label className="space-y-1 text-sm text-gray-300" key={field.key}>
-                        <span>{field.label}</span>
+                        <span>{t(field.label)}</span>
                         <Input
                             // Sin aria-label el aviso suave (que vive dentro del
                             // <label>) pasaba al nombre accesible del campo y el
                             // lector de pantalla lo anunciaba como su nombre; el
                             // aviso corresponde a la descripción, no al nombre.
-                            aria-label={field.label}
+                            aria-label={t(field.label)}
                             aria-describedby={field.key === 'nif' && nifWarning ? 'tax-declarant-nif-warning' : undefined}
                             className="h-11"
                             autoComplete={field.autoComplete}
@@ -111,38 +114,38 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                     </label>
                 ))}
                 <label className="space-y-1 text-sm text-gray-300">
-                    <span>Presentaste el 720 en ejercicios anteriores</span>
+                    <span>{t('settings.tax.filedBefore')}</span>
                     <select
-                        className="h-11 w-full rounded-lg border border-gray-600 bg-transparent px-3 text-sm"
+                        className="h-11 w-full rounded-lg border border-gray-600 bg-transparent px-3 text-base sm:text-sm"
                         disabled={busy}
                         onChange={(event) => setFiled(event.target.value)}
                         value={filed}
                     >
-                        {FILED.map((option) => <option className="bg-gray-900" key={option.value} value={option.value}>{option.label}</option>)}
+                        {FILED.map((option) => <option className="bg-gray-900" key={option.value} value={option.value}>{t(option.label)}</option>)}
                     </select>
                 </label>
             </div>
             {initial.partidas.length ? (
                 <details className="rounded-lg border border-gray-800 p-3">
                     <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-gray-200">
-                        Custodia por partida ({initial.partidas.length})
+                        {t('settings.tax.custodyTitle', { count: initial.partidas.length })}
                     </summary>
                     <fieldset className="mt-3 space-y-2">
-                    <legend className="sr-only">Custodia por partida</legend>
+                    <legend className="sr-only">{t('settings.tax.custodyLegend')}</legend>
                     <div className="space-y-3">
                         {initial.partidas.map((key) => {
                             const entity = entities[key] ?? EMPTY_ENTITY;
                             return (
                                 <div className="rounded-md border border-gray-800 p-3 text-sm text-gray-300" key={key}>
                                     <div className="flex flex-wrap items-center justify-between gap-3">
-                                        <span className="min-w-0 break-words font-medium">{partidaLabel(key)}</span>
+                                        <span className="min-w-0 break-words font-medium">{partidaLabel(key, t)}</span>
                                         <label className="flex items-center gap-2 text-xs text-gray-400" htmlFor={`custody-country-${key}`}>
-                                            <span>País de custodia</span>
+                                            <span>{t('settings.tax.custodyCountry')}</span>
                                             <Input
-                                                aria-label={`País de custodia de ${partidaLabel(key)}`}
+                                                aria-label={t('settings.tax.custodyCountryOf', { item: partidaLabel(key, t) })}
                                                 className="h-11 w-24 uppercase"
                                                 id={`custody-country-${key}`}
-                                                placeholder="Ej. ES"
+                                                placeholder={t('settings.tax.countryPlaceholder')}
                                                 disabled={busy}
                                                 maxLength={2}
                                                 onChange={(event) => setCustody((current) => ({ ...current, [key]: event.target.value }))}
@@ -151,11 +154,11 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                                         </label>
                                     </div>
                                     <details className="mt-3">
-                                        <summary className="min-h-11 cursor-pointer py-2 text-teal-300">Entidad depositaria y fecha</summary>
+                                        <summary className="min-h-11 cursor-pointer py-2 text-teal-300">{t('settings.tax.entityAndDate')}</summary>
                                         <div className="mt-2 grid gap-3 md:grid-cols-2">
                                             {ISIN.test(key) ? (
                                                 <label className="space-y-1">
-                                                    <span>Primera adquisición</span>
+                                                    <span>{t('settings.tax.firstAcquisition')}</span>
                                                     <Input
                                                         className="h-11"
                                                         disabled={busy}
@@ -167,7 +170,7 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                                             ) : null}
                                             {ENTITY_FIELDS.map((field) => (
                                                 <label className="space-y-1" key={field.key}>
-                                                    <span>{field.label}</span>
+                                                    <span>{t(field.label)}</span>
                                                     <Input
                                                         className="h-11"
                                                         disabled={busy}
@@ -188,7 +191,7 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                     </fieldset>
                 </details>
             ) : null}
-            <Button disabled={busy} type="submit">{busy ? 'Guardando…' : 'Guardar'}</Button>
+            <Button disabled={busy} type="submit">{busy ? t('settings.common.saving') : t('settings.common.save')}</Button>
         </form>
     );
 }

@@ -53,6 +53,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models.entities import Company, DividendRecord, Position
 from app.services.dividend_records import (
     records_in_position_currency,
@@ -172,7 +173,9 @@ def _month_key(d: date) -> str:
 
 class DividendProjectionService:
     def project(self, db: Session, months: int = 12) -> dict[str, Any]:
-        today = date.today()
+        # «Hoy» del usuario (Europe/Madrid): con el reloj UTC, entre las 00:00
+        # y las 01:00/02:00 la proyección seguía empezando en el día (y el mes) anterior.
+        today = local_today()
         cutoff = _shift_year(today, -1)
         # Horizonte exacto por fechas: [today, today + months meses], ambos
         # inclusive. Los buckets mensuales cubren desde el mes actual hasta
@@ -322,7 +325,12 @@ class DividendProjectionService:
 
             month_entries: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
             for record in trailing:
-                for year_offset in range(1, years_in_horizon + 1):
+                # Ex-date ya pasada y pago aun pendiente: ese cobro es real y cae
+                # dentro del horizonte (offset 0). Antes solo se replicaba a un
+                # ano vista y el trimestre declarado se perdia (3 de 4 pagos).
+                # Sin pay_date no hay pago pendiente que contar: solo replicas.
+                first_offset = 0 if record.pay_date and record.pay_date > today else 1
+                for year_offset in range(first_offset, years_in_horizon + 1):
                     projected = _shift_year(record.pay_date or record.ex_date, year_offset)
                     if projected < today or projected > end:
                         continue

@@ -32,5 +32,7 @@
   "providerError": "Search is unavailable right now (data provider failure). Please try again in a few seconds.",
   "noResultsFor": "No results for “{query}”.",
   "companies": "Companies",
-  "following": "Following"
+  "following": "Following",
+  "submitSearch": "Search",
+  "libraryLink": "Library"
 }

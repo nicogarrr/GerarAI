@@ -4,22 +4,24 @@ import { getAuth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { callAuthEndpoint } from "@/lib/auth/endpoint";
 import { AuthenticationError, toAppError, getSafeErrorMessage } from "@/lib/types/errors";
-import { ERROR_MESSAGES } from "@/lib/constants";
+import { getT } from "@/lib/i18n/server";
 
-export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData): Promise<{ success: boolean; error?: string }> => {
+export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData): Promise<{ success: boolean; error?: string; accountStatus?: string }> => {
+    const t = await getT();
     try {
         const auth = await getAuth();
         if (!auth) {
-            throw new AuthenticationError(ERROR_MESSAGES.AUTH_UNAVAILABLE);
+            throw new AuthenticationError(t('errors.backend.authUnavailable'));
         }
 
         // El perfil inversor viaja en el propio sign-up (additionalFields de
         // better-auth, sin migraciones SQL) en vez de perderse en el destructuring.
-        await callAuthEndpoint('/sign-up/email', { email, password, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry });
+        const response = await callAuthEndpoint('/sign-up/email', { email, password, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry });
 
         // The auth endpoint delivers the session in HttpOnly cookies. Never serialize
         // Better Auth's response: it also contains the raw bearer session token.
-        return { success: true };
+        // accountStatus ('pending' con el alta abierta) enruta a /cuenta-pendiente.
+        return { success: true, ...(response.accountStatus ? { accountStatus: response.accountStatus } : {}) };
     } catch (error: unknown) {
         const appError = toAppError(error);
         // The endpoint maps documented status/code pairs to safe Spanish copy.
@@ -30,14 +32,14 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
 
 
         // Mensajes de error más específicos
-        let errorMessage: string = ERROR_MESSAGES.AUTH_FAILED;
+        let errorMessage: string = t('errors.backend.authFailed');
 
         if (appError.message.includes('email') || appError.message.includes('Email')) {
-            errorMessage = 'Este email ya está registrado. Inicia sesión.';
+            errorMessage = t('errors.backend.emailAlreadyRegistered');
         } else if (appError.message.includes('password') || appError.message.includes('Password')) {
-            errorMessage = 'La contraseña debe tener al menos 8 caracteres.';
+            errorMessage = t('errors.backend.passwordTooShort');
         } else if (appError.message.includes('unavailable') || appError.message.includes('temporarily')) {
-            errorMessage = ERROR_MESSAGES.AUTH_UNAVAILABLE;
+            errorMessage = t('errors.backend.authUnavailable');
         } else {
             errorMessage = getSafeErrorMessage(error);
         }
@@ -47,11 +49,12 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
     }
 }
 
-export const signInWithEmail = async ({ email, password }: SignInFormData): Promise<{ success: boolean; error?: string; twoFactorRequired?: boolean }> => {
+export const signInWithEmail = async ({ email, password }: SignInFormData): Promise<{ success: boolean; error?: string; twoFactorRequired?: boolean; code?: string }> => {
+    const t = await getT();
     try {
         const auth = await getAuth();
         if (!auth) {
-            throw new AuthenticationError(ERROR_MESSAGES.AUTH_UNAVAILABLE);
+            throw new AuthenticationError(t('errors.backend.authUnavailable'));
         }
 
         const response = await callAuthEndpoint('/sign-in/email', { email, password });
@@ -72,7 +75,19 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
         // The endpoint maps documented status/code pairs to safe Spanish copy.
         // Do not reinterpret that structured result by English substrings.
         if (appError.code.startsWith('AUTH_ENDPOINT_') || appError.code === 'AUTH_UNAVAILABLE') {
-            return { success: false, error: getSafeErrorMessage(appError) };
+            // Código estable para el front solo donde el contrato lo pide
+            // (ACCOUNT_PENDING / ACCOUNT_REJECTED enrutan a /cuenta-pendiente);
+            // el resto mantiene la forma exacta de siempre.
+            const stableCode = appError.code === 'AUTH_ENDPOINT_ACCOUNT_PENDING'
+                ? 'ACCOUNT_PENDING'
+                : appError.code === 'AUTH_ENDPOINT_ACCOUNT_REJECTED'
+                    ? 'ACCOUNT_REJECTED'
+                    : undefined;
+            return {
+                success: false,
+                error: getSafeErrorMessage(appError),
+                ...(stableCode ? { code: stableCode } : {}),
+            };
         }
 
 
@@ -85,12 +100,12 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
             return { success: false, twoFactorRequired: true };
         }
 
-        let errorMessage: string = ERROR_MESSAGES.AUTH_FAILED;
+        let errorMessage: string = t('errors.backend.authFailed');
 
         if (appError.message.includes('Invalid') || appError.message.includes('invalid')) {
-            errorMessage = 'Email o contraseña no válidos. Revisa los datos e inténtalo de nuevo.';
+            errorMessage = t('errors.backend.invalidCredentialsLong');
         } else if (appError.message.includes('unavailable') || appError.message.includes('temporarily')) {
-            errorMessage = ERROR_MESSAGES.AUTH_UNAVAILABLE;
+            errorMessage = t('errors.backend.authUnavailable');
         } else {
             errorMessage = getSafeErrorMessage(error);
         }
@@ -102,10 +117,11 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
 
 export const verifyTwoFactorTotp = async ({ email, password, totpCode }: { email: string; password: string; totpCode: string }): Promise<{ success: boolean; error?: string }> => {
     void email; void password; // the pending 2FA session is carried by the cookies
+    const t = await getT();
     try {
         const auth = await getAuth();
         if (!auth) {
-            throw new AuthenticationError(ERROR_MESSAGES.AUTH_UNAVAILABLE);
+            throw new AuthenticationError(t('errors.backend.authUnavailable'));
         }
 
         await callAuthEndpoint('/two-factor/verify-totp', { code: totpCode });
@@ -118,15 +134,16 @@ export const verifyTwoFactorTotp = async ({ email, password, totpCode }: { email
         console.error('2FA verification failed:', appError);
         return { success: false, error: appError.statusCode === 429 || appError.statusCode === 503
             ? getSafeErrorMessage(appError)
-            : 'Código de autenticación no válido. Inténtalo de nuevo.' };
+            : t('errors.backend.invalidTotp') };
     }
 }
 
 export const enableTwoFactorTotp = async ({ password }: { password: string }): Promise<{ success: boolean; data?: { totpURI?: string; backupCodes?: string[] }; error?: string }> => {
+    const t = await getT();
     try {
         const auth = await getAuth();
         if (!auth) {
-            throw new AuthenticationError(ERROR_MESSAGES.AUTH_UNAVAILABLE);
+            throw new AuthenticationError(t('errors.backend.authUnavailable'));
         }
 
         const response = await auth.api.enableTwoFactor({
@@ -149,10 +166,11 @@ export const enableTwoFactorTotp = async ({ password }: { password: string }): P
 }
 
 export const activateTwoFactorTotp = async ({ totpCode }: { totpCode: string }): Promise<{ success: boolean; error?: string }> => {
+    const t = await getT();
     try {
         const auth = await getAuth();
         if (!auth) {
-            throw new AuthenticationError(ERROR_MESSAGES.AUTH_UNAVAILABLE);
+            throw new AuthenticationError(t('errors.backend.authUnavailable'));
         }
 
         await auth.api.verifyTOTP({
@@ -164,15 +182,16 @@ export const activateTwoFactorTotp = async ({ totpCode }: { totpCode: string }):
     } catch (error: unknown) {
         const appError = toAppError(error);
         console.error('Activate 2FA failed:', appError);
-        return { success: false, error: 'Código de autenticación no válido. Inténtalo de nuevo.' };
+        return { success: false, error: t('errors.backend.invalidTotp') };
     }
 }
 
 export const disableTwoFactor = async ({ password }: { password: string }): Promise<{ success: boolean; error?: string }> => {
+    const t = await getT();
     try {
         const auth = await getAuth();
         if (!auth) {
-            throw new AuthenticationError(ERROR_MESSAGES.AUTH_UNAVAILABLE);
+            throw new AuthenticationError(t('errors.backend.authUnavailable'));
         }
 
         await auth.api.disableTwoFactor({
@@ -189,10 +208,11 @@ export const disableTwoFactor = async ({ password }: { password: string }): Prom
 }
 
 export const getTwoFactorStatus = async (): Promise<{ success: boolean; enabled?: boolean; error?: string }> => {
+    const t = await getT();
     try {
         const auth = await getAuth();
         if (!auth) {
-            throw new AuthenticationError(ERROR_MESSAGES.AUTH_UNAVAILABLE);
+            throw new AuthenticationError(t('errors.backend.authUnavailable'));
         }
 
         const session = await auth.api.getSession({ headers: await headers() });
@@ -208,10 +228,11 @@ export const getTwoFactorStatus = async (): Promise<{ success: boolean; enabled?
 }
 
 export const signOut = async (): Promise<{ success: boolean; error?: string }> => {
+    const t = await getT();
     try {
         const auth = await getAuth();
         if (!auth) {
-            throw new AuthenticationError(ERROR_MESSAGES.AUTH_UNAVAILABLE);
+            throw new AuthenticationError(t('errors.backend.authUnavailable'));
         }
 
         await auth.api.signOut({ headers: await headers() });
@@ -219,6 +240,6 @@ export const signOut = async (): Promise<{ success: boolean; error?: string }> =
     } catch (error: unknown) {
         const appError = toAppError(error);
         console.error('Sign out failed:', appError);
-        return { success: false, error: 'No se pudo cerrar la sesión. Recarga la página e inténtalo de nuevo.' };
+        return { success: false, error: t('errors.backend.signOutFailed') };
     }
 }

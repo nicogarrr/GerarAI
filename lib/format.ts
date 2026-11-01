@@ -68,7 +68,8 @@ export type LocalizedNumberError = 'empty' | 'invalid' | 'ambiguous';
 
 const INT_PLAIN = /^\d+$/;
 // Miles es-ES estrictos: grupos de 3 tras el primero («1.234», «12.345.678»).
-const INT_GROUPS_ES = /^\d{1,3}(?:\.\d{3})+$/;
+// El primer grupo nunca es «0»: «0.125» es 0,125 y no 125 (factor 1000).
+const INT_GROUPS_ES = /^[1-9]\d{0,2}(?:\.\d{3})+$/;
 
 /**
  * Parsea números escritos por el usuario en formato es-ES sin adivinar.
@@ -109,7 +110,7 @@ export function parseLocalizedNumberDetailed(
     // («1,234», «1,234.56») y el punto es el decimal («32.5», «.5», «5.»).
     // Misma regla de honestidad que en es-ES: lo ambiguo se rechaza («32,5»,
     // «1.234,56», «1.234.567»), nunca se reinterpreta.
-    const match = /^(\d{1,3}(?:,\d{3})*|\d+)?(?:\.(\d*))?$/.exec(body);
+    const match = /^([1-9]\d{0,2}(?:,\d{3})+|\d+)?(?:\.(\d*))?$/.exec(body);
     if (match && (match[1] !== undefined || (match[2] ?? '') !== '')) {
       const intPart = (match[1] ?? '').replace(/,/g, '');
       const decPart = match[2] ?? '';
@@ -352,6 +353,11 @@ export function formatCompact(
   // «compact»): 999.999.999 redondea a 1.000 M y debe salir «1 mil M».
   const digits = Math.min(Math.max(Math.trunc(maximumFractionDigits), 0), 20);
   const roundsTo = (scaled: number) => Number(scaled.toFixed(digits));
+  // Billones (10^12): «3.414 mil M» se leía como tres mil cuatrocientos
+  // (visto en prod, capitalización de GOOGL). A partir de 1e12, «3,41 B».
+  if (abs >= 1e12 || roundsTo(abs / 1e9) >= 1000) {
+    return `${formatNumber(parsed / 1e12, { maximumFractionDigits, ...rest }, fallback, locale)} B`;
+  }
   if (abs >= 1e9 || roundsTo(abs / 1e6) >= 1000) {
     return `${formatNumber(parsed / 1e9, { maximumFractionDigits, ...rest }, fallback, locale)} mil M`;
   }
@@ -633,17 +639,41 @@ export function formatUserDateTime(
  * navegador da el de hoy, así que el default del input difiere entre el HTML
  * del servidor y la hidratación.
  */
-export function todayLocal(): string {
+export function todayLocal(date: Date = new Date()): string {
   // "Hoy" en la zona del USUARIO, no en la del proceso: con el servidor en
   // UTC y el navegador en Europe/Madrid, getFullYear()/getDate() daban dias
   // distintos entre el HTML del servidor y la hidratacion. `en-CA` rinde
-  // YYYY-MM-DD directamente.
+  // YYYY-MM-DD directamente. Acepta el instante a evaluar para que el
+  // validador compare contra el MISMO "hoy" que siembra el dialogo.
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: USER_TZ,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(new Date());
+  }).format(date);
+}
+
+/**
+ * Antigüedad compacta estilo feed («22 h», «1 d»), para la fila de noticias
+ * de Inicio (referencia Quartr, 1-nov-2026). `timestamp` viene en segundos.
+ * null = no representable (fecha inválida o más de 6 días: el caller pinta la
+ * fecha corta). `now` inyectable para no romper hidratación ni tests.
+ */
+export function formatAgeShort(
+  timestamp: number | null | undefined,
+  now: number = Date.now(),
+  locale: Locale = DEFAULT_LOCALE,
+): string | null {
+  const seconds = toFinite(timestamp);
+  if (seconds === null || seconds <= 0) return null;
+  const diffInMinutes = Math.max(0, Math.floor((now - seconds * 1000) / 60_000));
+  if (diffInMinutes < 1) return locale === 'en' ? 'now' : 'ahora';
+  if (diffInMinutes < 60) return `${diffInMinutes} min`;
+  const hours = Math.floor(diffInMinutes / 60);
+  if (hours < 24) return locale === 'en' ? `${hours}h` : `${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return locale === 'en' ? `${days}d` : `${days} d`;
+  return null;
 }
 
 /**

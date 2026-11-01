@@ -9,81 +9,147 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Panel } from '@/components/ui/panel';
 import BackendOffline from '@/components/system/BackendOffline';
-import { getPortfolioIntelligence, type PortfolioIntelligence } from '@/lib/actions/research-tools.actions';
+import { getPortfolioIntelligence, getPortfolioRiskMatrix, type PortfolioIntelligence, type PortfolioRiskMatrix } from '@/lib/actions/research-tools.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
-import { formatMarketDate, formatNumber, formatPercent, NA } from '@/lib/format';
+import { getT, getFormat } from '@/lib/i18n/server';
+import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
+import type { TranslationKey } from '@/lib/i18n/t';
+import type { Formatters } from '@/lib/format';
 
 
 
-const LEDGER_REASON_LABELS: Record<string, string> = {
-  missing_ledger: 'sin registro de transacciones',
-  incomplete_ledger: 'registro de transacciones incompleto',
-  missing_fx: 'sin tipo de cambio',
-  missing_start_price: 'sin precio al inicio del horizonte',
-  missing_start_fx: 'sin tipo de cambio al inicio del horizonte',
-  missing_end_value: 'sin valor actual en divisa base',
+const LEDGER_LABEL_KEYS = {
+  missing_ledger: 'portfolio.intelligence.ledger_missing_ledger',
+  incomplete_ledger: 'portfolio.intelligence.ledger_incomplete_ledger',
+  missing_fx: 'portfolio.intelligence.ledger_missing_fx',
+  missing_start_price: 'portfolio.intelligence.ledger_missing_start_price',
+  missing_start_fx: 'portfolio.intelligence.ledger_missing_start_fx',
+  missing_end_value: 'portfolio.intelligence.ledger_missing_end_value',
+} as const;
+const LEDGER_REASON_KEYS = Object.keys(LEDGER_LABEL_KEYS) as Array<keyof typeof LEDGER_LABEL_KEYS>;
+
+const ATTRIBUTION_ND_LABEL_KEYS = {
+  fundamental_growth: 'portfolio.intelligence.attrNd_fundamental_growth',
+  multiple: 'portfolio.intelligence.attrNd_multiple',
+  dividends: 'portfolio.intelligence.attrNd_dividends',
+  buybacks: 'portfolio.intelligence.attrNd_buybacks',
+  dilution: 'portfolio.intelligence.attrNd_dilution',
+  fx: 'portfolio.intelligence.attrNd_fx',
+  sizing: 'portfolio.intelligence.attrNd_sizing',
+} as const;
+const ATTRIBUTION_ND_KEYS = Object.keys(ATTRIBUTION_ND_LABEL_KEYS) as Array<keyof typeof ATTRIBUTION_ND_LABEL_KEYS>;
+
+// Portfolio X-ray rules (idea from Ghostfolio's X-ray report). Literal keys so the i18n
+// checker sees every text; an unknown rule or status falls back to «sin datos».
+const XRAY_LABEL_KEYS: Record<string, { aviso: TranslationKey; ok: TranslationKey }> = {
+  posicion_unica: { aviso: 'portfolio.intelligence.xrayPosicionUnicaAviso', ok: 'portfolio.intelligence.xrayPosicionUnicaOk' },
+  divisa_unica: { aviso: 'portfolio.intelligence.xrayDivisaUnicaAviso', ok: 'portfolio.intelligence.xrayDivisaUnicaOk' },
+  sector_unico: { aviso: 'portfolio.intelligence.xraySectorUnicoAviso', ok: 'portfolio.intelligence.xraySectorUnicoOk' },
+  pais_unico: { aviso: 'portfolio.intelligence.xrayPaisUnicoAviso', ok: 'portfolio.intelligence.xrayPaisUnicoOk' },
 };
 
+const RM_REASON_LABEL_KEYS = {
+  insufficient_history: 'portfolio.intelligence.rmReasonInsufficient',
+  fx_history_insufficient: 'portfolio.intelligence.rmReasonFx',
+  no_valuation: 'portfolio.intelligence.rmReasonNoValuation',
+  calendar_misaligned: 'portfolio.intelligence.rmReasonCalendar',
+} as const;
+const RM_REASON_KEYS = Object.keys(RM_REASON_LABEL_KEYS) as Array<keyof typeof RM_REASON_LABEL_KEYS>;
 
-const ATTRIBUTION_ND_REASONS: Record<string, string> = {
-  fundamental_growth: 'sin BPA anual en el horizonte',
-  multiple: 'depende de componentes sin dato',
-  dividends: 'sin dividendos en el registro de transacciones',
-  buybacks: 'sin cifras de acciones en el horizonte',
-  dilution: 'sin cifras de acciones en el horizonte',
-  fx: 'sin tipo de cambio',
-  sizing: 'sin precios en el horizonte',
-};
+const RM_WARNING_LABEL_KEYS = {
+  fx_conversion: 'portfolio.intelligence.rmWarnFx',
+  pairwise_fallback: 'portfolio.intelligence.rmWarnFallback',
+} as const;
+const RM_WARNING_KEYS = Object.keys(RM_WARNING_LABEL_KEYS) as Array<keyof typeof RM_WARNING_LABEL_KEYS>;
+
+function rmReasonLabel(ti: TFunction, key: string): string {
+  return (RM_REASON_KEYS as readonly string[]).includes(key)
+    ? ti(RM_REASON_LABEL_KEYS[key as keyof typeof RM_REASON_LABEL_KEYS])
+    : ti('portfolio.intelligence.rmReasonFallback');
+}
+
+function xrayLabelKey(id: string, status: string): TranslationKey {
+  const keys = XRAY_LABEL_KEYS[id];
+  if (!keys || (status !== 'aviso' && status !== 'ok')) return 'portfolio.intelligence.xraySinDatos';
+  return keys[status];
+}
+
+type LedgerReason = keyof typeof LEDGER_LABEL_KEYS;
+type AttributionNdReason = keyof typeof ATTRIBUTION_ND_LABEL_KEYS;
+
+function ledgerReasonLabel(ti: TFunction, key: string): string {
+  const reason: LedgerReason = (LEDGER_REASON_KEYS as readonly string[]).includes(key) ? (key as LedgerReason) : 'missing_ledger';
+  return (LEDGER_REASON_KEYS as readonly string[]).includes(key)
+    ? ti(LEDGER_LABEL_KEYS[reason])
+    : ti('portfolio.intelligence.ledger_fallback');
+}
+
+function attributionNdLabel(ti: TFunction, key: string): string {
+  return (ATTRIBUTION_ND_KEYS as readonly string[]).includes(key)
+    ? ti(ATTRIBUTION_ND_LABEL_KEYS[key as AttributionNdReason])
+    : ti('portfolio.intelligence.attrNd_fallback');
+}
 
 /** Celda de atribución: N/D con el motivo a mano (title) en vez de un 0,0 % inventado. */
-function attributionCell(value: number | null, key: string) {
-  if (value === null) return <span title={`N/D: ${ATTRIBUTION_ND_REASONS[key] ?? 'sin dato'}`}>{NA}</span>;
-  return pct(value);
+function attributionCell(ti: TFunction, f: Formatters, value: number | null, key: string) {
+  if (value === null) {
+    const na = ti('common.na');
+    return <span title={ti('portfolio.intelligence.attrNdTitle', { na, reason: attributionNdLabel(ti, key) })}>{na}</span>;
+  }
+  return f.formatPercent(value, { digits: 1 });
 }
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-  title: 'Inteligencia de cartera',
-  description:
-    'Rendimiento y riesgo histórico de la cartera: TWR, XIRR, caída máxima, volatilidad, VaR, correlaciones y atribución, con cobertura de datos y limitaciones explícitas. Las concentraciones están en Exposiciones de cartera.',
-};
-
-/** Porcentaje en es-ES. `null` es "sin dato" (NA), `0` es un 0,00 % legítimo. */
-function pct(value: number | null) { return formatPercent(value, { digits: 1 }); }
-/** Ratio en es-ES (Sharpe, Beta, Calmar…). `null` es "sin dato" (NA). */
-function ratio(value: number | null) { return formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+export async function generateMetadata(): Promise<Metadata> {
+  const ti = await getT();
+  return {
+    title: ti('portfolio.intelligence.metaTitle'),
+    description: ti('portfolio.intelligence.metaDescription'),
+  };
+}
 
 
 export default async function PortfolioIntelligencePage({ searchParams }: { searchParams: Promise<{ years?: string }> }) {
+  const ti = await getT();
+  const f = await getFormat();
+  const na = ti('common.na');
+  /** Porcentaje ligado al locale. `null` es "sin dato" (NA), `0` es un 0,00 % legítimo. */
+  const pct = (value: number | null) => f.formatPercent(value, { digits: 1 });
+  /** Ratio ligado al locale (Sharpe, Beta, Calmar…). `null` es "sin dato" (NA). */
+  const ratio = (value: number | null) => f.formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const query = await searchParams;
   const years = Math.max(1, Math.min(20, Number(query.years) || 5));
   // Sin este catch, un backend apagado (o un 5xx al calcular la analítica)
   // subía al ErrorBoundary global y el usuario se quedaba con una pantalla de
   // "se produjo un error inesperado" sin saber que era algo temporal.
   let data: PortfolioIntelligence;
+  let riskMatrix: PortfolioRiskMatrix;
   try {
-    data = await getPortfolioIntelligence(years);
+    [data, riskMatrix] = await Promise.all([getPortfolioIntelligence(years), getPortfolioRiskMatrix()]);
   } catch (error) {
     if (isBackendUnavailableError(error)) {
-      return <BackendOffline feature="Inteligencia de cartera" retryHref={`/portfolio/intelligence?years=${years}`} />;
+      return <BackendOffline feature={ti('portfolio.intelligence.featureName')} retryHref={`/portfolio/intelligence?years=${years}`} />;
     }
     throw error;
   }
   const tickers = Object.keys(data.risk.correlations);
-  return <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6"><header className="flex flex-col gap-4 border-b border-gray-800 pb-5 md:flex-row md:items-end"><div><Button asChild className="mb-4" size="sm" variant="ghost"><Link href="/portfolio"><ArrowLeft aria-hidden="true" className="h-4 w-4" />Cartera</Link></Button><p className="text-sm font-semibold uppercase text-teal-300">Rendimiento y riesgo</p><h1 className="mt-1 text-3xl font-bold text-gray-100">Inteligencia de cartera</h1><p className="mt-2 text-sm text-gray-400">Rendimiento y riesgo histórico de la cartera, con cobertura de datos y limitaciones metodológicas explícitas. Las concentraciones están en <Link className="inline-flex min-h-11 min-w-11 items-center text-teal-300 hover:text-teal-200" href="/risk">Exposiciones</Link>.</p></div><form className="flex flex-wrap items-end gap-2 md:ml-auto" method="get"><div><label className="mb-1 block text-xs text-gray-400" htmlFor="intelligence-years">Periodo de análisis (años)</label><Input id="intelligence-years" className="min-h-11 w-24" max="20" min="1" name="years" defaultValue={years} type="number" /></div><Button type="submit">Aplicar</Button></form></header>
-    <Link className="inline-flex min-h-11 items-center text-sm text-teal-300 hover:text-teal-200" href="/portfolio/stress">Estrés histórico · 2008 / 2020 / 2022</Link>
-    <section className={`rounded-xl border p-4 ${data.performance.twr_is_exact ? 'border-teal-900/60 bg-teal-950/20' : 'border-amber-900/60 bg-amber-950/20'}`}><div className="flex items-start gap-3"><AlertTriangle aria-hidden="true" className={`mt-0.5 h-5 w-5 shrink-0 ${data.performance.twr_is_exact ? 'text-teal-300' : 'text-amber-300'}`} /><div><h2 className={`font-semibold ${data.performance.twr_is_exact ? 'text-teal-200' : 'text-amber-200'}`}>{data.performance.twr_is_exact ? 'TWR diario con historial de cartera' : 'Indicativo: no es rendimiento contable exacto'}</h2><p className="mt-1 text-sm leading-6 text-gray-400">{data.performance.twr_is_exact ? `El TWR enlaza ${data.coverage.snapshot_returns} retornos diarios completos con posiciones, caja, FX y flujos externos persistidos.` : 'El TWR usa pesos estáticos actuales hasta que existan registros diarios completos de posiciones y caja.'} La atribución sigue siendo heurística, no por lotes de transacciones ni tipo Brinson.{data.performance.twr_is_exact ? '' : ` Estas cifras no son comparables con la ganancia o pérdida desde compra de Cartera: miden el precio de las posiciones actuales en un horizonte de hasta ${data.horizon_years} años, no tus aportaciones ni tu coste.`}{data.performance.xirr === null ? ` XIRR: ${NA}, ${xirrUnavailableReason(data.performance.trace?.status)}.` : ''}</p></div></div></section>
-    <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[[data.performance.twr_is_exact ? 'TWR diario' : 'TWR indicativo', pct(data.performance.twr)], ['XIRR', pct(data.performance.xirr)], [data.performance.twr_is_exact ? 'Máx. caída' : 'Máx. caída indicativa', pct(data.risk.max_drawdown)], [data.performance.twr_is_exact ? 'Sharpe' : 'Sharpe indicativo', ratio(data.risk.sharpe)]].map(([label, value]) => <div className="rounded-xl border border-gray-800 bg-surface-1 p-4" key={label}><div className="text-xs font-semibold uppercase text-gray-500">{label}</div><div className="mt-2 text-2xl font-semibold text-gray-100">{value}</div></div>)}</section>
+  const rmCorrelation = riskMatrix.correlation;
+  const rmIncluded = riskMatrix.positions.filter((position) => position.included);
+  const rmExcluded = riskMatrix.positions.filter((position) => !position.included);
+  return <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6"><header className="flex flex-col gap-4 border-b border-gray-800 pb-5 md:flex-row md:items-end"><div><Button asChild className="mb-4" size="sm" variant="ghost"><Link href="/portfolio"><ArrowLeft aria-hidden="true" className="h-4 w-4" />{ti('portfolio.intelligence.backToPortfolio')}</Link></Button><p className="text-sm font-semibold uppercase text-teal-300">{ti('portfolio.intelligence.kicker')}</p><h1 className="mt-1 text-3xl font-bold text-gray-100">{ti('portfolio.intelligence.title')}</h1><p className="mt-2 text-sm text-gray-400">{ti('portfolio.intelligence.subtitlePrefix')}<Link className="inline-flex min-h-11 min-w-11 items-center text-teal-300 hover:text-teal-200" href="/risk">{ti('portfolio.intelligence.subtitleLink')}</Link>.</p></div><form className="flex flex-wrap items-end gap-2 md:ml-auto" method="get"><div><label className="mb-1 block text-xs text-gray-400" htmlFor="intelligence-years">{ti('portfolio.intelligence.yearsLabel')}</label><Input id="intelligence-years" className="min-h-11 w-24" max="20" min="1" name="years" defaultValue={years} type="number" /></div><Button type="submit">{ti('portfolio.intelligence.apply')}</Button></form></header>
+    <Link className="inline-flex min-h-11 items-center text-sm text-teal-300 hover:text-teal-200" href="/portfolio/stress">{ti('portfolio.intelligence.stressLink')}</Link>
+    <section className={`rounded-xl border p-4 ${data.performance.twr_is_exact ? 'border-teal-900/60 bg-teal-950/20' : 'border-amber-900/60 bg-amber-950/20'}`}><div className="flex items-start gap-3"><AlertTriangle aria-hidden="true" className={`mt-0.5 h-5 w-5 shrink-0 ${data.performance.twr_is_exact ? 'text-teal-300' : 'text-amber-300'}`} /><div><h2 className={`font-semibold ${data.performance.twr_is_exact ? 'text-teal-200' : 'text-amber-200'}`}>{data.performance.twr_is_exact ? ti('portfolio.intelligence.twrExactTitle') : ti('portfolio.intelligence.twrIndicativeTitle')}</h2><p className="mt-1 text-sm leading-6 text-gray-400">{data.performance.twr_is_exact ? ti('portfolio.intelligence.twrExactBody', { n: data.coverage.snapshot_returns }) : ti('portfolio.intelligence.twrIndicativeBody')}{ti('portfolio.intelligence.attributionNote')}{data.performance.twr_is_exact ? '' : ti('portfolio.intelligence.notComparable', { years: data.horizon_years })}{data.performance.xirr === null ? ti('portfolio.intelligence.xirrSuffix', { na, reason: xirrUnavailableReason(data.performance.trace?.status) }) : ''}</p></div></div></section>
+    <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[[data.performance.twr_is_exact ? ti('portfolio.intelligence.kpiTwrDaily') : ti('portfolio.intelligence.kpiTwrIndicative'), pct(data.performance.twr)], [ti('portfolio.intelligence.kpiXirr'), pct(data.performance.xirr)], [data.performance.twr_is_exact ? ti('portfolio.intelligence.kpiMaxDrawdown') : ti('portfolio.intelligence.kpiMaxDrawdownIndicative'), pct(data.risk.max_drawdown)], [data.performance.twr_is_exact ? ti('portfolio.intelligence.kpiSharpe') : ti('portfolio.intelligence.kpiSharpeIndicative'), ratio(data.risk.sharpe)]].map(([label, value]) => <div className="rounded-xl border border-gray-800 bg-surface-1 p-4" key={label}><div className="text-xs font-semibold uppercase text-gray-500">{label}</div><div className="mt-2 text-2xl font-semibold text-gray-100">{value}</div></div>)}</section>
     {/*
         Once métricas en la primera rejilla eran once cosas que leer antes de
         llegar a nada. Quedan las cuatro que resumen el resultado (retorno,
         dinero, caída y calidad del retorno) y las otras siete se plegan: están
         calculadas y siguen a un clic, no desaparecen.
     */}
-    <Panel collapsible defaultOpen={false} description="Anualizado, volatilidad, Sortino, VaR, CVaR, Calmar y Beta. Mismo cálculo que las cuatro de arriba, con más decimales para el diagnóstico." title="Detalle avanzado">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[[data.performance.twr_is_exact ? 'Anualizado' : 'Anualizado indicativo', pct(data.performance.annualized_return)], [data.performance.twr_is_exact ? 'Volatilidad' : 'Volatilidad indicativa', pct(data.risk.volatility)], [data.performance.twr_is_exact ? 'Sortino' : 'Sortino indicativo', ratio(data.risk.sortino)], [data.performance.twr_is_exact ? 'VaR 95%' : 'VaR 95% indicativo', pct(data.risk.var_95)], [data.performance.twr_is_exact ? 'CVaR 95%' : 'CVaR 95% indicativo', pct(data.risk.cvar_95)], [data.performance.twr_is_exact ? 'Calmar' : 'Calmar indicativo', ratio(data.risk.calmar)], [data.performance.twr_is_exact ? 'Beta' : 'Beta indicativa', ratio(data.risk.beta)]].map(([label, value]) => <div className="rounded-xl border border-gray-800 bg-surface-1 p-4" key={label}><div className="text-xs font-semibold uppercase text-gray-500">{label}</div><div className="mt-2 text-xl font-semibold text-gray-100">{value}</div></div>)}</div>
+    <Panel collapsible defaultOpen={false} description={ti('portfolio.intelligence.advancedDescription')} title={ti('portfolio.intelligence.advancedTitle')}>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[[data.performance.twr_is_exact ? ti('portfolio.intelligence.metricAnnualized') : ti('portfolio.intelligence.metricAnnualizedIndicative'), pct(data.performance.annualized_return)], [data.performance.twr_is_exact ? ti('portfolio.intelligence.metricVolatility') : ti('portfolio.intelligence.metricVolatilityIndicative'), pct(data.risk.volatility)], [data.performance.twr_is_exact ? ti('portfolio.intelligence.metricSortino') : ti('portfolio.intelligence.metricSortinoIndicative'), ratio(data.risk.sortino)], [data.performance.twr_is_exact ? ti('portfolio.intelligence.metricVar') : ti('portfolio.intelligence.metricVarIndicative'), pct(data.risk.var_95)], [data.performance.twr_is_exact ? ti('portfolio.intelligence.metricCvar') : ti('portfolio.intelligence.metricCvarIndicative'), pct(data.risk.cvar_95)], [data.performance.twr_is_exact ? ti('portfolio.intelligence.metricCalmar') : ti('portfolio.intelligence.metricCalmarIndicative'), ratio(data.risk.calmar)], [data.performance.twr_is_exact ? ti('portfolio.intelligence.metricBeta') : ti('portfolio.intelligence.metricBetaIndicative'), ratio(data.risk.beta)]].map(([label, value]) => <div className="rounded-xl border border-gray-800 bg-surface-1 p-4" key={label}><div className="text-xs font-semibold uppercase text-gray-500">{label}</div><div className="mt-2 text-xl font-semibold text-gray-100">{value}</div></div>)}</div>
     </Panel>
     {/*
         Las exposiciones por sector, país, divisa y factor se pintaban aquí y en
@@ -92,20 +158,111 @@ export default async function PortfolioIntelligencePage({ searchParams }: { sear
         para leer el riesgo, con la salida al sitio único.
     */}
     <Panel
-      actions={<Link className="inline-flex min-h-11 items-center text-sm text-teal-300 hover:text-teal-200" href="/risk">Ver concentraciones</Link>}
-      description="Pesos sobre el valor de las posiciones de renta variable, sin caja; Exposiciones de cartera calcula sobre el total con caja. El desglose completo está en Exposiciones de cartera."
-      title="Concentración de la cartera"
+      actions={<Link className="inline-flex min-h-11 items-center text-sm text-teal-300 hover:text-teal-200" href="/risk">{ti('portfolio.intelligence.concentrationAction')}</Link>}
+      description={ti('portfolio.intelligence.concentrationDescription')}
+      title={ti('portfolio.intelligence.concentrationTitle')}
     >
       <div className="grid gap-3 text-sm sm:grid-cols-3">
-        <div className="flex justify-between gap-3"><span className="text-gray-400">Top 1 sobre renta variable</span><span className="text-gray-200">{pct(data.concentration.top_1)}</span></div>
-        <div className="flex justify-between gap-3"><span className="text-gray-400">Top 5 sobre renta variable</span><span className="text-gray-200">{pct(data.concentration.top_5)}</span></div>
-        <div className="flex justify-between gap-3"><span className="text-gray-400">Herfindahl (sobre renta variable)</span><span className="text-gray-200">{formatNumber(data.concentration.herfindahl, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span></div>
+        <div className="flex justify-between gap-3"><span className="text-gray-400">{ti('portfolio.intelligence.top1')}</span><span className="text-gray-200">{pct(data.concentration.top_1)}</span></div>
+        <div className="flex justify-between gap-3"><span className="text-gray-400">{ti('portfolio.intelligence.top5')}</span><span className="text-gray-200">{pct(data.concentration.top_5)}</span></div>
+        <div className="flex justify-between gap-3"><span className="text-gray-400">{ti('portfolio.intelligence.herfindahl')}</span><span className="text-gray-200">{f.formatNumber(data.concentration.herfindahl, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span></div>
       </div>
-      <p className="mt-4 border-t border-gray-800 pt-3 text-gray-500">{data.coverage.positions === 0 ? 'Sin posiciones que valorar todavía.' : `${data.coverage.positions_with_price_history}/${data.coverage.positions} posiciones con histórico de precios; ${data.coverage.positions_with_full_horizon}/${data.coverage.positions} cubren todo el horizonte de ${data.horizon_years} años (cobertura media del horizonte: ${formatPercent(data.coverage.price_history_window_percent, { fromRatio: false, digits: 0 })})`}</p>
+      {data.xray && data.xray.length > 0 ? (
+        <div className="mt-4 border-t border-gray-800 pt-3 text-sm">
+          <p className="mb-2 text-gray-300">{ti('portfolio.intelligence.xrayTitle')}</p>
+          <ul className="space-y-1">
+            {data.xray.map((rule) => (
+              <li className={rule.status === 'aviso' ? 'flex items-start gap-2 text-amber-300' : 'flex items-start gap-2 text-gray-400'} key={rule.id}>
+                {rule.status === 'aviso' ? <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" /> : null}
+                <span>
+                  {ti(xrayLabelKey(rule.id, rule.status), {
+                    subject: rule.subject ?? 'N/D',
+                    value: rule.value == null ? 'N/D' : pct(rule.value),
+                    threshold: pct(rule.threshold),
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <p className="mt-4 border-t border-gray-800 pt-3 text-gray-500">{data.coverage.positions === 0 ? ti('portfolio.intelligence.coverageNone') : ti('portfolio.intelligence.coverageLine', { withHistory: data.coverage.positions_with_price_history, positions: data.coverage.positions, fullHorizon: data.coverage.positions_with_full_horizon, positions2: data.coverage.positions, years: data.horizon_years, percent: f.formatPercent(data.coverage.price_history_window_percent, { fromRatio: false, digits: 0 }) })}</p>
     </Panel>
-    <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><div className="flex flex-col gap-2 md:flex-row md:items-center"><h2 className="font-semibold text-gray-100">Comparativa con índice de referencia ({data.benchmark.symbol})</h2>{data.benchmark.status !== 'calculated' ? <Badge className="md:ml-auto" variant="outline">{data.benchmark.status === 'missing_benchmark' ? 'índice de referencia sin datos' : `solapamiento insuficiente (${data.benchmark.observations} días)`}</Badge> : null}</div>{data.benchmark.status === 'calculated' ? <section className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[['Cartera anualizada', pct(data.benchmark.portfolio_annualized)], [`${data.benchmark.symbol} anualizado`, pct(data.benchmark.benchmark_annualized)], ['Alpha', pct(data.benchmark.alpha_annualized)], ['Error de seguimiento', pct(data.benchmark.tracking_error)], ['Ratio de información', ratio(data.benchmark.information_ratio)], ['Observaciones', String(data.benchmark.observations)]].map(([label, value]) => <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4" key={label}><div className="text-xs font-semibold uppercase text-gray-500">{label}</div><div className="mt-2 text-xl font-semibold text-gray-100">{value}</div></div>)}</section> : <p className="mt-3 text-sm text-gray-400">La comparativa necesita la serie de precios de SPY actualizada y al menos 20 sesiones compartidas con la serie de retornos de la cartera.</p>}</section>
-    <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><div className="flex flex-col gap-2 md:flex-row md:items-center"><h2 className="font-semibold text-gray-100">Contribución por posición</h2><Badge className="md:ml-auto" variant="outline">{data.ledger_contribution.coverage.positions === 0 ? 'sin posiciones' : `${data.ledger_contribution.coverage.with_contribution}/${data.ledger_contribution.coverage.positions} posiciones con contribución calculable`}</Badge></div><p className="mt-2 text-xs text-gray-500">Ganancias realizadas y no realizadas, más ingresos, reconstruidas desde el registro de transacciones{data.ledger_contribution.base_currency ? `, en ${data.ledger_contribution.base_currency}` : ''}. Contribución = valor final − valor inicial − neto invertido + ingresos. Los pesos firmados muestran ganadores por encima del 100 % y detractores en negativo.</p><div aria-label="Contribución por posición" className="scroll-affordance-x mt-4 overflow-x-auto [contain:layout_paint]" role="region" tabIndex={0}><table className="w-full min-w-[760px] text-left text-sm"><caption className="sr-only">Contribución a la P&amp;L de cada posición: valor inicial y final, neto invertido, ingresos, P&amp;L y peso sobre el horizonte</caption><thead className="text-xs uppercase text-gray-500"><tr><th className="border-b border-gray-800 py-2" scope="col">Ticker</th><th className="border-b border-gray-800 py-2 text-right" scope="col">Valor inicial</th><th className="border-b border-gray-800 py-2 text-right" scope="col">Valor final</th><th className="border-b border-gray-800 py-2 text-right" scope="col">Neto invertido</th><th className="border-b border-gray-800 py-2 text-right" scope="col">Ingresos</th><th className="border-b border-gray-800 py-2 text-right" scope="col">P&amp;L</th><th className="border-b border-gray-800 py-2 text-right" scope="col">Peso</th></tr></thead><tbody>{data.ledger_contribution.positions.map((row) => <tr className="border-b border-gray-900" key={row.ticker}><th className="py-3 text-left text-sm font-semibold text-teal-300" scope="row">{row.ticker}</th><td className="py-3 text-right">{formatNumber(row.start_value, { maximumFractionDigits: 0 })}</td><td className="py-3 text-right">{formatNumber(row.end_value, { maximumFractionDigits: 0 })}</td><td className="py-3 text-right">{formatNumber(row.net_invested, { maximumFractionDigits: 0 })}</td><td className="py-3 text-right">{formatNumber(row.income, { maximumFractionDigits: 0 })}</td><td className="py-3 text-right">{row.contribution_pnl === null ? `${NA} (${LEDGER_REASON_LABELS[row.reason ?? ''] ?? 'sin datos suficientes'})` : formatNumber(row.contribution_pnl, { maximumFractionDigits: 0 })}</td><td className="py-3 text-right">{pct(row.contribution_share)}</td></tr>)}</tbody></table></div>{data.ledger_contribution.total_pnl !== null ? <p className="mt-3 text-sm text-gray-400">{data.ledger_contribution.coverage.with_contribution < data.ledger_contribution.coverage.positions ? `P&L de posiciones calculables (${data.ledger_contribution.coverage.with_contribution}/${data.ledger_contribution.coverage.positions})` : 'P&L total del horizonte'}: <span className="font-semibold text-gray-100">{formatNumber(data.ledger_contribution.total_pnl, { maximumFractionDigits: 0 })} {data.ledger_contribution.base_currency}</span></p> : <p className="mt-3 text-sm text-gray-400">P&L total del horizonte: sin datos. No hay registro de transacciones suficiente para reconstruir la contribución; el valor actual de la cartera no es una ganancia.</p>}</section>
-    <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><div className="flex flex-col gap-2 md:flex-row md:items-center"><h2 className="font-semibold text-gray-100">Atribución de retorno heurística</h2><Badge className="md:ml-auto" variant="outline">no es atribución contable</Badge></div><p className="mt-2 text-xs text-gray-500">Retorno de precio ajustado{data.attribution.period_start && data.attribution.period_end ? ` del ${formatMarketDate(data.attribution.period_start)} al ${formatMarketDate(data.attribution.period_end)}` : ` en un horizonte de hasta ${data.horizon_years} años`}, sin dividendos ni divisa. No es la G/P desde compra de Cartera.</p><div aria-label="Atribución de retorno heurística" className="scroll-affordance-x mt-4 overflow-x-auto [contain:layout_paint]" role="region" tabIndex={0}><table className="w-full min-w-[1050px] text-left text-sm"><caption className="sr-only">Atribución heurística del retorno por posición: peso, retorno de precio y contribución de cada componente de cartera</caption><thead className="text-xs uppercase text-gray-500"><tr><th className="border-b border-gray-800 py-2" scope="col">Ticker</th><th className="border-b border-gray-800 py-2 text-right" scope="col">Peso sobre RV</th><th className="border-b border-gray-800 py-2 text-right" scope="col">Retorno de precio</th>{Object.keys(data.attribution.portfolio_components).map((key) => <th className="border-b border-gray-800 py-2 text-right" key={key} scope="col">{etiquetaComponenteAtribucion(key)}</th>)}</tr></thead><tbody>{data.attribution.positions.map((row) => <tr className="border-b border-gray-900" key={row.ticker}><th className="py-3 text-left text-sm font-semibold text-teal-300" scope="row">{row.ticker}{row.partial_history && row.period_start ? <Badge className="ml-2" variant="outline" title="Ventana medida mucho menor que la del panel; no entra en los totales agregados">historial parcial desde {formatMarketDate(row.period_start)}</Badge> : null}</th><td className="py-3 text-right">{pct(row.weight)}</td><td className="py-3 text-right" title={row.period_start && row.period_end ? `${formatMarketDate(row.period_start)} - ${formatMarketDate(row.period_end)}` : undefined}>{pct(row.total_return)}</td>{Object.keys(data.attribution.portfolio_components).map((key) => <td className="py-3 text-right text-gray-400" key={key}>{attributionCell(row.components[key] ?? null, key)}</td>)}</tr>)}</tbody></table></div>{data.attribution.excluded_partial_histories && data.attribution.excluded_partial_histories.length > 0 ? <p className="mt-3 text-xs text-amber-300/90">Con histórico parcial ({data.attribution.excluded_partial_histories.join(', ')}): su ventana medida cubre menos de la mitad de la del panel, así que se muestran por separado y no entran en los totales agregados.</p> : null}</section>
-    <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><h2 className="font-semibold text-gray-100">Correlaciones de retornos</h2><p className="mt-2 text-xs text-gray-500">Correlación de Pearson entre retornos diarios en las sesiones en que ambas posiciones tienen precio. Con menos de {data.risk.correlation_min_observations} sesiones compartidas el coeficiente sería ruido con aspecto de medida: se muestra {NA} y el número de sesiones al pasar el cursor.</p><div aria-label="Correlaciones de retornos" className="scroll-affordance-x mt-4 overflow-x-auto [contain:layout_paint]" role="region" tabIndex={0}><table className="text-sm"><caption className="sr-only">Matriz de correlaciones de los retornos diarios de cada posición de la cartera</caption><thead><tr><th className="p-2" scope="col"><span className="sr-only">Variable</span></th>{tickers.map((ticker) => <th className="p-2 text-gray-400" key={ticker} scope="col">{ticker}</th>)}</tr></thead><tbody>{tickers.map((left) => <tr key={left}><th className="p-2 text-left text-sm font-normal text-gray-400" scope="row">{left}</th>{tickers.map((right) => { const correlation = data.risk.correlations[left]?.[right]; const observations = data.risk.correlation_observations?.[left]?.[right] ?? 0; const insufficient = left !== right && observations < data.risk.correlation_min_observations; const title = left === right ? undefined : insufficient ? `Histórico insuficiente: ${observations} sesiones compartidas (mínimo ${data.risk.correlation_min_observations})` : `${observations} sesiones compartidas`; return <td className="min-w-16 border border-gray-900 p-2 text-center text-gray-300" key={right} title={title} style={{ backgroundColor: correlation === null || correlation === undefined ? 'transparent' : correlation >= 0 ? `rgb(13 148 136 / ${Math.abs(correlation) * 0.35})` : `rgb(239 68 68 / ${Math.abs(correlation) * 0.35})` }}>{correlation === null || correlation === undefined ? NA : formatNumber(correlation, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>; })}</tr>)}</tbody></table></div></section>
+    <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><div className="flex flex-col gap-2 md:flex-row md:items-center"><h2 className="font-semibold text-gray-100">{ti('portfolio.intelligence.benchmarkTitle', { symbol: data.benchmark.symbol })}</h2>{data.benchmark.status !== 'calculated' ? <Badge className="md:ml-auto" variant="outline">{data.benchmark.status === 'missing_benchmark' ? ti('portfolio.intelligence.benchmarkMissing') : ti('portfolio.intelligence.benchmarkOverlap', { n: data.benchmark.observations })}</Badge> : null}</div>{data.benchmark.status === 'calculated' ? <section className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[[ti('portfolio.intelligence.benchmarkPortfolioAnnualized'), pct(data.benchmark.portfolio_annualized)], [ti('portfolio.intelligence.benchmarkSymbolAnnualized', { symbol: data.benchmark.symbol }), pct(data.benchmark.benchmark_annualized)], [ti('portfolio.intelligence.benchmarkAlpha'), pct(data.benchmark.alpha_annualized)], [ti('portfolio.intelligence.benchmarkTrackingError'), pct(data.benchmark.tracking_error)], [ti('portfolio.intelligence.benchmarkInformationRatio'), ratio(data.benchmark.information_ratio)], [ti('portfolio.intelligence.benchmarkObservations'), String(data.benchmark.observations)]].map(([label, value]) => <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4" key={label}><div className="text-xs font-semibold uppercase text-gray-500">{label}</div><div className="mt-2 text-xl font-semibold text-gray-100">{value}</div></div>)}</section> : <p className="mt-3 text-sm text-gray-400">{ti('portfolio.intelligence.benchmarkRequirement')}</p>}</section>
+    <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><div className="flex flex-col gap-2 md:flex-row md:items-center"><h2 className="font-semibold text-gray-100">{ti('portfolio.intelligence.contributionTitle')}</h2><Badge className="md:ml-auto" variant="outline">{data.ledger_contribution.coverage.positions === 0 ? ti('portfolio.intelligence.contributionBadgeNone') : ti('portfolio.intelligence.contributionBadgeSome', { withContribution: data.ledger_contribution.coverage.with_contribution, positions: data.ledger_contribution.coverage.positions })}</Badge></div><p className="mt-2 text-xs text-gray-500">{ti('portfolio.intelligence.contributionNoteStart')}{data.ledger_contribution.base_currency ? ti('portfolio.intelligence.contributionNoteCurrency', { currency: data.ledger_contribution.base_currency }) : ''}{ti('portfolio.intelligence.contributionNoteEnd')}</p><div aria-label={ti('portfolio.intelligence.contributionAria')} className="scroll-affordance-x mt-4 overflow-x-auto [contain:layout_paint]" role="region" tabIndex={0}><table className="w-full min-w-[760px] text-left text-sm"><caption className="sr-only">{ti('portfolio.intelligence.contributionCaption')}</caption><thead className="text-xs uppercase text-gray-500"><tr><th className="border-b border-gray-800 py-2" scope="col">{ti('portfolio.intelligence.colTicker')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.colStartValue')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.colEndValue')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.colNetInvested')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.colIncome')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.colPnl')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.colWeight')}</th></tr></thead><tbody>{data.ledger_contribution.positions.map((row) => <tr className="border-b border-gray-900" key={row.ticker}><th className="py-3 text-left text-sm font-semibold text-teal-300" scope="row">{row.ticker}</th><td className="py-3 text-right">{f.formatNumber(row.start_value, { maximumFractionDigits: 0 })}</td><td className="py-3 text-right">{f.formatNumber(row.end_value, { maximumFractionDigits: 0 })}</td><td className="py-3 text-right">{f.formatNumber(row.net_invested, { maximumFractionDigits: 0 })}</td><td className="py-3 text-right">{f.formatNumber(row.income, { maximumFractionDigits: 0 })}</td><td className="py-3 text-right">{row.contribution_pnl === null ? ti('portfolio.intelligence.pnlNdSuffix', { na, reason: ledgerReasonLabel(ti, row.reason ?? '') }) : f.formatNumber(row.contribution_pnl, { maximumFractionDigits: 0 })}</td><td className="py-3 text-right">{pct(row.contribution_share)}</td></tr>)}</tbody></table></div>{data.ledger_contribution.total_pnl !== null ? <p className="mt-3 text-sm text-gray-400">{data.ledger_contribution.coverage.with_contribution < data.ledger_contribution.coverage.positions ? ti('portfolio.intelligence.totalPnlPartial', { withContribution: data.ledger_contribution.coverage.with_contribution, positions: data.ledger_contribution.coverage.positions }) : ti('portfolio.intelligence.totalPnlFull')}: <span className="font-semibold text-gray-100">{f.formatNumber(data.ledger_contribution.total_pnl, { maximumFractionDigits: 0 })} {data.ledger_contribution.base_currency}</span></p> : <p className="mt-3 text-sm text-gray-400">{ti('portfolio.intelligence.totalPnlNoData')}</p>}</section>
+    <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><div className="flex flex-col gap-2 md:flex-row md:items-center"><h2 className="font-semibold text-gray-100">{ti('portfolio.intelligence.attributionTitle')}</h2><Badge className="md:ml-auto" variant="outline">{ti('portfolio.intelligence.attributionBadge')}</Badge></div><p className="mt-2 text-xs text-gray-500">{ti('portfolio.intelligence.attributionNoteStart')}{data.attribution.period_start && data.attribution.period_end ? ti('portfolio.intelligence.attributionNotePeriod', { start: f.formatMarketDate(data.attribution.period_start), end: f.formatMarketDate(data.attribution.period_end) }) : ti('portfolio.intelligence.attributionNoteHorizon', { years: data.horizon_years })}{ti('portfolio.intelligence.attributionNoteEnd')}</p><div aria-label={ti('portfolio.intelligence.attributionAria')} className="scroll-affordance-x mt-4 overflow-x-auto [contain:layout_paint]" role="region" tabIndex={0}><table className="w-full min-w-[1050px] text-left text-sm"><caption className="sr-only">{ti('portfolio.intelligence.attributionCaption')}</caption><thead className="text-xs uppercase text-gray-500"><tr><th className="border-b border-gray-800 py-2" scope="col">{ti('portfolio.intelligence.colTicker')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.colWeightOnEquity')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.colPriceReturn')}</th>{Object.keys(data.attribution.portfolio_components).map((key) => <th className="border-b border-gray-800 py-2 text-right" key={key} scope="col">{etiquetaComponenteAtribucion(key)}</th>)}</tr></thead><tbody>{data.attribution.positions.map((row) => <tr className="border-b border-gray-900" key={row.ticker}><th className="py-3 text-left text-sm font-semibold text-teal-300" scope="row">{row.ticker}{row.partial_history && row.period_start ? <Badge className="ml-2" variant="outline" title={ti('portfolio.intelligence.partialHistoryTitle')}>{ti('portfolio.intelligence.partialHistoryText', { date: f.formatMarketDate(row.period_start) })}</Badge> : null}</th><td className="py-3 text-right">{pct(row.weight)}</td><td className="py-3 text-right" title={row.period_start && row.period_end ? `${f.formatMarketDate(row.period_start)} - ${f.formatMarketDate(row.period_end)}` : undefined}>{pct(row.total_return)}</td>{Object.keys(data.attribution.portfolio_components).map((key) => <td className="py-3 text-right text-gray-400" key={key}>{attributionCell(ti, f, row.components[key] ?? null, key)}</td>)}</tr>)}</tbody></table></div>{data.attribution.excluded_partial_histories && data.attribution.excluded_partial_histories.length > 0 ? <p className="mt-3 text-xs text-amber-300/90">{ti('portfolio.intelligence.excludedNote', { tickers: data.attribution.excluded_partial_histories.join(', ') })}</p> : null}</section>
+    <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><h2 className="font-semibold text-gray-100">{ti('portfolio.intelligence.correlationsTitle')}</h2><p className="mt-2 text-xs text-gray-500">{ti('portfolio.intelligence.correlationsNote', { min: data.risk.correlation_min_observations, na })}</p><div aria-label={ti('portfolio.intelligence.correlationsAria')} className="scroll-affordance-x mt-4 overflow-x-auto [contain:layout_paint]" role="region" tabIndex={0}><table className="text-sm"><caption className="sr-only">{ti('portfolio.intelligence.correlationsCaption')}</caption><thead><tr><th className="p-2" scope="col"><span className="sr-only">{ti('portfolio.intelligence.correlationsVariable')}</span></th>{tickers.map((ticker) => <th className="p-2 text-gray-400" key={ticker} scope="col">{ticker}</th>)}</tr></thead><tbody>{tickers.map((left) => <tr key={left}><th className="p-2 text-left text-sm font-normal text-gray-400" scope="row">{left}</th>{tickers.map((right) => { const correlation = data.risk.correlations[left]?.[right]; const observations = data.risk.correlation_observations?.[left]?.[right] ?? 0; const insufficient = left !== right && observations < data.risk.correlation_min_observations; const title = left === right ? undefined : insufficient ? ti('portfolio.intelligence.corrTitleInsufficient', { n: observations, min: data.risk.correlation_min_observations }) : ti('portfolio.intelligence.corrTitleOk', { n: observations }); return <td className="min-w-16 border border-gray-900 p-2 text-center text-gray-300" key={right} title={title} style={{ backgroundColor: correlation === null || correlation === undefined ? 'transparent' : correlation >= 0 ? `rgb(13 148 136 / ${Math.abs(correlation) * 0.35})` : `rgb(239 68 68 / ${Math.abs(correlation) * 0.35})` }}>{correlation === null || correlation === undefined ? na : f.formatNumber(correlation, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>; })}</tr>)}</tbody></table></div></section>
+    <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center">
+        <h2 className="font-semibold text-gray-100">{ti('portfolio.intelligence.rmTitle')}</h2>
+        {rmCorrelation ? <Badge className="md:ml-auto" variant="outline">{rmCorrelation.source === 'shrunk_covariance' ? ti('portfolio.intelligence.rmBadgeShrunk') : ti('portfolio.intelligence.rmBadgePairwise')}</Badge> : null}
+      </div>
+      {riskMatrix.warnings.length > 0 ? (
+        <div className="mt-3 space-y-2">
+          {riskMatrix.warnings.map((warning) => (
+            <p className="flex items-start gap-2 rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-sm text-amber-200" key={warning.code}>
+              <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{(RM_WARNING_KEYS as readonly string[]).includes(warning.code) ? ti(RM_WARNING_LABEL_KEYS[warning.code as keyof typeof RM_WARNING_LABEL_KEYS], { min: riskMatrix.window.min_sessions }) : warning.message}</span>
+            </p>
+          ))}
+        </div>
+      ) : null}
+      {riskMatrix.estimator && riskMatrix.window.sessions_common > 0 ? (
+        <p className="mt-2 text-xs text-gray-500">{ti('portfolio.intelligence.rmNote', { n: riskMatrix.window.sessions_common, min: riskMatrix.window.min_sessions, s: f.formatNumber(riskMatrix.estimator.shrinkage, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })}</p>
+      ) : null}
+      {rmCorrelation && rmCorrelation.tickers.length > 0 ? (
+        <div aria-label={ti('portfolio.intelligence.rmAria')} className="scroll-affordance-x mt-4 overflow-x-auto [contain:layout_paint]" role="region" tabIndex={0}>
+          <table className="text-sm">
+            <caption className="sr-only">{ti('portfolio.intelligence.rmCaption')}</caption>
+            <thead><tr><th className="p-2" scope="col"><span className="sr-only">{ti('portfolio.intelligence.rmVariable')}</span></th>{rmCorrelation.tickers.map((ticker) => <th className="p-2 text-gray-400" key={ticker} scope="col">{ticker}</th>)}</tr></thead>
+            <tbody>{rmCorrelation.tickers.map((left, rowIndex) => (
+              <tr key={left}>
+                <th className="p-2 text-left text-sm font-normal text-gray-400" scope="row">{left}</th>
+                {rmCorrelation.tickers.map((right, columnIndex) => {
+                  const value = rmCorrelation.matrix[rowIndex]?.[columnIndex];
+                  return <td className="min-w-16 border border-gray-900 p-2 text-center text-gray-300" key={right} style={{ backgroundColor: value === null || value === undefined ? 'transparent' : value >= 0 ? `rgb(13 148 136 / ${Math.abs(value) * 0.35})` : `rgb(239 68 68 / ${Math.abs(value) * 0.35})` }}>{value === null || value === undefined ? na : f.formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>;
+                })}
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      ) : null}
+      {riskMatrix.portfolio ? (
+        <>
+          <h3 className="mt-6 text-sm font-semibold text-gray-200">{ti('portfolio.intelligence.rmContributionTitle')}</h3>
+          <p className="mt-1 text-xs text-gray-500">{ti('portfolio.intelligence.rmContributionNote')}</p>
+          <div aria-label={ti('portfolio.intelligence.rmContributionTitle')} className="scroll-affordance-x mt-4 overflow-x-auto [contain:layout_paint]" role="region" tabIndex={0}>
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <caption className="sr-only">{ti('portfolio.intelligence.rmContributionTitle')}</caption>
+              <thead className="text-xs uppercase text-gray-500"><tr><th className="border-b border-gray-800 py-2" scope="col">{ti('portfolio.intelligence.colTicker')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.colWeight')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.rmColWeightIncluded')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.rmColVol')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.rmColContribution')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.rmColMarginal')}</th></tr></thead>
+              <tbody>{rmIncluded.map((row) => (
+                <tr className="border-b border-gray-900" key={row.ticker}>
+                  <th className="py-3 text-left text-sm font-semibold text-teal-300" scope="row">{row.ticker}</th>
+                  <td className="py-3 text-right">{pct(row.weight)}</td>
+                  <td className="py-3 text-right">{pct(row.weight_included ?? null)}</td>
+                  <td className="py-3 text-right">{pct(row.vol_annualized ?? null)}</td>
+                  <td className="py-3 text-right">{pct(row.risk_contribution ?? null)}</td>
+                  <td className="py-3 text-right">{ratio(row.marginal_contribution ?? null)}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-sm text-gray-400">{ti('portfolio.intelligence.rmPortfolioVol')}: <span className="font-semibold text-gray-100">{pct(riskMatrix.portfolio.vol_annualized)}</span></p>
+          {rmExcluded.length > 0 ? (
+            <p className="mt-2 rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-sm text-gray-400">{ti('portfolio.intelligence.rmCoverageNote', { n: rmIncluded.length })}</p>
+          ) : null}
+        </>
+      ) : null}
+      {rmExcluded.length > 0 ? (
+        <div className="mt-4 border-t border-gray-800 pt-3 text-sm">
+          <p className="mb-2 text-gray-300">{ti('portfolio.intelligence.rmExcludedTitle')}</p>
+          <ul className="space-y-1">
+            {rmExcluded.map((row) => (
+              <li className="text-gray-400" key={row.ticker}>{ti('portfolio.intelligence.rmExcludedLine', { ticker: row.ticker, reason: rmReasonLabel(ti, row.excluded_reason ?? ''), n: row.sessions })}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </section>
   </main>;
 }

@@ -15,10 +15,12 @@ from app.workers.dramatiq_app import (
     backfill_document_kpis,
     backfill_finnhub_profiles,
     backfill_sec_fundamentals,
+    coalesced_send,
     consolidate_memory,
     dispatch_earnings_reminders,
     dispatch_insider_alerts,
     dispatch_macro_reminders,
+    dispatch_source_health_watchdog,
     dispatch_tracked_news_alerts,
     evaluate_alert_rules,
     evaluate_dca_signals,
@@ -29,6 +31,7 @@ from app.workers.dramatiq_app import (
     ingest_sec_bottleneck_filings,
     ingest_spy_daily,
     ingest_uk_pdmr_filings,
+    propicks_radar_scan,
     propose_paper_trades,
     recompute_fundamental_metrics,
     reconcile_alert_analyses,
@@ -108,7 +111,28 @@ def _startup_fire_time(trigger_args: dict, now: datetime | None = None) -> datet
     return base + timedelta(seconds=random.uniform(low, high))
 
 
+def _default_jitter(trigger: str, trigger_args: dict) -> int:
+    """Escalonado anti-manada para el job que no declara jitter propio.
+
+    Sin jitter, todos los jobs de la misma cadencia disparan en el mismo
+    segundo (los de 6 h a las :00, los de 1 h a las :00...): la rafaga
+    sincronizada satura worker, Redis y proveedores a la vez. MEDIDO
+    2026-10-31: 44 de 65 jobs no declaraban jitter. Politica: intervalo/6
+    acotado a [1, 600] s para triggers interval (nunca alcanza la mitad de
+    la cadencia, asi no solapa el tick vecino) y 300 s para cron (mismo
+    orden que los crons diarios que ya lo declaraban). Un job con jitter
+    explicito conserva el suyo.
+    """
+    if trigger == "interval":
+        interval = _interval_seconds(trigger_args)
+        if interval <= 0:
+            return 300
+        return max(1, min(600, int(interval // 6)))
+    return 300
+
+
 def _register(scheduler: BlockingScheduler, func, trigger: str, *, job_id: str, **trigger_args) -> None:
+    trigger_args.setdefault("jitter", _default_jitter(trigger, trigger_args))
     if trigger == "interval" and "next_run_time" not in trigger_args:
         first = _startup_fire_time(trigger_args)
         if first is not None:
@@ -122,20 +146,26 @@ def _register(scheduler: BlockingScheduler, func, trigger: str, *, job_id: str, 
     )
 
 
+def _refresh_instrument_references() -> dict:
+    """Wrapper con import perezoso: scripts/ no es paquete de la app."""
+    from scripts.sync_instruments import refresh_weekly
+
+    return refresh_weekly()
+
+
 def enqueue_insider_scan(*, lookback: int, max_new_fetches: int) -> dict:
     """Fan-out del monitor insider con el alcance propio de cada cadencia."""
     queued = []
     for tenant_id, user_id in tenant_contexts():
-        message = scan_insider_watchlist.send(
-            tenant_id, user_id, lookback, max_new_fetches
+        message = coalesced_send(
+            scan_insider_watchlist, tenant_id, user_id, lookback, max_new_fetches
         )
-        queued.append(
-            {
-                "tenant_id": tenant_id,
-                "user_id": user_id,
-                "message_id": str(message.message_id),
-            }
-        )
+        entry = {"tenant_id": tenant_id, "user_id": user_id}
+        if message is None:
+            entry["suppressed"] = True
+        else:
+            entry["message_id"] = str(message.message_id)
+        queued.append(entry)
     return {
         "actor": scan_insider_watchlist.actor_name,
         "lookback": lookback,
@@ -147,25 +177,38 @@ def enqueue_insider_scan(*, lookback: int, max_new_fetches: int) -> dict:
 def enqueue_for_all_tenants(actor, **kwargs) -> dict:
     queued = []
     for tenant_id, user_id in tenant_contexts():
-        message = actor.send(tenant_id, user_id, **kwargs)
-        queued.append(
-            {
-                "tenant_id": tenant_id,
-                "user_id": user_id,
-                "message_id": str(message.message_id),
-            }
-        )
+        # Dedup "una copia en vuelo" para actores con politica de coalescencia:
+        # un tick suprimido queda cubierto por la copia pendiente del mismo job.
+        message = coalesced_send(actor, tenant_id, user_id, **kwargs)
+        entry = {"tenant_id": tenant_id, "user_id": user_id}
+        if message is None:
+            entry["suppressed"] = True
+        else:
+            entry["message_id"] = str(message.message_id)
+        queued.append(entry)
     return {"actor": actor.actor_name, "queued": queued}
 
 
 def enqueue_official_closes_once() -> dict:
     """Prices are global, unlike tenant portfolios: enqueue only one context."""
+    return enqueue_once(sync_official_closes)
+
+
+def enqueue_once(actor, **kwargs) -> dict:
+    """Un solo contexto para jobs de datos GLOBALES (precios/senales publicas).
+
+    Encolar por tenant generaria N-1 corridas skipped por el lease del actor:
+    un mensaje basta porque el resultado no es de tenant. Mismo patron que
+    los cierres oficiales.
+    """
     contexts = list(tenant_contexts())
     if not contexts:
-        return {"actor": "sync_official_closes", "queued": []}
+        return {"actor": actor.actor_name, "queued": []}
     tenant_id, user_id = contexts[0]
-    message = sync_official_closes.send(tenant_id, user_id)
-    return {"actor": "sync_official_closes", "queued": [str(message.message_id)]}
+    message = coalesced_send(actor, tenant_id, user_id, **kwargs)
+    if message is None:
+        return {"actor": actor.actor_name, "queued": [], "suppressed": True}
+    return {"actor": actor.actor_name, "queued": [str(message.message_id)]}
 
 
 def build_scheduler(*, background: bool = False) -> BlockingScheduler | BackgroundScheduler:
@@ -205,22 +248,27 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # Insiders Canada (Yahoo quoteSummary, no oficial): 2 GET por corrida cada 6 h.
     _register(scheduler, partial(enqueue_for_all_tenants, ingest_ca_insider_yahoo),
               "interval", job_id="ca_insider_yahoo", hours=6)
-    _register(scheduler, refresh_macro_context.send, "cron", job_id="macro_context_refresh", hour=23, minute=10)
+    _register(scheduler, partial(coalesced_send, refresh_macro_context), "cron", job_id="macro_context_refresh", hour=23, minute=10)
     # Holdings oficiales de ETFs tematicos (UFO, NASA): 1 descarga por ETF y semana.
     _register(scheduler, refresh_etf_holdings, "cron", job_id="etf_holdings_refresh", day_of_week="mon", hour=7, minute=20)
+    # instrument_references (nombres 13F por CUSIP, gems smart-money, resolver
+    # de renombres por FIGI): semanal; sin el refresco la tabla queda congelada
+    # al seed manual y los consumidores degradan en silencio.
+    _register(scheduler, _refresh_instrument_references, "cron", job_id="instrument_references_refresh",
+              day_of_week="mon", hour=6, minute=15)
     # Cartera real desde IBKR Flex (solo lectura). El actor no hace nada si
     # faltan token, query id o IBKR_FLEX_TENANT_ID; corre una vez al dia, con el
     # extracto del ultimo dia habil ya generado por IBKR.
-    _register(scheduler, sync_ibkr_flex.send, "cron", job_id="ibkr_flex_sync", hour=6, minute=40)
+    _register(scheduler, partial(coalesced_send, sync_ibkr_flex), "cron", job_id="ibkr_flex_sync", hour=6, minute=40)
     # Default behavior stays unchanged until the dedicated consumer is installed.
     ibkr_actor = sync_tenant_ibkr_connections
     if get_settings().ibkr_dedicated_sync_enabled:
         ibkr_actor = sync_tenant_ibkr_connections_dedicated
-        _register(scheduler, ibkr_actor.send, "cron", job_id="tenant_ibkr_post_close",
+        _register(scheduler, partial(coalesced_send, ibkr_actor), "cron", job_id="tenant_ibkr_post_close",
                   day_of_week="mon-fri", hour=18, minute=0, timezone="America/New_York")
-    _register(scheduler, ibkr_actor.send, "cron", job_id="tenant_ibkr_flex_sync", hour=6, minute=50)
+    _register(scheduler, partial(coalesced_send, ibkr_actor), "cron", job_id="tenant_ibkr_flex_sync", hour=6, minute=50)
     # One global GP + SupGP fetch every 2 h, never per tenant or more often.
-    _register(scheduler, refresh_asts_catalog.send, "interval", job_id="asts_celestrak_refresh", hours=2)
+    _register(scheduler, partial(coalesced_send, refresh_asts_catalog), "interval", job_id="asts_celestrak_refresh", hours=2)
     _register(
         scheduler,
         partial(enqueue_for_all_tenants, refresh_rss_feeds),
@@ -290,7 +338,7 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # kpis vuelve a tener capacidad (ver backfill_document_kpis).
     _register(
         scheduler,
-        backfill_document_kpis.send,
+        partial(coalesced_send, backfill_document_kpis),
         "interval",
         job_id="kpi_backfill",
         minutes=5,
@@ -349,7 +397,7 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     )
     _register(
         scheduler,
-        run_daily_research.send,
+        partial(coalesced_send, run_daily_research),
         "cron",
         job_id="daily_research",
         hour=6,
@@ -440,6 +488,11 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         partial(enqueue_for_all_tenants, refresh_paper_trades),
         "interval", job_id="paper_trading_quotes", minutes=30, jitter=60,
     )
+    # Watchdog de fuentes de datos: alerta in-app al operador (coste 0) cuando
+    # una fuente pasa a degradada/caída. Cada 5 min: el circuit breaker es por
+    # proceso y este actor lo lee en el worker de alertas.
+    _register(scheduler, partial(enqueue_for_all_tenants, dispatch_source_health_watchdog),
+              "interval", job_id="source_health_watchdog", minutes=5)
     # F17: precios intradia de la cartera (Yahoo, retardo ~15 min declarado
     # en la UI) durante la sesion US. Ventana 13-21 UTC cubre EDT y EST.
     _register(
@@ -522,6 +575,21 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         day=1,
         hour=22,
         minute=30,
+    )
+    # Radar ProPicks+DCA (universo 1.000): barrido nocturno acotado y
+    # resumible. Persiste snapshots SOLO con sesiones asentadas: la sesion
+    # del dia en curso nunca entra, asi que esta corrida NO usa el cierre
+    # de hoy aunque se encole despues de el. El cursor por dia reanuda lo
+    # que el presupuesto deje sin completar. Los snapshots son datos
+    # publicos globales: un solo encolado (enqueue_once); el lease global
+    # del actor sigue frenando solapes entre procesos.
+    _register(
+        scheduler,
+        partial(enqueue_once, propicks_radar_scan),
+        "cron",
+        job_id="propicks_radar_scan_daily",
+        hour=23,
+        minute=0,
     )
     # Serie diaria SPY para el "vs SPY" del track record ProPicks.
     _register(

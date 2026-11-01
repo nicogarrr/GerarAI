@@ -9,18 +9,21 @@ from datetime import UTC, date, datetime
 from functools import wraps
 from threading import Lock
 from typing import Concatenate, ParamSpec, TypeVar
-from xml.etree import ElementTree
 
+# XML externo (servicio web de IBKR): defusedxml solo para PARSEAR.
+from defusedxml import ElementTree as DefusedElementTree
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.llm_settings_crypto import decrypt_api_key, encrypt_api_key
 from app.models import IBKRConnection, IBKRSyncReceipt
-from app.services.connectors.ibkr import IBKRFlexClient
+from app.services.connectors.ibkr import IBKRFlexClient, IBKRFlexError
 from app.services.ibkr_import_service import (
+    _PNL_NOT_READY_MESSAGE,
     IBKRImportError,
     IBKRImportService,
+    IBKRPnlNotReadyError,
     _statement_identity_blockers,
     validate_flex_xml,
 )
@@ -28,6 +31,35 @@ from app.services.ibkr_import_service import (
 
 class ConnectionError(ValueError):
     """Only fixed safe messages, no upstream payloads or credentials."""
+
+
+# Tipos cortos de fallo persistibles en el receipt (sin mensajes ni datos
+# sensibles). Lo no clasificado conserva "sync_failed", el valor historico.
+ERROR_KINDS = frozenset({
+    "sync_failed",
+    "credentials",
+    "timeout",
+    "ibkr_rejected",
+    "unavailable",
+    "report",
+    "not_ready",
+    "connection_changed",
+    "import",
+})
+
+
+class SyncError(ConnectionError):
+    """Fallo de sincronizacion con tipo corto persistible en el receipt."""
+
+    def __init__(self, kind: str, message: str) -> None:
+        super().__init__(message)
+        self.kind = kind
+
+
+def error_kind(exc: BaseException) -> str:
+    """Tipo corto para el receipt; lo no clasificado conserva 'sync_failed'."""
+    kind = getattr(exc, "kind", None)
+    return kind if kind in ERROR_KINDS else "sync_failed"
 
 
 class SyncBusy(ConnectionError):
@@ -94,9 +126,12 @@ def _connection_mutation(fn: Callable[Concatenate[Session, _P], _R]) -> Callable
     return guarded
 
 
-def start_receipt(db: Session, *, revision: int) -> int:
+def start_receipt(db: Session, *, revision: int, origin: str | None = None) -> int:
+    # Origen del disparo ("manual" o "scheduled") en el JSONB de counts: sin
+    # migracion. Los contadores numericos se fusionan al cerrar el receipt.
+    counts = {"origin": origin} if origin in {"manual", "scheduled"} else {}
     receipt = IBKRSyncReceipt(tenant_id=require_tenant(db), revision=revision,
-                              started_at=datetime.now(UTC), result="running", counts={})
+                              started_at=datetime.now(UTC), result="running", counts=counts)
     db.add(receipt)
     db.flush()
     receipt_id = receipt.id
@@ -171,17 +206,20 @@ def check_report(xml: str, account_id: str) -> date:
     # Strict gate: unlike manual imports this automatic path never partially
     # imports malformed rows or combines cash/positions from different dates.
     if len(xml) > 20_000_000:
-        raise ConnectionError("El extracto es demasiado grande. Reduce el período de la consulta Flex.")
-    if validate_flex_xml(xml):
-        raise ConnectionError("El extracto Flex está incompleto o IBKR aún prepara los costes. Revisa la consulta y vuelve a intentarlo más tarde.")
-    root = ElementTree.fromstring(xml)
+        raise SyncError("report", "El extracto es demasiado grande. Reduce el período de la consulta Flex.")
+    validation_errors = validate_flex_xml(xml)
+    if validation_errors:
+        if any(_PNL_NOT_READY_MESSAGE in error for error in validation_errors):
+            raise SyncError("not_ready", "IBKR aún prepara los costes del extracto. Reintenta más tarde.")
+        raise SyncError("report", "El extracto Flex está incompleto o IBKR aún prepara los costes. Revisa la consulta y vuelve a intentarlo más tarde.")
+    root = DefusedElementTree.fromstring(xml)
     if _statement_identity_blockers(root, expected_account_id=account_id, max_age_days=5):
-        raise ConnectionError("La cuenta o la fecha del extracto no coincide. Selecciona una sola cuenta y un extracto reciente en IBKR.")
+        raise SyncError("report", "La cuenta o la fecha del extracto no coincide. Selecciona una sola cuenta y un extracto reciente en IBKR.")
     statement = next(e for e in root.iter() if e.tag.rsplit('}', 1)[-1] == "FlexStatement")
     report_date = date.fromisoformat(statement.attrib["toDate"].split(';', 1)[0]) if '-' in statement.attrib["toDate"] else datetime.strptime(statement.attrib["toDate"].split(';', 1)[0], "%Y%m%d").date()
     tags = {e.tag.rsplit('}', 1)[-1] for e in statement.iter()}
     if not {"OpenPositions", "CashReport"}.issubset(tags):
-        raise ConnectionError("La consulta debe incluir Open Positions y Cash Report, también cuando estén vacíos.")
+        raise SyncError("report", "La consulta debe incluir Open Positions y Cash Report, también cuando estén vacíos.")
     for element in statement.iter():
         if element.tag.rsplit('}', 1)[-1] not in {"OpenPosition", "CashReportCurrency", "CashReport"}:
             continue
@@ -189,19 +227,28 @@ def check_report(xml: str, account_id: str) -> date:
             continue
         raw = element.attrib.get("reportDate") or element.attrib.get("asOfDate") or element.attrib.get("toDate")
         if not raw:
-            raise ConnectionError("Incluye la fecha del informe en posiciones y caja para no mezclar fechas.")
+            raise SyncError("report", "Incluye la fecha del informe en posiciones y caja para no mezclar fechas.")
         value = raw.split(';', 1)[0]
         if value not in {report_date.isoformat(), report_date.strftime("%Y%m%d")}:
-            raise ConnectionError("Las posiciones y la caja tienen fechas distintas. Revisa la consulta Flex.")
+            raise SyncError("report", "Las posiciones y la caja tienen fechas distintas. Revisa la consulta Flex.")
     return report_date
 
 
 async def download(token: str, query_id: str) -> str:
+    _msg = (
+        "IBKR no pudo entregar el informe. Revisa token, caducidad, Query ID "
+        "y restricciones de IP; si está preparándolo, prueba más tarde."
+    )
     try:
         return await asyncio.wait_for(IBKRFlexClient(token=token, query_id=query_id).fetch_latest_xml(), timeout=90)
+    except TimeoutError:
+        raise SyncError("timeout", _msg) from None
+    except IBKRFlexError:
+        # IBKR respondio Fail (token caducado o invalido, query, IP, extracto).
+        raise SyncError("ibkr_rejected", _msg) from None
     except Exception:
-        # No upstream exception reaches HTTP logs/error payloads here.
-        raise ConnectionError("IBKR no pudo entregar el informe. Revisa token, caducidad, Query ID y restricciones de IP; si está preparándolo, prueba más tarde.") from None
+        # Red, DNS u otro fallo transitorio de entrega.
+        raise SyncError("unavailable", _msg) from None
 
 
 @_connection_mutation
@@ -215,7 +262,7 @@ def save_connection(db: Session, settings: Settings, *, token: str, query_id: st
     # Keep the high-water mark even when credentials were disconnected. A
     # renewed token/query must never make an older report eligible for import.
     if row and row.statement_date and statement_date < row.statement_date:
-        raise ConnectionError("El extracto es anterior al último verificado. Conservamos los datos más recientes.")
+        raise SyncError("report", "El extracto es anterior al último verificado. Conservamos los datos más recientes.")
     # Preserve the existing owner-only legacy source account, never switch it.
     if settings.ibkr_flex_tenant_id == tenant_id and settings.ibkr_flex_account_id and settings.ibkr_flex_account_id.upper() != account_id:
         raise ConnectionError("La cuenta no coincide con la fuente IBKR existente de esta cartera.")
@@ -251,8 +298,15 @@ def disconnect(db: Session) -> dict:
 def credentials(db: Session, settings: Settings) -> tuple[str, str, str, int]:
     row = connection(db)
     if not row or not row.enabled or not row.token_ciphertext:
-        raise ConnectionError("Conecta IBKR antes de sincronizar.")
-    result = (decrypt_api_key(row.token_ciphertext, settings), row.query_id, row.account_id, row.revision)
+        raise SyncError("credentials", "Conecta IBKR antes de sincronizar.")
+    try:
+        token = decrypt_api_key(row.token_ciphertext, settings)
+    except Exception:
+        raise SyncError(
+            "credentials",
+            "No se pudo descifrar el token guardado. Vuelve a conectar IBKR.",
+        ) from None
+    result = (token, row.query_id, row.account_id, row.revision)
     # Do not hold a DB transaction across report generation.
     db.commit()
     return result
@@ -262,20 +316,20 @@ def import_report(db: Session, xml: str, account_id: str, revision: int, *, rece
     report_date = check_report(xml, account_id)
     row = connection(db, lock=True)
     if not row or not row.enabled or row.revision != revision:
-        raise ConnectionError("La conexión cambió durante la descarga. No se ha importado nada.")
+        raise SyncError("connection_changed", "La conexión cambió durante la descarga. No se ha importado nada.")
     if row.statement_date and report_date < row.statement_date:
-        raise ConnectionError("El extracto es anterior al último verificado. Conservamos los datos más recientes.")
+        raise SyncError("report", "El extracto es anterior al último verificado. Conservamos los datos más recientes.")
     if receipt_id is None:
-        receipt_id = start_receipt(db, revision=revision)
+        receipt_id = start_receipt(db, revision=revision, origin="manual")
         row = connection(db, lock=True)
         if not row or not row.enabled or row.revision != revision:
-            raise ConnectionError("La conexión cambió durante la descarga. No se ha importado nada.")
+            raise SyncError("connection_changed", "La conexión cambió durante la descarga. No se ha importado nada.")
         if row.statement_date and report_date < row.statement_date:
-            raise ConnectionError("El extracto es anterior al último verificado. Conservamos los datos más recientes.")
+            raise SyncError("report", "El extracto es anterior al último verificado. Conservamos los datos más recientes.")
     receipt = db.scalar(select(IBKRSyncReceipt).where(IBKRSyncReceipt.id == receipt_id))
     if not receipt or receipt.revision != revision or receipt.result != "running":
-        raise ConnectionError("El intento de sincronización ya no es válido.")
-    statement = next(e for e in ElementTree.fromstring(xml).iter()
+        raise SyncError("connection_changed", "El intento de sincronización ya no es válido.")
+    statement = next(e for e in DefusedElementTree.fromstring(xml).iter()
                      if e.tag.rsplit('}', 1)[-1] == "FlexStatement")
     raw_start = statement.attrib.get("fromDate", "").split(';', 1)[0]
     try:
@@ -291,16 +345,21 @@ def import_report(db: Session, xml: str, account_id: str, revision: int, *, rece
             db, xml, expected_account_id=account_id,
             reconcile=row.complete_query, query_complete_attested=row.complete_query,
         )
+    except IBKRPnlNotReadyError:
+        db.rollback()
+        raise SyncError("not_ready", "IBKR aún prepara los costes del extracto. Reintenta más tarde.") from None
     except IBKRImportError:
         db.rollback()
-        raise ConnectionError("No se ha podido importar el extracto. Revisa la consulta Flex.") from None
+        raise SyncError("import", "No se ha podido importar el extracto. Revisa la consulta Flex.") from None
     partial = bool(not row.complete_query or result.get("row_errors") or result.get("rows_skipped") or result.get("reconcile_blocked"))
     receipt = db.scalar(select(IBKRSyncReceipt).where(IBKRSyncReceipt.id == receipt_id))
     receipt.result = "partial" if partial else "synced"
     receipt.finished_at = datetime.now(UTC)
-    receipt.counts = {key: result[key] for key in _COUNT_KEYS if type(result.get(key)) is int}
-    receipt.counts["row_errors"] = len(result.get("row_errors") or [])
-    receipt.counts["reconcile_blocked"] = len(result.get("reconcile_blocked") or [])
+    counts = dict(receipt.counts or {})
+    counts.update({key: result[key] for key in _COUNT_KEYS if type(result.get(key)) is int})
+    counts["row_errors"] = len(result.get("row_errors") or [])
+    counts["reconcile_blocked"] = len(result.get("reconcile_blocked") or [])
+    receipt.counts = counts
     row = connection(db, lock=True)
     if row and row.enabled and row.revision == revision:
         row.last_success_at = datetime.now(UTC)
@@ -311,7 +370,8 @@ def import_report(db: Session, xml: str, account_id: str, revision: int, *, rece
     return view(db)
 
 
-def record_failure(db: Session, *, revision: int | None, receipt_id: int | None = None) -> None:
+def record_failure(db: Session, *, revision: int | None, receipt_id: int | None = None,
+                   error_code: str = "sync_failed") -> None:
     """Only the connection revision that started the failed request may change.
 
     No credentials obtained means no report request was attributed to a revision.
@@ -324,7 +384,7 @@ def record_failure(db: Session, *, revision: int | None, receipt_id: int | None 
         receipt = db.scalar(select(IBKRSyncReceipt).where(IBKRSyncReceipt.id == receipt_id))
         if receipt and receipt.revision == revision and receipt.result == "running":
             receipt.result = "error"
-            receipt.error_code = "sync_failed"
+            receipt.error_code = error_code if error_code in ERROR_KINDS else "sync_failed"
             receipt.finished_at = datetime.now(UTC)
     row = connection(db, lock=True)
     if row and row.enabled and row.revision == revision:

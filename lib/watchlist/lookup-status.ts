@@ -17,7 +17,3 @@ export function isTickerNotFound(
     if (basics) return false;
     return resolveUnknownListingIdentity(profile, ticker).kind === 'not-in-sources';
 }
-
-export const NOT_FOUND_LABEL = 'No encontrado';
-export const NOT_FOUND_TITLE =
-    'Ninguna de nuestras fuentes reconoce este ticker: puede que el símbolo sea incorrecto. Sigue en tu watchlist hasta que lo quites.';

@@ -1,6 +1,9 @@
 'use server';
 
 import { getWatchlistEntryData, getWatchlistState } from '@/lib/actions/watchlist.actions';
+import { probeQuoteFromBackend, type ProbeQuote } from '@/lib/market/probe-quote';
+import type { ProviderQuotePayload } from '@/lib/market/quote-freshness';
+import { researchRequest } from '@/lib/research/client';
 import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { getFairValueReading, getScreenerStocksReal } from '@/lib/actions/screener.actions';
 import { DCF_MIN_UPSIDE_PCT } from '@/lib/overview/dcf-candidates';
@@ -102,6 +105,30 @@ export type HomeOpportunityProbe = {
     opportunity: HomeOpportunity | null;
 };
 
+/** Lote del backend: UNA llamada para las N candidatas del sondeo (Yahoo con
+ * cache Redis compartida de 60s) en vez de N fetches Finnhub/Yahoo desde
+ * Vercel con cache en memoria por instancia. Medido 2026-10-31: el POST del
+ * bundle de Inicio tardaba 6.959 ms y la cuota Finnhub free (60 req/min
+ * compartida por toda la app) se agotaba con pocas cargas. Simbolo sin dato
+ * en el lote -> fallback por candidata (getWatchlistEntryData). */
+async function fetchProbeQuotes(symbols: string[]): Promise<Map<string, ProbeQuote>> {
+    const out = new Map<string, ProbeQuote>();
+    if (symbols.length === 0) return out;
+    try {
+        const data = await researchRequest<{ quotes?: Record<string, ProviderQuotePayload | null> }>(
+            '/api/market/quotes/batch',
+            { method: 'POST', body: JSON.stringify({ symbols }) },
+        );
+        for (const [sym, payload] of Object.entries(data?.quotes ?? {})) {
+            const probe = probeQuoteFromBackend(payload);
+            if (probe) out.set(sym, probe);
+        }
+    } catch {
+        // El lote caido no rompe el sondeo: cada candidata usa su camino propio.
+    }
+    return out;
+}
+
 export async function getHomeOpportunities(params: {
     marketCapMoreThan: number;
     limit: number;
@@ -116,11 +143,16 @@ export async function getHomeOpportunities(params: {
     const withFundamentals = screener.filter((row) => row.has_fundamentals).map((row) => row.symbol);
     const withoutFundamentals = screener.filter((row) => !row.has_fundamentals).map((row) => row.symbol);
     const candidates = [...withFundamentals, ...withoutFundamentals].slice(0, params.candidateLimit);
+    const probeQuotes = await fetchProbeQuotes(candidates);
     return mapPool(candidates, SERVER_CONCURRENCY, async (sym): Promise<HomeOpportunityProbe> => {
         try {
             // Precio y divisa del LISTADO REAL (master): getStockQuote con el
             // ticker desnudo resolvia en la linea US y no traia divisa.
-            const [reading, listing] = await Promise.all([getFairValueReading(sym), getWatchlistEntryData(sym)]);
+            const batched = probeQuotes.get(sym.trim().toUpperCase()) ?? null;
+            const [reading, listing] = await Promise.all([
+                getFairValueReading(sym),
+                batched ? Promise.resolve(batched) : getWatchlistEntryData(sym),
+            ]);
             const currentPrice = listing.price ?? 0;
             if (reading && currentPrice > 0) {
                 const upside = ((reading.value - currentPrice) / currentPrice) * 100;

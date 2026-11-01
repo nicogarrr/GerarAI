@@ -5,8 +5,10 @@ import { Eye, EyeOff } from 'lucide-react';
 import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
 import {cn} from "@/lib/utils";
+import {useT} from "@/lib/i18n/client";
 
 const InputField = ({name, label, placeholder, type ="text", register, error, validation, disabled, value, autoComplete}: FormInputProps) => {
+    const t = useT();
     const [showPassword, setShowPassword] = useState(false);
     const isPassword = type === 'password';
     // Determinar el autocompletado si no se proporciona explícitamente
@@ -48,7 +50,7 @@ const InputField = ({name, label, placeholder, type ="text", register, error, va
             {isPassword && (
                 <button
                     type="button"
-                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    aria-label={showPassword ? t('auth.fields.hidePassword') : t('auth.fields.showPassword')}
                     aria-pressed={showPassword}
                     aria-controls={name}
                     disabled={disabled}

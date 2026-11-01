@@ -8,8 +8,6 @@ from datetime import date
 from decimal import Decimal as D
 from types import SimpleNamespace
 
-from fastapi.testclient import TestClient
-
 from app.core.database import init_db
 from app.services.tax_report_service import (
     ZERO_COST_REVIEW_LABEL,
@@ -17,6 +15,7 @@ from app.services.tax_report_service import (
     zero_cost_buys_for_review,
 )
 from main import app
+from tests.auth_helpers import csrf_client
 
 START, END = date(2025, 1, 1), date(2025, 12, 31)
 
@@ -45,7 +44,19 @@ def test_zero_cost_buys_listed_for_review_without_changing_fifo():
 
 def test_transaction_list_flags_zero_price_buy():
     init_db()
-    client = TestClient(app)
+    client = csrf_client(app)
+    # Cobertura determinista del flake de paginacion: >20 operaciones ajenas
+    # mas recientes llenan la pagina 1; sin filtro por ticker, las filas
+    # objetivo (2025-03-03) caen fuera. Asi el test no depende del estado
+    # que otros tests dejen en la BD compartida.
+    for i in range(25):
+        filler = client.post(
+            "/api/portfolio/transactions",
+            json={"ticker": f"FILLER{i:02d}", "action": "buy", "quantity": "1",
+                  "price": "10", "currency": "EUR", "trade_date": "2026-10-30"},
+        )
+        assert filler.status_code == 201, filler.text
+    created = {}
     for ticker, price in (("ZEROGIFT", "0"), ("PAIDBUY", "10")):
         response = client.post(
             "/api/portfolio/transactions",
@@ -53,7 +64,16 @@ def test_transaction_list_flags_zero_price_buy():
                   "currency": "EUR", "trade_date": "2025-03-03"},
         )
         assert response.status_code == 201, response.text
-    listed = client.get("/api/portfolio/transactions").json()
-    rows = listed if isinstance(listed, list) else listed.get("items", listed.get("transactions", []))
-    flags = {r["ticker"]: r.get("review_flag") for r in rows if r["ticker"] in {"ZEROGIFT", "PAIDBUY"}}
+        created[ticker] = response.json()["id"]
+    flags = {}
+    for ticker, expected_id in created.items():
+        response = client.get("/api/portfolio/transactions", params={"ticker": ticker})
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        rows = payload if isinstance(payload, list) else payload.get("items", payload.get("transactions", []))
+        # La fila recien creada (por ID) debe estar en la respuesta filtrada:
+        # ausencia nunca se lee como «sin flag».
+        row = next((r for r in rows if r.get("id") == expected_id), None)
+        assert row is not None, f"{ticker} (id={expected_id}) ausente del listado filtrado"
+        flags[ticker] = row.get("review_flag")
     assert flags == {"ZEROGIFT": ZERO_COST_REVIEW_LABEL, "PAIDBUY": None}

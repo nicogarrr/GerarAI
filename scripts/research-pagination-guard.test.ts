@@ -46,14 +46,17 @@ test('10 por página, acotado y sin páginas vacías', () => {
 
 test('la ficha pagina historial, afirmaciones y hechos financieros móviles con el componente reutilizable', () => {
   const page = readFileSync(RESEARCH_PAGE, 'utf8');
-  assert.equal((page.match(/<PagedList/g) ?? []).length, 3, 'historial, afirmaciones y hechos financieros móviles usan PagedList');
+  // Los hechos financieros móviles paginan dentro de FactsPanels.
+  const panels = readFileSync('components/research/FactsPanels.tsx', 'utf8');
+  const src = page + '\n' + panels;
+  assert.equal((src.match(/<PagedList/g) ?? []).length, 3, 'historial, afirmaciones y hechos financieros móviles usan PagedList');
   assert.match(page, /collapseVersionHistory\(data\.historyDetail\.history\)\.map/);
   assert.match(page, /groupClaimsByVersion\(data\.claims, data\.history\)\.map/);
-  assert.match(page, /label="Historial de versiones y aprobaciones"/);
-  assert.match(page, /label="Hechos financieros"/);
-  assert.match(page, /pageSize=\{FACTS_MOBILE_PAGE\}/);
-  assert.match(page, /FACTS_MOBILE_PAGE = 10/);
-  assert.match(page, /label=\{`Afirmaciones de \$\{group\.label\}`\}/);
+  assert.match(page, /label=\{t\('research\.fichaVersionHistory'\)\}/);
+  assert.match(panels, /label="Hechos financieros"/);
+  assert.match(panels, /pageSize=\{FACTS_MOBILE_PAGE\}/);
+  assert.match(panels, /FACTS_MOBILE_PAGE = 10/);
+  assert.match(page, /label=\{t\('research\.fichaClaimsOf', \{ label: group\.label \}\)\}/);
   assert.equal((page.match(/pageSize=\{10\}/g) ?? []).length, 2);
 });
 
@@ -61,7 +64,10 @@ test('el componente paginador es cliente, accesible y conserva el estado', () =>
   const component = readFileSync(PAGINATION, 'utf8');
   assert.match(component, /'use client'/);
   assert.match(component, /useState\(1\)/);
-  assert.match(component, /aria-label=\{`Paginación: \$\{label\}`\}/);
+  assert.ok(component.includes("aria-label={t('ui.pagination.aria', { label })}"));
+  for (const [locale, expected] of [['es', 'Paginación: {label}'], ['en', 'Pagination: {label}']]) {
+    assert.equal(JSON.parse(readFileSync(`lib/i18n/messages/${locale}/ui.json`, 'utf8')).pagination.aria, expected);
+  }
   assert.match(component, /aria-current="page"/);
   assert.match(component, /pageLabel\(current, pages\)/);
   assert.match(component, /onPageChange\(current - 1\)/);

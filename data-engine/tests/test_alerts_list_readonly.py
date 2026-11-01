@@ -464,3 +464,26 @@ def test_product_feed_omits_ops_before_limit_preserving_daily_digest(db, status,
     # Read-only projection: operations history remains for internal diagnosis.
     assert db.scalar(select(func.count()).select_from(ResearchAlert)) == before == 3
     assert not db.dirty
+
+
+def test_alerts_timing_solo_con_flag(db, caplog, monkeypatch):
+    """Diagnostico: el desglose por tramos (consulta principal, companies,
+    news, insider, deliveries, DTO) solo se emite con ALERTS_TIMING=1.
+    Perfil local 2026-10-31: handler ~17,6 ms con 100 alertas sin tramo
+    dominante; prod p50 263 ms -> hace falta el desglose en prod."""
+    import logging
+
+    _seed(db)
+    with caplog.at_level(logging.INFO, logger="app.api.routes.alerts"):
+        list_alerts(ticker=None, status=None, include_snoozed=False, limit=100, db=db)
+    assert not [r for r in caplog.records if r.getMessage().startswith("alerts_timing")]
+
+    monkeypatch.setenv("ALERTS_TIMING", "1")
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="app.api.routes.alerts"):
+        list_alerts(ticker=None, status=None, include_snoozed=False, limit=100, db=db)
+    records = [r for r in caplog.records if r.getMessage().startswith("alerts_timing")]
+    assert len(records) == 1
+    msg = records[0].getMessage()
+    for tramo in ("query_ms", "companies_ms", "news_ms", "insider_ms", "deliveries_ms", "dto_ms", "total_ms", "alerts="):
+        assert tramo in msg, f"falta {tramo} en el desglose"

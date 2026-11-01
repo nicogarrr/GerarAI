@@ -31,9 +31,12 @@ test('overview conserva su BackendOffline ante un backend caído', () => {
     // El segundo await de marketPromise en overview debe seguir propagando el
     // rechazo a la ruta estricta: sin ella, una caída del backend pintaría la
     // vista principal vacía en vez del estado reintentable.
-    assert.match(page, /market = await marketPromise;/);
+    // El fix de lint 67760416e dejo el await pelado (sin asignacion: el valor
+    // ya se guardo al resolver headerMarket). Fijamos la INTENCION (await
+    // propaga el rechazo a la ruta estricta), no el texto de la asignacion.
+    assert.match(page, /^\s*await marketPromise;$/m);
     assert.match(page, /isBackendUnavailableError\(error\)/);
-    assert.match(page, /return <BackendOffline feature=\{`Datos de mercado de \$\{ticker\}`\}/);
+    assert.match(page, /return <BackendOffline feature=\{t\('research\.fichaMarketDataFeature', \{ ticker \}\)\}/);
 });
 
 test('el fixture E2E solo se activa en la combinación exacta de prueba', () => {

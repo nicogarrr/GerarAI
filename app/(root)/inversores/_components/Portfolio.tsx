@@ -52,20 +52,6 @@ export function Datum({
       {available ? (
         <span className="text-xs text-gray-500">
           {periodLabel(datum.as_of)}
-          {datum.source_url ? (
-            <>
-              {" "}
-              ·{" "}
-              <a
-                className="hover:underline"
-                href={datum.source_url}
-                rel="noreferrer"
-                target="_blank"
-              >
-                Fuente
-              </a>
-            </>
-          ) : null}
         </span>
       ) : null}
     </span>

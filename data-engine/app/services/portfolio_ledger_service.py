@@ -26,9 +26,41 @@ _ECB_BACKFILL_TRIED: set[tuple[str, date]] = set()
 
 
 def _default_fx_backfill(db: Session, currencies: set[str], start: date, end: date) -> dict:
+    """Descarga BCE con SESION PROPIA: jamas confirma la sesion del llamante.
+
+    :func:`backfill_ecb_rates` cierra su escritura con ``db.commit()``; sobre
+    la sesion del llamante ese commit mata cualquier savepoint abierto (p. ej.
+    el de cada fila del importador CSV: InvalidRequestError a mitad de
+    fichero) y confirma trabajo ajeno a medias. Con una sesion independiente
+    el commit es suyo, y la transaccion del llamante (Postgres, READ
+    COMMITTED) ve los tipos nuevos en su siguiente SELECT.
+
+    La sesion nueva hereda SOLO el contexto de autoridad del llamante
+    (``tenant_id``/``user_id`` de ``db.info``, puestos por ``get_db`` tras
+    autenticar al principal): sin tenant, ``before_flush`` rechaza la
+    escritura de ``FXRate`` (TenantOwnedMixin) con auth obligatoria y, sin
+    ella, la fila quedaria con tenant NULL, invisible para el propio
+    llamante. El contexto sale EXCLUSIVAMENTE de la sesion que ya tiene la
+    autoridad (nunca de parametros) y nunca se eleva el ambito: nada de
+    ``include_all_tenants``. Si el llamante no tiene tenant (sesion de
+    mantenimiento), la nueva tampoco: mismo fail-closed que tendria el
+    llamante escribiendo el mismo modelo.
+
+    ``db`` sigue siendo el origen del contexto; el seam inyectable de los
+    tests recibe la sesion de test como antes.
+    """
+    from app.core.database import SessionLocal
     from app.services.connectors.ecb_history import backfill_ecb_rates_sync
 
-    return backfill_ecb_rates_sync(db, currencies=currencies, start=start, end=end)
+    session = SessionLocal()
+    try:
+        for key in ("tenant_id", "user_id"):
+            value = db.info.get(key)
+            if value is not None:
+                session.info[key] = value
+        return backfill_ecb_rates_sync(session, currencies=currencies, start=start, end=end)
+    finally:
+        session.close()
 
 #: Acciones válidas del ledger (enum cerrado: buy/sell mueven posición,
 #: el resto son movimientos de caja/ajuste que no tocan cantidad).
@@ -158,6 +190,7 @@ class PortfolioLedgerService:
         fees: Decimal = Decimal("0"),
         currency: str = "USD",
         notes: str | None = None,
+        external_id: str | None = None,
     ) -> Transaction:
         normalized_action = (action or "").lower()
         if normalized_action not in LEDGER_ACTIONS:
@@ -213,7 +246,7 @@ class PortfolioLedgerService:
             price=price,
             fees=fees,
             currency=canonical_currency_code(currency),
-            external_id=f"manual-{uuid4().hex}",
+            external_id=external_id or f"manual-{uuid4().hex}",
             raw_payload={"notes": notes} if notes else {},
         )
         db.add(row)
@@ -459,7 +492,7 @@ class PortfolioLedgerService:
     ) -> None:
         position.valuation_hold_reason = reason[:200]
         position.valuation_hold_effective_date = effective_date
-        position.valuation_hold_since = since or date.today()
+        position.valuation_hold_since = since or local_today()
         self._blank_valuation(position)
         db.flush()
 

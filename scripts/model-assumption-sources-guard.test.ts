@@ -14,5 +14,6 @@ test('Solo se enlaza https y sin fuente se dice "sin fuente"', () => {
     assert.ok(panels.includes("https:"), "solo https");
     assert.match(panels, /\.test\(fuente\.url\)/);
     assert.match(panels, /rel="noopener noreferrer"/);
-    assert.match(panels, /<>sin fuente<\/>/);
+    assert.match(panels, /<>\{ti\('research\.modelSources\.none'\)\}<\/>/);
+    assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).modelSources.none, 'sin fuente');
 });

@@ -3,6 +3,7 @@ from app.models.entities import (
     AlertDelivery,
     AlertRule,
     AlertSubscription,
+    AuditLog,
     BudgetUsage,
     CalculatedMetric,
     CalendarFeedToken,
@@ -131,6 +132,7 @@ __all__ = [
     "BudgetUsage",
     "AlertRule",
     "AlertSubscription",
+    "AuditLog",
     "PushPreference",
     "PushSubscription",
     "CallClaim",
@@ -276,3 +278,18 @@ from app.models.ibkr_connection import IBKRSyncReceipt as IBKRSyncReceipt  # noq
 
 __all__.append("IBKRSyncReceipt")
 from app.models.dca_alert_settings import DcaAlertSettings
+from app.models.propicks_radar import ProPicksRadarCursor as ProPicksRadarCursor
+from app.models.propicks_radar import ProPicksRadarSnapshot as ProPicksRadarSnapshot
+
+__all__.extend(["ProPicksRadarCursor", "ProPicksRadarSnapshot"])
+
+# Invalidacion de la cache Redis (app.core.cache): los listeners ORM se
+# instalan aqui, al final, porque todo proceso que toca la base de datos
+# (API, workers, scheduler, tests) importa app.models. Idempotente.
+from app.core.cache_invalidation import (  # noqa: E402
+    install_invalidation_listeners as _install_cache_invalidation,
+)
+
+_install_cache_invalidation()
+del _install_cache_invalidation
+

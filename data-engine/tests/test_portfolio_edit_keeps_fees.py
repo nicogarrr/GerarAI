@@ -39,3 +39,63 @@ def test_put_without_fees_preserves_recorded_fee(monkeypatch):
     r = signed_request(client, SECRET, tenant, user, "PUT", f"/api/portfolio/transactions/{tid}",
                        json_body={**base, "price": 26, "fees": 2})
     assert r.json()["fees"] == 2
+
+
+
+def test_put_with_future_trade_date_is_rejected_like_create(monkeypatch):
+    """La fecha futura la rechaza el validador compartido del input (422) en
+    create y en update. Este test fija el contrato en el PUT y que el rechazo
+    no escribe nada."""
+    monkeypatch.setattr(
+        auth_module, "get_settings", lambda: auth_settings(strict=True, secret=SECRET)
+    )
+    init_db()
+    seed()
+    s = uuid4().hex[:8]
+    tenant, user, ticker = f"fut-{s}", f"user-{s}", f"U{s[:6]}".upper()
+    client = TestClient(main.app)
+    base = {"ticker": ticker, "action": "buy", "quantity": 4, "price": 25,
+            "trade_date": "2026-01-02", "currency": "USD"}
+    r = signed_request(client, SECRET, tenant, user, "POST", "/api/portfolio/transactions",
+                       json_body=base)
+    assert r.status_code == 201, r.text
+    tid = r.json()["id"]
+
+    r = signed_request(client, SECRET, tenant, user, "PUT", f"/api/portfolio/transactions/{tid}",
+                       json_body={**base, "trade_date": "2999-01-02"})
+    assert r.status_code == 422, r.text
+    assert "trade_date" in str(r.json()["detail"])
+
+    # La operacion conserva su fecha original: el 422 no escribio nada.
+    # Filtro por ticker exacto: sin el, el listado devuelve solo la pagina 1
+    # (20 operaciones) y el ID podria no aparecer si la suite deja filas.
+    r = signed_request(client, SECRET, tenant, user, "GET",
+                       "/api/portfolio/transactions", params={"ticker": ticker})
+    assert r.status_code == 200, r.text
+    mine = [row for row in r.json()["items"] if row["id"] == tid]
+    assert len(mine) == 1 and mine[0]["trade_date"] == "2026-01-02"
+
+
+
+def test_trade_date_422_field_alone_cannot_distinguish_cause():
+    """Por eso el front no afirma 'fecha futura': con el MISMO campo
+    trade_date fallan la fecha futura (validador del modelo), la fecha
+    imposible, el texto y el null (validacion de tipo de Pydantic), y el
+    detalle que llega al front conserva el campo, no el motivo."""
+    import pytest
+    from pydantic import ValidationError
+
+    from app.api.routes.portfolio import PortfolioTransactionInput
+
+    base = {"ticker": "ASTS", "action": "buy", "quantity": 1, "price": 10}
+    for bad in ("2999-01-02", "2026-02-30", "bad", None):
+        with pytest.raises(ValidationError) as excinfo:
+            PortfolioTransactionInput.model_validate({**base, "trade_date": bad})
+        assert any("trade_date" in error["loc"] for error in excinfo.value.errors())
+    # Solo la fecha futura nombra el motivo; parsing/null no lo distinguen.
+    with pytest.raises(ValidationError) as excinfo:
+        PortfolioTransactionInput.model_validate({**base, "trade_date": "2999-01-02"})
+    assert any("future" in error["msg"] for error in excinfo.value.errors())
+    with pytest.raises(ValidationError) as excinfo:
+        PortfolioTransactionInput.model_validate({**base, "trade_date": "bad"})
+    assert not any("future" in error["msg"] for error in excinfo.value.errors())

@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import { formatDate } from '@/lib/format';
 import { metricLabel } from '@/lib/research/metric-labels';
 import { changeHeadlineCopy } from '@/lib/research/change-copy';
-import { resolveVisitBaseline } from '@/lib/research/visit-baseline';
+import { markVisitRead, resolveVisitBaseline } from '@/lib/research/visit-baseline';
+import { metricChangeParts, type MetricChange } from '@/lib/research/metric-changes';
 
 interface ChangesSince {
     since: string;
     documentos: { total: number; items: Array<{ titulo: string; tipo: string; url: string | null; fecha: string | null }> };
     hechos: { total: number; por_metrica: Array<{ metric: string; n: number }> };
+    cambios_metricas?: MetricChange[];
     cambios_tesis: Array<{ resumen: string; direccion: string; requiere_revision: boolean; fecha: string; fuente_url?: string | null; fuente_nombre?: string | null; tambien_en?: Array<{ url: string | null; fuente: string | null; fecha?: string | null }> | null }>;
 }
 
@@ -66,29 +68,28 @@ export function ChangesSinceVisit({ ticker }: { ticker: string }) {
                     <li key={`${change.fecha}-${index}`}>
                         Tesis: {changeHeadlineCopy(change.resumen).text}{change.requiere_revision ? ' (requiere revisión)' : ''}
                         {changeHeadlineCopy(change.resumen).note ? <p className="mt-1 text-xs text-amber-300">{changeHeadlineCopy(change.resumen).note}</p> : null}
-                        {/* Procedencia: la fuente del evento y las URLs absorbidas al
-                            agrupar la misma noticia en dos idiomas quedan revisables. */}
-                        {change.fuente_url && /^https:\/\//.test(change.fuente_url) ? (
-                            <>
-                                {' · '}
-                                <a href={change.fuente_url} target="_blank" rel="noopener noreferrer" className="text-teal-400 underline">
-                                    {change.fuente_nombre || 'Fuente'}
-                                </a>
-                            </>
-                        ) : null}
-                        {change.tambien_en?.map((entry, entryIndex) => (
-                            entry.url && /^https:\/\//.test(entry.url) ? (
-                                <span key={`${entry.url}-${entryIndex}`}>
-                                    {' · también en '}
-                                    <a href={entry.url} target="_blank" rel="noopener noreferrer" className="text-teal-400 underline">
-                                        {entry.fuente || 'otra fuente'}
-                                    </a>
-                                </span>
-                            ) : null
-                        ))}
                     </li>
                 ))}
             </ul>
+            {data.cambios_metricas && data.cambios_metricas.length > 0 ? (
+                <ul className="mt-2 space-y-1 text-xs" aria-label="Qué ha cambiado">
+                    {data.cambios_metricas.map((change) => {
+                        const parts = metricChangeParts(change);
+                        return (
+                            <li key={change.metric}>
+                                <span className="text-gray-400">{metricLabel(change.metric)}:</span>{' '}
+                                {parts.before ? <><s className="text-gray-500">{parts.before}</s> → </> : null}
+                                <span className="font-semibold text-gray-100">{parts.after}</span>
+                                <span className="text-gray-500"> · {parts.note}{change.fuente ? ` · Fuente: ${change.fuente}` : ''}</span>
+                            </li>
+                        );
+                    })}
+                </ul>
+            ) : null}
+            <button type="button" className="mt-2 min-h-9 text-xs text-teal-300 underline-offset-2 hover:underline" onClick={() => {
+                try { markVisitRead(window.localStorage, window.sessionStorage, ticker, new Date()); } catch { /* almacenamiento bloqueado */ }
+                setData(null);
+            }}>Marcar como leído</button>
         </section>
     );
 }

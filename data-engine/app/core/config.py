@@ -149,7 +149,10 @@ class Settings(BaseSettings):
     app_env: str = "local"
     app_name: str = "GerarAI Research Engine"
     api_prefix: str = "/api"
-    cors_origins: list[str] = Field(
+    # NoDecode: la plantilla (docker.env.example) y cualquier .env escriben
+    # CORS_ORIGINS como lista separada por comas; pydantic-settings intentaria
+    # leerlo como JSON y tumbaria el arranque. Ver _parse_cors_origins.
+    cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
     )
 
@@ -205,12 +208,12 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./portfolio_research_os.db"
     # Pool SQLAlchemy SOLO para Postgres (database.py ignora estos valores con
-    # sqlite). Backend: 20+10 conexiones; workers: 4+2 via compose. Juntos
+    # sqlite). Backend: 10+10 conexiones; workers: 4+2 via compose. Juntos
     # quedan muy por debajo de max_connections=200 del Postgres de prod.
-    db_pool_size: int = Field(default=20, ge=1, le=200)
+    db_pool_size: int = Field(default=10, ge=1, le=200)
     db_max_overflow: int = Field(default=10, ge=0, le=200)
     db_pool_timeout: float = Field(default=30.0, gt=0, le=300)
-    db_pool_recycle: int = Field(default=1800, ge=0)
+    db_pool_recycle: int = Field(default=3600, ge=0)
     # Defensa de red tras los commits de #1657: una transaccion abierta y
     # olvidada en un worker no puede bloquear tablas mas de 2 minutos. Solo
     # Postgres (se pasa via connect_args options); 0 lo desactiva.
@@ -261,7 +264,7 @@ class Settings(BaseSettings):
     knowledge_rag_min_free_gb: float = Field(default=3.0, ge=0.0, le=1000.0)
     # Chunks: margen bajo el truncado de ambos densos (MiniLM 256 wp, e5-large 512 wp).
     knowledge_rag_child_max_tokens: int = Field(default=200, ge=32, le=250)
-    knowledge_rag_child_overlap_tokens: int = Field(default=30, ge=0, le=100)
+    knowledge_rag_child_overlap_tokens: int = Field(default=50, ge=0, le=100)
     knowledge_rag_parent_max_tokens: int = Field(default=900, ge=200, le=4000)
     # Docling minimo: sin OCR, sin VLM, sin ASR. Tablas: "fast" (~145 MB) o
     # "accurate" (~213 MB).
@@ -371,7 +374,7 @@ class Settings(BaseSettings):
     # Apagada por defecto: via nueva con dependencia de bus-factor 1 y el
     # enchufado al scheduler/Dramatiq es un follow-up cuando BUG-1 cierre.
     # Env: EDGARTOOLS_ENABLED.
-    edgartools_enabled: bool = False
+    edgartools_enabled: bool = True  # via cableada como fallback de lectura 13F; EDGARTOOLS_ENABLED=false = kill switch
     # Snapshot edgartools (manifest.json con synced_at + companyfacts/ +
     # submissions/ + filings/): mismo patron que sec_snapshot_dir. En
     # produccion (OCI, IP baneada por la SEC con 403 permanente) es la UNICA
@@ -473,6 +476,15 @@ class Settings(BaseSettings):
     # X-GerarAI-Language (es/en) fija el idioma de generación de la petición.
     # Env: I18N_GENERATION_ENABLED.
     i18n_generation_enabled: bool = False
+
+    # Invalidación GLOBAL de la caché de mercado (compartida entre tenants).
+    # Las rutas POST /api/cache/invalidate/market-data e /invalidate/all la
+    # vacían para TODOS los tenants; sin gate, cualquier identidad firmada
+    # podía dejar fría la caché de los demás (re-fetch masivo a yfinance/SEC).
+    # Omiso: activo fuera de producción (dev/test), apagado en producción,
+    # donde la acción queda como script de ops
+    # (scripts/invalidate_market_cache.py). Env: CACHE_GLOBAL_INVALIDATION_ENABLED.
+    cache_global_invalidation_enabled: bool | None = None
     langfuse_public_key: str | None = Field(default=None, repr=False)
     langfuse_secret_key: str | None = Field(default=None, repr=False)
     langfuse_host: str = "https://cloud.langfuse.com"
@@ -679,6 +691,17 @@ class Settings(BaseSettings):
     asts_llm_calls_per_day: int = Field(default=30, ge=0, le=10000)
 
     @property
+    def cache_global_invalidation_allowed(self) -> bool:
+        """Resuelve el gate de invalidación global de caché.
+
+        La variable explícita manda; omisa, solo se permite fuera de
+        producción.
+        """
+        if self.cache_global_invalidation_enabled is not None:
+            return self.cache_global_invalidation_enabled
+        return not self.is_production
+
+    @property
     def is_production(self) -> bool:
         # Denylist, no allowlist: cualquier APP_ENV que no sea un entorno local
         # conocido se trata como produccion. Con una allowlist, 'staging',
@@ -753,6 +776,17 @@ class Settings(BaseSettings):
             section, LLM_REASONING_EFFORT_DEFAULTS[section]
         )
         return value or None
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, value):
+        """Acepta `a,b` (formato de las plantillas) y tambien una lista JSON."""
+        if isinstance(value, str):
+            text = value.strip()
+            if text.startswith("["):
+                return json.loads(text)
+            return [origin.strip() for origin in text.split(",") if origin.strip()]
+        return value
 
     @field_validator("llm_model_overrides", mode="before")
     @classmethod

@@ -17,7 +17,7 @@ const thesis = (over: Record<string, unknown>): ResearchThesis => ({
     ...over,
 } as unknown as ResearchThesis);
 
-function riskBar(container: HTMLElement): HTMLElement {
+function riskBar(): HTMLElement {
     const label = screen.getByText('Riesgo de valoración');
     const card = label.closest('.min-w-0');
     expect(card).not.toBeNull();
@@ -28,25 +28,25 @@ function riskBar(container: HTMLElement): HTMLElement {
 
 describe('ThesisMemo barra de riesgo de valoración', () => {
     it('riesgo alto (75 = especulativa) se pinta en rojo, no en verde', () => {
-        const { container } = render(
+        render(
             <ThesisMemo model={{ publishable: false }} thesis={thesis({ valuation_risk_score: 75 })} />,
         );
-        expect(riskBar(container).className).toContain('bg-red-400');
-        expect(riskBar(container).className).not.toContain('bg-teal-400');
+        expect(riskBar().className).toContain('bg-red-400');
+        expect(riskBar().className).not.toContain('bg-teal-400');
     });
     it('riesgo bajo (20) se pinta en verde', () => {
-        const { container } = render(
+        render(
             <ThesisMemo model={{ publishable: false }} thesis={thesis({ valuation_risk_score: 20 })} />,
         );
-        expect(riskBar(container).className).toContain('bg-teal-400');
+        expect(riskBar().className).toContain('bg-teal-400');
     });
     it('las barras de calidad siguen sin invertir (80 en verde)', () => {
-        const { container } = render(
+        render(
             <ThesisMemo model={{ publishable: false }} thesis={thesis({ valuation_risk_score: 45 })} />,
         );
         const label = screen.getByText('Confianza en datos');
         const bar = label.closest('.min-w-0')!.querySelector('.h-1\\.5.rounded-full:not(.bg-gray-800)') as HTMLElement;
         expect(bar.className).toContain('bg-teal-400');
-        expect(riskBar(container).className).toContain('bg-amber-400');
+        expect(riskBar().className).toContain('bg-amber-400');
     });
 });

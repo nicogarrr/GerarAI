@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OwnershipSignalsPanel } from '@/components/research/OwnershipSignalsPanel';
 import { TtmPanel } from '@/components/research/TtmPanel';
 import { ThesisScenariosPanel } from '@/components/research/ThesisScenariosPanel';
-import { ChangeImpactCard } from '@/components/research/ChangeImpactCard';
 import type { OwnershipSignals } from '@/lib/research/ownership-signals';
 import type { ResearchTtm } from '@/lib/research/ttm-display';
 
@@ -118,27 +117,3 @@ describe('ThesisScenariosPanel', () => {
     });
 });
 
-const change = (over: Record<string, unknown> = {}) => ({
-    summary: 'Resumen del cambio.', materiality_score: 7, requires_review: true, created_at: '2026-10-01T10:00:00Z',
-    affected_metrics: ['market_cap'], affected_claim_ids: [1, 2], ...over,
-}) as never;
-
-describe('ChangeImpactCard', () => {
-    it('muestra etiquetas, materialidad, revisión pendiente y qué toca, con enlace a la tesis', () => {
-        render(<ChangeImpactCard change={change()} directionLabel="Negativo" ticker="BRK/B" typeLabel="resultados" />);
-        expect(screen.getByText('materialidad 7')).toBeInTheDocument();
-        expect(screen.getByText('revisión pendiente')).toBeInTheDocument();
-        expect(screen.getByText(/Toca:/).textContent).toMatch(/Capitalización bursátil · 2 afirmaci\S+ de la tesis/);
-        expect(screen.getByRole('link', { name: 'Ver la tesis' })).toHaveAttribute('href', '/research/BRK%2FB?view=thesis');
-    });
-    it('singular, sin revisión pendiente', () => {
-        render(<ChangeImpactCard change={change({ requires_review: false, affected_metrics: [], affected_claim_ids: [9] })} directionLabel="d" ticker="X" typeLabel="t" />);
-        expect(screen.queryByText('revisión pendiente')).toBeNull();
-        expect(screen.getByText(/1 afirmación de la tesis/)).toBeInTheDocument();
-    });
-    it('sin métricas ni afirmaciones no se deduce impacto: no hay línea "Toca"', () => {
-        render(<ChangeImpactCard change={change({ affected_metrics: [], affected_claim_ids: [] })} directionLabel="d" ticker="X" typeLabel="t" />);
-        expect(screen.queryByText(/Toca:/)).toBeNull();
-        expect(screen.queryByRole('link')).toBeNull();
-    });
-});

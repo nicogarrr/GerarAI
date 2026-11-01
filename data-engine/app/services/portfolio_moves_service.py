@@ -24,18 +24,47 @@ def build_digest(db: Session, as_of: date, generated_at: datetime | None = None)
     if generated_at.tzinfo is None or as_of >= generated_at.astimezone(UTC).date():
         raise ValueError("Only prior completed UTC dates may be summarized")
     positions = db.scalars(select(Position).where(Position.quantity > 0).order_by(Position.id)).all()
-    items = []
-    for position in positions:
-        company = db.get(Company, position.company_id)
-        if not company:
-            continue
-        prices = db.scalars(select(MarketPrice).where(
-            MarketPrice.company_id == company.id,
+    # Lotes anti N+1: 1 consulta de empresas, 1 de precios (2 barras mas
+    # recientes por empresa) y 1 de noticias GDELT del dia (5 por empresa),
+    # con la misma ventana, filtros y orden que las consultas por posicion.
+    company_ids = sorted({position.company_id for position in positions})
+    companies = (
+        {c.id: c for c in db.scalars(select(Company).where(Company.id.in_(company_ids)))}
+        if company_ids else {}
+    )
+    prices_by_company: dict[int, list[MarketPrice]] = {cid: [] for cid in company_ids}
+    if company_ids:
+        for price in db.scalars(select(MarketPrice).where(
+            MarketPrice.company_id.in_(company_ids),
             MarketPrice.date <= as_of,
             MarketPrice.date >= as_of - timedelta(days=8),
             MarketPrice.source.in_(DAILY_BAR_SOURCES),
             MarketPrice.adj_close.is_not(None),
-        ).order_by(desc(MarketPrice.date)).limit(2)).all()
+        ).order_by(MarketPrice.company_id, desc(MarketPrice.date))).all():
+            bucket = prices_by_company[price.company_id]
+            if len(bucket) < 2:
+                bucket.append(price)
+    start = datetime.combine(as_of, time.min, tzinfo=UTC)
+    end = start + timedelta(days=1)
+    # Filtro connector en SQL ANTES del cap por empresa: si se filtra en
+    # Python, 5 noticias RSS/manuales recientes ocultan las GDELT del dia.
+    news_by_company: dict[int, list[NewsEvent]] = {cid: [] for cid in company_ids}
+    if company_ids:
+        for row in db.scalars(select(NewsEvent).where(
+            NewsEvent.company_id.in_(company_ids),
+            NewsEvent.date >= start, NewsEvent.date < end,
+            NewsEvent.url.is_not(None),
+            NewsEvent.metadata_["connector"].as_string() == "gdelt",
+        ).order_by(NewsEvent.company_id, desc(NewsEvent.date))).all():
+            bucket = news_by_company[row.company_id]
+            if len(bucket) < 5:
+                bucket.append(row)
+    items = []
+    for position in positions:
+        company = companies.get(position.company_id)
+        if not company:
+            continue
+        prices = prices_by_company[company.id]
         current = prices[0] if prices and prices[0].date == as_of and prices[0].adj_close and prices[0].adj_close > 0 else None
         prior = prices[1] if current and len(prices) > 1 and prices[1].adj_close and prices[1].adj_close > 0 else None
         item = {"position_id": position.id, "company_id": company.id, "ticker": company.ticker,
@@ -60,16 +89,7 @@ def build_digest(db: Session, as_of: date, generated_at: datetime | None = None)
                         price_ids=[prior.id, current.id])
             # GDELT articles retain publisher domain as source and independently
             # carry connector provenance; neither proximity nor coverage proves cause.
-            start = datetime.combine(as_of, time.min, tzinfo=UTC)
-            end = start + timedelta(days=1)
-            # Filtro connector en SQL ANTES del LIMIT: si se filtra en Python
-            # tras el LIMIT, 5 noticias RSS/manual recientes ocultan todas las
-            # GDELT del día aunque existan.
-            news = db.scalars(select(NewsEvent).where(
-                NewsEvent.company_id == company.id, NewsEvent.date >= start, NewsEvent.date < end,
-                NewsEvent.url.is_not(None),
-                NewsEvent.metadata_["connector"].as_string() == "gdelt",
-            ).order_by(desc(NewsEvent.date)).limit(5)).all()
+            news = news_by_company[company.id]
             item["related_news"] = [{"id": row.id, "title": row.title, "url": row.url,
                                     "source": row.source, "connector": "gdelt", "published_at": row.date.isoformat()}
                                    for row in news]

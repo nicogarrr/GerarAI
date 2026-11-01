@@ -1,0 +1,8 @@
+# Inertes conocidos (E6). find-dead-code --fail solo rompe por muertos NUEVOS.
+# Una entrada que deja de ser hallazgo (borrada o revivida) rompe el check:
+# quitala en el mismo PR que limpia. Regenerar: node scripts/find-dead-code.mjs --json | jq -r ".findings[].file" | sort
+research/dca-comparison-20261030/compare.py
+research/dca-comparison-20261030/test_compare.py
+scripts/theme-fundamentals/test_import_eia.py
+scripts/theme-fundamentals/test_import_usgs.py
+scripts/theme-fundamentals/test_import_world_bank.py

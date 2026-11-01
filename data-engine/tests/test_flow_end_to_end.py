@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 import main
 from app.api.routes import screeners as screeners_module
 from app.core import auth as auth_module
+from app.core.csrf import generate_csrf_token
 from app.seed import seed
 from tests.auth_helpers import auth_settings, bound_headers
 
@@ -44,6 +45,12 @@ FAKE_VENDOR_ITEMS = [
         "pb": None,
         "roe": None,
         "beta": None,
+        # Campos requeridos por ScreenerRealItemOut (response_model, #3698).
+        "priceAsOf": None,
+        "priceTimestampKind": "quote",
+        "priceDate": None,
+        "currency": "USD",
+        "has_fundamentals": False,
     },
     {
         "symbol": "NVDA",
@@ -61,6 +68,12 @@ FAKE_VENDOR_ITEMS = [
         "pb": None,
         "roe": None,
         "beta": None,
+        # Campos requeridos por ScreenerRealItemOut (response_model, #3698).
+        "priceAsOf": None,
+        "priceTimestampKind": "quote",
+        "priceDate": None,
+        "currency": "USD",
+        "has_fundamentals": False,
     },
 ]
 
@@ -84,6 +97,7 @@ def test_flow_end_to_end(monkeypatch):
     screeners_module._real_items_cache.clear()
 
     client = TestClient(main.app)
+    client.headers["X-CSRF-Token"] = generate_csrf_token()
 
     # 1. Screener real (mock vendor).
     screener = client.get("/api/screeners/real", params={"limit": 5})

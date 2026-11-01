@@ -10,7 +10,7 @@ import { formatMarketCapUsd, formatMarketDate, formatNumber, formatPercent, form
 import { etiquetaSector } from '@/lib/labels';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { indicesCardState } from '@/lib/market/indices-card-state';
-import { t } from '@/lib/i18n/t';
+import { getT } from '@/lib/i18n/server';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +28,7 @@ export const revalidate = 0;
 export const metadata: Metadata = {
   title: 'Explorar acciones',
   description:
-    'Large caps líquidos con precio y market cap reales, filtros guardados del motor de análisis y lectura offline con Finnhub.',
+    'Large caps líquidos con precio y market cap reales, filtros guardados del motor de análisis y lectura offline de precios.',
 };
 
 /** Sectores que el Screener ofrece: etiqueta ES de lib/labels.ts + valor EN
@@ -89,6 +89,7 @@ function VistaTabs({ vista }: { vista: Vista }) {
 }
 
 async function MoversVista({ vista }: { vista: Exclude<Vista, 'empresas'> }) {
+  const t = await getT();
   let moversResult, tickerContext;
   try {
     [moversResult, tickerContext] = await Promise.all([getMarketMoversResult(25), getTickerContext()]);
@@ -138,6 +139,7 @@ async function MoversVista({ vista }: { vista: Exclude<Vista, 'empresas'> }) {
 }
 
 export default async function ScreenerPage({ searchParams }: { searchParams?: Promise<{ sector?: string; vista?: string }> }) {
+  const t = await getT();
   const params = await searchParams;
   const vista = vistaDe(params?.vista);
   if (vista === 'regimen') {
@@ -411,7 +413,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
         <CardContent>
           {engineScreens.engineDown ? (
             <p className="text-sm text-gray-500">
-              La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertura. El motor de filtros guardados no está disponible.
+              La tabla muestra precios como lectura offline, sin análisis de cobertura. El motor de filtros guardados no está disponible.
             </p>
           ) : engineScreens.screens.length === 0 ? (
             <p className="text-sm text-gray-500">

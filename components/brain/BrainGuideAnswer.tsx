@@ -1,17 +1,22 @@
+'use client';
+
 import { useId } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { safeAssistantSourceUrl, type AssistantCitationKind, type AssistantResponse, type AssistantSectionKey } from '@/lib/research/assistant-contract';
-import { t } from '@/lib/i18n/t';
+import { safeAssistantSourceUrl, type AssistantResponse } from '@/lib/research/assistant-contract';
+import { useT } from '@/lib/i18n/client';
 
-const SECTION_LABELS: Record<AssistantSectionKey, string> = {
-    facts: 'Hechos', calculations: 'Cálculos', hypotheses: 'Hipótesis', inferences: 'Inferencias',
-    contradictions: 'Contradicciones', insufficient_data: 'Datos insuficientes', conclusion: 'Conclusión',
-};
-const CITATION_LABELS: Record<AssistantCitationKind, string> = {
-    news_event: 'Noticia atribuida', financial_fact: 'Dato financiero', document_chunk: 'Documento',
-    claim_evidence: 'Evidencia de afirmación', market_observation: 'Observación de mercado', thesis_record: 'Tesis guardada',
-};
+const SECTION_KEYS = {
+    facts: 'brain.guide.sections.facts', calculations: 'brain.guide.sections.calculations',
+    hypotheses: 'brain.guide.sections.hypotheses', inferences: 'brain.guide.sections.inferences',
+    contradictions: 'brain.guide.sections.contradictions', insufficient_data: 'brain.guide.sections.insufficientData',
+    conclusion: 'brain.guide.sections.conclusion',
+} as const;
+const CITATION_KEYS = {
+    news_event: 'brain.guide.citations.newsEvent', financial_fact: 'brain.guide.citations.financialFact',
+    document_chunk: 'brain.guide.citations.documentChunk', claim_evidence: 'brain.guide.citations.claimEvidence',
+    market_observation: 'brain.guide.citations.marketObservation', thesis_record: 'brain.guide.citations.thesisRecord',
+} as const;
 
 /**
  * Copy de una respuesta o sección VACÍA.
@@ -21,32 +26,29 @@ const CITATION_LABELS: Record<AssistantCitationKind, string> = {
  * la respuesta, si la evidencia no daba para una o si el modelo se quedó mudo.
  * Se nombra el caso y se dice dónde está la información que sí hay.
  */
-function emptyAnswerCopy(status: 'answered' | 'insufficient_data'): string {
-    return status === 'insufficient_data'
-        ? 'El asistente no ha escrito una conclusión: la evidencia disponible no permite confirmar una conclusión. Revisa «Datos que faltan» más abajo para ver si se indica qué falta.'
-        : 'El asistente ha devuelto la respuesta sin texto: no hay nada que mostrar como respuesta. Revisa las secciones y las fuentes disponibles más abajo.';
+function emptyAnswerCopy(t: ReturnType<typeof useT>, status: 'answered' | 'insufficient_data'): string {
+    return status === 'insufficient_data' ? t('brain.guide.emptyAnswerInsufficient') : t('brain.guide.emptyAnswer');
 }
 
-function emptySectionCopy(status: 'answered' | 'insufficient_data'): string {
-    return status === 'insufficient_data'
-        ? 'Esta sección no contiene texto. La respuesta está marcada como «Datos insuficientes», pero no indica el motivo de este apartado vacío.'
-        : 'Sección sin cuerpo: el asistente la ha enviado vacía. Sin texto no hay nada que leer.';
+function emptySectionCopy(t: ReturnType<typeof useT>, status: 'answered' | 'insufficient_data'): string {
+    return status === 'insufficient_data' ? t('brain.guide.emptySectionInsufficient') : t('brain.guide.emptySection');
 }
 
 function GuideCitation({ citation, index, id }: { citation: AssistantResponse['citations'][number]; index: number; id: string }) {
+    const t = useT();
     const url = safeAssistantSourceUrl(citation.url);
     return (
         <li id={id} className="min-w-0 scroll-mt-3 rounded-lg border border-slate-700/60 bg-slate-900/60 p-2 text-xs text-slate-400">
             <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold text-slate-200">Fuente {index + 1}</span>
-                <Badge variant="outline">{CITATION_LABELS[citation.kind] ?? 'Fuente sin clasificar'}</Badge>
+                <span className="font-semibold text-slate-200">{t('brain.guide.sourceN', { n: index + 1 })}</span>
+                <Badge variant="outline">{t(CITATION_KEYS[citation.kind] ?? 'brain.guide.citations.unclassified')}</Badge>
                 {url
-                    ? <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 text-indigo-300 underline underline-offset-2 hover:text-indigo-200"><span className="min-w-0 break-words">{citation.source || 'Fuente sin nombre'}</span><ExternalLink aria-hidden className="h-3 w-3 shrink-0" /></a>
-                    : <span className="min-w-0 break-all text-slate-200">{citation.source || 'Fuente sin nombre'}</span>}
+                    ? <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 text-indigo-300 underline underline-offset-2 hover:text-indigo-200"><span className="min-w-0 break-words">{citation.source || t('brain.guide.unnamedSource')}</span><ExternalLink aria-hidden className="h-3 w-3 shrink-0" /></a>
+                    : <span className="min-w-0 break-all text-slate-200">{citation.source || t('brain.guide.unnamedSource')}</span>}
             </div>
-            <div className="mt-1 break-all">Fecha de referencia: {citation.as_of || t('signals.noDate')}</div>
+            <div className="mt-1 break-all">{t('brain.guide.referenceDate', { date: citation.as_of || t('signals.noDate') })}</div>
             {citation.excerpt
-                ? <details className="mt-1"><summary className="cursor-pointer text-slate-400 hover:text-slate-200">Extracto original</summary><p className="mt-1 whitespace-pre-wrap break-words text-slate-300">{citation.excerpt}</p></details>
+                ? <details className="mt-1"><summary className="cursor-pointer text-slate-400 hover:text-slate-200">{t('brain.guide.originalExcerpt')}</summary><p className="mt-1 whitespace-pre-wrap break-words text-slate-300">{citation.excerpt}</p></details>
                 : null}
         </li>
     );
@@ -59,40 +61,41 @@ function GuideCitation({ citation, index, id }: { citation: AssistantResponse['c
  * cliente por herencia de GlobalBrain.
  */
 export function BrainGuideAnswer({ result }: { result: AssistantResponse }) {
+    const t = useT();
     const sourcePrefix = useId();
     return (
         <div className="space-y-3">
-            <p className="text-xs text-slate-400">Guía de {result.mode === 'guide' ? 'empresa' : 'exploración'} · Sin escritura: solo lectura, no modifica nada.</p>
+            <p className="text-xs text-slate-400">{t('brain.guide.header', { kind: result.mode === 'guide' ? t('brain.guide.kindCompany') : t('brain.guide.kindExploration') })}</p>
             {result.status === 'insufficient_data' ? (
                 <div role="status" className="rounded-lg border border-amber-800 bg-amber-950/20 p-3 text-sm text-amber-200">
-                    <strong>Datos insuficientes</strong>
-                    <p className="mt-1">La evidencia disponible no permite una conclusión confirmada.</p>
+                    <strong>{t('brain.guide.insufficientTitle')}</strong>
+                    <p className="mt-1">{t('brain.guide.insufficientBody')}</p>
                 </div>
             ) : null}
-            <p className="whitespace-pre-wrap break-words">{result.answer?.trim() ? result.answer : emptyAnswerCopy(result.status)}</p>
+            <p className="whitespace-pre-wrap break-words">{result.answer?.trim() ? result.answer : emptyAnswerCopy(t, result.status)}</p>
             {result.sections.length ? (
                 <div className="space-y-2">
                     {result.sections.map((section, index) => (
                         <details key={`${section.key}-${index}`} className="rounded-lg border border-slate-700/60 bg-slate-900/60" open={section.key === 'conclusion' && result.status === 'answered'}>
-                            <summary className="min-h-11 cursor-pointer px-3 py-2 text-sm font-semibold text-slate-200">{SECTION_LABELS[section.key] ?? 'Sección sin clasificar'}</summary>
+                            <summary className="min-h-11 cursor-pointer px-3 py-2 text-sm font-semibold text-slate-200">{t(SECTION_KEYS[section.key] ?? 'brain.guide.sections.unclassified')}</summary>
                             <div className="border-t border-slate-800 px-3 py-2">
-                                <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">{section.body?.trim() ? section.body : emptySectionCopy(result.status)}</p>
+                                <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">{section.body?.trim() ? section.body : emptySectionCopy(t, result.status)}</p>
                                 {section.citation_ids.length ? (
-                                    <ul aria-label="Fuentes de esta sección" className="mt-2 space-y-1 text-xs">
+                                    <ul aria-label={t('brain.guide.sectionSourcesAria')} className="mt-2 space-y-1 text-xs">
                                         {[...new Set(section.citation_ids)].map((citationId) => {
                                             const sourceIndex = result.citations.findIndex((citation) => citation.id === citationId);
                                             return (
                                                 <li key={citationId}>
                                                     {sourceIndex >= 0 ? (
                                                         <a href={`#${sourcePrefix}-source-${sourceIndex}`} className="break-words text-indigo-300 underline underline-offset-2">
-                                                            Fuente {sourceIndex + 1}: {result.citations[sourceIndex].source || 'Fuente sin nombre'}
+                                                            {t('brain.guide.sourceRef', { n: sourceIndex + 1, name: result.citations[sourceIndex].source || t('brain.guide.unnamedSource') })}
                                                         </a>
-                                                    ) : <span className="text-amber-200">Referencia sin fuente disponible: no se puede comprobar esta cita.</span>}
+                                                    ) : <span className="text-amber-200">{t('brain.guide.missingRef')}</span>}
                                                 </li>
                                             );
                                         })}
                                     </ul>
-                                ) : <p className="mt-1 text-xs text-slate-400">Sin citas para esta sección: comprueba sus afirmaciones antes de usarlas.</p>}
+                                ) : <p className="mt-1 text-xs text-slate-400">{t('brain.guide.noCitations')}</p>}
                             </div>
                         </details>
                     ))}
@@ -100,23 +103,23 @@ export function BrainGuideAnswer({ result }: { result: AssistantResponse }) {
             ) : null}
             {result.missing_data.length || result.status === 'insufficient_data' ? (
                 <div className="rounded-lg border border-amber-800/60 p-3">
-                    <h4 className="text-sm font-semibold text-amber-200">Datos que faltan</h4>
+                    <h4 className="text-sm font-semibold text-amber-200">{t('brain.guide.missingTitle')}</h4>
                     {result.missing_data.length
                         ? <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-300">{result.missing_data.map((item, index) => <li key={index}>{item}</li>)}</ul>
-                        : <p className="mt-1 text-sm text-slate-400">El asistente no ha indicado qué información falta. Puedes preguntar por el dato y el periodo que necesitas comprobar.</p>}
+                        : <p className="mt-1 text-sm text-slate-400">{t('brain.guide.missingEmpty')}</p>}
                 </div>
             ) : null}
             {result.suggested_next_steps.length ? (
                 <div>
-                    <h4 className="text-sm font-semibold text-slate-200">Próximos pasos sugeridos</h4>
+                    <h4 className="text-sm font-semibold text-slate-200">{t('brain.guide.nextSteps')}</h4>
                     <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-400">{result.suggested_next_steps.map((item, index) => <li key={index}>{item}</li>)}</ul>
                 </div>
             ) : null}
             <div className="border-t border-slate-800 pt-2">
-                <h4 className="text-sm font-semibold text-slate-200">Citas y fuentes ({result.citations.length})</h4>
+                <h4 className="text-sm font-semibold text-slate-200">{t('brain.guide.citationsTitle', { n: result.citations.length })}</h4>
                 {result.citations.length
                     ? <ul className="mt-2 grid min-w-0 gap-2">{result.citations.map((citation, index) => <GuideCitation key={`${citation.id}-${index}`} citation={citation} index={index} id={`${sourcePrefix}-source-${index}`} />)}</ul>
-                    : <p className="mt-1 text-sm text-slate-400">El asistente no ha adjuntado fuentes. No puedes comprobar esta respuesta desde aquí.</p>}
+                    : <p className="mt-1 text-sm text-slate-400">{t('brain.guide.noSources')}</p>}
             </div>
         </div>
     );

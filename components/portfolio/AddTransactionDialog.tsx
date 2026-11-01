@@ -18,7 +18,9 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { hasTransactionErrors, validateTransactionForm, type TransactionFormErrors } from './transactionValidation';
-import { parseLocalizedNumber, todayLocal } from '@/lib/format';
+import { todayLocal } from '@/lib/format';
+import { parseLocalizedNumber } from '@/lib/i18n/parse-number';
+import { useLocale, useT } from '@/lib/i18n/client';
 import { currencyForTicker, currencyOptions, NEW_TRANSACTION_CURRENCY, presetTransactionCurrency } from './transactionCurrencies';
 import { SYMBOL_VALIDATION } from '@/lib/constants';
 
@@ -42,6 +44,8 @@ function validSymbol(raw: string | null | undefined): string | null {
 }
 
 export default function AddTransactionDialog({ userId, onClose, initialSymbol, initialCompanyName, initialCurrency }: DialogProps) {
+  const ti = useT();
+  const locale = useLocale();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   // Un símbolo de la URL con forma inválida se ignora (formulario vacío).
@@ -95,7 +99,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
       price: formData.price,
       fees: formData.fees,
       date: formData.date,
-    });
+    }, new Date(), { ti, locale });
     setFieldErrors(errors);
     if (hasTransactionErrors(errors)) return;
     setLoading(true);
@@ -105,17 +109,17 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
         userId,
         formData.symbol,
         formData.type,
-        parseLocalizedNumber(formData.quantity) ?? 0,
-        parseLocalizedNumber(formData.price) ?? 0,
+        parseLocalizedNumber(formData.quantity, locale) ?? 0,
+        parseLocalizedNumber(formData.price, locale) ?? 0,
         new Date(formData.date),
         formData.notes || undefined,
         formData.currency,
-        parseLocalizedNumber(formData.fees) ?? 0,
+        parseLocalizedNumber(formData.fees, locale) ?? 0,
       );
       // Rechazo conocido del ledger (vender más de lo que tienes, divisa distinta):
       // el formulario sigue abierto con lo escrito y el motivo en español.
       if (result?.success === false) {
-        toast.error(result.error ?? 'No se pudo registrar la transacción.');
+        toast.error(result.error ?? ti('portfolio.addTransaction.toastError'));
         return;
       }
       onClose();
@@ -132,7 +136,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
       });
       setSearchQuery('');
       setCurrencyChosen(false);
-      toast.success('Transacción registrada');
+      toast.success(ti('portfolio.addTransaction.toastSuccess'));
       router.refresh();
     } catch (error) {
       // Nunca tragar un redirect de Next (p. ej. sesión caducada): debe navegar.
@@ -145,21 +149,21 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
   };
 
   return (
-      <DialogContent className="bg-gray-900 border-gray-700 max-w-md">
+      <DialogContent className="bg-gray-900 border-gray-700 max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-gray-100">Nueva inversión</DialogTitle>
+          <DialogTitle className="text-gray-100">{ti('portfolio.addTransaction.title')}</DialogTitle>
           <DialogDescription className="text-gray-400">
-            Registra una compra o venta de acciones
+            {ti('portfolio.addTransaction.description')}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           {/* Buscador con autocompletado: el componente compartido de la app
               (misma búsqueda del buscador global, gate F215 y debounce). */}
           <div className="space-y-2">
-            <Label htmlFor="symbol" className="text-gray-300">Buscar acción</Label>
+            <Label htmlFor="symbol" className="text-gray-300">{ti('portfolio.addTransaction.searchLabel')}</Label>
             <TickerSearchInput
               id="symbol"
-              placeholder="Buscar por nombre o símbolo (ej: Apple, AAPL)"
+              placeholder={ti('portfolio.addTransaction.searchPlaceholder')}
               value={searchQuery}
               onValueChange={(value) => {
                 setSearchQuery(value);
@@ -173,14 +177,14 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
             />
             {canUseManualSymbol && (
               <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
-                <span>¿No aparece en la lista?</span>
+                <span>{ti('portfolio.addTransaction.notInList')}</span>
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={() => selectSymbol(manualSymbol, '')}
                   className="min-h-[44px] px-2 text-teal-300 hover:bg-teal-950/40 hover:text-teal-200"
                 >
-                  Usar «{manualSymbol}» como símbolo
+                  {ti('portfolio.addTransaction.useManual', { symbol: manualSymbol })}
                 </Button>
               </div>
             )}
@@ -201,7 +205,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="currency" className="text-gray-300">Moneda de la operación</Label>
+            <Label htmlFor="currency" className="text-gray-300">{ti('portfolio.addTransaction.currencyLabel')}</Label>
             <Select value={formData.currency} onValueChange={(currency) => { setCurrencyChosen(true); setFormData({ ...formData, currency }); }}>
               <SelectTrigger id="currency" className="bg-gray-800 border-gray-700 text-gray-100"><SelectValue /></SelectTrigger>
               <SelectContent className="bg-gray-800 border-gray-700">
@@ -211,7 +215,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="type" className="text-gray-300">Tipo de operación</Label>
+            <Label htmlFor="type" className="text-gray-300">{ti('portfolio.addTransaction.typeLabel')}</Label>
             <Select
               value={formData.type}
               onValueChange={(value: 'buy' | 'sell') => setFormData({ ...formData, type: value })}
@@ -220,15 +224,15 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-gray-800 border-gray-700">
-                <SelectItem value="buy">🟢 Compra</SelectItem>
-                <SelectItem value="sell">🔴 Venta</SelectItem>
+                <SelectItem value="buy">{ti('portfolio.addTransaction.typeBuy')}</SelectItem>
+                <SelectItem value="sell">{ti('portfolio.addTransaction.typeSell')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="quantity" className="text-gray-300">Cantidad</Label>
+              <Label htmlFor="quantity" className="text-gray-300">{ti('portfolio.addTransaction.quantityLabel')}</Label>
               <Input
                 id="quantity"
                 type="text"
@@ -245,12 +249,12 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="price" className="text-gray-300">Precio ({formData.currency})</Label>
+              <Label htmlFor="price" className="text-gray-300">{ti('portfolio.addTransaction.priceLabel', { currency: formData.currency })}</Label>
               <Input
                 id="price"
                 type="text"
                 inputMode="decimal"
-                placeholder="150,00"
+                placeholder={ti('portfolio.addTransaction.pricePlaceholder')}
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 required
@@ -263,12 +267,12 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="fees" className="text-gray-300">Comisiones ({formData.currency}) (opcional)</Label>
+            <Label htmlFor="fees" className="text-gray-300">{ti('portfolio.addTransaction.feesLabel', { currency: formData.currency })}</Label>
             <Input
               id="fees"
               type="text"
                 inputMode="decimal"
-              placeholder="0,00"
+              placeholder={ti('portfolio.addTransaction.feesPlaceholder')}
               value={formData.fees}
               onChange={(e) => setFormData({ ...formData, fees: e.target.value })}
               className="bg-gray-800 border-gray-700 text-gray-100"
@@ -279,7 +283,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="date" className="text-gray-300">Fecha</Label>
+            <Label htmlFor="date" className="text-gray-300">{ti('portfolio.addTransaction.dateLabel')}</Label>
             <Input
               id="date"
               type="date"
@@ -294,10 +298,10 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes" className="text-gray-300">Notas (opcional)</Label>
+            <Label htmlFor="notes" className="text-gray-300">{ti('portfolio.addTransaction.notesLabel')}</Label>
             <Input
               id="notes"
-              placeholder="Notas sobre la transacción"
+              placeholder={ti('portfolio.addTransaction.notesPlaceholder')}
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               className="bg-gray-800 border-gray-700 text-gray-100"
@@ -306,13 +310,13 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => onClose()}>
-              Cancelar
+              {ti('common.actions.cancel')}
             </Button>
             <Button
               type="submit"
               disabled={loading}
             >
-              {loading ? 'Guardando...' : 'Guardar inversión'}
+              {loading ? ti('portfolio.addTransaction.saving') : ti('portfolio.addTransaction.save')}
             </Button>
           </div>
         </form>

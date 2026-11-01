@@ -21,7 +21,7 @@ describe('sortCompaniesByRelevance', () => {
     it('ordena por grupo y desempata por ticker; no muta la entrada', () => {
         const copy = [...companies];
         const out = sortCompaniesByRelevance(companies, (c) => c.ticker === 'TSLA', pf, wl);
-        expect(out.map((c) => c.ticker)).toEqual(['TSLA', 'MSFT', 'NVDA', 'AAPL', 'ABB'].sort((a, b) => 0) && ['TSLA', 'MSFT', 'NVDA', 'AAPL', 'ABB'].slice(0, 3).concat(['AAPL', 'ABB'].sort()));
+        expect(out.map((c) => c.ticker)).toEqual(['TSLA', 'MSFT', 'NVDA', 'AAPL', 'ABB']);
         expect(companies).toEqual(copy);
     });
     it('lista vacía', () => {

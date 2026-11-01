@@ -9,9 +9,22 @@ from collections import Counter
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from xml.etree import ElementTree
+from xml.etree import ElementTree  # nosec B314  # stdlib solo para tipos (Element) y ParseError: defusedxml no los exporta; el parseo usa defusedxml
 
-from sqlalchemy import select, union_all
+from defusedxml import ElementTree as DefusedElementTree
+from defusedxml.common import EntitiesForbidden
+
+# XML externo (Flex Query subido por el usuario o servicio web de IBKR):
+# defusedxml rechaza entidades/DTDs (billion laughs) antes de expandirlas.
+# Solo se usa para PARSEAR; los constructores (Element, SubElement) siguen en
+# el stdlib porque defusedxml no los exporta (_merge_lot_rows construye la
+# fila resumen con xml.etree.ElementTree.Element).
+_XML_ENTITIES_MSG = (
+    "El XML declara entidades (DOCTYPE): no es un Flex Query exportado por IBKR. "
+    "Descarga el fichero de nuevo desde IBKR sin editarlo."
+)
+
+from sqlalchemy import func, select, union_all
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -102,7 +115,9 @@ def _is_date(value: str | None) -> bool:
 def validate_flex_xml(xml_text: str) -> list[str]:
     """Valida un Flex Query XML de IBKR (fechas con barra: orden por fichero)."""
     try:
-        root = ElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
+        root = DefusedElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
+    except EntitiesForbidden:
+        return [_XML_ENTITIES_MSG]
     except ElementTree.ParseError:
         root = None
     day_first = _flex_slash_day_first(root) if root is not None else False
@@ -126,7 +141,9 @@ def _validate_flex_xml(xml_text: str) -> list[str]:
     if not xml_text or not xml_text.strip():
         return ["El fichero está vacío: descarga de nuevo el Flex Query XML desde IBKR (Informes > Flex Queries)."]
     try:
-        root = ElementTree.fromstring(xml_text)
+        root = DefusedElementTree.fromstring(xml_text)
+    except EntitiesForbidden:
+        return [_XML_ENTITIES_MSG]
     except ElementTree.ParseError as exc:
         return [
             f"El XML no se puede leer ({exc}): el fichero está incompleto o no es XML. "
@@ -1136,7 +1153,9 @@ class IBKRImportService:
         omitía el 15/03 por «fecha no reconocida».
         """
         try:
-            root = ElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
+            root = DefusedElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
+        except EntitiesForbidden as exc:
+            raise IBKRImportError(_XML_ENTITIES_MSG) from exc
         except ElementTree.ParseError:
             root = None
         day_first = _flex_slash_day_first(root) if root is not None else False
@@ -1205,7 +1224,7 @@ class IBKRImportService:
         if fatal_errors:
             raise IBKRImportError(" ".join(fatal_errors))
         row_errors = [error for error in parse_errors if error not in fatal_errors]
-        root = ElementTree.fromstring(xml_text)
+        root = DefusedElementTree.fromstring(xml_text)
         if reconcile and not (expected_account_id or "").strip():
             raise IBKRImportError(
                 "reconcile exige expected_account_id: sin cuenta esperada no se puede probar que el extracto es completo."
@@ -2038,6 +2057,70 @@ class IBKRImportService:
                 raise IBKRImportError(f"Fecha no interpretable: {text!r}.")
             return parsed
         ledger = PortfolioLedgerService()
+        # Descarga historica del BCE ANTES de las filas y fuera de cualquier
+        # savepoint (el ``begin_nested`` de cada fila): aunque el backfill ya
+        # escribe con una sesion propia que nunca confirma la del importador,
+        # calentar aqui el rango completo evita descargas dentro del bucle.
+        # Los pares (divisa, desde) son EXACTAMENTE los que el bucle pedira:
+        #  - la divisa EFECTIVA de cada fila: la del listado verificado por
+        #    ISIN si lo hay (no la adivinada solo por simbolo) y su fecha;
+        #  - la divisa y fecha de las patas buy/sell YA guardadas de esas
+        #    companias, que ``rebuild_position`` reproduce al asentar la fila
+        #    nueva (sin esto, una pata vieja sin tipo provocaba una descarga
+        #    dentro del savepoint).
+        warm: dict[str, date] = {}
+
+        def _warm_add(currency: str | None, day: date | None) -> None:
+            if not currency or day is None:
+                return
+            code = currency.strip().upper()
+            if not code or code == "EUR":
+                return
+            previous = warm.get(code)
+            if previous is None or day < previous:
+                warm[code] = day
+
+        warm_tickers: set[str] = set()
+        for raw in data_rows[1:]:
+            def _raw(name: str) -> str:
+                position = mapping.get(name)
+                if position is None or position >= len(raw):
+                    return ""
+                return raw[position].strip()
+
+            warm_symbol = _raw("symbol").upper()
+            warm_listing = reviewed_listing(_raw("isin"))
+            warm_tickers.add(warm_listing.ticker if warm_listing is not None else warm_symbol)
+            warm_text = _raw("date")
+            _warm_add(
+                _raw("currency").upper()
+                or _csv_default_currency(
+                    warm_symbol, warm_listing.currency if warm_listing is not None else None
+                ),
+                _csv_date_value(warm_text, bool(day_first)) if warm_text else None,
+            )
+        if warm_tickers:
+            prior_legs = db.execute(
+                select(Transaction.currency, func.min(Transaction.trade_date))
+                .join(Company, Transaction.company_id == Company.id)
+                .where(
+                    Company.ticker.in_(warm_tickers),
+                    Transaction.action.in_(["buy", "sell"]),
+                    *tenant_filters(db, Transaction),
+                )
+                .group_by(Transaction.currency)
+            ).all()
+            for prior_currency, prior_day in prior_legs:
+                _warm_add(prior_currency, prior_day)
+        if warm:
+            warm_base = ledger.fx.ensure_portfolio(db).base_currency
+            for warm_code, warm_since in warm.items():
+                ledger.ensure_historical_fx(
+                    db,
+                    currencies={warm_code},
+                    base_currency=warm_base,
+                    since=warm_since,
+                )
         trades_imported = 0
         duplicate_trades = 0
         occurrences: Counter[str] = Counter()

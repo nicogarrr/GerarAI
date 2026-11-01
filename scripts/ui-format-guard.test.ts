@@ -21,12 +21,16 @@ describe('formato numérico es-ES', () => {
     assert.equal(formatCompact(416160000000), '416,16 mil M');
     assert.equal(formatCompact(1200000), '1,2 M');
     assert.equal(formatCompact(-2500000000), '-2,5 mil M');
-    // El volumen/cantidades siguen en es-ES: formatCompact no pone dólares.
-    assert.equal(formatCompact(4869930000000), '4.869,93 mil M');
+    // 31-oct-2026: escala de billones (B) a partir de 1e12 — en prod la
+    // capitalización de GOOGL salía «3.414 mil M US$», inlegible. Por debajo
+    // de 1e12 la escala M / mil M se conserva exacta.
+    assert.equal(formatCompact(4869930000000), '4,87 B');
+    assert.equal(formatCompact(999999999999), '1 B');
+    assert.equal(formatCompact(944700000000), '944,7 mil M');
   });
 
   it('formatMarketCapUsd: dólares en es-ES con la escala fija, sin cambiar el importe', () => {
-    assert.equal(formatMarketCapUsd(4869930000000), '4.869,93 mil M\u00a0US$');
+    assert.equal(formatMarketCapUsd(4869930000000), '4,87 B\u00a0US$');
     assert.equal(formatMarketCapUsd(404010000000), '404,01 mil M\u00a0US$');
     assert.equal(formatMarketCapUsd(9447000000), '9,45 mil M\u00a0US$');
     assert.equal(formatMarketCapUsd(9447000), '9,45 M\u00a0US$');
@@ -70,8 +74,8 @@ describe('guardas de UI', () => {
     // (el mismo currentStrategy): viven en una sola pestaña. La pestaña
     // «Joyas», «Deep value» y «Radar global» conviven con las cuatro originales.
     const triggerBlocks = [...triggers.matchAll(/<TabsTrigger[\s\S]*?>/g)].map((match) => match[0]);
-    assert.equal(triggerBlocks.length, 7, 'ProPicks tiene picks, joyas, deepvalue, estrategia, backtest, paper trading y radar');
-    for (const value of ['picks', 'joyas', 'deepvalue', 'estrategia', 'backtest', 'paper', 'radar']) {
+    assert.equal(triggerBlocks.length, 8, 'ProPicks tiene picks, joyas, deepvalue, estrategia, backtest, paper trading, radar y oportunidades');
+    for (const value of ['picks', 'joyas', 'deepvalue', 'estrategia', 'backtest', 'paper', 'radar', 'oportunidades']) {
       assert.ok(triggerBlocks.some((block) => block.includes(`value="${value}"`)), `falta trigger ${value}`);
     }
     // El contrato original, por trigger y no con un número suelto: cada uno

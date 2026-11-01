@@ -54,10 +54,10 @@ class LocalEmbedder:
         self.sparse_model = sparse_model
         self.dims = dims
 
-    def dense_docs(self, texts: list[str]) -> list[list[float]]:
+    def dense_docs(self, texts: list[str], batch_size: int = 5) -> list[list[float]]:
         if needs_e5_prefixes(self.dense_model):
             texts = [f"passage: {t}" for t in texts]
-        return embed_dense(texts, self.dense_model)
+        return embed_dense(texts, self.dense_model, batch_size=batch_size)
 
     def dense_query(self, text: str) -> list[float]:
         q = f"query: {text}" if needs_e5_prefixes(self.dense_model) else text

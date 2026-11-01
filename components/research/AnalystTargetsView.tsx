@@ -28,7 +28,7 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
                 <p className="mt-2 text-sm text-gray-400" role="status">{data.note ?? 'Sin precios objetivo por analista para este valor.'}</p>
             ) : (
                 <>
-                    {!cur ? <p className="mt-2 text-xs text-gray-400">Divisa no declarada por Yahoo: importes sin unidad verificada y potencial N/D.</p> : null}
+                    {!cur ? <p className="mt-2 text-xs text-gray-400">Divisa no declarada: importes sin unidad verificada y potencial N/D.</p> : null}
                     {cur && currency && cur.toUpperCase() !== currency.trim().toUpperCase() ? (
                         <p className="mt-2 text-xs text-gray-400" data-testid="analyst-targets-currency-note">
                             Objetivos {cur.toUpperCase() === 'USD' ? '(ADR, USD)' : `en ${cur.toUpperCase()}`}: la ficha cotiza en {currency.trim().toUpperCase()}.
@@ -37,7 +37,7 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
                     {data.consensus ? (
                         <div className="mt-1 text-sm text-gray-300">
                             <p>
-                                Consenso agregado de Yahoo: mediana {fmtTarget(data.consensus.median)} · media {fmtTarget(data.consensus.mean)} · rango {fmtTarget(data.consensus.low)} a {fmtTarget(data.consensus.high)}
+                                Consenso agregado de analistas: mediana {fmtTarget(data.consensus.median)} · media {fmtTarget(data.consensus.mean)} · rango {fmtTarget(data.consensus.low)} a {fmtTarget(data.consensus.high)}
                             </p>
 
                         </div>
@@ -49,7 +49,7 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
                     <>
                     {pages > 1 ? <nav aria-label="Paginación de analistas" className="mt-3 flex items-center justify-between gap-2 text-xs text-gray-300">
                       <button type="button" className="min-h-11 px-2 disabled:opacity-40" disabled={current === 0} onClick={() => setPage(current - 1)}>Anterior</button>
-                      <span aria-live="polite">Página {current + 1} de {pages} · {count} firmas</span>
+                      <span aria-live="polite"><span className="whitespace-nowrap">Página {current + 1} de {pages}</span> · {count} firmas</span>
                       <button type="button" className="min-h-11 px-2 disabled:opacity-40" disabled={current + 1 >= pages} onClick={() => setPage(current + 1)}>Siguiente</button>
                     </nav> : null}
                     <ul aria-label="Precios objetivo por firma" className="mt-1 divide-y divide-gray-800 sm:hidden">
@@ -96,9 +96,7 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
                     </>
                     ) : null}
                     <p className="mt-2 text-xs text-gray-500">
-                        Fuente: {data.source}
-                        {data.source_url ? <> · <a className="text-teal-300 underline underline-offset-4 hover:text-teal-200" href={data.source_url} rel="noreferrer noopener" target="_blank">ver en Yahoo Finance</a></> : null}
-                        {' '}· obtenido el {formatUserDateTime(data.fetched_at * 1000)}
+                        Obtenido el {formatUserDateTime(data.fetched_at * 1000)}
                         {cur && data.reference_price ? ` · potencial frente a ${fmtTarget(data.reference_price)} (${data.reference_price_source ?? 'precio de referencia'})` : ' · sin precio de referencia con unidad verificada: potencial N/D'}
                         . Terceros, no verificado por GerarAI.
                     </p>

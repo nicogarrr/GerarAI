@@ -17,7 +17,7 @@ const NavItems = () => {
     return (
         <ul className="flex max-w-full flex-col p-2 text-sm font-medium">
             {NAV_SECTIONS.map((section) => (
-                <li key={section.titleKey}>
+                <li key={section.titleKey ?? section.items[0]?.href}>
                     {showsNavSectionTitle(section) && (
                         <p className="px-1 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
                             {section.titleKey ? t(section.titleKey) : null}

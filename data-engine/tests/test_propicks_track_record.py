@@ -222,3 +222,32 @@ def test_split_between_entry_and_now_is_not_a_crash():
         assert pick["current_price"] == 110.0
         assert abs(pick["pct_since_entry"] - 0.10) < 1e-9
         assert abs(pick["spy_pct_since_entry"] - 0.02) < 1e-9
+
+
+def test_track_record_batches_market_price_reads():
+    """Perf: build_track_record hacia hasta ~5 SELECTs a market_prices por pick
+    (salida/actual/horizonte/entrada). Medido en el barrido 2026-10-31: 855 ms
+    el endpoint. La precarga por lotes deja los SELECTs a market_prices en 1
+    (constante, no crece con picks x meses)."""
+    from sqlalchemy import event
+
+    with _db() as db:
+        _seed_two_months(db)
+        engine = db.get_bind()
+        statements: list[str] = []
+
+        def capture(conn, cursor, statement, parameters, context, executemany):
+            if "market_prices" in statement:
+                statements.append(statement)
+
+        event.listen(engine, "before_cursor_execute", capture)
+        try:
+            result = build_track_record(db, today=TODAY)
+        finally:
+            event.remove(engine, "before_cursor_execute", capture)
+
+        assert result["picks"], "fixture vacio"
+        assert len(statements) <= 2, (
+            f"N+1: {len(statements)} SELECTs a market_prices "
+            f"(esperado <= 2 con precarga por lotes)"
+        )

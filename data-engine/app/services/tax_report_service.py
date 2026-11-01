@@ -1078,7 +1078,7 @@ class TaxReportService:
                         "manual_review": sale_cancelled_lot,
                         "warning": (
                             "over_sell: sold more shares than the recorded lots; "
-                            "excess valued at zero cost, verify the ledger"
+                            "gain not computed (cost unknown), verify the ledger"
                             if sale_over_sell
                             else (
                                 "cancelled_lot: the broker cancelled a purchase dated on or "

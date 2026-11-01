@@ -70,9 +70,17 @@ describe('componente y acción', () => {
     assert.ok(chat.includes('setMessages(prev => [...prev,') && !chat.includes('setMessages([])'));
   });
   it('un error se muestra en su turno y no tumba el historial', () => {
-    assert.ok(chat.includes('No se pudo consultar la biblioteca'));
+    assert.ok(chat.includes('brain.panel.libraryError'));
+    const dictBrain = JSON.parse(readFileSync('lib/i18n/messages/es/brain.json', 'utf8'));
+    assert.ok(dictBrain.panel.libraryError.startsWith('No se pudo consultar la biblioteca'), dictBrain.panel.libraryError);
   });
   it('la acción no traga errores (la UI los muestra)', () => {
-    assert.ok(!/catch\s*[({]/.test(action));
+    const core = action.slice(action.indexOf('export async function askKnowledge('), action.indexOf('export type AskKnowledgeResult'));
+    assert.ok(core.includes('return researchRequest<LibraryAnswer>'));
+    assert.doesNotMatch(core, /catch\s*[({]/, 'la petición no convierte errores API en éxito');
+    const wrapper = action.slice(action.indexOf('export async function askKnowledgeResult('));
+    assert.match(wrapper, /if \(isNextRedirectError\(error\)\) throw error;/);
+    assert.match(wrapper, /if \(error instanceof ValidationError\) \{\s*return \{ ok: false, cause: 'validation', message: error.message \};\s*\}\s*throw error;/);
+    assert.match(wrapper, /ok: true, answer: await askKnowledge\(/);
   });
 });

@@ -4,6 +4,7 @@ import { useRef, useState, type ComponentPropsWithoutRef } from 'react';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { classifyError, getFriendlyErrorMessage, isNextRedirectError } from '@/lib/types/errors';
+import { useT } from '@/lib/i18n/client';
 
 type MutationFormProps = Omit<ComponentPropsWithoutRef<'form'>, 'action'> & {
   action: (formData: FormData) => Promise<unknown>;
@@ -15,11 +16,13 @@ type MutationFormProps = Omit<ComponentPropsWithoutRef<'form'>, 'action'> & {
 export function MutationForm({
   action,
   children,
-  successMessage = 'Operación completada',
+  successMessage,
   resetOnSuccess = false,
   showSuccessInline = false,
   ...props
 }: MutationFormProps) {
+  const t = useT();
+  const resolvedSuccessMessage = successMessage ?? t('auth.fields.defaultSuccess');
   const formRef = useRef<HTMLFormElement>(null);
   const lastFormData = useRef<FormData | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -42,11 +45,11 @@ export function MutationForm({
         const message =
           'message' in result && typeof (result as { message: unknown }).message === 'string'
             ? (result as { message: string }).message
-            : 'No se pudo completar la operación. Inténtalo de nuevo.';
+            : t('errors.mutationFailed');
         setError(message);
         return;
       }
-      const message = result && typeof result === 'object' && 'message' in result && typeof result.message === 'string' ? result.message : successMessage;
+      const message = result && typeof result === 'object' && 'message' in result && typeof result.message === 'string' ? result.message : resolvedSuccessMessage;
       if (resetOnSuccess) formRef.current?.reset();
       toast.success(message);
       if (showSuccessInline) setSuccess(message);
@@ -66,7 +69,7 @@ export function MutationForm({
             const payload = lastFormData.current;
             if (payload) await submit(payload);
           },
-          successMessage,
+          successMessage: resolvedSuccessMessage,
         });
       }
     } finally {
@@ -78,7 +81,7 @@ export function MutationForm({
     <form {...props} action={submit} aria-busy={isPending} ref={formRef}>
       {isPending ? (
         <span aria-live="polite" role="status" className="sr-only">
-          Enviando formulario
+          {t('auth.fields.submitting')}
         </span>
       ) : null}
       <fieldset disabled={isPending} className="contents">

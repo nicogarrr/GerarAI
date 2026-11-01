@@ -92,7 +92,9 @@ def test_drawdown_level_prices_are_fractions_of_previous_high():
 
 
 def test_signal_metric_names_the_rule_used():
-    assert _last([*_wavy(60), 90.0]).metrics["signal"] == "sma_gap"
+    assert _last([*_wavy(60), 90.0]).metrics["signal"] == "combined"
+    assert _last([*_wavy(60), 90.0], params=replace(DEFAULT_PARAMS, signal="sma_gap")).metrics["signal"] == "sma_gap"
+    assert _last([*_wavy(60), 90.0], params=replace(DEFAULT_PARAMS, signal="drawdown")).metrics["signal"] == "drawdown"
 
 
 # --- touched level: the month's low, not the close ---------------------------

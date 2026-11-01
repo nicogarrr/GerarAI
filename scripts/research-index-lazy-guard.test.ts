@@ -26,6 +26,6 @@ describe('research índice: diálogo de entregable diferido', () => {
 
     it('el diálogo conserva el visor markdown diferido y la etiqueta siempre visible', () => {
         assert.ok(dialog.includes("dynamic(() => import('@/components/research/ThesisMarkdown')"), 'el visor markdown sigue diferido');
-        assert.ok(dialog.includes("<span>{loading ? 'Generando...' : 'Generar documento'}</span>"), 'la etiqueta no desaparece con el spinner');
+        assert.ok(dialog.includes("<span>{loading ? t('workProducts.generating') : t('workProducts.generate')}</span>"), 'la etiqueta no desaparece con el spinner');
     });
 });

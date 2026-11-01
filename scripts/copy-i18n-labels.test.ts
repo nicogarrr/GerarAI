@@ -57,8 +57,8 @@ void test('tipos de evento y fallback de códigos futuros (F175)', () => {
 
 void test('los componentes usan las etiquetas, no la cadena cruda', () => {
     const risk = readFileSync('components/risk/RiskDashboardView.tsx', 'utf8');
-    assert.match(risk, /exposureRecord\(value, etiquetaSector\)/);
-    assert.match(risk, /exposureRecord\(value, etiquetaFactor\)/);
+    assert.match(risk, /exposureRecord\(t, f, value, etiquetaSector\)/);
+    assert.match(risk, /exposureRecord\(t, f, value, etiquetaFactor\)/);
     assert.match(risk, /etiquetaSeveridad\(formatRecordValue\(alert\.severity\)\)/);
     assert.doesNotMatch(risk, /hace falta historia de precios/);
     const search = readFileSync('components/SearchCommand.tsx', 'utf8') + readFileSync('components/SearchCommandDialog.tsx', 'utf8');
@@ -67,9 +67,9 @@ void test('los componentes usan las etiquetas, no la cadena cruda', () => {
     // La tabla ya no muestra la columna de tier (SERIE 1): si vuelve a
     // aparecer source_tier, debe pasar por la etiqueta, nunca crudo.
     if (news.includes('event.source_tier')) {
-        assert.match(news, /etiquetaTierFuente\(event\.source_tier\)/, 'source_tier solo se muestra via etiquetaTierFuente, nunca crudo');
+        assert.match(news, /etiquetaTierFuente\(event\.source_tier, locale\)/, 'source_tier solo se muestra via etiquetaTierFuente, nunca crudo');
     }
-    assert.match(news, /etiquetaTipoEvento\(event\.event_type\)/);
+    assert.match(news, /etiquetaTipoEvento\(event\.event_type, locale\)/);
 });
 
 test('industrias conocidas se traducen en la línea de sector del índice', () => {
@@ -91,7 +91,9 @@ test('etiquetaValor traduce códigos del backend y no deja guiones bajos', () =>
 
 test('la lista de auditorías conserva la referencia a su versión de tesis', () => {
   const source = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-  assert.ok(source.includes("`tesis v${audit.thesis_version}`"));
+  const es = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8'));
+  assert.ok(source.includes("t('research.fichaThesisVersionShort', { version: audit.thesis_version })"), 'usa la clave i18n de versión de tesis');
+  assert.equal(es['fichaThesisVersionShort'], 'tesis v{version}', 'el literal ES visible no cambia');
   assert.ok(!source.includes('tesis {audit.thesis_version_id'), 'id interno de tesis');
   assert.ok(source.includes('<SourceAuditDetail audit={audit} ticker={ticker} />'));
 });

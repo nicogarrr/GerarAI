@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { resetPasswordWithToken } from '@/lib/actions/password.actions';
+import { useT } from '@/lib/i18n/client';
 
 export default function ResetPasswordForm({
     token,
@@ -16,6 +17,7 @@ export default function ResetPasswordForm({
     token: string;
     linkError: boolean;
 }) {
+    const t = useT();
     const router = useRouter();
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -27,9 +29,9 @@ export default function ResetPasswordForm({
     if (!token || linkError) {
         return (
             <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-100">
-                <p className="font-medium">El enlace no es válido o ha caducado.</p>
+                <p className="font-medium">{t('auth.resetPassword.invalidLinkTitle')}</p>
                 <p className="mt-1">
-                    Pide uno nuevo en <Link className="underline" href="/forgot-password">restablecer contraseña</Link>.
+                    {t('auth.resetPassword.invalidLinkPrefix')} <Link className="underline" href="/forgot-password">{t('auth.resetPassword.invalidLinkLink')}</Link>.
                 </p>
             </div>
         );
@@ -53,7 +55,7 @@ export default function ResetPasswordForm({
                 setTimeout(() => router.push('/sign-in'), 1200);
             }
         } catch {
-            setMessage('No se pudo guardar la contraseña. Inténtalo de nuevo.');
+            setMessage(t('auth.resetPassword.saveError'));
             setIsError(true);
         } finally {
             setBusy(false);
@@ -63,7 +65,7 @@ export default function ResetPasswordForm({
     return (
         <form className="space-y-4" onSubmit={onSubmit}>
             <div>
-                <Label htmlFor="reset-new-password">Contraseña nueva</Label>
+                <Label htmlFor="reset-new-password">{t('auth.resetPassword.newPasswordLabel')}</Label>
                 <Input
                     autoComplete="new-password"
                     className="mt-2"
@@ -75,10 +77,10 @@ export default function ResetPasswordForm({
                     type="password"
                     value={newPassword}
                 />
-                <p className="mt-1 text-xs text-gray-500">Entre 8 y 128 caracteres.</p>
+                <p className="mt-1 text-xs text-gray-500">{t('auth.resetPassword.newPasswordHint')}</p>
             </div>
             <div>
-                <Label htmlFor="reset-confirm-password">Repite la contraseña nueva</Label>
+                <Label htmlFor="reset-confirm-password">{t('auth.resetPassword.confirmPasswordLabel')}</Label>
                 <Input
                     autoComplete="new-password"
                     className="mt-2"
@@ -92,7 +94,7 @@ export default function ResetPasswordForm({
                 />
             </div>
             <Button disabled={busy || done} type="submit">
-                {busy ? 'Guardando…' : done ? 'Contraseña actualizada' : 'Guardar contraseña'}
+                {busy ? t('auth.resetPassword.submitting') : done ? t('auth.resetPassword.updated') : t('auth.resetPassword.submit')}
             </Button>
             {message ? (
                 <p
@@ -103,7 +105,7 @@ export default function ResetPasswordForm({
                 </p>
             ) : null}
             <p className="text-sm text-gray-500">
-                <Link className="underline hover:text-teal-300" href="/sign-in">Ir a iniciar sesión</Link>
+                <Link className="underline hover:text-teal-300" href="/sign-in">{t('auth.resetPassword.goToSignIn')}</Link>
             </p>
         </form>
     );

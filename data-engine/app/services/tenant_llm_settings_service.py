@@ -350,6 +350,51 @@ def _probe_client(provider: str) -> httpx.AsyncClient:
     )
 
 
+# Cota de lectura del /models de la prueba: el listado real de cualquier
+# proveedor cabe en decenas de KB, pero la base_url custom la define el
+# tenant y un endpoint roto o malicioso podria responder un cuerpo infinito:
+# sin cota, cada prueba de conexion bufferizaria todo en memoria del backend.
+_PROBE_MAX_BODY_BYTES = 512 * 1024
+
+
+async def _bounded_get(
+    client: httpx.AsyncClient, url: str, headers: dict[str, str]
+) -> httpx.Response:
+    """GET que nunca bufferiza mas de ``_PROBE_MAX_BODY_BYTES``.
+
+    Lee en streaming y corta al llegar a la cota; el cuerpo truncado hace
+    fallar el parseo despues (la prueba queda "no verificable", honesta) en
+    vez de inflar la memoria del worker.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    async with client.stream("GET", url, headers=headers) as response:
+        status = response.status_code
+        async for chunk in response.aiter_bytes(64 * 1024):
+            chunks.append(chunk)
+            total += len(chunk)
+            if total >= _PROBE_MAX_BODY_BYTES:
+                break
+    return httpx.Response(status, content=b"".join(chunks))
+
+
+def _model_ids(response: httpx.Response) -> set[str] | None:
+    """Ids del listado /models (forma OpenAI {"data": [{"id": ...}]}).
+
+    None = la respuesta no es una lista de modelos legible: la prueba falla
+    honesta en vez de dar por bueno un modelo quizas inexistente.
+    """
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, list):
+        return None
+    ids = {item["id"] for item in data if isinstance(item, dict) and isinstance(item.get("id"), str)}
+    return ids if ids or not data else None
+
+
 async def probe_connection(
     *, provider: str, base_url: str | None, api_key: str, model: str
 ) -> dict:
@@ -364,7 +409,7 @@ async def probe_connection(
     }
     try:
         async with _probe_client(provider) as client:
-            response = await client.get(endpoint, headers=headers)
+            response = await _bounded_get(client, endpoint, headers)
     except httpx.TimeoutException:
         return {
             "ok": False,
@@ -388,18 +433,45 @@ async def probe_connection(
                 else "No se pudo conectar con el proveedor."
             ),
         }
-    ok = 200 <= response.status_code < 300
+    if not (200 <= response.status_code < 300):
+        return {
+            "ok": False,
+            "status_code": response.status_code,
+            "provider": provider,
+            "base_url": url,
+            "model": model,
+            "message": f"El proveedor respondio HTTP {response.status_code}.",
+        }
+    # La conexion responde, pero la prueba tambien exige que el MODELO pedido
+    # exista en el proveedor: un "Conexion correcta" con un modelo inventado
+    # romperia cada llamada real despues (hallazgo front, medido en prod con
+    # model="modelo-inventado-123"). No gasta tokens: solo lee /models.
+    model_ids = _model_ids(response)
+    if model_ids is None:
+        return {
+            "ok": False,
+            "status_code": response.status_code,
+            "provider": provider,
+            "base_url": url,
+            "model": model,
+            "message": "El proveedor respondio, pero sin una lista de modelos legible: no se pudo verificar el modelo.",
+        }
+    if model not in model_ids:
+        return {
+            "ok": False,
+            "status_code": response.status_code,
+            "provider": provider,
+            "base_url": url,
+            "model": model,
+            "message": f"El modelo '{model}' no existe en este proveedor. Revisa el nombre exacto en su lista de modelos.",
+        }
     return {
-        "ok": ok,
+        "ok": True,
         "status_code": response.status_code,
         "provider": provider,
         "base_url": url,
         "model": model,
-        "message": (
-            "Conexion correcta."
-            if ok
-            else f"El proveedor respondio HTTP {response.status_code}."
-        ),
+        "message": "Conexion correcta.",
     }
 
 

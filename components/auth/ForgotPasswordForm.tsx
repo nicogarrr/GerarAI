@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { requestPasswordReset } from '@/lib/actions/password.actions';
+import { useT } from '@/lib/i18n/client';
 
 export default function ForgotPasswordForm({
     emailConfigured,
@@ -15,6 +16,7 @@ export default function ForgotPasswordForm({
     emailConfigured: boolean;
     supportEmail: string;
 }) {
+    const t = useT();
     const [email, setEmail] = useState('');
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
@@ -23,15 +25,14 @@ export default function ForgotPasswordForm({
     if (!emailConfigured) {
         return (
             <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-100">
-                <p className="font-medium">El restablecimiento por correo no está disponible.</p>
+                <p className="font-medium">{t('auth.forgotPassword.unavailableTitle')}</p>
                 <p className="mt-1">
-                    Este despliegue no tiene SMTP configurado, así que no se enviará ningún
-                    enlace. Si ya has iniciado sesión, cambia la contraseña desde{' '}
-                    <Link className="underline" href="/security">Seguridad</Link>.
+                    {t('auth.forgotPassword.unavailableBody')}{' '}
+                    <Link className="underline" href="/security">{t('auth.forgotPassword.securityLink')}</Link>.
                     {supportEmail ? (
-                        <> Si no puedes entrar, escribe a <a className="underline" href={`mailto:${supportEmail}`}>{supportEmail}</a>.</>
+                        <> {t('auth.forgotPassword.unavailableContactPrefix')} <a className="underline" href={`mailto:${supportEmail}`}>{supportEmail}</a>.</>
                     ) : (
-                        <> Si no puedes entrar, consulta el <Link className="underline" href="/help">centro de ayuda</Link> para contactar con soporte.</>
+                        <> {t('auth.forgotPassword.unavailableHelpPrefix')} <Link className="underline" href="/help">{t('auth.forgotPassword.helpLink')}</Link> {t('auth.forgotPassword.unavailableHelpSuffix')}</>
                     )}
                 </p>
             </div>
@@ -46,7 +47,7 @@ export default function ForgotPasswordForm({
             setMessage(result.message);
             setIsError(!result.success);
         } catch {
-            setMessage('No se pudo procesar la solicitud. Inténtalo de nuevo en unos minutos.');
+            setMessage(t('auth.forgotPassword.requestError'));
             setIsError(true);
         } finally {
             setBusy(false);
@@ -56,7 +57,7 @@ export default function ForgotPasswordForm({
     return (
         <form className="space-y-4" onSubmit={onSubmit}>
             <div>
-                <Label htmlFor="forgot-email">Email de la cuenta</Label>
+                <Label htmlFor="forgot-email">{t('auth.forgotPassword.emailLabel')}</Label>
                 <Input
                     autoComplete="email"
                     className="mt-2"
@@ -68,7 +69,7 @@ export default function ForgotPasswordForm({
                 />
             </div>
             <Button disabled={busy} type="submit">
-                {busy ? 'Enviando…' : 'Enviar enlace de restablecimiento'}
+                {busy ? t('auth.forgotPassword.submitting') : t('auth.forgotPassword.submit')}
             </Button>
             {message ? (
                 <p
@@ -79,7 +80,7 @@ export default function ForgotPasswordForm({
                 </p>
             ) : null}
             <p className="text-sm text-gray-500">
-                <Link className="underline hover:text-teal-300" href="/sign-in">Volver a iniciar sesión</Link>
+                <Link className="underline hover:text-teal-300" href="/sign-in">{t('auth.forgotPassword.backToSignIn')}</Link>
             </p>
         </form>
     );

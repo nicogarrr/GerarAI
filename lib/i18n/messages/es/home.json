@@ -1,1 +1,136 @@
-{}
+{
+  "metadata": {
+    "title": "GerarAI · Research OS de inversión",
+    "description": "Qué ha cambiado en tus posiciones, valor de cartera, alertas disparadas, watchlist y oportunidades por valor intrínseco."
+  },
+  "news": {
+    "title": "Noticias destacadas",
+    "error": "No se pudieron cargar las noticias. El resto de la página sigue funcionando.",
+    "analysisLink": "Ver el análisis de noticias",
+    "empty": "No hay noticias disponibles en este momento.",
+    "generalMarket": "Mercado general",
+    "noDate": "Fecha no disponible"
+  },
+  "attention": {
+    "title": "Requieren atención",
+    "fullList": "Lista completa",
+    "subtitle": "Cambios de tesis pendientes y niveles DCA desde tu umbral elegido. Un nivel DCA no es una orden de compra.",
+    "loading": "Consultando tesis y niveles DCA…",
+    "unavailableBoth": "No se pudieron comprobar los cambios de tesis ni los niveles DCA. Lo disponible se muestra debajo.",
+    "unavailableThesis": "No se pudieron comprobar los cambios de tesis. Lo disponible se muestra debajo.",
+    "unavailableDca": "No se pudieron comprobar los niveles DCA. Lo disponible se muestra debajo.",
+    "emptyFiltered": "Sin elementos en las fuentes que se han podido comprobar.",
+    "empty": "Sin cambios de tesis pendientes ni niveles DCA recientes desde tu umbral. Los datos no evaluados o antiguos no se muestran como señales actuales.",
+    "truncated": "Se muestran los {n} cambios de tesis pendientes más recientes. Revisa también las fichas de tus empresas.",
+    "paginationAria": "Paginación de atención",
+    "pageStatus": "{current} / {pages} · {n} elementos",
+    "ctaOf": "de",
+    "ctaReviewChange": "Revisar cambio",
+    "ctaReviewThesis": "Revisar tesis",
+    "reviewPending": "Revisión pendiente · {date}",
+    "dcaTitle": "Nivel DCA {level}X",
+    "dcaInPortfolio": "Revisar la aportación a tu posición.",
+    "dcaNotInPortfolio": "Valorar una entrada, después de revisar la tesis.",
+    "dcaNote": "Desde {threshold}X · Cierre {date}",
+    "dcaForming": " · Mes en formación",
+    "dcaConfirmed": " · Confirmado",
+    "direction": {
+      "positive": "Mejora de tesis",
+      "negative": "Deterioro de tesis",
+      "neutral": "Cambio de tesis"
+    }
+  },
+  "fair": {
+    "none": "Sin valor justo",
+    "title": "Valor justo · {label}",
+    "source": {
+      "tesis": "tesis",
+      "motor": "motor",
+      "orient": "motor orient."
+    }
+  },
+  "steps": {
+    "title": "Primeros pasos",
+    "subtitle": "Tres pasos para que el inicio te diga qué ha cambiado en tus empresas.",
+    "followTitle": "Sigue tus empresas",
+    "followDone": "Hecho: sigues {count} {unit}.",
+    "followTodo": "Añádelas a la watchlist para ver precio, valoración y avisos.",
+    "company": "empresa",
+    "companies": "empresas",
+    "view": "Ver",
+    "add": "Añadir",
+    "watchlistSr": " empresas a la watchlist",
+    "buyTitle": "Registra tu primera compra",
+    "buyBody": "Con tus posiciones verás el valor de la cartera y dónde poner la aportación del mes.",
+    "investmentSr": " inversión",
+    "brainTitle": "Pregunta al Cerebro",
+    "brainBody": "Por ejemplo: «¿Qué está barato de mi watchlist?»",
+    "open": "Abrir",
+    "brainSr": " el Cerebro"
+  },
+  "severity": {
+    "critical": "crítica",
+    "high": "alta",
+    "medium": "media",
+    "low": "baja",
+    "info": "informativa"
+  },
+  "overview": {
+    "kicker": "Tu research hoy",
+    "title": "Qué ha cambiado"
+  },
+  "portfolio": {
+    "title": "Tu cartera hoy",
+    "details": "Ver detalles",
+    "gainLoss": "Ganancia/Pérdida desde la compra",
+    "weightsNote": "Pesos sobre el valor bruto de las posiciones.",
+    "empty": "Todavía no tienes posiciones. Añade tu primera inversión para ver aquí qué ha cambiado desde la compra.",
+    "noCostBasis": "Todavía no tenemos la base de coste de tus posiciones. Cuando esté cargada, aquí verás cómo va tu cartera desde la compra.",
+    "partial": "Entre las posiciones con base de coste: la ganancia/pérdida no incluye las demás.",
+    "reviewMover": "Revisar {symbol} (mayor variación desde la compra)",
+    "reviewAll": "Revisar tu cartera"
+  },
+  "alerts": {
+    "title": "Alertas",
+    "manage": "Gestionar",
+    "originalNotice": "Ver aviso original",
+    "reviewThesis": "Revisar tesis de {symbol}",
+    "openDocument": "Abrir documento",
+    "rulesActiveOne": "1 regla activa",
+    "rulesActiveOther": "{n} reglas activas",
+    "evaluated": "el motor las evalúa cada 5 min.",
+    "noneTriggered": "ninguna se ha disparado todavía.",
+    "createFirst": "Crear la primera alerta"
+  },
+  "watchlist": {
+    "recent": "Últimas añadidas",
+    "viewAll": "Ver todo",
+    "close": "Cierre {date}",
+    "closeNoDate": "Cierre sin fecha de la fuente",
+    "noQuote": "No hay cotización disponible",
+    "noData": "sin datos",
+    "lastNOfTotal": "Las {n} últimas añadidas de {total}",
+    "totalCount": "{total} en total",
+    "empty": "Aún no sigues ninguna empresa.",
+    "seeFullList": "ver la lista completa"
+  },
+  "opportunities": {
+    "title": "Oportunidades por valor intrínseco (DCF)",
+    "refine": "Afinar con el Screener",
+    "price": "Precio",
+    "priceUnknownCurrency": "Precio (divisa {na})",
+    "potential": "{value} potencial",
+    "fairUnknown": "Valor justo (divisa {na}): {value}",
+    "source": "Fuente: {label}",
+    "orientation": "Orientación del motor, no valoración final",
+    "topN": "Las {limit} con más potencial de {total}; las demás se afinan en «Afinar con el Screener»."
+  },
+  "dcf": {
+    "scopeOk": "Las {probed} primeras candidatas del screener (market cap > {cap}), sin filtro de sector.",
+    "scopeWithFailures": "Las {probed} primeras candidatas del screener (market cap > {cap}), sin filtro de sector; {failed} no se pudieron evaluar.",
+    "noCandidates": "El screener no devolvió candidatas sobre las que calcular el valor intrínseco.",
+    "noneEvaluated": "No se pudo calcular el valor intrínseco de las {probed} candidatas del screener probadas.",
+    "noneAbove": "Ninguna de las {evaluated} candidatas del screener evaluadas supera hoy un {min} % de potencial sobre su valor intrínseco.",
+    "noneAboveWithFailures": "Ninguna de las {evaluated} candidatas del screener evaluadas supera hoy un {min} % de potencial sobre su valor intrínseco; {failed} no se pudieron evaluar."
+  }
+}

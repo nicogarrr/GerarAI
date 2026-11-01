@@ -26,7 +26,7 @@ void test('RecordList aplica formatColumns antes del fallback genérico', () => 
     const views = readFileSync('components/data/RecordViews.tsx', 'utf8');
     assert.match(views, /formatColumns\?: Record<string, \(value: unknown, record: DataRecord\) => string>/);
     const cell = views.indexOf('const format = formatColumns?.[column];');
-    const fallback = views.indexOf('formatRecordValue(record[column]);', cell);
+    const fallback = views.indexOf('formatRecordValue(record[column]', cell);
     assert.ok(cell > -1 && fallback > cell, 'el formateador de columna se consulta antes del String(value)');
 });
 

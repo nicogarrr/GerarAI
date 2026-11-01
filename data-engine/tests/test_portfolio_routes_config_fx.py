@@ -72,12 +72,29 @@ def test_fx_rate_upsert_list_ordering_and_latest_source(env):
             "base_currency": "eur", "quote_currency": "usd", "rate": rate, "rate_date": d, "source": "bce",
         })
         assert r.status_code == 201, r.text
-    rows = client.get("/portfolio/fx-rates").json()
+    rows = client.get("/portfolio/fx-rates").json()["items"]  # sobre paginado {items, page_info}
     assert [x["rate_date"] for x in rows] == ["2026-02-03", "2026-01-02"]  # más reciente primero
     assert rows[0]["rate"] == pytest.approx(0.95)
-    assert client.get("/portfolio/fx-rates?limit=1&offset=1").json()[0]["rate_date"] == "2026-01-02"
+    assert client.get("/portfolio/fx-rates?limit=1&offset=1").json()["items"][0]["rate_date"] == "2026-01-02"
+    # offset sin limit no significa nada en page/page_size: 422 explicito
+    assert client.get("/portfolio/fx-rates?offset=1").status_code == 422
     cfg = client.get("/portfolio/configuration").json()
     assert cfg["fx_source"]["source"] == "bce" and cfg["fx_source"]["latest_rate_date"] == "2026-02-03"
+
+
+def test_fx_rates_limit_offset_ventana_exacta_y_page_info_veraz(env):
+    client, _ = env
+    for d, rate in (("2026-01-02", "0.90"), ("2026-02-03", "0.95"), ("2026-03-04", "1.01")):
+        r = client.post("/portfolio/fx-rates", json={
+            "base_currency": "eur", "quote_currency": "usd", "rate": rate, "rate_date": d, "source": "bce",
+        })
+        assert r.status_code == 201, r.text
+    payload = client.get("/portfolio/fx-rates?limit=2&offset=1").json()
+    # orden mas reciente primero: 03-04, 02-03, 01-02 -> ventana [02-03, 01-02]
+    assert [x["rate_date"] for x in payload["items"]] == ["2026-02-03", "2026-01-02"]
+    info = payload["page_info"]
+    assert info["page_size"] == 2 and info["total_items"] == 3
+    assert info["has_prev"] is True and info["has_next"] is False
 
 
 def test_fx_rate_same_day_upsert_replaces_instead_of_duplicating(env):
@@ -121,11 +138,17 @@ def test_snapshot_capture_then_history_filters_by_start(env):
         r = client.post(f"/portfolio/snapshots/capture?as_of={d}")
         assert r.status_code == 200, r.text
         assert r.json()["snapshot_date"] == d
-    all_rows = client.get("/portfolio/snapshots").json()
+    all_rows = client.get("/portfolio/snapshots").json()["items"]
     assert {x["snapshot_date"] for x in all_rows} == {"2026-01-05", "2026-02-05"}
     assert all(x["source"] == "manual_capture" for x in all_rows)
-    later = client.get("/portfolio/snapshots?start=2026-02-01").json()
+    later = client.get("/portfolio/snapshots?start=2026-02-01").json()["items"]
     assert [x["snapshot_date"] for x in later] == ["2026-02-05"]
+    # offset exacto no multiplo: limit 2 / offset 1 -> filas 2 y 3, page_info veraz
+    window = client.get("/portfolio/snapshots?limit=2&offset=1").json()
+    assert [x["snapshot_date"] for x in window["items"]] == ["2026-02-05"]
+    assert window["page_info"]["has_prev"] is True and window["page_info"]["has_next"] is False
+    assert client.get("/portfolio/snapshots?offset=1").status_code == 422
+
     assert client.get("/portfolio/snapshots?limit=0").status_code == 422
     assert client.get("/portfolio/snapshots?limit=5001").status_code == 422
     assert date.fromisoformat(all_rows[0]["snapshot_date"])

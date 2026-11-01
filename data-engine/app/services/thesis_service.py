@@ -500,10 +500,11 @@ class ThesisService:
         from app.models import Document, FinancialFact, MarketPrice, NewsEvent
 
         latest_seen: datetime | None = None
-        # F317: los agregados MAX no heredan with_loader_criteria; las
-        # fuentes tenant-owned se filtran explícitamente o una actualización
-        # de otro tenant marcaría obsoleta esta tesis sin cambiar su
-        # información. MarketPrice es global por diseño y sigue global.
+        # F317: las fuentes tenant-owned se filtran explícitamente o una
+        # actualización de otro tenant marcaría obsoleta esta tesis sin
+        # cambiar su información. Medido en SQLAlchemy 2.1.6: los agregados
+        # MAX SI heredan with_loader_criteria; el filtro queda como segunda
+        # capa y fail-closed. MarketPrice es global por diseño y sigue global.
         tenant_id = db.info.get("tenant_id")
         for model in (FinancialFact, NewsEvent, Document):
             stmt = select(func.max(model.updated_at)).where(model.company_id == company_id)
@@ -706,6 +707,30 @@ class ThesisService:
         escrito por esta generación (nunca ``db.rollback()`` global, que
         descartaría trabajo ajeno pendiente en la sesión).
         """
+        # i18n B: narrativas, debate y revision heredan el idioma guardado
+        # del tenant/peticion (db.info lo puebla get_db o el worker).
+        from app.core.i18n import language_from_db, reset_language_scope, set_language_scope
+
+        _lang_token = set_language_scope(language_from_db(db))
+        try:
+            return self._generate_with_scope(
+                db, ticker, force_new_version, phase_callback,
+                stored_evidence_only=stored_evidence_only,
+                refresh_receipt=refresh_receipt,
+            )
+        finally:
+            reset_language_scope(_lang_token)
+
+    def _generate_with_scope(
+        self,
+        db: Session,
+        ticker: str,
+        force_new_version: bool = False,
+        phase_callback=None,
+        *,
+        stored_evidence_only: bool = False,
+        refresh_receipt: dict | None = None,
+    ) -> ThesisVersion:
         # La narrativa se prepara sin transacción de tesis ni sesión en red.
         narrative_sections = prepare_news_narrative(db, ticker)
         savepoint = db.begin_nested()

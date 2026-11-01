@@ -187,7 +187,7 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                 })}
             </Tabs>
             <p className="mt-4 text-xs leading-5 text-gray-500">
-                Fuente: Yahoo Finance. Cada fila muestra la hora que informa el proveedor y su antigüedad
+                Cada fila muestra la hora que informa el proveedor y su antigüedad
                 al consultar la fuente (hora de Madrid); el panel se actualiza cada minuto. No son datos
                 oficiales de mercado ni sirven para operar con garantías.
             </p>

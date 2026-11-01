@@ -36,7 +36,7 @@ function YieldCell({ item }: { item: DeepValueItem }) {
             {item.desacuerdo_fuentes && item.finnhub_yield_indicated !== null && (
                 <span className="inline-flex w-fit items-center gap-1 rounded border border-amber-600/60 bg-amber-900/20 px-1.5 py-0.5 text-xs text-amber-300">
                     <AlertTriangle aria-hidden="true" className="h-3 w-3" />
-                    Fuentes en desacuerdo: Finnhub indica {formatPercent(item.finnhub_yield_indicated)}
+                    Fuentes en desacuerdo: otra fuente indica {formatPercent(item.finnhub_yield_indicated)}
                 </span>
             )}
             {item.yield_extremo_revisar && (

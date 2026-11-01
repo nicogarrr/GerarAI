@@ -28,6 +28,9 @@
  *   node scripts/find-dead-code.mjs            # human table
  *   node scripts/find-dead-code.mjs --json     # machine readable
  *   node scripts/find-dead-code.mjs --fail     # non-zero exit if anything is dead
+ *   node scripts/find-dead-code.mjs --fail --baseline scripts/baselines/dead-code.txt
+ *       # non-zero exit only on dead code NOT in the baseline; a baseline entry
+ *       # that stops being a finding is fail-closed (shrink the baseline in that PR)
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
@@ -85,6 +88,22 @@ const ENTRY_POINTS = {
     'scripts/research-identity-guard.loader.mjs',
     'scripts/transaction-validation.loader.mjs',
     'infra/postgres/init.sql',
+    // Invocado por path desde CI: .github/workflows/agent-qa.yml corre
+    // `python qa-agents/run.py`; monitor.py/personas.py/report.py son sus
+    // modulos hermanos (import por sys.path[0], invisible al grafo).
+    'qa-agents/run.py',
+    'qa-agents/monitor.py',
+    'qa-agents/personas.py',
+    'qa-agents/report.py',
+    // thesis_audio_service.py lo lee/ejecuta construyendo el path con
+    // Path(__file__).parent / 'tts_sidecar' / 'server.py': nunca hay un
+    // import ni una cadena de path verbatim que el grafo pueda seguir.
+    'data-engine/tts_sidecar/server.py',
+    // Scripts operadores de reimportacion de datos, documentados en
+    // data/theme-fundamentals/README.md (`python scripts/theme-fundamentals/import_X.py`).
+    'scripts/theme-fundamentals/import_eia.py',
+    'scripts/theme-fundamentals/import_usgs.py',
+    'scripts/theme-fundamentals/import_world_bank.py',
   ],
   /** Globs: every match is an entry point. */
   globs: [
@@ -104,6 +123,16 @@ const ENTRY_POINTS = {
     // Playwright collects specs by path (playwright.config.ts testDir).
     'e2e/**/*.ts',
     'e2e/*.ts',
+    // Vitest collects unit specs by path (vitest.config.mts include:
+    // tests/unit/**/*.test.{ts,tsx}). setup.ts y stubs/server-only.ts los
+    // referencia vitest.config.mts (ver REFERRER_GLOBS).
+    'tests/unit/**/*.test.ts',
+    'tests/unit/**/*.test.tsx',
+    // `npx e2e run` (qa-e2e.yml) recoge los specs *.e2e.ts por path, igual
+    // que Playwright; assert-deps-security.mjs lo invoca el script
+    // test:deps de qa-e2e/package.json (ver REFERRER_GLOBS).
+    'qa-e2e/tests/*.e2e.ts',
+    'qa-e2e/tests/*.mjs',
     // `npm run` targets and standalone node utilities.
     'scripts/*.mjs',
     'scripts/*.ts',
@@ -158,11 +187,6 @@ const ENTRY_POINTS = {
  * flag it: they are reached dynamically, or only from tests, or are vendored.
  */
 const KNOWN_ALIVE = [
-  // Imported by tests/test_portfolio_analytics.py, not by app/. The only reason
-  // it is alive at all is that a test exercises it.
-  'data-engine/modules/portfolio_analytics.py',
-  // Imported by tests/test_return_engine.py.
-  'data-engine/modules/return_engine.py',
   // Imported by tests/test_portfolio_risk_metrics.py as quantstats.montecarlo.
   'data-engine/quantstats/montecarlo/analytics.py',
   // FastAPI mounts every route module through app/api/router.py.
@@ -410,6 +434,9 @@ function resolveTs(spec, fromRel) {
     const hit = firstExisting([
       ...TS_EXTS.map((e) => `${stem}${e}`),
       ...TS_EXTS.map((e) => `${stem}/index${e}`),
+      // Import relativo con extension explicita ('./public-ip.ts'): el stem ya
+      // es el fichero. Va el ultimo para no cambiar la resolucion habitual.
+      stem,
     ]);
     if (hit) return hit;
   }
@@ -459,6 +486,11 @@ const REFERRER_GLOBS = [
   'data-engine/Dockerfile*',
   'package.json',
   'playwright.config.ts',
+  // setupFiles y alias de Vitest nombran ficheros por path (tests/unit/setup.ts,
+  // tests/unit/stubs/server-only.ts).
+  'vitest.config.*',
+  // El script test:deps invoca tests/assert-deps-security.mjs por path.
+  'qa-e2e/package.json',
   'data-engine/alembic.ini',
   'data-engine/pyproject.toml',
   'docker-compose*.yml',
@@ -576,9 +608,29 @@ function human(bytes) {
 }
 
 function main() {
-  const args = new Set(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  const args = new Set(argv);
   const asJson = args.has('--json');
   const failOnDead = args.has('--fail');
+  // --baseline <fichero>: lista de inertes conocidos (uno por linea, # comenta).
+  // Con baseline, --fail solo rompe por muertos NUEVOS; una entrada de la
+  // baseline que ya no es hallazgo (borrada o revivida) es fallo cerrado:
+  // la baseline se encoge en el mismo PR que limpia, nunca se acumula.
+  const baselineIdx = argv.indexOf('--baseline');
+  const baselinePath = baselineIdx >= 0 ? argv[baselineIdx + 1] : null;
+  let baseline = null;
+  if (baselinePath) {
+    if (!baselinePath || baselinePath.startsWith('--') || !existsSync(resolve(REPO, baselinePath))) {
+      console.error(`--baseline: fichero no encontrado: ${baselinePath ?? '(sin valor)'}`);
+      process.exit(2);
+    }
+    baseline = new Set(
+      readFileSync(resolve(REPO, baselinePath), 'utf8')
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith('#')),
+    );
+  }
   const allFiles = trackedFiles();
   const { nodes, nodeSet, edges, importers } = buildGraph(allFiles);
   const files = new Map(nodes.map((n) => [n, statSync(join(REPO, n)).size]));
@@ -646,8 +698,25 @@ function main() {
   }
   findings.sort((a, b) => b.bytes - a.bytes);
 
+  // --- baseline de inertes conocidos
+  let newFindings = findings;
+  let staleBaseline = [];
+  if (baseline !== null) {
+    const found = new Set(findings.map((f) => f.file));
+    newFindings = findings.filter((f) => !baseline.has(f.file));
+    staleBaseline = [...baseline].filter((f) => !found.has(f));
+  }
+
   // --- fail-closed self checks
   const failures = [];
+  if (staleBaseline.length) {
+    failures.push({
+      check: 'baseline-stale',
+      detail:
+        'entradas de la baseline que ya no son hallazgo (borradas o revividas); ' +
+        `quitalas de la baseline en este PR: ${staleBaseline.join(', ')}`,
+    });
+  }
   if (staleWhitelist.length) {
     failures.push({
       check: 'whitelist-stale',
@@ -686,6 +755,8 @@ function main() {
     deadBytes: findings.reduce((a, f) => a + f.bytes, 0),
     reachableTests,
     findings,
+    newFindings,
+    baseline: baseline === null ? null : { path: baselinePath, known: baseline.size, stale: staleBaseline },
     selfCheckFailures: failures,
   };
 
@@ -713,7 +784,11 @@ function main() {
   }
 
   if (failures.length) process.exit(2);
-  if (failOnDead && findings.length) process.exit(1);
+  if (baseline !== null && newFindings.length) {
+    console.log(`\n  muertos NUEVOS (no en baseline ${baselinePath}):`);
+    for (const f of newFindings) console.log(`   - ${f.file}`);
+  }
+  if (failOnDead && newFindings.length) process.exit(1);
 }
 
 main();

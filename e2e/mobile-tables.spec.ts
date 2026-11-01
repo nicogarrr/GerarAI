@@ -198,7 +198,10 @@ test.describe("tablas: semántica y fallback móvil (estático)", () => {
       ["app", "(root)", "knowledge-graph", "page.tsx"],
       ["components", "research", "NewsEventsFlow.tsx"],
       ["app", "(root)", "research", "sources", "page.tsx"],
-      ["app", "(root)", "research", "[ticker]", "page.tsx"],
+      // #3527 saco las tablas del detalle de ticker a componentes:
+      // la de hechos vive en FactTable y la de capital en ShareCapitalPanel.
+      ["components", "research", "FactsPanels.tsx"],
+      ["components", "research", "ShareCapitalPanel.tsx"],
       // Tras la extracción de secciones (#3038) las tablas viven en los Section,
       // no en las páginas: la página solo compone.
       ["components", "research", "sections", "FinancialTerminalSection.tsx"],
@@ -244,6 +247,7 @@ test.describe("tablas: semántica y fallback móvil (estático)", () => {
       ["components", "research", "NewsEventsFlow.tsx"],
       ["app", "(root)", "research", "sources", "page.tsx"],
       ["app", "(root)", "research", "[ticker]", "page.tsx"],
+      ["components", "research", "ShareCapitalPanel.tsx"],
       // Tras la extracción de secciones (#3038) las tablas viven en los Section,
       // no en las páginas: la página solo compone.
       ["components", "research", "sections", "FinancialTerminalSection.tsx"],

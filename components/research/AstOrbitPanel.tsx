@@ -37,10 +37,6 @@ function CatalogReading({ analysis }: { analysis: AstsAnalysis | null }) {
         {interpretation.observations.map((item) => <li key={item.text}>{item.text}</li>)}
       </ul>
     </div> : null}
-    <p className="mt-3 text-xs text-gray-500">
-      Fuente: <a className="text-teal-300 hover:underline" href={analysis.source.url} rel="noopener noreferrer" target="_blank">{analysis.source.name}</a>
-      {analysis.source.fetched_at ? ` · descarga ${formatUserDateTime(analysis.source.fetched_at)}` : ''}
-    </p>
   </Panel>;
 }
 
@@ -55,13 +51,11 @@ export function AstOrbitPanel({ data, analysis }: { data: AstOrbitOverview | nul
     <section className="space-y-3" aria-label="Historial GP">
       <h2 className="text-lg font-semibold text-gray-100">Catálogo GP · CelesTrak</h2>
       <p className="text-xs text-gray-400">Última descarga GP: {data?.fetched_at ? formatUserDateTime(data.fetched_at) : 'sin datos'}.</p>
-      {data?.source_url ? <a className="inline-block max-w-full break-all text-xs text-teal-300 hover:underline" href={data.source_url} rel="noopener noreferrer" target="_blank">Ver fuente GP</a> : null}
       {data?.status === 'disponible' && data.objects.length ? <SourceObjects objects={data.objects} /> : <Panel title="Objetos GP"><p className="text-sm text-gray-400">Sin datos orbitales vigentes. El catálogo deja de publicarse tras 30 h sin una descarga válida.</p></Panel>}
     </section>
     <section className="space-y-3" aria-label="Historial SupGP">
       <h2 className="text-lg font-semibold text-gray-100">Elementos suplementarios SupGP · AST-E</h2>
       <p className="text-xs text-gray-400">Última descarga SupGP vigente: {supgp?.fetched_at ? formatUserDateTime(supgp.fetched_at) : 'sin datos'}. Fuente independiente de GP; no se comparan las series para emitir señales.</p>
-      {supgp?.source_url ? <a className="inline-block max-w-full break-all text-xs text-teal-300 hover:underline" href={supgp.source_url} rel="noopener noreferrer" target="_blank">Ver fuente SupGP</a> : null}
       {supgp?.status === 'disponible' && supgp.objects.length ? <SourceObjects objects={supgp.objects} /> : <Panel title="Objetos SupGP"><p className="text-sm text-gray-400">Sin datos suplementarios vigentes. SupGP puede no estar disponible aunque GP sí lo esté.</p></Panel>}
     </section>
     <p className="text-xs leading-5 text-gray-500">Una firma compatible con variación orbital solo invita a revisar fuentes independientes. No confirma despliegue, maniobra ni posición actual.</p>

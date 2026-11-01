@@ -39,7 +39,7 @@ test('el alta offline se reintenta inline dentro del diálogo, sin toast acciona
 test('borrar y revisar conservan showErrorToast con reintento', () => {
     assert.match(source, /onRetry: \(\) => handleDeleteAlert\(alertId\)/);
     assert.match(source, /onRetry: \(\) => handleReview\(alert\)/);
-    assert.match(source, /duplicateMessage: 'Ya tienes esta alerta configurada.'/);
+    assert.match(source, /duplicateMessage: ti\('alerts\.errors\.duplicate'\)/);
 });
 
 test('la carga distingue causa probada en servidor, sin inventarla', () => {
@@ -58,7 +58,8 @@ test('la carga distingue causa probada en servidor, sin inventarla', () => {
     assert.match(source, /alertsLoadErrorRate/);
     // El enlace de re-login solo se ofrece con causa session probada.
     assert.match(source, /cause === 'session' \? \(/);
-    assert.match(source, /Iniciar sesión/);
+    // i18n: el literal «Iniciar sesión» vive en messages/<locale>/alerts.json (session.signIn).
+    assert.match(source, /alerts\.session\.signIn/);
     assert.doesNotMatch(source, /alertsLoadErrorAuth/);
     // La vista ya no consume la variante que lanza sin causa.
     assert.doesNotMatch(source, /getUserAlerts\(\)/);

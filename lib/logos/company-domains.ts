@@ -65,6 +65,23 @@ export const COMPANY_DOMAINS: Readonly<Record<string, string>> = {
     'DIS': 'thewaltdisneycompany.com',
     'AENA': 'aena.es',
     'AENA.MC': 'aena.es',
+    // 31-oct-2026: huecos medidos en la watchlist real de pruebas (FMP daba
+    // logo y /api/logo 404). Dominios oficiales verificados uno a uno:
+    // BFIT = Basic-Fit N.V. (Euronext Ámsterdam) — corporate.basic-fit.com/investors
+    'BFIT': 'basic-fit.com',
+    'BFIT.AS': 'basic-fit.com',
+    // IBG = Iberpapel Gestión (BME) — iberpapel.es
+    'IBG': 'iberpapel.es',
+    'IBG.MC': 'iberpapel.es',
+    // EBRO = Ebro Foods (BME) — ebrofoods.es
+    'EBRO': 'ebrofoods.es',
+    'EBRO.MC': 'ebrofoods.es',
+    // VID = Vidrala (BME) — vidrala.com (el icono solo resuelve vía www,
+    // verificado con fetchSiteIcon: bare=null, www=OK)
+    'VID': 'www.vidrala.com',
+    'VID.MC': 'www.vidrala.com',
+    // SPCX = SpaceX (pre-IPO, sin listado oficial) — spacex.com
+    'SPCX': 'spacex.com',
     'ITX.MC': 'inditex.com',
     'SAN.MC': 'santander.com',
     'SAN': 'santander.com',

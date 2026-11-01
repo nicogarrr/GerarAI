@@ -9,10 +9,13 @@ emisor declaro, con su contexto (periodo + miembro + eje).
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B314  # stdlib solo para tipos (Element) y ParseError: defusedxml no los exporta; el parseo usa defusedxml
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal, InvalidOperation
+
+# XBRL externo (SEC/ESEF): defusedxml solo para PARSEAR (iterparse).
+import defusedxml.ElementTree as DefusedET
 
 # Tags XBRL (nombre local) que alimentan cada metrica interna. Los "basic"
 # solo se usan cuando el emisor no declara el diluido (Berkshire no tiene
@@ -178,7 +181,7 @@ def parse_instance_dimensioned_facts(
     # texto literal: Visa/BRK escriben `shares` sin prefijo.
     scopes: list[dict[str, str]] = [{}]
     pending_ns: list[tuple[str, str]] = []
-    for _event, el in ET.iterparse(stream, events=("start-ns", "start", "end")):
+    for _event, el in DefusedET.iterparse(stream, events=("start-ns", "start", "end")):
         if _event == "start-ns":
             pending_ns.append(el)  # type: ignore[arg-type]
             continue

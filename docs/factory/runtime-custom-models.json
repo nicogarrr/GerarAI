@@ -1,0 +1,24 @@
+{
+  "customModels": [
+    {
+      "model": "claude-opus-5-5",
+      "baseUrl": "https://api.oneprovider.dev",
+      "apiKey": "<REDACTED-clave-expuesta-en-repo-ver-docs/ROTACION_CLAVES.md>",
+      "provider": "anthropic",
+      "id": "custom:claude-opus-5-5-0",
+      "index": 0,
+      "displayName": "claude-opus-5-5",
+      "noImageSupport": false
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "baseUrl": "https://api.oneprovider.dev",
+      "apiKey": "<REDACTED-clave-expuesta-en-repo-ver-docs/ROTACION_CLAVES.md>",
+      "provider": "anthropic",
+      "id": "custom:claude-sonnet-5-5-0",
+      "index": 1,
+      "displayName": "claude-sonnet-5-5",
+      "noImageSupport": false
+    }
+  ]
+}

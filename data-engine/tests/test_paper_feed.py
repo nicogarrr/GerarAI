@@ -205,3 +205,22 @@ def test_scheduler_registers_daily_proposals(monkeypatch):
     assert trigger == "cron"
     assert kwargs.get("hour") == 15 and kwargs.get("minute") == 30
     assert "paper_dividends_daily" in seen
+
+
+def test_ownership_disclosure_cannot_seed_automatic_paper_proposal(db):
+    co = company(db, 'ASTS')
+    db.add(NewsEvent(company_id=co.id, title='Declaración de participación: Vanguard',
+                     date=NOW - timedelta(hours=1), materiality_score=6,
+                     event_type='ownership_disclosure'))
+    db.commit()
+    assert select_candidates(db, NOW, 10) == []
+    calls = []
+    async def forbidden(*args, **kwargs):
+        calls.append(True)
+        raise AssertionError('disclosure must not invoke paper LLM')
+    assert _feed(db, forbidden)['status'] == 'sin_candidatos'
+    assert calls == []
+    news(db, co, 7)
+    db.commit()
+    # A separate real material event may still qualify the same ticker.
+    assert select_candidates(db, NOW, 10) == ['ASTS']

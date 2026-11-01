@@ -25,6 +25,7 @@
 #   llm/thesis_go.py: LLM provider endpoint; custom URLs via egress_guard
 #   services/class_filer_eps_service.py: SEC EDGAR fixed host
 #   services/company_enrichment_service.py: fixed provider APIs (OpenFIGI/Finnhub)
+#   services/connectors/alpha_vantage.py: Alpha Vantage fixed host (www.alphavantage.co), rate-limited
 #   services/connectors/base.py: connector to a fixed public data API
 #   services/connectors/ca_insider_yahoo.py: connector to a fixed public data API
 #   services/connectors/celestrak_ast.py: connector to a fixed public data API
@@ -85,7 +86,7 @@ rules:
     el host es fijo, anade el modulo a la lista revisada de .semgrep/gerarai.yml con su motivo.
   paths:
     include:
-    - data-engine/app/
+    - /data-engine/app/
     exclude:
     - /data-engine/app/api/routes/companies.py
     - /data-engine/app/core/error_reporting.py
@@ -101,6 +102,7 @@ rules:
     - /data-engine/app/llm/thesis_go.py
     - /data-engine/app/services/class_filer_eps_service.py
     - /data-engine/app/services/company_enrichment_service.py
+    - /data-engine/app/services/connectors/alpha_vantage.py
     - /data-engine/app/services/connectors/base.py
     - /data-engine/app/services/connectors/ca_insider_yahoo.py
     - /data-engine/app/services/connectors/celestrak_ast.py
@@ -163,7 +165,7 @@ rules:
   message: 'Mock con spec de un modelo ORM ($M): oculta columnas, relaciones y tenant_id reales (asi se escondio el AttributeError de las tesis). Crea el modelo real en una sesion SQLite.'
   paths:
     include:
-    - data-engine/tests/
+    - /data-engine/tests/
   patterns:
   - pattern-either:
     - pattern: MagicMock(spec=$M, ...)
@@ -180,7 +182,7 @@ rules:
   message: 'SimpleNamespace con columnas ORM (tenant_id/company_id) como falso modelo: no ejecuta el gate ni el scoping reales. Usa el modelo real.'
   paths:
     include:
-    - data-engine/tests/
+    - /data-engine/tests/
   pattern-either:
   - pattern: SimpleNamespace(..., tenant_id=$A, ...)
   - pattern: SimpleNamespace(..., company_id=$A, ...)
@@ -191,7 +193,7 @@ rules:
   message: 'Expresion ${{ inputs.* / github.event.* }} interpolada dentro de un run: de GitHub Actions. El texto se pega en el script antes de ejecutarlo (inyeccion de shell, y el step puede llevar secretos en su env). Pasalo por env: (p. ej. PERSONAS: ${{ inputs.personas }}) y usa "$PERSONAS" en el script.'
   paths:
     include:
-    - .github/workflows/
+    - /.github/workflows/
   patterns:
   - pattern-inside: 'steps: [...]'
   - pattern: 'run: $SHELL'
@@ -205,7 +207,7 @@ rules:
   message: 'SQL crudo sobre una tabla con tenant_id: text()/exec_driver_sql saltan el scoping automatico de app/core/database.py. Usa el ORM o anade el filtro de tenant explicito.'
   paths:
     include:
-    - data-engine/app/
+    - /data-engine/app/
   patterns:
   - pattern-either:
     - pattern: text("$SQL", ...)
@@ -221,7 +223,7 @@ rules:
   message: include_all_tenants=True en una ruta HTTP desactiva el aislamiento entre tenants para esa consulta.
   paths:
     include:
-    - data-engine/app/api/
+    - /data-engine/app/api/
   pattern-either:
   - pattern: $Q.execution_options(..., include_all_tenants=True, ...)
   - pattern: execution_options(..., include_all_tenants=True, ...)
@@ -232,7 +234,7 @@ rules:
   message: 'Igualdad exacta entre floats: usa Decimal, math.isclose o math.isfinite.'
   paths:
     include:
-    - data-engine/app/
+    - /data-engine/app/
   pattern-either:
   - pattern: float(...) == $Y
   - pattern: $Y == float(...)
@@ -245,7 +247,7 @@ rules:
   message: '`x or 0` convierte un importe desconocido (None) en 0: una ganancia, un coste o un peso inventados. Conserva None (y muestra N/D) o justifica por que 0 es correcto.'
   paths:
     include:
-    - data-engine/app/
+    - /data-engine/app/
   patterns:
   - pattern-either:
     - patterns:
@@ -281,7 +283,7 @@ rules:
   message: 'datetime naive (sin zona): usa datetime.now(UTC) o la zona del usuario.'
   paths:
     include:
-    - data-engine/app/
+    - /data-engine/app/
   pattern-either:
   - pattern: datetime.now()
   - pattern: datetime.datetime.now()
@@ -296,7 +298,7 @@ rules:
   message: 'except Exception: pass oculta el fallo. Estrecha la excepcion, registralo (logger.warning(..., exc_info=True)) o justifica con nosemgrep.'
   paths:
     include:
-    - data-engine/app/
+    - /data-engine/app/
   patterns:
   - pattern-either:
     - pattern: "try:\n  ...\nexcept Exception:\n  pass"
@@ -326,6 +328,6 @@ rules:
     - '*.md'
     - .semgrep/
     - '*.test.ts'
-    - data-engine/tests/
+    - /data-engine/tests/
     - tests/
   pattern-regex: (sk-(proj-|ant-)?[A-Za-z0-9_\-]{24,}|gh[pousr]_[A-Za-z0-9]{36}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_\-]{35}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|\d{8,10}:AA[A-Za-z0-9_\-]{33})

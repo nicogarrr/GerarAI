@@ -8,6 +8,8 @@ const quality: PortfolioDataQuality = {
  position_sources: ['ibkr_flex'], cash_sources: ['ibkr_flex'], cash_native: {EUR: 0.57, USD: -9954.44},
  snapshots: 20, complete_snapshots: 1, return_observations: 0,
  latest_snapshot_date: '2026-10-29', latest_pricing_coverage: 1,
+ cost_review_positions: 1, cost_unverified_positions: 0,
+ twr_chain: { status: 'broken', unlinked_snapshots: 2, first_unlinked_date: '2026-10-15' },
  reasons: ['mixed_valuation_dates', 'ibkr_cost_mismatch'],
 };
 describe('PortfolioDataNotice', () => {

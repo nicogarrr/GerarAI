@@ -19,6 +19,9 @@ class _EngineReturning:
     def build_context(self, db, company, current_price, as_of=None, **_):
         return object()
 
+    def currency_input_units(self, context) -> list[str | None]:
+        return []  # This point-in-time fixture supplies no monetary inputs.
+
     def value(self, context) -> dict:
         return self.result
 

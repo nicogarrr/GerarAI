@@ -50,7 +50,7 @@ def _resolve_range(desde: date | None, hasta: date | None) -> tuple[date, date]:
     if (end - start).days + 1 > calendar_connector.MAX_DAYS_PER_REQUEST:
         raise HTTPException(
             status_code=400,
-            detail=f"rango maximo: {calendar_connector.MAX_DAYS_PER_REQUEST} dias",
+            detail=f"rango máximo: {calendar_connector.MAX_DAYS_PER_REQUEST} días",
         )
     return start, end
 
@@ -104,8 +104,29 @@ def followed_earnings_calendar(
     if start > end:
         raise HTTPException(status_code=400, detail="desde no puede ser posterior a hasta")
     if (end - start).days > 366:
-        raise HTTPException(status_code=400, detail="rango maximo: 366 dias")
+        raise HTTPException(status_code=400, detail="rango máximo: 366 días")
     return followed_calendar(db, start, end)
+
+
+@router.get("/portfolio-upcoming")
+def portfolio_upcoming_dates(
+    desde: date | None = Query(default=None),
+    hasta: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    """«Próximas fechas» de la cartera: resultados (oficial/estimada), ex-dividendo y pago, con recordatorio.
+
+    Solo tablas guardadas (``earnings_dates`` y ``dividend_records``): ninguna llamada a proveedores.
+    """
+    from app.services.earnings_dates_service import portfolio_upcoming
+
+    start = desde or _madrid_today()
+    end = hasta or _plus_days(start, 90)
+    if start > end:
+        raise HTTPException(status_code=400, detail="desde no puede ser posterior a hasta")
+    if (end - start).days > 366:
+        raise HTTPException(status_code=400, detail="rango máximo: 366 días")
+    return portfolio_upcoming(db, start, end)
 
 
 @router.get("/followed/materials")

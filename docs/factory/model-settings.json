@@ -1,0 +1,8 @@
+{
+  "validationWorkerReasoningEffort": "xhigh",
+  "workerModel": "custom:claude-sonnet-5-5-0",
+  "workerReasoningEffort": "high",
+  "validationWorkerModel": "custom:claude-sonnet-5-5-0",
+  "skipScrutiny": false,
+  "skipUserTesting": false
+}

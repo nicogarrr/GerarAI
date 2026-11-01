@@ -10,6 +10,9 @@ import {toast} from "sonner";
 import {useRouter} from "next/navigation";
 import Link from "next/link";
 import React, {useState} from "react";
+import {useT} from "@/lib/i18n/client";
+import AccountStatusNotice from "@/components/auth/AccountStatusNotice";
+import {pendingStateFromSignInCode, type PendingAccountState} from "@/lib/auth/pending-account";
 
 type Props = {
     /** Solo se muestra el enlace de recuperación si el despliegue puede enviar correo. */
@@ -20,8 +23,10 @@ type Props = {
 };
 
 const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirectTo = '/inicio' }: Props) => {
+    const t = useT();
     const router = useRouter()
     const [twoFactorRequired, setTwoFactorRequired] = useState(false);
+    const [accountNotice, setAccountNotice] = useState<PendingAccountState | null>(null);
     const [pendingCredentials, setPendingCredentials] = useState<{ email: string; password: string } | null>(null);
     const [isVerifying, setIsVerifying] = useState(false);
     const {
@@ -50,12 +55,20 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
                 setTwoFactorRequired(true);
                 return;
             }
-            toast.error('No se pudo iniciar sesión', {
-                description: result.error ?? 'Email o contraseña no válidos.',
+            // Cuenta pendiente o rechazada: pantalla de estado, no el toast
+            // generico (un "credenciales no validas" aqui confunde y filtra el
+            // estado de la solicitud).
+            const noticeState = pendingStateFromSignInCode(result.code);
+            if (noticeState) {
+                setAccountNotice(noticeState);
+                return;
+            }
+            toast.error(t('auth.signIn.failedTitle'), {
+                description: result.error ?? t('auth.signIn.invalidCredentials'),
             });
         } catch (e) {
-            toast.error('No se pudo iniciar sesión', {
-                description: e instanceof Error ? e.message : 'Ha ocurrido un error inesperado. Inténtalo de nuevo.'
+            toast.error(t('auth.signIn.failedTitle'), {
+                description: e instanceof Error ? e.message : t('auth.signIn.unexpectedError')
             })
         }
     }
@@ -74,45 +87,54 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
                 router.refresh();
                 return;
             }
-            toast.error('Verificación fallida', {
-                description: result.error ?? 'Código de autenticación no válido.',
+            toast.error(t('auth.twoFactor.failedTitle'), {
+                description: result.error ?? t('auth.twoFactor.invalidCode'),
             });
         } catch (e) {
-            toast.error('Verificación fallida', {
-                description: e instanceof Error ? e.message : 'Ha ocurrido un error inesperado.'
+            toast.error(t('auth.twoFactor.failedTitle'), {
+                description: e instanceof Error ? e.message : t('auth.twoFactor.unexpectedError')
             })
         } finally {
             setIsVerifying(false);
         }
     }
 
+    if (accountNotice) {
+        return (
+            <AccountStatusNotice
+                state={accountNotice}
+                onBack={() => setAccountNotice(null)}
+            />
+        );
+    }
+
     if (twoFactorRequired) {
         return (
             <React.Fragment key="two-factor">
-                <h1 className="form-title">Verificación en dos pasos</h1>
+                <h1 className="form-title">{t('auth.twoFactor.title')}</h1>
                 <p className="text-sm text-gray-500 mb-6">
-                    Introduce el código de 6 dígitos de tu app de autenticación para continuar.
+                    {t('auth.twoFactor.subtitle')}
                 </p>
 
                 <form onSubmit={handleSubmit((_data) => onVerifyTotp(getValues('totpCode') ?? ''))} className="space-y-5">
                                     <InputField
                                         name="totpCode"
-                                        label="Código de autenticación"
+                                        label={t('auth.twoFactor.codeLabel')}
                                         placeholder="000000"
                                         autoComplete="one-time-code"
                                         register={register}
                                         error={errors.totpCode}
                                         validation={{
-                                            required: 'El código de autenticación es obligatorio',
+                                            required: t('auth.twoFactor.codeRequired'),
                                             pattern: {
                                                 value: /^\d{6}$/,
-                                                message: 'El código debe tener 6 dígitos'
+                                                message: t('auth.twoFactor.codeLength')
                                             }
                                         }}
                                     />
 
                     <Button type="submit" disabled={isVerifying} className="brand-btn w-full mt-5">
-                        {isVerifying ? 'Verificando…' : 'Verificar y entrar'}
+                        {isVerifying ? t('auth.twoFactor.verifying') : t('auth.twoFactor.submit')}
                     </Button>
 
                     <button
@@ -123,7 +145,7 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
                             setPendingCredentials(null);
                         }}
                     >
-                        Volver a iniciar sesión
+                        {t('auth.twoFactor.back')}
                     </button>
                 </form>
             </React.Fragment>
@@ -132,14 +154,14 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
 
     return (
         <React.Fragment key="credentials">
-            <h1 className="form-title !mb-3">Bienvenido de nuevo</h1>
-            <p className="mb-7 text-sm leading-6 text-gray-400">Entra para seguir con tus empresas y tu cartera.</p>
+            <h1 className="form-title !mb-3">{t('auth.signIn.welcomeTitle')}</h1>
+            <p className="mb-7 text-sm leading-6 text-gray-400">{t('auth.signIn.welcomeSubtitle')}</p>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <InputField
                     name="email"
-                    label="Email"
-                    placeholder="email@ejemplo.com"
+                    label={t('auth.signIn.emailLabel')}
+                    placeholder={t('auth.signIn.emailPlaceholder')}
                     register={register}
                     error={errors.email}
                     validation={emailFieldValidation}
@@ -147,12 +169,12 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
 
                 <InputField
                     name="password"
-                    label="Contraseña"
-                    placeholder="Introduce tu contraseña"
+                    label={t('auth.signIn.passwordLabel')}
+                    placeholder={t('auth.signIn.passwordPlaceholder')}
                     type="password"
                     register={register}
                     error={errors.password}
-                    validation={{ required: 'La contraseña es obligatoria', minLength: { value: 8, message: 'La contraseña debe tener al menos 8 caracteres' } }}
+                    validation={{ required: t('auth.signIn.passwordRequired'), minLength: { value: 8, message: t('auth.signIn.passwordMinLength') } }}
                 />
 
                 {passwordResetAvailable ? (
@@ -161,16 +183,16 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
                             className="text-sm text-gray-400 underline-offset-4 transition-colors hover:text-teal-300 hover:underline"
                             href="/forgot-password"
                         >
-                            ¿Has olvidado tu contraseña?
+                            {t('auth.signIn.forgotLink')}
                         </Link>
                     </div>
                 ) : null}
 
                 <Button type="submit" disabled={isSubmitting} className="brand-btn w-full mt-5">
-                    {isSubmitting ? 'Iniciando sesión…' : 'Iniciar sesión'}
+                    {isSubmitting ? t('auth.signIn.submitting') : t('auth.signIn.submit')}
                 </Button>
 
-                <FooterLink text="¿No tienes cuenta?" linkText={publicSignUpOpen ? 'Crear cuenta' : 'Pedir acceso'} href="/sign-up" />
+                <FooterLink text={t('auth.signIn.noAccount')} linkText={publicSignUpOpen ? t('auth.signIn.createAccount') : t('auth.signIn.requestAccess')} href="/sign-up" />
             </form>
         </React.Fragment>
     );

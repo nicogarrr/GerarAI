@@ -62,7 +62,7 @@ describe('middleware de sesión', () => {
     });
 
     it('la decisión de sesión respeta lo público y protege lo autenticado (requiresSession real)', () => {
-        for (const pub of ['/', '/sign-in', '/sign-up', '/forgot-password', '/reset-password', '/metodologia', '/help', '/privacidad', '/terminos', '/api/auth/session', '/api/health']) {
+        for (const pub of ['/', '/sign-in', '/sign-up', '/cuenta-pendiente', '/forgot-password', '/reset-password', '/metodologia', '/help', '/privacidad', '/terminos', '/api/auth/session', '/api/health']) {
             assert.equal(requiresSession(pub), false, `${pub} debe quedar pública`);
         }
         for (const priv of ['/inicio', '/taxes', '/insider', '/movers', '/research/AAPL', '/propicks', '/portfolio']) {

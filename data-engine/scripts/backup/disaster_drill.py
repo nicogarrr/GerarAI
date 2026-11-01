@@ -72,10 +72,10 @@ from scripts.backup.seed_drill_data import (  # noqa: E402
 SEED_BUCKET = "drill-bucket"
 SEED_COLLECTION = "drill_collection"
 
-PG_USER = "drill"
-PG_PASSWORD = "drill-password"
-MINIO_USER = "drilluser"
-MINIO_PASSWORD = "drillpassword123"
+PG_USER = os.getenv("DRILL_PG_USER", "drill")
+PG_PASSWORD = os.getenv("DRILL_PG_PASSWORD", "drill-password")
+MINIO_USER = os.getenv("DRILL_MINIO_USER", "drilluser")
+MINIO_PASSWORD = os.getenv("DRILL_MINIO_PASSWORD", "drillpassword123")
 APP_WAIT_SECONDS = 180
 
 
@@ -89,10 +89,19 @@ class DrillEnvironment:
     """Contenedores, puertos y volumenes PROPIOS del drill."""
 
     def __init__(
-        self, *, workdir: Path, keep: bool = False, minio_image: str | None = None
+        self,
+        *,
+        workdir: Path,
+        keep: bool = False,
+        minio_image: str | None = None,
+        pg_memory: str | None = None,
     ) -> None:
         self.workdir = workdir
         self.keep = keep
+        # Tope de memoria del contenedor Postgres (formato docker: 896m, 4g...).
+        # Lo usa el A/B de carga (pg_load_ab); el drill normal lo deja en None
+        # para no cambiar el comportamiento del canario de backup/restore.
+        self.pg_memory = pg_memory
         self.drill_id = f"drill{os.getpid()}{uuid.uuid4().hex[:4]}"
         self.containers: dict[str, str] = {}
         self.volumes: dict[str, str] = {}
@@ -143,28 +152,35 @@ class DrillEnvironment:
         self.volumes[service] = name
         return name
 
+    def _pg_options(self, pg_volume: str) -> list[str]:
+        """Opciones del contenedor Postgres; con `pg_memory`, tope duro.
+
+        --memory-swap igual que --memory: sin swap, el tope es de verdad; si el
+        motor pide mas, el kernel lo mata (OOM) en vez de degradar en silencio,
+        y el A/B registra ese resultado en vez de medir una maquina swapping.
+        """
+        options = [
+            "-e",
+            f"POSTGRES_USER={PG_USER}",
+            "-e",
+            f"POSTGRES_PASSWORD={PG_PASSWORD}",
+            "-e",
+            "POSTGRES_DB=cavaai_drill",
+            "-v",
+            f"{pg_volume}:/var/lib/postgresql/data",
+            "-p",
+            f"127.0.0.1:{self.pg_port}:5432",
+        ]
+        if self.pg_memory:
+            options += ["--memory", self.pg_memory, "--memory-swap", self.pg_memory]
+        return options
+
     def up(self) -> None:
         require_tool_docker()
         pg_volume = self._volume("postgres")
         minio_volume = self._volume("minio")
         qdrant_volume = self._volume("qdrant")
-        self._run_container(
-            "postgres",
-            POSTGRES_IMAGE,
-            [
-                "-e",
-                f"POSTGRES_USER={PG_USER}",
-                "-e",
-                f"POSTGRES_PASSWORD={PG_PASSWORD}",
-                "-e",
-                "POSTGRES_DB=cavaai_drill",
-                "-v",
-                f"{pg_volume}:/var/lib/postgresql/data",
-                "-p",
-                f"127.0.0.1:{self.pg_port}:5432",
-            ],
-            [],
-        )
+        self._run_container("postgres", POSTGRES_IMAGE, self._pg_options(pg_volume), [])
         self._run_container(
             "minio",
             self.minio_image,
@@ -213,11 +229,51 @@ class DrillEnvironment:
                     print(f"[drill] {service} listo")
             if pending:
                 time.sleep(2)
-        require(
-            not pending,
-            f"los servicios {sorted(pending)} no respondieron en {timeout}s: "
-            "el drill no puede seguir (fallo, no un resultado verde)",
-        )
+        if pending:
+            raise FailClosedError(
+                f"los servicios {sorted(pending)} no respondieron en {timeout}s: "
+                "el drill no puede seguir (fallo, no un resultado verde).\n"
+                + self._diagnostico_contenedores(sorted(pending))
+            )
+
+    def _diagnostico_contenedores(self, servicios: list[str]) -> str:
+        """Estado y ultimas lineas de log de los contenedores que no arrancaron.
+
+        Un timeout de espera sin el log del contenedor es un fallo mudo: en CI
+        el runner se destruye y no hay forma de saber si la imagen no tiro del
+        entrypoint, pidio una variable o nunca llego a escuchar (medido
+        2026-10-31: bitnamilegacy/minio no acepta el comando `server ...` de la
+        imagen oficial y el drill solo decia "no respondio en 300s").
+        """
+        partes: list[str] = []
+        for servicio in servicios:
+            nombre = self.containers.get(servicio)
+            if not nombre:
+                continue
+            estado = run(
+                [
+                    "docker",
+                    "inspect",
+                    "--format",
+                    "{{.State.Status}} exit={{.State.ExitCode}}",
+                    nombre,
+                ],
+                timeout=30,
+                check=False,
+                what="docker inspect",
+            ).stdout.strip()
+            logs = run(
+                ["docker", "logs", "--tail", "15", nombre],
+                timeout=30,
+                check=False,
+                what="docker logs",
+            )
+            lineas = (logs.stdout + logs.stderr).strip().splitlines()
+            partes.append(
+                f"{servicio} ({nombre}): {estado}; ultimas lineas: "
+                + redact(" | ".join(lineas[-8:]))
+            )
+        return "\n".join(partes)
 
     def _pg_query(self) -> bool:
         result = run(

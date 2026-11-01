@@ -1,7 +1,7 @@
 from datetime import date
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models import CashBalance, Company, Position
 from app.services.portfolio_fx_service import PortfolioFXService
@@ -15,7 +15,11 @@ class RiskService:
         base_currency = fx.base_currency(db)
         missing_fx: list[dict] = []
         held_valuation: list[dict] = []
-        rows = db.execute(select(Position, Company).join(Company, Position.company_id == Company.id)).all()
+        rows = db.execute(
+            select(Position, Company)
+            .join(Company, Position.company_id == Company.id)
+            .options(joinedload(Position.company))
+        ).all()
         positions = []
         fx_used: dict[tuple, dict] = {}
         for position, company in rows:

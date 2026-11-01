@@ -5,6 +5,7 @@ export async function resolve(specifier, context, nextResolve) {
     if (specifier === 'next/headers') return { url: 'auth-boundary:headers', shortCircuit: true };
     if (specifier === '@/lib/types/errors') return { url: new URL('../lib/types/errors.ts', import.meta.url).href, shortCircuit: true };
     if (specifier === '@/lib/constants') return { url: 'auth-boundary:constants', shortCircuit: true };
+    if (specifier === '@/lib/i18n/server') return { url: new URL('./auth-session-boundary.i18n-shim.mjs', import.meta.url).href, shortCircuit: true };
     return nextResolve(specifier, context);
 }
 export async function load(url, context, nextLoad) {

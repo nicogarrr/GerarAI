@@ -14,26 +14,38 @@ import { readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 
 // @ts-expect-error TS5097: la extensión .ts explícita la exige node --experimental-strip-types.
-import { clientOrderIdAfter, parseEsNumber, type SubmitResult } from '../components/paper-trading/submit.ts';
+import { clientOrderIdAfter, NUM_INPUT_HINT, parseEsNumber, type SubmitResult } from '../components/paper-trading/submit.ts';
 
 const PAGE = 'app/(root)/paper-trading/page.tsx';
+
+test('NUM_INPUT_HINT coincide con el diccionario i18n', () => {
+    const dict = JSON.parse(readFileSync('lib/i18n/messages/es/paperTrading.json', 'utf8'));
+    assert.equal(NUM_INPUT_HINT, dict.numInputHint);
+});
 const COMPONENTS_DIR = 'components/paper-trading';
 
 test('la ruta /paper-trading existe, es dinámica y etiqueta la demo', () => {
     const page = readFileSync(PAGE, 'utf8');
     assert.match(page, /export const dynamic = 'force-dynamic'/, 'la página debe ser dinámica');
     assert.match(page, /NODE_ENV !== 'production'/, 'los fixtures deben quedar fuera de producción');
-    assert.match(page, /ficticio/i, 'la página debe declarar el dinero ficticio');
+    // i18n: el copy vive en messages/<locale>/paperTrading.json; la página referencia la clave.
+    assert.match(page, /paperTrading\.page\.description/, 'la página referencia la descripción');
+    const dict = JSON.parse(readFileSync('lib/i18n/messages/es/paperTrading.json', 'utf8'));
+    assert.match(dict.page.description, /ficticio/i, 'la página debe declarar el dinero ficticio');
 });
 
 test('el realizado se etiqueta como antes de comisiones en panel y tabla (delta 21-oct-2026)', () => {
     // Verificado en lib/paper-trading/accounting.ts: el FIFO calcula
     // realizado = cantidad x (precio venta - precio lote); las comisiones
     // solo mueven el efectivo. La UI debe decirlo junto a la cifra.
+    const dict = JSON.parse(readFileSync('lib/i18n/messages/es/paperTrading.json', 'utf8'));
     const summary = readFileSync(`${COMPONENTS_DIR}/AccountSummary.tsx`, 'utf8');
-    assert.match(summary, /hint="antes de comisiones"/, 'los totales realizados deben llevar el hint');
+    // i18n: el hint vive en el diccionario; el código referencia la clave.
+    assert.match(summary, /hint=\{ti\('paperTrading\.account\.realizedHint'\)\}/, 'los totales realizados deben llevar el hint');
+    assert.equal(dict.account.realizedHint, 'antes de comisiones');
     const table = readFileSync(`${COMPONENTS_DIR}/PositionsTable.tsx`, 'utf8');
-    assert.match(table, /Realizado antes de comisiones \(las comisiones solo mueven el efectivo\)/, 'la tabla debe declararlo');
+    assert.match(table, /paperTrading\.positions\.footnote/, 'la tabla referencia la nota de realizado');
+    assert.match(dict.positions.footnote, /Realizado antes de comisiones \(las comisiones solo mueven el efectivo\)/, 'la tabla debe declararlo');
     // Aviso de cuenta (QA live 21-oct-2026): el campo de comisión ya no
     // existe (#2011); el aviso describe el 0 simulado y los históricos sin
     // sugerir tarifa 0 de ningún bróker.
@@ -51,21 +63,28 @@ test('la celda N/D de escritorio no se rompe en líneas: motivo expandible y acc
     // debe ser visible/expandible con teclado y táctil (details nativo).
     // En móvil se muestra entero bajo el nombre.
     const table = readFileSync(`${COMPONENTS_DIR}/PositionsTable.tsx`, 'utf8');
-    assert.match(table, /<summary className="[^"]*">Motivo<\/summary>/);
-    assert.match(table, /<p className="mt-1 max-w-56 whitespace-normal">\{row\?\.note \?\? 'Sin valoración\.'\}<\/p>/);
+    // i18n: «Motivo» y «Sin valoración.» viven en el diccionario (positions.reasonSummary/noValuation).
+    assert.match(table, /<summary className="[^"]*">\{ti\('paperTrading\.positions\.reasonSummary'\)\}<\/summary>/);
+    assert.match(table, /<p className="mt-1 max-w-56 whitespace-normal">\{row\?\.note \?\? ti\('paperTrading\.positions\.noValuation'\)\}<\/p>/);
     assert.doesNotMatch(table, /truncate text-xs text-gray-500" title=/);
 });
 
 test('la UI declara el origen manual simulado sin prometer ejecución real', () => {
+    const dict = JSON.parse(readFileSync('lib/i18n/messages/es/paperTrading.json', 'utf8'));
     const panel = readFileSync(`${COMPONENTS_DIR}/ManualDemoPanel.tsx`, 'utf8');
-    assert.match(panel, /ficticio/i, 'el panel debe declarar el saldo ficticio');
-    assert.match(panel, /no es una ejecución de\s+mercado/i, 'debe negar la ejecución de mercado');
+    // i18n: el copy vive en el diccionario; el código referencia las claves.
+    assert.match(panel, /paperTrading\.panel\.intro/, 'el panel referencia su declaración');
+    assert.match(dict.panel.intro, /ficticio/i, 'el panel debe declarar el saldo ficticio');
+    assert.match(dict.panel.intro, /no es una ejecución de mercado/i, 'debe negar la ejecución de mercado');
     const ledger = readFileSync(`${COMPONENTS_DIR}/LedgerTable.tsx`, 'utf8');
-    assert.match(ledger, /Manual simulada/, 'cada fila ejecutada etiqueta su fuente');
-    assert.match(ledger, /Rechazada/, 'las órdenes rechazadas llevan badge propio');
+    assert.match(ledger, /paperTrading\.ledger\.manualBadge/, 'cada fila ejecutada referencia su fuente');
+    assert.equal(dict.ledger.manualBadge, 'Manual simulada');
+    assert.match(ledger, /paperTrading\.ledger\.rejectedBadge/, 'las órdenes rechazadas llevan badge propio');
+    assert.equal(dict.ledger.rejectedBadge, 'Rechazada');
     assert.match(ledger, /rejectReason/, 'las rechazadas muestran el motivo, nunca un fill');
     const ticket = readFileSync(`${COMPONENTS_DIR}/OrderTicket.tsx`, 'utf8');
-    assert.match(ticket, /no es una ejecución de\s+mercado/i, 'el ticket advierte del fill manual');
+    assert.match(ticket, /paperTrading\.ticket\.manualNote/, 'el ticket referencia la advertencia del fill manual');
+    assert.match(dict.ticket.manualNote, /no es una ejecución de mercado/i, 'el ticket advierte del fill manual');
     assert.doesNotMatch(ticket, /orderType|limitPrice/, 'sin órdenes límite ficticias en el ticket manual');
 });
 
@@ -195,5 +214,6 @@ test('el historial es paginado: cursor estable cableado página -> panel -> pagi
     assert.doesNotMatch(panel, /Cargar más/, 'Nico 2026-10-28: paginación, no «Cargar más»');
     assert.match(panel, /<Pagination[\s\S]*?hasMore=/, 'el panel pagina el historial');
     assert.match(panel, /onLoadMoreHistory/, 'la última página pide el siguiente bloque con el cursor');
-    assert.match(panel, /role="alert"[\s\S]{0,200}No se pudo cargar más historial/, 'un fallo al cargar más es visible');
+    // i18n: el mensaje vive en el diccionario (panel.loadMoreError).
+    assert.match(panel, /role="alert"[\s\S]{0,200}paperTrading\.panel\.loadMoreError/, 'un fallo al cargar más es visible');
 });

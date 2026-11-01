@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.local_date import local_today
 from app.core.ui_errors import ui_error
 from app.services import macro_calendar_service
 from app.services.eight_k_digest import eight_k_digest
@@ -27,12 +28,16 @@ async def macro_events(
     Una fuente caída marca ``status="partial"``/``"unavailable"``; nunca 5xx
     por fallo del proveedor y nunca fechas inventadas.
     """
-    start = desde or date.today()
-    end = hasta or (start + timedelta(days=60))
+    start = desde or local_today()  # día de Madrid, como /calendar
+    try:
+        end = hasta or (start + timedelta(days=60))
+    except OverflowError as exc:
+        # 9999-12-31 + 60 días no existe: error del cliente, no un 500.
+        raise HTTPException(status_code=400, detail="Fecha fuera de rango") from exc
     try:
         result = await macro_calendar_service.get_macro_events(start, end)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (ValueError, OverflowError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc) or "Fecha fuera de rango") from exc
     offset = (page - 1) * page_size
     return {**result, "page": page, "page_size": page_size,
             "events": result["events"][offset:offset + page_size]}

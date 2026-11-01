@@ -37,19 +37,29 @@ const source = (relativePath: string): string => readFileSync(join(root, relativ
 describe('proyección de dividendos: ausente no es cero', () => {
   it('la vista usa formatMoney con su fallback N/D, sin ?? 0 en importes', () => {
     const view = source('components/portfolio/PortfolioDividends.tsx');
-    assert.ok(view.includes("from '@/lib/format'"), 'debe formatear con lib/format');
+    assert.ok(view.includes("from '@/lib/format'"), 'formatea con los helpers ligados al locale');
     assert.ok(!/\?\?\s*0(?![\d.])/.test(view), 'un importe ausente no puede volverse 0');
-    assert.ok(view.includes("'N/D'"), 'los importes sin cobertura se pintan N/D');
+    // i18n: N/D vive en common.na del diccionario.
+    assert.ok(view.includes("ti('common.na')"), 'los importes sin cobertura referencian common.na');
+    const commonEs = JSON.parse(source('lib/i18n/messages/es/common.json'));
+    assert.equal(commonEs.na, 'N/D', 'el N/D es el del diccionario es');
   });
 
   it('el tipo declara los campos fiscales como number | null', () => {
+    // Los tipos del front son alias del OpenAPI generado (response_model en
+    // el backend): la declaracion vive en openapi.generated.ts.
     const actions = source('lib/actions/portfolio.actions.ts');
-    const declared = /export type DividendProjectionFiscalYear = \{[\s\S]*?\n\};/.exec(actions);
-    assert.ok(declared, 'debe existir DividendProjectionFiscalYear');
+    assert.ok(
+      actions.includes("export type DividendProjectionFiscalYear = components['schemas']['DividendProjectionFiscalYearOut'];"),
+      'DividendProjectionFiscalYear es el alias del tipo generado',
+    );
+    const generated = source('lib/research/openapi.generated.ts');
+    const declared = /DividendProjectionFiscalYearOut: \{[\s\S]*?\n        \};/.exec(generated);
+    assert.ok(declared, 'debe existir DividendProjectionFiscalYearOut en el OpenAPI generado');
     for (const key of ['gross_base', 'irpf_scenario', 'net_scenario', 'cuota_pendiente_estimada']) {
       assert.ok(
         new RegExp(`${key}: number \\| null;`).test(declared[0]),
-        `DividendProjectionFiscalYear debe declarar ${key}: number | null`,
+        `DividendProjectionFiscalYearOut debe declarar ${key}: number | null`,
       );
     }
   });
@@ -58,22 +68,28 @@ describe('proyección de dividendos: ausente no es cero', () => {
     const view = source('components/portfolio/PortfolioDividends.tsx');
     // La etiqueta INFERIDO ya no se pinta en la UI (decisión del dueño, 17 oct): el payload la conserva.
     assert.equal(view.includes('{projection.label}'), false, 'sin etiqueta «inferido» visible');
-    const actions = source('lib/actions/portfolio.actions.ts');
-    assert.ok(actions.includes('label: string;'), 'el tipo conserva la etiqueta del backend');
+    const generated = source('lib/research/openapi.generated.ts');
+    const projection = /PortfolioDividendProjectionOut: \{[\s\S]*?\n        \};/.exec(generated);
+    assert.ok(projection && /label: string;/.test(projection[0]), 'el tipo generado conserva la etiqueta del backend');
   });
 
   it('las posiciones excluidas se nombran, no se agregan en silencio', () => {
     const view = source('components/portfolio/PortfolioDividends.tsx');
     assert.ok(view.includes('excluded_tickers'), 'las excluidas del mes/año se listan');
-    assert.ok(view.includes('sin datos, no cero'), 'la exclusión se explica como ausencia, no como cero');
+    // i18n: el sufijo vive en messages/es/portfolio.json.
+    const divEs = JSON.parse(source('lib/i18n/messages/es/portfolio.json'));
+    assert.ok(divEs.dividends.subsetSuffix.includes('sin datos, no cero'), 'la exclusión se explica como ausencia, no como cero');
+    assert.ok(view.includes('portfolio.dividends.subsetSuffix'), 'la vista referencia el sufijo');
   });
 
   it('el aviso INFERIDO y las condiciones fiscales son accesibles desde la vista', () => {
     const view = source('components/portfolio/PortfolioDividends.tsx');
     // La vista no pinta un bloque largo de método: la procedencia INFERIDO
     // y el carácter de escenario van en un aviso breve junto al bruto.
-    assert.ok(view.includes('INFERIDO: réplica de los dividendos de los últimos 12 meses'), 'aviso INFERIDO visible junto al bruto');
-    assert.ok(view.includes('no el neto final'), 'el escenario fiscal se declara como no definitivo junto a las cifras');
+    const divEs2 = JSON.parse(source('lib/i18n/messages/es/portfolio.json'));
+    assert.ok(divEs2.dividends.grossInferredNote.includes('INFERIDO: réplica de los dividendos de los últimos 12 meses'), 'aviso INFERIDO visible junto al bruto');
+    assert.ok(divEs2.dividends.grossInferredNote.includes('no el neto final'), 'el escenario fiscal se declara como no definitivo junto a las cifras');
+    assert.ok(view.includes('portfolio.dividends.grossInferredNote'), 'la vista referencia el aviso');
     assert.equal(view.includes('projection.method'), false, 'el párrafo largo de método ya no se pinta');
     assert.ok(view.includes('projection.fiscal_conditions'), 'las condiciones del escenario son visibles');
     assert.ok(view.includes('projection.sources'), 'las fuentes son enlazables');

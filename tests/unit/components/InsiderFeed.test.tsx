@@ -100,7 +100,7 @@ describe('InsiderFeed', () => {
         expect(within(rows[1]).getByText('3 tramos · precio medio')).toBeInTheDocument();
         expect(within(rows[1]).getByText('Plan 10b5-1')).toBeInTheDocument();
         expect(within(rows[2]).getByText('PDMR (Reino Unido)')).toBeInTheDocument();
-        expect(within(rows[3]).getByText('Canadá · fuente no oficial (Yahoo)')).toBeInTheDocument();
+        expect(within(rows[3]).getByText('Canadá · fuente no oficial')).toBeInTheDocument();
         expect(within(rows[3]).getByText('Divisa no informada')).toBeInTheDocument();
         expect(within(rows[4]).getAllByText('—').length).toBeGreaterThan(0);
         // la tarjeta móvil repite lo mismo

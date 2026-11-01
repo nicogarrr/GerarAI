@@ -1,7 +1,6 @@
 import time
 from uuid import uuid4
 
-from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
 import main
@@ -9,7 +8,7 @@ from app.core import auth as auth_module
 from app.core.database import SessionLocal, init_db
 from app.models import Tenant, WatchItem
 from app.seed import seed
-from tests.auth_helpers import auth_settings, signed_request
+from tests.auth_helpers import auth_settings, csrf_client, signed_request
 
 
 def _cleanup(watch_symbols: list[str], tenant_external_ids: list[str] | None = None) -> None:
@@ -36,7 +35,7 @@ def test_watchlist_crud_and_deduplication():
     init_db()
     symbols = ["MSFT", "AAPL", "WLTEST", "WLTEST2"]
     _cleanup(symbols)
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
 
     created = client.post(
         "/api/watchlist", json={"symbol": "msft", "company": "Microsoft"}
@@ -100,7 +99,7 @@ def test_watchlist_is_isolated_per_tenant(monkeypatch):
     suffix = uuid4().hex[:8]
     tenant_a = f"watch-a-{suffix}"
     tenant_b = f"watch-b-{suffix}"
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
 
     try:
         unauthorized = client.get("/api/watchlist")
@@ -153,7 +152,7 @@ def test_watchlist_concurrent_add_returns_existing_row_not_500(monkeypatch):
     )
     suffix = uuid4().hex[:8]
     tenant, user = f"watch-race-{suffix}", f"user-race-{suffix}"
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
 
     def post(body):
         return signed_request(client, secret, tenant, user, "POST", "/api/watchlist", json_body=body)
@@ -191,7 +190,7 @@ def test_watchlist_same_instant_adds_have_stable_order():
     init_db()
     symbols = ["WLTIE1", "WLTIE2", "WLTIE3"]
     _cleanup(symbols)
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
     try:
         for sym in symbols:
             assert client.post("/api/watchlist", json={"symbol": sym}).status_code == 201
@@ -210,6 +209,6 @@ def test_watchlist_same_instant_adds_have_stable_order():
 def test_watchlist_delete_missing_is_spanish_404():
     init_db()
     _cleanup(["WLNONE"])
-    missing = TestClient(main.app).delete("/api/watchlist/WLNONE")
+    missing = csrf_client(main.app).delete("/api/watchlist/WLNONE")
     assert missing.status_code == 404
     assert missing.json()["detail"] == "Ese ticker no está en tu watchlist"

@@ -15,7 +15,11 @@ import httpx
 from app.core.config import get_settings
 from app.services.connectors import sec_edgar
 from app.services.connectors.base import ConnectorItem, ConnectorResult, retry_after_seconds
+from app.services.data_source_health import get_data_source_registry
 from app.services.sec_ticker import CikIndex
+
+# Clave compartida con connectors/sec_edgar.py: mismo proveedor, mismo circuito.
+_REGISTRY_KEY = "sec_edgar"
 
 logger = logging.getLogger(__name__)
 
@@ -154,9 +158,7 @@ class SECClient:
         # MISMA URL y compartirlos entre casos los contaminaria. Se puede
         # forzar con use_cache=True/False.
         self.use_cache = (client is None) if use_cache is None else use_cache
-        self.max_retries = (
-            int(self.settings.sec_max_retries) if max_retries is None else max(0, max_retries)
-        )
+        self.max_retries = int(self.settings.sec_max_retries) if max_retries is None else max(0, max_retries)
         self._minimum_interval = 1 / max(0.1, min(requests_per_second, 10))
         # Ultimo payload de submissions servido a ESTA instancia: las vistas del
         # indice (anclas anuales, accessions listados) se derivan de la MISMA
@@ -218,7 +220,9 @@ class SECClient:
                 continue
             if response.status_code in _RETRYABLE_STATUS and attempt < max_retries:
                 wait = retry_after_seconds(response, cap=_BACKOFF_CAP_SECONDS) or delay
-                logger.warning("SEC %s en %s, reintento %d en %.1fs", response.status_code, url, attempt + 1, wait)
+                logger.warning(
+                    "SEC %s en %s, reintento %d en %.1fs", response.status_code, url, attempt + 1, wait
+                )
                 await asyncio.sleep(min(wait, _BACKOFF_CAP_SECONDS))
                 delay *= 2
                 continue
@@ -254,17 +258,41 @@ class SECClient:
         return copy.deepcopy(await asyncio.shield(task))
 
     async def _fetch_json(self, url: str) -> dict:
+        registry = get_data_source_registry()
+        started = time.perf_counter()
         try:
             payload = (await self._get(url)).json()
             if self.use_cache:
                 _cache_put(url, payload, float(self.settings.sec_cache_ttl_seconds))
+            registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
             return payload
         except httpx.HTTPStatusError as exc:
             # La SEC bloquea IPs de datacenter con 403: el mirror HF sirve el
             # mismo JSON oficial. Un 404 de la SEC es un fallo de DATO y
             # nunca se enmascara como fallo de transporte.
             if exc.response is not None and exc.response.status_code in {401, 403}:
-                return await sec_edgar.mirror_get_json(url, direct_error=exc)
+                try:
+                    mirrored = await sec_edgar.mirror_get_json(url, direct_error=exc)
+                except Exception as mirror_exc:
+                    registry.record_failure(
+                        _REGISTRY_KEY,
+                        f"HTTP {exc.response.status_code} (IP) y mirror fallo: {type(mirror_exc).__name__}",
+                    )
+                    raise
+                # El fallback declarado (hf_snapshot) sirvio el dato.
+                registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+                return mirrored
+            if exc.response is not None and exc.response.status_code in (400, 404):
+                # Documento/CIK inexistente: dato por emisor, no fuente caida.
+                raise
+            status = exc.response.status_code if exc.response is not None else "desconocido"
+            registry.record_failure(_REGISTRY_KEY, f"HTTP {status}")
+            raise
+        except httpx.TransportError as exc:
+            registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+            raise
+        except ValueError:
+            registry.record_failure(_REGISTRY_KEY, "respuesta no JSON")
             raise
 
     async def ticker_map(self) -> dict:
@@ -360,9 +388,7 @@ class SECClient:
                 break
         if not filings:
             raise RuntimeError(f"EFTS sin filings para CIK{padded}")
-        ordered = sorted(
-            filings.items(), key=lambda kv: kv[1].get("filingDate") or "", reverse=True
-        )
+        ordered = sorted(filings.items(), key=lambda kv: kv[1].get("filingDate") or "", reverse=True)
         recent = {
             "accessionNumber": [a for a, _ in ordered],
             "form": [v["form"] for _, v in ordered],
@@ -407,9 +433,7 @@ class SECClient:
                 form = str(forms[index]) if index < len(forms) else ""
                 if form not in ANNUAL_REPORT_FORMS:
                     continue
-                report_date = (
-                    str(report_dates[index]) if index < len(report_dates) else ""
-                )
+                report_date = str(report_dates[index]) if index < len(report_dates) else ""
                 if accession and report_date:
                     anchors[str(accession)] = report_date
 
@@ -545,11 +569,7 @@ class SECClient:
                             # texto completo son lo unico veraz que mostrar.
                             "items": self._column(recent, "items", index),
                             "is_inline_xbrl": self._column(recent, "isInlineXBRL", index),
-                            **(
-                                {"source_fallback": fallback, "partial_coverage": True}
-                                if fallback
-                                else {}
-                            ),
+                            **({"source_fallback": fallback, "partial_coverage": True} if fallback else {}),
                         },
                     )
                 )
@@ -612,4 +632,3 @@ class SECClient:
             return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=UTC)
         except ValueError:
             return None
-

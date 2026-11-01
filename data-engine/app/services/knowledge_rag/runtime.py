@@ -34,11 +34,17 @@ def chunk_config(s: Settings) -> ChunkConfig:
     )
 
 
-def make_store(s: Settings) -> KnowledgeStore:
+@lru_cache(maxsize=4)
+def _qdrant_client(url: str):
+    """Cached Qdrant client to enable connection pooling."""
     from qdrant_client import QdrantClient
 
+    return QdrantClient(url=url)
+
+
+def make_store(s: Settings) -> KnowledgeStore:
     return KnowledgeStore(
-        QdrantClient(url=s.qdrant_url), s.knowledge_rag_collection, dims=s.knowledge_rag_dense_dims
+        _qdrant_client(s.qdrant_url), s.knowledge_rag_collection, dims=s.knowledge_rag_dense_dims
     )
 
 

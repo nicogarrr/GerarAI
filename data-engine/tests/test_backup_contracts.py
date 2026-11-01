@@ -20,6 +20,7 @@ en cada push, `.github/workflows/restore-drill.yml`.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -43,6 +44,7 @@ RUNBOOK = BACKUP_DIR / "RUNBOOK.md"
 README = BACKUP_DIR / "README.md"
 DRILL = BACKUP_DIR / "disaster_drill.py"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "restore-drill.yml"
+CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 
@@ -702,6 +704,56 @@ def test_workflow_instala_congelado_desde_uv_lock_y_lo_cachea():
     assert "pip install" not in text
 
 
+def test_workflow_ejecuta_el_drill_reproducible():
+    """El script del drill (local/VM) se verifica en CI: un drill que nadie
+    ejecuta se rompe en silencio (auditoria 2026-10-31)."""
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "scripts.backup.disaster_drill" in text
+
+
+def test_block_on_main_exige_los_dos_drills():
+    try:
+        import yaml
+    except ImportError:
+        pytest.skip("PyYAML no instalado en este entorno")
+    data = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    block = data["jobs"]["block-on-main"]
+    necesita = block["needs"]
+    if isinstance(necesita, str):
+        necesita = [necesita]
+    assert "restore-drill" in necesita and "drill-script" in necesita
+    pasos = json.dumps(block["steps"])
+    assert "needs.restore-drill.result" in pasos
+    assert "needs.drill-script.result" in pasos
+
+
+def test_el_workflow_construye_la_imagen_minio_fijada_para_el_drill():
+    """El drill reproducible levanta el pin de _kit.MINIO_IMAGE (la imagen de
+    produccion, compilada desde docker/minio): el workflow la construye en el
+    runner, no la sustituye por otra de registro. La familia bitnamilegacy no
+    acepta el comando `server ...` de la imagen oficial (medido 2026-10-31, job
+    124386414236: contenedor muerto y espera de 300 s)."""
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "docker build" in text and "docker/minio" in text
+    assert "MINIO_IMAGE" in text, "el tag tiene que salir de _kit, no de una copia a mano"
+
+
+def test_el_drill_reproducible_acepta_override_de_registro_minio():
+    """La opcion --minio-image sigue existiendo para hosts donde el build no
+    es posible; el parser no la puede perder."""
+    mod = __import__("scripts.backup.disaster_drill", fromlist=["build_parser"])
+    args = mod.build_parser().parse_args(["--minio-image", "bitnamilegacy/minio:2025.7.23-debian-12-r5"])
+    assert args.minio_image == "bitnamilegacy/minio:2025.7.23-debian-12-r5"
+
+
+def test_el_drill_falla_con_diagnostico_de_contenedores():
+    """Un timeout de espera sin el log del contenedor es un fallo mudo: el
+    drill vuelca estado y ultimas lineas de cada servicio que no arranco."""
+    source = DRILL.read_text(encoding="utf-8")
+    assert "_diagnostico_contenedores" in source
+    assert '"logs"' in source and '"inspect"' in source
+
+
 def test_workflow_es_yaml_valido():
     try:
         import yaml
@@ -722,3 +774,40 @@ def test_exec_permission_denied_fails_closed_with_reason(monkeypatch):
     monkeypatch.setattr(_kit.subprocess, "run", denied)
     with pytest.raises(FailClosedError, match="no ejecutable"):
         _kit.run(["synthetic-command"], what="prueba")
+
+
+# --------------------------------------------------------------------------
+# Alcance del lint en el drill vs cobertura repo-wide en ci.yml
+# --------------------------------------------------------------------------
+
+
+def test_drill_lint_acotado_a_los_scripts_del_drill():
+    """El paso de lint del drill revisa SOLO scripts/backup y scripts/restore.
+
+    El lint de todo data-engine ya corre en el job backend-lint de ci.yml en
+    cada PR y push a main. Un `ruff check .` repo-wide dentro del drill
+    convertia errores de lint ajenos (acumulados en main por merges sin
+    esperar CI) en un drill rojo: una alarma falsa sobre los backups. Si
+    alguien vuelve a ampliarlo, este test lo detecta.
+    """
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "ruff check scripts/backup scripts/restore" in text, (
+        "el paso de lint del drill debe estar acotado a los scripts del drill"
+    )
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("run:") and "ruff" in stripped:
+            assert "check ." not in stripped, (
+                "el drill no debe volver a hacer `ruff check .` repo-wide: "
+                "eso ya lo cubre backend-lint en ci.yml"
+            )
+
+
+def test_ci_yml_mantiene_el_lint_repowide_que_cubre_el_resto():
+    """Si el drill va acotado, la cobertura repo-wide tiene que existir en
+    ci.yml; sin ella, estrechar el drill dejaria modulos sin lint."""
+    text = CI_WORKFLOW.read_text(encoding="utf-8")
+    assert "ruff check ." in text, (
+        "ci.yml debe mantener un job con `ruff check .` sobre data-engine "
+        "(hoy backend-lint): es la cobertura que permite acotar el drill"
+    )

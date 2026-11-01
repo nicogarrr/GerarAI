@@ -40,12 +40,23 @@ test('actions preserve structured endpoint copy instead of guessing from substri
     const errorState = globalThis as typeof globalThis & { __authBoundaryEndpointError?: Error };
     for (const [code, message, status] of [
         ['AUTH_ENDPOINT_USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL', 'Este email ya está registrado. Inicia sesión.', 422],
+        ['AUTH_ENDPOINT_ACCOUNT_PENDING', 'Tu cuenta está pendiente de aprobación.', 403],
+        ['AUTH_ENDPOINT_ACCOUNT_REJECTED', 'Tu solicitud de acceso no ha sido aprobada.', 403],
         ['AUTH_ENDPOINT_PASSWORD_TOO_SHORT', 'La contraseña debe tener al menos 8 caracteres.', 400],
         ['AUTH_ENDPOINT_ERROR', 'Demasiados intentos. Espera un momento antes de volver a intentarlo.', 429],
         ['AUTH_UNAVAILABLE', 'El servicio de acceso no está disponible. Inténtalo más tarde.', 503],
     ] as const) {
         errorState.__authBoundaryEndpointError = new AppError(message, code, status);
-        assert.deepEqual(await signInWithEmail(credentials), { success: false, error: message });
+        // El formulario necesita `code` SOLO para abrir la pantalla de cuenta
+        // pendiente/rechazada en lugar del toast generico; el resto de errores
+        // mantiene la forma exacta de siempre (sin `code`).
+        const expectsCode = code === 'AUTH_ENDPOINT_ACCOUNT_PENDING' || code === 'AUTH_ENDPOINT_ACCOUNT_REJECTED';
+        const expectedSignIn: Record<string, unknown> = { success: false, error: message };
+        if (expectsCode) {
+            // Codigo estable hacia el front (no el crudo AUTH_ENDPOINT_*).
+            expectedSignIn.code = code === 'AUTH_ENDPOINT_ACCOUNT_PENDING' ? 'ACCOUNT_PENDING' : 'ACCOUNT_REJECTED';
+        }
+        assert.deepEqual(await signInWithEmail(credentials), expectedSignIn);
         assert.deepEqual(await signUpWithEmail({ ...credentials, fullName: 'Synthetic', country: 'ES', investmentGoals: 'Growth', riskTolerance: 'Medium', preferredIndustry: 'Technology', acceptTerms: true }), { success: false, error: message });
     }
     delete errorState.__authBoundaryEndpointError;

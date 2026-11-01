@@ -94,6 +94,10 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "es": "Sin cotización disponible",
         "en": "No quote available",
     },
+    "quotes_batch_too_large": {
+        "es": "Demasiados símbolos en el lote (máx. 30)",
+        "en": "Too many symbols in the batch (max 30)",
+    },
     "proposal_not_found": {
         "es": "Propuesta no encontrada",
         "en": "Proposal not found",

@@ -6,17 +6,22 @@ import ast
 import logging
 import operator
 import re
+import threading
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal, DecimalException
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
-from app.core.errors import redact_secrets
+_METRIC_COVERAGE_CACHE: dict[int, tuple[float, list[str]]] = {}
+_METRIC_COVERAGE_LOCK = threading.Lock()
+_METRIC_COVERAGE_TTL_SECONDS = 600.0
 from app.core.tenancy import tenant_filters
 from app.models import (
     CalculatedMetric,
@@ -49,6 +54,9 @@ class MissingVariables(ValueError):
     def __init__(self, names: set[str]) -> None:
         self.names = names
         super().__init__(f"Missing variables: {', '.join(sorted(names))}")
+
+
+CRITERION_UNEVALUABLE_REASON = "No se puede evaluar la fórmula con estos valores"
 
 
 class SafeFormula:
@@ -207,6 +215,39 @@ class CustomMetricService:
         )
 
 
+def _distinct_facts_metrics(db: Session) -> list[str]:
+    """Metricas de facts con datos, sin barrer la porcion del tenant.
+
+    El distinct ORM leia todas las filas de facts del tenant (medido 150 ms
+    caliente en el laboratorio con 1M filas/tenant; en prod, parte del coste
+    en frio de 15-18 s de metric-coverage). Hay ~decenas de metricas: la CTE
+    recursiva salta duplicados con una sonda por metrica sobre
+    ix_facts_tenant_metric (0122). Portable (subconsulta escalar, sin
+    LATERAL); mismo conjunto exacto que el distinct. Medido: 150 ms -> 4 ms.
+    """
+    tenant_id = db.info.get("tenant_id")
+    if tenant_id is None:
+        # Dev/test legado sin contexto: mismo resultado por la via ORM.
+        return list(
+            db.scalars(
+                select(FinancialFact.metric).where(*tenant_filters(db, FinancialFact)).distinct()
+            ).all()
+        )
+    # nosemgrep: gerarai-tenant-raw-sql -- ambas lecturas filtran tenant_id=:tenant; bind desde db.info, aislamiento probado en test_cold_endpoints_skip_scan.
+    sql = sa.text("""
+        WITH RECURSIVE m(metric) AS (
+          SELECT * FROM (SELECT metric FROM financial_facts WHERE tenant_id = :tenant ORDER BY metric LIMIT 1)
+          UNION ALL
+          SELECT (SELECT t2.metric FROM financial_facts t2
+                  WHERE t2.tenant_id = :tenant AND t2.metric > m.metric
+                  ORDER BY t2.metric LIMIT 1)
+          FROM m WHERE m.metric IS NOT NULL
+        )
+        SELECT metric FROM m WHERE metric IS NOT NULL
+    """)
+    return [row[0] for row in db.execute(sql, {"tenant": tenant_id}).all()]
+
+
 class ScreenerService:
     def create_screen(
         self,
@@ -247,9 +288,7 @@ class ScreenerService:
         db.refresh(screen)
         return screen
 
-    def claim_screen_name(
-        self, db: Session, name: str, *, exclude_id: int | None = None
-    ) -> str:
+    def claim_screen_name(self, db: Session, name: str, *, exclude_id: int | None = None) -> str:
         """Valida y reserva ``name`` para un filtro activo del tenant.
 
         ``uq_saved_screen_tenant_name`` cubre también los filtros archivados
@@ -261,9 +300,7 @@ class ScreenerService:
         if not clean:
             raise ValueError("El nombre no puede estar vacío")
         holders = db.scalars(
-            select(SavedScreen).where(
-                SavedScreen.name == clean, *tenant_filters(db, SavedScreen)
-            )
+            select(SavedScreen).where(SavedScreen.name == clean, *tenant_filters(db, SavedScreen))
         ).all()
         for holder in holders:
             if holder.id == exclude_id:
@@ -283,7 +320,25 @@ class ScreenerService:
         missing it" outcome, so offering it in the datalist sets the user up
         to fail. Mirrors what run() tracks as names_with_data: calculated
         metrics with a value plus raw financial facts.
+
+        Tres agregaciones (calculated metrics, facts, contexto) sobre tablas
+        grandes: en frio tarda >15 s en prod (medido 15,8 s). Se cachea por
+        tenant unos minutos: las sugerencias del datalist no necesitan
+        frescura en tiempo real.
         """
+        tenant = db.info.get("tenant_id")
+        with _METRIC_COVERAGE_LOCK:
+            cached = _METRIC_COVERAGE_CACHE.get(tenant)
+            if cached and time.monotonic() - cached[0] < _METRIC_COVERAGE_TTL_SECONDS:
+                return list(cached[1])
+        result = self._metric_coverage_uncached(db)
+        with _METRIC_COVERAGE_LOCK:
+            if len(_METRIC_COVERAGE_CACHE) > 128:
+                _METRIC_COVERAGE_CACHE.clear()
+            _METRIC_COVERAGE_CACHE[tenant] = (time.monotonic(), result)
+        return list(result)
+
+    def _metric_coverage_uncached(self, db: Session) -> list[str]:
         calculated = set(
             db.scalars(
                 select(CalculatedMetric.metric)
@@ -295,13 +350,7 @@ class ScreenerService:
                 .distinct()
             ).all()
         )
-        facts = set(
-            db.scalars(
-                select(FinancialFact.metric)
-                .where(*tenant_filters(db, FinancialFact))
-                .distinct()
-            ).all()
-        )
+        facts = set(_distinct_facts_metrics(db))
         return sorted(calculated | facts | set(context_metrics_with_data(db)))
 
     def run_saved(self, db: Session, screen: SavedScreen) -> dict[str, Any]:
@@ -390,13 +439,36 @@ class ScreenerService:
         companies = list(db.scalars(select(Company).order_by(Company.ticker)).all())
         # Batch-fetch observations once: two queries per table instead of two
         # queries per company (2N -> 2 on every screener run).
-        calculated_by_company: dict[int, list[CalculatedMetric]] = {}
-        for row in db.scalars(
-            select(CalculatedMetric)
+        # Solo la ultima fila por (empresa, metrica) se usa (la primera en el
+        # orden fiscal_year DESC NULLS LAST, id DESC): row_number con ese mismo
+        # orden y rn = 1 la acota en SQL. Antes se leian TODOS los años y
+        # periodos de TODAS las metricas calculadas en cada corrida del
+        # screener (y de cada saved screen en cada market refresh).
+        ranked_calculated = (
+            select(
+                CalculatedMetric.id.label("id"),
+                func.row_number()
+                .over(
+                    partition_by=(CalculatedMetric.company_id, CalculatedMetric.metric),
+                    order_by=(
+                        CalculatedMetric.fiscal_year.desc().nullslast(),
+                        desc(CalculatedMetric.id),
+                    ),
+                )
+                .label("rn"),
+            )
             .where(
                 CalculatedMetric.value.is_not(None),
                 CalculatedMetric.status == "ok",
+                *tenant_filters(db, CalculatedMetric),
             )
+            .subquery("bounded_calculated_metrics")
+        )
+        calculated_by_company: dict[int, list[CalculatedMetric]] = {}
+        for row in db.scalars(
+            select(CalculatedMetric)
+            .join(ranked_calculated, ranked_calculated.c.id == CalculatedMetric.id)
+            .where(ranked_calculated.c.rn == 1)
             .order_by(
                 CalculatedMetric.company_id,
                 CalculatedMetric.metric,
@@ -405,9 +477,7 @@ class ScreenerService:
             )
         ).all():
             calculated_by_company.setdefault(row.company_id, []).append(row)
-        facts_by_company = self._facts_by_company(
-            db, self._required_fact_metrics(used_names, definitions)
-        )
+        facts_by_company = self._facts_by_company(db, self._required_fact_metrics(used_names, definitions))
         # Valoracion, tesis y nivel DCA como nombres del screener (tambien
         # dentro de metricas personalizadas). Solo se leen si se usan.
         context_names = set(used_names)
@@ -465,12 +535,21 @@ class ScreenerService:
                     # POST /api/portfolio/refresh-market after prices, FX,
                     # revaluation and the snapshot had already been committed).
                     unevaluable_criteria.add(criterion["left"])
+                    # py/stack-trace-exposure (alerta 216): la razon publica es
+                    # constante y el detalle de la excepcion va al log del
+                    # servidor, nunca a la respuesta.
+                    logger.warning(
+                        "screener criterion %s unevaluable for company_id=%s: %s",
+                        criterion["left"],
+                        company.id,
+                        exc,
+                    )
                     criterion_results.append(
                         {
                             **criterion,
                             "passed": False,
                             "status": "unevaluable",
-                            "error": redact_secrets(str(exc)),
+                            "error": CRITERION_UNEVALUABLE_REASON,
                         }
                     )
             rank_value = None
@@ -479,9 +558,7 @@ class ScreenerService:
                 try:
                     rank_value = ranking.evaluate(values)
                 except MissingVariables as exc:
-                    ranking_missing.update(
-                        self._expand_missing(exc.names, definitions, values)
-                    )
+                    ranking_missing.update(self._expand_missing(exc.names, definitions, values))
                 except ValueError as exc:
                     # Same isolation as the criteria: an unrankable company keeps
                     # its result row and simply sorts on the `rank_value is None`
@@ -509,9 +586,7 @@ class ScreenerService:
                 "name": company.name,
                 "matched": not criteria_missing and all(item["passed"] for item in criterion_results),
                 "rank_value": str(rank_value) if rank_value is not None else None,
-                "coverage_percent": round(100 * len(available) / len(used_names), 1)
-                if used_names
-                else 100.0,
+                "coverage_percent": round(100 * len(available) / len(used_names), 1) if used_names else 100.0,
                 "confidence": str(sum(confidence_values, Decimal("0")) / len(confidence_values))
                 if confidence_values
                 else "0",
@@ -549,9 +624,7 @@ class ScreenerService:
     # per metric is plenty of history while still bounding the read.
     MAX_FACTS_PER_METRIC = 60
 
-    def _facts_by_company(
-        self, db: Session, metrics: set[str]
-    ) -> dict[int, list[FinancialFact]]:
+    def _facts_by_company(self, db: Session, metrics: set[str]) -> dict[int, list[FinancialFact]]:
         """Financial facts for the metrics this screen references, bounded.
 
         Unfiltered, this read the WHOLE `financial_facts` table (every metric of
@@ -568,16 +641,23 @@ class ScreenerService:
         """
         if not metrics:
             return {}
+        # Single-pass: la ventana se calcula sobre las filas que ya cumplen
+        # metric/tenant y se filtra por rn en la MISMA consulta. La forma
+        # anterior (subconsulta de ids + join de vuelta por id) leia la tabla
+        # entera del tenant para reencontrar ~7k filas por id (MEDIDO en el
+        # laboratorio 0120: 43,5 ms -> 5,9 ms con conjunto de filas identico).
         ranked = (
             select(
-                FinancialFact.id.label("id"),
-                func.row_number().over(
+                FinancialFact,
+                func.row_number()
+                .over(
                     partition_by=(FinancialFact.company_id, FinancialFact.metric),
                     order_by=(
                         FinancialFact.fiscal_year.desc().nullslast(),
                         desc(FinancialFact.id),
                     ),
-                ).label("rn"),
+                )
+                .label("rn"),
             )
             .where(
                 FinancialFact.metric.in_(sorted(metrics)),
@@ -585,24 +665,22 @@ class ScreenerService:
             )
             .subquery("bounded_financial_facts")
         )
+        bounded_fact = aliased(FinancialFact, ranked)
         facts_by_company: dict[int, list[FinancialFact]] = {}
         for fact in db.scalars(
-            select(FinancialFact)
-            .join(ranked, ranked.c.id == FinancialFact.id)
+            select(bounded_fact)
             .where(ranked.c.rn <= self.MAX_FACTS_PER_METRIC)
             .order_by(
-                FinancialFact.company_id,
-                FinancialFact.metric,
-                FinancialFact.fiscal_year.desc().nullslast(),
-                desc(FinancialFact.id),
+                bounded_fact.company_id,
+                bounded_fact.metric,
+                bounded_fact.fiscal_year.desc().nullslast(),
+                desc(bounded_fact.id),
             )
         ).all():
             facts_by_company.setdefault(fact.company_id, []).append(fact)
         return facts_by_company
 
-    def _required_fact_metrics(
-        self, names: set[str], definitions: list[CustomMetricDefinition]
-    ) -> set[str]:
+    def _required_fact_metrics(self, names: set[str], definitions: list[CustomMetricDefinition]) -> set[str]:
         """Fact metrics behind the names a screen references.
 
         Walks the same graph the observations do: a `*_cagr` name needs its base
@@ -857,9 +935,7 @@ class ScreenerService:
                     # data (division by zero, non-finite) is left unobserved, so
                     # the screen reports it as missing instead of the whole run
                     # raising out of here.
-                    logger.warning(
-                        "custom metric %s unevaluable: %s", definition.metric_key, exc
-                    )
+                    logger.warning("custom metric %s unevaluable: %s", definition.metric_key, exc)
                     continue
                 dependencies = [observations[name] for name in formula.names]
                 observations[definition.metric_key] = Observation(

@@ -1,4 +1,7 @@
 import { AlertTriangle } from 'lucide-react';
+import { getLocale, getT } from '@/lib/i18n/server';
+import type { Locale } from '@/lib/i18n/locale';
+import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 import Link from 'next/link';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { TickerContextBadges } from '@/components/common/TickerContextBadges';
@@ -11,11 +14,11 @@ import { NewsSecondOrder } from '@/components/research/NewsSecondOrder';
 import { etiquetaDireccionImpacto, etiquetaTemaMacro, etiquetaTierFuente, etiquetaTipoEvento } from "@/lib/labels";
 
 const CARRILES = [
-  { key: null, label: 'Todas' },
-  { key: 'para-ti', label: 'Para ti' },
-  { key: 'empresa', label: 'Empresas' },
-  { key: 'gobierno', label: 'Gobierno' },
-  { key: 'macro', label: 'Macro' },
+  { key: null, labelKey: 'research.flow.lane.all' },
+  { key: 'para-ti', labelKey: 'research.flow.lane.forYou' },
+  { key: 'empresa', labelKey: 'research.flow.lane.companies' },
+  { key: 'gobierno', labelKey: 'research.flow.lane.government' },
+  { key: 'macro', labelKey: 'research.flow.lane.macro' },
 ] as const;
 
 function carrilHref(lane: NewsLane, ticker?: string | null): string {
@@ -48,21 +51,21 @@ function newsPageHref(lane: NewsLane, page: number, ticker?: string | null): str
   return text ? `/research/news?${text}` : '/research/news';
 }
 
-function NewsPager({label,lane,page,hasMore,ticker,inFicha}:{label:string;lane:NewsLane;page:number;hasMore:boolean;ticker?:string|null;inFicha?:boolean}){
+function NewsPager({label,lane,page,hasMore,ticker,inFicha,t}:{label:string;lane:NewsLane;page:number;hasMore:boolean;ticker?:string|null;inFicha?:boolean;t:TranslateFn}){
  const href = (target: number) =>
    inFicha && ticker ? fichaNewsPageHref(ticker, target) : newsPageHref(lane, target, ticker);
  return (
         <nav aria-label={label} className="mt-4 flex items-center justify-between gap-4">
           {page > 1 ? (
-            <Link className={PAGER_LINK} href={href(page - 1)} rel="prev">← Anterior</Link>
+            <Link className={PAGER_LINK} href={href(page - 1)} rel="prev">{t('research.flow.previous')}</Link>
           ) : (
-            <span aria-disabled="true" className={PAGER_OFF}>← Anterior</span>
+            <span aria-disabled="true" className={PAGER_OFF}>{t('research.flow.previous')}</span>
           )}
-          <span className="text-sm font-medium text-gray-400">Página {page}</span>
+          <span className="text-sm font-medium text-gray-400">{t('research.flow.pageN', { page })}</span>
           {hasMore ? (
-            <Link className={PAGER_LINK} href={href(page + 1)} rel="next">Siguiente →</Link>
+            <Link className={PAGER_LINK} href={href(page + 1)} rel="next">{t('research.flow.next')}</Link>
           ) : (
-            <span aria-disabled="true" className={PAGER_OFF}>Siguiente →</span>
+            <span aria-disabled="true" className={PAGER_OFF}>{t('research.flow.next')}</span>
           )}
         </nav>
  );
@@ -77,26 +80,28 @@ function NewsPager({label,lane,page,hasMore,ticker,inFicha}:{label:string;lane:N
 /** Fecha del evento; con hora solo si la fuente trae una hora real (no medianoche UTC por defecto).
  *  El día sin hora se pinta en es-ES con formatUserDate (día de calendario literal, sin
  *  desplazamiento por zona); antes se devolvía el ISO crudo («2026-10-27»). */
-export function eventDateText(value: string): string {
+export function eventDateText(value: string, locale: Locale = 'es'): string {
   const day = value.split('T')[0];
   const match = /T(\d{2}:\d{2})/.exec(value);
-  if (!match || match[1] === '00:00') return formatUserDate(day);
-  const formatted = formatUserDateTime(value);
-  return formatted === NA ? formatUserDate(day) : formatted;
+  if (!match || match[1] === '00:00') return formatUserDate(day, undefined, undefined, locale);
+  const formatted = formatUserDateTime(value, undefined, undefined, locale);
+  return formatted === NA ? formatUserDate(day, undefined, undefined, locale) : formatted;
 }
 
 /** Materialidad como indicador visual: barra proporcional + número, color por impacto. */
-function MaterialityIndicator({ score }: { score: number }) {
+function MaterialityIndicator({ score, t }: { score: number; t: TranslateFn }) {
   const clamped = Math.min(10, Math.max(0, score));
   const color =
     clamped >= 7 ? 'bg-red-400' : clamped >= 4 ? 'bg-amber-400' : 'bg-gray-600';
   const text =
     clamped >= 7 ? 'text-red-400' : clamped >= 4 ? 'text-amber-400' : 'text-gray-500';
+  const level = clamped >= 7 ? t('research.flow.levelHigh') : clamped >= 4 ? t('research.flow.levelMedium') : t('research.flow.levelLow');
+  const description = t('research.flow.materiality', { score, level });
   return (
     <span
       className="inline-flex items-center justify-center gap-2"
-      title={`Materialidad ${score} de 10: ${clamped >= 7 ? 'alta' : clamped >= 4 ? 'media' : 'baja'}`}
-      aria-label={`Materialidad ${score} de 10: ${clamped >= 7 ? 'alta' : clamped >= 4 ? 'media' : 'baja'}`}
+      title={description}
+      aria-label={description}
     >
       <span aria-hidden="true" className="h-1.5 w-10 overflow-hidden rounded-full bg-gray-800">
         <span className={`block h-full ${color}`} style={{ width: `${clamped * 10}%` }} />
@@ -119,27 +124,32 @@ const IMPACTO_ESTILO: Record<string, string> = {
 export function ImpactBadge({
   direction,
   eventType,
+  t = createTranslator('es'),
+  locale = 'es',
 }: {
   direction?: string | null;
   eventType?: string | null;
+  /** Traductor del locale activo; sin el, el badge pinta el español de siempre (llamadores sin getT). */
+  t?: TranslateFn;
+  locale?: Locale;
 }) {
   if (!direction) return null;
   const estilo = IMPACTO_ESTILO[direction] ?? 'bg-gray-800/60 text-gray-400';
-  const nota = 'Lectura automática del titular por reglas; no es un dato de la fuente.';
+  const nota = t('research.flow.impactNote');
   // Motivo en una línea: el tipo de evento casado por las reglas (dilución,
   // resultados…). «Noticia general» y «Desconocido» no explican nada: se
   // omiten en vez de añadir relleno.
   const motivo =
     eventType && eventType !== 'general_news' && eventType !== 'unknown'
-      ? etiquetaTipoEvento(eventType)
+      ? etiquetaTipoEvento(eventType, locale)
       : null;
   return (
     <span
-      aria-label={`Impacto ${etiquetaDireccionImpacto(direction)}${motivo ? `, motivo: ${motivo}` : ''}. ${nota}`}
+      aria-label={motivo ? t('research.flow.impactAriaReason', { impact: etiquetaDireccionImpacto(direction, locale), reason: motivo, note: nota }) : t('research.flow.impactAria', { impact: etiquetaDireccionImpacto(direction, locale), note: nota })}
       className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estilo}`}
       title={nota}
     >
-      {etiquetaDireccionImpacto(direction)}
+      {etiquetaDireccionImpacto(direction, locale)}
       {motivo ? ` · ${motivo}` : ''}
     </span>
   );
@@ -147,100 +157,75 @@ export function ImpactBadge({
 
 /** «N fuentes»: la misma historia la cubrieron varios medios y la portada la
  *  agrupa en una fila (PR story clusters). El detalle lista las fuentes. */
-function CoverageChip({ event }: { event: ResearchNewsEvent }) {
+function CoverageChip({ event, t }: { event: ResearchNewsEvent; t: TranslateFn }) {
   if (!event.coverage_count || event.coverage_count < 2) return null;
   return (
     <span
       className="rounded-full bg-teal-950/60 px-2 py-0.5 text-xs font-semibold text-teal-300"
-      title="La misma historia publicada por varios medios, agrupada"
+      title={t('research.flow.coverageTitle')}
     >
-      {event.coverage_count} fuentes
+      {t('research.flow.coverageSources', { count: event.coverage_count })}
     </span>
   );
 }
 
-/** Fuentes absorbidas por la agrupación de historia, dentro del detalle. */
-function CoverageDetail({ event }: { event: ResearchNewsEvent }) {
-  if (!event.coverage?.length) return null;
-  return (
-    <div className="mt-1 max-w-xs space-y-1 break-words rounded-md border border-gray-800 p-2">
-      <div className="font-medium">También lo cubrieron:</div>
-      <div className="space-y-0.5">
-        {event.coverage.map((item, idx) => (
-          <div key={`${item.url ?? item.source}-${idx}`}>
-            {item.url ? (
-              <a className="text-teal-300 hover:text-teal-200" href={item.url} rel="noreferrer" target="_blank">
-                {item.source || 'Fuente sin nombre'}
-              </a>
-            ) : (
-              <span>{item.source || 'Fuente sin nombre'}</span>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MacroChip({ event }: { event: ResearchNewsEvent }) {
+function MacroChip({ event, t, locale }: { event: ResearchNewsEvent; t: TranslateFn; locale: Locale }) {
   if (event.news_lane !== 'macro') return null;
   return (
     <span className="rounded-full bg-indigo-950/60 px-2 py-0.5 text-xs font-semibold text-indigo-300">
-      macro{event.macro_theme ? ` · ${etiquetaTemaMacro(event.macro_theme)}` : ''}
+      {t('research.flow.macroChip')}{event.macro_theme ? ` · ${etiquetaTemaMacro(event.macro_theme, locale)}` : ''}
     </span>
   );
 }
 
-function GobiernoChip({ event }: { event: ResearchNewsEvent }) {
+function GobiernoChip({ event, t }: { event: ResearchNewsEvent; t: TranslateFn }) {
   if (event.news_lane !== 'gobierno') return null;
   return (
     <span className="rounded-full bg-sky-950/60 px-2 py-0.5 text-xs font-semibold text-sky-300">
-      gobierno · oficial
+      {t('research.flow.governmentChip')}
     </span>
   );
 }
 
-function DateNotes({ event, inline = false }: { event: ResearchNewsEvent; inline?: boolean }) {
+function DateNotes({ event, t, inline = false }: { event: ResearchNewsEvent; t: TranslateFn; inline?: boolean }) {
   const className = inline ? 'text-gray-500' : 'mt-1 text-xs text-gray-500';
   const Tag = inline ? 'span' : 'div';
   const prefix = inline ? '· ' : '';
   return (
     <>
       {event.date_source === 'ingested_at_fallback' ? (
-        <Tag className={className}>{prefix}fecha de ingesta · la fuente no da fecha</Tag>
+        <Tag className={className}>{prefix}{t('research.flow.dateIngested')}</Tag>
       ) : null}
       {event.date_source === 'gdelt_first_seen' ? (
-        <Tag className={className} title="Fecha de primera detección en GDELT, no de publicación">{prefix}vía GDELT</Tag>
+        <Tag className={className} title={t('research.flow.dateGdeltTitle')}>{prefix}{t('research.flow.dateGdelt')}</Tag>
       ) : null}
     </>
   );
 }
 
 /** Detalle de contexto de la fila; va dentro del único desplegable (NewsSecondOrder). */
-function ContextDetail({ event }: { event: ResearchNewsEvent }) {
+function ContextDetail({ event, t, locale }: { event: ResearchNewsEvent; t: TranslateFn; locale: Locale }) {
   return (
     <dl className="mt-1 max-w-xs space-y-1 break-words rounded-md border border-gray-800 p-2">
-      <div><dt className="inline font-medium">Fuente: </dt><dd className="inline">{event.source || NA}</dd></div>
-      <div><dt className="inline font-medium">Tipo: </dt><dd className="inline">{etiquetaTipoEvento(event.event_type)}</dd></div>
+      <div><dt className="inline font-medium">{t('research.flow.ctxType')}</dt><dd className="inline">{etiquetaTipoEvento(event.event_type, locale)}</dd></div>
       {/* Datos decisionales reubicados (SERIE 1, auditoria): nunca crudos, nulos etiquetados "sin datos". */}
-      <div><dt className="inline font-medium">Tier de fuente: </dt><dd className="inline">{event.source_tier ? etiquetaTierFuente(event.source_tier) : NA}</dd></div>
-      <div><dt className="inline font-medium">Impacto: </dt><dd className="inline">{event.impact_direction ? etiquetaDireccionImpacto(event.impact_direction) : NA}</dd></div>
-      <div><dt className="inline font-medium">Peso en cartera: </dt><dd className="inline">{event.portfolio_weight != null ? formatPercent(event.portfolio_weight, { digits: 1 }) : NA}</dd></div>
-      {event.news_lane === 'macro' && event.macro_theme ? <div><dt className="inline font-medium">Tema: </dt><dd className="inline">{etiquetaTemaMacro(event.macro_theme)}</dd></div> : null}
+      <div><dt className="inline font-medium">{t('research.flow.ctxTier')}</dt><dd className="inline">{event.source_tier ? etiquetaTierFuente(event.source_tier, locale) : NA}</dd></div>
+      <div><dt className="inline font-medium">{t('research.flow.ctxImpact')}</dt><dd className="inline">{event.impact_direction ? etiquetaDireccionImpacto(event.impact_direction, locale) : NA}</dd></div>
+      <div><dt className="inline font-medium">{t('research.flow.ctxWeight')}</dt><dd className="inline">{event.portfolio_weight != null ? formatPercent(event.portfolio_weight, { digits: 1 }) : NA}</dd></div>
+      {event.news_lane === 'macro' && event.macro_theme ? <div><dt className="inline font-medium">{t('research.flow.ctxTheme')}</dt><dd className="inline">{etiquetaTemaMacro(event.macro_theme, locale)}</dd></div> : null}
     </dl>
   );
 }
 
-function ContextAndCoverage({ event }: { event: ResearchNewsEvent }) {
+function ContextAndCoverage({ event, t, locale }: { event: ResearchNewsEvent; t: TranslateFn; locale: Locale }) {
   return (
     <>
-      <ContextDetail event={event} />
-      <CoverageDetail event={event} />
+      <ContextDetail event={event} t={t} locale={locale} />
     </>
   );
 }
 
-export function NewsEventsFlow({
+export async function NewsEventsFlow({
   events,
   hasMore,
   lane,
@@ -261,26 +246,28 @@ export function NewsEventsFlow({
    *  empresa) y la paginación apunta a ?view=noticias, no a /research/news. */
   inFicha?: boolean;
 }) {
+  const t = await getT();
+  const locale = await getLocale();
   const portfolioSet = new Set(portfolioTickers);
   const watchlistSet = new Set(watchlistTickers);
   // Carril macro sin frescura: la API sirve el archivo reciente (fuente
   // caída). Se anuncia con la fecha real del evento más reciente; nunca se
   // finge frescura (medido en prod 30-oct-2026: GDELT >72h sin responder).
   const macroArchive = lane === 'macro' && events.length > 0 && events.every((event) => event.archive);
-  const macroArchiveDate = macroArchive && events[0] ? eventDateText(events[0].date) : null;
+  const macroArchiveDate = macroArchive && events[0] ? eventDateText(events[0].date, locale) : null;
   return (
     <section className="rounded-lg border border-gray-800 bg-surface-1 p-5">
         <div className="mb-4 flex items-center gap-2">
           <AlertTriangle aria-hidden="true" className="h-5 w-5 text-teal-300" />
-          <h2 className="text-lg font-semibold text-gray-100">Flujo de eventos</h2>
+          <h2 className="text-lg font-semibold text-gray-100">{t('research.flow.title')}</h2>
         </div>
-        <NewsPager label="Paginación" lane={lane} page={page} hasMore={hasMore} ticker={ticker} inFicha={inFicha} />
+        <NewsPager t={t} label={t('research.flow.paginationAria')} lane={lane} page={page} hasMore={hasMore} ticker={ticker} inFicha={inFicha} />
         {inFicha ? (
           <p className="mb-4 mt-3 text-sm text-gray-500">
-            {events.length} {events.length === 1 ? 'evento' : 'eventos'} en la página {page}
+            {events.length === 1 ? t('research.flow.eventsOnPage.one', { count: events.length, page }) : t('research.flow.eventsOnPage.other', { count: events.length, page })}
           </p>
         ) : (
-        <nav aria-label="Filtrar por carril" className="mb-4 mt-3 flex flex-wrap items-center gap-2">
+        <nav aria-label={t('research.flow.laneFilterAria')} className="mb-4 mt-3 flex flex-wrap items-center gap-2">
           {CARRILES.map((option) => {
             const active = lane === option.key;
             return (
@@ -292,21 +279,20 @@ export function NewsEventsFlow({
                     : 'border-gray-700 text-gray-300 hover:border-gray-500 hover:text-gray-100'
                 }`}
                 href={carrilHref(option.key, ticker)}
-                key={option.label}
+                key={option.labelKey}
               >
-                {option.label}
+                {t(option.labelKey)}
               </Link>
             );
           })}
           <span className="text-sm text-gray-500">
-            {events.length} {events.length === 1 ? 'evento' : 'eventos'} en la página {page}
+            {events.length === 1 ? t('research.flow.eventsOnPage.one', { count: events.length, page }) : t('research.flow.eventsOnPage.other', { count: events.length, page })}
           </span>
         </nav>
         )}
         {macroArchive ? (
           <p className="mb-4 rounded-lg border border-amber-900/60 bg-amber-950/40 p-3 text-sm text-amber-200">
-            La fuente macro no aporta datos nuevos desde el {macroArchiveDate}; la ingesta sigue
-            reintentándose. Mostrando el archivo reciente con su fecha real.
+            {t('research.flow.macroArchive', { date: macroArchiveDate ?? '' })}
           </p>
         ) : null}
         {/* F176: sin contain, Chrome propaga el overflow horizontal de la
@@ -316,9 +302,9 @@ export function NewsEventsFlow({
             tabla de 5 columnas solo se usa desde md; en pantallas estrechas
             cortaba titulares y partia el layout. */}
         {events.length === 0 ? <div className="rounded-lg border border-gray-800 p-4 md:hidden">
-          <EmptyState title={lane === 'macro' ? 'Sin eventos macro disponibles.' : 'Sin eventos de noticias todavía.'} description={lane === 'macro' ? 'La fuente macro no aporta datos nuevos ahora mismo; la ingesta sigue reintentándose.' : 'Este carril todavía no tiene noticias disponibles.'} action={<EmptyLink href="/research/sources">Importa una fuente o analiza una noticia manual</EmptyLink>} />
+          <EmptyState title={lane === 'macro' ? t('research.flow.emptyMacroTitle') : t('research.flow.emptyTitle')} description={lane === 'macro' ? t('research.flow.emptyMacroDescription') : t('research.flow.emptyLaneDescription')} action={<EmptyLink href="/research/sources">{t('research.flow.emptyAction')}</EmptyLink>} />
         </div> : null}
-        <ul aria-label="Eventos de noticias" className="flex flex-col gap-3 md:hidden">
+        <ul aria-label={t('research.flow.listAria')} className="flex flex-col gap-3 md:hidden">
           {events.map((event) => (
             <li className="rounded-lg border border-gray-800 bg-black/20 p-3" key={`card-${event.id}`}>
               <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
@@ -329,45 +315,46 @@ export function NewsEventsFlow({
                 ) : null}
                 {event.ticker ? (
                   <TickerContextBadges
+                    locale={locale}
                     portfolioTickers={portfolioSet}
                     ticker={event.ticker}
                     watchlistTickers={watchlistSet}
                   />
                 ) : null}
-                <MacroChip event={event} />
-                <GobiernoChip event={event} />
+                <MacroChip event={event} t={t} locale={locale} />
+                <GobiernoChip event={event} t={t} />
 
-                <CoverageChip event={event} />
-                <ImpactBadge direction={event.impact_direction} eventType={event.event_type} />
+                <CoverageChip event={event} t={t} />
+                <ImpactBadge direction={event.impact_direction} eventType={event.event_type} t={t} locale={locale} />
                 {event.requires_update ? (
-                  <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-amber-300">Revisar</span>
+                  <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-amber-300">{t('research.flow.review')}</span>
                 ) : null}
-                <span className="ml-auto"><MaterialityIndicator score={event.materiality_score} /></span>
+                <span className="ml-auto"><MaterialityIndicator score={event.materiality_score} t={t} /></span>
               </div>
               <div className="mt-2 text-sm text-gray-200"><NewsHeadline event={event} /></div>
               <NewsSummary event={event} />
               <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
                 <span className="min-w-0 break-words">{event.source || NA}</span>
                 <span aria-hidden="true">·</span>
-                <span>{formatTimeAgo(event.date)}</span>
-                <DateNotes event={event} inline />
+                <span>{formatTimeAgo(event.date, Date.now(), locale)}</span>
+                <DateNotes event={event} t={t} inline />
               </div>
-              <NewsSecondOrder eventId={event.id} subjectTicker={event.ticker} summary="Ver contexto">
-                <ContextAndCoverage event={event} />
+              <NewsSecondOrder eventId={event.id} subjectTicker={event.ticker} summary={t('research.flow.viewContext')}>
+                <ContextAndCoverage event={event} t={t} locale={locale} />
               </NewsSecondOrder>
             </li>
           ))}
         </ul>
-        <div aria-label="Flujo de eventos de noticias" className="scroll-affordance-x overflow-x-auto [contain:layout_paint] hidden md:block" role="region" tabIndex={0}>
+        <div aria-label={t('research.flow.regionAria')} className="scroll-affordance-x overflow-x-auto [contain:layout_paint] hidden md:block" role="region" tabIndex={0}>
           <table className="w-full min-w-[650px] text-left text-sm">
-            <caption className="sr-only">Eventos de noticias con materialidad y detalles de la fuente por fila</caption>
+            <caption className="sr-only">{t('research.flow.caption')}</caption>
             <thead className="text-xs uppercase text-gray-500">
               <tr>
-                <th className="border-b border-gray-800 py-2" scope="col">Ticker</th>
-                <th className="border-b border-gray-800 px-3 py-2" scope="col">Fecha</th>
-                <th className="border-b border-gray-800 px-3 py-2" scope="col">Titular</th>
-                <th className="border-b border-gray-800 px-3 py-2 text-center" scope="col">Materialidad</th>
-                <th className="border-b border-gray-800 px-3 py-2" scope="col">Estado y detalle</th>
+                <th className="border-b border-gray-800 py-2" scope="col">{t('research.flow.colTicker')}</th>
+                <th className="border-b border-gray-800 px-3 py-2" scope="col">{t('research.flow.colDate')}</th>
+                <th className="border-b border-gray-800 px-3 py-2" scope="col">{t('research.flow.colHeadline')}</th>
+                <th className="border-b border-gray-800 px-3 py-2 text-center" scope="col">{t('research.flow.colMateriality')}</th>
+                <th className="border-b border-gray-800 px-3 py-2" scope="col">{t('research.flow.colStatus')}</th>
               </tr>
             </thead>
             <tbody>
@@ -386,6 +373,7 @@ export function NewsEventsFlow({
                     )}
                     {event.ticker ? (
                       <TickerContextBadges
+                    locale={locale}
                         portfolioTickers={portfolioSet}
                         ticker={event.ticker}
                         watchlistTickers={watchlistSet}
@@ -393,19 +381,19 @@ export function NewsEventsFlow({
                     ) : null}
                     {event.news_lane === 'macro' || event.news_lane === 'gobierno' ? (
                       <div className="mt-1">
-                        <MacroChip event={event} />
-                        <GobiernoChip event={event} />
+                        <MacroChip event={event} t={t} locale={locale} />
+                        <GobiernoChip event={event} t={t} />
 
                       </div>
                     ) : null}
                     <div className="mt-1">
-                      <CoverageChip event={event} />
+                      <CoverageChip event={event} t={t} />
                     </div>
                   </th>
                   <td className="min-w-[120px] px-3 py-2.5 text-gray-400">
-                    <div>{formatTimeAgo(event.date)}</div>
-                    <div className="mt-0.5 text-xs text-gray-500">{eventDateText(event.date)}</div>
-                    <DateNotes event={event} />
+                    <div>{formatTimeAgo(event.date, Date.now(), locale)}</div>
+                    <div className="mt-0.5 text-xs text-gray-500">{eventDateText(event.date, locale)}</div>
+                    <DateNotes event={event} t={t} />
                   </td>
                   <td className="max-w-[420px] px-3 py-2.5 text-gray-300">
                     <NewsHeadline event={event} />
@@ -413,15 +401,15 @@ export function NewsEventsFlow({
                     <div className="mt-1 text-xs text-gray-500">{event.source || NA}</div>
                   </td>
                   <td className="px-3 py-2.5 text-center">
-                    <MaterialityIndicator score={event.materiality_score} />
+                    <MaterialityIndicator score={event.materiality_score} t={t} />
                     <div className="mt-1">
-                      <ImpactBadge direction={event.impact_direction} eventType={event.event_type} />
+                      <ImpactBadge direction={event.impact_direction} eventType={event.event_type} t={t} locale={locale} />
                     </div>
                   </td>
                   <td className="py-2.5 text-gray-300">
-                    {event.requires_update ? <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-xs text-amber-300">Revisar</span> : null}
-                    <NewsSecondOrder eventId={event.id} subjectTicker={event.ticker} summary="Ver contexto">
-                      <ContextAndCoverage event={event} />
+                    {event.requires_update ? <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-xs text-amber-300">{t('research.flow.review')}</span> : null}
+                    <NewsSecondOrder eventId={event.id} subjectTicker={event.ticker} summary={t('research.flow.viewContext')}>
+                      <ContextAndCoverage event={event} t={t} locale={locale} />
                     </NewsSecondOrder>
                   </td>
                 </tr>
@@ -430,15 +418,15 @@ export function NewsEventsFlow({
                 <tr>
                   <td className="p-0" colSpan={5}>
                     <EmptyState
-                      action={<EmptyLink href="/research/sources">Importa una fuente o analiza una noticia manual</EmptyLink>}
+                      action={<EmptyLink href="/research/sources">{t('research.flow.emptyAction')}</EmptyLink>}
                       className="rounded-none border-0 p-6"
-                      description={lane === 'macro' ? 'La fuente macro no aporta datos nuevos ahora mismo; la ingesta sigue reintentándose.' : undefined}
+                      description={lane === 'macro' ? t('research.flow.emptyMacroDescription') : undefined}
                       title={
                         lane === 'para-ti' && !portfolioTickers.length && !watchlistTickers.length
-                          ? 'Sin empresas en tu cartera ni watchlist.'
+                          ? t('research.flow.emptyForYouTitle')
                           : lane === 'macro'
-                            ? 'Sin eventos macro disponibles.'
-                            : 'Sin eventos de noticias todavía.'
+                            ? t('research.flow.emptyMacroTitle')
+                            : t('research.flow.emptyTitle')
                       }
                     />
                   </td>
@@ -447,7 +435,7 @@ export function NewsEventsFlow({
             </tbody>
           </table>
         </div>
-        <NewsPager label="Paginación inferior" lane={lane} page={page} hasMore={hasMore} ticker={ticker} inFicha={inFicha} />
+        <NewsPager t={t} label={t('research.flow.paginationBottomAria')} lane={lane} page={page} hasMore={hasMore} ticker={ticker} inFicha={inFicha} />
       </section>
   );
 }

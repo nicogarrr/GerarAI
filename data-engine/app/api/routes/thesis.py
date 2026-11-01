@@ -14,6 +14,12 @@ from app.core.database import get_db
 from app.core.ui_errors import ui_error
 from app.models import Claim, ClaimEvidence, ThesisDiff, ThesisSection, ThesisVersion
 from app.schemas import ThesisGenerateRequest, ThesisGraphOut, ThesisOut
+from app.schemas.api import (
+    ThesisAudioStatusOut,
+    ThesisHistoryOut,
+    ThesisJobStatusOut,
+    ThesisLatestJobOut,
+)
 from app.services import thesis_audio_service
 from app.services.company_resolver import resolve_company
 from app.services.driver_assumption_service import DriverAssumptionService, driver_assumption_payload
@@ -30,6 +36,7 @@ from app.services.thesis_epub_service import (
 )
 from app.services.thesis_graph_service import ThesisGraphService
 from app.services.thesis_memo import build_memo_markdown
+from app.services.thesis_pdf_service import export_thesis_pdf_for_ticker, sanitize_pdf_filename
 from app.services.thesis_publication_gate import (
     archived_thesis_notice,
     thesis_withheld_reason,
@@ -208,10 +215,29 @@ def thesis_epub(ticker: str, db: Session = Depends(get_db)) -> Response:
         citations=[] if reason else _epub_citations(db, list(claims)),
     )
     content = build_thesis_epub(data)
-    filename = f"gerarai-thesis-{company.ticker}-v{thesis.version}.epub"
+    # Mismo saneado que el PDF: el ticker va a una cabecera Content-Disposition.
+    filename = f"gerarai-thesis-{sanitize_pdf_filename(company.ticker)}-v{thesis.version}.epub"
     return Response(
         content=content,
         media_type="application/epub+zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{ticker}/pdf")
+def thesis_pdf(ticker: str, db: Session = Depends(get_db)) -> Response:
+    """Descarga la última tesis como PDF con diseño profesional y branding GerarAI.
+
+    404 limpio cuando no hay tesis: nunca se genera un documento vacío.
+    """
+    try:
+        content, filename = export_thesis_pdf_for_ticker(db, ticker)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return Response(
+        content=content,
+        media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
@@ -260,7 +286,8 @@ def thesis_versions(
             for row in versions]
 
 
-@router.get("/{ticker}/history")
+@router.get("/{ticker}/history", response_model=ThesisHistoryOut,
+                    response_model_exclude_unset=True)
 def thesis_history(ticker: str, db: Session = Depends(get_db)) -> dict:
     """Historial de versiones/aprobaciones: que cambio, cuando y con que resultado.
 
@@ -470,7 +497,8 @@ def _audio_context(db: Session, ticker: str, version: int | None = None) -> tupl
     return key, text
 
 
-@router.get("/{ticker}/audio/status")
+@router.get("/{ticker}/audio/status", response_model=ThesisAudioStatusOut,
+                    response_model_exclude_unset=True)
 def thesis_audio_status(
     ticker: str,
     version: int | None = Query(None, ge=1),
@@ -804,7 +832,7 @@ def generate_thesis_async(payload: ThesisGenerateRequest, db: Session = Depends(
     return job_payload(run)
 
 
-@router.get("/jobs/{run_id}")
+@router.get("/jobs/{run_id}", response_model=ThesisJobStatusOut)
 def thesis_job_status(run_id: int, db: Session = Depends(get_db)) -> dict:
     from app.models.entities import WorkflowRun
     from app.services.thesis_job_service import WORKFLOW_NAME, job_payload
@@ -815,7 +843,7 @@ def thesis_job_status(run_id: int, db: Session = Depends(get_db)) -> dict:
     return job_payload(run)
 
 
-@router.get("/jobs")
+@router.get("/jobs", response_model=ThesisLatestJobOut)
 def latest_thesis_job(ticker: str = Query(min_length=1, max_length=20), db: Session = Depends(get_db)) -> dict:
     """Recover the user's latest active/completed generation after navigation."""
     from app.services.thesis_job_service import job_payload, latest_generation

@@ -17,6 +17,11 @@ export const TICKER_BADGE_LABELS: Record<TickerBadge, string> = {
     watchlist: 'En watchlist',
 };
 
+export const TICKER_BADGE_LABELS_EN: Record<TickerBadge, string> = {
+    portfolio: 'In portfolio',
+    watchlist: 'On watchlist',
+};
+
 /** Tickers con posición abierta (quantity numérica y no nula). */
 export function openPositionTickers(
     positions: ReadonlyArray<{ ticker: string; quantity: number | null }>,

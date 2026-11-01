@@ -37,7 +37,7 @@ export function DocumentsList({ documents }: { documents: DocumentRow[] }) {
       {documents.length > PAGE ? (
         <input
           aria-label="Buscar documentos"
-          className="mb-3 h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 text-sm text-gray-200 placeholder:text-gray-500 sm:h-10"
+          className="mb-3 h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-200 placeholder:text-gray-500 sm:h-10 sm:text-sm"
           onChange={(e) => { setQuery(e.target.value); setPage(1); }}
           placeholder="Buscar por título o tipo"
           type="search"

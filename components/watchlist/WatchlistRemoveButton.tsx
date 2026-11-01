@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useT } from '@/lib/i18n/client';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
 import { removeFromWatchlist } from '@/lib/actions/watchlist.actions';
@@ -15,6 +16,7 @@ interface WatchlistRemoveButtonProps {
 
 export default function WatchlistRemoveButton({ symbol }: WatchlistRemoveButtonProps) {
     const router = useRouter();
+    const t = useT();
     const confirmRemoval = useConfirmWatchlistRemoval();
     const [loading, setLoading] = useState(false);
 
@@ -24,10 +26,10 @@ export default function WatchlistRemoveButton({ symbol }: WatchlistRemoveButtonP
             const res = await removeFromWatchlist(symbol);
             if (res.success) {
                 confirmRemoval(symbol);
-                toast.success(`${symbol} eliminado de la watchlist`);
+                toast.success(t('watchlist.remove.removed', { symbol }));
                 router.refresh();
             } else {
-                showErrorToast(res.message ?? 'No se pudo eliminar de la watchlist', {
+                showErrorToast(res.message ?? t('watchlist.remove.failed'), {
                     onRetry: handleRemove,
                 });
             }
@@ -45,9 +47,9 @@ export default function WatchlistRemoveButton({ symbol }: WatchlistRemoveButtonP
             onClick={handleRemove}
             disabled={loading}
             aria-busy={loading}
-            aria-label={`Quitar ${symbol} de la watchlist`}
+            aria-label={t('watchlist.remove.label', { symbol })}
             className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-900/20"
-            title={`Quitar ${symbol} de la watchlist`}
+            title={t('watchlist.remove.label', { symbol })}
         >
             <Trash2 aria-hidden="true" className="w-4 h-4" />
         </Button>

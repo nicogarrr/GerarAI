@@ -48,6 +48,7 @@ def _run_with_handler(
     rounds: int = 1,
     skip_llm: bool = False,
     identities: list[Any] | None = None,
+    inicio_watchlist: bool = False,
 ) -> dict[str, Any]:
     cfg = LoadConfig(
         base_url="http://127.0.0.1:8000",
@@ -71,6 +72,7 @@ def _run_with_handler(
                 secret="s" * 32,
                 identities=people,
                 portfolio_path=harness.DEFAULT_PORTFOLIO_PATH,
+                include_inicio_watchlist=inicio_watchlist,
             )
 
     return asyncio.run(runner())
@@ -320,3 +322,55 @@ def test_slow_p95_marks_failure() -> None:
 
     assert report["ok"] is False
     assert any("supera el umbral" in failure for failure in report["failures"])
+
+
+def test_inicio_watchlist_profile_adds_readonly_scenarios() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.path == "/api/settings":
+            return httpx.Response(200, json=_settings_payload())
+        return httpx.Response(200, json={"items": [], "page_info": {"has_next": False}})
+
+    report = _run_with_handler(handler, rounds=2, skip_llm=True, inicio_watchlist=True)
+
+    for key in (
+        "watchlist_list",
+        "watchlist_monitor",
+        "calendar_earnings",
+        "metric_coverage",
+        "data_health",
+    ):
+        assert report["scenarios"][key]["count"] == 6, key
+    assert any("inicio-watchlist" in note for note in report["notes"])
+
+    new_paths = {
+        "/api/watchlist",
+        "/api/watchlist/monitor",
+        "/api/calendar/earnings",
+        "/api/screeners/metric-coverage",
+        "/api/data-health",
+    }
+    new_requests = [request for request in seen if request.url.path in new_paths]
+    assert len(new_requests) == 5 * 3 * 2  # 5 escenarios x 3 usuarios x 2 rondas
+    assert {request.method for request in new_requests} == {"GET"}
+    monitor = [request for request in new_requests if request.url.path == "/api/watchlist/monitor"]
+    assert monitor and all(request.url.query == b"tickers=MSFT,NVDA,ASTS" for request in monitor)
+
+
+def test_inicio_watchlist_profile_off_by_default() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/settings":
+            return httpx.Response(200, json=_settings_payload())
+        return httpx.Response(200, json=[])
+
+    report = _run_with_handler(handler, rounds=1, skip_llm=True)
+
+    assert "watchlist_list" not in report["scenarios"]
+    assert "data_health" not in report["scenarios"]
+
+
+def test_parse_args_inicio_watchlist_flag() -> None:
+    assert harness.parse_args([]).inicio_watchlist is False
+    assert harness.parse_args(["--inicio-watchlist"]).inicio_watchlist is True

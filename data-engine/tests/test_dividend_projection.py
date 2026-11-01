@@ -346,6 +346,8 @@ class _FakeDate(date):
 def _patch_today(monkeypatch, value):
     _FakeDate._today = value
     monkeypatch.setattr("app.services.dividend_projection_service.date", _FakeDate)
+    # La proyección usa el día de Madrid (local_today): congelarlo al mismo día.
+    monkeypatch.setattr("app.services.dividend_projection_service.local_today", lambda: value)
 
 
 def test_end_date_clamp_jan31(db, monkeypatch):

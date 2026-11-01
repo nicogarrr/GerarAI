@@ -2,7 +2,7 @@
   "canvas": {
     "label": "Interactive knowledge graph",
     "feature": "Knowledge graph",
-    "description": "Graph view. Drag to pan, use the wheel or buttons to zoom in and out, press a node to see its details and use the arrow keys to move without a mouse.",
+    "description": "Graph view. Drag to pan, use the wheel or buttons to zoom in and out, press a node to see its detail and the arrow keys to move without a mouse.",
     "roleDescription": "Knowledge graph",
     "preparing": "Preparing the graph view…",
     "zoomIn": "Zoom in",
@@ -10,15 +10,15 @@
     "fit": "Fit to screen",
     "reset": "Reset view",
     "zoomLevel": "Zoom {percent}%",
-    "keyboardHelp": "Keyboard: arrow keys to pan, + and − to zoom in and out, 0 to fit and Escape to reset.",
+    "keyboardHelp": "Keyboard: arrows to pan, + and − to zoom in and out, 0 to fit and Escape to reset.",
     "selectedNode": "Selected node: {label}",
     "hoverNode": "Node under the pointer: {label}, type {type}, {degree} relationships.",
     "nodesDrawn": "Nodes drawn: {drawn} of {total}",
     "edgesDrawn": "Relationships drawn: {drawn} of {total}",
-    "truncatedHint": "Drawing is limited to {max} nodes. Narrow it down with the filters above or export the JSON to see the full loaded subgraph: the dump bypasses the drawing cut-off.",
+    "truncatedHint": "Drawing is limited to {max} nodes. Narrow it down with the filters above or export the JSON to see the full loaded subgraph: the dump does not go through the drawing crop.",
     "isolatedOn": {
-      "one": "Showing the selected node and its only neighbor; the rest are dimmed.",
-      "other": "Showing the selected node and its {count} neighbors; the rest are dimmed."
+      "one": "Showing the selected node and its only neighbor; the rest is dimmed.",
+      "other": "Showing the selected node and its {count} neighbors; the rest is dimmed."
     },
     "isolatedOff": "Full view: no dimmed nodes.",
     "isolate": "Isolate node",
@@ -26,39 +26,37 @@
     "zoomLimits": "Zoom between {min}% and {max}%.",
     "nodeLabel": "{label}, type {type}",
     "tooltipMeta": "Type {type} · {degree} relationships",
-    "noNodesInScene": "There are no nodes to draw.",
+    "noNodesInScene": "No nodes to draw.",
     "degradedEmpty": "The graph is empty: there are no active nodes in the backend.",
-    "degradedEmptyHint": "Press \"Sync graph\" to create the deterministic nodes and relationships.",
+    "degradedEmptyHint": "Press «Sync graph» to create the deterministic nodes and relationships.",
     "exportSvg": "Download SVG",
     "exportJson": "Download JSON"
   },
   "search": {
-    "label": "Search for a node by name",
+    "label": "Search a node by name",
     "placeholder": "Search node by name",
     "results": {
-      "one": "1 node matches “{query}”.",
-      "other": "{count} nodes match “{query}”."
+      "one": "1 node matches «{query}».",
+      "other": "{count} nodes match «{query}»."
     },
-    "noResults": "No drawn node contains “{query}”.",
+    "noResults": "No drawn node contains «{query}».",
     "hint": "Choosing a node centers it and puts it in the URL, so the link can be shared.",
-    "open": "Center and select “{label}”",
+    "open": "Center and select «{label}»",
     "clear": "Clear the search"
   },
   "detail": {
     "title": "Node detail",
-    "empty": "Select a node in the graph to see what the backend knows about it.",
-    "absent": "N/A",
+    "empty": "Select a node from the graph to see what the backend knows about it.",
     "neighborsTitle": "Neighbors ({count})",
     "noNeighbors": "This node has no relationships in the visible subgraph.",
-    "directionOut": "outgoing",
-    "directionIn": "incoming",
+    "directionOut": "out",
+    "directionIn": "in",
     "confidence": "Confidence",
-    "provenance": "Provenance",
-    "scopeLink": "Open this node’s full neighborhood on the server",
+    "scopeLink": "Open the full neighborhood of this node on the server",
     "unknownNode": "Node #{id} is not in the loaded subgraph.",
     "shareLink": "Shareable link to this node",
     "shareLinkCopied": "Link copied to the clipboard.",
-    "shareLinkFailed": "The link could not be copied: select it below and copy it by hand.",
+    "shareLinkFailed": "Could not copy the link: select it below and copy it by hand.",
     "fields": {
       "id": "Identifier",
       "label": "Label",
@@ -70,11 +68,24 @@
       "degree": "Degree",
       "description": "Description",
       "attributes": "Attributes"
-    }
+    },
+    "absent": "N/A",
+    "absentReason": {
+      "id": "The backend returned no identifier for this node.",
+      "label": "The backend returned no label for this node.",
+      "type": "The backend returned no type for this node.",
+      "key": "The graph keeps no key of its own for this node type.",
+      "entity": "This node is not linked to an entity in another table.",
+      "confidence": "The graph keeps no confidence for this node.",
+      "degree": "No incident edges: the graph does not relate this node to any other.",
+      "description": "The graph keeps no description for this node type.",
+      "attributes": "The backend returned no attributes for this node."
+    },
+    "provenance": "Provenance"
   },
   "listing": {
     "title": "Graph nodes in text",
-    "description": "The same information as the drawing, in text: works for screen readers, as a fallback if the canvas fails to load, and as indexable content.",
+    "description": "Same information as the drawing, in text: works for screen readers, as a fallback if the canvas does not load and as indexable content.",
     "columnLabel": "Label",
     "columnType": "Type",
     "columnDegree": "Relationships",
@@ -83,7 +94,7 @@
       "one": "1 node in the visible subgraph.",
       "other": "{count} nodes in the visible subgraph."
     },
-    "empty": "There are no nodes to list.",
+    "empty": "No nodes to list.",
     "caption": "Table of graph nodes: label, type and number of relationships of each node."
   },
   "page": {
@@ -95,7 +106,7 @@
     "neighborhood": "Neighborhood of node #{id}",
     "fullGraph": "Full graph",
     "nodeTypesLabel": "Node types",
-    "nodeTypesPlaceholder": "Node types, comma separated",
+    "nodeTypesPlaceholder": "Node types, comma-separated",
     "maxNodes": "Maximum nodes",
     "filter": "Filter",
     "statNodes": "Nodes",
@@ -103,15 +114,26 @@
     "showing": "Showing {shown} of {total} nodes with these filters. Most connected first; only relationships between included nodes are shown.",
     "edgesTitle": "Relationships",
     "edgesAria": "Graph relationships",
-    "edgesCaption": "Knowledge graph relationships: source node, relationship type, target node, confidence and provenance",
     "colFrom": "From",
     "colRelation": "Relationship",
     "colTo": "To",
     "colConfidence": "Confidence",
-    "colProvenance": "Provenance",
     "nodeFallback": "Node {id}",
     "noEdges": "No relationship matches the current scope.",
     "confidence": "Confidence {value}",
-    "truncated": "Showing 30 of {total} relationships: filter to narrow the scope."
+    "truncated": "Showing 30 of {total} relationships: filter to narrow the scope.",
+    "edgesCaption": "Knowledge graph relationships: source node, relationship type, target node, confidence and provenance",
+    "colProvenance": "Provenance"
+  },
+  "nodeType": {
+    "company": "Company",
+    "principle": "Principle",
+    "author": "Author",
+    "decision": "Decision",
+    "decisionLesson": "Lesson",
+    "kpi": "Indicator",
+    "risk": "Risk",
+    "concept": "Concept",
+    "caseStudy": "Case study"
   }
 }

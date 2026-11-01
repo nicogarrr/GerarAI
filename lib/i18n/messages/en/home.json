@@ -1,1 +1,136 @@
-{}
+{
+  "metadata": {
+    "title": "GerarAI · Investment research OS",
+    "description": "What changed in your positions, portfolio value, triggered alerts, watchlist and intrinsic-value opportunities."
+  },
+  "news": {
+    "title": "Top news",
+    "error": "News could not be loaded. The rest of the page keeps working.",
+    "analysisLink": "View news analysis",
+    "empty": "No news available at the moment.",
+    "generalMarket": "General market",
+    "noDate": "Date not available"
+  },
+  "attention": {
+    "title": "Needs attention",
+    "fullList": "Full list",
+    "subtitle": "Pending thesis changes and DCA levels from your chosen threshold. A DCA level is not a buy order.",
+    "loading": "Checking theses and DCA levels…",
+    "unavailableBoth": "Thesis changes and DCA levels could not be checked. Whatever is available is shown below.",
+    "unavailableThesis": "Thesis changes could not be checked. Whatever is available is shown below.",
+    "unavailableDca": "DCA levels could not be checked. Whatever is available is shown below.",
+    "emptyFiltered": "No items in the sources that could be checked.",
+    "empty": "No pending thesis changes or recent DCA levels from your threshold. Unevaluated or stale data is not shown as current signals.",
+    "truncated": "Showing the {n} most recent pending thesis changes. Also review the pages of your companies.",
+    "paginationAria": "Attention pagination",
+    "pageStatus": "{current} / {pages} · {n} items",
+    "ctaOf": "for",
+    "ctaReviewChange": "Review change",
+    "ctaReviewThesis": "Review thesis",
+    "reviewPending": "Pending review · {date}",
+    "dcaTitle": "DCA level {level}X",
+    "dcaInPortfolio": "Review the contribution to your position.",
+    "dcaNotInPortfolio": "Consider an entry, after reviewing the thesis.",
+    "dcaNote": "From {threshold}X · Close {date}",
+    "dcaForming": " · Forming month",
+    "dcaConfirmed": " · Confirmed",
+    "direction": {
+      "positive": "Thesis upgrade",
+      "negative": "Thesis downgrade",
+      "neutral": "Thesis change"
+    }
+  },
+  "fair": {
+    "none": "No fair value",
+    "title": "Fair value · {label}",
+    "source": {
+      "tesis": "thesis",
+      "motor": "engine",
+      "orient": "engine orient."
+    }
+  },
+  "steps": {
+    "title": "First steps",
+    "subtitle": "Three steps so the home tells you what changed in your companies.",
+    "followTitle": "Follow your companies",
+    "followDone": "Done: you follow {count} {unit}.",
+    "followTodo": "Add them to the watchlist to see price, valuation and alerts.",
+    "company": "company",
+    "companies": "companies",
+    "view": "View",
+    "add": "Add",
+    "watchlistSr": " companies to the watchlist",
+    "buyTitle": "Record your first purchase",
+    "buyBody": "With your positions you will see the portfolio value and where to place this month's contribution.",
+    "investmentSr": " investment",
+    "brainTitle": "Ask the Brain",
+    "brainBody": "For example: \"What's cheap in my watchlist?\"",
+    "open": "Open",
+    "brainSr": " the Brain"
+  },
+  "severity": {
+    "critical": "critical",
+    "high": "high",
+    "medium": "medium",
+    "low": "low",
+    "info": "informational"
+  },
+  "overview": {
+    "kicker": "Your research today",
+    "title": "What changed"
+  },
+  "portfolio": {
+    "title": "Your portfolio today",
+    "details": "View details",
+    "gainLoss": "Gain/Loss since purchase",
+    "weightsNote": "Weights over the gross value of the positions.",
+    "empty": "You have no positions yet. Add your first investment to see here what changed since the purchase.",
+    "noCostBasis": "We don't have the cost basis of your positions yet. Once it's loaded, you'll see here how your portfolio is doing since the purchase.",
+    "partial": "Among the positions with a cost basis: the gain/loss does not include the others.",
+    "reviewMover": "Review {symbol} (largest move since purchase)",
+    "reviewAll": "Review your portfolio"
+  },
+  "alerts": {
+    "title": "Alerts",
+    "manage": "Manage",
+    "originalNotice": "View original notice",
+    "reviewThesis": "Review {symbol} thesis",
+    "openDocument": "Open document",
+    "rulesActiveOne": "1 active rule",
+    "rulesActiveOther": "{n} active rules",
+    "evaluated": "the engine evaluates them every 5 min.",
+    "noneTriggered": "none has triggered yet.",
+    "createFirst": "Create your first alert"
+  },
+  "watchlist": {
+    "recent": "Recently added",
+    "viewAll": "View all",
+    "close": "Close {date}",
+    "closeNoDate": "Close with no source date",
+    "noQuote": "No quote available",
+    "noData": "no data",
+    "lastNOfTotal": "The latest {n} added of {total}",
+    "totalCount": "{total} in total",
+    "empty": "You are not following any companies yet.",
+    "seeFullList": "see the full list"
+  },
+  "opportunities": {
+    "title": "Intrinsic value opportunities (DCF)",
+    "refine": "Refine with the Screener",
+    "price": "Price",
+    "priceUnknownCurrency": "Price (currency {na})",
+    "potential": "{value} upside",
+    "fairUnknown": "Fair value (currency {na}): {value}",
+    "source": "Source: {label}",
+    "orientation": "Engine guidance, not a final valuation",
+    "topN": "The {limit} with the most potential out of {total}; refine the rest in \"Refine with the Screener\"."
+  },
+  "dcf": {
+    "scopeOk": "The first {probed} screener candidates (market cap > {cap}), no sector filter.",
+    "scopeWithFailures": "The first {probed} screener candidates (market cap > {cap}), no sector filter; {failed} could not be evaluated.",
+    "noCandidates": "The screener returned no candidates to compute intrinsic value for.",
+    "noneEvaluated": "The intrinsic value of the {probed} screener candidates probed could not be computed.",
+    "noneAbove": "None of the {evaluated} screener candidates evaluated beats its intrinsic value by {min} % today.",
+    "noneAboveWithFailures": "None of the {evaluated} screener candidates evaluated beats its intrinsic value by {min} % today; {failed} could not be evaluated."
+  }
+}

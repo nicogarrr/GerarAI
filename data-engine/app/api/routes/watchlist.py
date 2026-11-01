@@ -6,6 +6,13 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.cache import (
+    DCA_SCHEDULE_PREFIX,
+    DCA_SCHEDULE_TTL,
+    cached,
+    invalidate_dca_cache,
+    tenant_from_first_db_arg,
+)
 from app.core.database import get_db
 from app.core.tenancy import tenant_filters
 from app.core.ui_errors import ui_error
@@ -17,6 +24,12 @@ from app.models import (
     FinancialFact,
     MarketPrice,
     WatchItem,
+)
+from app.schemas.api import (
+    WatchlistAttentionThesisOut,
+    WatchlistItemOut,
+    WatchlistMetricsOut,
+    WatchlistMonitorOut,
 )
 from app.services.connectors.earnings_calendar import fetch_earnings_range
 from app.services.derived_market_cap_service import DERIVED_SOURCE
@@ -48,7 +61,8 @@ def _find_watch_item(db: Session, symbol: str) -> WatchItem | None:
     return db.scalar(select(WatchItem).where(WatchItem.symbol == symbol))
 
 
-@router.get("")
+@router.get("", response_model=list[WatchlistItemOut],
+            response_model_exclude_unset=True)
 def list_watchlist(db: Session = Depends(get_db)) -> list[dict]:
     """Watch items of the active tenant, most recently added first.
 
@@ -101,6 +115,8 @@ def upsert_watch_item(
         # Los hechos son por tenant: siembra automatica para que la ficha no
         # salga vacia hasta pulsar «Refrescar SEC» (hallazgo del tester).
         enqueue_fundamentals_seed(db, symbol)
+    # Alta o cambio de ticker: el listado DCA cacheado incluye la watchlist.
+    invalidate_dca_cache(db=db)
     return _payload(item)
 
 
@@ -111,8 +127,9 @@ def delete_watch_item(symbol: str, db: Session = Depends(get_db)) -> None:
         raise HTTPException(status_code=404, detail=ui_error(404, "ticker_not_in_watchlist").detail)
     db.delete(item)
     db.commit()
+    invalidate_dca_cache(db=db)
 
-@router.get("/monitor")
+@router.get("/monitor", response_model=WatchlistMonitorOut)
 async def watchlist_monitor(
     tickers: str = Query(..., description="CSV de tickers, max 60"),
     db: Session = Depends(get_db),
@@ -228,7 +245,7 @@ async def watchlist_monitor(
     return {"items": items, "earnings_status": earnings_status}
 
 
-@router.get("/metrics/{symbol}")
+@router.get("/metrics/{symbol}", response_model=WatchlistMetricsOut)
 def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
     """Market cap y PER de respaldo para emisoras sin cobertura del
     proveedor US (QA AENA/ASML): market_cap del proveedor o derivado
@@ -424,6 +441,9 @@ class DcaSignalStateOut(BaseModel):
     # nivel guardado ya no es actual (la evaluacion lo omite por datos viejos).
     data_age_days: int | None = None
     stale: bool = False
+    # True cuando el nivel guardado lo calculo una formula distinta de la
+    # vigente (cuenta como desactualizado aunque el cierre sea de hoy).
+    params_outdated: bool = False
 
 
 class DcaHitRateCellOut(BaseModel):
@@ -442,6 +462,28 @@ class DcaHitRateRowOut(BaseModel):
     cells: list[DcaHitRateCellOut]
 
 
+class DcaZoneVisitOut(BaseModel):
+    start: str
+    end: str
+    months: int
+
+
+class DcaZoneVisitsOut(BaseModel):
+    available: bool = False
+    reason: str | None = None
+    levels: list[int] = Field(default_factory=list)
+    months_completed: int = 0
+    first_period: str | None = None
+    last_period: str | None = None
+    completed_visits: int = 0
+    excluded_gap_visits: int = 0
+    avg_months: float | None = None
+    max_months: int | None = None
+    visits: list[DcaZoneVisitOut] = Field(default_factory=list)
+    open_visit_months: int | None = None
+    params_version: str | None = None
+
+
 class DcaHitRatesOut(BaseModel):
     symbol: str
     available: bool
@@ -453,6 +495,7 @@ class DcaHitRatesOut(BaseModel):
     params_version: str | None = None
     evaluated_at: datetime | None = None
     rows: list[DcaHitRateRowOut] = Field(default_factory=list)
+    zone_visits: DcaZoneVisitsOut | None = None
     disclaimer: str = "Histórico, hipotético. No es asesoramiento."
 
 
@@ -594,10 +637,16 @@ def _dca_staleness(signal_date: date | None, today: date | None = None) -> tuple
 
 def _dca_state_payload(state: DcaSignalState, *, today: date | None = None) -> dict:
     from app.services.dca_alert_copy import currency_label
-    from app.services.dca_signal_engine import ZONES
+    from app.services.dca_signal_engine import DEFAULT_PARAMS, ZONES
 
     zone = ZONES.get(state.level, ZONES[1])
     data_age_days, stale = _dca_staleness(state.signal_date, today)
+    # Desactualizado tambien por FORMULA: un nivel calculado con una version
+    # anterior (p. ej. estados nico-v1 persistidos tras el cambio a nico-v2)
+    # no es actual aunque el cierre sea de hoy. La cola manual ya la recoge
+    # como pendiente (pending_symbols); el listado ahora tambien lo declara.
+    params_outdated = state.params_version != DEFAULT_PARAMS.version
+    stale = stale or params_outdated
     return {
         "level": state.level,
         "previous_level": state.previous_level,
@@ -615,6 +664,7 @@ def _dca_state_payload(state: DcaSignalState, *, today: date | None = None) -> d
         "metrics": state.metrics or {},
         "level_prices": state.level_prices or {},
         "params_version": state.params_version,
+        "params_outdated": params_outdated,
         "data_source": state.data_source,
         "evaluated_at": state.evaluated_at,
         "last_alerted_level": state.last_alerted_level,
@@ -624,9 +674,18 @@ def _dca_state_payload(state: DcaSignalState, *, today: date | None = None) -> d
     }
 
 
-@router.get("/dca-signals", response_model=DcaSignalsOut)
-def list_dca_signals(db: Session = Depends(get_db)) -> dict:
-    """Nivel DCA actual de cada ticker de watchlist + cartera y su minimo de aviso."""
+@cached(
+    prefix=f"{DCA_SCHEDULE_PREFIX}:signals_payload",
+    ttl=DCA_SCHEDULE_TTL,
+    category="dca_schedule",
+    extract_tenant=tenant_from_first_db_arg,
+)
+def _dca_signals_payload(db: Session) -> dict:
+    """Payload de GET /watchlist/dca-signals con cache Redis de 5 min por tenant.
+
+    Se invalida por eventos ORM al tocar watchlist, posiciones, overrides,
+    politica o estados DCA, y de forma explicita al terminar cada evaluacion.
+    """
     from app.core.config import get_settings
     from app.services import dca_signal_service as dca
     from app.services.dca_signal_engine import DEFAULT_PARAMS, ZONES
@@ -679,6 +738,12 @@ def list_dca_signals(db: Session = Depends(get_db)) -> dict:
     }
 
 
+@router.get("/dca-signals", response_model=DcaSignalsOut)
+def list_dca_signals(db: Session = Depends(get_db)) -> dict:
+    """Nivel DCA actual de cada ticker de watchlist + cartera y su minimo de aviso."""
+    return _dca_signals_payload(db)
+
+
 @router.put("/{symbol}/dca-alert-min-level", response_model=DcaMinLevelOut)
 def set_dca_alert_min_level(symbol: str, payload: DcaMinLevelIn, db: Session = Depends(get_db)) -> dict:
     """Ajusta el nivel minimo de aviso DCA de un ticker (null = global, 0 = apagado)."""
@@ -700,6 +765,7 @@ def set_dca_alert_min_level(symbol: str, payload: DcaMinLevelIn, db: Session = D
     else:
         row.min_level = payload.min_level
     db.commit()
+    invalidate_dca_cache(db=db)
     return {
         "symbol": key,
         "min_level_override": payload.min_level,
@@ -818,6 +884,7 @@ def dca_hit_rates(symbol: str, db: Session = Depends(get_db)) -> dict:
         "params_version": data.get("params_version"),
         "evaluated_at": state.evaluated_at,
         "rows": rows,
+        "zone_visits": data.get("zone_visits"),
     }
 
 
@@ -890,7 +957,7 @@ def dca_backtest(
     return out
 
 
-@router.get("/attention-thesis")
+@router.get("/attention-thesis", response_model=WatchlistAttentionThesisOut)
 def home_attention_thesis(db: Session = Depends(get_db)) -> dict:
     """Unresolved thesis changes for this tenant's watchlist and open holdings."""
     from app.services.home_attention_service import pending_thesis_changes

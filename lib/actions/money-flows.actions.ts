@@ -1,6 +1,7 @@
 'use server';
 
 import { researchRequest } from '@/lib/research/client';
+import { BACKEND_PAGE_SIZE, fetchAllBackendPages, type PaginatedBackendResponse } from '@/lib/paginated-backend';
 import type { MoneyFlow, MoneyFlowThemeSummary } from '@/lib/market/flows';
 
 /**
@@ -43,10 +44,13 @@ export async function getFlowHoldings(): Promise<{
   unavailable: boolean;
 }> {
   try {
-    const [positions, watchlist] = await Promise.all([
-      researchRequest<Array<{ ticker: string }>>('/api/portfolio/positions', { fast: true }),
-      researchRequest<Array<{ symbol: string }>>('/api/watchlist', { fast: true }),
+    const [rawPositions, rawWatchlist] = await Promise.all([
+      // Lectura completa: paginado page/page_size hasta agotar (fetchAllBackendPages lanza si no avanza).
+      fetchAllBackendPages((page) => researchRequest<PaginatedBackendResponse<{ ticker: string }>>(`/api/portfolio/positions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true }), (position) => position.ticker),
+      researchRequest<Array<{ symbol: string }> | { items: Array<{ symbol: string }> }>('/api/watchlist', { fast: true }),
     ]);
+    const positions = rawPositions;
+    const watchlist = Array.isArray(rawWatchlist) ? rawWatchlist : (rawWatchlist as { items?: Array<{ symbol: string }> })?.items;
     if (!Array.isArray(positions) || !Array.isArray(watchlist)) {
       return { portfolio: new Set(), watchlist: new Set(), unavailable: true };
     }

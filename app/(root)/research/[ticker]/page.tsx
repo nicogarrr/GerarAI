@@ -1,4 +1,11 @@
-import { FactCalculatedLabel } from '@/components/research/FactCalculatedLabel';
+import { getLocale, getT } from '@/lib/i18n/server';
+import { RATING_LABELS_EN, STATUS_LABELS_EN } from '@/lib/research/status-labels-en';
+import type { TranslationKey } from '@/lib/i18n/t';
+import type { Locale } from '@/lib/i18n/locale';
+import type { TranslateFn } from '@/lib/i18n/translate';
+import { getParticipationFilings } from '@/lib/actions/research.actions';
+import { ParticipationFilingsPanel } from '@/components/research/ParticipationFilingsPanel';
+import { FactTable } from '@/components/research/FactsPanels';
 import BlockedValuation from '@/components/research/BlockedValuation';
 import { ThesisSummary } from '@/components/research/ThesisSummary';
 import { CompanyNavigation } from '@/components/research/CompanyNavigation';
@@ -15,7 +22,6 @@ import CompanyActionsMenu from '@/components/research/CompanyActionsMenu';
 import { collapseVersionHistory, versionHistoryBadges } from '@/lib/research/version-history';
 import { ListingStaleBanner } from '@/components/research/ListingStaleBanner';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
-import { factDisplayAudit, factStalenessNotice } from '@/lib/research/fact-display-audit';
 import { groupClaimsByVersion } from '@/lib/research/claim-groups';
 import { asView, tabHref, tabOfView, type View } from '@/lib/research/research-views';
 import { FinancialTerminalSection } from '@/components/research/sections/FinancialTerminalSection';
@@ -26,6 +32,7 @@ import { DecisionLessonsSection } from '@/components/research/sections/DecisionL
 import { SectionLoadError } from '@/components/research/sections/SectionLoadError';
 import { QuickGlancePanel } from '@/components/research/QuickGlancePanel';
 import { getAnalystTargets } from '@/lib/research/analyst-targets';
+import { getKeyStats } from '@/lib/research/key-stats';
 import { researchValuability, visibleThesisRating } from '@/lib/research/coverage-state';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -116,7 +123,6 @@ import {
   refreshCompanyFinancialsSEC,
   refreshCompanyResearchModel,
   type ResearchCalculatedMetric,
-  type ResearchFact,
   type ResearchLongTermModel,
   type ResearchValuation,
   getMoatQualityScore,
@@ -146,7 +152,7 @@ import { dedupeNewsEvents, newsDisplayTitle } from '@/lib/news-display';
 import ThesisApproveButton from '@/components/research/ThesisApproveButton';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
-import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, formatPrice, isValidCurrencyCode, NA } from '@/lib/format';
+import { createFormatters, formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, formatPrice, isValidCurrencyCode, NA } from '@/lib/format';
 import { getInsiderFilings, getOwnershipSignals } from '@/lib/actions/insider.actions';
 import { OwnershipSignalsPanel } from '@/components/research/OwnershipSignalsPanel';
 import { insiderName, insiderRole } from '@/lib/insider/format';
@@ -182,15 +188,15 @@ type PageProps = {
 
 /** Fecha de la noticia con su provenance: nunca afirmar fecha de publicacion
  *  cuando es el fallback de ingesta o no hay metadato. */
-function newsDateLabel(event: { date: string; date_source?: string | null }): string {
+function newsDateLabel(event: { date: string; date_source?: string | null }, t: TranslateFn, locale: Locale): string {
   // es-ES («16 oct 2026»), no ISO crudo: el resto de la app ya pinta así.
-  const day = formatUserDate(event.date);
+  const day = formatUserDate(event.date, undefined, undefined, locale);
   // Mismo criterio que NewsEventsFlow y ResearchAssistant: solo 'source' es
   // fecha de publicacion verificada; el resto se etiqueta, nunca se afirma.
   if (event.date_source === 'source') return day;
-  if (event.date_source === 'gdelt_first_seen') return `Detectada el ${day}`;
-  if (event.date_source === 'ingested_at_fallback') return `Incorporada el ${day}`;
-  return `Fecha no verificada (${day})`;
+  if (event.date_source === 'gdelt_first_seen') return t('research.ficha.dateDetected', { date: day });
+  if (event.date_source === 'ingested_at_fallback') return t('research.ficha.dateIngested', { date: day });
+  return t('research.ficha.dateUnverified', { date: day });
 }
 
 function number(value: number | string | null | undefined): number | null {
@@ -262,13 +268,13 @@ const RATING_LABELS: Record<string, string> = {
 
 /** F24 (vista Comparables): etiquetas/prosa del backend en español,
  *  con fallback al original para no ocultar datos si el backend cambia. */
-const PEERS_BASIS_LABELS: Record<string, string> = {
-  traceable_calculated_metric: 'métrica calculada trazable',
-  evidence_backed_claim: 'afirmación con evidencia enlazada',
+const PEERS_BASIS_KEYS: Record<string, TranslationKey> = {
+  traceable_calculated_metric: 'research.peers.basisTraceable',
+  evidence_backed_claim: 'research.peers.basisEvidence',
 };
-const PEERS_METHODOLOGY_ES: Record<string, string> = {
+const PEERS_METHODOLOGY_KEYS: Record<string, TranslationKey> = {
   'Quantitative differences use traceable calculated metrics. Qualitative differences are emitted only when linked evidence exists.':
-    'Las diferencias cuantitativas usan métricas calculadas trazables. Las diferencias cualitativas solo se publican cuando existe evidencia enlazada.',
+    'research.peers.methodology',
 };
 
 /**
@@ -291,12 +297,13 @@ export async function generateMetadata({ params }: Pick<PageProps, 'params'>): P
   const subject = name ? `${ticker} · ${name}` : ticker;
   return {
     title: subject,
-    description: `Research de ${name ?? ticker}: tesis versionada, financieros canónicos, modelo a largo plazo, valoración y evidencia con fuentes trazables.`,
+    description: (await getT())('research.identity.metaDescription', { subject: name ?? ticker }),
   };
 }
 
-function label(value: string | null | undefined): string {
+function label(value: string | null | undefined, locale: Locale = 'es'): string {
   if (value === null || value === undefined || value === '') return NA;
+  if (locale === 'en') return STATUS_LABELS_EN[value] ?? RATING_LABELS_EN[value] ?? etiquetaValor(value);
   return STATUS_LABELS[value] ?? RATING_LABELS[value] ?? etiquetaValor(value);
 }
 
@@ -325,144 +332,25 @@ function moatDefinition(type: string): string | null {
   return key ? glossary[key].short : null;
 }
 
-function metricValue(value: number | string | null | undefined, unit: string) {
+function metricValue(value: number | string | null | undefined, unit: string, t: TranslateFn) {
   const parsed = number(value);
-  if (parsed === null) return 'desconocido';
+  if (parsed === null) return t('research.ficha.unknownValue');
   return formatResearchMetric(parsed, unit);
 }
-
-/** Fuente de una cifra: enlace real al documento de origen (filing SEC/ESEF o pagina del proveedor) con su fecha, o texto plano cuando no hay documento. Nunca un enlace inventado. */
-function FactSource({ fact }: { fact: ResearchFact }) {
-  const text = label(fact.source_type);
-  if (!fact.source_url) return <>{text}<FactCalculatedLabel fact={fact} /></>;
-  const date = fact.source_published_at ? formatUserDate(fact.source_published_at) : null;
-  return (
-    <>
-    <a
-      className="text-teal-300 underline-offset-2 transition hover:text-teal-200 hover:underline"
-      href={fact.source_url}
-      rel="noopener noreferrer"
-      target="_blank"
-      title={fact.source_title ?? fact.source_url}
-    >
-      {text}{date ? ` · ${date}` : ''}
-    </a>
-    <FactCalculatedLabel fact={fact} />
-    </>
-  );
-}
-
-/** La cifra enlaza a su fuente cuando el backend trae URL real del documento. */
-function FactValueLink({ fact, children }: { fact: ResearchFact; children: React.ReactNode }) {
-  if (!fact.source_url) return <>{children}</>;
-  return (
-    <a
-      className="underline-offset-2 transition hover:text-teal-200 hover:underline"
-      href={fact.source_url}
-      rel="noopener noreferrer"
-      target="_blank"
-      title={fact.source_title ?? 'Fuente del dato'}
-    >
-      {children}
-    </a>
-  );
-}
-
-function FactCard({ fact, ticker, staleness }: { fact: ResearchFact; ticker: string; staleness: string | null }) {
-  const audit = factDisplayAudit(ticker, fact);
-  return (
-    <div className="rounded-lg border border-gray-800 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-medium text-gray-200">{metricLabel(fact.metric)}</span>
-        <span className={`text-sm font-semibold ${audit ? 'text-gray-400' : 'text-teal-300'}`}>{audit ? 'N/D' : <FactValueLink fact={fact}>{metricValue(fact.value, fact.unit)}</FactValueLink>}</span>
-      </div>
-      {audit ? <p className="mt-2 text-xs text-amber-300">{audit}</p> : null}
-      {!audit && staleness ? <p className="mt-2 text-xs text-amber-300">{staleness}</p> : null}
-      <div className="mt-1.5 flex flex-wrap gap-2 text-xs text-gray-500">
-        <span>{financialPeriod(fact.period)}</span>
-        <span>·</span>
-        <span><FactSource fact={fact} /></span>
-      </div>
-    </div>
-  );
-}
-
-/** Hechos visibles en móvil antes del «ver más» */
-const FACTS_MOBILE_PAGE = 10;
 
 /** Un borrador o una tesis en revisión no enseña veredicto ni cifras (regla vigente, igual que el memo y el PDF). */
 function thesisIsPublic(status: string | null | undefined): boolean {
   return status === 'published' || status === 'approved';
 }
 
-function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact[]; refreshLabel: string; ticker: string }) {
-  if (!facts.length) {
-    return (
-      <EmptyState
-        description={`Pulsa «${refreshLabel}» arriba para traerlos del proveedor indicado. Si sigue vacío, no hay datos persistidos: comprueba el resultado del refresh y la fuente.`}
-        title="Todavía no hay hechos financieros persistidos."
-      />
-    );
-  }
-  // El último hecho de cada métrica (la lista viene ordenada por año fiscal
-  // descendente) es el que un lector toma por «estado actual».
-  const latestFiscalYear = facts.reduce((acc, fact) => Math.max(acc, fact.fiscal_year ?? 0), 0) || null;
-  const latestIdByMetric = new Map<string, number>();
-  for (const fact of facts) {
-    if (!latestIdByMetric.has(fact.metric)) latestIdByMetric.set(fact.metric, fact.id);
-  }
-  const stalenessOf = (fact: ResearchFact) =>
-    factStalenessNotice(fact, { isLatestForMetric: latestIdByMetric.get(fact.metric) === fact.id, latestFiscalYear });
-  const hasUnofficial = facts.some((fact) => String(fact.source_type ?? '').toUpperCase() === 'YAHOO_FUNDAMENTALS');
-  return (
-    <>
-      {hasUnofficial ? (
-        <p className="mb-3 text-xs text-amber-300" role="note">
-          Incluye cifras de una fuente no oficial (Yahoo Finance), sin auditar ni contrastar con el emisor; la fuente de cada fila aparece a la derecha.
-        </p>
-      ) : null}
-      {/* Móvil: cards paginadas (Anterior/Siguiente), sin «ver más» ni corte silencioso */}
-      <div className="space-y-3 md:hidden">
-        <PagedList
-          items={facts.map((fact) => ({ key: `fact-${fact.id}`, node: <FactCard fact={fact} staleness={stalenessOf(fact)} ticker={ticker} /> }))}
-          label="Hechos financieros"
-          pageSize={FACTS_MOBILE_PAGE}
-        />
-      </div>
-      {/* Escritorio: tabla completa */}
-      <div aria-label="Hechos financieros" className="hidden overflow-x-auto md:block" role="region" tabIndex={0}>
-      <table className="w-full text-left text-sm">
-        <caption className="sr-only">Hechos financieros de la empresa (oficiales y, si se indica, no oficiales): métrica, periodo, valor y fuente</caption>
-        <thead className="text-xs uppercase text-gray-500">
-          <tr>
-            <th className="border-b border-gray-800 py-2" scope="col">Métrica</th>
-            <th className="border-b border-gray-800 py-2" scope="col">Periodo</th>
-            <th className="border-b border-gray-800 py-2 text-right" scope="col">Valor</th>
-            <th className="border-b border-gray-800 py-2 text-right" scope="col">Fuente</th>
-          </tr>
-        </thead>
-        <tbody>
-          {facts.map((fact) => (
-            <tr key={fact.id} className="text-gray-300">
-              <th className="border-b border-gray-900 py-2 text-left text-sm font-medium" scope="row">{metricLabel(fact.metric)}</th>
-              <td className="border-b border-gray-900 py-2">{financialPeriod(fact.period)}</td>
-              <td className="border-b border-gray-900 py-2 text-right">{factDisplayAudit(ticker, fact) ? <span className="text-gray-400">N/D<span className="mt-1 block text-xs text-amber-300">{factDisplayAudit(ticker, fact)}</span></span> : <><FactValueLink fact={fact}>{metricValue(fact.value, fact.unit)}</FactValueLink>{stalenessOf(fact) ? <span className="mt-1 block text-xs text-amber-300">{stalenessOf(fact)}</span> : null}</>}</td>
-              <td className="border-b border-gray-900 py-2 text-right text-xs text-gray-500"><FactSource fact={fact} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      </div>
-    </>
-  );
-}
-
-function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] }) {
+async function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] }) {
+  const t = await getT();
+  const locale = await getLocale();
   if (!metrics.length) {
     return (
       <EmptyState
-        description="Las métricas se derivan de los hechos financieros: pulsa «Recalcular» arriba. Si todavía no hay hechos, refresca primero los financieros con el botón de actualización correspondiente."
-        title="Las métricas calculadas aún no se han refrescado."
+        description={t('research.ficha.metricsEmptyDescription')}
+        title={t('research.ficha.metricsEmptyTitle')}
       />
     );
   }
@@ -474,24 +362,26 @@ function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] }) {
               (net_debt_to_ebitda): sin min-w-0/break-all empujaba el badge
               fuera de la tarjeta a 768px. */}
           <div className="flex items-center justify-between gap-3">
-            <span className="min-w-0 break-all font-medium text-gray-200">{metricLabel(metric.metric)}</span>
-            <Badge className="shrink-0" variant="outline">{label(metric.status)}</Badge>
+            <span className="min-w-0 break-all font-medium text-gray-200">{metricLabel(metric.metric, locale)}</span>
+            <Badge className="shrink-0" variant="outline">{label(metric.status, locale)}</Badge>
           </div>
-          <div className="mt-2 text-xl text-teal-300">{metricValue(metric.value, metric.unit)}</div>
-          <div className="mt-2 text-xs text-gray-500">{financialPeriod(metric.period)} · {financialVersionLabel(metric.definition_version)}</div>
-          <div className="mt-2 text-xs leading-5 text-gray-400">{financialFormula(metric.formula)}</div>
+          <div className="mt-2 text-xl text-teal-300">{metricValue(metric.value, metric.unit, t)}</div>
+          <div className="mt-2 text-xs text-gray-500">{financialPeriod(metric.period, locale)} · {financialVersionLabel(metric.definition_version, locale)}</div>
+          <div className="mt-2 text-xs leading-5 text-gray-400">{financialFormula(metric.formula, locale)}</div>
         </div>
       ))}
     </div>
   );
 }
 
-function ValuationView({ valuation, currency, ticker }: { valuation: ResearchValuation | null; currency: string; ticker: string }) {
+async function ValuationView({ valuation, currency, ticker }: { valuation: ResearchValuation | null; currency: string; ticker: string }) {
+  const t = await getT();
+  const locale = await getLocale();
   if (!valuation) {
     return (
       <EmptyState
-        action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>Genera primero el modelo a largo plazo</EmptyLink>}
-        title="No hay ninguna valoración persistida."
+        action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>{t('research.ficha.valuationEmptyAction')}</EmptyLink>}
+        title={t('research.ficha.valuationEmptyTitle')}
       />
     );
   }
@@ -500,10 +390,9 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
   }
   const engine = typeof valuation.trace?.engine === 'string' ? valuation.trace.engine : null;
   const method = typeof valuation.trace?.method === 'string' ? valuation.trace.method : null;
-  const inputSource = typeof valuation.trace?.input_source === 'string' ? valuation.trace.input_source : null;
   const periods = Object.entries(valuation.trace?.periods ?? {})
     .filter(([, value]) => value)
-    .map(([metric, period]) => `${termLabel(metric)}: ${period}`)
+    .map(([metric, period]) => `${termLabel(metric, locale)}: ${period}`)
     .join(' · ');
   // Una valoración no publicable (estado distinto de ok, p.ej. partial por
   // entradas sin trazabilidad fechada como traceable_wacc) no puede
@@ -533,8 +422,8 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
   const basisLabel = scenarios.label;
   const priceAsOf = typeof valuation.trace?.price_as_of === 'string' ? valuation.trace.price_as_of : null;
   const modelPriceLabel = priceAsOf
-    ? `Precio del modelo al ${formatMarketDate(priceAsOf, { day: 'numeric', month: 'short' })}`
-    : 'Precio del modelo (sin fecha)';
+    ? t('research.ficha.modelPriceAt', { date: formatMarketDate(priceAsOf, { day: 'numeric', month: 'short' }, undefined, locale) })
+    : t('research.ficha.modelPriceNoDate');
   if (notPublishable) {
     return (
       <div className="space-y-3">
@@ -542,19 +431,18 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
           <Stat label={modelPriceLabel} value={formatMoney(valuation.current_price, currency)} />
         </div>
         <div className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-4 text-sm text-amber-200">
-          <p className="font-semibold">Orientación del motor, no precio objetivo.</p>
+          <p className="font-semibold">{t('research.ficha.engineGuidanceTitle')}</p>
           <p className="mt-1">
-            Esta valoración no es publicable (estado {label(valuation.status ?? 'unknown')}): los números de
-            abajo son una orientación del motor, no una valoración final ni un precio objetivo.
+            {t('research.ficha.notPublishable', { status: label(valuation.status ?? 'unknown', locale) })}
           </p>
-          {blockers.length ? <p className="mt-2 text-xs">Motivos registrados: {blockers.map(blockerLabel).join('; ')}.</p> : null}
-          {missingInputs.length ? <p className="mt-2 text-xs">Entradas faltantes: {missingInputs.map(termLabel).join(', ')}.</p> : null}
-          {engineNotice ? <p className="mt-2 text-xs text-amber-200/70">Nota del motor: {engineNotice}</p> : null}
+          {blockers.length ? <p className="mt-2 text-xs">{t('research.ficha.blockers', { list: blockers.map((id) => blockerLabel(id, locale)).join('; ') })}</p> : null}
+          {missingInputs.length ? <p className="mt-2 text-xs">{t('research.ficha.missingInputs', { list: missingInputs.map((item) => termLabel(item, locale)).join(', ') })}</p> : null}
+          {engineNotice ? <p className="mt-2 text-xs text-amber-200/70">{t('research.ficha.engineNote', { note: engineNotice })}</p> : null}
         </div>
         <div className="grid grid-cols-1 gap-4 opacity-60 sm:grid-cols-3">
-          <Stat label={`Bear (orientación)${basisLabel}`} value={formatMoney(scenarios.values.bear as number | null, currency)} />
-          <Stat label={`Base (orientación)${basisLabel}`} value={formatMoney(scenarios.values.base as number | null, currency)} />
-          <Stat label={`Bull (orientación)${basisLabel}`} value={formatMoney(scenarios.values.bull as number | null, currency)} />
+          <Stat label={`${t('research.ficha.bearGuidance')}${basisLabel}`} value={formatMoney(scenarios.values.bear as number | null, currency)} />
+          <Stat label={`${t('research.ficha.baseGuidance')}${basisLabel}`} value={formatMoney(scenarios.values.base as number | null, currency)} />
+          <Stat label={`${t('research.ficha.bullGuidance')}${basisLabel}`} value={formatMoney(scenarios.values.bull as number | null, currency)} />
         </div>
         {scenarioNotes.length ? (
           <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-amber-300/80">
@@ -564,9 +452,9 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
         {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
         {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
         <p className="text-xs leading-5 text-gray-500">
-          Valoración persistida ({termLabel(valuation.model_type)}{engine ? ` · motor ${engine}` : ''}{method ? ` · ${method}` : ''} · estado {label(valuation.status ?? 'unknown')}).
-          El «valor por acción» del Modelo a largo plazo es otro cálculo (otra versión/fecha/motor).
-          Fuente de datos: {inputSource ?? NA}{periods ? ` · periodos ${periods}` : ` · periodos ${NA}`}.
+          {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type, locale), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
+          {t('research.ficha.persistedNoteGuidance')}{' '}
+          {t('research.ficha.inputPeriods', { periods: periods ? periods : NA })}
         </p>
       </div>
     );
@@ -575,9 +463,9 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
     <div className="space-y-3">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label={modelPriceLabel} value={formatMoney(valuation.current_price, currency)} />
-        <Stat label={`Bear${basisLabel}`} value={formatMoney(scenarios.values.bear as number | null, currency)} />
-        <Stat label={`Base${basisLabel}`} value={formatMoney(scenarios.values.base as number | null, currency)} />
-        <Stat label={`Bull${basisLabel}`} value={formatMoney(scenarios.values.bull as number | null, currency)} />
+        <Stat label={`${t('research.ficha.bear')}${basisLabel}`} value={formatMoney(scenarios.values.bear as number | null, currency)} />
+        <Stat label={`${t('research.ficha.base')}${basisLabel}`} value={formatMoney(scenarios.values.base as number | null, currency)} />
+        <Stat label={`${t('research.ficha.bull')}${basisLabel}`} value={formatMoney(scenarios.values.bull as number | null, currency)} />
       </div>
       {scenarioNotes.length ? (
         <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-amber-300/80">
@@ -587,21 +475,22 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
       {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
       {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
       <p className="text-xs leading-5 text-gray-500">
-        Valoración persistida ({termLabel(valuation.model_type)}{engine ? ` · motor ${engine}` : ''}{method ? ` · ${method}` : ''} · estado {label(valuation.status ?? 'unknown')}).
-        No es comparable 1:1 con el «valor por acción» del Modelo a largo plazo: ese es un cálculo interno
-        del escenario (otra versión/fecha/motor). Antes de fiarte, comprueba versión y fecha en ambas vistas.
-        Fuente de datos: {inputSource ?? NA}{periods ? ` · periodos ${periods}` : ` · periodos ${NA}`}.
+        {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type, locale), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
+        {t('research.ficha.persistedNote')}{' '}
+        {t('research.ficha.inputPeriods', { periods: periods ? periods : NA })}
       </p>
     </div>
   );
 }
 
-function MarketOpportunityView({ model, ticker }: { model: ResearchLongTermModel | null; ticker: string }) {
+async function MarketOpportunityView({ model, ticker }: { model: ResearchLongTermModel | null; ticker: string }) {
+  const t = await getT();
+  const locale = await getLocale();
   if (!model || model.status === 'not_generated') {
     return (
       <EmptyState
-        action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>Generar el modelo a largo plazo</EmptyLink>}
-        title="Genera el modelo a largo plazo antes de valorar la oportunidad de mercado."
+        action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>{t('research.ficha.marketEmptyAction')}</EmptyLink>}
+        title={t('research.ficha.marketEmptyTitle')}
       />
     );
   }
@@ -609,27 +498,27 @@ function MarketOpportunityView({ model, ticker }: { model: ResearchLongTermModel
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Stat label="TAM (mercado total)" value={metricValue(opportunity.top_down.tam.value, opportunity.top_down.tam.unit)} />
-        <Stat label="SAM (mercado atendible)" value={metricValue(opportunity.top_down.sam.value, opportunity.top_down.sam.unit)} />
-        <Stat label="SOM (mercado obtenible)" value={metricValue(opportunity.top_down.som.value, opportunity.top_down.som.unit)} />
+        <Stat label={t('research.ficha.tam')} value={metricValue(opportunity.top_down.tam.value, opportunity.top_down.tam.unit, t)} />
+        <Stat label={t('research.ficha.sam')} value={metricValue(opportunity.top_down.sam.value, opportunity.top_down.sam.unit, t)} />
+        <Stat label={t('research.ficha.som')} value={metricValue(opportunity.top_down.som.value, opportunity.top_down.som.unit, t)} />
       </div>
-      <Panel title="Veredicto con restricciones">
+      <Panel title={t('research.ficha.verdictTitle')}>
         <div className="flex flex-wrap gap-2">
-          <Badge>{label(opportunity.verdict.label)}</Badge>
-          <Badge variant="outline">confianza: {label(opportunity.verdict.confidence)}</Badge>
-          <Badge variant="outline">restricción ligante: {opportunity.constraints.binding_constraint ? termLabel(opportunity.constraints.binding_constraint) : 'desconocida'}</Badge>
+          <Badge>{label(opportunity.verdict.label, locale)}</Badge>
+          <Badge variant="outline">{t('research.ficha.confidence', { value: label(opportunity.verdict.confidence, locale) })}</Badge>
+          <Badge variant="outline">{t('research.ficha.bindingConstraint', { value: opportunity.constraints.binding_constraint ? termLabel(opportunity.constraints.binding_constraint, locale) : t('research.ficha.unknownFem') })}</Badge>
         </div>
         <p className="mt-3 text-sm text-gray-300">{opportunity.verdict.conclusion}</p>
       </Panel>
-      <Panel title="Fórmulas bottom-up">
+      <Panel title={t('research.ficha.bottomUpTitle')}>
         <div className="space-y-3">
           {opportunity.bottom_up.formulas.map((formula) => (
             <div className="rounded-lg border border-gray-800 p-3" key={formula.label}>
               <div className="flex justify-between gap-4 text-sm">
                 <span className="text-gray-200">{formula.label}</span>
-                <span className="text-teal-300">{formula.value === null ? label(formula.status) : metricValue(formula.value, formula.unit ?? '')}</span>
+                <span className="text-teal-300">{formula.value === null ? label(formula.status, locale) : metricValue(formula.value, formula.unit ?? '', t)}</span>
               </div>
-              {formula.missing_inputs?.length ? <p className="mt-2 text-xs text-amber-300">Faltan entradas: {formula.missing_inputs.map(termLabel).join(', ')}</p> : null}
+              {formula.missing_inputs?.length ? <p className="mt-2 text-xs text-amber-300">{t('research.ficha.missingInputsShort', { list: formula.missing_inputs.map((item) => termLabel(item, locale)).join(', ') })}</p> : null}
             </div>
           ))}
         </div>
@@ -833,6 +722,8 @@ const ENTRY_WORKSPACE: Partial<Record<View, keyof ViewWorkspaces>> = {
 export default async function ResearchCompanyPage({ params, searchParams }: PageProps) {
   const [{ ticker: rawTicker }, query] = await Promise.all([params, searchParams]);
   assertTickerShape(rawTicker);
+  const t = await getT();
+  const locale = await getLocale();
   const ticker = rawTicker.trim().toUpperCase();
   if (rawTicker !== ticker) {
     const search = new URLSearchParams();
@@ -919,7 +810,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     snapshot = await snapshotPromise;
   } catch (error) {
     if (isBackendUnavailableError(error)) {
-      return <BackendOffline feature={`Research de ${ticker}`} retryHref={`/research/${ticker}`} />;
+      return <BackendOffline feature={t('research.identity.feature', { ticker })} retryHref={`/research/${ticker}`} />;
     }
     throw error;
   }
@@ -953,9 +844,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           <div className="mx-auto max-w-[1600px] space-y-6">
             <Link className="inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
             <EmptyState
-              description={`La identidad de ${ticker} está verificada por doble coincidencia SEC + proveedor de mercado: «${verification.sec.name}» (${verification.provider.exchange}${verification.provider.currency ? `, ${verification.provider.currency}` : ', divisa N/D'}). La ficha aún no existe en GerarAI: se crea solo si la abres, y nacerá sin research generado.`}
+              description={t('research.identity.verifiedDesc', { ticker, name: verification.sec.name, exchange: verification.provider.exchange, currency: verification.provider.currency ? `, ${verification.provider.currency}` : t('research.identity.currencyNa') })}
               icon={ShieldAlert}
-              title="Identidad verificada por dos fuentes"
+              title={t('research.identity.verifiedTitle')}
               titleAs="h1"
               action={
                 <form action={openVerifiedFicha.bind(null, ticker)}>
@@ -978,22 +869,22 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     }
     const identity = resolveUnknownListingIdentity(await getProfile(ticker), ticker);
     const doubleCheckNote = verification
-      ? ' Se comprobó la doble coincidencia SEC + proveedor de mercado y no se cumplió, así que la identidad sigue sin verificar.'
+      ? t('research.identity.doubleCheckFailed')
       : '';
     const state =
       identity.kind === 'unverified'
         ? {
-            title: 'Identidad del ticker no verificada',
-            description: `${ticker} no tiene identidad de listado verificada en GerarAI: el proveedor de mercado conoce este símbolo como «${identity.providerName}», que puede no ser el emisor que buscas. Sin identidad verificada no se pueden mostrar datos ni generar research de este símbolo.${doubleCheckNote}`,
+            title: t('research.identity.unverifiedTitle'),
+            description: t('research.identity.unverifiedDesc', { ticker, providerName: identity.providerName, note: doubleCheckNote }),
           }
         : identity.kind === 'not-in-sources'
           ? {
-              title: 'No encontramos este ticker en nuestras fuentes',
-              description: `Ninguna de nuestras fuentes reconoce ${ticker}: puede que el símbolo sea incorrecto o que aún no tenga cobertura verificada. Sin identidad verificada no se pueden mostrar datos ni generar research de este símbolo.`,
+              title: t('research.identity.notInSourcesTitle'),
+              description: t('research.identity.notInSourcesDesc', { ticker }),
             }
           : {
-              title: 'No pudimos comprobar este ticker',
-              description: `${ticker} no está en la cobertura verificada de GerarAI y el proveedor de mercado no está disponible para comprobarlo. Sin identidad verificada no se pueden mostrar datos ni generar research de este símbolo; inténtalo de nuevo más tarde.`,
+              title: t('research.identity.uncheckedTitle'),
+              description: t('research.identity.uncheckedDesc', { ticker }),
             };
     return (
       <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 text-gray-100">
@@ -1009,7 +900,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               // volver a comprobar (recarga completa: el proveedor pudo fallar).
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <EmptyLink className="min-h-11 px-4 text-sm" href="/search">
-                  Buscar otra empresa
+                  {t('research.identity.searchOther')}
                 </EmptyLink>
                 <a
                   className="inline-flex min-h-11 items-center rounded-md border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 transition hover:border-gray-500 hover:text-gray-100"
@@ -1040,7 +931,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   const unavailableView = findUnavailableViewFailure(entrySettled, isBackendUnavailableError);
   if (unavailableView) {
     console.warn(`[research] ${ticker} · ${activeView} motor no disponible: ${unavailableView.key}=${unavailableView.reason}`);
-    return <BackendOffline feature={`Research de ${ticker}`} retryHref={viewRetryHref(ticker, activeView)} />;
+    return <BackendOffline feature={t('research.identity.feature', { ticker })} retryHref={viewRetryHref(ticker, activeView)} />;
   }
   const isFollowed = watchlist?.some((item) => item.symbol.toUpperCase() === ticker) ?? false;
   /**
@@ -1086,15 +977,16 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   // Constructores de secciones: cada pestaña compone sus módulos como
   // secciones seguidas con título claro («Una fila, no tres menús», 29-oct-2026).
   const buildOverviewContent = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     // marketPromise ya se lanzó en paralelo al snapshot más arriba.
-    let market: Awaited<ReturnType<typeof getCompanyMarketSnapshot>>;
     try {
       // headerMarket ya guarda esta misma promesa resuelta (se esperó en la
-      // cabecera); aquí solo se distingue la caída del motor del resto.
-      market = await marketPromise;
+      // cabecera); aquí solo se espera para distinguir la caída del motor
+      // del resto de errores; el valor se lee en la cabecera.
+      await marketPromise;
     } catch (error) {
       if (isBackendUnavailableError(error)) {
-        return <BackendOffline feature={`Datos de mercado de ${ticker}`} retryHref={`/research/${ticker}`} />;
+        return <BackendOffline feature={t('research.fichaMarketDataFeature', { ticker })} retryHref={`/research/${ticker}`} />;
       }
       throw error;
     }
@@ -1134,20 +1026,21 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     // Conexión 10b: insiders + 13F en paralelo con el PER; si falla, el panel lo dice.
     // La posición real solo se pide si la empresa está en cartera (misma lectura que Cartera).
     const [per, ownershipSignals, holdingContext] = await Promise.all([
-      getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }).catch(() => ({ value: null, note: 'No se pudo consultar el PER' })),
+      getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }).catch(() => ({ value: null, note: t('research.fichaPerUnavailable') })),
       getOwnershipSignals(ticker).catch(() => null),
       snapshot.in_portfolio
-        ? getCompanyHolding(ticker).catch(() => ({ status: 'error' as const, message: 'No se pudo cargar tu posición en esta empresa.' }))
+        ? getCompanyHolding(ticker).catch(() => ({ status: 'error' as const, message: t('research.fichaHoldingLoadError') }))
         : Promise.resolve(null),
     ]);
     // Panel de vistazo rápido: datos reales ya existentes, cada fila a su
     // sección. En móvil va arriba (bajo el precio de la cabecera); en PC
     // es la columna lateral derecha (estilo Investing, opción 1).
-    const [glanceModel, glanceCapital, glanceCredibility, glanceAnalysts] = await Promise.all([
+    const [glanceModel, glanceCapital, glanceCredibility, glanceAnalysts, glanceKeyStats] = await Promise.all([
       glanceModelPromise ?? Promise.resolve(null),
       glanceCapitalPromise ?? Promise.resolve(null),
       glanceCredibilityPromise ?? Promise.resolve(null),
       getAnalystTargets(quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker).catch(() => null),
+      getKeyStats(ticker).catch(() => null),
     ]);
     return (
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
@@ -1156,6 +1049,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             analysts={glanceAnalysts}
             credibility={glanceCredibility}
             currency={company.currency}
+            keyStats={glanceKeyStats}
             livePrice={headerMarket?.quote?.price ?? null}
             moatScore={moatScore}
             model={glanceModel}
@@ -1165,7 +1059,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </div>
         <div className="min-w-0 space-y-6 xl:order-1">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <Panel density="compact" title="Última tesis">
+          <Panel density="compact" title={t('research.fichaLatestThesis')}>
             {snapshot.latest_thesis ? (
               <>
                 <div className="flex flex-wrap gap-2">
@@ -1184,18 +1078,18 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                   */}
                   <Button asChild variant="outline">
                     <Link href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>
-                      <FileText className="mr-2 h-4 w-4" />Leer tesis completa
+                      <FileText className="mr-2 h-4 w-4" />{t('research.fichaReadFullThesis')}
                     </Link>
                   </Button>
-                  <ThesisGenerateButton ticker={ticker} label="Regenerar tesis" />
+                  <ThesisGenerateButton ticker={ticker} label={t('research.fichaRegenerateThesis')} />
                 </div>
               </>
             ) : (
-              <ThesisGenerateButton ticker={ticker} label="Genera la primera tesis" emptyCopy="Sin tesis todavía." />
+              <ThesisGenerateButton ticker={ticker} label={t('research.fichaGenerateFirstThesis')} emptyCopy={t('research.fichaNoThesisYet')} />
             )}
           <dl className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
-            <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">PER (TTM)</dt><dd className="font-semibold text-gray-100">{per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}</dd></div>
-            {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">Modelo</dt><dd className="font-semibold text-gray-100"><Link className="inline-flex min-h-11 min-w-11 items-center underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</Link></dd></div> : null}
+            <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">{t('research.fichaPerTtm')}</dt><dd className="font-semibold text-gray-100">{per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}</dd></div>
+            {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">{t('research.fichaModel')}</dt><dd className="font-semibold text-gray-100"><Link className="inline-flex min-h-11 min-w-11 items-center underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>{snapshot.model_summary.publishable ? t('research.fichaModelPublishable') : t('research.fichaModelBlocked')}</Link></dd></div> : null}
           </dl>
           {per.note ? <p className="mt-1 text-xs text-gray-500">{per.note}</p> : null}
           </Panel>
@@ -1212,18 +1106,18 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               className="inline-flex min-h-[44px] items-center sm:min-h-0 text-sm text-teal-300 hover:text-teal-200"
               href="#noticias"
             >
-              Ver todas
+              {t('research.fichaViewAll')}
             </Link>
           }
-          description="Las 5 noticias de mayor materialidad entre las 25 más recientes de esta empresa, con fuente y fecha."
-          title="Últimas noticias"
+          description={t('research.fichaLatestNewsDesc')}
+          title={t('research.fichaLatestNews')}
         >
           {overviewNewsError ? (
             <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
-              No se pudieron cargar las noticias. Reintenta en unos segundos.
+              {t('research.fichaNewsLoadError')}
             </p>
           ) : overviewNews.length === 0 ? (
-            <EmptyState title="Sin noticias recientes de esta empresa." />
+            <EmptyState title={t('research.fichaNoRecentNews')} />
           ) : (
             <ul className="space-y-3">
               {overviewNews.map((event) => (
@@ -1231,7 +1125,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                   <NewsHeadline event={event} />
                   <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                     <ImpactBadge direction={event.impact_direction} />
-                    <span>{event.source} · {newsDateLabel(event)}</span>
+                    <span>{event.source} · {newsDateLabel(event, t, locale)}</span>
                   </p>
                 </li>
               ))}
@@ -1249,11 +1143,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               className="inline-flex min-h-[44px] sm:min-h-0 items-center text-sm text-teal-300 hover:text-teal-200"
               href={`/research/${encodeURIComponent(ticker)}?view=seguimiento`}
             >
-              Ver todos los cambios
+              {t('research.fichaViewAllChanges')}
             </Link>
           }
           density="compact"
-          title="Últimos cambios"
+          title={t('research.fichaLatestChanges')}
         >
           {snapshot.recent_changes?.length ? (
             <ul className="space-y-2">
@@ -1262,40 +1156,21 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                   <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                     <Badge variant="outline">{label(change.impact_direction)}</Badge>
                     <span className="text-xs text-gray-500">
-                      Materialidad {change.materiality_score} · {formatDate(change.created_at)}
+                      {t('research.fichaMaterialityScore', { score: change.materiality_score })} · {formatDate(change.created_at)}
                     </span>
                   </div>
                   <p className="break-words leading-6 [overflow-wrap:anywhere]">{changeSummaryText(change.summary)}</p>
-                  {/* Procedencia: fuente del evento y URLs absorbidas al agrupar
-                      la misma noticia en dos idiomas (identidad atribuida). */}
-                  {change.fuente_url && /^https:\/\//.test(change.fuente_url) ? (
-                    <p className="mt-1 text-xs text-gray-500">
-                      <a href={change.fuente_url} target="_blank" rel="noopener noreferrer" className="text-teal-400 underline">
-                        {change.fuente_nombre || 'Fuente'}
-                      </a>
-                      {(change.tambien_en ?? []).map((entry, entryIndex) => {
-                        const url = typeof entry?.url === 'string' ? entry.url : null;
-                        const nombre = typeof entry?.fuente === 'string' ? entry.fuente : 'otra fuente';
-                        return url && /^https:\/\//.test(url) ? (
-                          <span key={`${url}-${entryIndex}`}>
-                            {' · también en '}
-                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-teal-400 underline">{nombre}</a>
-                          </span>
-                        ) : null;
-                      })}
-                    </p>
-                  ) : null}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-gray-500">Sin cambios registrados desde la última revisión.</p>
+            <p className="text-sm text-gray-500">{t('research.fichaNoChangesSinceReview')}</p>
           )}
         </Panel>
         {snapshot.research_health.missing?.length ? (
-          <MobileCollapse title={`Capas de research que faltan (${snapshot.research_health.missing.length})`}>
+          <MobileCollapse title={t('research.fichaMissingLayersTitle', { count: snapshot.research_health.missing.length })}>
           <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-200">
-            <p>Capas de research que faltan:</p>
+            <p>{t('research.fichaMissingLayersHeading')}</p>
             <ul className="mt-2 space-y-1">
               {snapshot.research_health.missing.map((layer) => {
                 const action = missingLayerAction(ticker, layer);
@@ -1323,15 +1198,15 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               className="inline-flex min-h-11 min-w-11 items-center text-sm text-teal-300 hover:text-teal-200"
               href={`/research/${encodeURIComponent(ticker)}?view=valoracion#foso`}
             >
-              Ver la evaluación del foso
+              {t('research.fichaViewMoatEval')}
             </Link>
           ) : undefined}
-          title="Calidad financiera según la empresa"
+          title={t('research.fichaFinancialQuality')}
         >
           {moatScore ? (
-            <MoatPanel company={company} metric={moatScore} />
+            <MoatPanel company={company} metric={moatScore} ti={t} fmt={createFormatters(locale)} />
           ) : (
-            <EmptyState title="Sin evaluación de calidad generada todavía: aparece con el refresco de las métricas financieras de la empresa." />
+            <EmptyState title={t('research.fichaNoQualityEval')} />
           )}
         </Panel>
         {/*
@@ -1340,16 +1215,16 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             planas que había antes.
         */}
         <Panel className="hidden md:block" collapsible="mobile"
-          description="Dónde está el resto del análisis de esta empresa."
+          description={t('research.fichaWhereNextDesc')}
           density="compact"
-          title="Por dónde seguir"
+          title={t('research.fichaWhereNext')}
         >
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
             {[
-              ['Modelo a largo plazo', 'valoracion#modelo'],
-              ['Oportunidad de mercado', 'valoracion#oportunidad'],
-              ['Comparables', 'valoracion#comparables'],
-              ['Documentos y fuentes', 'fuentes#documentos'],
+              [t('research.fichaNextModel'), 'valoracion#modelo'],
+              [t('research.fichaNextOpportunity'), 'valoracion#oportunidad'],
+              [t('research.fichaNextPeers'), 'valoracion#comparables'],
+              [t('research.fichaNextDocs'), 'fuentes#documentos'],
             ].map(([nextLabel, nextView]) => (
               <NextStepLink href={`/research/${encodeURIComponent(ticker)}?view=${nextView}`} key={nextView}>
                 {nextLabel}
@@ -1358,7 +1233,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           </div>
         </Panel>
         <OwnershipSignalsPanel signals={ownershipSignals} ticker={ticker} />
-        {ticker === 'ASTS' ? <Panel collapsible="mobile" title="Satélites AST"><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=seguimiento#satellites`}>Ver señal orbital exploratoria</Link></Panel> : null}
+        {ticker === 'ASTS' ? <Panel collapsible="mobile" title={t('research.fichaSatellitesPanel')}><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=seguimiento#satellites`}>{t('research.fichaOrbitalSignal')}</Link></Panel> : null}
         <p role="status" className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
           {researchValuability(snapshot)}
         </p>
@@ -1369,6 +1244,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildNoticiasSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     // Noticias de la empresa dentro de su ficha (cohesión: sin salir a
     // /research/news). Mismo componente y misma paginación que la portada de
     // noticias, filtrado por ticker en la API. La lectura sale del lote con
@@ -1382,9 +1258,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     const newsEvents = dedupeNewsEvents(fetchedNews.slice(0, NEWS_PAGE_SIZE));
     // El flujo ya trae su propia sección con cabecera; sin Panel extra.
     return fichaNewsError ? (
-      <Panel title="Noticias de la empresa">
+      <Panel title={t('research.fichaCompanyNews')}>
         <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
-          No se pudieron cargar las noticias. Reintenta en unos segundos.
+          {t('research.fichaNewsLoadError')}
         </p>
       </Panel>
     ) : (
@@ -1403,6 +1279,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildThesisContent = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     const data = await viewData('thesis');
     return (
       <div className="min-w-0 max-w-full space-y-6 [overflow-wrap:anywhere]">
@@ -1414,9 +1291,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             latestStatus={data.thesis?.status ?? null}
             latestVersion={data.thesis?.version ?? null}
             riskNotes={[
-              ...(snapshot?.model_summary && !snapshot.model_summary.publishable ? ['La valoración es parcial o está bloqueada: no es un valor justo final.'] : []),
-              ...((data.thesis?.missing_inputs?.length ?? 0) > 0 ? [`Faltan ${data.thesis?.missing_inputs?.length} inputs del modelo (ver «Datos pendientes»).`] : []),
-              ...(typeof data.thesis?.red_team_score === 'number' && data.thesis.red_team_score < 40 ? [`El red team puntúa ${data.thesis.red_team_score}/100.`] : []),
+              ...(snapshot?.model_summary && !snapshot.model_summary.publishable ? [t('research.fichaRiskPartialValuation')] : []),
+              ...((data.thesis?.missing_inputs?.length ?? 0) > 0 ? [t('research.fichaRiskMissingInputs', { count: data.thesis?.missing_inputs?.length ?? 0 })] : []),
+              ...(typeof data.thesis?.red_team_score === 'number' && data.thesis.red_team_score < 40 ? [t('research.fichaRiskRedTeam', { score: data.thesis.red_team_score })] : []),
             ]}
             olderPublishedVersion={
               data.historyDetail.history
@@ -1430,12 +1307,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             latestDraftVersion={data.historyDetail.history.filter((entry) => entry.status !== 'published').map((entry) => entry.version).reduce((a, b) => Math.max(a, b), 0) || null}
             ticker={ticker}
           />
-          <Badge variant="outline">{data.history.length} versiones</Badge>
-          <Badge variant="outline">{data.claims.length} afirmaciones</Badge>
+          <Badge variant="outline">{t('research.fichaVersionsCount', { count: data.history.length })}</Badge>
+          <Badge variant="outline">{t('research.fichaClaimsCount', { count: data.claims.length })}</Badge>
         </div>
-        <Panel title="Historial de versiones y aprobaciones" collapsible="mobile">
+        <Panel title={t('research.fichaVersionHistory')} collapsible="mobile">
           {data.historyDetail.history.length === 0 ? (
-            <EmptyState title="Aún no hay historial de versiones." />
+            <EmptyState title={t('research.fichaNoVersionHistory')} />
           ) : (
             <PagedList
               className="space-y-3"
@@ -1448,7 +1325,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline">v{entry.version}</Badge>
                         {group.length > 1 ? (
-                          <Badge variant="outline">{group.length} versiones seguidas con el mismo resumen (v{entry.version}–v{group[group.length - 1].version})</Badge>
+                          <Badge variant="outline">{t('research.fichaSameSummaryVersions', { count: group.length, from: entry.version, to: group[group.length - 1].version })}</Badge>
                         ) : null}
                         {versionHistoryBadges(entry, label).map((badge) => (
                           <Badge
@@ -1470,22 +1347,22 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                       {entry.diff ? (
                         <p className="mt-2 text-sm leading-6 text-gray-400">{entry.diff.change_summary}</p>
                       ) : (
-                        <p className="mt-2 text-xs text-gray-500">Primera versión registrada o sin diff persistido.</p>
+                        <p className="mt-2 text-xs text-gray-500">{t('research.fichaFirstVersionNoDiff')}</p>
                       )}
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                        <span>red-team {entry.red_team_score}/100</span>
-                        <span>confianza datos {entry.data_confidence_score}/100</span>
+                        <span>{t('research.fichaRedTeamScore', { score: entry.red_team_score })}</span>
+                        <span>{t('research.fichaDataConfidence', { score: entry.data_confidence_score })}</span>
                       </div>
                     </div>
                   ),
                 };
               })}
-              label="Historial de versiones y aprobaciones"
+              label={t('research.fichaVersionHistory')}
               pageSize={10}
             />
           )}
           <p className="mt-3 text-xs text-gray-500">
-            El historial muestra estado, fecha y resumen del cambio tal como están persistidos; el sistema no registra quién aprobó cada versión.
+            {t('research.fichaHistoryFootnote')}
           </p>
         </Panel>
         <ThesisAudioPlayer
@@ -1493,7 +1370,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           version={data.historyDetail.history.filter((entry) => entry.status === 'published').reduce<number | null>((a, entry) => (a === null ? entry.version : Math.max(a, entry.version)), null)}
         />
         <div id="tesis-actual" style={{ scrollMarginTop: '5rem' }}>
-        <Panel title="Tesis actual">
+        <Panel title={t('research.fichaCurrentThesis')}>
           {data.thesis ? (
             <ThesisMemo
               thesis={data.thesis}
@@ -1507,38 +1384,38 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             />
           ) : (
             <EmptyState
-              action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=fuentes`}>Importa fuentes antes de generar</EmptyLink>}
-              title="Aún no existe ninguna tesis."
+              action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=fuentes`}>{t('research.fichaImportSourcesFirst')}</EmptyLink>}
+              title={t('research.fichaNoThesis')}
             />
           )}
         </Panel>
         </div>
         <ThesisScenariosPanel adrRatio={data.thesis?.valuation_basis?.adr_ratio} currency={company.currency} data={data.scenarios} />
-        <Panel title="Afirmaciones y evidencia">
+        <Panel title={t('research.fichaClaimsEvidence')}>
           <ResearchClaimForm action={createResearchClaim.bind(null, ticker)} />
           <div className="space-y-3">
             {data.claims.length ? groupClaimsByVersion(data.claims, data.history).map((group) => (
               <details key={group.key} open={group.claims.some((claim) => claim.thesis_version_id === data.thesis?.id)} className="rounded-lg border border-gray-800 p-3">
-                <summary className="cursor-pointer text-sm font-semibold text-gray-300">{group.label} · {group.claims.length} afirmaciones</summary>
+                <summary className="cursor-pointer text-sm font-semibold text-gray-300">{t('research.fichaGroupClaims', { label: group.label, count: group.claims.length })}</summary>
                 <PagedList
                   className="mt-3"
                   items={group.claims.map((claim) => ({
                     key: `claim-${claim.id}`,
                     node: (
                       <div className="rounded-lg border border-gray-800 p-4">
-                        <div className="flex flex-wrap gap-2"><Badge variant="outline">{label(claim.status)}</Badge><Badge variant="outline">materialidad {claim.materiality_score}</Badge><Badge variant="outline">{claim.evidence.length} pruebas</Badge></div>
+                        <div className="flex flex-wrap gap-2"><Badge variant="outline">{label(claim.status)}</Badge><Badge variant="outline">{t('research.fichaMaterialityLower', { score: claim.materiality_score })}</Badge><Badge variant="outline">{t('research.fichaEvidenceCount', { count: claim.evidence.length })}</Badge></div>
                         <p className="mt-3 text-sm text-gray-300">{claim.statement}</p>
                       </div>
                     ),
                   }))}
-                  label={`Afirmaciones de ${group.label}`}
+                  label={t('research.fichaClaimsOf', { label: group.label })}
                   pageSize={10}
                 />
               </details>
             )) : (
               <EmptyState
-                action={<EmptyLink href="#statement">Escribe la primera afirmación</EmptyLink>}
-                title="Sin afirmaciones registradas."
+                action={<EmptyLink href="#statement">{t('research.fichaWriteFirstClaim')}</EmptyLink>}
+                title={t('research.fichaNoClaims')}
               />
             )}
           </div>
@@ -1548,6 +1425,8 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildChangesContent = async (): Promise<React.ReactNode> => {
+    const t = await getT();
+    const locale = await getLocale();
     const data = await viewData('changes');
     // Contexto de guía (revisiones anclables + noticias atribuidas): opcional,
     // su fallo no puede romper la pestaña Seguir.
@@ -1561,36 +1440,41 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         {data.changes.length || data.reviews.length || data.alerts.length ? (
           <ChangesFeed alerts={data.alerts} changes={data.changes} reviews={data.reviews} ticker={ticker} />
         ) : (
-          <Panel title="Qué ha cambiado">
+          <Panel title={t('research.fichaWhatChanged')}>
             <EmptyState
-              action={<EmptyLink href="/research/news">Analiza la última noticia</EmptyLink>}
-              title="Sin cambios materiales registrados."
+              action={<EmptyLink href="/research/news">{t('research.fichaAnalyzeLatestNews')}</EmptyLink>}
+              title={t('research.fichaNoMaterialChanges')}
             />
           </Panel>
         )}
         <GuideContextPanel ticker={ticker} context={guideContext} hideReviews />
-        <DecisionAndRealityPanel ticker={ticker} decisions={data.decisions} reviews={data.expectations} trades={data.trades} />
+        <DecisionAndRealityPanel ticker={ticker} decisions={data.decisions} reviews={data.expectations} trades={data.trades} t={t} locale={locale} />
         <CompanyPaperTrades state={paperTrades} ticker={ticker} />
       </div>
     );
   };
 
   const buildHoldersSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     const holders = await viewData('holders');
     // Propietarios = 13F (gestores) + insiders (Form 4, SEC EDGAR, gratis).
     // Los Form 4 persistidos se leen del backend; sin red ni proveedor de
     // pago. Best-effort: cualquier fallo degrada a panel vacio honesto.
-    const insiderFilings = await getInsiderFilings(ticker, 8).catch(() => null);
+    const [insiderFilings, participation] = await Promise.all([
+      getInsiderFilings(ticker, 8).catch(() => null),
+      getParticipationFilings(ticker).catch(() => null),
+    ]);
     return (
       <div className="space-y-6">
+        <ParticipationFilingsPanel data={participation} />
         {holders === null ? (
-          <EmptyState title="No se pudieron cargar los superinversores de esta empresa." />
+          <EmptyState title={t('research.fichaHoldersLoadError')} />
         ) : holders.status === 'sin_identificador' ? (
-          <EmptyState title={holders.identity_source ?? 'Sin identidad CUSIP verificada para cruzar los 13F.'} />
+          <EmptyState title={holders.identity_source ?? t('research.fichaNoCusipIdentity')} />
         ) : holders.status === 'sin_datos' ? (
-          <EmptyState title="Sin informes 13F sincronizados." />
+          <EmptyState title={t('research.fichaNo13fSynced')} />
         ) : (
-          <Panel title="Superinversores que la declaran">
+          <Panel title={t('research.fichaHoldersPanel')}>
             {holders.holders.length ? (
               <ul className="space-y-3">
                 {holders.holders.map((holder) => (
@@ -1600,12 +1484,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                       <span className="text-gray-200">{holder.value_usd !== null ? formatMarketCapUsd(holder.value_usd) : NA}</span>
                     </div>
                     <p className="mt-1 text-xs text-gray-500">
-                      Cartera a {holder.report_date ? formatDate(holder.report_date) : 'fecha desconocida'}
-                      {holder.coverage === 'partial' ? ' · Datos parciales' : ''}
+                      {t('research.fichaPortfolioAt', { date: holder.report_date ? formatDate(holder.report_date) : t('research.fichaUnknownDate') })}
+                      {holder.coverage === 'partial' ? ` · ${t('research.fichaPartialData')}` : ''}
                       {holder.filing_url ? (
                         <>
                           {' · '}
-                          <a className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={holder.filing_url} rel="noopener noreferrer" target="_blank">13F original</a>
+                          <a className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={holder.filing_url} rel="noopener noreferrer" target="_blank">{t('research.fichaOriginal13f')}</a>
                         </>
                       ) : null}
                     </p>
@@ -1613,23 +1497,23 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 ))}
               </ul>
             ) : (
-              <EmptyState title="Ningún gestor revisado la declara en su último 13F." />
+              <EmptyState title={t('research.fichaNoManagerDeclares')} />
             )}
             <p className="mt-4 text-xs text-gray-500">
-              {holders.managers_with_data} gestores con datos · {holders.managers_without_data} sin datos
-              {holders.managers_partial ? ` · ${holders.managers_partial} parciales` : ''} · {ownershipLimitations(holders.limitations)}
+              {t('research.fichaManagersSummary', { withData: holders.managers_with_data, withoutData: holders.managers_without_data })}
+              {holders.managers_partial ? t('research.fichaManagersPartialSuffix', { count: holders.managers_partial }) : ''} · {ownershipLimitations(holders.limitations)}
             </p>
           </Panel>
         )}
-        <Panel title="Insiders (Form 4 · SEC EDGAR)">
+        <Panel title={t('research.fichaInsidersPanel')}>
           {insiderFilings === null || insiderFilings.status !== 'ok' || insiderFilings.filings.length === 0 ? (
             insiderFilings?.foreign_issuer ? (
               <EmptyState
-                description="Los emisores privados extranjeros están exentos de la Sección 16 de la SEC: no presentan Form 4. Sus insiders declaran en el registro de su país (p. ej. SEDI en Canadá, NSM/FCA en Reino Unido), no en EDGAR."
-                title="Sin Form 4: emisor extranjero"
+                description={t('research.fichaForeignIssuerDesc')}
+                title={t('research.fichaForeignIssuerTitle')}
               />
             ) : (
-              <EmptyState title="Sin operaciones insider persistidas para este ticker." />
+              <EmptyState title={t('research.fichaNoInsiderTrades')} />
             )
           ) : (
             <ul className="space-y-3">
@@ -1637,25 +1521,25 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 <li className="rounded-lg border border-gray-800 p-3 text-sm" key={filing.accession_number}>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span className="text-gray-300">
-                      {filing.form}{filing.is_amendment ? ' (enmienda)' : ''} · {filing.filing_date ? formatDate(filing.filing_date) : 'fecha desconocida'}
+                      {filing.form}{filing.is_amendment ? t('research.fichaAmendmentSuffix') : ''} · {filing.filing_date ? formatDate(filing.filing_date) : t('research.fichaUnknownDate')}
                     </span>
                     {safeHttpUrl(filing.source_url) ? (
-                      <a className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={safeHttpUrl(filing.source_url) ?? undefined} rel="noopener noreferrer" target="_blank">Form 4 original</a>
+                      <a className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={safeHttpUrl(filing.source_url) ?? undefined} rel="noopener noreferrer" target="_blank">{t('research.fichaOriginalForm4')}</a>
                     ) : null}
                   </div>
                   <ul className="mt-2 space-y-1 text-xs text-gray-400">
                     {filing.transactions.slice(0, 6).map((tx, index) => (
                       <li key={`${filing.accession_number}-${index}`}>
-                        {insiderName(tx.insider)} · {insiderRole(tx.role, tx.officer_title)} · {tx.code === 'P' ? 'Compra' : tx.code === 'S' ? 'Venta' : tx.code ?? '—'}
-                        {typeof tx.shares === 'number' ? ` · ${formatNumber(tx.shares)} acciones` : ''}
+                        {insiderName(tx.insider)} · {insiderRole(tx.role, tx.officer_title)} · {tx.code === 'P' ? t('research.fichaTxBuy') : tx.code === 'S' ? t('research.fichaTxSell') : tx.code ?? '—'}
+                        {typeof tx.shares === 'number' ? t('research.fichaTxSharesSuffix', { count: formatNumber(tx.shares) }) : ''}
                         {typeof tx.value === 'number' && Number.isFinite(tx.value) ? ` · ${tx.currency && isValidCurrencyCode(tx.currency) ? formatPrice(tx.value, tx.currency, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : formatNumber(tx.value, { maximumFractionDigits: 0 })}` : ''}
-                        {tx.currency == null && typeof tx.value === 'number' ? ' · divisa no informada' : ''}
+                        {tx.currency == null && typeof tx.value === 'number' ? t('research.fichaTxNoCurrencySuffix') : ''}
                         {tx.tx_date ? ` · ${formatDate(tx.tx_date)}` : ''}
                       </li>
                     ))}
                   </ul>
                   {filing.transactions.length > 6 ? (
-                    <p className="mt-1 text-xs text-gray-500">Se muestran 6 de {formatNumber(filing.transactions.length, { maximumFractionDigits: 0 })} operaciones de este formulario.</p>
+                    <p className="mt-1 text-xs text-gray-500">{t('research.fichaTxShown', { total: formatNumber(filing.transactions.length, { maximumFractionDigits: 0 }) })}</p>
                   ) : null}
                 </li>
               ))}
@@ -1667,6 +1551,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildFinancialsContent = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     const data = await viewData('financials');
     return (
       <div className="space-y-6">
@@ -1676,34 +1561,36 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               La decision usa el perfil (mercado declarado), no solo el
               sufijo del ticker: los europeos canonicos no lo llevan (AENA). */}
           {fmpCovers(ticker, company.exchange) ? (
-            <MutationForm action={refreshCompanyFinancials.bind(null, ticker)} successMessage="Financieros actualizados (FMP)"><Button type="submit" variant="outline">Refrescar financieros (FMP)</Button></MutationForm>
+            <MutationForm action={refreshCompanyFinancials.bind(null, ticker)} successMessage={t('research.fichaFinancialsUpdatedFmp')}><Button type="submit" variant="outline">{t('research.fichaRefreshFinancialsFmp')}</Button></MutationForm>
           ) : null}
           {isEsefIssuerProfile(ticker, company.exchange) ? (
-            <MutationForm action={refreshCompanyFinancialsESEF.bind(null, ticker)} successMessage="Financieros ESEF refrescados"><Button type="submit" variant="outline">Refrescar ESEF</Button></MutationForm>
+            <MutationForm action={refreshCompanyFinancialsESEF.bind(null, ticker)} successMessage={t('research.fichaFinancialsUpdatedEsef')}><Button type="submit" variant="outline">{t('research.fichaRefreshEsef')}</Button></MutationForm>
           ) : (
-            <MutationForm action={refreshCompanyFinancialsSEC.bind(null, ticker)} successMessage="Financieros SEC refrescados"><Button type="submit" variant="outline">Refrescar SEC</Button></MutationForm>
+            <MutationForm action={refreshCompanyFinancialsSEC.bind(null, ticker)} successMessage={t('research.fichaFinancialsUpdatedSec')}><Button type="submit" variant="outline">{t('research.fichaRefreshSec')}</Button></MutationForm>
           )}
-          <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage="Métricas y modelo de research refrescados"><Button type="submit"><RefreshCcw className="mr-2 h-4 w-4" />Recalcular</Button></MutationForm>
+          <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage={t('research.fichaModelMetricsRefreshed')}><Button type="submit"><RefreshCcw className="mr-2 h-4 w-4" />{t('research.fichaRecalculate')}</Button></MutationForm>
         </div>
-        <Panel title="Fundamentales actuales · TTM (últimos 4 trimestres)"><TtmPanel ttm={data.ttm} /></Panel>
-        <Panel title="Métricas calculadas trazables"><MetricsGrid metrics={data.calculatedMetrics} /></Panel>
-        <Panel title="Hechos financieros canónicos"><FactTable ticker={ticker} facts={data.facts} refreshLabel={
+        <Panel title={t('research.fichaCurrentFundamentals')}><TtmPanel ttm={data.ttm} /></Panel>
+        <Panel title={t('research.fichaTraceableMetrics')}><MetricsGrid metrics={data.calculatedMetrics} /></Panel>
+        <Panel title={t('research.fichaCanonicalFacts')}><FactTable ticker={ticker} facts={data.facts} refreshLabel={
             fmpCovers(ticker, company.exchange)
-              ? 'Refrescar financieros (FMP)'
+              ? t('research.fichaRefreshFinancialsFmp')
               : isEsefIssuerProfile(ticker, company.exchange)
-                ? 'Refrescar ESEF'
-                : 'Refrescar SEC'
+                ? t('research.fichaRefreshEsef')
+                : t('research.fichaRefreshSec')
           } /></Panel>
       </div>
     );
   };
 
   const buildModelSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
+    const locale = await getLocale();
     const model = await viewData('model');
     return (
       <div className="space-y-5">
-        <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage="Modelo a largo plazo generado"><Button type="submit"><RefreshCcw className="mr-2 h-4 w-4" />Generar modelo</Button></MutationForm>
-        <LongTermModelPanel model={model?.status === 'not_generated' ? null : model} ticker={ticker} />
+        <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage={t('research.fichaModelGenerated')}><Button type="submit"><RefreshCcw className="mr-2 h-4 w-4" />{t('research.fichaGenerateModel')}</Button></MutationForm>
+        <LongTermModelPanel model={model?.status === 'not_generated' ? null : model} ticker={ticker} t={t} locale={locale} />
       </div>
     );
   };
@@ -1713,27 +1600,28 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildMoatSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     const moat = await viewData('moat');
     return (
       <div className="space-y-5">
-        <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage="Evaluación del foso refrescada"><Button type="submit" variant="outline"><ShieldCheck className="mr-2 h-4 w-4" />Reevaluar evidencia</Button></MutationForm>
-        <MoatClassificationPanel moat={moat} />
-        <MoatChecklistPanel moat={moat} />
+        <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage={t('research.fichaMoatRefreshed')}><Button type="submit" variant="outline"><ShieldCheck className="mr-2 h-4 w-4" />{t('research.fichaReevaluateEvidence')}</Button></MutationForm>
+        <MoatClassificationPanel moat={moat} ti={t} />
+        <MoatChecklistPanel moat={moat} ti={t} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {moat?.moats.length ? moat.moats.map((item) => {
             const definition = moatDefinition(item.type);
             return (
               <div className="rounded-xl border border-gray-800 bg-surface-1 p-4" key={item.type}>
                 <div className="flex justify-between gap-3"><MoatTerm type={item.type} /><Badge>{item.strength}/100</Badge></div>
-                <p className="mt-3 text-sm text-gray-400">{label(item.status)} · {label(item.trend)} · persistencia {label(item.persistence)}</p>
+                <p className="mt-3 text-sm text-gray-400">{label(item.status)} · {label(item.trend)} · {t('research.fichaPersistence')} {label(item.persistence)}</p>
                 {definition ? <p className="mt-2 text-xs leading-5 text-gray-500">{definition}</p> : null}
-                <p className="mt-2 text-xs text-gray-500">{item.supporting_claim_ids.length} afirmaciones a favor · {item.contradicting_claim_ids.length} en contra</p>
+                <p className="mt-2 text-xs text-gray-500">{t('research.fichaMoatClaims', { forCount: item.supporting_claim_ids.length, againstCount: item.contradicting_claim_ids.length })}</p>
               </div>
             );
           }) : (
             <EmptyState
-              action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>Genera el modelo y reevalúa el foso</EmptyLink>}
-              title="Sin evaluación de foso persistida."
+              action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>{t('research.fichaGenerateModelReevaluate')}</EmptyLink>}
+              title={t('research.fichaNoMoatEval')}
             />
           )}
         </div>
@@ -1742,19 +1630,21 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildSatellitesSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     // El panel ya degrada solo cuando no hay datos; aquí la lectura llega del
     // lote en paralelo (null si degradó, igual que antes).
     const satellites = ticker === 'ASTS' ? await viewData('satellites') : null;
-    return ticker === 'ASTS' ? <AstOrbitPanel data={satellites?.orbits ?? null} analysis={satellites?.analysis ?? null} /> : <EmptyState title="Esta vista orbital solo está disponible para ASTS." />;
+    return ticker === 'ASTS' ? <AstOrbitPanel data={satellites?.orbits ?? null} analysis={satellites?.analysis ?? null} /> : <EmptyState title={t('research.fichaOrbitalOnlyAsts')} />;
   };
 
   const buildPeersSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     const peers = await viewData('peers');
     return (
       <div className="space-y-6">
-        <Panel title="Conjunto de comparables"><p className="text-sm text-gray-300">{peers.comparison?.basis ? (PEERS_BASIS_LABELS[peers.comparison.basis] ?? peers.comparison.basis) : 'Sin conjunto de comparables'} · {peers.comparison?.peer_count ?? 0} comparables con datos{(peers.comparison?.peers_without_data ?? []).length > 0 ? ` · sin datos: ${(peers.comparison?.peers_without_data ?? []).join(', ')}` : ''}</p><div className="mt-4 flex flex-wrap gap-2">{peers.comparison?.companies.map((peer) => <Badge variant={peer.is_target ? 'default' : 'outline'} key={peer.ticker}>{peer.ticker}</Badge>)}</div></Panel>
-        <Panel title="Métricas comparables"><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{Object.entries(peers.comparison?.benchmarks ?? {}).map(([metric, value]) => <div className="rounded-lg border border-gray-800 p-3" key={metric}><div className="text-sm text-gray-200">{metric}</div><div className="mt-2 text-xs text-gray-500">Objetivo {formatPeerValue(value.target_value, metric)}{value.target_atypical ? ' (atípico: posible ganancia no operativa)' : ''} · mediana {peerMedianText(value, metric)} · n={value.peer_sample_size}</div>{(value.excluded_atypical ?? []).length > 0 ? <div className="mt-1 text-xs text-amber-300/80">Fuera de la mediana: {(value.excluded_atypical ?? []).map((ex) => `${ex.ticker} ${ex.value ?? 's/d'}`).join(', ')} - lectura atípica verificable, no benchmark</div> : null}</div>)}</div></Panel>
-        <Panel title="Ventajas y desventajas"><p className="text-sm text-gray-400">{peers.analysis?.methodology ? (PEERS_METHODOLOGY_ES[peers.analysis.methodology] ?? peers.analysis.methodology) : 'Sin análisis de comparables persistido.'}</p><p className="mt-3 text-xs text-amber-300">{peers.analysis?.insufficient_data.join(', ')}</p></Panel>
+        <Panel title={t('research.fichaPeerSet')}><p className="text-sm text-gray-300">{peers.comparison?.basis ? (PEERS_BASIS_KEYS[peers.comparison.basis] ? t(PEERS_BASIS_KEYS[peers.comparison.basis]) : peers.comparison.basis) : t('research.fichaNoPeerSet')} · {t('research.fichaPeersWithData', { count: peers.comparison?.peer_count ?? 0 })}{(peers.comparison?.peers_without_data ?? []).length > 0 ? t('research.fichaPeersWithoutDataSuffix', { list: (peers.comparison?.peers_without_data ?? []).join(', ') }) : ''}</p><div className="mt-4 flex flex-wrap gap-2">{peers.comparison?.companies.map((peer) => <Badge variant={peer.is_target ? 'default' : 'outline'} key={peer.ticker}>{peer.ticker}</Badge>)}</div></Panel>
+        <Panel title={t('research.fichaPeerMetrics')}><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{Object.entries(peers.comparison?.benchmarks ?? {}).map(([metric, value]) => <div className="rounded-lg border border-gray-800 p-3" key={metric}><div className="text-sm text-gray-200">{metric}</div><div className="mt-2 text-xs text-gray-500">{t('research.fichaPeerTarget', { value: formatPeerValue(value.target_value, metric) })}{value.target_atypical ? t('research.fichaAtypicalSuffix') : ''}{t('research.fichaMedianSuffix', { value: peerMedianText(value, metric) })}{t('research.fichaSampleSuffix', { count: value.peer_sample_size })}</div>{(value.excluded_atypical ?? []).length > 0 ? <div className="mt-1 text-xs text-amber-300/80">{t('research.fichaOutsideMedian', { list: (value.excluded_atypical ?? []).map((ex) => `${ex.ticker} ${ex.value ?? t('research.fichaNoDataShort')}`).join(', ') })}</div> : null}</div>)}</div></Panel>
+        <Panel title={t('research.fichaAdvantages')}><p className="text-sm text-gray-400">{peers.analysis?.methodology ? (PEERS_METHODOLOGY_KEYS[peers.analysis.methodology] ? t(PEERS_METHODOLOGY_KEYS[peers.analysis.methodology]) : peers.analysis.methodology) : t('research.fichaNoPeerAnalysis')}</p><p className="mt-3 text-xs text-amber-300">{peers.analysis?.insufficient_data.join(', ')}</p></Panel>
       </div>
     );
   };
@@ -1764,6 +1654,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildDocumentsContent = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     // Conexión 10a: las lecturas de la biblioteca enlazadas a este ticker se
     // piden en paralelo; si la biblioteca falla, la vista sigue sin ellas.
     const [documents, libraryReadings] = await Promise.all([
@@ -1773,18 +1664,18 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     return (
       <div className="space-y-6">
         <details className="rounded-lg border border-gray-800 bg-surface-1 p-4" data-testid="add-source">
-          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-teal-300">Añadir fuente (subir archivo o importar URL)</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-teal-300">{t('research.fichaAddSource')}</summary>
           <div className="mt-4">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <Panel title="Sube una fuente primaria"><MutationForm action={importResearchDocumentFile} className="grid grid-cols-1 gap-3" successMessage="Documento subido"><input type="hidden" name="ticker" value={ticker} /><Input name="title" placeholder="Título del documento" required /><FileUploadInput name="file" required /><Button type="submit">Subir</Button></MutationForm></Panel>
-          <Panel title="Importar desde una URL"><MutationForm action={importResearchDocumentUrl} className="grid grid-cols-1 gap-3" successMessage="Documento importado"><input type="hidden" name="ticker" value={ticker} /><Input name="title" placeholder="Título del documento" required /><Input name="url" type="url" placeholder="https://..." required /><Input name="source_type" placeholder="sec_filing / investor_relations" defaultValue="url" /><Button type="submit">Importar</Button></MutationForm></Panel>
+          <Panel title={t('research.fichaUploadPrimarySource')}><MutationForm action={importResearchDocumentFile} className="grid grid-cols-1 gap-3" successMessage={t('research.fichaDocUploaded')}><input type="hidden" name="ticker" value={ticker} /><Input name="title" placeholder={t('research.fichaDocTitlePh')} required /><FileUploadInput name="file" required /><Button type="submit">{t('research.fichaUpload')}</Button></MutationForm></Panel>
+          <Panel title={t('research.fichaImportFromUrl')}><MutationForm action={importResearchDocumentUrl} className="grid grid-cols-1 gap-3" successMessage={t('research.fichaDocImported')}><input type="hidden" name="ticker" value={ticker} /><Input name="title" placeholder={t('research.fichaDocTitlePh')} required /><Input name="url" type="url" placeholder="https://..." required /><Input name="source_type" placeholder="sec_filing / investor_relations" defaultValue="url" /><Button type="submit">{t('research.fichaImport')}</Button></MutationForm></Panel>
         </div>
           </div>
         </details>
         {/* F249: las fichas enlazan a la fuente primaria cuando el
             documento tiene source_url (filings SEC la traen); sin URL la
             ficha queda como texto, nunca un enlace roto. */}
-        <Panel title="Documentos" actions={<Link className="text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}/filings`}>Informe frente al año anterior</Link>}>
+        <Panel title={t('research.fichaDocuments')} actions={<Link className="text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}/filings`}>{t('research.fichaYearOverYearReport')}</Link>}>
           {documents.length ? (
             <DocumentsList
               documents={documents.map((document) => ({
@@ -1794,20 +1685,20 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 tier: etiquetaTierFuente(document.source_tier),
                 tierRank: tierRankFuente(document.source_tier),
                 type: label(document.source_type),
-                published: document.published_at ? formatDate(document.published_at) : 'fecha desconocida',
+                published: document.published_at ? formatDate(document.published_at) : t('research.fichaUnknownDate'),
                 publishedTs: document.published_at ?? null,
               }))}
             />
           ) : (
             <EmptyState
-              action={<EmptyLink href="/research/sources">Importa tu primer documento</EmptyLink>}
-              title="Sin documentos ingeridos."
+              action={<EmptyLink href="/research/sources">{t('research.fichaImportFirstDoc')}</EmptyLink>}
+              title={t('research.fichaNoDocsIngested')}
             />
           )}
         </Panel>
-        <Panel title="Lecturas de la biblioteca" actions={<Link className="text-sm text-teal-300" href="/knowledge?tab=subir">Añadir a la biblioteca</Link>}>
+        <Panel title={t('research.fichaLibraryReadings')} actions={<Link className="text-sm text-teal-300" href="/knowledge?tab=subir">{t('research.fichaAddToLibrary')}</Link>}>
           {libraryReadings === null ? (
-            <EmptyState title="No se pudo cargar la biblioteca ahora mismo." />
+            <EmptyState title={t('research.fichaLibraryLoadError')} />
           ) : libraryReadings.length ? (
             <ul className="space-y-3">
               {libraryReadings.map((reading) => (
@@ -1816,14 +1707,14 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                     <FileText className="h-4 w-4 text-teal-300" />
                     <Link className="font-medium text-gray-200 underline decoration-gray-700 underline-offset-4 transition hover:text-teal-200" href={libraryDocumentHref(reading.id)}>{reading.title}</Link>
                   </div>
-                  <p className="mt-2 text-xs text-gray-500">{reading.author ?? 'Autor desconocido'}{reading.publication_date ? ` · ${formatDate(reading.publication_date)}` : ''}</p>
+                  <p className="mt-2 text-xs text-gray-500">{reading.author ?? t('research.fichaUnknownAuthor')}{reading.publication_date ? ` · ${formatDate(reading.publication_date)}` : ''}</p>
                 </li>
               ))}
             </ul>
           ) : (
             <EmptyState
-              action={<EmptyLink href="/knowledge">Asigna este ticker a un documento de la biblioteca</EmptyLink>}
-              title={`Ningún libro, carta o nota de la biblioteca está enlazado a ${ticker}.`}
+              action={<EmptyLink href="/knowledge">{t('research.fichaAssignTickerToDoc')}</EmptyLink>}
+              title={t('research.fichaNoLibraryLink', { ticker })}
             />
           )}
         </Panel>
@@ -1832,24 +1723,25 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildSourcesSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     const audits = await viewData('sources');
     return (
-      <Panel title="Auditorías de fuentes">
+      <Panel title={t('research.fichaSourceAudits')}>
         {audits.length ? (
           <div className="space-y-3">
-            {audits.length > 100 ? <p className="text-xs text-gray-500">Se muestran 100 de {formatNumber(audits.length, { maximumFractionDigits: 0 })} auditorías: la última y hasta 99 anteriores.</p> : null}
+            {audits.length > 100 ? <p className="text-xs text-gray-500">{t('research.fichaAuditsShown', { total: formatNumber(audits.length, { maximumFractionDigits: 0 }) })}</p> : null}
             {/* Solo la auditoría más reciente a la vista; el historial de
                 versiones viejas queda plegado (era un muro de tarjetas casi
                 idénticas que se leía como bug). */}
             {(() => {
               const ordered = sortAuditsRecentFirst(audits);
-              const renderAudit = (audit: (typeof ordered)[number]) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">{audit.thesis_version != null ? `tesis v${audit.thesis_version}` : 'versión de tesis no registrada'}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>;
+              const renderAudit = (audit: (typeof ordered)[number]) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">{audit.thesis_version != null ? t('research.fichaThesisVersionShort', { version: audit.thesis_version }) : t('research.fichaThesisVersionMissing')}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>;
               const previous = ordered.slice(1, 100);
               return <>
                 {renderAudit(ordered[0])}
                 {previous.length ? (
                   <details className="rounded-lg border border-gray-800 p-4">
-                    <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-gray-400">{formatNumber(previous.length, { maximumFractionDigits: 0 })} {previous.length === 1 ? 'auditoría anterior' : 'auditorías anteriores'} de versiones viejas de la tesis</summary>
+                    <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-gray-400">{formatNumber(previous.length, { maximumFractionDigits: 0 })} {previous.length === 1 ? t('research.fichaAuditPreviousSingular') : t('research.fichaAuditPreviousPlural')} {t('research.fichaAuditsOldVersions')}</summary>
                     <div className="mt-3 space-y-3">{previous.map(renderAudit)}</div>
                   </details>
                 ) : null}
@@ -1858,8 +1750,8 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           </div>
         ) : (
           <EmptyState
-            action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>Genera una tesis para auditar fuentes</EmptyLink>}
-            title="Sin auditorías de fuentes persistidas."
+            action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>{t('research.fichaGenerateThesisForAudit')}</EmptyLink>}
+            title={t('research.fichaNoSourceAudits')}
           />
         )}
       </Panel>
@@ -1867,10 +1759,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildChatSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     return (
       <div className="space-y-6" id="chat-empresa" style={{ scrollMarginTop: '1rem' }}>
         <LegacyChatRedirect ticker={ticker} question={query.chat} />
-        <Panel title="Pregunta al Cerebro sobre esta empresa">
+        <Panel title={t('research.fichaAskBrain')}>
           {/* Sin chat propio: los atajos y el campo abren el Cerebro (panel
               global) con el ticker puesto, con su contexto de página e historial. */}
           <ChatIntentLinks ticker={ticker} />
@@ -1883,14 +1776,14 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   // Secciones que eran subrutas propias hasta el 29-oct-2026.
   const buildTerminalSection = async (): Promise<React.ReactNode> => {
     const terminal = await viewData('terminal');
-    if (!terminal) return <EmptyState title="Sin datos del terminal financiero todavía: se cargan con los financieros de la empresa." />;
+    if (!terminal) return <EmptyState title={t('research.fichaTerminalEmpty')} />;
     return <FinancialTerminalSection metrics={terminalQuery.metrics} periodicity={terminalQuery.periodicity} terminal={terminal} years={terminalQuery.years} />;
   };
   const buildCapitalSection = async (): Promise<React.ReactNode> => <ShareCapitalSection data={await viewData('capital')} ticker={ticker} />;
   const buildSupuestosSection = async (): Promise<React.ReactNode> => <DriverAssumptionsSection assumptions={await viewData('supuestos')} ticker={ticker} />;
   const buildDirectivaSection = async (): Promise<React.ReactNode> => {
     const dashboard = await viewData('directiva');
-    if (!dashboard) return <EmptyState title="Sin compromisos de la directiva registrados todavía." />;
+    if (!dashboard) return <EmptyState title={t('research.fichaDirectivaEmpty')} />;
     return <ManagementCredibilitySection dashboard={dashboard} ticker={ticker} />;
   };
   const buildLeccionesSection = async (): Promise<React.ReactNode> => <DecisionLessonsSection data={await viewData('lecciones')} ticker={ticker} />;
@@ -1914,38 +1807,38 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   if (activeView === 'overview') {
     sections = [
       { node: await buildOverviewContent() },
-      await optionalSection('noticias', 'Noticias', buildNoticiasSection),
+      await optionalSection('noticias', t('research.fichaSecNoticias'), buildNoticiasSection),
     ];
   } else if (activeView === 'thesis') {
     sections = [{ node: await buildThesisContent() }];
   } else if (activeView === 'financials') {
     sections = [
-      { id: 'financieros', title: 'Financieros', node: await buildFinancialsContent() },
-      await optionalSection('terminal', 'Terminal financiero', buildTerminalSection),
-      await optionalSection('dilucion', 'Dilución y recompras', buildCapitalSection),
+      { id: 'financieros', title: t('research.fichaSecFinancieros'), node: await buildFinancialsContent() },
+      await optionalSection('terminal', t('research.fichaSecTerminal'), buildTerminalSection),
+      await optionalSection('dilucion', t('research.fichaSecDilucion'), buildCapitalSection),
     ];
   } else if (activeView === 'valuation') {
     sections = [
-      { id: 'valoracion', title: 'Valoración', node: await buildValuationContent() },
-      await optionalSection('modelo', 'Modelo a largo plazo', buildModelSection),
-      await optionalSection('supuestos', 'Supuestos de drivers', buildSupuestosSection),
-      await optionalSection('oportunidad', 'Oportunidad de mercado', buildMarketOpportunitySection),
-      await optionalSection('comparables', 'Comparables', buildPeersSection),
-      await optionalSection('foso', 'Foso', buildMoatSection),
+      { id: 'valoracion', title: t('research.fichaSecValoracion'), node: await buildValuationContent() },
+      await optionalSection('modelo', t('research.fichaSecModelo'), buildModelSection),
+      await optionalSection('supuestos', t('research.fichaSecSupuestos'), buildSupuestosSection),
+      await optionalSection('oportunidad', t('research.fichaSecOportunidad'), buildMarketOpportunitySection),
+      await optionalSection('comparables', t('research.fichaSecComparables'), buildPeersSection),
+      await optionalSection('foso', t('research.fichaSecFoso'), buildMoatSection),
     ];
   } else if (activeView === 'changes') {
     sections = [
-      { id: 'cambios', title: 'Cambios y revisiones', node: await buildChangesContent() },
-      await optionalSection('superinversores', 'Superinversores', buildHoldersSection),
-      await optionalSection('directiva', 'Credibilidad de la directiva', buildDirectivaSection),
-      await optionalSection('lecciones', 'Lecciones de decisiones', buildLeccionesSection),
-      ...(ticker === 'ASTS' ? [await optionalSection('satellites', 'Satélites AST', buildSatellitesSection)] : []),
+      { id: 'cambios', title: t('research.fichaSecCambios'), node: await buildChangesContent() },
+      await optionalSection('superinversores', t('research.fichaSecSuperinversores'), buildHoldersSection),
+      await optionalSection('directiva', t('research.fichaSecDirectiva'), buildDirectivaSection),
+      await optionalSection('lecciones', t('research.fichaSecLecciones'), buildLeccionesSection),
+      ...(ticker === 'ASTS' ? [await optionalSection('satellites', t('research.fichaSecSatelites'), buildSatellitesSection)] : []),
     ];
   } else {
     sections = [
-      { id: 'documentos', title: 'Documentos', node: await buildDocumentsContent() },
-      await optionalSection('fuentes', 'Fuentes', buildSourcesSection),
-      { id: 'chat', title: 'Chat con fuentes', node: await buildChatSection() },
+      { id: 'documentos', title: t('research.fichaSecDocumentos'), node: await buildDocumentsContent() },
+      await optionalSection('fuentes', t('research.fichaSecFuentes'), buildSourcesSection),
+      { id: 'chat', title: t('research.fichaSecChat'), node: await buildChatSection() },
     ];
   }
 
@@ -1958,7 +1851,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   // el fallback de label()). Un company_type portfolio_holding sin
   // posicion viva se muestra como candidato de analisis.
   const holdingBadge = snapshot.in_portfolio
-    ? 'en cartera'
+    ? t('research.fichaInPortfolio')
     : companyTypeLabel(company.company_type === 'portfolio_holding' ? 'research_candidate' : company.company_type);
 
   return (
@@ -1969,7 +1862,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       <Suspense fallback={null}><ResearchHashScroll /></Suspense>
       <div className="mx-auto max-w-[1600px]">
         {/* Desde md las migas ya llevan a Research: la flecha solo queda en movil. */}
-        <Link className="mb-3 inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 md:hidden" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
+        <Link className="mb-3 inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 md:hidden" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />{t('research.fichaBackResearch')}</Link>
         <header className="mb-6 flex flex-col gap-4 border-b border-gray-800 pb-6">
           <div className="flex items-start gap-3 sm:gap-4">
             <CompanyLogo ticker={ticker} name={company.name || ticker} className="size-12 shrink-0 rounded-xl sm:size-14" />
@@ -1995,13 +1888,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           {/* Ancla del comando GP del buscador (`ASTS GP` -> #grafico). */}
           {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton />}><CompanyHeaderQuote compact={activeView !== 'overview'} snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
           <ChangesSinceVisit ticker={ticker} />
-          <div className="scroll-mt-6" id="analistas"><MobileCollapse title="Precios objetivo de analistas"><Suspense fallback={null}><AnalystTargetsSection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></Suspense></MobileCollapse></div>
-          <MobileCollapse title="Señales DCA: histórico"><Suspense fallback={null}><DcaHitRatesSection ticker={ticker} /></Suspense></MobileCollapse>
+          <div className="scroll-mt-6" id="analistas"><MobileCollapse title={t('research.fichaAnalystTargetsTitle')}><Suspense fallback={null}><AnalystTargetsSection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></Suspense></MobileCollapse></div>
+          <MobileCollapse title={t('research.fichaDcaSignalsTitle')}><Suspense fallback={null}><DcaHitRatesSection ticker={ticker} /></Suspense></MobileCollapse>
         </header>
         {sections.filter((section) => section.id && section.title).length > 1 ? (
           // Sumario local de la pestaña (anclas dentro de la página): nunca
           // otra barra global de menús.
-          <nav aria-label="En esta página" className="mb-6 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <nav aria-label={t('research.fichaOnThisPage')} className="mb-6 flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {sections.filter((section) => section.id && section.title).map((section) => (
               <a className="inline-flex min-h-[44px] items-center text-gray-500 hover:text-teal-300 sm:min-h-0" href={`#${section.id}`} key={section.id}>
                 {section.title}

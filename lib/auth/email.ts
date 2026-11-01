@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 
 import { smtpConfig } from '@/lib/access-request';
+import { getT } from '@/lib/i18n/server';
 
 /**
  * SMTP es opcional: mientras no haya SMTP_USER/SMTP_PASS, /sign-in y
@@ -21,7 +22,11 @@ export async function sendPasswordResetEmail(args: {
     if (!smtp) {
         throw new Error('SMTP is not configured');
     }
-    const greeting = args.name?.trim() ? `Hola ${args.name.trim()},` : 'Hola,';
+    // i18n B: el correo sale en el idioma de la peticion (cookie gerarai_locale).
+    const t = await getT();
+    const greeting = args.name?.trim()
+        ? t('emails.passwordReset.greetingNamed', { name: args.name.trim() })
+        : t('emails.passwordReset.greeting');
     const transport = nodemailer.createTransport({
         host: smtp.host,
         port: smtp.port,
@@ -34,17 +39,17 @@ export async function sendPasswordResetEmail(args: {
     await transport.sendMail({
         from: smtp.from,
         to: args.to,
-        subject: 'Restablece tu contraseña de GerarAI',
+        subject: t('emails.passwordReset.subject'),
         text: [
             greeting,
             '',
-            'Hemos recibido una solicitud para restablecer la contraseña de tu cuenta de GerarAI.',
-            'Abre este enlace (caduca pronto y solo se puede usar una vez):',
+            t('emails.passwordReset.body'),
+            t('emails.passwordReset.linkIntro'),
             args.url,
             '',
-            'Si no has pedido el cambio, ignora este correo: tu contraseña actual sigue siendo válida.',
+            t('emails.passwordReset.ignore'),
             '',
-            'GerarAI no te pedirá la contraseña por correo.',
+            t('emails.passwordReset.noAsk'),
         ].join('\n'),
     });
 }

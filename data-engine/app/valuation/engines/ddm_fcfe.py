@@ -129,6 +129,7 @@ MODEL_INPUT_METRICS = frozenset(
         "delta_total_debt",
         "delta_working_capital",
         "retention_ratio",
+        "dividends_paid",
     }
 )
 
@@ -154,6 +155,7 @@ DIVIDEND_ALIASES = {
     "payout_ratio": ("payout_ratio", "dividend_payout_ratio", "payout"),
     "roe": ("roe", "return_on_equity", "return_on_tangible_equity"),
     "shares_diluted": ("shares_diluted",),
+    "dividends_paid": ("dividends_paid", "dividends_paid_common", "payments_of_dividends"),
     "dividend_forecast_years": ("dividend_forecast_years", "ddm_forecast_years"),
 }
 
@@ -503,6 +505,26 @@ class _EquityMethodEngine(ValuationEngine):
         )
 
 
+def _same_fiscal_period(a: SourcedFact, b: SourcedFact) -> bool:
+    """Mismo ejercicio y periodo entre un flujo y su recuento de acciones.
+
+    Dividendos pagados de FY2025 partidos por acciones de FY2024 mezclan una
+    recompra o dilucion entre ambos ejercicios (misma doctrina que el P/B de
+    los motores sectoriales y que gems en #3449): sin par del mismo periodo
+    la cifra derivada es N/D, no una aproximacion.
+    """
+    if a.fiscal_year is not None and b.fiscal_year is not None:
+        if a.fiscal_year != b.fiscal_year:
+            return False
+        qa = (a.fiscal_quarter or "FY").upper()
+        qb = (b.fiscal_quarter or "FY").upper()
+        annual = {"FY", "ANNUAL", ""}
+        if qa in annual and qb in annual:
+            return True
+        return qa == qb
+    return (a.period or "").upper() == (b.period or "").upper()
+
+
 class DividendDiscountEngine(_EquityMethodEngine):
     """Multi-stage dividend discount model, per ordinary share.
 
@@ -514,6 +536,37 @@ class DividendDiscountEngine(_EquityMethodEngine):
     """
 
     key = "ddm"
+
+    def currency_input_units(self, context: ValuationContext) -> list[str | None]:
+        """Unidad del dividendo, leido FUERA del snapshot (declarado o derivado).
+
+        Sin declararla, un dividendo en otra divisa que el precio se comparaba
+        sin convertir: el filtro FX del servicio solo ve el snapshot. Se
+        declara el hecho que el motor usara (dividend_per_share si existe;
+        si no, dividends_paid para la derivacion) y el filtro convierte o
+        bloquea, nunca compara divisas distintas en silencio.
+        """
+        if context.db is None or context.company.id is None:
+            return []
+        raw = latest_facts(
+            context.db,
+            context.company.id,
+            sorted(
+                {
+                    alias
+                    for key in ("dividend_per_share", "dividends_paid")
+                    for alias in DIVIDEND_ALIASES[key]
+                }
+            ),
+            cutoff=context_split_cutoff(context),
+        )
+        rows = resolve_aliases(raw, DIVIDEND_ALIASES)
+        units: list[str | None] = []
+        for key in ("dividend_per_share", "dividends_paid"):
+            fact = rows.get(key)
+            if fact is not None:
+                units.append(fact.unit)
+        return units
 
     def value(self, context: ValuationContext) -> dict:
         company = context.company
@@ -535,7 +588,46 @@ class DividendDiscountEngine(_EquityMethodEngine):
         if shares_fact is None:
             missing.append("shares_diluted")
         dividend_fact = rows.get("dividend_per_share")
-        if dividend_fact is None:
+        total_dividends_fact = rows.get("dividends_paid")
+        dividend: float | None = None
+        dividend_source = "unavailable"
+        dividend_derivation: dict | None = None
+        dividend_alignment_note: str | None = None
+        if dividend_fact is not None:
+            dividend = float(dividend_fact.value)
+            dividend_source = "financial_facts"
+        elif (
+            total_dividends_fact is not None
+            and shares_fact is not None
+            and float(shares_fact.value) > 0
+            and abs(float(total_dividends_fact.value)) > 0
+            and _same_fiscal_period(total_dividends_fact, shares_fact)
+        ):
+            # DPS derivado: dividendos pagados totales / acciones diluidas.
+            # abs(): parte del cash-flow SEC lo reporta en negativo. Es una
+            # derivacion, no un hecho declarado: va marcada en la traza con
+            # sus componentes y bloquea la publicacion igual que el payout
+            # derivado.
+            dividend = abs(float(total_dividends_fact.value)) / float(shares_fact.value)
+            dividend_source = "derived_dividends_paid_over_shares"
+            dividend_derivation = {
+                "formula": "abs(dividends_paid) / shares_diluted",
+                "dividends_paid": total_dividends_fact.as_trace(),
+                "shares_diluted": shares_fact.as_trace(),
+            }
+        if (
+            dividend is None
+            and dividend_fact is None
+            and total_dividends_fact is not None
+            and shares_fact is not None
+            and not _same_fiscal_period(total_dividends_fact, shares_fact)
+        ):
+            dividend_alignment_note = (
+                "dividends_paid y shares_diluted son de periodos distintos "
+                f"({total_dividends_fact.period} frente a {shares_fact.period}): "
+                "el DPS derivado mezclaria ejercicios; N/D en vez de mezclar."
+            )
+        if dividend is None:
             missing.append("dividend_per_share_or_payout_ratio")
 
         if missing:
@@ -558,13 +650,13 @@ class DividendDiscountEngine(_EquityMethodEngine):
                         "dividend_per_share": None
                         if dividend_fact is None
                         else dividend_fact.as_trace(),
+                        "dividend_derivation_skipped": dividend_alignment_note,
                     },
                 },
             )
 
-        assert shares_fact is not None and dividend_fact is not None
+        assert shares_fact is not None and dividend is not None
         shares = float(shares_fact.value)
-        dividend = float(dividend_fact.value)
         growth = _growth_assumption(context, rows)
         cost_of_equity, cost_source = _cost_of_equity(context, rows)
         years, years_source = _stage1_years(rows)
@@ -584,6 +676,8 @@ class DividendDiscountEngine(_EquityMethodEngine):
             blockers.append("cost_of_equity_source")
         if payout_source not in ("financial_facts",):
             blockers.append("payout_ratio_source")
+        if dividend_source != "financial_facts":
+            blockers.append("dividend_per_share_source")
 
         base_inputs = DdmInputs(
             dividend_per_share=dividend,
@@ -708,7 +802,8 @@ class DividendDiscountEngine(_EquityMethodEngine):
         }
         assumptions = {
             "dividend_per_share_d0": dividend,
-            "dividend_source": "financial_facts" if dividend_fact else "derived",
+            "dividend_source": dividend_source,
+            "dividend_per_share_derivation": dividend_derivation,
             "stage1_growth": growth.stage1,
             "stage1_years": years,
             "stage1_years_source": years_source,

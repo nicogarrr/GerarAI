@@ -91,19 +91,29 @@ void test('la página usa el helper y declara el contador honesto de lo visible'
     assert.match(page, /part === null/, 'un lote fallido no borra los demás');
     assert.ok(!page.includes('THESIS_DETAIL_LIMIT'), 'ya no hay recorte de detalle por página');
     assert.ok(!page.includes('pendiente'), 'desaparece el estado «pendiente»: ninguna tarjeta visible sale sin detalle por recorte');
-    assert.match(page, /Mostrando \$\{formatNumber\(slice\.from\)\}-\$\{formatNumber\(slice\.to\)\} de \$\{formatNumber\(slice\.total\)\} empresas/, 'contador de lo visible');
-    assert.match(page, /Mostrando \$\{formatNumber\(slice\.from\)\}-\$\{formatNumber\(slice\.to\)\} de \$\{formatNumber\(slice\.total\)\} coincidencias para «\$\{query\}»/, 'bajo filtro también se declara el rango visible');
-    assert.match(page, /coincidencias para «\$\{query\}» \(de \$\{formatNumber\(ordered\.length\)\} empresas en el registro\)/, 'contador del filtro contra el total real');
-    assert.match(page, /`0 coincidencias para «\$\{query\}»/, 'filtro sin coincidencias no pinta un rango 0-0');
+    // Los textos van por t(); el ES verbatim historico se fija contra el dict.
+    const es = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8'));
+    assert.match(page, /t\('research\.showingAll', \{ from: formatNumber\(slice\.from\), to: formatNumber\(slice\.to\), total: formatNumber\(slice\.total\) \}\)/, 'contador de lo visible');
+    assert.equal(es.showingAll, 'Mostrando {from}-{to} de {total} empresas');
+    assert.match(page, /t\('research\.showingMatches', \{ from: formatNumber\(slice\.from\), to: formatNumber\(slice\.to\), total: formatNumber\(slice\.total\), query, companies: formatNumber\(ordered\.length\) \}\)/, 'bajo filtro también se declara el rango visible contra el total real');
+    assert.equal(es.showingMatches, 'Mostrando {from}-{to} de {total} coincidencias para «{query}» (de {companies} empresas en el registro)');
+    assert.match(page, /t\('research\.zeroMatches', \{ query, companies: formatNumber\(ordered\.length\) \}\)/, 'filtro sin coincidencias no pinta un rango 0-0');
+    assert.equal(es.zeroMatches, '0 coincidencias para «{query}» (de {companies} empresas en el registro)');
     assert.match(page, /\{ordered\.length\s*\?/, 'el estado vacío depende del registro, no del filtro');
-    assert.match(page, /Todavía no hay ninguna empresa con research/, 'el estado sin empresas se conserva');
-    assert.match(page, /Página \{formatNumber\(slice\.page\)\} de \{formatNumber\(slice\.pages\)\}/, 'posición de página declarada');
+    assert.match(page, /title=\{t\('research\.emptyTitle'\)\}/, 'el estado sin empresas se conserva');
+    assert.equal(es.emptyTitle, 'Todavía no hay ninguna empresa con research.');
+    assert.match(page, /t\('research\.pageOf', \{ current: formatNumber\(slice\.page\), total: formatNumber\(slice\.pages\) \}\)/, 'posición de página declarada');
+    assert.equal(es.pageOf, 'Página {current} de {total}');
 });
 
 void test('el buscador es un formulario GET accesible y las coincidencias vacías son honestas', () => {
     const page = readSource(PAGE);
     assert.match(page, /<form action="\/research"[^>]*method="get">/, 'filtro por GET: la URL cuenta el estado');
     assert.match(page, /htmlFor="research-index-q"/, 'label asociado al input');
-    assert.match(page, /Sin coincidencias para «\$\{query\}»\./, 'filtro sin resultados lo dice, no pinta un índice fantasma');
-    assert.match(page, /Quitar (el )?filtro/, 'salida explícita del filtro');
+    assert.match(page, /title=\{t\('research\.noMatchTitle', \{ query \}\)\}/, 'filtro sin resultados lo dice, no pinta un índice fantasma');
+    const es = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8'));
+    assert.equal(es.noMatchTitle, 'Sin coincidencias para «{query}».');
+    assert.match(page, /t\('research\.filterClear(Long)?'\)/, 'salida explícita del filtro');
+    assert.equal(es.filterClear, 'Quitar filtro');
+    assert.equal(es.filterClearLong, 'Quitar el filtro');
 });

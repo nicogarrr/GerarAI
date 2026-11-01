@@ -30,6 +30,50 @@ npm run coverage:summary # tabla: Vitest, guards y unión por lib/ y components/
 
 Un fichero concreto: `npx vitest run tests/unit/components/PortfolioSummary.test.tsx`.
 
+## E2E de flujos de usuario (navegador real)
+
+La suite `e2e/user-flows/` recorre la app en Chromium de verdad (sign-in,
+watchlist, ficha, cartera con CSV IBKR, impuestos, alertas, 404 y Cerebro con
+LLM simulado), en escritorio 1280x800 y móvil 375x812, comprobando que no haya
+errores de consola, 4xx/5xx inesperados, desborde horizontal ni
+`NaN/undefined/null/[object Object]` visibles. Un solo comando la levanta
+TODA y la ejecuta:
+
+```bash
+npm run test:e2e:flows
+```
+
+El runner arranca él mismo los dos servidores (webServer de
+`playwright.config.ts`): el backend FastAPI en `127.0.0.1:8100` con una SQLite
+nueva (`data-engine/cavaai_ui_e2e.db`) y `SCREENER_QUOTE_VENDOR=offline`, y el
+frontend Next en `127.0.0.1:3100` con `APP_ENV=test` y bypass de auth e2e. No
+hace falta red externa ni claves. Antes del primer test,
+`e2e/user-flows/global-setup.ts` compila en serie cada ruta (sin ese
+calentamiento, la primera compilación de `next dev` cae dentro de los tests).
+
+Requisitos locales (los mismos que el workflow
+`.github/workflows/user-flows-e2e.yml`, que corre la suite en cada PR y push a
+main como smoke NO bloqueante):
+
+- Node 22 y `npm ci` hecho.
+- Python **>= 3.12** (`requires-python = ">=3.12,<3.13"`; con 3.10 el backend
+  ni siquiera importa: `datetime.UTC` no existe) con
+  `pip install -r data-engine/requirements.txt`. Si el intérprete del PATH no
+  es el del venv, expón `PYTHON_BIN=/ruta/al/python`.
+- Navegador: `npx playwright install chromium`.
+- Memoria: el trio uvicorn + `next dev` + Chromium necesita ~4 GB libres; en
+  máquinas de 2 GB el OOM killer tumba `next dev` a mitad de calentamiento.
+- Redis es opcional: sin él el backend loguea `Connection refused` pero la
+  suite corre (en CI hay servicio en `localhost:6379`; fuera, apunta
+  `E2E_REDIS_URL` si quieres el log limpio). MongoDB (`MONGODB_URI`) solo la
+  usa el entorno de CI; la suite no la necesita.
+
+Puertos, BD y demás valores se cambian por entorno sin tocar los specs
+(`E2E_UI_URL`, `E2E_UI_BACKEND_URL`, `E2E_UI_DATABASE_URL`, `E2E_REDIS_URL`,
+`PYTHON_BIN`): ver `e2e/fixtures/e2e-env.ts`. La suite API
+(`npm run test:e2e`, sin navegador) usa `E2E_RUN=1` y el backend en
+`127.0.0.1:8101`.
+
 ## Cómo escribir un test de componente
 
 - Importa el componente real con el alias `@/` y renderízalo con `render()`.

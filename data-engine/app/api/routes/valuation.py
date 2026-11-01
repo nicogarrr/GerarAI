@@ -8,7 +8,7 @@ from app.schemas import ValuationResponse
 from app.services.company_resolver import resolve_company
 from app.services.fair_value_service import (
     PRECEDENCE_TEXT,
-    resolve_fair_value,
+    resolve_fair_value_cached,
     resolve_fair_values,
 )
 from app.services.historical_valuation_service import HistoricalValuationService
@@ -50,11 +50,16 @@ def fair_values(
 
 @router.get("/{ticker}/fair-value")
 def fair_value(ticker: str, db: Session = Depends(get_db)) -> dict:
-    """Valor justo único de un ticker; recalcula el motor si la tesis no basta."""
+    """Valor justo único de un ticker; recalcula el motor si la tesis no basta.
+
+    El recalculo pasa por cache Redis (FAIR_VALUE_LIVE_CACHE_TTL_SECONDS):
+    el sondeo de oportunidades de Inicio y la ficha piden el mismo ticker
+    muchas veces al dia y el motor no cambia hasta la proxima ingesta.
+    """
     company = resolve_company(db, ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
-    return {**resolve_fair_value(db, company, live=True), "precedence": PRECEDENCE_TEXT}
+    return {**resolve_fair_value_cached(db, company, live=True), "precedence": PRECEDENCE_TEXT}
 
 
 @router.get("/{ticker}", response_model=ValuationResponse)

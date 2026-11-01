@@ -48,10 +48,10 @@ def _production(**overrides) -> Settings:
 
 def test_db_pool_defaults_and_env_parsing(monkeypatch):
     defaults = Settings(_env_file=None, app_env="test")
-    assert defaults.db_pool_size == 20
+    assert defaults.db_pool_size == 10
     assert defaults.db_max_overflow == 10
     assert defaults.db_pool_timeout == 30.0
-    assert defaults.db_pool_recycle == 1800
+    assert defaults.db_pool_recycle == 3600
 
     monkeypatch.setenv("DB_POOL_SIZE", "4")
     monkeypatch.setenv("DB_MAX_OVERFLOW", "2")
@@ -116,7 +116,7 @@ def test_production_rejects_placeholders():
 def test_production_accepts_real_looking_values():
     settings = _production(sec_user_agent="GerarAI research ops@gerarai-real.es")
     assert settings.is_production is True
-    assert settings.db_pool_size == 20
+    assert settings.db_pool_size == 10
 
 
 def test_deploy_script_is_idempotent_and_has_a_secretless_preflight():

@@ -1,8 +1,10 @@
 'use server';
 
 import { isQuoteLandingEvent } from '@/lib/news-landing';
+import { BACKEND_PAGE_SIZE, fetchAllBackendPages, type PaginatedBackendResponse } from '@/lib/paginated-backend';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { revalidatePath } from 'next/cache';
+import type { ImpliedSensitivity, ImpliedValueSplit } from '@/lib/research/implied-growth';
 import { AppError, ExternalAPIError, ValidationError, getSafeErrorMessage } from '@/lib/types/errors';
 import { sourcesPageInfo } from '@/lib/research/sources-inventory';
 import { researchRequest } from '@/lib/research/client';
@@ -262,22 +264,7 @@ export type ResearchThesis = {
   created_at: string;
 };
 
-type ResearchThesisHistoryEntry = {
-  id: number;
-  version: number;
-  status: string;
-  rating: string;
-  red_team_score: number;
-  data_confidence_score: number;
-  created_at: string;
-  updated_at: string;
-  diff: {
-    change_summary: string;
-    affected_assumptions: string[];
-    rating_changed: boolean;
-    created_at: string;
-  } | null;
-};
+type ResearchThesisHistoryEntry = components['schemas']['ThesisHistoryItemOut'];
 
 type ResearchSourceDocument = {
   id: number;
@@ -599,7 +586,7 @@ export type ResearchLongTermModel = {
   current_snapshot: { period: string | null; fiscal_year: number | null; metrics: Record<string, { value: number | null; source_fact_ids: number[]; status: string }> };
   assumptions: Record<string, { value: number | null; unit: string; source_type: string; basis: string; source_fact_ids: number[]; fuentes?: Array<{ fact_id: number; titulo: string | null; url: string | null; fecha: string | null }>; confidence: number }>;
   scenarios: Record<string, ResearchLongTermScenario>;
-  reverse_dcf: { status: string; required_revenue_growth?: number; base_revenue_growth?: number; fcf_margin?: number | null; growth_gap_vs_base?: number; market_price?: number | null; missing_inputs?: string[] };
+  reverse_dcf: { status: string; required_revenue_growth?: number; implied_perpetual_growth?: number | null; wacc?: number | null; value_split?: ImpliedValueSplit | null; sensitivity?: ImpliedSensitivity | null; base_revenue_growth?: number; fcf_margin?: number | null; growth_gap_vs_base?: number; market_price?: number | null; missing_inputs?: string[] };
   market_opportunity: {
     status: string;
     mode: string;
@@ -1437,11 +1424,18 @@ export async function submitThesisHumanInput(ticker: string, formData: FormData)
 /** Index relevance needs membership, not prices, FX totals or data quality. */
 export async function getResearchPortfolioPositions(): Promise<Array<{ ticker: string; quantity: number }>> {
   await requireAuthenticatedUser();
-  return paginateAll(
-    (offset) => researchRequest<Array<{ ticker: string; quantity: number }>>(
-      `/api/portfolio/positions?limit=2000&offset=${offset}`, { fast: true },
+  // El backend pagina con page/page_size (max 200): limit/offset NO existen
+  // en este endpoint y los ignoraba, repitiendo siempre la pagina 1.
+  return fetchAllBackendPages((page) =>
+    researchRequest<PaginatedBackendResponse<{ ticker: string; quantity: number }>>(
+      `/api/portfolio/positions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true },
     ),
-    2000,
     (position) => position.ticker,
   );
+}
+
+/** Read only: opening a company never starts a 13D/G scan. */
+export async function getParticipationFilings(ticker: string): Promise<import('@/lib/research/schedule13dg').ParticipationResponse> {
+  await requireAuthenticatedUser();
+  return getJson<import('@/lib/research/schedule13dg').ParticipationResponse>(`/api/ownership/schedule-13dg?ticker=${encodeURIComponent(ticker.trim().toUpperCase())}`, { ticker, count: 0, filings: [] });
 }

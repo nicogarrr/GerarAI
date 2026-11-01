@@ -108,6 +108,14 @@ def _engine_pool_kwargs(database_url: str, settings: Settings) -> dict:
     }
 
 
+def _engine_isolation_kwargs(database_url: str) -> dict:
+    """Nivel de aislamiento transaccional para Postgres (READ COMMITTED)."""
+    scheme = database_url.split(":", 1)[0].lower().split("+", 1)[0]
+    if scheme in {"postgres", "postgresql"}:
+        return {"isolation_level": "READ COMMITTED"}
+    return {}
+
+
 settings = get_settings()
 engine = create_engine(
     settings.database_url,
@@ -116,16 +124,20 @@ engine = create_engine(
     ),
     pool_pre_ping=True,
     **_engine_pool_kwargs(settings.database_url, settings),
+    **_engine_isolation_kwargs(settings.database_url),
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 
 @event.listens_for(Session, "do_orm_execute")
 def _scope_tenant_queries(execute_state) -> None:
-    # Entity loads get the criteria below. Column/aggregate selects
-    # (`select(Model.columna)`, func.count/max, window functions) must add
-    # explicit predicates with app.core.tenancy.tenant_filters: on SQLAlchemy
-    # 2.0 the loader criteria does not reach those compiled column queries.
+    # El criteria acota todos los selects ORM con contexto de tenant:
+    # entity loads y tambien column selects, agregados, GROUP BY, joins,
+    # subqueries IN y window functions (medido en SQLAlchemy 2.1.6, rango
+    # fijado >=2.0.32,<2.2). Los predicados explicitos de
+    # app/core/tenancy.py siguen siendo obligatorios como segunda capa:
+    # defensa en profundidad, fail-closed sin contexto y ejecuciones
+    # no-ORM (Core/text()), que nunca pasan por aqui.
     if execute_state.execution_options.get("include_all_tenants"):
         return
     tenant_id = execute_state.session.info.get("tenant_id")
@@ -194,7 +206,12 @@ def _assign_tenant_to_new_rows(session: Session, _flush_context, _instances) -> 
     tenant_id = session.info.get("tenant_id")
     from sqlalchemy import inspect as sa_inspect
 
-    from app.models.entities import InferredInput, TenantOwnedMixin
+    from app.models.entities import AuditLog, InferredInput, TenantOwnedMixin
+
+    # AuditLog es append-only: nunca se permite modificar ni borrar registros de auditoria.
+    for instance in [*session.dirty, *session.deleted]:
+        if isinstance(instance, AuditLog):
+            raise RuntimeError("AuditLog is append-only and cannot be updated or deleted")
 
     # Also reject attached/privileged-loaded cross-tenant mutations and deletes.
     # Do not rely only on SELECT filters to protect an already-loaded object.
@@ -322,6 +339,15 @@ def get_db(
         db.close()
 
 
+def _quote_identifiers(names: list[str]) -> list[str]:
+    """Identificadores SQL entrecomillados con escape de comillas internas.
+
+    Los nombres salen de PRAGMA table_info (la propia DB), pero un nombre con
+    '"' no debe poder romper el literal: sqlite escapa la comilla como "".
+    """
+    return ['"{}"'.format(name.replace('"', '""')) for name in names]
+
+
 def init_db() -> None:
     import re
 
@@ -446,9 +472,9 @@ def init_db() -> None:
                                         "PRAGMA table_info(thesis_versions)"
                                     ).all()
                                 ]
-                                quoted = ", ".join(f'"{name}"' for name in names)
+                                quoted = ", ".join(_quote_identifiers(names))
                                 conn.exec_driver_sql(
-                                    f"INSERT INTO thesis_versions__nullable ({quoted}) "
+                                    f"INSERT INTO thesis_versions__nullable ({quoted}) "  # nosec B608 -- identificadores de PRAGMA table_info (introspeccion) escapados con _quote_identifiers; sin input externo
                                     f"SELECT {quoted} FROM thesis_versions"
                                 )
                                 conn.exec_driver_sql("DROP TABLE thesis_versions")

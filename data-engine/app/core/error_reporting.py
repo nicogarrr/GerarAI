@@ -101,7 +101,7 @@ def _post(url: str, auth: str, event: dict) -> None:
         headers={"Content-Type": "application/json", "X-Sentry-Auth": auth},
     )
     try:
-        with urllib.request.urlopen(request, timeout=SEND_TIMEOUT_SECONDS):  # noqa: S310
+        with urllib.request.urlopen(request, timeout=SEND_TIMEOUT_SECONDS):  # noqa: S310  # nosec B310 -- la URL es el ERROR_TRACKING_DSN que fija el operador, nunca input de usuario
             pass
     except Exception:  # noqa: BLE001 - el seguimiento nunca rompe nada
         logger.warning("error_tracking send failed")

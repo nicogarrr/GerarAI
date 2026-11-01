@@ -15,6 +15,30 @@ def redact_secrets(text: str) -> str:
     return _redact_core(_redact_llm(text))
 
 
+_QDRANT_CLIENT_POOL: dict[str, QdrantClient] = {}
+_QDRANT_POOL_LOCK = threading.Lock()
+
+
+def get_qdrant_client(url: str) -> QdrantClient:
+    """Pool de conexiones thread-safe para reutilizar clientes Qdrant sin reconexiones repetidas.
+
+    Fulfills: VAL-PERF-005
+    """
+    cached = _QDRANT_CLIENT_POOL.get(url)
+    if cached is not None:
+        return cached
+    with _QDRANT_POOL_LOCK:
+        if url not in _QDRANT_CLIENT_POOL:
+            _QDRANT_CLIENT_POOL[url] = QdrantClient(url=url)
+        return _QDRANT_CLIENT_POOL[url]
+
+
+def clear_qdrant_pool() -> None:
+    """Limpia el pool de conexiones (para pruebas y reinicios)."""
+    with _QDRANT_POOL_LOCK:
+        _QDRANT_CLIENT_POOL.clear()
+
+
 class RAGIndex:
     collection_name = "portfolio_research_documents"
     vector_size = 384
@@ -23,7 +47,7 @@ class RAGIndex:
         self.settings = get_settings()
 
     def client(self) -> QdrantClient:
-        return QdrantClient(url=self.settings.qdrant_url)
+        return get_qdrant_client(self.settings.qdrant_url)
 
     def _setting(self, name: str, default):
         return getattr(self.settings, name, default)
@@ -41,6 +65,7 @@ class RAGIndex:
         return bool(self._setting("rag_hybrid_enabled", False))
 
     _st_model = None
+    _st_error: Exception | None = None
     _st_lock = threading.Lock()
 
     def _embedder(self):
@@ -48,13 +73,30 @@ class RAGIndex:
 
     @classmethod
     def warm_fallback(cls):
-        """Carga (una vez por proceso) el modelo ST de fallback y lo devuelve."""
-        if cls._st_model is None:
-            with cls._st_lock:
-                if cls._st_model is None:
-                    from sentence_transformers import SentenceTransformer
+        """Carga (una vez por proceso) el modelo ST de fallback y lo devuelve.
 
-                    cls._st_model = SentenceTransformer("all-MiniLM-L6-v2")
+        Si la carga falla, el error se cachea y se relanza siempre la MISMA
+        excepcion: el primer intento de import puede fallar de forma distinta
+        a los siguientes (p.ej. RuntimeError del import inicial frente a
+        ModuleNotFoundError del cache de import de Python) y los llamadores
+        necesitan un comportamiento deterministico.
+        """
+        if cls._st_model is not None:
+            return cls._st_model
+        with cls._st_lock:
+            if cls._st_model is not None:
+                return cls._st_model
+            if cls._st_error is not None:
+                raise cls._st_error
+            try:
+                from sentence_transformers import SentenceTransformer
+
+                cls._st_model = SentenceTransformer("all-MiniLM-L6-v2")
+            except Exception as exc:
+                cls._st_error = RuntimeError(
+                    "sentence-transformers no disponible para el embedder de fallback"
+                )
+                raise cls._st_error from exc
         return cls._st_model
 
     def _dense_vectors(self, texts: list[str]) -> list[list[float]]:

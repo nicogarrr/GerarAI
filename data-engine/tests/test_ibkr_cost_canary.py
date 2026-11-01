@@ -107,7 +107,7 @@ def test_payload_masks_cost_and_profit_but_preserves_market_value(db):
 def test_positions_api_hides_conflict_and_shows_review(db):
     IBKRImportService().import_flex_xml(db, xml())
     from app.api.routes.portfolio import positions
-    row = positions(limit=100, offset=0, db=db)[0]
+    row = positions(db=db)["items"][0]  # sobre paginado {items, page_info}
     assert row["ticker"] == "BABA"
     assert row["average_cost"] is None
     assert row["cost_basis_native"] is None

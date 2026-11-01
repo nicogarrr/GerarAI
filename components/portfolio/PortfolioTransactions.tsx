@@ -1,7 +1,14 @@
 'use client';
 
 import { CompanyLogo } from '@/components/calendar/CompanyLogo';
-import { formatMoney, formatNumber, formatPrice, formatUserDate, isValidCurrencyCode, NA } from '@/lib/format';
+import { isValidCurrencyCode } from '@/lib/format';
+import { useT, useFormat } from '@/lib/i18n/client';
+import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
+import { createFormatters, type Formatters } from '@/lib/format';
+import { t } from '@/lib/i18n/t';
+
+const esT: TFunction = t;
+const esF = createFormatters('es');
 import { useState } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -62,17 +69,19 @@ export function isZeroCostBuy(tx: Pick<Transaction, 'type' | 'quantity' | 'price
  * ticker, fecha y precio) para que no se borre uno parecido por error, y avisa
  * de que no se puede deshacer.
  */
-export function describeDeletion(tx: Transaction | undefined): string {
-  const tail = 'No se puede deshacer: la posición y la fiscalidad se recalculan sin él.';
-  if (!tx) return `¿Eliminar este movimiento? ${tail}`;
+export function describeDeletion(tx: Transaction | undefined, ti: TFunction = esT, f: Formatters = esF): string {
+  const tail = ti('portfolio.transactions.deleteTail');
+  if (!tx) return ti('portfolio.transactions.deleteGeneric', { tail });
   const currency = transactionCurrency(tx.currency);
-  const kind = tx.type === 'buy' ? 'la compra' : 'la venta';
-  const qty = formatNumber(tx.quantity, { maximumFractionDigits: 4 });
-  const price = currency ? formatPrice(tx.price, currency) : NA;
-  return `¿Eliminar ${kind} de ${qty} ${tx.symbol} del ${formatUserDate(tx.date)} a ${price}? ${tail}`;
+  const kind = ti(tx.type === 'buy' ? 'portfolio.transactions.deleteKindBuy' : 'portfolio.transactions.deleteKindSell');
+  const qty = f.formatNumber(tx.quantity, { maximumFractionDigits: 4 });
+  const price = currency ? f.formatPrice(tx.price, currency) : ti('common.na');
+  return ti('portfolio.transactions.deleteDetail', { kind, quantity: qty, symbol: tx.symbol, date: f.formatUserDate(tx.date), price, tail });
 }
 
 export default function PortfolioTransactions({ transactions, userId, page }: Props) {
+  const ti = useT();
+  const f = useFormat();
   const router = useRouter();
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -89,10 +98,10 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
       const result = await deleteTransaction(userId, transactionId);
       // Rechazo del ledger (una venta posterior se quedaría sin acciones): motivo en español, sin «Reintentar».
       if (result?.success === false) {
-        toast.error(result.error ?? 'No se pudo eliminar la transacción.');
+        toast.error(result.error ?? ti('portfolio.transactions.toastError'));
         return;
       }
-      toast.success('Transacción eliminada');
+      toast.success(ti('portfolio.transactions.toastDeleted'));
       router.refresh();
     } catch (error) {
       showErrorToast(error, { onRetry: () => handleDelete(transactionId) });
@@ -106,43 +115,42 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
       <CardHeader className="pb-3 pt-5 border-b border-gray-800/50">
         <CardTitle className="text-gray-100 text-base font-medium flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-blue-500"></span>
-          Historial de movimientos
+          {ti('portfolio.transactions.title')}
         </CardTitle>
         {transactions.length > 0 ? (
           <p className="mt-1 text-[11px] leading-4 text-gray-500">
-            El importe es el nocional del movimiento (cantidad × precio) y no descuenta las
-            comisiones, que se muestran aparte en cada movimiento.
+            {ti('portfolio.transactions.grossNote')}
           </p>
         ) : null}
       </CardHeader>
       {page && (page.total > 0 || filtered) ? (
         // Formulario GET: los filtros viven en la URL (se pueden compartir y
         // la paginación los conserva) y el backend filtra antes de paginar.
-        <form method="get" action="/portfolio" role="search" aria-label="Filtrar movimientos" className="flex flex-wrap items-end gap-2 border-b border-gray-800/50 px-4 py-3 text-sm">
+        <form method="get" action="/portfolio" role="search" aria-label={ti('portfolio.transactions.filterAria')} className="flex flex-wrap items-end gap-2 border-b border-gray-800/50 px-4 py-3 text-sm">
           <input type="hidden" name="tab" value="movimientos" />
           <label className="grid gap-1 text-xs text-gray-400">
-            Ticker
-            <input name="ticker" defaultValue={filters?.ticker ?? ''} placeholder="Todos" autoCapitalize="characters" maxLength={32}
-              className="min-h-11 w-28 rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-100 md:min-h-9" />
+            {ti('common.labels.ticker')}
+            <input name="ticker" defaultValue={filters?.ticker ?? ''} placeholder={ti('portfolio.transactions.filterAll')} autoCapitalize="characters" maxLength={32}
+              className="min-h-11 w-28 rounded-md border border-gray-700 bg-gray-800 px-2 text-base text-gray-100 sm:text-sm md:min-h-9" />
           </label>
           <label className="grid gap-1 text-xs text-gray-400">
-            Tipo
-            <select name="type" defaultValue={filters?.type ?? ''} className="min-h-11 rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-100 md:min-h-9">
-              <option value="">Todos</option>
-              <option value="buy">Compras</option>
-              <option value="sell">Ventas</option>
+            {ti('portfolio.transactions.filterType')}
+            <select name="type" defaultValue={filters?.type ?? ''} className="min-h-11 rounded-md border border-gray-700 bg-gray-800 px-2 text-base text-gray-100 sm:text-sm md:min-h-9">
+              <option value="">{ti('portfolio.transactions.filterAll')}</option>
+              <option value="buy">{ti('portfolio.transactions.typeBuys')}</option>
+              <option value="sell">{ti('portfolio.transactions.typeSells')}</option>
             </select>
           </label>
-          <Button type="submit" variant="outline" className="min-h-11 md:min-h-9">Filtrar</Button>
+          <Button type="submit" variant="outline" className="min-h-11 md:min-h-9">{ti('portfolio.transactions.filterSubmit')}</Button>
           {filtered ? (
-            <Button asChild variant="ghost" className="min-h-11 md:min-h-9"><Link href={transactionsHref(undefined)}>Quitar filtros</Link></Button>
+            <Button asChild variant="ghost" className="min-h-11 md:min-h-9"><Link href={transactionsHref(undefined)}>{ti('portfolio.transactions.filterClear')}</Link></Button>
           ) : null}
         </form>
       ) : null}
-      {page && page.total > 0 ? <nav aria-label="Páginas de movimientos" className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm text-gray-400">
-        <span>{transactions.length ? `${formatNumber(page.offset + 1)}-${formatNumber(page.offset + transactions.length)} de ${formatNumber(page.total)}` : `0 de ${formatNumber(page.total)}`}</span>
-        {page.offset > 0 ? <Button asChild variant="outline" className="min-h-11"><Link href={transactionsHref(filters, Math.max(0, page.offset - 50))}>Anteriores</Link></Button> : null}
-        {page.offset + transactions.length < page.total ? <Button asChild variant="outline" className="min-h-11"><Link href={transactionsHref(filters, page.offset + 50)}>Siguientes</Link></Button> : null}
+      {page && page.total > 0 ? <nav aria-label={ti('portfolio.transactions.navAria')} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm text-gray-400">
+        <span>{transactions.length ? `${f.formatNumber(page.offset + 1)}-${f.formatNumber(page.offset + transactions.length)} ${ti('portfolio.transactions.of')} ${f.formatNumber(page.total)}` : `0 ${ti('portfolio.transactions.of')} ${f.formatNumber(page.total)}`}</span>
+        {page.offset > 0 ? <Button asChild variant="outline" className="min-h-11"><Link href={transactionsHref(filters, Math.max(0, page.offset - 50))}>{ti('portfolio.transactions.prev')}</Link></Button> : null}
+        {page.offset + transactions.length < page.total ? <Button asChild variant="outline" className="min-h-11"><Link href={transactionsHref(filters, page.offset + 50)}>{ti('portfolio.transactions.next')}</Link></Button> : null}
       </nav> : null}
       <CardContent className="p-0 flex-1 overflow-hidden">
         {transactions.length === 0 ? (
@@ -152,8 +160,8 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
             </div>
             {noTransactionsAtAll ? (
               <>
-                <p className="text-gray-300 text-sm font-medium mb-1">Aún no tienes movimientos</p>
-                <p className="text-gray-500 text-sm mb-4">Añade tu primera compra o importa tu historial desde IBKR.</p>
+                <p className="text-gray-300 text-sm font-medium mb-1">{ti('portfolio.transactions.emptyTitle')}</p>
+                <p className="text-gray-500 text-sm mb-4">{ti('portfolio.transactions.emptyHint')}</p>
                 <div className="flex flex-wrap justify-center gap-2">
                   <AddTransactionButton userId={userId} />
                   <ImportIBKRButton userId={userId} />
@@ -162,16 +170,16 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
             ) : (
               filtered && page?.total === 0 ? (
                 <>
-                  <p className="text-gray-500 text-sm mb-4">Ningún movimiento coincide con estos filtros</p>
+                  <p className="text-gray-500 text-sm mb-4">{ti('portfolio.transactions.emptyFiltered')}</p>
                   <Button asChild variant="outline" className="min-h-11">
-                    <Link href={transactionsHref(undefined)}>Quitar filtros</Link>
+                    <Link href={transactionsHref(undefined)}>{ti('portfolio.transactions.filterClear')}</Link>
                   </Button>
                 </>
               ) : (
                 <>
-                  <p className="text-gray-500 text-sm mb-4">Sin movimientos en esta página</p>
+                  <p className="text-gray-500 text-sm mb-4">{ti('portfolio.transactions.emptyPage')}</p>
                   <Button asChild variant="outline" className="min-h-11">
-                    <Link href={transactionsHref(filters)}>Ir a la primera página</Link>
+                    <Link href={transactionsHref(filters)}>{ti('portfolio.transactions.firstPage')}</Link>
                   </Button>
                 </>
               )
@@ -207,19 +215,19 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
                             </Link>
                             <span className={`text-xs px-1.5 py-0.5 rounded ${tx.type === 'buy' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
                               }`}>
-                              {tx.type === 'buy' ? 'Compra' : 'Venta'}
+                              {tx.type === 'buy' ? ti('portfolio.transactions.typeBuy') : ti('portfolio.transactions.typeSell')}
                             </span>
                           </div>
                           {isZeroCostBuy(tx) ? (
                             <p
                               className="mt-1 inline-flex rounded bg-amber-500/10 px-1.5 py-0.5 text-xs text-amber-300"
-                              title="Compra a precio 0: si fue un spin-off o acciones liberadas, edita el precio para repartir el coste de la matriz; si fue un regalo, el coste es el valor de mercado en la fecha."
+                              title={ti('portfolio.transactions.zeroCostTitle')}
                             >
-                              {ZERO_COST_REVIEW_LABEL}
+                              {ti('portfolio.transactions.zeroCostLabel')}
                             </p>
                           ) : null}
                           <p className="text-xs text-gray-500 mt-0.5">
-                            {formatUserDate(tx.date)}
+                            {f.formatUserDate(tx.date)}
                           </p>
                           {tx.notes?.trim() ? (
                             <p className="mt-0.5 max-w-[16rem] truncate text-xs text-gray-400" title={tx.notes}>
@@ -230,18 +238,17 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
                       </div>
                       <div className="pl-11 sm:pl-0 sm:text-right">
                         <p className="font-medium text-gray-200">
-                          {currency ? formatMoney(gross, currency) : NA}
-                          <span className="ml-1.5 text-[10px] uppercase tracking-wide text-gray-500">bruto</span>
+                          {currency ? f.formatMoney(gross, currency) : ti('common.na')}
+                          <span className="ml-1.5 text-[10px] uppercase tracking-wide text-gray-500">{ti('portfolio.transactions.grossTag')}</span>
                         </p>
                         <p className="text-xs text-gray-500">
-                          {formatNumber(tx.quantity, { maximumFractionDigits: 4 })} acc @{' '}
-                          {currency ? formatPrice(tx.price, currency) : NA}
+                          {ti('portfolio.transactions.sharesLine', { quantity: f.formatNumber(tx.quantity, { maximumFractionDigits: 4 }), price: currency ? f.formatPrice(tx.price, currency) : ti('common.na') })}
                         </p>
                         {/* Las comisiones se guardaban (alta, edición, IBKR) pero no se
                             veían en ningún sitio de Movimientos. */}
                         {tx.fees !== undefined && Number.isFinite(tx.fees) && tx.fees > 0 ? (
                           <p className="text-xs text-gray-500">
-                            Comisión {currency ? formatPrice(tx.fees, currency) : NA}
+                            {ti('portfolio.transactions.feeLabel', { amount: currency ? f.formatPrice(tx.fees, currency) : ti('common.na') })}
                           </p>
                         ) : null}
                       </div>
@@ -255,7 +262,7 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
                         size="sm"
                         onClick={() => setConfirmId(tx._id)}
                         disabled={deleting === tx._id}
-                        aria-label="Eliminar transacción"
+                        aria-label={ti('portfolio.transactions.deleteAria')}
                         className="h-11 w-11 p-0 text-gray-400 hover:text-red-400 hover:bg-red-950/20 md:h-7 md:w-7"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -271,8 +278,8 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
       <ConfirmDialog
         open={confirmId !== null}
         onOpenChange={(next) => { if (!next) setConfirmId(null); }}
-        title="Eliminar transacción"
-        description={describeDeletion(confirmTx)}
+        title={ti('portfolio.transactions.confirmTitle')}
+        description={describeDeletion(confirmTx, ti, f)}
         onConfirm={() => { if (confirmId) handleDelete(confirmId); }}
       />
     </Card>

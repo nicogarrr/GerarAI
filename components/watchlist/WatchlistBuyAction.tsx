@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
+import { useT } from '@/lib/i18n/client';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 
 // Mismo split que AddTransactionButton: el formulario (buscador de ticker,
@@ -36,6 +37,7 @@ const TRIGGER_CLASS: Record<Props['variant'], string> = {
 
 export default function WatchlistBuyAction({ userId, symbol, companyName, currency, variant }: Props) {
   const [open, setOpen] = useState(false);
+  const t = useT();
   // Una vez abierto, el diálogo queda montado (oculto por Radix al cerrar)
   // para conservar lo escrito si se cierra sin enviar.
   const [openedOnce, setOpenedOnce] = useState(false);
@@ -55,7 +57,7 @@ export default function WatchlistBuyAction({ userId, symbol, companyName, curren
           onPointerDown={() => void loadAddTransactionDialog()}
           onFocus={() => void loadAddTransactionDialog()}
         >
-          Registrar compra
+          {t('watchlist.buy.trigger')}
         </button>
       </DialogTrigger>
       {openedOnce ? (

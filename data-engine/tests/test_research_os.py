@@ -149,6 +149,8 @@ class FakeFMPClient:
 def test_research_api_core_flow():
     seed()
     client = TestClient(main.app)
+    token = client.get("/api/csrf-token").json()["csrf_token"]
+    client.headers.update({"x-csrf-token": token})
 
     companies = client.get("/api/companies")
     assert companies.status_code == 200
@@ -179,6 +181,8 @@ def test_research_api_core_flow():
 def test_memory_api_tracks_claims_evidence_sections_and_sessions():
     seed()
     client = TestClient(main.app)
+    token = client.get("/api/csrf-token").json()["csrf_token"]
+    client.headers.update({"x-csrf-token": token})
 
     thesis = client.post("/api/thesis/generate", json={"ticker": "MSFT", "force_new_version": True})
     assert thesis.status_code == 200
@@ -587,6 +591,8 @@ def test_ibkr_xml_import_endpoint_ingests_positions_cash_and_trades(monkeypatch)
     """
     try:
         client = TestClient(main.app)
+        token = client.get("/api/csrf-token").json()["csrf_token"]
+        client.headers.update({"x-csrf-token": token})
         response = client.post("/api/portfolio/import/ibkr/xml", json={"xml": xml})
         assert response.status_code == 200
         payload = response.json()
@@ -614,6 +620,8 @@ def test_fmp_refresh_normalizes_facts_and_valuation_uses_them(monkeypatch):
     seed()
     monkeypatch.setattr(companies_route, "FMPClient", FakeFMPClient)
     client = TestClient(main.app)
+    token = client.get("/api/csrf-token").json()["csrf_token"]
+    client.headers.update({"x-csrf-token": token})
 
     refresh = client.post("/api/companies/MSFT/refresh/fmp")
     assert refresh.status_code == 200
@@ -681,6 +689,9 @@ def test_fmp_refresh_402_returns_actionable_message(monkeypatch):
     seed()
     monkeypatch.setattr(companies_route, "FMPClient", DeniedFMPClient)
     client = TestClient(main.app)
+    # El endpoint muta estado: exige token CSRF (VAL-SEC-001).
+    token = client.get("/api/csrf-token").json()["csrf_token"]
+    client.headers.update({"x-csrf-token": token})
 
     refresh = client.post("/api/companies/MSFT/refresh/fmp")
     assert refresh.status_code == 424
@@ -689,3 +700,45 @@ def test_fmp_refresh_402_returns_actionable_message(monkeypatch):
     # La URL con la api key nunca se filtra en el detalle.
     assert "apikey" not in detail
     assert "http" not in detail.lower()
+
+
+def test_manual_import_reimport_is_idempotent():
+    """Reimportar la misma transcripción no duplica documento, chunks ni índice."""
+    from app.models import Document, DocumentChunk, Transcript
+
+    init_db()
+    seed()
+    db = SessionLocal()
+    try:
+        text = f"Dedupe check {uuid4().hex}: discussed Azure AI demand. " * 20
+        first = ManualTranscriptImportService().import_text(
+            db=db, ticker="MSFT", title="MSFT Q1 call transcript", text=text,
+            source_url="https://www.microsoft.com/investor", period="Q1",
+        )
+        import hashlib
+
+        first_doc_checksum = hashlib.sha256(text.encode()).hexdigest()
+        second = ManualTranscriptImportService().import_text(
+            db=db, ticker="MSFT", title="MSFT Q1 call transcript", text=text,
+            source_url="https://www.microsoft.com/investor", period="Q1",
+        )
+
+        assert first["document_id"] == second["document_id"]
+        assert second["already_imported"] is True
+        assert second["chunks"] == 0
+        docs = db.scalars(select(Document).where(Document.checksum.isnot(None), Document.source_type == "manual_transcript", Document.title == "MSFT Q1 call transcript")).all()
+        assert len([d for d in docs if d.checksum == first_doc_checksum]) == 1
+        chunks = db.scalars(select(DocumentChunk).where(DocumentChunk.document_id == first["document_id"])).all()
+        assert len(chunks) == first["chunks"]
+        transcripts = db.scalars(select(Transcript).where(Transcript.source_id == first["document_id"])).all()
+        assert len(transcripts) == 1
+
+        # Texto distinto (aunque mismo ticker/título) es otra operación: importa
+        third = ManualTranscriptImportService().import_text(
+            db=db, ticker="MSFT", title="MSFT Q1 call transcript", text=text + " Q&A follows.",
+            source_url="https://www.microsoft.com/investor", period="Q1",
+        )
+        assert third["document_id"] != first["document_id"]
+        assert "already_imported" not in third
+    finally:
+        db.close()

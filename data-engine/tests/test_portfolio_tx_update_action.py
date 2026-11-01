@@ -86,7 +86,8 @@ def _positions(payload: dict) -> list[dict]:
         "GET", "/api/portfolio/positions",
     )
     assert response.status_code == 200, response.text
-    return [row for row in response.json() if row["ticker"] == payload["ticker"]]
+    # /positions devuelve sobre paginado {"items": [...], "page_info": {...}}.
+    return [row for row in response.json()["items"] if row["ticker"] == payload["ticker"]]
 
 
 def test_update_with_cash_action_is_rejected_and_position_survives(book):
@@ -110,7 +111,8 @@ def test_update_with_cash_action_is_rejected_and_position_survives(book):
         "GET", "/api/portfolio/transactions",
     )
     assert stored.status_code == 200
-    rows = [row for row in stored.json() if row["id"] == book["transaction_id"]]
+    # /transactions tambien devuelve sobre paginado {"items": [...]}.
+    rows = [row for row in stored.json()["items"] if row["id"] == book["transaction_id"]]
     assert len(rows) == 1
     assert rows[0]["action"] == "buy"
     assert rows[0]["quantity"] == 4.0

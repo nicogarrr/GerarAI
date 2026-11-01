@@ -70,6 +70,7 @@ from app.services.dca_signal_engine import (
     MonthlyVerdict,
     current_verdict,
     hit_rates,
+    zone_visits,
 )
 
 logger = logging.getLogger(__name__)
@@ -590,7 +591,12 @@ def evaluate_watchlist(
         state.sources = list(item.sources)
         # Tabla "¿cuantas veces estaba mas arriba?" con la misma serie y los
         # mismos parametros (solo meses confirmados, sin look-ahead).
-        state.hit_rates = hit_rates(bars, params=params, today=today)
+        hr_payload = hit_rates(bars, params=params, today=today)
+        # Mismo corte temporal que hit_rates: la duración de visitas sale de la
+        # misma serie y parámetros; los estados viejos sin la clave se declaran
+        # no disponibles hasta la próxima evaluación, nunca se rellenan.
+        hr_payload["zone_visits"] = zone_visits(bars, params=params, today=today)
+        state.hit_rates = hr_payload
         state.params_version = params.version
         state.evaluated_at = now
         state.data_source = source or "desconocido"
@@ -633,4 +639,9 @@ def evaluate_watchlist(
         if symbol not in tracked:
             db.delete(state)
     db.commit()
+    # Tras el commit final: el listado /watchlist/dca-signals cacheado por
+    # tenant ya no refleja los estados recien escritos.
+    from app.core.cache import invalidate_dca_cache
+
+    invalidate_dca_cache(db=db)
     return summary

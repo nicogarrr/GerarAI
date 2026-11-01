@@ -1,7 +1,15 @@
+import time
+
 import httpx
 
 from app.core.config import get_settings
-from app.services.connectors.base import get_with_retry
+from app.services.connectors.base import UpstreamRateLimited, get_with_retry
+from app.services.data_source_health import get_data_source_registry
+
+# Clave en el registry de salud de fuentes. 400/404 son dato por ticker y
+# 402 es entitlement por endpoint (fuera de plan): ninguno degrada la fuente
+# completa; 401/403 (clave/legacy), 429 y 5xx SI.
+REGISTRY_KEY = "fmp"
 
 
 class FMPClient:
@@ -38,10 +46,31 @@ class FMPClient:
             raise RuntimeError("FMP no está configurado en este despliegue (FMP_API_KEY vacía)")
         merged = {**(params or {}), "apikey": self.settings.fmp_api_key}
         url = f"{self.base_url}{path}"
-        async with httpx.AsyncClient(timeout=30) as client:
-            retry_kwargs = {} if max_retries is None else {"max_retries": max_retries}
-            response = await get_with_retry(lambda: client.get(url, params=merged), **retry_kwargs)
-            return response.json()
+        registry = get_data_source_registry()
+        started = time.perf_counter()
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                retry_kwargs = {} if max_retries is None else {"max_retries": max_retries}
+                response = await get_with_retry(lambda: client.get(url, params=merged), **retry_kwargs)
+                payload = response.json()
+        except UpstreamRateLimited:
+            registry.record_failure(REGISTRY_KEY, "HTTP 429: cuota diaria/rate limit agotada")
+            raise
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (400, 402, 404):
+                # 400/404: ticker sin dato. 402: endpoint fuera de plan
+                # (entitlement por endpoint, no fuente caida).
+                raise
+            registry.record_failure(REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+            raise
+        except httpx.TransportError as exc:
+            registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+            raise
+        except ValueError:
+            registry.record_failure(REGISTRY_KEY, "respuesta no JSON")
+            raise
+        registry.record_success(REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+        return payload
 
     async def company_profile(self, ticker: str) -> list | dict:
         return await self._get("/profile", {"symbol": ticker.upper()})

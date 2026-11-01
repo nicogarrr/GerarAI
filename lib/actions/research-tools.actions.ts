@@ -10,6 +10,7 @@ import { AppError, ExternalAPIError, ValidationError, isNextRedirectError } from
 import { assertPositiveInt } from '@/lib/validation/pathParams';
 import { knowledgeTickerFormValue, libraryReadingsPath } from '@/lib/knowledge/document-ticker';
 import { spanishBackendMessage } from '@/lib/research/backend-error-es';
+import type { components } from '@/lib/research/openapi.generated';
 
 const BACKEND_URL = process.env.FMP_BACKEND_URL ?? 'http://localhost:8000';
 
@@ -114,17 +115,7 @@ export type UniversalSearchResponse = {
   results: UniversalSearchResult[];
 };
 
-export type CustomMetric = {
-  id: number;
-  metric_key: string;
-  name: string;
-  formula: string;
-  unit: string;
-  description: string;
-  version: number;
-  active: boolean;
-  created_at: string;
-};
+export type CustomMetric = components['schemas']['ScreenerCustomMetricOut'];
 
 export type ScreenCriterion = {
   left: string;
@@ -132,18 +123,7 @@ export type ScreenCriterion = {
   right: string;
 };
 
-export type SavedScreen = {
-  id: number;
-  name: string;
-  description: string;
-  criteria: ScreenCriterion[];
-  ranking_formula: string | null;
-  ranking_direction: 'asc' | 'desc';
-  alerts_enabled: boolean;
-  active: boolean;
-  last_run_at: string | null;
-  created_at: string;
-};
+export type SavedScreen = components['schemas']['ScreenerSavedScreenOut'];
 
 export type ScreenResult = {
   criteria: ScreenCriterion[];
@@ -262,66 +242,7 @@ export type ManagementCredibility = {
   }>;
 };
 
-export type PortfolioIntelligence = {
-  as_of: string;
-  base_currency: string;
-  horizon_years: number;
-  performance: { twr: number | null; xirr: number | null; annualized_return: number | null; trace: Record<string, unknown>; twr_method: string; twr_is_exact: boolean };
-  risk: {
-    max_drawdown: number | null;
-    drawdown_series: Array<{ date: string; drawdown: number }>;
-    volatility: number | null;
-    sharpe: number | null;
-    sortino: number | null;
-    var_95: number | null;
-    cvar_95: number | null;
-    calmar: number | null;
-    beta: number | null;
-    beta_trace: Record<string, unknown>;
-    correlations: Record<string, Record<string, number | null>>;
-    correlation_observations: Record<string, Record<string, number>>;
-    correlation_min_observations: number;
-  };
-  concentration: { top_1: number; top_5: number; herfindahl: number; weights: Record<string, number> };
-  exposures: Record<'sectors' | 'countries' | 'currencies' | 'factors', Record<string, number>>;
-  attribution: {
-    basis?: 'adjusted_price_return';
-    period_start?: string | null;
-    period_end?: string | null;
-    portfolio_components: Record<string, number | null>;
-    incomplete_components?: string[];
-    excluded_partial_histories?: string[];
-    positions: Array<{ ticker: string; weight: number; total_return: number | null; period_start?: string | null; period_end?: string | null; period_days?: number | null; partial_history?: boolean; components: Record<string, number | null> }>;
-  };
-  ledger_contribution: {
-    positions: Array<{
-      ticker: string;
-      contribution_pnl: number | null;
-      contribution_share: number | null;
-      end_value: number | null;
-      start_value: number | null;
-      net_invested: number;
-      income: number;
-      reason: string | null;
-    }>;
-    total_pnl: number | null;
-    coverage: { positions: number; with_contribution: number; reasons: Record<string, number> };
-    methodology: string;
-    base_currency: string;
-  };
-  benchmark: {
-    symbol: string;
-    status: 'calculated' | 'missing_benchmark' | 'insufficient_overlap';
-    benchmark_twr: number | null;
-    benchmark_annualized: number | null;
-    portfolio_annualized: number | null;
-    alpha_annualized: number | null;
-    tracking_error: number | null;
-    information_ratio: number | null;
-    observations: number;
-  };
-  coverage: { positions: number; positions_with_price_history: number; positions_with_full_horizon: number; price_history_window_percent: number; price_history_percent: number; portfolio_snapshots: number; snapshot_returns: number; snapshot_pricing_complete: number; limitations: string[] };
-};
+export type PortfolioIntelligence = components['schemas']['PortfolioIntelligenceOut'];
 
 export type KnowledgeGraph = {
   node_count: number;
@@ -694,7 +615,7 @@ export async function searchResearchLibrary(input: {
       collection_id: input.collectionId || null,
       date_from: input.dateFrom || null,
       date_to: input.dateTo || null,
-      limit: 50,
+      page_size: 50,
       include_vector: input.includeVector !== false,
     }),
   });
@@ -779,7 +700,7 @@ export async function getScreenerMetricCoverage(): Promise<string[] | null> {
   // answer, so the UI keeps its full static suggestion list instead of
   // offering nothing.
   try {
-    const payload = await requestJson<{ metrics_with_data: string[] }>('/api/screeners/metric-coverage');
+    const payload = await requestJson<components['schemas']['ScreenerMetricCoverageOut']>('/api/screeners/metric-coverage');
     return Array.isArray(payload.metrics_with_data) ? payload.metrics_with_data : null;
   } catch {
     return null;
@@ -921,6 +842,13 @@ export async function updateManagementExplanation(ticker: string, promiseId: num
 
 export async function getPortfolioIntelligence(years = 5): Promise<PortfolioIntelligence> {
   return requestJson(`/api/portfolio/intelligence?years=${Math.max(1, Math.min(20, years))}`);
+}
+
+export type PortfolioRiskMatrix = components['schemas']['PortfolioRiskMatrixOut'];
+
+/** GET /api/portfolio/risk-matrix — covarianza Ledoit-Wolf y contribución al riesgo por posición. */
+export async function getPortfolioRiskMatrix(): Promise<PortfolioRiskMatrix> {
+  return requestJson('/api/portfolio/risk-matrix');
 }
 
 export async function getKnowledgeGraph(input: { nodeTypes?: string; ticker?: string; limit?: number } = {}): Promise<KnowledgeGraph> {

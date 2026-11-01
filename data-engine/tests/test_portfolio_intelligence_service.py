@@ -122,3 +122,69 @@ def test_attribution_with_spot_null_adj_close_at_end_uses_close_and_declares_it(
     # La cola spot usa `close` (aproximacion declarada en coverage): 11 / 9.5 - 1.
     assert positions[0]["total_return"] == pytest.approx(11 / 9.5 - 1)
     assert result["coverage"]["spot_tail_positions"] == ["DDD"]
+
+
+def _snapshots(db, portfolio, days, *, daily_return="0.001"):
+    from app.models.entities import PortfolioDailySnapshot
+
+    for i, day in enumerate(days):
+        db.add(
+            PortfolioDailySnapshot(
+                portfolio_id=portfolio.id,
+                snapshot_date=day,
+                base_currency="USD",
+                positions_value_base=Decimal("1000"),
+                cash_value_base=Decimal("0"),
+                total_value_base=Decimal("1000"),
+                net_external_flow_base=Decimal("0"),
+                daily_return=Decimal(daily_return),
+                pricing_coverage=Decimal("1"),
+            )
+        )
+    db.commit()
+
+
+def test_history_full_window_is_not_truncated_to_first_page(db):
+    """La rentabilidad de cartera usa TODA la ventana, no la primera pagina.
+
+    La paginacion del endpoint (aea13ccd3) convirtio history() en una consulta
+    de 20 filas: con una ventana de 5 anos (default) el resumen usaba solo las
+    20 sesiones MAS ANTIGUAS y, al ser consecutivas y completas, pasaba el
+    chequeo de exactitud: el TWR publicado cubria un mes, no la ventana.
+    """
+    from datetime import timedelta
+
+    from app.models.entities import Portfolio
+    from app.services.portfolio_snapshot_service import PortfolioSnapshotService
+
+    db.add(Portfolio(name="Main", base_currency="USD", is_default=True))
+    db.commit()
+    portfolio = db.query(Portfolio).one()
+    start = date.today() - timedelta(days=40)
+    days = [start + timedelta(days=i) for i in range(30)]
+    _snapshots(db, portfolio, days)
+
+    service = PortfolioSnapshotService()
+    assert len(service.history(db, start=start)) == 20  # contrato del endpoint
+    assert len(service.history(db, start=start, page_size=None)) == 30
+
+
+def test_performance_summary_uses_the_whole_snapshot_window(db):
+    """30 sesiones exactas: el TWR publicado compone las 30, no 20."""
+    from datetime import timedelta
+
+    from app.models.entities import Portfolio
+
+    db.add(Portfolio(name="Main", base_currency="USD", is_default=True))
+    db.commit()
+    portfolio = db.query(Portfolio).one()
+    company = _company(db, "FULLW")
+    _position(db, company, currency="USD", market_value_base="1000")
+    start = date.today() - timedelta(days=40)
+    days = [start + timedelta(days=i) for i in range(30)]
+    _snapshots(db, portfolio, days)
+
+    result = PortfolioIntelligenceService().build(db, years=1)
+    expected = (1 + 0.001) ** 30 - 1  # 30 retornos diarios exactos
+    assert result["performance"]["twr"] == pytest.approx(expected, rel=1e-9)
+    assert result["performance"]["twr_is_exact"] is True

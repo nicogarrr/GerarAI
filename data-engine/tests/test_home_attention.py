@@ -5,13 +5,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.core.database import Base
-from app.models import Company, Position, ResearchReview, ThesisChange, WatchItem
+from app.models import Company, NewsEvent, Position, ResearchReview, ThesisChange, WatchItem
 from app.services.home_attention_service import pending_thesis_changes
 
 
 def test_attention_tenant_status_membership_and_deduplication():
     engine = create_engine("sqlite://")
-    tables = [Company.__table__, Position.__table__, ResearchReview.__table__, ThesisChange.__table__, WatchItem.__table__]
+    # NewsEvent va en el esquema aunque la fixture no lo siembre: el puente
+    # review -> evento se resuelve ahora en una sola consulta con JOIN.
+    tables = [Company.__table__, Position.__table__, ResearchReview.__table__, ThesisChange.__table__, WatchItem.__table__, NewsEvent.__table__]
     Base.metadata.create_all(engine, tables=tables)
     with Session(engine) as db:
         company = Company(id=1, ticker="ASTS", name="AST", exchange="NASDAQ", company_type="equity", valuation_model="dcf")

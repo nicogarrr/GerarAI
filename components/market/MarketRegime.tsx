@@ -5,7 +5,6 @@ import type { MarketRegime, RegimeComputedMetric, RegimeObservedMetric, RegimeSt
 import { getMarketRegimeResult } from '@/lib/actions/market-regime.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { formatMarketDate, formatNumber, formatPercent, formatUserDateTime } from '@/lib/format';
-import { ExternalLink } from 'lucide-react';
 
 /**
  * Vista «Régimen» de la seccion Mercado: pinta el ultimo snapshot de
@@ -38,23 +37,6 @@ function valorMetrica(m: { value: number; unit: string }): string {
   return `${n} ${m.unit}`;
 }
 
-function Fuente({ source, url }: { source?: string; url?: string | null }) {
-  if (!source) return null;
-  return url ? (
-    <a
-      className="inline-flex items-center gap-1 text-xs text-teal-300 hover:text-teal-200 hover:underline"
-      href={url}
-      rel="noopener noreferrer"
-      target="_blank"
-    >
-      {source}
-      <ExternalLink aria-hidden="true" className="h-3 w-3" />
-    </a>
-  ) : (
-    <span className="text-xs text-gray-500">{source}</span>
-  );
-}
-
 function TarjetaMetrica({ label, metrica }: { label: string; metrica?: RegimeObservedMetric | RegimeComputedMetric }) {
   return (
     <Card className="min-w-0 border-gray-800">
@@ -69,7 +51,6 @@ function TarjetaMetrica({ label, metrica }: { label: string; metrica?: RegimeObs
             {'method' in metrica && metrica.method ? (
               <p className="text-xs text-gray-500">{metrica.method}</p>
             ) : null}
-            {'source' in metrica ? <Fuente source={metrica.source} url={metrica.source_url} /> : null}
           </>
         ) : (
           <p className="text-sm text-gray-500">Sin datos</p>
@@ -141,7 +122,6 @@ function TarjetaConcentracion({ top }: { top?: RegimeTopTen }) {
             {top.snapshot_as_of ? (
               <p className="text-xs text-gray-500">Snapshot del {formatMarketDate(top.snapshot_as_of)}</p>
             ) : null}
-            <Fuente source={top.source} url={top.source_url} />
           </>
         ) : (
           <>

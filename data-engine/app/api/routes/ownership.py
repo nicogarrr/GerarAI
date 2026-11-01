@@ -6,6 +6,12 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.ui_errors import ui_error
+from app.schemas.api import (
+    ManagerChangesOut,
+    ManagerHoldingsOut,
+    OwnershipManagersOut,
+    Schedule13DGResponseOut,
+)
 from app.services import schedule13dg_monitor, schedule13dg_service
 from app.services.manager_holding_ingestion_service import (
     LIMITATIONS,
@@ -16,7 +22,7 @@ from app.services.manager_holding_ingestion_service import (
 router = APIRouter()
 
 
-@router.get("/managers")
+@router.get("/managers", response_model=OwnershipManagersOut)
 def list_managers() -> dict:
     """Reviewed managers available for 13F sync (exact CIK, never inferred)."""
     return {
@@ -52,13 +58,13 @@ def sync_managers(cik: str | None = None, db: Session = Depends(get_db)) -> dict
     return service.sync_all(db)
 
 
-@router.get("/managers/{cik}/changes")
+@router.get("/managers/{cik}/changes", response_model=ManagerChangesOut)
 def manager_changes(cik: str, db: Session = Depends(get_db)) -> dict:
     """Quarter-over-quarter 13F position changes for a reviewed manager."""
     return ManagerHoldingIngestionService().changes(db, cik=cik)
 
 
-@router.get("/managers/{cik}/holdings")
+@router.get("/managers/{cik}/holdings", response_model=ManagerHoldingsOut)
 def manager_holdings(cik: str, db: Session = Depends(get_db)) -> dict:
     """Latest 13F report holdings for a reviewed manager, as filed."""
     from app.services.investor_autosync import maybe_autosync_holdings
@@ -67,7 +73,7 @@ def manager_holdings(cik: str, db: Session = Depends(get_db)) -> dict:
     return ManagerHoldingIngestionService().latest_holdings(db, cik=cik)
 
 
-@router.get("/schedule-13dg")
+@router.get("/schedule-13dg", response_model=Schedule13DGResponseOut)
 def schedule_13dg(
     ticker: str = Query(min_length=1, max_length=20),
     db: Session = Depends(get_db),

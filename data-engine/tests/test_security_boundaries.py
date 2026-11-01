@@ -4,7 +4,6 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import delete, select, update
 
@@ -26,7 +25,7 @@ from app.models import (
 from app.seed import seed
 from app.services.financial_ingestion_service import FinancialIngestionService
 from app.workers import dramatiq_app
-from tests.auth_helpers import auth_settings, bound_headers, signed_request
+from tests.auth_helpers import auth_settings, bound_headers, csrf_client, signed_request
 
 SECRET = "research-security-test-secret-at-least-32-chars"
 
@@ -100,7 +99,7 @@ def test_production_aliases_force_signed_identity_even_without_flag(monkeypatch,
         "get_settings",
         lambda: auth_settings(strict=True, secret=SECRET, app_env=alias, required=False),
     )
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
     unsigned = client.get("/api/news")
     assert unsigned.status_code == 401
 
@@ -213,7 +212,7 @@ def test_strict_binding_flag_exists_and_defaults_on():
 
 
 def test_private_routers_reject_missing_and_invalid_signed_identity(required_auth):
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
 
     unsigned = client.get("/api/news")
     assert unsigned.status_code == 401
@@ -410,7 +409,7 @@ def test_cross_tenant_document_chunk_cannot_be_linked_as_evidence(required_auth)
     tenant_b_external = f"chunk-b-{suffix}"
     user_a = f"user-a-{suffix}"
     user_b = f"user-b-{suffix}"
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
 
     claim_response = signed_request(
         client, SECRET, tenant_a_external, user_a, "POST", "/api/memory/claims",
@@ -482,7 +481,7 @@ def test_postgres_portfolio_crud_is_tenant_scoped(required_auth):
     ticker = f"P{suffix[:5]}".upper()
     tenant_a = f"portfolio-a-{suffix}"
     tenant_b = f"portfolio-b-{suffix}"
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
     payload = {
         "ticker": ticker,
         "action": "buy",
@@ -505,8 +504,8 @@ def test_postgres_portfolio_crud_is_tenant_scoped(required_auth):
     other = signed_request(
         client, SECRET, tenant_b, f"user-b-{suffix}", "GET", "/api/portfolio/transactions"
     )
-    assert [row["id"] for row in own.json()] == [transaction_id]
-    assert other.json() == []
+    assert [row["id"] for row in own.json()["items"]] == [transaction_id]
+    assert other.json()["items"] == []
 
     forbidden_update = signed_request(
         client, SECRET, tenant_b, f"user-b-{suffix}", "PUT",

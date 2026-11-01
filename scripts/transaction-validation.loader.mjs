@@ -13,5 +13,11 @@ export async function resolve(specifier, context, nextResolve) {
       shortCircuit: true,
     };
   }
+  if (specifier === '@/lib/i18n/parse-number') {
+    return {
+      url: new URL('../lib/i18n/parse-number.ts', import.meta.url).href,
+      shortCircuit: true,
+    };
+  }
   return nextResolve(specifier, context);
 }

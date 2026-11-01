@@ -1,4 +1,21 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+// Calentamiento del chunk de la paleta (patrón del repo, cf. 'MSFT ALERT'
+// en search-hash-scroll.spec.ts): con el dev server frío (CI), el primer
+// Ctrl+K compila el chunk del diálogo y los listeners de Escape de Radix se
+// registran después de la primera pintada, perdiendo la tecla y dejando un
+// diálogo abierto huérfano. Abrir y cerrar una vez estabiliza el entorno;
+// las aserciones medidas después siguen siendo estrictas.
+async function warmUpPalette(page: Page) {
+    await page.keyboard.press('Control+k');
+    await expect(page.locator('[role="dialog"]')).toHaveCount(1);
+    for (let i = 0; i < 3 && (await page.locator('[role="dialog"]').count()) > 0; i++) {
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(300);
+    }
+    await expect(page.locator('[role="dialog"]')).toHaveCount(0);
+}
+
+
 
 // Owner único del buscador global: antes Ctrl+K abría un CommandDialog por
 // instancia montada (desktop + icono móvil), apilados píxel a píxel. Estas
@@ -14,6 +31,7 @@ test.describe('buscador global: una sola instancia de diálogo', () => {
             await page.goto('/research/MSFT', { waitUntil: 'networkidle' });
             await page.locator('[data-testid="search-command-trigger"]:visible').first().waitFor();
             await page.waitForTimeout(500); // registro de instancias tras hidratar
+            await warmUpPalette(page);
 
             await page.keyboard.press('Control+k');
             await expect(page.locator('[role="dialog"]')).toHaveCount(1);
@@ -72,6 +90,7 @@ test.describe('owner huérfano (objeción auditor)', () => {
         await page.goto('/research/MSFT', { waitUntil: 'networkidle' });
         await page.locator('[data-testid="search-command-trigger"]:visible').first().waitFor();
         await page.waitForTimeout(500);
+        await warmUpPalette(page);
 
         // Drawer móvil: su SearchCommand es una instancia más.
         await page.click('button[aria-label="Abrir menú de navegación"]');

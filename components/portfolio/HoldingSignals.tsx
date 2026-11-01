@@ -7,7 +7,8 @@ import {
     fairValueGapPercent,
     type HoldingSignals,
 } from '@/lib/portfolio/holding-signals';
-import { formatMarketDate, formatNumber, formatPercent, formatPrice, isValidCurrencyCode } from '@/lib/format';
+import { isValidCurrencyCode } from '@/lib/format';
+import { useT, useFormat } from '@/lib/i18n/client';
 import { cn } from '@/lib/utils';
 
 const EMPTY_SIGNALS: HoldingSignals = { fairValues: {}, dca: null };
@@ -38,17 +39,21 @@ export function useHoldingSignals(symbols: string[]): HoldingSignals | null {
 
 /** Chip del nivel DCA: color de la zona del motor o «Sin nivel» gris. */
 export function DcaLevelChip({ symbol, signals }: { symbol: string; signals: HoldingSignals | null }) {
+    const ti = useT();
+    const f = useFormat();
     if (signals === null) return <span className="text-xs text-gray-500">…</span>;
     const level = signals.dca?.[symbol.toUpperCase()] ?? null;
     const title = signals.dca === null
-        ? 'El motor de niveles DCA aún no está activo: sin nivel.'
+        ? ti('portfolio.holdingSignals.dcaInactive')
         : level
-          ? `Nivel DCA de tu fórmula${level.signalDate ? ` (cierre ${formatMarketDate(level.signalDate)})` : ''}${level.forming ? '; mes en formación, se confirma al cierre' : ''}`
-          : 'Este ticker aún no tiene nivel DCA evaluado.';
+          ? ti('portfolio.holdingSignals.dcaTitle')
+            + (level.signalDate ? ti('portfolio.holdingSignals.dcaTitleDate', { date: f.formatMarketDate(level.signalDate) }) : '')
+            + (level.forming ? ti('portfolio.holdingSignals.dcaTitleForming') : '')
+          : ti('portfolio.holdingSignals.dcaNotEvaluated');
     return (
         <span
             className={cn(
-                'inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] font-semibold',
+                'inline-flex shrink-0 items-center rounded border px-1.5 py-0.5 text-[11px] font-semibold',
                 level ? 'border-transparent' : 'border-gray-700 text-gray-500',
             )}
             style={level?.color ? { backgroundColor: level.color, color: level.fg ?? undefined } : undefined}
@@ -71,20 +76,22 @@ export function FairValueLine({
     priceCurrency: string | null;
     signals: HoldingSignals | null;
 }) {
+    const ti = useT();
+    const f = useFormat();
     if (signals === null) return <span className="text-xs text-gray-500">…</span>;
     const fair = signals.fairValues[symbol.toUpperCase()];
-    if (!fair) return <span className="text-xs text-gray-500" title="Sin tesis publicada ni valoración del motor">Sin valor justo</span>;
+    if (!fair) return <span className="text-xs text-gray-500" title={ti('portfolio.holdingSignals.noFairValueTitle')}>{ti('portfolio.holdingSignals.noFairValue')}</span>;
     const gap = fairValueGapPercent(price, priceCurrency, fair);
-    const amount = fair.currency && isValidCurrencyCode(fair.currency) ? formatPrice(fair.value, fair.currency) : formatNumber(fair.value);
+    const amount = fair.currency && isValidCurrencyCode(fair.currency) ? f.formatPrice(fair.value, fair.currency) : f.formatNumber(fair.value);
     return (
         <span
             className="block text-right text-xs text-gray-300"
-            title={`Fuente: ${fair.label}${fair.asOf ? ` · ${formatMarketDate(fair.asOf)}` : ''}`}
+            title={ti('portfolio.holdingSignals.fairSource', { label: fair.label }) + (fair.asOf ? ` · ${f.formatMarketDate(fair.asOf)}` : '')}
         >
             {amount}
             {gap !== null ? (
                 <span className={cn('ml-1', gap >= 0 ? 'text-good' : 'text-bad')}>
-                    ({formatPercent(gap, { fromRatio: false, digits: 1, signDisplay: 'always' })})
+                    ({f.formatPercent(gap, { fromRatio: false, digits: 1, signDisplay: 'always' })})
                 </span>
             ) : null}
             <span className="block text-[10px] text-gray-500">{fair.label}</span>

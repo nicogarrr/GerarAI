@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { useT } from '@/lib/i18n/client';
+
 /** Ventana típica de un restart del backend: 10-20 s (observado en prod).
  *  Cuatro reintentos con espera creciente la cruzan sin martillear. */
 const RETRY_DELAYS_MS = [5000, 10000, 20000, 40000];
@@ -15,6 +17,7 @@ const RETRY_DELAYS_MS = [5000, 10000, 20000, 40000];
  * la página vuelve con datos y este componente se desmonta.
  */
 export function BackendOfflineAutoRetry() {
+  const t = useT();
   const router = useRouter();
   const [attempt, setAttempt] = useState(0);
 
@@ -30,7 +33,7 @@ export function BackendOfflineAutoRetry() {
   if (attempt >= RETRY_DELAYS_MS.length) return null;
   return (
     <p className="text-xs text-teal-300/80" role="status">
-      Reintentando automáticamente (intento {attempt + 1} de {RETRY_DELAYS_MS.length})…
+      {t('ui.system.autoRetry', { attempt: attempt + 1, total: RETRY_DELAYS_MS.length })}
     </p>
   );
 }

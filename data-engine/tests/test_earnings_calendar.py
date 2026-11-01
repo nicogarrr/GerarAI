@@ -137,7 +137,7 @@ def test_fetch_range_unavailable_when_everything_fails():
 def test_fetch_range_rejects_bad_ranges():
     with pytest.raises(ValueError, match="posterior"):
         run_async(connector.fetch_earnings_range(date(2026, 9, 18), date(2026, 9, 17)))
-    with pytest.raises(ValueError, match="maximo"):
+    with pytest.raises(ValueError, match="máximo"):
         run_async(connector.fetch_earnings_range(date(2026, 1, 1), date(2026, 3, 15)))
 
 

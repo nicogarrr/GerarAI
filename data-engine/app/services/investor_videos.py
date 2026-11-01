@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import re
 import time
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B314  # stdlib solo para tipos (Element) y ParseError: defusedxml no los exporta; el parseo usa defusedxml
 from datetime import datetime
 from threading import Lock
 
+# Atom externo (YouTube): defusedxml solo para PARSEAR.
+import defusedxml.ElementTree as DefusedET
 import httpx
 
 _CHANNEL = re.compile(r"UC[A-Za-z0-9_-]{22}\Z")
@@ -47,7 +49,7 @@ def parse_feed(content: bytes, channel_id: str, channel_kind: str) -> list[dict[
     if "<!DOCTYPE" in text.upper() or "<!ENTITY" in text.upper():
         return []
     try:
-        root = ET.fromstring(text)
+        root = DefusedET.fromstring(text)
     except ET.ParseError:
         return []
     if root.tag != _ATOM + "feed":

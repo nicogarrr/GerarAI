@@ -7,7 +7,43 @@
  * o precio válidos no hay petición al backend.
  */
 
-import { parseLocalizedNumberDetailed } from '@/lib/format';
+import { todayLocal } from '@/lib/format';
+import { parseLocalizedNumberDetailed } from '@/lib/i18n/parse-number';
+import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
+import type { TranslationKey } from '@/lib/i18n/t';
+
+/** Copias ES por defecto (byte-idénticas a las del diccionario
+ *  lib/i18n/messages/es/portfolio.json#transactionForm, lo verifica el
+ *  guard scripts/transaction-validation.test.ts): este módulo se importa
+ *  también desde guards de node, que no cargan el registro de mensajes. */
+export const TRANSACTION_VALIDATION_ES = {
+  errSymbol: 'Busca y selecciona una acción de la lista.',
+  errQuantity: 'Introduce una cantidad mayor que 0.',
+  errPrice: 'Introduce un precio válido (0 o mayor).',
+  errFees: 'Introduce una comisión válida (0 o mayor) o déjala vacía.',
+  errDateInvalid: 'Fecha no válida (usa el selector de fecha).',
+  errDateFuture: 'La fecha no puede ser futura.',
+  errAmbiguous: 'Formato de número ambiguo: usa la coma para los decimales y el punto para los miles (ej. 1.234,56).',
+} as const;
+
+type ValidationMessageKey = keyof typeof TRANSACTION_VALIDATION_ES;
+
+const VALIDATION_I18N_KEYS: Record<ValidationMessageKey, TranslationKey> = {
+  errSymbol: 'portfolio.transactionForm.errSymbol',
+  errQuantity: 'portfolio.transactionForm.errQuantity',
+  errPrice: 'portfolio.transactionForm.errPrice',
+  errFees: 'portfolio.transactionForm.errFees',
+  errDateInvalid: 'portfolio.transactionForm.errDateInvalid',
+  errDateFuture: 'portfolio.transactionForm.errDateFuture',
+  errAmbiguous: 'portfolio.transactionForm.errAmbiguous',
+};
+
+export interface TransactionValidationOptions {
+  /** Traductor del locale activo; sin él, copias ES por defecto. */
+  ti?: TFunction;
+  /** Locale para interpretar los números introducidos. */
+  locale?: string;
+}
 
 export interface TransactionFormValues {
   symbol: string;
@@ -29,56 +65,53 @@ export interface TransactionFormErrors {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/**
- * El parser rechaza los formatos ambiguos («1,234.5», «1,234») en lugar de
- * reinterpretarlos con un factor 1000 silencioso; este mensaje enseña el
- * formato esperado en vez de acusar al usuario de escribir «mal» el número.
- */
-const AMBIGUOUS_NUMBER_MESSAGE =
-  'Formato de número ambiguo: usa la coma para los decimales y el punto para los miles (ej. 1.234,56).';
-
-export function validateTransactionForm(values: TransactionFormValues, now: Date = new Date()): TransactionFormErrors {
+export function validateTransactionForm(values: TransactionFormValues, now: Date = new Date(), options: TransactionValidationOptions = {}): TransactionFormErrors {
+  const { ti, locale = 'es' } = options;
+  const msg = (key: ValidationMessageKey): string => (ti ? ti(VALIDATION_I18N_KEYS[key]) : TRANSACTION_VALIDATION_ES[key]);
   const errors: TransactionFormErrors = {};
 
   if (!values.symbol || !values.symbol.trim()) {
-    errors.symbol = 'Busca y selecciona una acción de la lista.';
+    errors.symbol = msg('errSymbol');
   }
 
-  const quantity = parseLocalizedNumberDetailed(values.quantity);
+  const quantity = parseLocalizedNumberDetailed(values.quantity, locale);
   if (!quantity.ok) {
-    errors.quantity = quantity.error === 'ambiguous' ? AMBIGUOUS_NUMBER_MESSAGE : 'Introduce una cantidad mayor que 0.';
+    errors.quantity = quantity.error === 'ambiguous' ? msg('errAmbiguous') : msg('errQuantity');
   } else if (quantity.value <= 0) {
-    errors.quantity = 'Introduce una cantidad mayor que 0.';
+    errors.quantity = msg('errQuantity');
   }
 
-  const price = parseLocalizedNumberDetailed(values.price);
+  const price = parseLocalizedNumberDetailed(values.price, locale);
   if (!price.ok) {
-    errors.price = price.error === 'ambiguous' ? AMBIGUOUS_NUMBER_MESSAGE : 'Introduce un precio válido (0 o mayor).';
+    errors.price = price.error === 'ambiguous' ? msg('errAmbiguous') : msg('errPrice');
   } else if (price.value < 0) {
-    errors.price = 'Introduce un precio válido (0 o mayor).';
+    errors.price = msg('errPrice');
   }
 
   if (values.fees !== undefined && values.fees.trim() !== '') {
-    const fees = parseLocalizedNumberDetailed(values.fees);
+    const fees = parseLocalizedNumberDetailed(values.fees, locale);
     if (!fees.ok) {
-      errors.fees = fees.error === 'ambiguous' ? AMBIGUOUS_NUMBER_MESSAGE : 'Introduce una comisión válida (0 o mayor) o déjala vacía.';
+      errors.fees = fees.error === 'ambiguous' ? msg('errAmbiguous') : msg('errFees');
     } else if (fees.value < 0) {
-      errors.fees = 'Introduce una comisión válida (0 o mayor) o déjala vacía.';
+      errors.fees = msg('errFees');
     }
   }
 
   if (!DATE_RE.test(values.date)) {
-    errors.date = 'Fecha no válida (usa el selector de fecha).';
+    errors.date = msg('errDateInvalid');
   } else {
     const day = new Date(`${values.date}T00:00:00`);
     if (Number.isNaN(day.getTime())) {
-      errors.date = 'Fecha no válida (usa el selector de fecha).';
+      errors.date = msg('errDateInvalid');
     } else {
       // Comparación por día de calendario (no por hora): mañana ya es futuro.
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      // «Hoy» en USER_TZ, la misma base con la que el diálogo siembra la
+      // fecha (todayLocal): con los getters locales del proceso, un proceso
+      // una hora atrás (CI en UTC a las 23:xx, navegador al oeste de Madrid)
+      // veía «ayer» y rechazaba la fecha sembrada como futura.
+      const today = todayLocal(now);
       if (values.date > today) {
-        errors.date = 'La fecha no puede ser futura.';
+        errors.date = msg('errDateFuture');
       }
     }
   }

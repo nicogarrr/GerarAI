@@ -142,5 +142,5 @@ export async function deletePlanContribution(contributionId: number): Promise<Pl
 export async function getSavingsProjection(input?: import('@/lib/plan/savings-projection').SavingsPreviewInput): Promise<import('@/lib/plan/savings-projection').SavingsProjection> {
     await requireAuthenticatedUser();
     const query = input ? new URLSearchParams({ monthly: String(input.monthly), years: String(input.years), currency: input.currency, dividend_yield: String(input.dividendYield), inflation: String(input.inflation) }) : null;
-    return researchRequest(`/api/plan/savings-projection${query ? `?${query}` : ''}`);
+    return researchRequest<import('@/lib/plan/savings-projection').SavingsProjection>(`/api/plan/savings-projection${query ? `?${query}` : ''}`);
 }

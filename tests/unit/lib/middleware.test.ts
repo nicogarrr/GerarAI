@@ -68,7 +68,7 @@ describe('middleware de sesión', () => {
         expect(middleware(request('/portfolio')).headers.get('location')).not.toBeNull();
     });
 
-    it.each(['/', '/sign-in', '/sign-up', '/forgot-password', '/metodologia', '/help', '/privacidad', '/terminos', '/api/auth/session'])('la decisión de sesión deja pública %s', (path) => {
+    it.each(['/', '/sign-in', '/sign-up', '/cuenta-pendiente', '/forgot-password', '/metodologia', '/help', '/privacidad', '/terminos', '/api/auth/session'])('la decisión de sesión deja pública %s', (path) => {
         expect(requiresSession(path)).toBe(false);
         expect(middleware(request(path)).headers.get('location')).toBeNull();
     });
@@ -77,6 +77,16 @@ describe('middleware de sesión', () => {
         'el matcher deja pública %s',
         (path) => {
             expect(matcher.test(path)).toBe(false);
+        },
+    );
+
+    it.each(['/cuenta-pendiente?estado=pendiente', '/cuenta-pendiente?estado=rechazada'])(
+        'sin cookie de sesión %s pasa (la cuenta pendiente/rechazada nunca tiene sesión)',
+        (path) => {
+            const res = middleware(request(path));
+            expect(res.status).not.toBe(307);
+            expect(res.headers.get('location')).toBeNull();
+            expect(res.headers.get('x-middleware-next')).toBe('1');
         },
     );
 

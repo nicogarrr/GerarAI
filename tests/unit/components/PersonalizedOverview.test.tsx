@@ -74,7 +74,7 @@ function setup(o: {
 
 async function renderHome(props: Partial<React.ComponentProps<typeof PersonalizedOverview>> = {}) {
     const view = render(<PersonalizedOverview userId="u1" {...props} />);
-    await waitFor(() => expect(screen.queryAllByText('Cargando…')).toHaveLength(0));
+    await waitFor(() => expect(screen.queryAllByText(/Cargando(?:…|\.\.\.)/u)).toHaveLength(0));
     return view;
 }
 
@@ -87,7 +87,7 @@ describe('PersonalizedOverview', () => {
         setup();
         getPortfolioSummary.mockReturnValue(new Promise(() => {}));
         render(<PersonalizedOverview userId="u1" />);
-        expect(screen.getAllByText('Cargando…').length).toBeGreaterThanOrEqual(3);
+        expect(screen.getAllByText(/Cargando(?:…|\.\.\.)/u).length).toBeGreaterThanOrEqual(3);
         expect(screen.queryByText(/Oportunidades por valor intrínseco/)).not.toBeInTheDocument();
         expect(screen.getByRole('heading', { level: 1, name: 'Qué ha cambiado' })).toBeInTheDocument();
     });
@@ -103,7 +103,7 @@ describe('PersonalizedOverview', () => {
         // Rejilla de hasta 4 posiciones, 1 columna en móvil y 2 desde sm.
         const tiles = skeleton.querySelector('.grid-cols-1.sm\\:grid-cols-2');
         expect(tiles?.children).toHaveLength(4);
-        expect(within(skeleton).getByText('Cargando…')).toHaveAttribute('role', 'status');
+        expect(within(skeleton).getByText(/Cargando(?:…|\.\.\.)/u)).toHaveAttribute('role', 'status');
     });
 
     it('cartera vacía: primeros pasos, con y sin watchlist', async () => {
@@ -165,6 +165,22 @@ describe('PersonalizedOverview', () => {
         expect(screen.queryByRole('link', { name: /Ver qué ha cambiado en/i })).not.toBeInTheDocument();
     });
 
+    it('el precio queda en la fila del símbolo y nunca bajo la insignia DCA (solape)', async () => {
+        // Regresión: con la insignia «2X DCA (provisional)» en la segunda fila,
+        // el precio (centrado en vertical contra la columna de dos filas) se
+        // pintaba encima de la insignia en pantallas estrechas.
+        setup({
+            portfolio: summary([holding('ASTS', { cost: null, gain: null, gainPercent: null, firstBuyDate: null })]),
+            signals: { fairValues: {}, dca: { ASTS: { label: '2X DCA', forming: true } } },
+        });
+        await renderHome();
+        const asts = screen.getByRole('link', { name: /^ASTS/ });
+        const symbolRow = within(asts).getByText('ASTS').parentElement as HTMLElement;
+        expect(within(symbolRow).getByText(/1\.200/)).toBeInTheDocument();
+        expect(within(symbolRow).queryByText(/2X DCA/)).not.toBeInTheDocument();
+        await waitFor(() => expect(within(asts).getByText('2X DCA (provisional)')).toBeInTheDocument());
+    });
+
     it('valor justo en otra divisa: muestra el valor sin porcentaje y la fuente', async () => {
         setup({
             portfolio: summary([holding('ASTS')]),
@@ -199,7 +215,7 @@ describe('PersonalizedOverview', () => {
         expect(screen.getAllByText('N/D', { selector: 'span.font-mono' })).toHaveLength(2);
         expect(screen.getByText(/Todavía no tenemos la base de coste/)).toBeInTheDocument();
         const aaa = screen.getByRole('link', { name: /^AAA/ });
-        expect(aaa.textContent).toMatch(/1\.?000,00\s*€ · 25,0\s?%/);
+        expect(aaa.textContent).toMatch(/1\.?000,00\s*€\s·\s25,0\s?%/);
         expect(screen.getByRole('link', { name: 'Revisar tu cartera' })).toHaveAttribute('href', '/portfolio');
         expect(screen.getAllByText('N/D').length).toBeGreaterThanOrEqual(3);
     });

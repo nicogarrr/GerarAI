@@ -47,13 +47,11 @@
   "detail": {
     "title": "Detalle del nodo",
     "empty": "Selecciona un nodo del grafo para ver lo que el backend sabe de él.",
-    "absent": "N/D",
     "neighborsTitle": "Vecinos ({count})",
     "noNeighbors": "Este nodo no tiene relaciones en el subgrafo visible.",
     "directionOut": "sale",
     "directionIn": "entra",
     "confidence": "Confianza",
-    "provenance": "Procedencia",
     "scopeLink": "Abrir el entorno completo de este nodo en el servidor",
     "unknownNode": "El nodo #{id} no está en el subgrafo que se ha cargado.",
     "shareLink": "Enlace compartible a este nodo",
@@ -70,6 +68,18 @@
       "degree": "Grado",
       "description": "Descripción",
       "attributes": "Atributos"
+    },
+    "absent": "N/D",
+    "absentReason": {
+      "id": "El backend no devolvio identificador para este nodo.",
+      "label": "El backend no devolvio etiqueta para este nodo.",
+      "type": "El backend no devolvio tipo para este nodo.",
+      "key": "El grafo no guarda clave propia para este tipo de nodo.",
+      "entity": "Este nodo no esta enlazado con una entidad de otra tabla.",
+      "confidence": "El grafo no guarda confianza para este nodo.",
+      "degree": "Sin aristas incidentes: el grafo no relaciona este nodo con ninguno.",
+      "description": "El grafo no guarda descripción para este tipo de nodo.",
+      "attributes": "El backend no devolvio atributos para este nodo."
     }
   },
   "listing": {
@@ -103,15 +113,26 @@
     "showing": "Mostrando {shown} de {total} nodos con estos filtros. Primero los de más relaciones; solo se muestran relaciones entre los nodos incluidos.",
     "edgesTitle": "Relaciones",
     "edgesAria": "Relaciones del grafo",
-    "edgesCaption": "Relaciones del grafo de conocimiento: nodo de origen, tipo de relación, nodo de destino, confianza y procedencia",
     "colFrom": "Desde",
     "colRelation": "Relación",
     "colTo": "Hasta",
     "colConfidence": "Confianza",
-    "colProvenance": "Procedencia",
     "nodeFallback": "Nodo {id}",
     "noEdges": "Ninguna relación coincide con el ámbito actual.",
     "confidence": "Confianza {value}",
-    "truncated": "Mostrando 30 de {total} relaciones: filtra para acotar el ámbito."
+    "truncated": "Mostrando 30 de {total} relaciones: filtra para acotar el ámbito.",
+    "edgesCaption": "Relaciones del grafo de conocimiento: nodo de origen, tipo de relación, nodo de destino, confianza y procedencia",
+    "colProvenance": "Procedencia"
+  },
+  "nodeType": {
+    "company": "Empresa",
+    "principle": "Principio",
+    "author": "Autor",
+    "decision": "Decisión",
+    "decisionLesson": "Lección",
+    "kpi": "Indicador",
+    "risk": "Riesgo",
+    "concept": "Concepto",
+    "caseStudy": "Caso de estudio"
   }
 }

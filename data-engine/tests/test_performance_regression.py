@@ -338,18 +338,20 @@ def test_pagination_caps_are_enforced(perf_db) -> None:
     from app.api.routes import portfolio as portfolio_routes
 
     db, _counter, _today = perf_db
-    assert len(portfolio_routes.transactions(limit=5, offset=0, db=db)) == 5
-    assert len(portfolio_routes.transactions(limit=5, offset=5, db=db)) == 5
-    assert len(portfolio_routes.positions(limit=5, offset=0, db=db)) == 5
-    assert len(portfolio_routes.positions(limit=5, offset=5, db=db)) == 5
-    assert len(portfolio_routes.list_fx_rates(limit=1, offset=0, db=db)) == 1
+    # Contrato paginado actual: /transactions/page y sobres items+page_info.
+    assert len(portfolio_routes.transactions_page(limit=5, offset=0, db=db)["items"]) == 5
+    assert len(portfolio_routes.transactions_page(limit=5, offset=5, db=db)["items"]) == 5
+    assert len(portfolio_routes.positions(limit=5, offset=0, db=db)["items"]) == 5
+    assert len(portfolio_routes.positions(limit=5, offset=5, db=db)["items"]) == 5
+    assert len(portfolio_routes.list_fx_rates(limit=1, offset=0, db=db)["items"]) == 1
     assert len(companies_routes.list_companies(limit=5, offset=0, db=db)) == 5
     assert len(companies_routes.list_companies(limit=5, offset=25, db=db)) == 0
     # Los techos existen en la firma (Query le=...).
     import inspect as _inspect
 
     for fn, name, ceiling in [
-        (portfolio_routes.transactions, "transactions", 1000),
+        # /transactions usa page/page_size; el listado limit/offset es /transactions/page.
+        (portfolio_routes.transactions_page, "transactions_page", 200),
         (portfolio_routes.positions, "positions", 2000),
         (portfolio_routes.list_fx_rates, "fx-rates", 2000),
         (companies_routes.list_companies, "companies", 500),
@@ -373,6 +375,7 @@ def test_perf_indexes_present_in_metadata() -> None:
         "ix_thesis_versions_company_version",
         "ix_claims_company_status",
         "ix_thesis_changes_company_created",
+        "ix_thesis_changes_tenant_company_id",
         "ix_research_reviews_company_status",
         "ix_research_alerts_company_status",
     }
@@ -402,3 +405,32 @@ def test_migration_0021_has_upgrade_and_downgrade() -> None:
     assert module.down_revision == "0020_news_event_metadata"
     assert callable(module.upgrade) and callable(module.downgrade)
     assert len(module.INDEXES) >= 10
+
+
+def test_migration_0118_has_upgrade_and_downgrade() -> None:
+    """0118: indice compuesto de thesis_changes para /api/attention-thesis.
+
+    MEDIDO por el piloto (EXPLAIN ANALYZE, 2026-10-31, bajo restore+build
+    concurrentes): la consulta principal hace 466 sondas por company_id con
+    ~64 filas cada una y descarta 29.456 por el filtro id = thesis_change_id
+    (18.936 buffer hits). El planner estimaba rows=3 (real: 64) y eligio
+    ix_thesis_changes_company_id; con (tenant_id, company_id, id) las tres
+    condiciones van al indice y cada sonda toca 1 fila.
+    """
+    import importlib.util
+
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "0118_thesis_attention_idx.py"
+    )
+    assert path.exists(), "falta la migración 0118"
+    spec = importlib.util.spec_from_file_location("m0118", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.revision == "0118_thesis_attention_idx"
+    assert len(module.revision) <= 32
+    assert module.down_revision == "0117_fk_child_indexes"
+    assert callable(module.upgrade) and callable(module.downgrade)

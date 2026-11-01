@@ -21,6 +21,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/db-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Db Metrics
+         * @description Get database performance metrics.
+         *
+         *     Returns:
+         *         - Connection pool statistics (active, idle, max connections)
+         *         - Disk usage (database size, table sizes)
+         *         - Table bloat detection (PostgreSQL only)
+         *
+         *     This endpoint requires authentication and is intended for monitoring
+         *     and operational visibility.
+         */
+        get: operations["db_metrics_api_admin_db_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/alerts": {
         parameters: {
             query?: never;
@@ -350,6 +378,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/audit/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Audit Logs
+         * @description Consulta registros de auditoria inmutables para el tenant activo.
+         */
+        get: operations["get_audit_logs_api_audit_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/bottlenecks": {
         parameters: {
             query?: never;
@@ -406,6 +454,133 @@ export interface paths {
          *     encola, nunca se llama al modelo desde la peticion.
          */
         post: operations["run_discovery_api_bottlenecks_discoveries_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cache/invalidate/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invalidate All
+         * @description Invalidate all cache entries for current tenant. GLOBAL leg: gated.
+         */
+        post: operations["invalidate_all_api_cache_invalidate_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cache/invalidate/dca": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invalidate Dca
+         * @description Invalidate DCA schedule cache for current tenant.
+         */
+        post: operations["invalidate_dca_api_cache_invalidate_dca_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cache/invalidate/market-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invalidate Market Data
+         * @description Invalidate all market data cache entries. GLOBAL: gated in production.
+         */
+        post: operations["invalidate_market_data_api_cache_invalidate_market_data_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cache/invalidate/portfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invalidate Portfolio
+         * @description Invalidate portfolio valuation cache for current tenant.
+         */
+        post: operations["invalidate_portfolio_api_cache_invalidate_portfolio_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cache/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Stats
+         * @description Get cache statistics including hit rates.
+         *
+         *     Returns cache hits, misses, and hit rate percentage for:
+         *     - market_data: Market prices, quotes, history
+         *     - portfolio_valuation: Portfolio snapshots and valuations
+         *     - dca_schedule: DCA signals and schedules
+         *
+         *     Expected hit rate >70% for repeated requests.
+         */
+        get: operations["get_stats_api_cache_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cache/stats/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Stats
+         * @description Reset cache statistics counters (for testing).
+         */
+        post: operations["reset_stats_api_cache_stats_reset_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -608,6 +783,28 @@ export interface paths {
          *     ``status`` lo declara; nunca devuelve 5xx por un fallo del proveedor.
          */
         get: operations["ipo_calendar_api_calendar_ipos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendar/portfolio-upcoming": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Portfolio Upcoming Dates
+         * @description «Próximas fechas» de la cartera: resultados (oficial/estimada), ex-dividendo y pago, con recordatorio.
+         *
+         *     Solo tablas guardadas (``earnings_dates`` y ``dividend_records``): ninguna llamada a proveedores.
+         */
+        get: operations["portfolio_upcoming_dates_api_calendar_portfolio_upcoming_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1060,6 +1257,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/events/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Company Timeline Events
+         * @description Eventos guardados para el gráfico de precio (resultados, ex-dividendo, filings, insiders, noticias).
+         *
+         *     Lee solo la base de datos: no llama a Finnhub, GDELT, la SEC ni Yahoo. Todo evento lleva fecha y fuente.
+         */
+        get: operations["get_company_timeline_events_api_companies__ticker__events_timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{ticker}/expectation-reality": {
         parameters: {
             query?: never;
@@ -1220,6 +1439,28 @@ export interface paths {
          * @description Estima FCF, WACC o crecimiento terminal desde extractos ingeridos. Guarda INFERIDO.
          */
         post: operations["create_inferred_input_llm_api_companies__ticker__inferred_inputs_llm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{ticker}/key-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Company Key Stats
+         * @description Datos clave de la ficha (rango 52 semanas, proximos resultados,
+         *     ex-dividendo, beta). Fuentes gratuitas ya presentes; cada dato lleva su
+         *     fuente y un dato sin fuente queda vacio, nunca estimado.
+         */
+        get: operations["company_key_stats_api_companies__ticker__key_stats_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1861,6 +2102,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/csrf-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Csrf Token
+         * @description Obtiene un token CSRF para peticiones mutantes sin firma Research OS.
+         */
+        get: operations["get_csrf_token_api_csrf_token_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data-health": {
         parameters: {
             query?: never;
@@ -1906,6 +2167,26 @@ export interface paths {
         put?: never;
         /** Shorts Refresh */
         post: operations["shorts_refresh_api_data_health_shorts__ticker__refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Data Sources Health
+         * @description Estado, latencia y circuit breakers de las fuentes de datos externas.
+         */
+        get: operations["data_sources_health_api_data_sources_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1975,6 +2256,26 @@ export interface paths {
          * @description Readiness: BD (SELECT 1), scheduler y versión.
          */
         get: operations["health_api_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health/data-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Data Sources Health
+         * @description Estado, latencia y circuit breakers de las fuentes de datos externas.
+         */
+        get: operations["data_sources_health_api_health_data_sources_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2902,6 +3203,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/quotes/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Market Quotes Batch
+         * @description Cotizaciones por lote (shape Finnhub via Yahoo), cache Redis 60s.
+         *
+         *     Respuesta por simbolo: payload o null (sin dato NUNCA es error global).
+         */
+        post: operations["market_quotes_batch_api_market_quotes_batch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/regime": {
         parameters: {
             query?: never;
@@ -3619,6 +3942,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Portfolios */
+        get: operations["list_portfolios_api_portfolio_get"];
+        put?: never;
+        /** Create Portfolio */
+        post: operations["create_portfolio_api_portfolio_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Portfolios */
+        get: operations["list_portfolios_api_portfolio__get"];
+        put?: never;
+        /** Create Portfolio */
+        post: operations["create_portfolio_api_portfolio__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/add": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Portfolio Transaction
+         * @description Añade una transacción/posición a la cartera (alias para contratos de API).
+         */
+        post: operations["add_portfolio_transaction_api_portfolio_add_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portfolio/cash": {
         parameters: {
             query?: never;
@@ -3878,6 +4257,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portfolio/import/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Commit Transaction Import
+         * @description Inserta atómicamente el lote de transacciones validadas en la cartera.
+         */
+        post: operations["commit_transaction_import_api_portfolio_import_commit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/import/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Transaction Import File
+         * @description Sube un archivo CSV o Excel (.xlsx) y realiza la validación previa de transacciones.
+         */
+        post: operations["upload_transaction_import_file_api_portfolio_import_file_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portfolio/import/ibkr": {
         parameters: {
             query?: never;
@@ -3923,6 +4342,26 @@ export interface paths {
         put?: never;
         /** Import Ibkr Xml */
         post: operations["import_ibkr_xml_api_portfolio_import_ibkr_xml_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/import/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Transaction Import
+         * @description Valida un archivo CSV o texto tabular y devuelve informe previo con errores y mapeo detectado.
+         */
+        post: operations["preview_transaction_import_api_portfolio_import_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4008,6 +4447,23 @@ export interface paths {
         put?: never;
         /** Refresh Portfolio Market Data */
         post: operations["refresh_portfolio_market_data_api_portfolio_refresh_market_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/risk-matrix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Portfolio Risk Matrix */
+        get: operations["portfolio_risk_matrix_api_portfolio_risk_matrix_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4107,6 +4563,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portfolio/transactions/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Transaction Batch
+         * @description Bulk transaction creation with atomic commit.
+         *
+         *     All transactions are validated before any are inserted. If any transaction
+         *     fails validation or causes a ledger error (oversell, mixed currency), the
+         *     entire batch is rolled back.
+         *
+         *     Returns the count of created transactions and their IDs.
+         */
+        post: operations["create_transaction_batch_api_portfolio_transactions_batch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portfolio/transactions/page": {
         parameters: {
             query?: never;
@@ -4137,6 +4619,26 @@ export interface paths {
         post?: never;
         /** Delete Transaction */
         delete: operations["delete_transaction_api_portfolio_transactions__transaction_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/{portfolio_id}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Portfolio Pdf Export
+         * @description Exporta el informe consolidado de la cartera y sus posiciones a formato PDF.
+         */
+        get: operations["portfolio_pdf_export_api_portfolio__portfolio_id__pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4271,6 +4773,45 @@ export interface paths {
          *     Ops/sync manual; el scheduler lo corre a diario tras el cierre US.
          */
         post: operations["refresh_prices_api_propicks_prices_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/propicks/radar/opportunities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Radar Opportunities */
+        get: operations["list_radar_opportunities_api_propicks_radar_opportunities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/propicks/radar/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enqueue Radar Scan
+         * @description Encola un lote del barrido (ops/sync manual; el diario lo da el scheduler).
+         *
+         *     El job es resumible por cursor: reintentar no duplica snapshots del día.
+         */
+        post: operations["enqueue_radar_scan_api_propicks_radar_scan_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5538,6 +6079,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/thesis/{ticker}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Thesis Pdf
+         * @description Descarga la última tesis como PDF con diseño profesional y branding GerarAI.
+         *
+         *     404 limpio cuando no hay tesis: nunca se genera un documento vacío.
+         */
+        get: operations["thesis_pdf_api_thesis__ticker__pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/thesis/{ticker}/versions": {
         parameters: {
             query?: never;
@@ -5624,6 +6187,10 @@ export interface paths {
         /**
          * Fair Value
          * @description Valor justo único de un ticker; recalcula el motor si la tesis no basta.
+         *
+         *     El recalculo pasa por cache Redis (FAIR_VALUE_LIVE_CACHE_TTL_SECONDS):
+         *     el sondeo de oportunidades de Inicio y la ficha piden el mismo ticker
+         *     muchas veces al dia y el motor no cambia hasta la proxima ingesta.
          */
         get: operations["fair_value_api_valuation__ticker__fair_value_get"];
         put?: never;
@@ -6056,6 +6623,58 @@ export interface components {
             /** Ranking Formula */
             ranking_formula?: string | null;
         };
+        /** AlertAnalysisCitationOut */
+        AlertAnalysisCitationOut: {
+            /** As Of */
+            as_of: string;
+            /** Excerpt */
+            excerpt: string;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Source */
+            source: string;
+            /** Url */
+            url: string;
+        };
+        /** AlertAnalysisReadOut */
+        AlertAnalysisReadOut: {
+            /** Alert Id */
+            alert_id: number;
+            /** Versions */
+            versions: components["schemas"]["AlertAnalysisVersionOut"][];
+        };
+        /** AlertAnalysisSectionOut */
+        AlertAnalysisSectionOut: {
+            /** Body */
+            body: string;
+            /** Citation Ids */
+            citation_ids: string[];
+            /** Key */
+            key: string;
+        };
+        /** AlertAnalysisVersionOut */
+        AlertAnalysisVersionOut: {
+            /** Citations */
+            citations: components["schemas"]["AlertAnalysisCitationOut"][];
+            /** Id */
+            id: number;
+            /** Missing Data */
+            missing_data: string[];
+            /** Second Order */
+            second_order?: {
+                [key: string]: unknown;
+            } | null;
+            /** Sections */
+            sections: components["schemas"]["AlertAnalysisSectionOut"][];
+            /** Status */
+            status: string;
+            /** Version */
+            version: string;
+            /** Writeback */
+            writeback: boolean;
+        };
         /** AlertRuleOut */
         AlertRuleOut: {
             /** Active */
@@ -6108,6 +6727,17 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** AlertsTelegramStatusOut */
+        AlertsTelegramStatusOut: {
+            /** Configured */
+            configured: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Has Bot Token */
+            has_bot_token: boolean;
+            /** Has Chat Id */
+            has_chat_id: boolean;
         };
         /** AnalystConsensus */
         AnalystConsensus: {
@@ -6258,6 +6888,13 @@ export interface components {
              */
             key: "facts" | "calculations" | "hypotheses" | "inferences" | "contradictions" | "insufficient_data" | "conclusion";
         };
+        /** Beta */
+        Beta: {
+            /** Source */
+            source: string;
+            /** Value */
+            value: number;
+        };
         /** Body_ingest_document_file_api_sources_documents_ingest_file_post */
         Body_ingest_document_file_api_sources_documents_ingest_file_post: {
             /** File */
@@ -6297,6 +6934,11 @@ export interface components {
             ticker?: string | null;
             /** Title */
             title: string;
+        };
+        /** Body_upload_transaction_import_file_api_portfolio_import_file_post */
+        Body_upload_transaction_import_file_api_portfolio_import_file_post: {
+            /** File */
+            file: string;
         };
         /** BotLinkIn */
         BotLinkIn: {
@@ -6397,6 +7039,19 @@ export interface components {
             status: string;
             /** Ticker */
             ticker: string;
+        };
+        /** CashBalanceOut */
+        CashBalanceOut: {
+            /** Balance */
+            balance: number;
+            /** Currency */
+            currency: string;
+            /** Interest Rate */
+            interest_rate: number;
+            /** Settled Cash */
+            settled_cash: number;
+            /** Source */
+            source: string;
         };
         /**
          * ChatPageContext
@@ -6819,6 +7474,22 @@ export interface components {
                 [key: string]: components["schemas"]["CompanySnapshotOut"];
             };
         };
+        /** CompanyTimelineEventsOut */
+        CompanyTimelineEventsOut: {
+            /** Currency */
+            currency?: string | null;
+            /** Desde */
+            desde: string;
+            /** Events */
+            events: components["schemas"]["TimelineEventOut"][];
+            /** Hasta */
+            hasta: string;
+            holding?: components["schemas"]["TimelineHoldingOut"] | null;
+            /** Source */
+            source: string;
+            /** Ticker */
+            ticker: string;
+        };
         /** CompanyTtmOut */
         CompanyTtmOut: {
             /** As Of */
@@ -6829,6 +7500,15 @@ export interface components {
             metrics: components["schemas"]["TtmMetricOut"][];
             /** Ticker */
             ticker: string;
+        };
+        /** ComparedAccessionsOut */
+        ComparedAccessionsOut: {
+            /** Latest */
+            latest: string;
+            /** Previous */
+            previous: string;
+            /** Rule */
+            rule: string;
         };
         /** ConfirmInput */
         ConfirmInput: {
@@ -6935,6 +7615,16 @@ export interface components {
             /** Ticker */
             ticker: string;
         };
+        /** CreatePortfolioInput */
+        CreatePortfolioInput: {
+            /**
+             * Base Currency
+             * @default EUR
+             */
+            base_currency: string;
+            /** Name */
+            name: string;
+        };
         /** Criterion */
         Criterion: {
             /** Left */
@@ -6946,6 +7636,20 @@ export interface components {
             operator: ">" | ">=" | "<" | "<=" | "==" | "!=";
             /** Right */
             right: string;
+        };
+        /** CsvPreviewRequest */
+        CsvPreviewRequest: {
+            /** Column Mapping */
+            column_mapping?: {
+                [key: string]: string;
+            } | null;
+            /** Content */
+            content: string;
+            /**
+             * Filename
+             * @default import.csv
+             */
+            filename: string;
         };
         /** CustomMetricCreate */
         CustomMetricCreate: {
@@ -7178,6 +7882,7 @@ export interface components {
             rows?: components["schemas"]["DcaHitRateRowOut"][];
             /** Symbol */
             symbol: string;
+            zone_visits?: components["schemas"]["DcaZoneVisitsOut"] | null;
         };
         /** DcaManualStatusOut */
         DcaManualStatusOut: {
@@ -7397,6 +8102,56 @@ export interface components {
             /** Zone */
             zone: string;
         };
+        /** DcaZoneVisitOut */
+        DcaZoneVisitOut: {
+            /** End */
+            end: string;
+            /** Months */
+            months: number;
+            /** Start */
+            start: string;
+        };
+        /** DcaZoneVisitsOut */
+        DcaZoneVisitsOut: {
+            /**
+             * Available
+             * @default false
+             */
+            available: boolean;
+            /** Avg Months */
+            avg_months?: number | null;
+            /**
+             * Completed Visits
+             * @default 0
+             */
+            completed_visits: number;
+            /**
+             * Excluded Gap Visits
+             * @default 0
+             */
+            excluded_gap_visits: number;
+            /** First Period */
+            first_period?: string | null;
+            /** Last Period */
+            last_period?: string | null;
+            /** Levels */
+            levels?: number[];
+            /** Max Months */
+            max_months?: number | null;
+            /**
+             * Months Completed
+             * @default 0
+             */
+            months_completed: number;
+            /** Open Visit Months */
+            open_visit_months?: number | null;
+            /** Params Version */
+            params_version?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Visits */
+            visits?: components["schemas"]["DcaZoneVisitOut"][];
+        };
         /** DecisionJournalCreate */
         DecisionJournalCreate: {
             /**
@@ -7614,6 +8369,228 @@ export interface components {
             theme_last_seen: string | null;
             /** Ticker */
             ticker: string;
+        };
+        /** DividendProjectionCoverageOut */
+        DividendProjectionCoverageOut: {
+            /** Fx Missing */
+            fx_missing: string[];
+            /** Sin Datos */
+            sin_datos: string[];
+            /** Uncertain Dividends */
+            uncertain_dividends: string[];
+            /** Unknown Source Withholding */
+            unknown_source_withholding: string[];
+            /** Unverified Reasons */
+            unverified_reasons: {
+                [key: string]: string;
+            };
+            /** With Data */
+            with_data: number;
+        };
+        /** DividendProjectionDeclaredFutureOut */
+        DividendProjectionDeclaredFutureOut: {
+            /** Amount Per Share */
+            amount_per_share: number;
+            /** Currency */
+            currency: string;
+            /** Ex Date */
+            ex_date: string;
+            /** Label */
+            label: string;
+            /** Note */
+            note: string;
+            /** Pay Date */
+            pay_date: string | null;
+            /** Projection As Of */
+            projection_as_of: string;
+            /** Source */
+            source: string;
+            /** Ticker */
+            ticker: string;
+        };
+        /** DividendProjectionFiscalYearOut */
+        DividendProjectionFiscalYearOut: {
+            /** Covered Tickers */
+            covered_tickers: string[];
+            /** Cuota Pendiente Estimada */
+            cuota_pendiente_estimada: number | null;
+            /** Double Tax Deduction */
+            double_tax_deduction: number | null;
+            /** Effective Avg Rate */
+            effective_avg_rate?: number | null;
+            /** Excluded Tickers */
+            excluded_tickers: string[];
+            /** Gross Base */
+            gross_base: number | null;
+            /** Irpf Scenario */
+            irpf_scenario: number | null;
+            /** Net Scenario */
+            net_scenario: number | null;
+            /** Note */
+            note: string;
+            /** Per Position */
+            per_position?: {
+                [key: string]: components["schemas"]["DividendProjectionPositionFiscalOut"];
+            } | null;
+            /** Retencion A Cuenta Es */
+            retencion_a_cuenta_es: number | null;
+            /** Source Withheld Foreign */
+            source_withheld_foreign: number | null;
+        };
+        /** DividendProjectionGrossSummaryOut */
+        DividendProjectionGrossSummaryOut: {
+            /** Complete */
+            complete: boolean;
+            /** Excluded No Dividends */
+            excluded_no_dividends: string[];
+            /** Excluded No Fx */
+            excluded_no_fx: string[];
+            /** Excluded Uncertain Dividends */
+            excluded_uncertain_dividends: string[];
+            /** Gross Total Base */
+            gross_total_base: number;
+            /** Gross Unverified Base */
+            gross_unverified_base: number;
+            /** Label */
+            label: string;
+            /** Net Irpf */
+            net_irpf: string;
+        };
+        /** DividendProjectionMonthOut */
+        DividendProjectionMonthOut: {
+            /** Covered Tickers */
+            covered_tickers: string[];
+            /** Excluded Tickers */
+            excluded_tickers: string[];
+            /** Gross Base */
+            gross_base: number;
+            /** Gross Total Base */
+            gross_total_base: number;
+            /** Gross Unverified Base */
+            gross_unverified_base: number;
+            /** Month */
+            month: string;
+            /** Note */
+            note: string | null;
+            /** Source Withheld Base */
+            source_withheld_base: number;
+        };
+        /** DividendProjectionPositionFiscalOut */
+        DividendProjectionPositionFiscalOut: {
+            /** Double Tax Deduction Base */
+            double_tax_deduction_base: number;
+            /** Gross Base */
+            gross_base: number;
+            /** Retencion A Cuenta Base */
+            retencion_a_cuenta_base: number;
+            /** Source Withheld Foreign Base */
+            source_withheld_foreign_base: number;
+        };
+        /** DividendProjectionPositionOut */
+        DividendProjectionPositionOut: {
+            /** Currency */
+            currency: string;
+            /** Domicile Country */
+            domicile_country: string | null;
+            /** Frequency Last Year */
+            frequency_last_year: number;
+            /** Gross Base */
+            gross_base: number | null;
+            /** Gross Native */
+            gross_native: number;
+            /** Months */
+            months: {
+                [key: string]: number;
+            };
+            /** Quantity */
+            quantity: number;
+            /** Scenario Conditions */
+            scenario_conditions: string | null;
+            /** Source Withheld Base */
+            source_withheld_base: number | null;
+            /** Source Withholding Rate */
+            source_withholding_rate: number | null;
+            /** Ticker */
+            ticker: string;
+            /** Unverified Reason */
+            unverified_reason: string | null;
+            /** Withholding Basis */
+            withholding_basis: ("emisor_verificado" | "domicilio_bd") | null;
+            /** Withholding Kind */
+            withholding_kind: ("techo_convenio" | "escenario_convenio" | "sin_impuesto_origen_escenario") | null;
+        };
+        /** DividendSyncResultOut */
+        DividendSyncResultOut: {
+            /** Currency Unknown Rows */
+            currency_unknown_rows?: number | null;
+            /** Error */
+            error?: string | null;
+            /** Existing */
+            existing: number;
+            /** Fetched At */
+            fetched_at?: string | null;
+            /** Inserted */
+            inserted: number;
+            /** Reason */
+            reason?: string | null;
+            /** Skipped */
+            skipped?: {
+                [key: string]: number;
+            } | null;
+            /** Source */
+            source?: string | null;
+            /** Split Readjustments Healed */
+            split_readjustments_healed?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "unavailable" | "unknown_company" | "no_safe_symbol" | "currency_unknown";
+            /** Ticker */
+            ticker: string;
+        };
+        /** DividendUncertainEventOut */
+        DividendUncertainEventOut: {
+            /** Amounts */
+            amounts: string[];
+            /** Ex Date */
+            ex_date: string;
+        };
+        /** DividendYieldCoverageOut */
+        DividendYieldCoverageOut: {
+            /** Covered Value Fraction */
+            covered_value_fraction: number | null;
+            /** Percent */
+            percent: number;
+            /** Positions */
+            positions: number;
+            /** Positions Missing Base Value */
+            positions_missing_base_value: string[];
+            /** Positions With Dividend Data */
+            positions_with_dividend_data: number;
+        };
+        /** DividendYieldPositionOut */
+        DividendYieldPositionOut: {
+            /** Currency */
+            currency: string;
+            /** Dividend Yield */
+            dividend_yield: number | null;
+            /** Last Fetched At */
+            last_fetched_at: string | null;
+            /** Matching Currency Records 12M */
+            matching_currency_records_12m: number;
+            /** Price */
+            price: number | null;
+            /** Records 12M */
+            records_12m: number;
+            /** Skipped Currency Mismatch */
+            skipped_currency_mismatch: number;
+            /** Ticker */
+            ticker: string;
+            /** Ttm Dividend Per Share */
+            ttm_dividend_per_share: number | null;
+            /** Uncertain Dividend Events */
+            uncertain_dividend_events: components["schemas"]["DividendUncertainEventOut"][];
         };
         /**
          * DocType
@@ -7860,6 +8837,21 @@ export interface components {
              */
             source: string;
         };
+        /** FXRateOut */
+        FXRateOut: {
+            /** Base Currency */
+            base_currency: string;
+            /** Id */
+            id: number;
+            /** Quote Currency */
+            quote_currency: string;
+            /** Rate */
+            rate: number;
+            /** Rate Date */
+            rate_date: string;
+            /** Source */
+            source: string;
+        };
         /** FeedCreate */
         FeedCreate: {
             /**
@@ -8085,6 +9077,144 @@ export interface components {
              */
             unit: string;
         };
+        /** ForecastCoveredOnlyOut */
+        ForecastCoveredOnlyOut: {
+            /** Expected Cagr */
+            expected_cagr: number | null;
+            /** Scenarios */
+            scenarios: {
+                [key: string]: components["schemas"]["ForecastCoveredScenarioOut"];
+            };
+        };
+        /** ForecastCoveredScenarioOut */
+        ForecastCoveredScenarioOut: {
+            /** Cagr */
+            cagr: number;
+            /** Coverage */
+            coverage: number;
+            /**
+             * Horizon Scope
+             * @enum {string}
+             */
+            horizon_scope: "uniform" | "mixed";
+            /** Total Return */
+            total_return: number;
+        };
+        /** ForecastExcludedOut */
+        ForecastExcludedOut: {
+            /** Currency */
+            currency: string;
+            /** Name */
+            name: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "valuation_hold" | "no_base_value" | "no_published_thesis" | "valuation_basis_unverified" | "no_computable_intrinsic";
+            /** Ticker */
+            ticker: string;
+            /** Weight */
+            weight: number | null;
+        };
+        /** ForecastPortfolioOut */
+        ForecastPortfolioOut: {
+            /** Covered Count */
+            covered_count: number;
+            covered_only: components["schemas"]["ForecastCoveredOnlyOut"];
+            /** Covered Weight */
+            covered_weight: number | null;
+            /** Excluded Count */
+            excluded_count: number;
+            /** Expected Cagr */
+            expected_cagr: number | null;
+            /** Expected Coverage */
+            expected_coverage: number | null;
+            /** Position Count */
+            position_count: number;
+            /** Scenarios */
+            scenarios: {
+                [key: string]: components["schemas"]["ForecastScenarioOut"];
+            } | null;
+            /** Total Value Base */
+            total_value_base: number;
+        };
+        /** ForecastPositionOut */
+        ForecastPositionOut: {
+            /** Cagr */
+            cagr: {
+                [key: string]: number;
+            };
+            /** Comparison Basis */
+            comparison_basis: string;
+            /** Contribution Expected */
+            contribution_expected: number | null;
+            /** Currency */
+            currency: string;
+            /** Expected Cagr */
+            expected_cagr: number | null;
+            /** Horizon Years */
+            horizon_years: number;
+            /** Intrinsic */
+            intrinsic: {
+                [key: string]: number | null;
+            };
+            /** Model Version */
+            model_version: number | null;
+            /** Name */
+            name: string;
+            /** Partial Expected Cagr */
+            partial_expected_cagr: number | null;
+            /** Price */
+            price: number;
+            /** Price As Of */
+            price_as_of: string;
+            /** Price Source */
+            price_source: string;
+            /**
+             * Price Veracity
+             * @enum {string}
+             */
+            price_veracity: "OFICIAL" | "MANUAL/NO OFICIAL" | "NO VERIFICADA";
+            /** Probabilities */
+            probabilities: {
+                [key: string]: number;
+            } | null;
+            /** Probability Mass */
+            probability_mass: number | null;
+            /** Thesis Status */
+            thesis_status: string;
+            /** Thesis Version */
+            thesis_version: number;
+            /** Ticker */
+            ticker: string;
+            /** Total Return */
+            total_return: {
+                [key: string]: number;
+            };
+            /** Weight */
+            weight: number;
+            /**
+             * Weight Scope
+             * @enum {string}
+             */
+            weight_scope: "total_portfolio" | "valued_subset";
+        };
+        /** ForecastScenarioOut */
+        ForecastScenarioOut: {
+            /** Contribution Cagr */
+            contribution_cagr: number;
+            /** Contribution Total Return */
+            contribution_total_return: number;
+            /** Coverage */
+            coverage: number;
+            /**
+             * Horizon Scope
+             * @enum {string}
+             */
+            horizon_scope: "uniform" | "mixed";
+        };
         /** GemOut */
         GemOut: {
             /** Market Cap */
@@ -8229,6 +9359,196 @@ export interface components {
             /** Rules */
             rules?: components["schemas"]["InvalidationRuleIn"][];
         };
+        /**
+         * InvestorDatumOut
+         * @description Datum etiquetado de investor_portfolio.datum: N/D => todo null.
+         */
+        InvestorDatumOut: {
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Label
+             * @enum {string}
+             */
+            label: "OFICIAL" | "INFERIDO" | "SIN_DATOS";
+            /** Source Url */
+            source_url?: string | null;
+            /** Value */
+            value?: number | null;
+        };
+        /**
+         * InvestorDetailOut
+         * @description Ficha de inversor: _entry + holdings + provenance; la ruta anade
+         *     changes solo si hay CIK (clave ausente si no) y videos siempre.
+         */
+        InvestorDetailOut: {
+            changes?: components["schemas"]["ManagerChangesOut"] | null;
+            /** Cik */
+            cik?: string | null;
+            /** Coverage */
+            coverage?: string | null;
+            /** Firm */
+            firm: string;
+            /** Has 13F */
+            has_13f: boolean;
+            /** Has Public Profile */
+            has_public_profile: boolean;
+            /** Holdings */
+            holdings: components["schemas"]["InvestorHoldingOut"][];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "person" | "firm" | "company";
+            /** Limitations */
+            limitations: string[];
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            /** Official Name */
+            official_name?: string | null;
+            /** Positions */
+            positions?: number | null;
+            provenance: components["schemas"]["ProvenanceOut"];
+            public_profile?: components["schemas"]["PublicProfileOut"] | null;
+            /** Report Date */
+            report_date?: string | null;
+            /** Slug */
+            slug: string;
+            /** Value Usd Thousands */
+            value_usd_thousands?: number | null;
+            /** Verification */
+            verification?: string | null;
+            /**
+             * Videos
+             * @default []
+             */
+            videos: components["schemas"]["InvestorVideoOut"][];
+        };
+        /**
+         * InvestorHoldingOut
+         * @description Fila de cartera del detalle: ORM con defaults "" (filing_url nunca null).
+         */
+        InvestorHoldingOut: {
+            /** Cusip */
+            cusip: string;
+            /** Filing Url */
+            filing_url: string;
+            /** Name Of Issuer */
+            name_of_issuer: string;
+            /** Name Of Issuer Filed */
+            name_of_issuer_filed: string;
+            /** Put Call */
+            put_call?: string | null;
+            /** Shares */
+            shares?: number | null;
+            /** Title Of Class */
+            title_of_class: string;
+            /** Value Usd Thousands */
+            value_usd_thousands?: number | null;
+            /** Weight Pct */
+            weight_pct?: number | null;
+        };
+        /**
+         * InvestorPortfolioOut
+         * @description Respuesta de investor_portfolio(): ramas 13F y curated/Form4.
+         */
+        InvestorPortfolioOut: {
+            /** As Of */
+            as_of?: string | null;
+            /** Coverage */
+            coverage?: string | null;
+            /** Firm */
+            firm: string;
+            /** Has 13F */
+            has_13f: boolean;
+            /** Labels */
+            labels: string[];
+            /** Limitations */
+            limitations: string[] | string;
+            /** Movements */
+            movements: components["schemas"]["PortfolioMovementOut"][];
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            /** Positions */
+            positions: components["schemas"]["PortfolioPositionOut"][];
+            /** Slug */
+            slug: string;
+            /** Source Kinds */
+            source_kinds: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "sin_datos";
+            total_value_usd: components["schemas"]["InvestorDatumOut"];
+        };
+        /**
+         * InvestorSummaryOut
+         * @description Fila del listado de inversores (services/investors.list_investors).
+         */
+        InvestorSummaryOut: {
+            /** Cik */
+            cik?: string | null;
+            /** Coverage */
+            coverage?: string | null;
+            /** Firm */
+            firm: string;
+            /** Has 13F */
+            has_13f: boolean;
+            /** Has Public Profile */
+            has_public_profile: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "person" | "firm" | "company";
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            /** Official Name */
+            official_name?: string | null;
+            /** Positions */
+            positions?: number | null;
+            /** Report Date */
+            report_date?: string | null;
+            /** Slug */
+            slug: string;
+            /** Value Usd Thousands */
+            value_usd_thousands?: number | null;
+            /** Verification */
+            verification?: string | null;
+        };
+        /** InvestorVideoOut */
+        InvestorVideoOut: {
+            /**
+             * Channel Kind
+             * @enum {string}
+             */
+            channel_kind: "personal_confirmed" | "firm_confirmed" | "archive";
+            /** Channel Name */
+            channel_name: string;
+            /** Channel Url */
+            channel_url: string;
+            /** Published At */
+            published_at: string;
+            /** Title */
+            title: string;
+            /** Video Id */
+            video_id: string;
+        };
+        /** InvestorsListOut */
+        InvestorsListOut: {
+            /** Investors */
+            investors: components["schemas"]["InvestorSummaryOut"][];
+            /** Limitations */
+            limitations: string[];
+            provenance: components["schemas"]["ProvenanceOut"];
+        };
         /** KPIExtractionAction */
         KPIExtractionAction: {
             /**
@@ -8301,6 +9621,32 @@ export interface components {
             trace: {
                 [key: string]: unknown;
             };
+        };
+        /** KeyDate */
+        KeyDate: {
+            /** Confirmed */
+            confirmed?: boolean | null;
+            /** Date */
+            date: string;
+            /** Source */
+            source: string;
+            /** Upcoming */
+            upcoming: boolean;
+        };
+        /** KeyStats */
+        KeyStats: {
+            beta?: components["schemas"]["Beta"] | null;
+            /** Currency */
+            currency?: string | null;
+            ex_dividend?: components["schemas"]["KeyDate"] | null;
+            /** Fetched At */
+            fetched_at: number;
+            next_earnings?: components["schemas"]["KeyDate"] | null;
+            /** Note */
+            note?: string | null;
+            range_52w?: components["schemas"]["Range52w"] | null;
+            /** Symbol */
+            symbol: string;
         };
         /** LLMProposalRequest */
         LLMProposalRequest: {
@@ -8506,6 +9852,117 @@ export interface components {
             /** Unit */
             unit?: string | null;
         };
+        /** ManagerChangeRowOut */
+        ManagerChangeRowOut: {
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "new" | "closed" | "increased" | "decreased" | "unchanged";
+            /** Cusip */
+            cusip: string;
+            /** Name Of Issuer */
+            name_of_issuer: string;
+            /** Put Call */
+            put_call?: string | null;
+            /** Shares Latest */
+            shares_latest?: number | null;
+            /** Shares Previous */
+            shares_previous?: number | null;
+            /** Title Of Class */
+            title_of_class: string;
+            /** Value Usd Thousands Latest */
+            value_usd_thousands_latest?: number | null;
+            /** Value Usd Thousands Previous */
+            value_usd_thousands_previous?: number | null;
+        };
+        /** ManagerChangesOut */
+        ManagerChangesOut: {
+            /** Changes */
+            changes: components["schemas"]["ManagerChangeRowOut"][];
+            /** Cik */
+            cik: string;
+            compared_accessions?: components["schemas"]["ComparedAccessionsOut"] | null;
+            /** Detail */
+            detail?: string | null;
+            /** Latest Report */
+            latest_report?: string | null;
+            /** Limitations */
+            limitations?: string[] | null;
+            /** Manager */
+            manager?: string | null;
+            /** Previous Report */
+            previous_report?: string | null;
+            provenance?: components["schemas"]["ProvenanceOut"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_history" | "unavailable";
+        };
+        /**
+         * ManagerHoldingRowOut
+         * @description Una posicion 13F tal como se sirvio. La via snapshot (sin sync en vivo)
+         *     deja en None lo que el snapshot no tiene (accession, filing_url, ...).
+         */
+        ManagerHoldingRowOut: {
+            /** Accession Number */
+            accession_number?: string | null;
+            /** Cusip */
+            cusip?: string | null;
+            /** Filing Url */
+            filing_url?: string | null;
+            /** Investment Discretion */
+            investment_discretion?: string | null;
+            /**
+             * Is Amendment
+             * @default false
+             */
+            is_amendment: boolean;
+            /** Name Of Issuer */
+            name_of_issuer?: string | null;
+            /** Name Of Issuer Filed */
+            name_of_issuer_filed?: string | null;
+            /** Put Call */
+            put_call?: string | null;
+            /** Share Type */
+            share_type?: string | null;
+            /** Shares */
+            shares?: number | null;
+            /** Title Of Class */
+            title_of_class?: string | null;
+            /** Value Usd Thousands */
+            value_usd_thousands?: number | null;
+        };
+        /** ManagerHoldingsOut */
+        ManagerHoldingsOut: {
+            /** Cik */
+            cik: string;
+            /** Coverage */
+            coverage?: string | null;
+            /** Errors */
+            errors?: unknown[] | null;
+            /** Holdings */
+            holdings: components["schemas"]["ManagerHoldingRowOut"][];
+            /** Limitations */
+            limitations?: string[] | null;
+            /** Manager */
+            manager?: string | null;
+            provenance?: components["schemas"]["ProvenanceOut"] | null;
+            /** Report Date */
+            report_date?: string | null;
+            /** Snapshot Synced At */
+            snapshot_synced_at?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "mismatch" | "unverified" | "partial" | "unavailable" | "snapshot";
+            /** Transport */
+            transport?: string | null;
+            /** Verification */
+            verification?: string | null;
+        };
         /** ManualAlertCreate */
         ManualAlertCreate: {
             /**
@@ -8604,6 +10061,11 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** MarketQuotesBatchIn */
+        MarketQuotesBatchIn: {
+            /** Symbols */
+            symbols: string[];
+        };
         /** MemoryItemCreate */
         MemoryItemCreate: {
             /** Company Id */
@@ -8674,6 +10136,60 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** MostBoughtBuyerOut */
+        MostBoughtBuyerOut: {
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "new" | "increased";
+            /** Name */
+            name: string;
+            /** Report Date */
+            report_date: string;
+            /** Slug */
+            slug: string;
+        };
+        /** MostBoughtItemOut */
+        MostBoughtItemOut: {
+            /** Buyers */
+            buyers: components["schemas"]["MostBoughtBuyerOut"][];
+            /** Buyers Count */
+            buyers_count: number;
+            /** Cusip */
+            cusip: string;
+            /** Name Of Issuer */
+            name_of_issuer: string;
+            /** Name Of Issuer Filed */
+            name_of_issuer_filed: string;
+            /** New Count */
+            new_count: number;
+            /** Sellers Count */
+            sellers_count: number;
+            /** Value Usd */
+            value_usd?: number | null;
+        };
+        /** MostBoughtOut */
+        MostBoughtOut: {
+            /** Items */
+            items: components["schemas"]["MostBoughtItemOut"][];
+            /** Limitations */
+            limitations: string[];
+            /** Managers Compared */
+            managers_compared: number;
+            /** Managers Partial */
+            managers_partial: number;
+            /** Managers Without History */
+            managers_without_history: number;
+            provenance: components["schemas"]["ProvenanceOut"];
+            /** Report Dates */
+            report_dates: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "sin_datos";
         };
         /** NarrativeSectionOut */
         NarrativeSectionOut: {
@@ -8747,6 +10263,97 @@ export interface components {
             /** Year */
             year?: number | null;
         };
+        /** OverlapHolderOut */
+        OverlapHolderOut: {
+            /** Coverage */
+            coverage?: string | null;
+            /** Filing Date */
+            filing_date?: string | null;
+            /** Filing Url */
+            filing_url?: string | null;
+            /** Name */
+            name: string;
+            /** Report Date */
+            report_date: string;
+            /** Slug */
+            slug: string;
+            /** Verification */
+            verification?: string | null;
+        };
+        /** OverlapPositionOut */
+        OverlapPositionOut: {
+            /** Cusip */
+            cusip?: string | null;
+            /** Holders */
+            holders: components["schemas"]["OverlapHolderOut"][];
+            /** Identity Source */
+            identity_source?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "sin_identificador" | "sin_coincidencias" | "coincidencia";
+            /** Ticker */
+            ticker: string;
+        };
+        /** OwnershipManagerOut */
+        OwnershipManagerOut: {
+            /** Cik */
+            cik: string;
+            /** Name */
+            name: string;
+        };
+        /** OwnershipManagersOut */
+        OwnershipManagersOut: {
+            /** Limitations */
+            limitations: string[];
+            /** Managers */
+            managers: components["schemas"]["OwnershipManagerOut"][];
+        };
+        /**
+         * PageInfo
+         * @description Pagination metadata.
+         */
+        PageInfo: {
+            /** Has Next */
+            has_next: boolean;
+            /** Has Prev */
+            has_prev: boolean;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total Items */
+            total_items: number;
+            /** Total Pages */
+            total_pages: number;
+        };
+        /** PaginatedResponse[FXRateOut] */
+        PaginatedResponse_FXRateOut_: {
+            /** Items */
+            items: components["schemas"]["FXRateOut"][];
+            page_info: components["schemas"]["PageInfo"];
+        };
+        /** PaginatedResponse[PortfolioPositionItemOut] */
+        PaginatedResponse_PortfolioPositionItemOut_: {
+            /** Items */
+            items: components["schemas"]["PortfolioPositionItemOut"][];
+            page_info: components["schemas"]["PageInfo"];
+        };
+        /** PaginatedResponse[PortfolioSnapshotOut] */
+        PaginatedResponse_PortfolioSnapshotOut_: {
+            /** Items */
+            items: components["schemas"]["PortfolioSnapshotOut"][];
+            page_info: components["schemas"]["PageInfo"];
+        };
+        /** PaginatedResponse[PortfolioTransactionOut] */
+        PaginatedResponse_PortfolioTransactionOut_: {
+            /** Items */
+            items: components["schemas"]["PortfolioTransactionOut"][];
+            page_info: components["schemas"]["PageInfo"];
+        };
         /** PaperProposal */
         PaperProposal: {
             /** Conviction */
@@ -8777,6 +10384,33 @@ export interface components {
             target: number | string;
             /** Thesis */
             thesis: string;
+            /** Ticker */
+            ticker: string;
+        };
+        /** ParsedTransaction */
+        ParsedTransaction: {
+            /** Action */
+            action: string;
+            /**
+             * Currency
+             * @default EUR
+             */
+            currency: string;
+            /** Date */
+            date: string;
+            /**
+             * Fees
+             * @default 0
+             */
+            fees: number;
+            /** Notes */
+            notes?: string | null;
+            /** Price */
+            price: number;
+            /** Quantity */
+            quantity: number;
+            /** Row Number */
+            row_number: number;
             /** Ticker */
             ticker: string;
         };
@@ -8813,10 +10447,719 @@ export interface components {
             /** Target Allocations */
             target_allocations?: components["schemas"]["PlanTarget"][];
         };
+        /**
+         * PortfolioAnalysisStateOut
+         * @description Estado de analisis tracked (tracked_statuses): clave por ticker.
+         */
+        PortfolioAnalysisStateOut: {
+            /** As Of */
+            as_of: string;
+            /** Missing Inputs */
+            missing_inputs?: string[] | null;
+            /** Status */
+            status: string;
+            /** Thesis Status */
+            thesis_status?: string | null;
+        };
+        /** PortfolioAttributionOut */
+        PortfolioAttributionOut: {
+            /** Basis */
+            basis: string;
+            /** Excluded Partial Histories */
+            excluded_partial_histories: string[];
+            /** Incomplete Components */
+            incomplete_components: string[];
+            /** Period End */
+            period_end: string | null;
+            /** Period Start */
+            period_start: string | null;
+            /** Portfolio Components */
+            portfolio_components: {
+                [key: string]: number | null;
+            };
+            /** Positions */
+            positions: components["schemas"]["PortfolioAttributionPositionOut"][];
+        };
+        /** PortfolioAttributionPositionOut */
+        PortfolioAttributionPositionOut: {
+            /** Components */
+            components: {
+                [key: string]: number | null;
+            };
+            /** Dividends Known */
+            dividends_known: boolean;
+            /** Fx Known */
+            fx_known: boolean;
+            /** Partial History */
+            partial_history: boolean;
+            /** Period Days */
+            period_days: number | null;
+            /** Period End */
+            period_end: string | null;
+            /** Period Start */
+            period_start: string | null;
+            /** Ticker */
+            ticker: string;
+            /** Total Return */
+            total_return: number | null;
+            /** Weight */
+            weight: number;
+        };
+        /** PortfolioBenchmarkOut */
+        PortfolioBenchmarkOut: {
+            /** Alpha Annualized */
+            alpha_annualized: number | null;
+            /** Benchmark Annualized */
+            benchmark_annualized: number | null;
+            /** Benchmark Twr */
+            benchmark_twr: number | null;
+            /** Information Ratio */
+            information_ratio: number | null;
+            /** Observations */
+            observations: number;
+            /** Portfolio Annualized */
+            portfolio_annualized: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "calculated" | "missing_benchmark" | "insufficient_overlap";
+            /** Symbol */
+            symbol: string;
+            /** Tracking Error */
+            tracking_error: number | null;
+        };
+        /** PortfolioConcentrationOut */
+        PortfolioConcentrationOut: {
+            /** Herfindahl */
+            herfindahl: number;
+            /** Top 1 */
+            top_1: number;
+            /** Top 5 */
+            top_5: number;
+            /** Weights */
+            weights: {
+                [key: string]: number;
+            };
+        };
         /** PortfolioConfigurationInput */
         PortfolioConfigurationInput: {
             /** Base Currency */
             base_currency: string;
+        };
+        /** PortfolioConfigurationOut */
+        PortfolioConfigurationOut: {
+            /** Base Currency */
+            base_currency: string;
+            fx_source: components["schemas"]["PortfolioFxSourceOut"];
+            /** Id */
+            id: number | null;
+            /** Is Default */
+            is_default: boolean;
+            /** Name */
+            name: string;
+            /** Tax Currency */
+            tax_currency: string;
+        };
+        /** PortfolioConfigurationUpdateOut */
+        PortfolioConfigurationUpdateOut: {
+            /** Base Currency */
+            base_currency: string;
+            /** Id */
+            id: number;
+            /** Is Default */
+            is_default: boolean;
+            /** Name */
+            name: string;
+        };
+        /**
+         * PortfolioCostReconciliationOut
+         * @description Resultado de reconcile_ibkr_costs para una posicion IBKR.
+         */
+        PortfolioCostReconciliationOut: {
+            /** Cost Unit Verified */
+            cost_unit_verified?: boolean | null;
+            /** Currency */
+            currency?: string | null;
+            /** Difference Native */
+            difference_native?: number | null;
+            /** Message */
+            message?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Snapshot Cost Native */
+            snapshot_cost_native?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "review_required" | "not_comparable";
+            /** Tolerance Native */
+            tolerance_native?: number | null;
+            /** Trade Cost Native */
+            trade_cost_native?: number | null;
+        };
+        /** PortfolioCoverageOut */
+        PortfolioCoverageOut: {
+            /** Limitations */
+            limitations: string[];
+            /** Partial Trading Day */
+            partial_trading_day: boolean;
+            /** Portfolio Snapshots */
+            portfolio_snapshots: number;
+            /** Positions */
+            positions: number;
+            /** Positions With Full Horizon */
+            positions_with_full_horizon: number;
+            /** Positions With Price History */
+            positions_with_price_history: number;
+            /** Price History Percent */
+            price_history_percent: number;
+            /** Price History Window Percent */
+            price_history_window_percent: number;
+            /** Snapshot Pricing Complete */
+            snapshot_pricing_complete: number;
+            /** Snapshot Returns */
+            snapshot_returns: number;
+            /** Spot Tail Positions */
+            spot_tail_positions: string[];
+        };
+        /** PortfolioDataQualityOut */
+        PortfolioDataQualityOut: {
+            /** Cash Dates */
+            cash_dates: string[];
+            /** Cash Native */
+            cash_native: {
+                [key: string]: number;
+            };
+            /** Cash Sources */
+            cash_sources: string[];
+            /** Complete Snapshots */
+            complete_snapshots: number;
+            /** Cost Review Positions */
+            cost_review_positions?: number | null;
+            /** Cost Unverified Positions */
+            cost_unverified_positions?: number | null;
+            /** Latest Pricing Coverage */
+            latest_pricing_coverage: number | null;
+            /** Latest Snapshot Date */
+            latest_snapshot_date: string | null;
+            /** Missing Cost Positions */
+            missing_cost_positions: number;
+            /** Position Dates */
+            position_dates: string[];
+            /** Position Sources */
+            position_sources: string[];
+            /** Positions */
+            positions: number;
+            /** Reasons */
+            reasons: string[];
+            /** Return Observations */
+            return_observations: number;
+            /** Snapshots */
+            snapshots: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "incomplete" | "no_portfolio";
+            twr_chain: components["schemas"]["PortfolioTwrChainOut"];
+        };
+        /** PortfolioDividendProjectionOut */
+        PortfolioDividendProjectionOut: {
+            /** As Of */
+            as_of: string;
+            /** Base Currency */
+            base_currency: string;
+            coverage: components["schemas"]["DividendProjectionCoverageOut"];
+            /** Declared Future */
+            declared_future: components["schemas"]["DividendProjectionDeclaredFutureOut"][];
+            /** Fiscal By Year */
+            fiscal_by_year: {
+                [key: string]: components["schemas"]["DividendProjectionFiscalYearOut"];
+            };
+            /** Fiscal Conditions */
+            fiscal_conditions: string[];
+            gross_summary: components["schemas"]["DividendProjectionGrossSummaryOut"];
+            /** Horizon Months */
+            horizon_months: number;
+            /** Label */
+            label: string;
+            /** Method */
+            method: string;
+            /** Months */
+            months: components["schemas"]["DividendProjectionMonthOut"][];
+            /** Positions */
+            positions: components["schemas"]["DividendProjectionPositionOut"][];
+            /** Sources */
+            sources: {
+                [key: string]: string;
+            };
+        };
+        /** PortfolioDividendSyncOut */
+        PortfolioDividendSyncOut: {
+            /** Companies */
+            companies: number;
+            /** Currency Unknown */
+            currency_unknown: number;
+            provenance: components["schemas"]["ProvenanceOut"];
+            /** Results */
+            results: components["schemas"]["DividendSyncResultOut"][];
+            /** Synced */
+            synced: number;
+            /** Unavailable */
+            unavailable: number;
+        };
+        /** PortfolioDividendYieldsOut */
+        PortfolioDividendYieldsOut: {
+            /** As Of */
+            as_of: string;
+            coverage: components["schemas"]["DividendYieldCoverageOut"];
+            /** Portfolio Yield */
+            portfolio_yield: number | null;
+            /** Positions */
+            positions: components["schemas"]["DividendYieldPositionOut"][];
+            provenance: components["schemas"]["ProvenanceOut"];
+        };
+        /** PortfolioDrawdownPointOut */
+        PortfolioDrawdownPointOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Drawdown */
+            drawdown: number;
+        };
+        /** PortfolioExposuresOut */
+        PortfolioExposuresOut: {
+            /** Countries */
+            countries: {
+                [key: string]: number;
+            };
+            /** Currencies */
+            currencies: {
+                [key: string]: number;
+            };
+            /** Factors */
+            factors: {
+                [key: string]: number;
+            };
+            /** Sectors */
+            sectors: {
+                [key: string]: number;
+            };
+        };
+        /** PortfolioForecastOut */
+        PortfolioForecastOut: {
+            /** As Of */
+            as_of: string | null;
+            /** Assumptions */
+            assumptions: string[];
+            /** Base Currency */
+            base_currency: string | null;
+            /** Excluded */
+            excluded: components["schemas"]["ForecastExcludedOut"][];
+            portfolio: components["schemas"]["ForecastPortfolioOut"] | null;
+            /** Positions */
+            positions: components["schemas"]["ForecastPositionOut"][];
+        };
+        /** PortfolioFxRateOut */
+        PortfolioFxRateOut: {
+            /** As Of */
+            as_of: string;
+            /** Currency */
+            currency: string;
+            /** Rate */
+            rate: number;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "cash" | "positions";
+        };
+        /** PortfolioFxSourceOut */
+        PortfolioFxSourceOut: {
+            /** Base Currency */
+            base_currency: string;
+            /** Latest Rate Date */
+            latest_rate_date: string | null;
+            /** Source */
+            source: string | null;
+        };
+        /** PortfolioIbkrCsvImportOut */
+        PortfolioIbkrCsvImportOut: {
+            /** Duplicate Trades */
+            duplicate_trades: number;
+            /** Identity Warning */
+            identity_warning: string | null;
+            /** Legacy Reimport Blocked */
+            legacy_reimport_blocked: number;
+            /** Row Errors */
+            row_errors: string[];
+            /** Rows Skipped */
+            rows_skipped: number;
+            /**
+             * Status
+             * @constant
+             */
+            status: "imported";
+            /** Trades Imported */
+            trades_imported: number;
+        };
+        /** PortfolioIbkrImportOut */
+        PortfolioIbkrImportOut: {
+            /** Cash Imported */
+            cash_imported?: number | null;
+            /** Cash Removed */
+            cash_removed?: string[] | null;
+            /** Cash Transactions Imported */
+            cash_transactions_imported?: number | null;
+            /** Cost Review Required */
+            cost_review_required?: string[] | null;
+            /** Dividends Imported */
+            dividends_imported?: number | null;
+            /** Fees Imported */
+            fees_imported?: number | null;
+            /** Fx Conversions Imported */
+            fx_conversions_imported?: number | null;
+            /** Fx Conversions Skipped */
+            fx_conversions_skipped?: number | null;
+            /** Message */
+            message?: string | null;
+            /** Portfolio Snapshot Id */
+            portfolio_snapshot_id?: number | null;
+            /** Positions Closed */
+            positions_closed?: string[] | null;
+            /** Positions Imported */
+            positions_imported?: number | null;
+            /** Price Backfills Enqueued */
+            price_backfills_enqueued?: number | null;
+            /** Raw Rows Already Present */
+            raw_rows_already_present?: number | null;
+            /** Raw Rows Pruned */
+            raw_rows_pruned?: number | null;
+            /** Raw Rows Stored */
+            raw_rows_stored?: number | null;
+            /** Reconcile Blocked */
+            reconcile_blocked?: string[] | null;
+            /** Row Errors */
+            row_errors?: string[] | null;
+            /** Rows Skipped */
+            rows_skipped?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "imported" | "not_configured";
+            /** Trades Cancelled */
+            trades_cancelled?: number | null;
+            /** Trades Imported */
+            trades_imported?: number | null;
+            /** Unattributed Cash Rows */
+            unattributed_cash_rows?: number | null;
+            /** Valuation Hold Kept */
+            valuation_hold_kept?: string[] | null;
+        };
+        /** PortfolioIbkrXmlImportOut */
+        PortfolioIbkrXmlImportOut: {
+            /** Cash Imported */
+            cash_imported: number;
+            /** Cash Removed */
+            cash_removed: string[];
+            /** Cash Transactions Imported */
+            cash_transactions_imported: number;
+            /** Cost Review Required */
+            cost_review_required: string[];
+            /** Dividends Imported */
+            dividends_imported: number;
+            /** Fees Imported */
+            fees_imported: number;
+            /** Fx Conversions Imported */
+            fx_conversions_imported: number;
+            /** Fx Conversions Skipped */
+            fx_conversions_skipped: number;
+            /** Portfolio Snapshot Id */
+            portfolio_snapshot_id: number;
+            /** Positions Closed */
+            positions_closed: string[];
+            /** Positions Imported */
+            positions_imported: number;
+            /** Price Backfills Enqueued */
+            price_backfills_enqueued: number;
+            /** Raw Rows Already Present */
+            raw_rows_already_present: number;
+            /** Raw Rows Pruned */
+            raw_rows_pruned: number;
+            /** Raw Rows Stored */
+            raw_rows_stored: number;
+            /** Reconcile Blocked */
+            reconcile_blocked: string[];
+            /** Row Errors */
+            row_errors: string[];
+            /** Rows Skipped */
+            rows_skipped: number;
+            /**
+             * Status
+             * @constant
+             */
+            status: "imported";
+            /** Trades Cancelled */
+            trades_cancelled: number;
+            /** Trades Imported */
+            trades_imported: number;
+            /** Unattributed Cash Rows */
+            unattributed_cash_rows: number;
+            /** Valuation Hold Kept */
+            valuation_hold_kept: string[];
+        };
+        /** PortfolioImportCommitOut */
+        PortfolioImportCommitOut: {
+            /** Duplicates Skipped */
+            duplicates_skipped: number;
+            /** Import Batch */
+            import_batch: string;
+            /** Imported Count */
+            imported_count: number;
+            /** Message */
+            message: string;
+            /** Success */
+            success: boolean;
+        };
+        /** PortfolioIntelligenceOut */
+        PortfolioIntelligenceOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            attribution: components["schemas"]["PortfolioAttributionOut"];
+            /** Base Currency */
+            base_currency: string;
+            benchmark: components["schemas"]["PortfolioBenchmarkOut"];
+            concentration: components["schemas"]["PortfolioConcentrationOut"];
+            coverage: components["schemas"]["PortfolioCoverageOut"];
+            exposures: components["schemas"]["PortfolioExposuresOut"];
+            /** Horizon Years */
+            horizon_years: number;
+            ledger_contribution: components["schemas"]["PortfolioLedgerContributionOut"];
+            /** Missing Fx */
+            missing_fx: {
+                [key: string]: unknown;
+            }[];
+            performance: components["schemas"]["PortfolioPerformanceOut"];
+            risk: components["schemas"]["PortfolioRiskOut"];
+            /**
+             * Xray
+             * @default []
+             */
+            xray: components["schemas"]["PortfolioXrayRuleOut"][];
+        };
+        /** PortfolioLedgerContributionOut */
+        PortfolioLedgerContributionOut: {
+            /** Base Currency */
+            base_currency?: string | null;
+            coverage: components["schemas"]["PortfolioLedgerCoverageOut"];
+            /** Methodology */
+            methodology: string;
+            /** Positions */
+            positions: components["schemas"]["PortfolioLedgerPositionOut"][];
+            /** Total Pnl */
+            total_pnl: number | null;
+        };
+        /** PortfolioLedgerCoverageOut */
+        PortfolioLedgerCoverageOut: {
+            /** Positions */
+            positions: number;
+            /** Reasons */
+            reasons: {
+                [key: string]: number;
+            };
+            /** With Contribution */
+            with_contribution: number;
+        };
+        /** PortfolioLedgerPositionOut */
+        PortfolioLedgerPositionOut: {
+            /** Contribution Pnl */
+            contribution_pnl: number | null;
+            /** Contribution Share */
+            contribution_share: number | null;
+            /** End Value */
+            end_value: number | null;
+            /** Income */
+            income: number | null;
+            /** Net Invested */
+            net_invested: number | null;
+            /** Reason */
+            reason: string | null;
+            /** Start Value */
+            start_value: number | null;
+            /** Ticker */
+            ticker: string;
+        };
+        /** PortfolioMovementOut */
+        PortfolioMovementOut: {
+            /** Action */
+            action: string;
+            /** Date */
+            date?: string | null;
+            /** Filing Date */
+            filing_date?: string | null;
+            /** Issuer */
+            issuer: string;
+            /** Note */
+            note?: string | null;
+            price_usd: components["schemas"]["InvestorDatumOut"];
+            shares: components["schemas"]["InvestorDatumOut"];
+            shares_after: components["schemas"]["InvestorDatumOut"];
+            /** Source Form */
+            source_form: string;
+            /** Ticker */
+            ticker?: string | null;
+            /** Transaction Code */
+            transaction_code?: string | null;
+        };
+        /** PortfolioOverlapOut */
+        PortfolioOverlapOut: {
+            /** Comparison Complete */
+            comparison_complete?: boolean | null;
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "derivado";
+            /** Limitations */
+            limitations?: string[] | null;
+            /** Managers Partial */
+            managers_partial: number;
+            /** Managers With Data */
+            managers_with_data: number;
+            /** Managers Without Data */
+            managers_without_data: number;
+            /** Message */
+            message?: string | null;
+            /** Not Owned */
+            not_owned: components["schemas"]["MostBoughtItemOut"][];
+            /** Positions */
+            positions: components["schemas"]["OverlapPositionOut"][];
+            /** Report Dates */
+            report_dates: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "sin_datos";
+            /** Unresolved Positions */
+            unresolved_positions: number;
+        };
+        /** PortfolioPerformanceOut */
+        PortfolioPerformanceOut: {
+            /** Annualized Return */
+            annualized_return: number | null;
+            reconstruction: components["schemas"]["PortfolioReconstructionOut"];
+            /** Trace */
+            trace: {
+                [key: string]: unknown;
+            };
+            /** Twr */
+            twr: number | null;
+            /** Twr Is Exact */
+            twr_is_exact: boolean;
+            /**
+             * Twr Method
+             * @enum {string}
+             */
+            twr_method: "daily_portfolio_snapshots" | "ledger_reconstruction_positions_only" | "static_current_weight_estimate";
+            twr_period: components["schemas"]["PortfolioTwrPeriodOut"] | null;
+            /** Valuation History */
+            valuation_history: {
+                [key: string]: unknown;
+            }[];
+            /** Xirr */
+            xirr: number | null;
+        };
+        /** PortfolioPositionItemOut */
+        PortfolioPositionItemOut: {
+            analysis: components["schemas"]["PortfolioAnalysisStateOut"] | null;
+            /** As Of */
+            as_of: string;
+            /** Average Cost */
+            average_cost: number | null;
+            /** Base Currency */
+            base_currency: string;
+            /** Cost Basis */
+            cost_basis: number | null;
+            /** Cost Basis Base */
+            cost_basis_base: number | null;
+            /** Cost Basis Native */
+            cost_basis_native: number | null;
+            cost_reconciliation: components["schemas"]["PortfolioCostReconciliationOut"] | null;
+            /** Currency */
+            currency: string;
+            /** First Buy Date */
+            first_buy_date: string | null;
+            /** Fiscal Bucket */
+            fiscal_bucket: ("corto_plazo" | "largo_plazo") | null;
+            /** Fx Rate */
+            fx_rate: number | null;
+            /** Holding Days */
+            holding_days: number | null;
+            /** Market Price */
+            market_price: number | null;
+            /** Market Value */
+            market_value: number | null;
+            /** Market Value Base */
+            market_value_base: number | null;
+            /** Market Value Native */
+            market_value_native: number | null;
+            /** Name */
+            name: string;
+            /** Native Currency */
+            native_currency: string;
+            /** Pnl Fx Effect Base */
+            pnl_fx_effect_base: number | null;
+            /** Pnl Price Effect Base */
+            pnl_price_effect_base: number | null;
+            /** Quantity */
+            quantity: number;
+            /** Quote Missing */
+            quote_missing: boolean;
+            /** Realized Pnl */
+            realized_pnl: number;
+            /** Realized Pnl Base */
+            realized_pnl_base: number | null;
+            /** Sector */
+            sector: string;
+            /** Source */
+            source: string;
+            /** Ticker */
+            ticker: string;
+            /** Unrealized Pnl */
+            unrealized_pnl: number | null;
+            /** Unrealized Pnl Base */
+            unrealized_pnl_base: number | null;
+            /** Unrealized Pnl Native */
+            unrealized_pnl_native: number | null;
+            valuation_hold: components["schemas"]["PositionValuationHoldOut"] | null;
+        };
+        /** PortfolioPositionOut */
+        PortfolioPositionOut: {
+            /** Cusip */
+            cusip?: string | null;
+            /** Issuer */
+            issuer: string;
+            /** Note */
+            note?: string | null;
+            ownership_pct: components["schemas"]["InvestorDatumOut"];
+            shares: components["schemas"]["InvestorDatumOut"];
+            /** Source Form */
+            source_form: string;
+            /** Ticker */
+            ticker?: string | null;
+            /** Title Of Class */
+            title_of_class: string;
+            value_usd: components["schemas"]["InvestorDatumOut"];
+            weight_pct: components["schemas"]["InvestorDatumOut"];
         };
         /** PortfolioPriceInput */
         PortfolioPriceInput: {
@@ -8826,6 +11169,335 @@ export interface components {
             price: number | string;
             /** Ticker */
             ticker: string;
+        };
+        /** PortfolioPriceUpdateOut */
+        PortfolioPriceUpdateOut: {
+            /** Market Price */
+            market_price: number;
+            /** Ticker */
+            ticker: string;
+        };
+        /** PortfolioReconstructionOut */
+        PortfolioReconstructionOut: {
+            /** Days Excluded */
+            days_excluded: number;
+            /** Days Valued */
+            days_valued: number;
+            /** Excluded Days */
+            excluded_days: {
+                [key: string]: unknown;
+            }[];
+            /** First Date */
+            first_date: string | null;
+            /** Last Date */
+            last_date: string | null;
+            /** Method */
+            method: string;
+            /** Price Check */
+            price_check: {
+                [key: string]: unknown;
+            };
+            /** Quantity Check */
+            quantity_check: {
+                [key: string]: unknown;
+            }[];
+            /** Scope */
+            scope: string;
+            /** Status */
+            status: string;
+            /** Twr */
+            twr: number | null;
+        };
+        /** PortfolioRefreshMarketOut */
+        PortfolioRefreshMarketOut: {
+            /** Alert Results */
+            alert_results: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Completed At
+             * Format: date-time
+             */
+            completed_at: string;
+            /** Order */
+            order: string[];
+            /** Risk */
+            risk: {
+                [key: string]: unknown;
+            };
+            /** Screen Results */
+            screen_results: {
+                [key: string]: unknown;
+            }[];
+            /** Stages */
+            stages: components["schemas"]["RefreshMarketStageOut"][];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "partial";
+        };
+        /** PortfolioRiskMatrixOut */
+        PortfolioRiskMatrixOut: {
+            /** As Of */
+            as_of: string;
+            /** Base Currency */
+            base_currency: string;
+            concentration: components["schemas"]["RiskMatrixConcentrationOut"];
+            correlation: components["schemas"]["RiskMatrixCorrelationOut"] | null;
+            covariance_annualized: components["schemas"]["RiskMatrixGridOut"] | null;
+            estimator: components["schemas"]["RiskMatrixEstimatorOut"] | null;
+            /** Excluded */
+            excluded: components["schemas"]["RiskMatrixExcludedOut"][];
+            portfolio: components["schemas"]["RiskMatrixPortfolioOut"] | null;
+            /** Positions */
+            positions: components["schemas"]["RiskMatrixPositionOut"][];
+            /** Provenance */
+            provenance: {
+                [key: string]: unknown;
+            };
+            /** Status */
+            status: string;
+            /** Trace */
+            trace: {
+                [key: string]: unknown;
+            };
+            /** Warnings */
+            warnings: components["schemas"]["RiskMatrixWarningOut"][];
+            window: components["schemas"]["RiskMatrixWindowOut"];
+        };
+        /** PortfolioRiskOut */
+        PortfolioRiskOut: {
+            /** Beta */
+            beta: number | null;
+            /** Beta Trace */
+            beta_trace: {
+                [key: string]: unknown;
+            };
+            /** Calmar */
+            calmar: number | null;
+            /** Correlation Min Observations */
+            correlation_min_observations: number;
+            /** Correlation Observations */
+            correlation_observations: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            /** Correlations */
+            correlations: {
+                [key: string]: {
+                    [key: string]: number | null;
+                };
+            };
+            /** Cvar 95 */
+            cvar_95: number | null;
+            /** Drawdown Series */
+            drawdown_series: components["schemas"]["PortfolioDrawdownPointOut"][];
+            /** Max Drawdown */
+            max_drawdown: number | null;
+            /** Sharpe */
+            sharpe: number | null;
+            /** Sortino */
+            sortino: number | null;
+            /** Var 95 */
+            var_95: number | null;
+            /** Volatility */
+            volatility: number | null;
+        };
+        /** PortfolioSnapshotCaptureOut */
+        PortfolioSnapshotCaptureOut: {
+            /** Cumulative Twr */
+            cumulative_twr: number | null;
+            /** Daily Return */
+            daily_return: number | null;
+            /** Id */
+            id: number;
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Pricing Coverage */
+            pricing_coverage: number;
+            /**
+             * Snapshot Date
+             * Format: date
+             */
+            snapshot_date: string;
+            /** Total Value Base */
+            total_value_base: number;
+        };
+        /** PortfolioSnapshotOut */
+        PortfolioSnapshotOut: {
+            /** Base Currency */
+            base_currency: string;
+            /** Cash Value Base */
+            cash_value_base: number;
+            /** Cumulative Twr */
+            cumulative_twr: number | null;
+            /** Daily Return */
+            daily_return: number | null;
+            /** Id */
+            id: number;
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Net External Flow Base */
+            net_external_flow_base: number;
+            /** Portfolio Id */
+            portfolio_id: number;
+            /** Positions Value Base */
+            positions_value_base: number;
+            /** Pricing Coverage */
+            pricing_coverage: number;
+            /**
+             * Snapshot Date
+             * Format: date
+             */
+            snapshot_date: string;
+            /** Source */
+            source: string;
+            /** Total Value Base */
+            total_value_base: number;
+        };
+        /** PortfolioSummaryAlertOut */
+        PortfolioSummaryAlertOut: {
+            /** Message */
+            message: string;
+            /** Metric Value */
+            metric_value: number;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "high" | "medium";
+            /** Threshold */
+            threshold: number;
+            /** Ticker */
+            ticker: string | null;
+        };
+        /** PortfolioSummaryOut */
+        PortfolioSummaryOut: {
+            /** Alerts */
+            alerts: components["schemas"]["PortfolioSummaryAlertOut"][];
+            /** Base Currency */
+            base_currency: string;
+            /** Cash */
+            cash: {
+                [key: string]: number;
+            };
+            /** Cash As Of */
+            cash_as_of: string | null;
+            /** Cash Assets Base */
+            cash_assets_base: number;
+            /** Cash Native */
+            cash_native: {
+                [key: string]: number;
+            };
+            /** Data As Of */
+            data_as_of: string | null;
+            /** Equity Value */
+            equity_value: number;
+            /** Fx Rates */
+            fx_rates: components["schemas"]["PortfolioFxRateOut"][];
+            /** Margin Debt Base */
+            margin_debt_base: number;
+            /** Missing Fx */
+            missing_fx: {
+                [key: string]: unknown;
+            }[];
+            provenance: components["schemas"]["ProvenanceOut"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "incomplete_fx" | "incomplete_valuation";
+            /** Top 1 Weight */
+            top_1_weight: number;
+            /** Top 5 Weight */
+            top_5_weight: number;
+            /** Total Value */
+            total_value: number;
+            /** Valuation Dates Differ */
+            valuation_dates_differ: boolean;
+            /** Valuation Hold */
+            valuation_hold: components["schemas"]["PortfolioValuationHoldOut"][];
+        };
+        /** PortfolioTearsheetOut */
+        PortfolioTearsheetOut: {
+            exposure: components["schemas"]["TearsheetExposureOut"] | null;
+            metrics: components["schemas"]["TearsheetMetricsOut"] | null;
+            qualification: components["schemas"]["TearsheetQualificationOut"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "no_portfolio";
+            trace: components["schemas"]["TearsheetTraceOut"];
+        };
+        /** PortfolioTransactionBatchInput */
+        PortfolioTransactionBatchInput: {
+            /** Transactions */
+            transactions: components["schemas"]["PortfolioTransactionInput"][];
+        };
+        /**
+         * PortfolioTransactionBatchOut
+         * @description Respuesta de POST /api/portfolio/transactions/batch (201, atomico).
+         */
+        PortfolioTransactionBatchOut: {
+            /** Created */
+            created: number;
+            /** Transaction Ids */
+            transaction_ids: number[];
+            /** Transactions */
+            transactions: components["schemas"]["PortfolioTransactionCreateOut"][];
+        };
+        /**
+         * PortfolioTransactionCreateOut
+         * @description Respuesta de POST /api/portfolio/transactions (201).
+         *
+         *     Igual que PortfolioTransactionOut pero el POST acepta acciones de caja
+         *     (dividend/interest/fee/cash_misc), no solo buy/sell.
+         */
+        PortfolioTransactionCreateOut: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "buy" | "sell" | "dividend" | "interest" | "fee" | "cash_misc";
+            /** Created At */
+            created_at: string;
+            /** Currency */
+            currency: string;
+            /** Fees */
+            fees: number;
+            /** Id */
+            id: number;
+            /** Notes */
+            notes: string | null;
+            /** Price */
+            price: number;
+            /** Quantity */
+            quantity: number;
+            /** Review Flag */
+            review_flag: string | null;
+            /** Ticker */
+            ticker: string;
+            /** Trade Date */
+            trade_date: string;
+            /** Updated At */
+            updated_at: string;
         };
         /** PortfolioTransactionInput */
         PortfolioTransactionInput: {
@@ -8857,6 +11529,104 @@ export interface components {
              * Format: date
              */
             trade_date: string;
+        };
+        /** PortfolioTransactionOut */
+        PortfolioTransactionOut: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "buy" | "sell";
+            /** Created At */
+            created_at: string;
+            /** Currency */
+            currency: string;
+            /** Fees */
+            fees: number;
+            /** Id */
+            id: number;
+            /** Notes */
+            notes: string | null;
+            /** Price */
+            price: number;
+            /** Quantity */
+            quantity: number;
+            /** Review Flag */
+            review_flag: string | null;
+            /** Ticker */
+            ticker: string;
+            /** Trade Date */
+            trade_date: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /**
+         * PortfolioTransactionPageOut
+         * @description Respuesta de GET /api/portfolio/transactions/page (limit/offset).
+         */
+        PortfolioTransactionPageOut: {
+            /** Items */
+            items: components["schemas"]["PortfolioTransactionOut"][];
+            /** Total */
+            total: number;
+        };
+        /** PortfolioTwrChainOut */
+        PortfolioTwrChainOut: {
+            /** First Unlinked Date */
+            first_unlinked_date: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "no_snapshots" | "broken" | "linked";
+            /** Unlinked Snapshots */
+            unlinked_snapshots: number;
+        };
+        /** PortfolioTwrPeriodOut */
+        PortfolioTwrPeriodOut: {
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Sessions */
+            sessions: number;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+        };
+        /** PortfolioValuationHoldOut */
+        PortfolioValuationHoldOut: {
+            /** Effective Date */
+            effective_date: string | null;
+            /** Reason */
+            reason: string;
+            /** Ticker */
+            ticker: string;
+        };
+        /** PortfolioXrayRuleOut */
+        PortfolioXrayRuleOut: {
+            /** Id */
+            id: string;
+            /** Status */
+            status: string;
+            /** Subject */
+            subject?: string | null;
+            /** Threshold */
+            threshold: number;
+            /** Value */
+            value?: number | null;
+        };
+        /** PositionValuationHoldOut */
+        PositionValuationHoldOut: {
+            /** Effective Date */
+            effective_date: string | null;
+            /** Reason */
+            reason: string;
+            /** Since */
+            since: string | null;
         };
         /** PrincipleAction */
         PrincipleAction: {
@@ -9005,6 +11775,101 @@ export interface components {
             /** Universe Size */
             universe_size: number;
         };
+        /**
+         * ProvenanceOut
+         * @description Bloque de proveniencia estandar (app/services/provenance.py).
+         */
+        ProvenanceOut: {
+            /** Coverage */
+            coverage: string;
+            /** Fetched At */
+            fetched_at: string;
+            /** Note */
+            note?: string | null;
+            /** Source */
+            source: string;
+            /** Source Kind */
+            source_kind: string;
+            /** Source Url */
+            source_url?: string | null;
+        };
+        /** PublicFactOut */
+        PublicFactOut: {
+            /** As Of */
+            as_of: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "oficial" | "inferido" | "prensa";
+            /** Label */
+            label: string;
+            /** Source Url */
+            source_url: string;
+            /** Value */
+            value: string;
+        };
+        /** PublicProfileLetterOut */
+        PublicProfileLetterOut: {
+            /** Date */
+            date: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+        };
+        /** PublicProfileLinkOut */
+        PublicProfileLinkOut: {
+            /** Label */
+            label: string;
+            /** Url */
+            url: string;
+        };
+        /** PublicProfileMeetingOut */
+        PublicProfileMeetingOut: {
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+            /** Year */
+            year: string;
+        };
+        /**
+         * PublicProfileOut
+         * @description Ficha pública curada (investor_profiles.PUBLIC_PROFILES) + provenance_note.
+         */
+        PublicProfileOut: {
+            /** Facts */
+            facts: components["schemas"]["PublicFactOut"][];
+            /** Holdings */
+            holdings?: unknown[] | null;
+            /** Holdings Note */
+            holdings_note: string;
+            /** Letters */
+            letters: components["schemas"]["PublicProfileLetterOut"][];
+            /** Links */
+            links: components["schemas"]["PublicProfileLinkOut"][];
+            /** Meetings */
+            meetings: components["schemas"]["PublicProfileMeetingOut"][];
+            /** Provenance Note */
+            provenance_note: string;
+            vehicle: components["schemas"]["PublicProfileVehicleOut"];
+        };
+        /** PublicProfileVehicleOut */
+        PublicProfileVehicleOut: {
+            /** Manager Company */
+            manager_company: string;
+            /** Name */
+            name: string;
+            /** Regulator Id */
+            regulator_id: string;
+            /** Source Url */
+            source_url: string;
+            /** Start Date */
+            start_date: string;
+            /** Type */
+            type: string;
+        };
         /** PushConfigOut */
         PushConfigOut: {
             /** Enabled */
@@ -9131,6 +11996,50 @@ export interface components {
             regiones: string[];
             /** Rotulo */
             rotulo: string;
+        };
+        /** Range52w */
+        Range52w: {
+            /** High */
+            high: number;
+            /** High Date */
+            high_date?: string | null;
+            /** Low */
+            low: number;
+            /** Low Date */
+            low_date?: string | null;
+            /** Sessions */
+            sessions?: number | null;
+            /** Source */
+            source: string;
+        };
+        /** RefreshMarketStageOut */
+        RefreshMarketStageOut: {
+            /** Alert Rules */
+            alert_rules?: number | null;
+            /** Errors */
+            errors?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Market Data Status */
+            market_data_status?: string | null;
+            /** Name */
+            name: string;
+            /** Portfolio Snapshot Id */
+            portfolio_snapshot_id?: number | null;
+            /** Saved Screens */
+            saved_screens?: number | null;
+            /** Snapshot Pricing Coverage */
+            snapshot_pricing_coverage?: number | null;
+            /** Stale Prices */
+            stale_prices?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Status */
+            status: string;
+            /** Step */
+            step: number;
+            /** Updated */
+            updated?: number | null;
         };
         /** ResearchAlertAction */
         ResearchAlertAction: {
@@ -9344,6 +12253,264 @@ export interface components {
             /** Rows */
             rows: components["schemas"]["ConfirmedImageRow"][];
         };
+        /** RiskMatrixConcentrationOut */
+        RiskMatrixConcentrationOut: {
+            /** Effective Positions */
+            effective_positions: number | null;
+            /** Herfindahl */
+            herfindahl: number;
+            /** Top 1 */
+            top_1: number;
+            /** Top 5 */
+            top_5: number;
+            /** Weights */
+            weights: {
+                [key: string]: number;
+            };
+        };
+        /** RiskMatrixCorrelationOut */
+        RiskMatrixCorrelationOut: {
+            /** Matrix */
+            matrix: (number | null)[][];
+            /** Source */
+            source: string;
+            /** Tickers */
+            tickers: string[];
+        };
+        /** RiskMatrixEstimatorOut */
+        RiskMatrixEstimatorOut: {
+            /** Annualization */
+            annualization: number;
+            /** Name */
+            name: string;
+            /** Shrinkage */
+            shrinkage: number;
+        };
+        /** RiskMatrixExcludedOut */
+        RiskMatrixExcludedOut: {
+            /** Reason */
+            reason: string;
+            /** Sessions */
+            sessions: number;
+            /** Ticker */
+            ticker: string;
+        };
+        /** RiskMatrixGridOut */
+        RiskMatrixGridOut: {
+            /** Matrix */
+            matrix: (number | null)[][];
+            /** Tickers */
+            tickers: string[];
+        };
+        /** RiskMatrixPortfolioOut */
+        RiskMatrixPortfolioOut: {
+            /** Variance Annualized */
+            variance_annualized: number;
+            /** Vol Annualized */
+            vol_annualized: number;
+        };
+        /** RiskMatrixPositionOut */
+        RiskMatrixPositionOut: {
+            /** Excluded Reason */
+            excluded_reason?: string | null;
+            /** Fx Dropped Returns */
+            fx_dropped_returns?: number | null;
+            /** Fx Mode */
+            fx_mode: string;
+            /** Included */
+            included: boolean;
+            /** Marginal Contribution */
+            marginal_contribution?: number | null;
+            /** Risk Contribution */
+            risk_contribution?: number | null;
+            /** Sessions */
+            sessions: number;
+            /** Sessions Common */
+            sessions_common: number;
+            /** Ticker */
+            ticker: string;
+            /** Vol Annualized */
+            vol_annualized?: number | null;
+            /** Weight */
+            weight: number;
+            /** Weight Included */
+            weight_included?: number | null;
+        };
+        /** RiskMatrixWarningOut */
+        RiskMatrixWarningOut: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
+        /** RiskMatrixWindowOut */
+        RiskMatrixWindowOut: {
+            /** End */
+            end: string | null;
+            /** Min Sessions */
+            min_sessions: number;
+            /** Requested Days */
+            requested_days: number;
+            /** Sessions Common */
+            sessions_common: number;
+            /** Start */
+            start: string | null;
+        };
+        /** RowValidationError */
+        RowValidationError: {
+            /** Field */
+            field: string;
+            /** Message */
+            message: string;
+            /** Raw Value */
+            raw_value?: string | null;
+            /** Row Number */
+            row_number: number;
+        };
+        /**
+         * SavingsProjectionOut
+         * @description Contrato de savings_contract: dict literal, todas las claves siempre presentes.
+         */
+        SavingsProjectionOut: {
+            /** Assumptions */
+            assumptions: string[];
+            /** Basis */
+            basis: string;
+            /** Currency */
+            currency?: string | null;
+            /** Horizon Years */
+            horizon_years?: number | null;
+            /** Initial Capital */
+            initial_capital: number;
+            /** Monthly Contribution */
+            monthly_contribution?: number | null;
+            /** Plan Exists */
+            plan_exists: boolean;
+            /** Plan Id */
+            plan_id?: number | null;
+            /** Portfolio Included */
+            portfolio_included: boolean;
+            /** Preview */
+            preview: boolean;
+            /** Projection Url */
+            projection_url: string;
+            /** Scenarios */
+            scenarios: components["schemas"]["SavingsScenarioOut"][];
+            /** Source */
+            source: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "no_plan" | "currency_missing";
+        };
+        /**
+         * SavingsScenarioOut
+         * @description Escenario de project_savings: cifras ilustrativas, net_dividend siempre null.
+         */
+        SavingsScenarioOut: {
+            /** Annual Inflation */
+            annual_inflation: number;
+            /** Annual Total Return */
+            annual_total_return: number;
+            /** Contributed */
+            contributed: number;
+            /** Net Dividend */
+            net_dividend?: null;
+            /** Simulated Return */
+            simulated_return: number;
+            /** Terminal Annual Gross Dividend */
+            terminal_annual_gross_dividend: number;
+            /** Terminal Dividend Yield */
+            terminal_dividend_yield: number;
+            /** Terminal Monthly Gross Dividend Equivalent */
+            terminal_monthly_gross_dividend_equivalent: number;
+            /** Terminal Value */
+            terminal_value: number;
+            /** Terminal Value Today Money */
+            terminal_value_today_money: number;
+            /** Years */
+            years: number;
+        };
+        /** Schedule13DGDisplayOut */
+        Schedule13DGDisplayOut: {
+            /** Aggregate Shares */
+            aggregate_shares: string;
+            /** Holder */
+            holder: string;
+            /** Percent Of Class */
+            percent_of_class: string;
+            /** Snapshot Date */
+            snapshot_date: string;
+        };
+        /**
+         * Schedule13DGFilingOut
+         * @description Fila persistida de SC 13D/13G: lo no parseado queda null (N/D en display).
+         */
+        Schedule13DGFilingOut: {
+            /** Accession Number */
+            accession_number: string;
+            /** Aggregate Shares */
+            aggregate_shares?: number | null;
+            display: components["schemas"]["Schedule13DGDisplayOut"];
+            /** Filer Cik */
+            filer_cik?: string | null;
+            /** Filing Date */
+            filing_date?: string | null;
+            /** Form */
+            form: string;
+            /** Holder Name */
+            holder_name?: string | null;
+            /** Index Url */
+            index_url?: string | null;
+            /** Is Amendment */
+            is_amendment: boolean;
+            /** Issuer Cik */
+            issuer_cik?: string | null;
+            /** Issuer Name */
+            issuer_name?: string | null;
+            /** Issuer Ticker */
+            issuer_ticker?: string | null;
+            /** Parser Version */
+            parser_version: string;
+            /** Percent Of Class */
+            percent_of_class?: number | null;
+            /** Report Date */
+            report_date?: string | null;
+            /** Securities Class Title */
+            securities_class_title?: string | null;
+            /** Shared Dispositive Power */
+            shared_dispositive_power?: number | null;
+            /** Shared Voting Power */
+            shared_voting_power?: number | null;
+            /** Signature Date */
+            signature_date?: string | null;
+            /** Snapshot Date */
+            snapshot_date?: string | null;
+            /** Sole Dispositive Power */
+            sole_dispositive_power?: number | null;
+            /** Sole Voting Power */
+            sole_voting_power?: number | null;
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** Schedule13DGResponseOut */
+        Schedule13DGResponseOut: {
+            /** Count */
+            count: number;
+            /** Filings */
+            filings: components["schemas"]["Schedule13DGFilingOut"][];
+            /** Limitations */
+            limitations: string[];
+            /** Source */
+            source: string;
+            /** Ticker */
+            ticker: string;
+        };
         /** ScreenCreate */
         ScreenCreate: {
             /**
@@ -9368,6 +12535,143 @@ export interface components {
             ranking_direction: "asc" | "desc";
             /** Ranking Formula */
             ranking_formula?: string | null;
+        };
+        /** ScreenerCriterionOut */
+        ScreenerCriterionOut: {
+            /** Left */
+            left: string;
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: ">" | ">=" | "<" | "<=" | "==" | "!=";
+            /** Right */
+            right: string;
+        };
+        /** ScreenerCustomMetricOut */
+        ScreenerCustomMetricOut: {
+            /** Active */
+            active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /** Formula */
+            formula: string;
+            /** Id */
+            id: number;
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Metric Key */
+            metric_key: string;
+            /** Name */
+            name: string;
+            /** Unit */
+            unit: string;
+            /** Version */
+            version: number;
+        };
+        /** ScreenerMetricCoverageOut */
+        ScreenerMetricCoverageOut: {
+            /** Metrics With Data */
+            metrics_with_data: string[];
+        };
+        /** ScreenerRealItemOut */
+        ScreenerRealItemOut: {
+            /** Beta */
+            beta: null;
+            /** Change */
+            change: number | null;
+            /** Changepercent */
+            changePercent: number | null;
+            /** Currency */
+            currency: string | null;
+            /** Exchange */
+            exchange: string;
+            /** Has Fundamentals */
+            has_fundamentals: boolean;
+            /** Marketcap */
+            marketCap: number | null;
+            /** Name */
+            name: string;
+            /** Pb */
+            pb: number | null;
+            /** Pe */
+            pe: number | null;
+            /** Prevclose */
+            prevClose: number | null;
+            /** Price */
+            price: number;
+            /** Priceasof */
+            priceAsOf: number | null;
+            /** Pricedate */
+            priceDate: string | null;
+            /**
+             * Pricetimestampkind
+             * @enum {string}
+             */
+            priceTimestampKind: "daily_candle_open" | "quote";
+            /** Roe */
+            roe: number | null;
+            /** Sector */
+            sector: string;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "ETF" | "Stock";
+            /** Volume */
+            volume: number | null;
+        };
+        /** ScreenerRealOut */
+        ScreenerRealOut: {
+            /** As Of */
+            as_of: number;
+            /** Count */
+            count: number;
+            /** Refreshing */
+            refreshing: boolean;
+            /** Screener */
+            screener: components["schemas"]["ScreenerRealItemOut"][];
+            /** Source */
+            source: string;
+            /** Unavailable */
+            unavailable: boolean;
+            /** Universe Size */
+            universe_size: number;
+        };
+        /** ScreenerSavedScreenOut */
+        ScreenerSavedScreenOut: {
+            /** Active */
+            active: boolean;
+            /** Alerts Enabled */
+            alerts_enabled: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Criteria */
+            criteria: components["schemas"]["ScreenerCriterionOut"][];
+            /** Description */
+            description: string;
+            /** Id */
+            id: number;
+            /** Last Run At */
+            last_run_at: string | null;
+            /** Name */
+            name: string;
+            /** Ranking Direction */
+            ranking_direction: string;
+            /** Ranking Formula */
+            ranking_formula: string | null;
         };
         /** SnapshotCountsOut */
         SnapshotCountsOut: {
@@ -9613,6 +12917,91 @@ export interface components {
              */
             key: "facts" | "calculations" | "user_hypotheses" | "unverified_claims" | "inferences" | "contradictions" | "insufficient_data" | "conclusion";
         };
+        /** TearsheetExposureOut */
+        TearsheetExposureOut: {
+            /** Base Currency */
+            base_currency: string;
+            /** Cash Value Base */
+            cash_value_base: number | null;
+            /** Cash Weight */
+            cash_weight: number | null;
+            /** Equity Weight */
+            equity_weight: number | null;
+            /** Gross Leverage */
+            gross_leverage: number | null;
+            /** Gross Positions Value Base */
+            gross_positions_value_base: number | null;
+            /** N Positions */
+            n_positions: number;
+            /** Net Leverage */
+            net_leverage: number | null;
+            /** Positions Value Base */
+            positions_value_base: number | null;
+            /** Snapshot Date */
+            snapshot_date: string;
+            /** Top 1 Gross Positions Weight */
+            top_1_gross_positions_weight: number | null;
+            /** Top 1 Weight */
+            top_1_weight: number | null;
+            /** Top 5 Gross Positions Weight */
+            top_5_gross_positions_weight: number | null;
+            /** Top 5 Weight */
+            top_5_weight: number | null;
+            /** Total Value Base */
+            total_value_base: number | null;
+            /** Weight Bases */
+            weight_bases: {
+                [key: string]: string;
+            };
+        };
+        /** TearsheetMetricsOut */
+        TearsheetMetricsOut: {
+            /** Best Day */
+            best_day: number | null;
+            /** Cumulative Return */
+            cumulative_return: number | null;
+            /** Max Drawdown */
+            max_drawdown: number | null;
+            /** N Observations */
+            n_observations: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Sharpe */
+            sharpe: number | null;
+            /** Sortino */
+            sortino: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data";
+            /** Win Rate */
+            win_rate: number | null;
+            /** Worst Day */
+            worst_day: number | null;
+        };
+        /** TearsheetQualificationOut */
+        TearsheetQualificationOut: {
+            /** Continuous */
+            continuous: boolean;
+            /** End Date */
+            end_date: string | null;
+            /** Excluded Returns */
+            excluded_returns: number;
+            /** Series Breaks */
+            series_breaks: number;
+            /** Start Date */
+            start_date: string | null;
+        };
+        /** TearsheetTraceOut */
+        TearsheetTraceOut: {
+            /** Method */
+            method: string;
+            /** N Returns */
+            n_returns?: number | null;
+            /** N Snapshots */
+            n_snapshots?: number | null;
+        };
         /** TelegramSubscriptionIn */
         TelegramSubscriptionIn: {
             /**
@@ -9650,6 +13039,15 @@ export interface components {
              * @enum {string}
              */
             decision: "approved" | "rejected";
+        };
+        /** ThesisAudioStatusOut */
+        ThesisAudioStatusOut: {
+            /** Generated At */
+            generated_at?: string | null;
+            /** Key */
+            key: string | null;
+            /** State */
+            state: string;
         };
         /** ThesisChangeCreate */
         ThesisChangeCreate: {
@@ -9759,6 +13157,51 @@ export interface components {
             /** Ticker */
             ticker: string;
         };
+        /** ThesisHistoryDiffOut */
+        ThesisHistoryDiffOut: {
+            /** Affected Assumptions */
+            affected_assumptions: string[];
+            /** Change Summary */
+            change_summary: string;
+            /** Created At */
+            created_at: string;
+            /** Derived */
+            derived?: boolean | null;
+            /** Rating Changed */
+            rating_changed: boolean;
+        };
+        /** ThesisHistoryItemOut */
+        ThesisHistoryItemOut: {
+            /** Created At */
+            created_at: string;
+            /** Data Confidence Score */
+            data_confidence_score: number;
+            diff: components["schemas"]["ThesisHistoryDiffOut"] | null;
+            /** Id */
+            id: number;
+            /** Rating */
+            rating: string;
+            /** Red Team Score */
+            red_team_score: number;
+            /** Status */
+            status: string;
+            /** Updated At */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** ThesisHistoryOut */
+        ThesisHistoryOut: {
+            /** Count */
+            count: number;
+            /** Data As Of */
+            data_as_of: string | null;
+            /** History */
+            history: components["schemas"]["ThesisHistoryItemOut"][];
+            provenance: components["schemas"]["ProvenanceOut"];
+            /** Ticker */
+            ticker: string;
+        };
         /**
          * ThesisHumanInput
          * @description Explicit human assumptions, never promoted to sourced financial facts.
@@ -9790,6 +13233,56 @@ export interface components {
         ThesisInputsRequest: {
             /** Inputs */
             inputs: components["schemas"]["ThesisHumanInput"][];
+        };
+        /** ThesisJobPhaseOut */
+        ThesisJobPhaseOut: {
+            /** Finished At */
+            finished_at: string | null;
+            /** Name */
+            name: string;
+            /** Started At */
+            started_at: string | null;
+            /** Status */
+            status: string;
+        };
+        /** ThesisJobStatusOut */
+        ThesisJobStatusOut: {
+            /** Attempt */
+            attempt: number;
+            /** Created At */
+            created_at: string | null;
+            /** Current Phase */
+            current_phase: string | null;
+            /** Error Class */
+            error_class: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Force */
+            force: boolean | null;
+            /** Id */
+            id: number;
+            /** Phases */
+            phases: components["schemas"]["ThesisJobPhaseOut"][];
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            } | null;
+            /** Started At */
+            started_at: string | null;
+            /** Status */
+            status: string;
+            /** Ticker */
+            ticker: string | null;
+            /** Total Phases */
+            total_phases: number;
+            /** Workflow Name */
+            workflow_name: string;
+        };
+        /** ThesisLatestJobOut */
+        ThesisLatestJobOut: {
+            job: components["schemas"]["ThesisJobStatusOut"] | null;
         };
         /** ThesisNodeOut */
         ThesisNodeOut: {
@@ -9974,6 +13467,61 @@ export interface components {
             /** Tickers */
             tickers: string[];
         };
+        /** TimelineEventOut */
+        TimelineEventOut: {
+            /** Date */
+            date: string;
+            /** Detail */
+            detail?: string | null;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** TimelineHoldingOut */
+        TimelineHoldingOut: {
+            /** Average Cost */
+            average_cost?: number | null;
+            /** First Buy Date */
+            first_buy_date?: string | null;
+        };
+        /** TransactionImportCommitRequest */
+        TransactionImportCommitRequest: {
+            /** Source Filename */
+            source_filename?: string | null;
+            /** Transactions */
+            transactions: components["schemas"]["ParsedTransaction"][];
+        };
+        /** TransactionImportPreviewResponse */
+        TransactionImportPreviewResponse: {
+            /** Detected Columns */
+            detected_columns: {
+                [key: string]: string;
+            };
+            /** Errors */
+            errors: components["schemas"]["RowValidationError"][];
+            /** Invalid Rows Count */
+            invalid_rows_count: number;
+            /** Preview Items */
+            preview_items: components["schemas"]["ParsedTransaction"][];
+            /** Success */
+            success: boolean;
+            /** Total Rows */
+            total_rows: number;
+            /** Valid Rows Count */
+            valid_rows_count: number;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: components["schemas"]["RowValidationError"][];
+        };
         /** TtmMetricOut */
         TtmMetricOut: {
             /**
@@ -10033,10 +13581,15 @@ export interface components {
              */
             include_vector: boolean;
             /**
-             * Limit
+             * Page
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
              * @default 20
              */
-            limit: number;
+            page_size: number;
             /** Query */
             query: string;
             /** Source Types */
@@ -10162,6 +13715,108 @@ export interface components {
             /** Symbol */
             symbol: string;
         };
+        /** WatchlistAnalysisStateOut */
+        WatchlistAnalysisStateOut: {
+            /** As Of */
+            as_of: string;
+            /** Missing Inputs */
+            missing_inputs?: string[] | null;
+            /** Status */
+            status: string;
+            /** Thesis Status */
+            thesis_status: string | null;
+        };
+        /** WatchlistAttentionThesisItemOut */
+        WatchlistAttentionThesisItemOut: {
+            /** Createdat */
+            createdAt: string;
+            /** Direction */
+            direction: string;
+            /** Id */
+            id: number;
+            /** Summary */
+            summary: string;
+            /** Symbol */
+            symbol: string;
+        };
+        /** WatchlistAttentionThesisOut */
+        WatchlistAttentionThesisOut: {
+            /** Items */
+            items: components["schemas"]["WatchlistAttentionThesisItemOut"][];
+            /** Truncated */
+            truncated: boolean;
+        };
+        /** WatchlistItemOut */
+        WatchlistItemOut: {
+            analysis: components["schemas"]["WatchlistAnalysisStateOut"] | null;
+            /** Company */
+            company: string | null;
+            /** Created At */
+            created_at: string | null;
+            /** Id */
+            id: number;
+            /** Symbol */
+            symbol: string;
+            /** Updated At */
+            updated_at: string | null;
+        };
+        /** WatchlistMetricsOut */
+        WatchlistMetricsOut: {
+            /** Currency */
+            currency: string | null;
+            /** Market Cap */
+            market_cap: number | null;
+            /** Per */
+            per: number | null;
+            /** Sources */
+            sources: string[];
+        };
+        /** WatchlistMonitorItemOut */
+        WatchlistMonitorItemOut: {
+            /** Currency */
+            currency: string | null;
+            /** Fair Value */
+            fair_value: number | null;
+            /** Fair Value As Of */
+            fair_value_as_of: string | null;
+            /** Fair Value Label */
+            fair_value_label: string;
+            /** Fair Value Publishable */
+            fair_value_publishable: boolean;
+            /** Fair Value Reason */
+            fair_value_reason: string | null;
+            /** Fair Value Source */
+            fair_value_source: ("tesis" | "motor" | "motor_orientativo") | null;
+            /** Fair Value Thesis Version */
+            fair_value_thesis_version: number | null;
+            /** Last Close */
+            last_close: number | null;
+            /** Last Close Date */
+            last_close_date: string | null;
+            /** Low 52W */
+            low_52w: number | null;
+            /** Low 52W Date */
+            low_52w_date: string | null;
+            /** Low 52W Sessions */
+            low_52w_sessions: number;
+            /** Next Earnings Confirmed */
+            next_earnings_confirmed: boolean | null;
+            /** Next Earnings Date */
+            next_earnings_date: string | null;
+            /** Next Earnings Source */
+            next_earnings_source: string | null;
+            /** Valuation Side */
+            valuation_side: ("infravalorada" | "sobrevalorada") | null;
+        };
+        /** WatchlistMonitorOut */
+        WatchlistMonitorOut: {
+            /** Earnings Status */
+            earnings_status: string;
+            /** Items */
+            items: {
+                [key: string]: components["schemas"]["WatchlistMonitorItemOut"];
+            };
+        };
         /** WorkProductRequest */
         WorkProductRequest: {
             /**
@@ -10220,6 +13875,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    db_metrics_api_admin_db_metrics_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -10786,9 +14481,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AlertsTelegramStatusOut"];
                 };
             };
             /** @description Validation Error */
@@ -10954,9 +14647,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AlertAnalysisReadOut"];
                 };
             };
             /** @description Validation Error */
@@ -11043,6 +14734,49 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_audit_logs_api_audit_logs_get: {
+        parameters: {
+            query?: {
+                action?: string | null;
+                resource_type?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -11161,6 +14895,246 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invalidate_all_api_cache_invalidate_all_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invalidate_dca_api_cache_invalidate_dca_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invalidate_market_data_api_cache_invalidate_market_data_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invalidate_portfolio_api_cache_invalidate_portfolio_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_stats_api_cache_stats_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_stats_api_cache_stats_reset_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
                     };
                 };
             };
@@ -11545,6 +15519,49 @@ export interface operations {
     ipo_calendar_api_calendar_ipos_get: {
         parameters: {
             query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portfolio_upcoming_dates_api_calendar_portfolio_upcoming_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
             header?: {
                 "x-cavaai-user"?: string | null;
                 "x-cavaai-tenant"?: string | null;
@@ -12603,6 +16620,49 @@ export interface operations {
             };
         };
     };
+    get_company_timeline_events_api_companies__ticker__events_timeline_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyTimelineEventsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     expectation_reality_api_companies__ticker__expectation_reality_get: {
         parameters: {
             query?: never;
@@ -13022,6 +17082,46 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    company_key_stats_api_companies__ticker__key_stats_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyStats"];
                 };
             };
             /** @description Validation Error */
@@ -14542,6 +18642,28 @@ export interface operations {
             };
         };
     };
+    get_csrf_token_api_csrf_token_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
     data_health_api_data_health_get: {
         parameters: {
             query?: never;
@@ -14662,6 +18784,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    data_sources_health_api_data_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -14795,6 +18939,28 @@ export interface operations {
         };
     };
     health_api_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    data_sources_health_api_health_data_sources_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -15058,9 +19224,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["InvestorsListOut"];
                 };
             };
             /** @description Validation Error */
@@ -15140,9 +19304,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MostBoughtOut"];
                 };
             };
             /** @description Validation Error */
@@ -15180,9 +19342,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioOverlapOut"];
                 };
             };
             /** @description Validation Error */
@@ -15222,9 +19382,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["InvestorDetailOut"];
                 };
             };
             /** @description Validation Error */
@@ -15264,9 +19422,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["InvestorPortfolioOut"];
                 };
             };
             /** @description Validation Error */
@@ -17060,6 +21216,50 @@ export interface operations {
             };
         };
     };
+    market_quotes_batch_api_market_quotes_batch_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarketQuotesBatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     regime_api_market_regime_get: {
         parameters: {
             query?: never;
@@ -18010,9 +22210,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["OwnershipManagersOut"];
                 };
             };
             /** @description Validation Error */
@@ -18134,9 +22332,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ManagerChangesOut"];
                 };
             };
             /** @description Validation Error */
@@ -18176,9 +22372,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ManagerHoldingsOut"];
                 };
             };
             /** @description Validation Error */
@@ -18218,9 +22412,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Schedule13DGResponseOut"];
                 };
             };
             /** @description Validation Error */
@@ -18889,9 +23081,209 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SavingsProjectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_portfolios_api_portfolio_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_portfolio_api_portfolio_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePortfolioInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_portfolios_api_portfolio__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_portfolio_api_portfolio__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePortfolioInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_portfolio_transaction_api_portfolio_add_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioTransactionInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioTransactionCreateOut"];
                 };
             };
             /** @description Validation Error */
@@ -18929,9 +23321,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["CashBalanceOut"][];
                 };
             };
             /** @description Validation Error */
@@ -18969,9 +23359,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioConfigurationOut"];
                 };
             };
             /** @description Validation Error */
@@ -19013,9 +23401,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioConfigurationUpdateOut"];
                 };
             };
             /** @description Validation Error */
@@ -19053,9 +23439,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioDataQualityOut"];
                 };
             };
             /** @description Validation Error */
@@ -19093,9 +23477,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioDividendYieldsOut"];
                 };
             };
             /** @description Validation Error */
@@ -19135,9 +23517,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioDividendProjectionOut"];
                 };
             };
             /** @description Validation Error */
@@ -19175,9 +23555,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioDividendSyncOut"];
                 };
             };
             /** @description Validation Error */
@@ -19215,9 +23593,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioForecastOut"];
                 };
             };
             /** @description Validation Error */
@@ -19234,8 +23610,10 @@ export interface operations {
     list_fx_rates_api_portfolio_fx_rates_get: {
         parameters: {
             query?: {
-                limit?: number;
-                offset?: number;
+                page?: number;
+                page_size?: number;
+                limit?: number | null;
+                offset?: number | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -19258,9 +23636,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["PaginatedResponse_FXRateOut_"];
                 };
             };
             /** @description Validation Error */
@@ -19302,9 +23678,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["FXRateOut"];
                 };
             };
             /** @description Validation Error */
@@ -19530,6 +23904,90 @@ export interface operations {
             };
         };
     };
+    commit_transaction_import_api_portfolio_import_commit_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransactionImportCommitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioImportCommitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_transaction_import_file_api_portfolio_import_file_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_transaction_import_file_api_portfolio_import_file_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionImportPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     import_ibkr_api_portfolio_import_ibkr_post: {
         parameters: {
             query?: never;
@@ -19554,9 +24012,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioIbkrImportOut"];
                 };
             };
             /** @description Validation Error */
@@ -19598,9 +24054,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioIbkrCsvImportOut"];
                 };
             };
             /** @description Validation Error */
@@ -19642,9 +24096,49 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioIbkrXmlImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_transaction_import_api_portfolio_import_preview_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CsvPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionImportPreviewResponse"];
                 };
             };
             /** @description Validation Error */
@@ -19684,9 +24178,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioIntelligenceOut"];
                 };
             };
             /** @description Validation Error */
@@ -19743,8 +24235,10 @@ export interface operations {
     positions_api_portfolio_positions_get: {
         parameters: {
             query?: {
-                limit?: number;
-                offset?: number;
+                page?: number;
+                page_size?: number;
+                limit?: number | null;
+                offset?: number | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -19767,9 +24261,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["PaginatedResponse_PortfolioPositionItemOut_"];
                 };
             };
             /** @description Validation Error */
@@ -19811,9 +24303,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioPriceUpdateOut"];
                 };
             };
             /** @description Validation Error */
@@ -19853,9 +24343,45 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioRefreshMarketOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portfolio_risk_matrix_api_portfolio_risk_matrix_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioRiskMatrixOut"];
                 };
             };
             /** @description Validation Error */
@@ -19873,7 +24399,10 @@ export interface operations {
         parameters: {
             query?: {
                 start?: string | null;
-                limit?: number;
+                page?: number;
+                page_size?: number;
+                limit?: number | null;
+                offset?: number | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -19896,9 +24425,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["PaginatedResponse_PortfolioSnapshotOut_"];
                 };
             };
             /** @description Validation Error */
@@ -19938,9 +24465,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioSnapshotCaptureOut"];
                 };
             };
             /** @description Validation Error */
@@ -19978,9 +24503,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioSummaryOut"];
                 };
             };
             /** @description Validation Error */
@@ -20018,9 +24541,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioTearsheetOut"];
                 };
             };
             /** @description Validation Error */
@@ -20037,8 +24558,11 @@ export interface operations {
     transactions_api_portfolio_transactions_get: {
         parameters: {
             query?: {
-                limit?: number;
-                offset?: number;
+                page?: number;
+                page_size?: number;
+                ticker?: string | null;
+                action?: ("buy" | "sell") | null;
+                offset?: number | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -20061,9 +24585,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["PaginatedResponse_PortfolioTransactionOut_"];
                 };
             };
             /** @description Validation Error */
@@ -20105,9 +24627,49 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioTransactionCreateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_transaction_batch_api_portfolio_transactions_batch_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioTransactionBatchInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioTransactionBatchOut"];
                 };
             };
             /** @description Validation Error */
@@ -20150,9 +24712,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioTransactionPageOut"];
                 };
             };
             /** @description Validation Error */
@@ -20196,9 +24756,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioTransactionOut"];
                 };
             };
             /** @description Validation Error */
@@ -20238,6 +24796,46 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portfolio_pdf_export_api_portfolio__portfolio_id__pdf_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                portfolio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {
@@ -20484,6 +25082,92 @@ export interface operations {
         };
     };
     refresh_prices_api_propicks_prices_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_radar_opportunities_api_propicks_radar_opportunities_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                level?: number | null;
+                sector?: string | null;
+                outside_tracked?: boolean;
+                quality?: string | null;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enqueue_radar_scan_api_propicks_radar_scan_post: {
         parameters: {
             query?: never;
             header?: {
@@ -21165,9 +25849,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["ScreenerCustomMetricOut"][];
                 };
             };
             /** @description Validation Error */
@@ -21249,9 +25931,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ScreenerMetricCoverageOut"];
                 };
             };
             /** @description Validation Error */
@@ -21293,9 +25973,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ScreenerRealOut"];
                 };
             };
             /** @description Validation Error */
@@ -21377,9 +26055,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["ScreenerSavedScreenOut"][];
                 };
             };
             /** @description Validation Error */
@@ -23112,9 +27788,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ThesisLatestJobOut"];
                 };
             };
             /** @description Validation Error */
@@ -23154,9 +27828,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ThesisJobStatusOut"];
                 };
             };
             /** @description Validation Error */
@@ -23330,9 +28002,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ThesisAudioStatusOut"];
                 };
             };
             /** @description Validation Error */
@@ -23534,9 +28204,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ThesisHistoryOut"];
                 };
             };
             /** @description Validation Error */
@@ -23726,6 +28394,46 @@ export interface operations {
         };
     };
     export_obsidian_api_thesis__ticker__obsidian_zip_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    thesis_pdf_api_thesis__ticker__pdf_get: {
         parameters: {
             query?: never;
             header?: {
@@ -24044,9 +28752,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["WatchlistItemOut"][];
                 };
             };
             /** @description Validation Error */
@@ -24128,9 +28834,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["WatchlistAttentionThesisOut"];
                 };
             };
             /** @description Validation Error */
@@ -24373,9 +29077,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["WatchlistMetricsOut"];
                 };
             };
             /** @description Validation Error */
@@ -24416,9 +29118,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["WatchlistMonitorOut"];
                 };
             };
             /** @description Validation Error */

@@ -6,7 +6,10 @@ yahoo_finance_intraday»). Espejo de lib/research/source-display.ts del
 front; ampliar las etiquetas solo con evidencia.
 """
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
+from zoneinfo import ZoneInfo
+
+_MADRID = ZoneInfo("Europe/Madrid")
 
 MESES_ES = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept", "oct", "nov", "dic")
 
@@ -14,7 +17,9 @@ MESES_ES = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept", "oct
 def fecha_es(value) -> str:
     """«18 oct 2026», la misma forma corta que usa el front (23 sept 2026).
     Acepta date/datetime o texto ISO («2026-10-18»), que es como guardan
-    algunos modelos la fecha (p. ej. InsiderTransaction.tx_date)."""
+    algunos modelos la fecha (p. ej. InsiderTransaction.tx_date). None → «N/D»."""
+    if value is None:
+        return "N/D"
     if isinstance(value, str):
         try:
             value = date.fromisoformat(value[:10])
@@ -23,7 +28,11 @@ def fecha_es(value) -> str:
             # devuelve tal cual, nunca se rompe la respuesta por formato.
             return value
     if isinstance(value, datetime):
-        value = value.date()
+        # Un instante se muestra en el día de Madrid: entre 00:00 y 01:00/02:00
+        # (CET/CEST) la fecha UTC aún es «ayer». Naive = UTC (convención de BD).
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        value = value.astimezone(_MADRID).date()
     return f"{value.day} {MESES_ES[value.month - 1]} {value.year}"
 
 

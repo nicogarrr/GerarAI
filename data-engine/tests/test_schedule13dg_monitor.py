@@ -217,7 +217,9 @@ def test_scan_flush_error_rolls_back_and_keeps_scanning(monkeypatch):
     )
     assert stats["filings_seen"] == 2
     assert stats["filings_new"] == 1
-    assert any("IntegrityError" in error for error in stats["errors"])
+    # stats se sirve en la API: razon publica constante, sin tipo de excepcion.
+    assert any("form13dg_filing_error" in error for error in stats["errors"])
+    assert not any("IntegrityError" in error for error in stats["errors"])
     # El filing previo y el segundo filing nuevo sobreviven; el envenenado no.
     rows = db.scalars(select(Schedule13DGFiling).order_by(Schedule13DGFiling.id)).all()
     assert [row.accession_number for row in rows] == [

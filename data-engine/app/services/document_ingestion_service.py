@@ -25,6 +25,10 @@ from app.services.evidence_contract import build_ingestion_evidence
 from app.services.public_fetch import fetch_public_url
 
 MAX_DOCUMENT_BYTES = 15 * 1024 * 1024
+# Document.source_url es String(1000): la entrada de la ruta ya va acotada,
+# pero la URL final de ingest-url puede crecer por redirects; este tope es
+# la ultima linea antes del INSERT (Postgres rompe con 500 si se pasa).
+MAX_SOURCE_URL_CHARS = 1000
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".html", ".htm", ".pdf", ".docx", ".xlsx", ".csv", ".tsv"}
 
 # DOCX/XLSX son ZIP: el limite de 15 MB aplica al fichero comprimido, asi que
@@ -107,6 +111,12 @@ def _guard_ooxml_zip(content: bytes) -> None:
             raise ValueError("El documento tiene tamanos o CRC ZIP inconsistentes")
 
 
+# Nombre publico de la guarda OOXML: cualquier servicio que abra un DOCX/XLSX
+# subido por el usuario (p. ej. la importacion de transacciones) debe aplicarla
+# antes de parsear; el nombre con "_" era privado solo por historia del modulo.
+guard_ooxml_zip = _guard_ooxml_zip
+
+
 @dataclass
 class ParsedBlock:
     text: str
@@ -181,6 +191,8 @@ class DocumentIngestionService:
     ) -> dict:
         if not content:
             raise ValueError("Document is empty")
+        if source_url is not None and len(source_url) > MAX_SOURCE_URL_CHARS:
+            raise ValueError("source_url exceeds 1000 characters")
         if len(content) > MAX_DOCUMENT_BYTES:
             raise ValueError("Document exceeds 15MB local ingestion limit")
 
@@ -519,8 +531,9 @@ class DocumentIngestionService:
     def _parse_xlsx(self, content: bytes) -> ParsedDocument:
         # Comprobar coordenadas XML ANTES de iter_rows: con dimension ausente
         # openpyxl puede expandir una fila enorme antes de devolverla.
-        from xml.etree.ElementTree import iterparse
-
+        # defusedxml: el XLSX lo sube el usuario; sus XML internos no pueden
+        # declarar entidades (billion laughs) - se rechazan sin expandir.
+        from defusedxml.ElementTree import iterparse
         from openpyxl import load_workbook
         from openpyxl.utils.cell import coordinate_to_tuple
 

@@ -150,7 +150,7 @@ export default async function ResearchSourcesPage({
           <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-scope">
             Alcance
             <select
-              className="h-11 rounded-lg border border-gray-800 bg-black px-3 text-sm text-gray-200"
+              className="h-11 rounded-lg border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm"
               defaultValue={scope}
               id="sources-scope"
               name="scope"
@@ -162,7 +162,7 @@ export default async function ResearchSourcesPage({
           <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-source-type">
             Tipo de fuente
             <select
-              className="h-11 rounded-lg border border-gray-800 bg-black px-3 text-sm text-gray-200"
+              className="h-11 rounded-lg border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm"
               defaultValue={sourceType}
               id="sources-source-type"
               name="source_type"
@@ -247,6 +247,7 @@ export default async function ResearchSourcesPage({
               {!documents.length ? (
                 <tr>
                   <td className="py-6 text-center text-gray-500" colSpan={6}>
+                    <div className="w-full max-w-[calc(100vw-6rem)] text-left sm:mx-auto sm:w-fit sm:text-center">
                     {ticker ? (
                       <p>
                         Sin documentos de {ticker}.{' '}
@@ -284,6 +285,7 @@ export default async function ResearchSourcesPage({
                         Usa los formularios de arriba para subir tu primer documento o ingerir una URL.
                       </span>
                     )}
+                    </div>
                   </td>
                 </tr>
               ) : null}
@@ -300,7 +302,7 @@ export default async function ResearchSourcesPage({
                 Anterior
               </Link>
             ) : null}
-            <span className="text-xs text-gray-500">
+            <span className="text-xs whitespace-nowrap text-gray-500">
               Página {formatNumber(pageInfo.page, { maximumFractionDigits: 0 })} de{' '}
               {formatNumber(pageInfo.pages, { maximumFractionDigits: 0 })}
             </span>
@@ -362,7 +364,7 @@ export default async function ResearchSourcesPage({
             </div>
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="manual-source-type">Tipo de fuente</label>
-              <select id="manual-source-type" name="source_type" defaultValue="manual_upload" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">
+              <select id="manual-source-type" name="source_type" defaultValue="manual_upload" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm">
                 <option value="manual_upload">Texto aportado por el usuario</option>
                 <option value="manual_transcript">Transcripción</option>
                 <option value="company_ir">Relaciones con inversores</option>
@@ -414,7 +416,7 @@ export default async function ResearchSourcesPage({
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-source-type">Tipo de fuente</label>
-                <select id="file-source-type" name="source_type" defaultValue="manual_upload" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
+                <select id="file-source-type" name="source_type" defaultValue="manual_upload" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-source-url">URL de la fuente</label>
@@ -447,7 +449,7 @@ export default async function ResearchSourcesPage({
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url-source-type">Tipo de fuente</label>
-                <select id="url-source-type" name="source_type" defaultValue="url" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
+                <select id="url-source-type" name="source_type" defaultValue="url" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url">URL</label>

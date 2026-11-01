@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
+const panels = readFileSync('components/research/FactsPanels.tsx', 'utf8');
 // @ts-expect-error TS5097 importar un helper .ts puro desde el guard
 const { METRIC_LABELS, metricLabel } = await import('../lib/research/metric-labels.ts');
 
@@ -50,9 +51,10 @@ test('QA 21-oct: claves vista en prod con fallback en inglés tienen etiqueta', 
 });
 
 test('F321: la ficha usa metricLabel en hechos y metricas calculadas', () => {
-    assert.match(page, /\{metricLabel\(fact\.metric\)\}<\/span>/);
-    assert.match(page, /scope="row">\{metricLabel\(fact\.metric\)\}<\/th>/);
-    assert.match(page, /\{metricLabel\(metric\.metric\)\}<\/span>/);
+    // Los hechos (tarjeta movil y tabla) viven en FactsPanels.
+    assert.match(panels, /\{metricLabel\(fact\.metric\)\}<\/span>/);
+    assert.match(panels, /scope="row">\{metricLabel\(fact\.metric\)\}<\/th>/);
+    assert.match(page, /\{metricLabel\(metric\.metric, locale\)\}<\/span>/);
 });
 
 test('F321: los estados ok/unavailable del backend tienen etiqueta en espanol', () => {

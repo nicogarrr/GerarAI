@@ -3,13 +3,14 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const page = readFileSync('app/(root)/knowledge-graph/page.tsx', 'utf8');
+const kgDict = JSON.parse(readFileSync('lib/i18n/messages/es/knowledgeGraph.json', 'utf8'));
 
-test('F312: Confianza y Procedencia no quedan pegadas en la tabla de relaciones', () => {
-    // Confianza va alineada a la derecha y Procedencia a la izquierda: sin
-    // padding horizontal los dos textos se tocaban en el borde compartido
-    // («CONFIANZAPROCEDENCIA») a cualquier ancho (confirmado 1440 y 1920).
-    assert.match(page, /px-3 py-2 text-right" scope="col">Confianza/);
-    assert.match(page, /py-2 pl-3" scope="col">Procedencia/);
+test('F312: Confianza conserva su padding en la tabla de relaciones', () => {
+    // Confianza va alineada a la derecha con padding horizontal (F312). La
+    // columna Procedencia se elimino de la tabla en #3527 (la procedencia
+    // sigue disponible en la API).
+    // i18n: la cabecera referencia la clave y el diccionario es conserva «Confianza» verbatim.
+    assert.match(page, /px-3 py-2 text-right" scope="col">\{t\('knowledgeGraph\.page\.colConfidence'\)\}/);
+    assert.equal(kgDict.page.colConfidence, 'Confianza', 'el rotulo de la columna se mantiene verbatim');
     assert.match(page, /px-3 py-3 text-right text-gray-400">\{formatConfidence\(edge\.confidence\)/);
-    assert.match(page, /py-3 pl-3 text-xs text-gray-500">\{edge\.provenance\}/);
 });

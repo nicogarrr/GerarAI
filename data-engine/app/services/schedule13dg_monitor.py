@@ -20,6 +20,7 @@ Cada corrida:
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -33,6 +34,8 @@ from app.models.entities import ConnectorState, Schedule13DGFiling
 from app.services import schedule13dg_persistence
 from app.services.connectors import form13dg as form13dg_connector
 from app.services.insider_monitor import resolve_ciks, watchlist_tickers
+
+logger = logging.getLogger(__name__)
 
 CONNECTOR_NAME = "schedule13dg_monitor"
 DEFAULT_DELAY_SECONDS = 0.15
@@ -151,8 +154,11 @@ def scan(
                 filings = form13dg_connector.recent_form13dg_filings(
                     cik, limit=lookback, client=client
                 )
-            except Exception as exc:  # noqa: BLE001 - best-effort por emisor
-                stats["errors"].append(f"{ticker}: {type(exc).__name__}")
+            except Exception:  # noqa: BLE001 - best-effort por emisor
+                # Detalle completo solo en el log del servidor: el mensaje de
+                # una excepcion no viaja a la API (razon publica constante).
+                logger.warning("13D/G: fallo listando filings de %s", ticker, exc_info=True)
+                stats["errors"].append(f"{ticker}: form13dg_list_error")
                 continue
             stats["filings_seen"] += len(filings)
             for filing in filings:
@@ -197,8 +203,9 @@ def scan(
                     stats["filings_unparsed"] += (
                         1 if persisted["filing_created"] and persisted["status"] != "parsed" else 0
                     )
-                except Exception as exc:  # noqa: BLE001 - best-effort por filing
-                    stats["errors"].append(f"{accession}: {type(exc).__name__}")
+                except Exception:  # noqa: BLE001 - best-effort por filing
+                    logger.warning("13D/G: fallo procesando filing %s", accession, exc_info=True)
+                    stats["errors"].append(f"{accession}: form13dg_filing_error")
                 if delay_seconds > 0:
                     sleeper(delay_seconds)
 
@@ -208,10 +215,13 @@ def scan(
         return stats
     except Exception as exc:  # noqa: BLE001 - el actor jamas recibe una excepcion
         stats["status"] = "error"
-        # last_error y last_run se guardan y se ven en la API de estado del
-        # conector: un fallo de red de httpx trae la URL con su token tal cual.
+        # El mensaje de la excepcion NO va a la respuesta de la API (stats):
+        # razon publica constante. En last_error (persistido para ops, no se
+        # sirve en ninguna respuesta) va el detalle con secretos redactados,
+        # y el detalle completo queda en el log del servidor.
+        logger.exception("13D/G: fallo fatal en scan")
         fatal_error = redact_secrets(f"{type(exc).__name__}: {exc}")[:1000]
-        stats["errors"].append(f"fatal: {fatal_error}")
+        stats["errors"].append("fatal: schedule13dg_scan_fatal")
         # Si el fallo vino de la sesion (p. ej. un commit roto), hay que hacer
         # rollback ANTES de tocar nada mas; commitear sobre una sesion
         # envenenada lanzaria PendingRollbackError y perderia el estado.

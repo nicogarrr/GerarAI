@@ -80,7 +80,7 @@ export default function ThesisInvalidationRulesForm({
   const remove = (index: number) => persist(rules.filter((_, i) => i !== index));
 
   const selected = INVALIDATION_METRICS.find((item) => item.value === metric);
-  const inputClass = 'mt-1 w-full rounded border border-gray-700 bg-gray-950 px-2 py-1.5 text-sm text-gray-100';
+  const inputClass = 'mt-1 min-h-[44px] w-full rounded border border-gray-700 bg-gray-950 px-2 py-1.5 text-base text-gray-100 sm:min-h-0 sm:text-sm';
 
   return (
     <div className="mt-3 border-t border-red-900/40 pt-3">

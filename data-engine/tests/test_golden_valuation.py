@@ -37,7 +37,6 @@ from app.valuation.dividend_equity import (
 )
 from app.valuation.engines.sector_specific import _pb_sensitivity_rows
 from app.valuation.engines.sotp_engine import sotp_discount_sensitivity
-from app.valuation.regulated_asset import excess_return_equity_value
 from app.valuation.reverse_dcf import ReverseDCFInputs, solve_required_growth
 from app.valuation.scenario_model import Scenario, probability_weighted_value
 from app.valuation.sensitivity import sensitivity_grid
@@ -336,18 +335,6 @@ def test_rejilla_de_sensibilidad_recalcula_el_dcf_y_anula_wacc_menor_que_g():
     assert cells[1]["value_per_share"] is None
     assert cells[1]["error"] == "cell_out_of_range"
 
-
-def test_ingreso_residual_activo_regulado():
-    """V = B + (ROE − ke)·B/(ke − g) (CFA L2 Equity, Residual Income, una etapa).
-
-    A mano: B 100, ROE 10 %, ke 8 %, g 3 % → 100 + 2/0,05 = 140. Con g = 0:
-    B·ROE/ke = 125.
-    """
-    out = excess_return_equity_value(book_equity=100.0, allowed_roe=0.10, cost_of_equity=0.08, growth=0.03)
-    assert out["equity_value"] == pytest.approx(140.0)
-    flat = excess_return_equity_value(book_equity=100.0, allowed_roe=0.10, cost_of_equity=0.08, growth=0.0)
-    assert flat["equity_value"] == pytest.approx(125.0)
-    assert flat["gordon_special_case"] == pytest.approx(125.0)
 
 
 def test_cagr_y_dispersion_del_modelo_largo_plazo():

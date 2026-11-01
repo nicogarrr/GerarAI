@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from uuid import uuid4
 
 import pytest
@@ -212,12 +213,42 @@ def test_tenant_key_bypasses_eur_caps_and_records_zero_cost() -> None:
 
 
 class _FakeResponse:
-    def __init__(self, status_code: int) -> None:
+    def __init__(self, status_code: int, payload=None) -> None:
         self.status_code = status_code
+        self._payload = payload if payload is not None else {"data": [{"id": "gpt-4.1-mini"}]}
+
+    def json(self):
+        if isinstance(self._payload, Exception):
+            raise self._payload
+        return self._payload
+
+
+class _FakeStream:
+    """Respuesta en streaming: probe_connection lee /models con cota, no con .get."""
+
+    def __init__(self, status_code: int, payload) -> None:
+        self.status_code = status_code
+        self._payload = payload
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args) -> None:
+        return None
+
+    async def aiter_bytes(self, _n: int = 65536):
+        payload = self._payload
+        if payload is None:
+            payload = {"data": [{"id": "gpt-4.1-mini"}]}
+        if isinstance(payload, Exception):
+            yield b"no-json"
+        else:
+            yield json.dumps(payload).encode()
 
 
 class _FakeClient:
     calls: list[tuple[str, dict[str, str]]] = []
+    _payload = None
 
     def __init__(self, **_kwargs) -> None:
         pass
@@ -228,9 +259,9 @@ class _FakeClient:
     async def __aexit__(self, *_args) -> None:
         return None
 
-    async def get(self, url: str, headers: dict[str, str]):
-        type(self).calls.append((url, headers))
-        return _FakeResponse(200)
+    def stream(self, _method: str, url: str, headers: dict[str, str] | None = None):
+        type(self).calls.append((url, headers or {}))
+        return _FakeStream(200, type(self)._payload)
 
 
 @pytest.mark.parametrize(
@@ -260,6 +291,46 @@ def test_probe_connection_uses_five_second_client_and_never_leaks_key(
     assert result["ok"] is True
     assert _FakeClient.calls[0][0] == expected
     assert API_KEY not in str(result)
+
+
+def _probe_with(monkeypatch, payload, model="gpt-4.1-mini"):
+    """probe_connection con la lista /models inyectada (sin red)."""
+    _FakeClient.calls.clear()
+
+    class _Client(_FakeClient):
+        _payload = payload
+
+    monkeypatch.setattr(
+        "app.services.tenant_llm_settings_service.httpx.AsyncClient", _Client
+    )
+    import asyncio
+
+    return asyncio.run(
+        probe_connection(provider="openai", base_url=None, api_key=API_KEY, model=model)
+    )
+
+
+def test_probe_rechaza_modelo_inventado_aunque_la_conexion_responda(monkeypatch) -> None:
+    """Hallazgo front (medido en prod): model="modelo-inventado-123" decia
+    "Conexion correcta". Ahora el modelo debe aparecer en /models."""
+    result = _probe_with(monkeypatch, {"data": [{"id": "gpt-4.1-mini"}]}, model="modelo-inventado-123")
+    assert result["ok"] is False
+    assert "modelo-inventado-123" in result["message"]
+    assert "no existe" in result["message"]
+    assert API_KEY not in str(result)
+
+
+def test_probe_acepta_modelo_presente_en_la_lista(monkeypatch) -> None:
+    result = _probe_with(monkeypatch, {"data": [{"id": "otro"}, {"id": "gpt-4.1-mini"}]})
+    assert result["ok"] is True
+    assert result["message"] == "Conexion correcta."
+
+
+def test_probe_falla_honesto_si_la_lista_no_es_legible(monkeypatch) -> None:
+    for payload in (ValueError("no json"), {"error": "nope"}, {"data": "texto"}):
+        result = _probe_with(monkeypatch, payload)
+        assert result["ok"] is False
+        assert "no se pudo verificar el modelo" in result["message"]
 
 
 def _client(monkeypatch, *, required: bool = True) -> TestClient:
@@ -436,3 +507,89 @@ def test_endpoint_test_returns_probe_result_without_key(monkeypatch) -> None:
     assert response.status_code == 200, response.text
     assert response.json()["ok"] is True
     assert API_KEY not in response.text
+
+
+class _TrackingStream:
+    """Respuesta de streaming que CUENTA los bytes que el cliente consume."""
+
+    def __init__(self, status_code: int, body_chunks: list[bytes], counter: dict) -> None:
+        self.status_code = status_code
+        self._chunks = body_chunks
+        self._counter = counter
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args) -> None:
+        return None
+
+    async def aiter_bytes(self, _n: int = 65536):
+        for chunk in self._chunks:
+            self._counter["read"] += len(chunk)
+            yield chunk
+
+
+class _TrackingClient:
+    """Cliente con .get (lee TODO el body) y .stream (lectura incremental).
+
+    Sirve para medir cuanto bufferiza probe_connection ante un /models que no
+    para de crecer (base_url custom maliciosa o rota): el contrato es que la
+    lectura quede acotada aunque el servidor siga mandando.
+    """
+
+    def __init__(self, counter: dict, total_bytes: int) -> None:
+        self._counter = counter
+        self._total = total_bytes
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args) -> None:
+        return None
+
+    def _chunks(self) -> list[bytes]:
+        blob = b'{"data": [{"id": "gpt-4.1-mini"}, "' + b"x" * self._total
+        return [blob[i : i + 65536] for i in range(0, len(blob), 65536)]
+
+    async def get(self, url, headers):
+        body = b"".join(self._chunks())
+        self._counter["read"] += len(body)
+
+        class _R:
+            status_code = 200
+
+            def json(self):
+                raise ValueError("cuerpo gigante no parseable")
+
+        return _R()
+
+    def stream(self, _method, _url, headers=None):
+        return _TrackingStream(200, self._chunks(), self._counter)
+
+
+def test_probe_acota_la_lectura_del_listado_de_modelos(monkeypatch) -> None:
+    """Un /models de 5 MB no se bufferiza entero: la lectura se corta en la cota.
+
+    El listado real de /models de cualquier proveedor cabe en decenas de KB;
+    un endpoint custom del tenant que responde un cuerpo infinito no puede
+    inflar la memoria del backend por cada prueba de conexion.
+    """
+    from app.services import tenant_llm_settings_service as svc
+
+    counter = {"read": 0}
+    monkeypatch.setattr(
+        svc.httpx,
+        "AsyncClient",
+        lambda **_kwargs: _TrackingClient(counter, total_bytes=5 * 1024 * 1024),
+    )
+    import asyncio
+
+    result = asyncio.run(
+        svc.probe_connection(
+            provider="openai", base_url=None, api_key=API_KEY, model="gpt-4.1-mini"
+        )
+    )
+    assert counter["read"] <= svc._PROBE_MAX_BODY_BYTES + 65536
+    # La respuesta queda truncada: la prueba falla honesta, nunca crashea.
+    assert result["ok"] is False
+    assert API_KEY not in str(result)

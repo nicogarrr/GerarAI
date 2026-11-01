@@ -31,6 +31,15 @@ DEUDA_CONOCIDA = [
     "revision '0016_principle_jobs_snapshots' != fichero '0016_principle_jobs_and_portfolio_snapshots'",
 ]
 
+# Alembic crea alembic_version.version_num como VARCHAR(32): una revision mas
+# larga NO se puede registrar en ninguna base de datos (PostgreSQL aborta el
+# UPDATE de version con StringDataRightTruncation). Medido en el restore drill
+# de CI (seed -> alembic upgrade head) con 0108_add_database_check_constraints,
+# 35 caracteres, rojo en todos los runs del 2026-10-30/31. Renombrar una
+# revision ya aplicada rompe el historial, asi que el sitio barato de pillarlo
+# es este gate, antes del merge.
+_LIMITE_VERSION_NUM = 32
+
 _PATRON_PREFIJO = re.compile(r"^\d{4}_.+")
 _AUSENTE = object()
 
@@ -88,6 +97,12 @@ def violaciones_cadena(versions_dir: Path) -> list[str]:
             continue
         if revision != path.stem:
             problemas.append(f"{path.name}: revision '{revision}' != fichero '{path.stem}'")
+        if isinstance(revision, str) and len(revision) > _LIMITE_VERSION_NUM:
+            problemas.append(
+                f"{path.name}: revision '{revision}' mide {len(revision)} caracteres "
+                f"y alembic_version.version_num es VARCHAR({_LIMITE_VERSION_NUM}): "
+                "al aplicarla, el UPDATE de version aborta (StringDataRightTruncation)"
+            )
         if not _PATRON_PREFIJO.match(path.stem):
             problemas.append(f"{path.name}: el stem no empieza por prefijo de 4 digitos y '_'")
 
@@ -221,6 +236,18 @@ def test_ciclo_se_detecta(tmp_path):
     assert any("inalcanzables" in p for p in problemas), problemas
 
 
+def test_revision_mas_larga_que_varchar32_se_detecta(tmp_path):
+    _migracion_sintetica(tmp_path, "0001_alpha", "0001_alpha", None)
+    _migracion_sintetica(
+        tmp_path,
+        "0002_una_revision_con_nombre_larguisimo_de_mas",
+        "0002_una_revision_con_nombre_larguisimo_de_mas",
+        "0001_alpha",
+    )
+    problemas = violaciones_cadena(tmp_path)
+    assert any("VARCHAR(32)" in p for p in problemas), problemas
+
+
 def test_salto_huerfano_se_detecta(tmp_path):
     _migracion_sintetica(tmp_path, "0002_beta", "0002_beta", "0001_alpha")
     problemas = violaciones_cadena(tmp_path)
@@ -230,7 +257,6 @@ def test_salto_huerfano_se_detecta(tmp_path):
 def test_web_push_0101_round_trip_on_ci_postgres():
     """Real Postgres round trip in an isolated schema; CI migration job runs this file."""
     import importlib.util
-    import os
     import uuid
 
     import pytest
@@ -238,8 +264,8 @@ def test_web_push_0101_round_trip_on_ci_postgres():
     from alembic.migration import MigrationContext
     from alembic.operations import Operations
 
-    url = os.environ.get('DATABASE_URL', '')
-    if os.environ.get('CI') != 'true' or not url.startswith('postgresql'):
+    url = _url_postgres_ci()
+    if not url:
         pytest.skip('Runs only on the CI Postgres migration service')
     schema = 'push_0101_test_' + uuid.uuid4().hex
     path = VERSIONS_DIR / '0101_web_push.py'
@@ -271,3 +297,126 @@ def test_web_push_0101_round_trip_on_ci_postgres():
                 transaction.rollback()  # Removes only this test's temporary schema.
     finally:
         engine.dispose()
+
+
+BASELINE_DERIVA = Path(__file__).resolve().parent / "fixtures" / "alembic_drift_baseline.txt"
+
+
+def _url_postgres_ci() -> str:
+    """URL Postgres del job de CI, o "" si no aplica.
+
+    tests/conftest.py fuerza un sqlite hermetico en DATABASE_URL para toda la
+    suite; la URL real del job (cuando existe) queda preservada en
+    CAVAAI_ORIGINAL_DATABASE_URL. Sin este rescate los tests gated a CI
+    Postgres quedaban muertos: su guard leia el sqlite forzado y hacian skip
+    incluso en el job 'Postgres migration round trip'.
+    """
+    import os
+
+    if os.environ.get("CI") != "true":
+        return ""
+    url = os.environ.get("CAVAAI_ORIGINAL_DATABASE_URL") or os.environ.get("DATABASE_URL", "")
+    return url if url.startswith("postgresql") else ""
+
+
+def _deriva_actual(url: str) -> list[str]:
+    """Diffs models<->migraciones sobre una BD scratch migrada a head.
+
+    Misma comparacion que `alembic check` (compare_metadata con el
+    target_metadata de env.py), pero devolviendo los diffs en repr ordenado:
+    capturar el log de alembic.autogenerate.compare no es fiable aqui porque
+    env.py aplica fileConfig en cada comando y se lleva por delante los
+    handlers instalados por el test.
+    """
+    import os
+    import re
+    import uuid
+
+    import sqlalchemy as sa
+    from alembic.autogenerate import compare_metadata
+    from alembic.config import Config
+    from alembic.migration import MigrationContext
+
+    from alembic import command
+    from app.core.config import get_settings
+    from app.core.database import Base
+
+    scratch = "migdrift_" + uuid.uuid4().hex[:12]
+    engine = sa.create_engine(url, isolation_level="AUTOCOMMIT")
+    with engine.connect() as conn:
+        conn.execute(sa.text(f'CREATE DATABASE "{scratch}"'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre scratch uuid-hex generado por el propio test, sin input externo; BD efimera de CI
+
+    anterior = os.environ.get("DATABASE_URL", "")
+    try:
+        # Sustituye solo la base de datos, conservando la query verbatim (un
+        # socket unix lleva %2F al re-serializar y ConfigParser lo rechaza).
+        base, sep, query = url.partition("?")
+        base = re.sub(r"/[^/]+$", f"/{scratch}", base)
+        scratch_url = base + (sep + query if sep else "")
+        os.environ["DATABASE_URL"] = scratch_url
+        get_settings.cache_clear()
+
+        cfg = Config(str(VERSIONS_DIR.parent.parent / "alembic.ini"))
+        cfg.set_main_option("script_location", str(VERSIONS_DIR.parent))
+        command.upgrade(cfg, "head")
+
+        scratch_engine = sa.create_engine(scratch_url)
+        try:
+            with scratch_engine.connect() as conn:
+                ctx = MigrationContext.configure(
+                    connection=conn, opts={"target_metadata": Base.metadata}
+                )
+                diffs = compare_metadata(ctx, Base.metadata)
+        finally:
+            scratch_engine.dispose()
+        # Los repr de ReadOnlyColumnCollection llevan direccion de memoria:
+        # se enmascara para que la baseline sea determinista.
+        return sorted(
+            re.sub(r"0x[0-9a-fA-F]+", "0x_", repr(diff)) for diff in diffs
+        )
+    finally:
+        os.environ["DATABASE_URL"] = anterior
+        get_settings.cache_clear()
+        with engine.connect() as conn:
+            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}"'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre scratch uuid-hex generado por el propio test, sin input externo; BD efimera de CI
+        engine.dispose()
+
+
+def test_deriva_modelos_migraciones_no_cambia_en_ci_postgres():
+    """Rachet de deriva esquema models<->migraciones; solo en el Postgres de CI.
+
+    compare_metadata(Base.metadata, BD migrada a head) mide la misma deriva
+    que `alembic check`. Hoy hay deriva conocida (tablas muertas de backtests,
+    indices que los modelos declaran y ninguna migracion crea, NOT NULL
+    ajustados sin migracion): esta fijada, linea a linea, en
+    fixtures/alembic_drift_baseline.txt. El test falla si aparece deriva
+    NUEVA y tambien si desaparece deuda (quien la arregle regenera la
+    baseline en el mismo PR, para que el numero solo baje a proposito):
+
+        CI=true DATABASE_URL=postgresql+psycopg://... python - <<'EOF'
+        from pathlib import Path
+        import tests.test_alembic_chain as t
+        lineas = t._deriva_actual(t._url_postgres_ci())
+        Path("tests/fixtures/alembic_drift_baseline.txt").write_text(
+            "\\n".join(lineas) + "\\n", encoding="utf-8")
+        EOF
+
+    Corre en el job 'Postgres migration round trip' sobre una BD scratch
+    desechable que crea y destruye el propio test.
+    """
+    import pytest
+
+    url = _url_postgres_ci()
+    if not url:
+        pytest.skip("Runs only on the CI Postgres migration service")
+
+    actuales = _deriva_actual(url)
+    esperados = BASELINE_DERIVA.read_text(encoding="utf-8").splitlines()
+    if actuales != esperados:
+        nuevos = sorted(set(actuales) - set(esperados))
+        curados = sorted(set(esperados) - set(actuales))
+        detalle = ["deriva models<->migraciones distinta de la baseline:"]
+        detalle += [f"  NUEVA: {m}" for m in nuevos[:10]]
+        detalle += [f"  RESUELTA (regenera baseline): {m}" for m in curados[:10]]
+        raise AssertionError("\n".join(detalle))
+

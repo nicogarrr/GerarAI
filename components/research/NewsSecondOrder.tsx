@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
+import { useT } from '@/lib/i18n/client';
 
 type Candidate = {
   ticker: string;
@@ -18,9 +19,9 @@ type SecondOrder = {
 type Load = { state: 'idle' } | { state: 'loading' } | { state: 'error' } | { state: 'ready'; data: SecondOrder };
 
 const GROUPS = [
-  { key: 'beneficiada', label: 'Beneficiadas' },
-  { key: 'perjudicada', label: 'Perjudicadas' },
-  { key: 'incierta', label: 'Dirección incierta' },
+  { key: 'beneficiada', labelKey: 'research.flow.second.benefited' },
+  { key: 'perjudicada', labelKey: 'research.flow.second.harmed' },
+  { key: 'incierta', labelKey: 'research.flow.second.uncertain' },
 ] as const;
 const PER_GROUP = 8;
 
@@ -29,6 +30,7 @@ const PER_GROUP = 8;
  * server-rendered) y los efectos de segundo orden (carga perezosa al abrir).
  */
 export function NewsSecondOrder({ eventId, summary, subjectTicker, children }: { eventId: number; summary: string; subjectTicker?: string | null; children?: ReactNode }) {
+  const t = useT();
   const [load, setLoad] = useState<Load>({ state: 'idle' });
 
   async function fetchOnce() {
@@ -47,24 +49,24 @@ export function NewsSecondOrder({ eventId, summary, subjectTicker, children }: {
     <details className="mt-2 text-xs text-gray-400" onToggle={(event) => { if ((event.currentTarget as HTMLDetailsElement).open) void fetchOnce(); }}>
       <summary className="min-h-11 cursor-pointer py-2 text-teal-300">{summary}</summary>
       {children}
-      {load.state === 'loading' ? <p className="mt-1" role="status">Calculando…</p> : null}
-      {load.state === 'error' ? <p className="mt-1">No disponible ahora. Vuelve a abrir para reintentar.</p> : null}
+      {load.state === 'loading' ? <p className="mt-1" role="status">{t('research.flow.second.loading')}</p> : null}
+      {load.state === 'error' ? <p className="mt-1">{t('research.flow.second.error')}</p> : null}
       {load.state === 'ready' && load.data.status === 'sin_datos' ? (
         <p className="mt-1">
           {subjectTicker
-            ? `Ninguna otra empresa del universo aparece expuesta; el análisis excluye a propósito a la propia ${subjectTicker}.`
-            : 'Sin empresas del universo expuestas a esta noticia.'}
+            ? t('research.flow.second.noneWithSubject', { ticker: subjectTicker })
+            : t('research.flow.second.none')}
         </p>
       ) : null}
       {load.state === 'ready' && load.data.status !== 'sin_datos' ? (
         <div className="mt-1 space-y-3 rounded-md border border-gray-800 p-2">
-          <p className="font-medium text-gray-300">Hipótesis no verificadas · {load.data.mode === 'llm' ? 'modelo' : 'reglas'}</p>
+          <p className="font-medium text-gray-300">{t('research.flow.second.hypotheses')} · {load.data.mode === 'llm' ? t('research.flow.second.modeModel') : t('research.flow.second.modeRules')}</p>
           {GROUPS.map((group) => {
             const items = load.data.candidates.filter((item) => item.direction === group.key);
             if (!items.length) return null;
             return (
               <div key={group.key}>
-                <h4 className="font-semibold text-gray-200">{group.label} ({items.length})</h4>
+                <h4 className="font-semibold text-gray-200">{t(group.labelKey)} ({items.length})</h4>
                 <ul className="mt-1 space-y-1">
                   {items.slice(0, PER_GROUP).map((item) => (
                     <li className="break-words" key={`${group.key}-${item.ticker}`}>
@@ -75,7 +77,7 @@ export function NewsSecondOrder({ eventId, summary, subjectTicker, children }: {
                     </li>
                   ))}
                 </ul>
-                {items.length > PER_GROUP ? <p className="mt-1 text-gray-500">y {items.length - PER_GROUP} más</p> : null}
+                {items.length > PER_GROUP ? <p className="mt-1 text-gray-500">{t('research.flow.second.more', { count: items.length - PER_GROUP })}</p> : null}
               </div>
             );
           })}

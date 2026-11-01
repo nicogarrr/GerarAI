@@ -1,4 +1,8 @@
 {
+  "library": "Library",
+  "qualityCompounders": "Quality compounder companies",
+  "documents": "Documents",
+  "upload": "Upload knowledge",
   "metadataTitle": "Knowledge library",
   "metadataDescription": "Books, letters and case studies kept separate from company evidence, with human-approved, traceable investment principles.",
   "kicker": "Investment knowledge",
@@ -165,9 +169,5 @@
     "confirmCollectionTitle": "Delete the empty collection “{name}”?",
     "confirmCollectionDescription": "This action cannot be undone."
   },
-  "library": "Library",
-  "qualityCompounders": "Quality compounders",
-  "documents": "Documents",
-  "upload": "Upload knowledge",
   "statsAria": "Library summary"
 }

@@ -3,7 +3,6 @@ from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 import main
@@ -12,6 +11,7 @@ from app.models import Company, MarketPrice, NewsEvent, ThesisVersion
 from app.seed import seed
 from app.services.thesis_service import ThesisService
 from tests import test_thesis_auto_ingest as base
+from tests.auth_helpers import csrf_client
 
 
 @pytest.fixture(autouse=True)
@@ -49,7 +49,7 @@ def test_generate_dedupes_price_only_change_but_not_material_or_forced(monkeypat
     base._clean_asts_evidence()
     base._mock_all_sources(monkeypatch)
     base._seed_evidence_rows()
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
 
     first = client.post("/api/thesis/generate", json={"ticker": "ASTS", "force_new_version": True}).json()
     assert first["status"] == "insufficient_data"
@@ -110,7 +110,7 @@ def _setup_first(monkeypatch):
     base._clean_asts_evidence()
     base._mock_all_sources(monkeypatch)
     base._seed_evidence_rows()
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
     first = client.post("/api/thesis/generate", json={"ticker": "ASTS", "force_new_version": True}).json()
     assert first["status"] == "insufficient_data"
     return client, first

@@ -26,7 +26,7 @@ from app.valuation.engines.base import (
     is_adr_without_ratio,
     margin_of_safety,
 )
-from app.valuation.fact_reference import split_scaled_value
+from app.valuation.fact_reference import split_scaled_value, usable_fact
 from app.valuation.moat_framework import empty_moat_framework
 from app.valuation.scenario_definitions import holding_company_scenarios
 from app.valuation.scenario_model import Scenario, probability_weighted_value
@@ -52,7 +52,10 @@ def _latest_facts_by_metric(context: ValuationContext) -> dict[str, FinancialFac
     ).all()
     latest_by_metric: dict[str, FinancialFact] = {}
     for fact in facts:
-        latest_by_metric.setdefault(fact.metric, fact)
+        # Frontera del snapshot: cuarentena ESEF / no elegible = ausente;
+        # setdefault cae entonces al hecho limpio anterior de la metrica.
+        if usable_fact(fact):
+            latest_by_metric.setdefault(fact.metric, fact)
     return latest_by_metric
 
 
@@ -112,7 +115,7 @@ class SOTPEngine(ValuationEngine):
             for metric, fact in latest.items()
             if metric.startswith("segment_") and metric.endswith("_operating_metric")
         ]
-        units = list(segment_units)
+        units: list[str | None] = list(segment_units)
         if "net_debt" in latest:
             units.append(latest["net_debt"].unit)
         if not segment_units and is_reported_nav_entity(context.company) and "total_equity" in latest:

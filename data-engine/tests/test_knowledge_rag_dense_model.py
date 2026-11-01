@@ -114,7 +114,7 @@ def test_e5_prefija_docs_y_consulta_y_minilm_no(monkeypatch) -> None:
     from app.services.knowledge_rag import embedding
 
     sent: list[list[str]] = []
-    monkeypatch.setattr(embedding, "embed_dense", lambda texts, model: sent.append(list(texts)) or [[0.0]])
+    monkeypatch.setattr(embedding, "embed_dense", lambda texts, model, batch_size=None: sent.append(list(texts)) or [[0.0]])
     e5 = embedding.LocalEmbedder("intfloat/multilingual-e5-large", dims=1024)
     e5.dense_docs(["hola", "cartera"])
     e5.dense_query("que hora es")

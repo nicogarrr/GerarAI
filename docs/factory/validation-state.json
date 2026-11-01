@@ -1,0 +1,239 @@
+{
+  "assertions": {
+    "VAL-CONTENT-001": {
+      "status": "passed"
+    },
+    "VAL-CONTENT-002": {
+      "status": "passed"
+    },
+    "VAL-CONTENT-003": {
+      "status": "passed"
+    },
+    "VAL-CONTENT-004": {
+      "status": "passed"
+    },
+    "VAL-CONTENT-005": {
+      "status": "passed"
+    },
+    "VAL-CONTENT-006": {
+      "status": "passed"
+    },
+    "VAL-CONTENT-007": {
+      "status": "passed"
+    },
+    "VAL-CONTENT-008": {
+      "status": "passed"
+    },
+    "VAL-COV-001": {
+      "status": "passed"
+    },
+    "VAL-COV-002": {
+      "status": "passed"
+    },
+    "VAL-COV-003": {
+      "status": "passed"
+    },
+    "VAL-COV-004": {
+      "status": "passed"
+    },
+    "VAL-COV-005": {
+      "status": "passed"
+    },
+    "VAL-COV-006": {
+      "status": "passed"
+    },
+    "VAL-CROSS-001": {
+      "status": "passed"
+    },
+    "VAL-CROSS-002": {
+      "status": "passed"
+    },
+    "VAL-CROSS-003": {
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_thesis_pdf_export.py (4 passed): complete thesis workflow from creation through PDF export"
+    },
+    "VAL-CROSS-004": {
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_transaction_import_csv.py (7 passed): complete flow from file upload through validation and atomic commit"
+    },
+    "VAL-CROSS-005": {
+      "status": "passed"
+    },
+    "VAL-CROSS-006": {
+      "status": "passed"
+    },
+    "VAL-CROSS-007": {
+      "status": "passed"
+    },
+    "VAL-CROSS-008": {
+      "status": "passed"
+    },
+    "VAL-DATA-001": {
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.065Z",
+      "evidence": "tests/test_data_source_health_and_connectors.py: YahooFinanceClient configured without key, symbol normalization (BRK.B -> BRK-B), quotes and charts"
+    },
+    "VAL-DATA-002": {
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_data_source_health_and_connectors.py: AlphaVantageClient with 5 req/min rate limiter, quote and overview fundamentals"
+    },
+    "VAL-DATA-003": {
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_data_source_health_and_connectors.py: ECBClient daily official EUR exchange rates XML parsing and conversion"
+    },
+    "VAL-DATA-004": {
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_data_source_health_and_connectors.py: DataSourceHealthRegistry circuit breaker, automatic fallback from yahoo to alpha vantage, GET /api/health/data-sources"
+    },
+    "VAL-DATA-005": {
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_thesis_pdf_export.py (4 passed): valid PDF-1.4, GerarAI branding, holdings table, <1.2s speed, filename sanitization"
+    },
+    "VAL-DATA-006": {
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_transaction_import_csv.py (7 passed): CSV/Excel import, flexible column mapping, multiple date formats, row validation reporting, preview mode, atomic commit"
+    },
+    "VAL-DATA-007": {
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_data_validation_layer.py (5 passed): ticker format validation, sanity checks, future date rejection, quantity validation, actionable spanish errors"
+    },
+    "VAL-DATA-008": {
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_data_provenance_tracking.py (4 passed): SourceKind, Coverage, freshness thresholds, and OFICIAL/INFERIDO/SIN_DATOS labeling"
+    },
+    "VAL-DB-001": {
+      "status": "passed"
+    },
+    "VAL-DB-002": {
+      "status": "passed"
+    },
+    "VAL-DB-003": {
+      "status": "passed"
+    },
+    "VAL-DB-004": {
+      "status": "passed"
+    },
+    "VAL-DB-005": {
+      "status": "passed"
+    },
+    "VAL-DB-006": {
+      "status": "passed"
+    },
+    "VAL-DB-007": {
+      "status": "passed"
+    },
+    "VAL-DB-008": {
+      "status": "passed"
+    },
+    "VAL-DOC-001": {
+      "status": "passed"
+    },
+    "VAL-DOC-002": {
+      "status": "passed"
+    },
+    "VAL-DOC-003": {
+      "status": "passed"
+    },
+    "VAL-DOC-004": {
+      "status": "passed"
+    },
+    "VAL-DOC-005": {
+      "status": "passed"
+    },
+    "VAL-DOC-006": {
+      "status": "passed"
+    },
+    "VAL-DOC-007": {
+      "status": "passed"
+    },
+    "VAL-PERF-001": {
+      "status": "passed"
+    },
+    "VAL-PERF-002": {
+      "status": "passed"
+    },
+    "VAL-PERF-003": {
+      "status": "passed"
+    },
+    "VAL-PERF-004": {
+      "status": "passed"
+    },
+    "VAL-PERF-005": {
+      "status": "passed",
+      "verified_at": "2026-10-30T23:27:29.361Z",
+      "evidence": "tests/test_cerebro_rag_optimization.py (5 passed): Qdrant connection pooling, batch embedding with chunks of 5, reduced chunk overlap, latency <500ms"
+    },
+    "VAL-PERF-006": {
+      "status": "passed"
+    },
+    "VAL-PERF-007": {
+      "status": "passed"
+    },
+    "VAL-PERF-008": {
+      "status": "passed"
+    },
+    "VAL-SEC-001": {
+      "status": "passed"
+    },
+    "VAL-SEC-002": {
+      "status": "passed"
+    },
+    "VAL-SEC-003": {
+      "status": "passed"
+    },
+    "VAL-SEC-004": {
+      "status": "passed"
+    },
+    "VAL-SEC-005": {
+      "status": "passed"
+    },
+    "VAL-SEC-006": {
+      "status": "passed"
+    },
+    "VAL-SEC-007": {
+      "status": "passed"
+    },
+    "VAL-SEC-008": {
+      "status": "passed"
+    },
+    "VAL-UX-001": {
+      "status": "passed"
+    },
+    "VAL-UX-002": {
+      "status": "passed"
+    },
+    "VAL-UX-003": {
+      "status": "passed"
+    },
+    "VAL-UX-004": {
+      "status": "passed"
+    },
+    "VAL-UX-005": {
+      "status": "passed"
+    },
+    "VAL-UX-006": {
+      "status": "passed"
+    },
+    "VAL-UX-007": {
+      "status": "passed"
+    },
+    "VAL-UX-008": {
+      "status": "passed"
+    },
+    "VAL-UX-009": {
+      "status": "passed"
+    },
+    "VAL-UX-010": {
+      "status": "passed"
+    }
+  }
+}

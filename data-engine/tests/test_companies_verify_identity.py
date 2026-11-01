@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 import main
+from app.core.csrf import generate_csrf_token
 from app.core.database import SessionLocal, init_db
 from app.models import Company
 from app.services.connectors.finnhub import FinnhubClient
@@ -51,7 +52,7 @@ def _mock_sources(monkeypatch, sec_entry, provider_profile):
 def test_verified_double_match_creates_labeled_stub(monkeypatch):
     _clean()
     _mock_sources(monkeypatch, SEC_ENTRY, PROVIDER_PROFILE)
-    response = TestClient(main.app).post("/api/companies/verify-identity", json={"ticker": TICKER})
+    response = TestClient(main.app, headers={"X-CSRF-Token": generate_csrf_token()}).post("/api/companies/verify-identity", json={"ticker": TICKER})
     assert response.status_code == 200
     payload = response.json()
     assert payload["verified"] is True
@@ -73,7 +74,7 @@ def test_verified_double_match_creates_labeled_stub(monkeypatch):
 def test_negative_no_sec_record_creates_nothing(monkeypatch):
     _clean()
     _mock_sources(monkeypatch, None, PROVIDER_PROFILE)
-    response = TestClient(main.app).post("/api/companies/verify-identity", json={"ticker": TICKER})
+    response = TestClient(main.app, headers={"X-CSRF-Token": generate_csrf_token()}).post("/api/companies/verify-identity", json={"ticker": TICKER})
     assert response.status_code == 200
     payload = response.json()
     assert payload["verified"] is False
@@ -89,7 +90,7 @@ def test_negative_no_sec_record_creates_nothing(monkeypatch):
 def test_negative_name_mismatch_creates_nothing(monkeypatch):
     _clean()
     _mock_sources(monkeypatch, SEC_ENTRY, {**PROVIDER_PROFILE, "name": "Almonty Industries Inc"})
-    payload = TestClient(main.app).post("/api/companies/verify-identity", json={"ticker": TICKER}).json()
+    payload = TestClient(main.app, headers={"X-CSRF-Token": generate_csrf_token()}).post("/api/companies/verify-identity", json={"ticker": TICKER}).json()
     assert payload["verified"] is False
     assert any(r.startswith("nombre_no_coincide") for r in payload["reasons"])
     db = SessionLocal()
@@ -102,7 +103,7 @@ def test_negative_name_mismatch_creates_nothing(monkeypatch):
 def test_negative_non_us_exchange_creates_nothing(monkeypatch):
     _clean()
     _mock_sources(monkeypatch, SEC_ENTRY, {**PROVIDER_PROFILE, "exchange": "BOLSA MEXICANA DE VALORES"})
-    payload = TestClient(main.app).post("/api/companies/verify-identity", json={"ticker": TICKER}).json()
+    payload = TestClient(main.app, headers={"X-CSRF-Token": generate_csrf_token()}).post("/api/companies/verify-identity", json={"ticker": TICKER}).json()
     assert payload["verified"] is False
     assert any(r.startswith("mercado_no_sec") for r in payload["reasons"])
 
@@ -117,7 +118,7 @@ def test_existing_master_company_short_circuits(monkeypatch):
     finally:
         db.close()
     # Sin mocks de red: no debe llamar a ninguna fuente si ya está en el maestro.
-    payload = TestClient(main.app).post("/api/companies/verify-identity", json={"ticker": TICKER}).json()
+    payload = TestClient(main.app, headers={"X-CSRF-Token": generate_csrf_token()}).post("/api/companies/verify-identity", json={"ticker": TICKER}).json()
     assert payload["verified"] is True
     assert payload["already_in_master"] is True
     assert payload["company"]["name"] == "Master Corp"
@@ -151,7 +152,7 @@ def test_negative_homonym_in_master_rejects(monkeypatch):
     finally:
         db.close()
     _mock_sources(monkeypatch, SEC_ENTRY, PROVIDER_PROFILE)
-    response = TestClient(main.app).post("/api/companies/verify-identity", json={"ticker": TICKER})
+    response = TestClient(main.app, headers={"X-CSRF-Token": generate_csrf_token()}).post("/api/companies/verify-identity", json={"ticker": TICKER})
     payload = response.json()
     assert payload["verified"] is False
     assert any(r.startswith("ticker_ambiguo") for r in payload["reasons"])
@@ -169,7 +170,7 @@ def test_negative_homonym_in_master_rejects(monkeypatch):
 def test_negative_missing_currency_creates_nothing(monkeypatch):
     _clean()
     _mock_sources(monkeypatch, SEC_ENTRY, {**PROVIDER_PROFILE, "currency": ""})
-    payload = TestClient(main.app).post("/api/companies/verify-identity", json={"ticker": TICKER}).json()
+    payload = TestClient(main.app, headers={"X-CSRF-Token": generate_csrf_token()}).post("/api/companies/verify-identity", json={"ticker": TICKER}).json()
     assert payload["verified"] is False
     assert any(r.startswith("moneda_desconocida") for r in payload["reasons"])
     db = SessionLocal()
@@ -185,7 +186,7 @@ def test_double_click_race_returns_existing_company_not_500(monkeypatch):
 
     _clean()
     _mock_sources(monkeypatch, SEC_ENTRY, PROVIDER_PROFILE)
-    client = TestClient(main.app, raise_server_exceptions=False)
+    client = TestClient(main.app, raise_server_exceptions=False, headers={"X-CSRF-Token": generate_csrf_token()})
     first = client.post("/api/companies/verify-identity", json={"ticker": TICKER})
     assert first.status_code == 200 and first.json()["company"]["ticker"] == TICKER
 

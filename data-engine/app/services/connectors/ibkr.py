@@ -1,9 +1,12 @@
 import asyncio
 import logging
 import re
-from xml.etree import ElementTree
+from xml.etree import ElementTree  # nosec B314  # stdlib solo para tipos (Element) y ParseError: defusedxml no los exporta; el parseo usa defusedxml
 
 import httpx
+
+# XML externo (servicio web de IBKR): defusedxml solo para PARSEAR.
+from defusedxml import ElementTree as DefusedElementTree
 
 from app.core.config import get_settings
 
@@ -93,7 +96,7 @@ class IBKRFlexClient:
     @staticmethod
     def _status(text: str) -> tuple[str | None, str | None, str | None]:
         try:
-            root = ElementTree.fromstring(text)
+            root = DefusedElementTree.fromstring(text)
         except ElementTree.ParseError:
             return None, None, None
         return root.findtext(".//Status"), root.findtext(".//ErrorCode"), root.findtext(".//ErrorMessage")
@@ -119,7 +122,7 @@ class IBKRFlexClient:
         status, code, message = self._status(text)
         if status != "Success":
             raise IBKRFlexError(f"IBKR Flex request failed (code {_safe_code(code)})")
-        root = ElementTree.fromstring(text)
+        root = DefusedElementTree.fromstring(text)
         reference_code = root.findtext(".//ReferenceCode")
         if not reference_code:
             raise IBKRFlexError("IBKR Flex did not return a ReferenceCode")

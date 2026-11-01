@@ -42,7 +42,6 @@ const ask = (text: string) => {
     fireEvent.change(box(), { target: { value: text } });
     fireEvent.click(screen.getByRole('button', { name: 'Enviar pregunta' }));
 };
-const logEl = () => screen.getByRole('log', { name: 'Mensajes del cerebro' });
 
 beforeEach(() => {
     // jsdom no implementa Element.scrollTo (el panel lo usa para ir al último mensaje).
@@ -453,4 +452,42 @@ it('401 de biblioteca se muestra como sesión caducada sin borrar conversación'
   fireEvent.click(screen.getByRole('button',{name:'Enviar pregunta'}));
   await screen.findByText('Sesión caducada. Vuelve a iniciar sesión.');
   expect(screen.getByText('Pregunta válida')).toBeInTheDocument();
+});
+
+describe('GlobalBrain: autoscroll y prefers-reduced-motion', () => {
+    // jsdom no implementa matchMedia: cada caso lo define antes de abrir el
+    // panel (el efecto de autoscroll lo consulta al llegar un mensaje).
+    const setMatchMedia = (reduce: boolean) => {
+        window.matchMedia = ((query: string) => ({
+            matches: reduce,
+            media: query,
+            onchange: null,
+            addListener() {},
+            removeListener() {},
+            addEventListener() {},
+            removeEventListener() {},
+            dispatchEvent: () => false,
+        })) as unknown as typeof window.matchMedia;
+    };
+    afterEach(() => {
+        delete (window as Partial<Window>).matchMedia;
+    });
+
+    it.each([
+        [true, 'auto'],
+        [false, 'smooth'],
+    ] as const)('reduce=%s → behavior "%s" en el autoscroll', async (reduce, behavior) => {
+        setMatchMedia(reduce);
+        render(<GlobalBrain userId="u1" />);
+        await open();
+        await waitFor(() => expect(Element.prototype.scrollTo).toHaveBeenCalled());
+        expect(Element.prototype.scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior }));
+    });
+
+    it('sin matchMedia (jsdom) el fallback es "smooth"', async () => {
+        render(<GlobalBrain userId="u1" />);
+        await open();
+        await waitFor(() => expect(Element.prototype.scrollTo).toHaveBeenCalled());
+        expect(Element.prototype.scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }));
+    });
 });

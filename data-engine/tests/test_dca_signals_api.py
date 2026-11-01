@@ -86,8 +86,13 @@ def client(monkeypatch):
     store = _RedisGate()
     monkeypatch.setattr(redis.Redis, 'from_url', lambda *a, **kw: store)
     today = date.today()
+    # Ultimo cierre SIEMPRE asentado y fresco: ayer. El dia 1 de mes, una
+    # barra fechada «dia 1» es el dia en curso y settled_rows la descarta; la
+    # serie quedaba con el cierre del dia 1 del mes pasado (>max_age) y todo
+    # el archivo fallaba solo ese dia (main rojo el 1-nov-2026).
+    last_day = today - timedelta(days=1)
     rows: list[PriceRow] = []
-    y, m = today.year, today.month
+    y, m = last_day.year, last_day.month
     months = []
     for _ in range(30):
         months.append((y, m))
@@ -97,16 +102,20 @@ def client(monkeypatch):
     months.reverse()
     for y, m in months[:-1]:
         rows.append(PriceRow(day=date(y, m, 1), close=100.0))
-    # Ultimo cierre reciente: con la puerta de frescura una barra del dia 1 de
-    # hace semanas ya no cuenta como senal actual.
-    last_day = max(date(months[-1][0], months[-1][1], 1), today - timedelta(days=1))
     rows.append(PriceRow(day=last_day, close=55.0))
 
     def fake_fetch(symbol: str) -> FetchedHistory:
         return FetchedHistory(rows=rows, currency="USD")
 
     monkeypatch.setattr(dca_signal_service, "fetch_yahoo_history", fake_fetch)
-    yield TestClient(main.app)
+    client = TestClient(main.app)
+    # El middleware CSRF exige token en todo metodo mutante. Sin el, estos
+    # tests solo pasaban tapados por el orden de la suite completa y fallaban
+    # al ejecutar este archivo aislado.
+    csrf = client.get("/api/csrf-token")
+    assert csrf.status_code == 200, csrf.text
+    client.headers["X-CSRF-Token"] = csrf.json()["csrf_token"]
+    yield client
     _cleanup()
 
 
@@ -181,7 +190,7 @@ def test_backtest_endpoint_any_ticker_plain_vs_levels(client):
     assert set(plans) == {"plain", "levels", "fixed_budget"}
     assert plans["plain"]["invested"] == 50 * body["months"]
     assert plans["fixed_budget"]["invested"] == plans["plain"]["invested"]
-    assert body["params_version"] == "nico-v1"
+    assert body["params_version"] == "nico-v2"
     assert body["disclaimer"].startswith("Histórico, hipotético")
     assert client.get("/api/watchlist/dca-signals/DCABT/backtest", params={"start": "2026-13"}).status_code == 422
 
@@ -217,9 +226,13 @@ def test_list_reports_when_daily_evaluation_is_disabled(client, monkeypatch):
     servidor el job diario sale «disabled» cada noche, ningun ticker tiene
     nivel y el panel decia «Sin evaluar» sin explicar por que. El listado
     declara ahora si la evaluacion diaria esta encendida."""
+    from app.core.cache import invalidate_dca_cache
     from app.core.config import get_settings
 
     client.post("/api/watchlist", json={"symbol": "DCATST"})
+    # El listado cachea el payload 5 min por tenant (flag incluida): sin
+    # invalidar, la respuesta depende de lo que otro test hubiera cacheado.
+    invalidate_dca_cache()
     monkeypatch.setenv("DCA_EVALUATION_ENABLED", "false")
     get_settings.cache_clear()
     try:
@@ -232,6 +245,10 @@ def test_list_reports_when_daily_evaluation_is_disabled(client, monkeypatch):
     finally:
         monkeypatch.delenv("DCA_EVALUATION_ENABLED")
         get_settings.cache_clear()
+        # Si el batch no llego a invalidar (puerta en cooldown, sin pendientes),
+        # el payload con la flag apagada sobrevive 5 min y el assert final lee
+        # la cache vieja (rojo en CI, verde en aislamiento).
+        invalidate_dca_cache()
     assert client.get("/api/watchlist/dca-signals").json()["evaluation_enabled"] is True
 
 
@@ -300,3 +317,25 @@ def test_manual_limits_batch_and_reports_remaining(client, monkeypatch):
     assert len(seen[0]) == result['requested'] == 10
     assert result['pending_remaining'] == 13
     assert result['cooldown_seconds'] == 300
+
+
+def test_list_marks_old_formula_state_as_stale(client):
+    """Estado fresco pero de la formula anterior: marcado desactualizado.
+
+    Prod 31-oct-2026: estados nico-v1 evaluados hace minutos se mostraban como
+    actuales porque el listado solo miraba la edad del ultimo cierre, no la
+    version de la formula que produjo el nivel.
+    """
+    client.post("/api/watchlist", json={"symbol": "DCATST"})
+    summary = run_manual_batch()
+    assert "blocked" not in summary, summary
+    with SessionLocal() as db:
+        state = db.scalar(select(DcaSignalState).where(DcaSignalState.symbol == "DCATST"))
+        assert state is not None, summary
+        state.params_version = "nico-v1"  # formula anterior, cierre de hoy
+        db.commit()
+    item = next(i for i in client.get("/api/watchlist/dca-signals").json()["items"] if i["symbol"] == "DCATST")
+    assert item["state"]["params_outdated"] is True
+    assert item["state"]["stale"] is True
+    # El nivel se conserva visible, pero marcado (misma regla que con datos viejos).
+    assert item["state"]["level"] is not None

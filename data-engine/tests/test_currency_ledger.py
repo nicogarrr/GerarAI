@@ -194,3 +194,36 @@ def test_gain_is_never_blocked():
     lots = [CurrencyLot(date(2025, 1, 1), D(100), D(90)), CurrencyLot(date(2025, 6, 1), D(100), D(95))]
     r = _run(lots, [Conversion(date(2025, 3, 1), D(100), D("1.00"))])
     assert r["gain_base"] == 10.0 and r["blocked_loss_base"] == 0.0
+
+
+def test_lot_acquired_later_same_day_is_not_consumed():
+    # MEDIDO (sonda 31-10-2026): una conversion de las 10:00 consumia un lote
+    # adquirido a las 15:00 del mismo dia (la divisa aun no existia). Con
+    # ambas horas conocidas, el lote posterior no es consumible: sin saldo
+    # anterior la conversion no tiene adquisicion y el resultado es
+    # incomplete, nunca una ganancia computada con la base del futuro.
+    lot = CurrencyLot(date(2026, 3, 2), D("100"), D("90"), "venta", "150000")
+    conv = Conversion(date(2026, 3, 2), D("100"), D("0.95"), "fx", "100000")
+    result = compute_currency_ledger([lot], [conv], date(2026, 3, 2), date(2026, 3, 2),
+                                     opening_complete=True)
+    assert result["rows"][0]["gain_base"] is None
+    assert result["status"] == INCOMPLETE
+
+
+def test_lot_acquired_earlier_same_day_is_consumed():
+    lot = CurrencyLot(date(2026, 3, 2), D("100"), D("90"), "venta", "100000")
+    conv = Conversion(date(2026, 3, 2), D("100"), D("0.95"), "fx", "150000")
+    result = compute_currency_ledger([lot], [conv], date(2026, 3, 2), date(2026, 3, 2),
+                                     opening_complete=True)
+    assert result["rows"][0]["gain_base"] == 5.0
+    assert result["status"] == COMPUTED
+
+
+def test_same_day_without_times_still_consumes():
+    # Sin hora no hay orden intradia conocido: se mantiene el criterio actual
+    # (consumo por fecha) para no volver incomplete toda conversion intradia.
+    lot = CurrencyLot(date(2026, 3, 2), D("100"), D("90"), "venta", "")
+    conv = Conversion(date(2026, 3, 2), D("100"), D("0.95"), "fx", "")
+    result = compute_currency_ledger([lot], [conv], date(2026, 3, 2), date(2026, 3, 2),
+                                     opening_complete=True)
+    assert result["rows"][0]["gain_base"] == 5.0

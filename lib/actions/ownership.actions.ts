@@ -19,35 +19,43 @@ export type OwnershipProvenance = {
   source_url: string | null;
   fetched_at: string;
   coverage: string;
+  note?: string | null;
 };
 
+// La via snapshot (sin sync en vivo) deja en null lo que el snapshot no tiene:
+// accession, filing_url y los campos que el filing no parseo. Nunca asumir string.
 export type ManagerHoldingRow = {
-  accession_number: string;
+  accession_number: string | null;
   is_amendment: boolean;
-  name_of_issuer: string;
-  title_of_class: string;
-  cusip: string;
+  name_of_issuer: string | null;
+  name_of_issuer_filed?: string | null;
+  title_of_class: string | null;
+  cusip: string | null;
   value_usd_thousands: number | null;
   shares: number | null;
-  share_type: string;
+  share_type: string | null;
   put_call: string | null;
-  investment_discretion: string;
-  filing_url: string;
+  investment_discretion: string | null;
+  filing_url: string | null;
 };
 
 /** «ok» solo si los totales cuadran con el resumen del propio 13F (Auditoría A). */
-export type ManagerHoldingsStatus = 'ok' | 'mismatch' | 'unverified' | 'partial' | 'unavailable';
+// «snapshot»: servido del snapshot edgartools sin contrastar totales (nunca es «ok»).
+export type ManagerHoldingsStatus = 'ok' | 'mismatch' | 'unverified' | 'partial' | 'unavailable' | 'snapshot';
 
 export type ManagerHoldings = {
   cik: string;
-  manager?: string;
+  manager?: string | null;
   status: ManagerHoldingsStatus;
-  verification?: 'verified' | 'mismatch' | 'unverified' | 'partial' | 'unavailable' | null;
-  report_date?: string;
-  coverage?: string;
+  verification?: 'verified' | 'mismatch' | 'unverified' | 'partial' | 'unavailable' | 'snapshot_unverified' | null;
+  report_date?: string | null;
+  coverage?: string | null;
   holdings: ManagerHoldingRow[];
-  limitations?: string[];
-  provenance?: OwnershipProvenance;
+  errors?: unknown[] | null;
+  limitations?: string[] | null;
+  transport?: string | null;
+  snapshot_synced_at?: string | null;
+  provenance?: OwnershipProvenance | null;
 };
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -81,11 +89,11 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function getOwnershipManagers(): Promise<{ managers: OwnershipManager[]; limitations: string[] }> {
-  return requestJson('/api/ownership/managers');
+  return requestJson<{ managers: OwnershipManager[]; limitations: string[] }>('/api/ownership/managers');
 }
 
 export async function getManagerHoldings(cik: string): Promise<ManagerHoldings> {
-  return requestJson(`/api/ownership/managers/${encodeURIComponent(cik)}/holdings`);
+  return requestJson<ManagerHoldings>(`/api/ownership/managers/${encodeURIComponent(cik)}/holdings`);
 }
 
 export type ManagerChangeRow = {
@@ -102,19 +110,19 @@ export type ManagerChangeRow = {
 
 export type ManagerChanges = {
   cik: string;
-  manager?: string;
+  manager?: string | null;
   status: 'ok' | 'insufficient_history' | 'unavailable';
-  detail?: string;
-  latest_report?: string;
-  previous_report?: string;
-  compared_accessions?: { latest: string; previous: string; rule: string };
+  detail?: string | null;
+  latest_report?: string | null;
+  previous_report?: string | null;
+  compared_accessions?: { latest: string; previous: string; rule: string } | null;
   changes: ManagerChangeRow[];
-  limitations?: string[];
-  provenance?: OwnershipProvenance;
+  limitations?: string[] | null;
+  provenance?: OwnershipProvenance | null;
 };
 
 export async function getManagerChanges(cik: string): Promise<ManagerChanges> {
-  return requestJson(`/api/ownership/managers/${encodeURIComponent(cik)}/changes`);
+  return requestJson<ManagerChanges>(`/api/ownership/managers/${encodeURIComponent(cik)}/changes`);
 }
 
 export interface OwnershipSyncResult {

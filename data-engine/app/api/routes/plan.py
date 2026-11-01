@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.schemas.api import SavingsProjectionOut
 from app.services.investment_plan_service import (
     PLAN_CURRENCY_UNSET,
     ContributionConflict,
@@ -209,7 +210,7 @@ def contribution_split(db: Session = Depends(get_db)) -> dict:
 def drift_analysis(db: Session = Depends(get_db)) -> dict:
     return InvestmentPlanService().drift_analysis(db)
 
-@router.get("/savings-projection")
+@router.get("/savings-projection", response_model=SavingsProjectionOut)
 def savings_projection(
     db: Session = Depends(get_db),
     monthly: Annotated[float | None, Query(ge=0, le=1_000_000)] = None,

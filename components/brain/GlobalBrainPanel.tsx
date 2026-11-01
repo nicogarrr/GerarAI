@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Input } from '@/components/ui/input';
 import { X, Send, User, Bot, Loader2, Maximize2, Minimize2 } from 'lucide-react';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
+import { useT } from '@/lib/i18n/client';
 import { BRAIN_SUGGESTED_QUESTIONS } from '@/lib/brain/conversation';
 import { chatWithPortfolio } from '@/lib/actions/brain.actions';
 import { askResearchAssistantAction } from '@/lib/research/assistant-actions';
@@ -69,6 +70,7 @@ type ContextEcho = {
  * manda sobre la etiqueta local. Solo lectura.
  */
 export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setMessages, onClose, onClearKnowledge }: GlobalBrainPanelProps) {
+    const t = useT();
     const pathname = usePathname();
     const page = brainPageContext(pathname);
     // El panel solo se monta al abrirlo (chunk diferido desde GlobalBrain):
@@ -148,7 +150,15 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
 
     useEffect(() => {
         if (scrollRef.current) {
-            scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+            // Con movimiento reducido el salto es instantaneo (WCAG 2.3.3).
+            // jsdom no implementa matchMedia: typeof protege los tests.
+            const reduce =
+                typeof window.matchMedia === 'function' &&
+                window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            scrollRef.current.scrollTo({
+                top: scrollRef.current.scrollHeight,
+                behavior: reduce ? 'auto' : 'smooth',
+            });
         }
     }, [messages, isMaximized]);
 
@@ -271,11 +281,11 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                     return;
                 }
                 const result = outcome.answer;
-                const text = result.analysis ? analysisToText(result.analysis) : (result.answers ?? []).map(a => `${a.text ?? ''}\n«${a.citation.quote}» (${a.citation.author ?? 'Autor no registrado'} · ${a.citation.title}${a.citation.page_number !== null ? ` · Página ${a.citation.page_number}` : ''} · Fragmento ${a.citation.chunk_index + 1}${a.citation.publication_date ? ` · ${a.citation.publication_date}` : ''})`).join('\n\n');
-                setMessages(prev => [...prev, { role: 'assistant', content: text || result.message || 'Sin datos en la biblioteca.', library: result }]);
+                const text = result.analysis ? analysisToText(result.analysis) : (result.answers ?? []).map(a => `${a.text ?? ''}\n«${a.citation.quote}» (${a.citation.author ?? t('brain.library.unregisteredAuthor')} · ${a.citation.title}${a.citation.page_number !== null ? ` · ${t('brain.library.pageN', { n: a.citation.page_number })}` : ''} · ${t('brain.library.chunkN', { n: a.citation.chunk_index + 1 })}${a.citation.publication_date ? ` · ${a.citation.publication_date}` : ''})`).join('\n\n');
+                setMessages(prev => [...prev, { role: 'assistant', content: text || result.message || t('brain.panel.noLibraryData'), library: result }]);
             } catch (error) {
                 const expired = typeof error === 'object' && error !== null && 'statusCode' in error && error.statusCode === 401;
-                const message = expired ? 'Sesión caducada. Vuelve a iniciar sesión.' : error instanceof Error && /sesión|sesi[oó]n|401/i.test(error.message) ? error.message : 'No se pudo consultar la biblioteca. Inténtalo de nuevo.';
+                const message = expired ? t('brain.panel.sessionExpired') : error instanceof Error && /sesión|sesi[oó]n|401/i.test(error.message) ? error.message : t('brain.panel.libraryError');
                 setMessages(prev => [...prev, { role: 'assistant', content: message }]);
             } finally { setLoading(false); }
             return;
@@ -284,7 +294,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
         if (cleanTicker) {
             // Modo guía: asistente de research (solo lectura), secciones y citas tipadas.
             if (userMsg.length < 3 || userMsg.length > 2000) {
-                setMessages(prev => [...prev, { role: 'assistant', content: 'La pregunta debe tener entre 3 y 2000 caracteres.' }]);
+                setMessages(prev => [...prev, { role: 'assistant', content: t('brain.panel.questionLength') }]);
                 setLoading(false);
                 return;
             }
@@ -300,11 +310,11 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                 if (result.context) setEcho(result.context);
                 setMessages(prev => [...prev, {
                     role: 'assistant',
-                    content: result.answer?.trim() ? result.answer : `Guía de ${cleanTicker}: respuesta sin texto.`,
+                    content: result.answer?.trim() ? result.answer : t('brain.panel.guideEmpty', { ticker: cleanTicker }),
                     guide: result,
                 }]);
             } catch {
-                setMessages(prev => [...prev, { role: 'assistant', content: 'No se pudo obtener la guía. Reintenta; no se ha modificado nada.' }]);
+                setMessages(prev => [...prev, { role: 'assistant', content: t('brain.panel.guideError') }]);
             } finally {
                 setLoading(false);
             }
@@ -316,10 +326,10 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
             if (result.success) {
                 setMessages(prev => [...prev, { role: 'assistant', content: result.message, citations: result.citations }]);
             } else {
-                setMessages(prev => [...prev, { role: 'assistant', content: result.message || "Lo siento, hubo un error desconocido." }]);
+                setMessages(prev => [...prev, { role: 'assistant', content: result.message || t('brain.panel.unknownError') }]);
             }
         } catch {
-            setMessages(prev => [...prev, { role: 'assistant', content: "No se pudo completar la respuesta. Si tarda más de lo normal, reinténtalo en unos segundos." }]);
+            setMessages(prev => [...prev, { role: 'assistant', content: t('brain.panel.responseError') }]);
         } finally {
             setLoading(false);
         }
@@ -346,32 +356,32 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
             <CardHeader className="shrink-0 p-4 border-b border-indigo-500/20 flex flex-row items-center justify-between bg-indigo-900/20">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <BrainGlassesIcon className="h-9 w-9 shrink-0 object-contain" />
-                    <CardTitle as="h2" id="global-brain-title" className="text-sm font-medium">Cerebro GerarAI</CardTitle>
+                    <CardTitle as="h2" id="global-brain-title" className="text-sm font-medium">{t('brain.panel.title')}</CardTitle>
                     {showGuideInput || guideTicker ? (
                         <TickerSearchInput
                             value={guideTicker}
                             onValueChange={(value) => { onClearKnowledge(); setGuideTicker(value); setReviewId(undefined); }}
                             onSelect={(stock) => { onClearKnowledge(); setGuideTicker(stock.symbol); setReviewId(undefined); }}
                             onBlur={() => { if (!guideTicker.trim()) setShowGuideInput(false); }}
-                            placeholder="Ticker guía"
-                            ariaLabel="Ticker de la guía de investigación"
+                            placeholder={t('brain.panel.tickerPlaceholder')}
+                            ariaLabel={t('brain.panel.tickerAria')}
                             className="w-full min-w-0 rounded-full border border-slate-700 bg-slate-900 px-2 text-slate-200"
                         />
                     ) : (
                         <button
                             type="button"
                             onClick={() => { onClearKnowledge(); setShowGuideInput(true); }}
-                            title="Guía de investigación por empresa"
-                            aria-label="Abrir la guía de investigación por empresa"
+                            title={t('brain.panel.guideButtonTitle')}
+                            aria-label={t('brain.panel.guideButtonAria')}
                             className="inline-flex min-h-11 items-center rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-400 hover:border-indigo-400 hover:text-slate-200"
                         >
-                            Guía
+                            {t('brain.panel.guideButton')}
                         </button>
                     )}
                     {reviewId ? (
                         <span className="inline-flex items-center gap-1 rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300">
-                            Revisión #{reviewId}
-                            <button type="button" aria-label="Quitar la revisión anclada" onClick={() => setReviewId(undefined)} className="text-indigo-400 hover:text-indigo-200">×</button>
+                            {t('brain.panel.review', { id: reviewId })}
+                            <button type="button" aria-label={t('brain.panel.removeReviewAria')} onClick={() => setReviewId(undefined)} className="inline-flex min-h-11 min-w-11 items-center justify-center text-indigo-400 hover:text-indigo-200 sm:min-h-0 sm:min-w-0">×</button>
                         </span>
                     ) : null}
                     {viewing && (
@@ -382,7 +392,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                                 title={echo?.company_name ?? undefined}
                                 className="inline-flex min-h-11 items-center max-w-32 truncate rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300 hover:border-indigo-400 hover:text-indigo-200"
                             >
-                                Viendo {viewing}
+                                {t('brain.panel.viewing', { label: viewing })}
                             </Link>
                         ) : (
                             <span
@@ -390,7 +400,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                                 title={echo?.company_name ?? undefined}
                                 className="max-w-32 truncate rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300"
                             >
-                                Viendo {viewing}
+                                {t('brain.panel.viewing', { label: viewing })}
                             </span>
                         )
                     )}
@@ -400,7 +410,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                         variant="ghost"
                         size="icon"
                         onClick={() => setIsMaximized(!isMaximized)}
-                        aria-label={isMaximized ? 'Restaurar el cerebro' : 'Maximizar el cerebro'}
+                        aria-label={isMaximized ? t('brain.panel.restoreAria') : t('brain.panel.maximizeAria')}
                         className="size-11 text-slate-400 hover:text-white"
                     >
                         {isMaximized ? <Minimize2 aria-hidden="true" className="h-4 w-4" /> : <Maximize2 aria-hidden="true" className="h-4 w-4" />}
@@ -409,7 +419,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                         variant="ghost"
                         size="icon"
                         onClick={() => onClose()}
-                        aria-label="Cerrar el cerebro"
+                        aria-label={t('brain.panel.closeAria')}
                         className="size-11 text-slate-400 hover:text-white"
                     >
                         <X aria-hidden="true" className="h-4 w-4" />
@@ -418,10 +428,10 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
             </CardHeader>
 
             {knowledge && <div className="shrink-0 flex flex-col gap-2 border-b border-slate-700 p-3 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2"><span>{knowledge.documentTitle ? `Carta: ${knowledge.documentTitle}` : knowledge.scope === 'letters' ? 'Cartas' : 'Biblioteca'} · Doctrina, no datos actuales de empresas</span><button type="button" className="min-h-11 text-indigo-300" onClick={() => onClearKnowledge()}>Volver al chat general</button></div>
-                <details><summary className="min-h-11 cursor-pointer py-2">Autor y análisis</summary>
-                {!!knowledge.authors?.length && <label>Autor<select aria-label="Autor" value={author} onChange={e => setAuthor(e.target.value)} className="block min-h-11 w-full rounded bg-slate-900 p-2"><option value="">Todos los autores</option>{knowledge.authors.map(a => <option key={a} value={a}>{a}</option>)}</select></label>}
-                <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={analysis} onChange={e => setAnalysis(e.target.checked)} />Análisis estructurado (tesis, escenarios, modelos mentales)</label></details>
+                <div className="flex flex-wrap items-center justify-between gap-2"><span>{knowledge.documentTitle ? t('brain.panel.letterPrefix', { title: knowledge.documentTitle }) : knowledge.scope === 'letters' ? t('brain.panel.letters') : t('brain.panel.library')} · {t('brain.panel.doctrineNote')}</span><button type="button" className="min-h-11 text-indigo-300" onClick={() => onClearKnowledge()}>{t('brain.panel.backToChat')}</button></div>
+                <details><summary className="min-h-11 cursor-pointer py-2">{t('brain.panel.authorAnalysis')}</summary>
+                {!!knowledge.authors?.length && <label>{t('brain.panel.authorLabel')}<select aria-label={t('brain.panel.authorLabel')} value={author} onChange={e => setAuthor(e.target.value)} className="block min-h-11 w-full rounded bg-slate-900 p-2"><option value="">{t('brain.panel.allAuthors')}</option>{knowledge.authors.map(a => <option key={a} value={a}>{a}</option>)}</select></label>}
+                <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={analysis} onChange={e => setAnalysis(e.target.checked)} />{t('brain.panel.structuredAnalysis')}</label></details>
             </div>}
             <CardContent className="min-h-0 flex-1 p-0 overflow-hidden relative">
                 <div
@@ -429,7 +439,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                     role="log"
                     aria-live="polite"
                     aria-relevant="additions text"
-                    aria-label="Mensajes del cerebro"
+                    aria-label={t('brain.panel.messagesAria')}
                     className="h-full overflow-y-auto p-4 space-y-4"
                 >
                     {messages.map((m, i) => (
@@ -482,7 +492,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                                             onClick={() => void copyMessage(i, m.content)}
                                             className="mt-2 block min-h-11 text-xs text-indigo-300 hover:text-indigo-200"
                                         >
-                                            {copied === i ? 'Copiado' : 'Copiar'}
+                                            {copied === i ? t('brain.panel.copied') : t('brain.panel.copy')}
                                         </button>
                                     )}
                                 </div>
@@ -490,7 +500,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                         </div>
                     ))}
                     {messages.length === 1 && !loading && (
-                        <div className="flex flex-wrap gap-2" aria-label="Preguntas sugeridas">
+                        <div className="flex flex-wrap gap-2" aria-label={t('brain.panel.suggestedAria')}>
                             {(knowledge ? SUGGESTED_QUESTIONS : BRAIN_SUGGESTED_QUESTIONS).map((text) => (
                                 <button
                                     key={text}
@@ -511,7 +521,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                                 </div>
                                 <div role="status" aria-live="polite" className="p-3 rounded-lg bg-slate-800 border border-slate-700 rounded-tl-none">
                                     <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-indigo-400" />
-                                    <span className="sr-only">{knowledge && analysis ? 'Preparando el análisis (puede tardar hasta 90 segundos).' : 'GerarAI está escribiendo la respuesta.'}</span>
+                                    <span className="sr-only">{knowledge && analysis ? t('brain.panel.preparingAnalysis') : t('brain.panel.writing')}</span>
                                 </div>
                             </div>
                         </div>
@@ -525,7 +535,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                     onSubmit={(e) => { e.preventDefault(); handleSend(); }}
                 >
                     <label htmlFor="global-brain-input" className="sr-only">
-                        Pregunta al cerebro
+                        {t('brain.panel.inputLabel')}
                     </label>
                     {knowledge ? <textarea
                         ref={inputRef as React.RefObject<HTMLTextAreaElement>}
@@ -534,7 +544,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                         onChange={e => setInput(e.target.value)}
                         onKeyDown={e => { if (isSubmitShortcut(e)) { e.preventDefault(); void handleSend(); } }}
                         minLength={3} maxLength={1200} rows={2}
-                        placeholder="Pregunta a la biblioteca (Ctrl + Enter para enviar)"
+                        placeholder={t('brain.panel.libraryPlaceholder')}
                         className="min-h-11 min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 p-2"
                     /> : <Input
                         ref={inputRef as React.RefObject<HTMLInputElement>}
@@ -542,10 +552,10 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         maxLength={2000}
-                        placeholder={guideTicker.trim() ? `Pregunta sobre ${guideTicker.trim().toUpperCase()}...` : 'Pregunta al cerebro...'}
+                        placeholder={guideTicker.trim() ? t('brain.panel.tickerQuestion', { ticker: guideTicker.trim().toUpperCase() }) : t('brain.panel.placeholder')}
                         className="min-h-11 bg-slate-950 border-slate-700 focus-visible:ring-indigo-500"
                     />}
-                    <Button type="submit" size="icon" aria-label="Enviar pregunta" disabled={loading || !input.trim() || (!!knowledge && (input.trim().length < 3 || input.trim().length > 1200))} aria-busy={loading} className="bg-indigo-600 hover:bg-indigo-500">
+                    <Button type="submit" size="icon" aria-label={t('brain.panel.sendAria')} disabled={loading || !input.trim() || (!!knowledge && (input.trim().length < 3 || input.trim().length > 1200))} aria-busy={loading} className="bg-indigo-600 hover:bg-indigo-500">
                         <Send aria-hidden="true" className="h-4 w-4" />
                     </Button>
                 </form>

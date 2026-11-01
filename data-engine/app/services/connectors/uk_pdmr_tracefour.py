@@ -21,7 +21,10 @@ from typing import Any
 
 import httpx
 
+from app.services.data_source_health import get_data_source_registry
+
 TRACEFOUR_URL = "https://tracefour.com/v1/eu/uk"
+_REGISTRY_KEY = "tracefour"
 SOURCE_NAME = "tracefour"
 LICENCE = "CC BY 4.0"
 PARSER_VERSION = "tracefour-1"
@@ -36,23 +39,52 @@ _SELL_HINTS = ("disposal", "sale", "sell")
 # (bed & ISA), planes de compra de empleados no discrecionales, adquisiciones
 # nocionales y ofertas de recompra complejas.
 _NEUTRAL_HINTS = (
-    "dividend", "drip", "subscription", "placing", "award", "grant",
-    "exercise", "vest", "bed & isa", "bed and isa", "stock purchase plan",
-    "savings plan", "dcsp", "notional", "tender offer",
+    "dividend",
+    "drip",
+    "subscription",
+    "placing",
+    "award",
+    "grant",
+    "exercise",
+    "vest",
+    "bed & isa",
+    "bed and isa",
+    "stock purchase plan",
+    "savings plan",
+    "dcsp",
+    "notional",
+    "tender offer",
 )
 
 
 async def fetch_pdmr_feed(client: httpx.AsyncClient | None = None) -> list[dict[str, Any]]:
     """Un GET: la lista completa de movimientos recientes (sin parametros)."""
-    if client is not None:
-        response = await client.get(TRACEFOUR_URL)
-    else:
-        async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as owned:
-            response = await owned.get(TRACEFOUR_URL)
-    response.raise_for_status()
-    payload = response.json()
+    try:
+        if client is not None:
+            response = await client.get(TRACEFOUR_URL)
+        else:
+            async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as owned:
+                response = await owned.get(TRACEFOUR_URL)
+    except httpx.TransportError as exc:
+        get_data_source_registry().record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+        raise
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        # Endpoint fijo sin parámetros: un 404 aquí es que el endpoint se movió
+        # (deriva de la fuente), no un recurso por consulta. Degrada.
+        get_data_source_registry().record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+        raise
+    try:
+        payload = response.json()
+    except ValueError:
+        get_data_source_registry().record_failure(_REGISTRY_KEY, "200 sin JSON válido (parse failed)")
+        raise
     if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+        get_data_source_registry().record_failure(_REGISTRY_KEY, "200 sin lista 'data' (parse failed)")
         raise RuntimeError("tracefour devolvio una forma inesperada (sin lista 'data')")
+    # Éxito solo tras validar la envoltura {"data": [...]}: un 200 no basta.
+    get_data_source_registry().record_success(_REGISTRY_KEY)
     return payload["data"]
 
 

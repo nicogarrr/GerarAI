@@ -3,29 +3,30 @@ import { useState } from 'react';
 import type { ResearchNewsEvent } from '@/lib/actions/research.actions';
 import { newsSummaryToShow } from '@/lib/news-summary';
 import { isTranslatable } from '@/lib/news-language';
+import { useT } from '@/lib/i18n/client';
 
 
 /** Motivo estable que devuelve el motor (campo `reason` de la API) → texto
  *  honesto para la persona. Medido en prod 19-oct-2026: un fallo devolvía el
  *  botón a «Traducir» sin decir nada. Sin motivo conocido, mensaje genérico. */
-const REASON_TEXT: Record<string, string> = {
-  cooldown: 'Reintento programado en unos minutos.',
-  busy: 'Otra traducción está en curso. Inténtalo en unos segundos.',
-  budget: 'Límite diario de traducción alcanzado.',
-  quota: 'Límite de traducciones por minuto alcanzado. Inténtalo en un minuto.',
-  bad_output: 'El traductor automático no dio un resultado fiable para este texto.',
-  provider_rate_limited: 'Los traductores gratuitos están saturados ahora mismo. Inténtalo en unos minutos.',
-  provider_timeout: 'El traductor no respondió a tiempo. Inténtalo de nuevo en unos minutos.',
-  provider: 'El traductor falló. Inténtalo de nuevo en unos minutos.',
-  changed: 'La noticia cambió mientras se traducía. Inténtalo de nuevo.',
-};
-const GENERIC_FAILURE = 'Traducción no disponible ahora mismo. Inténtalo de nuevo en un rato.';
+const REASON_KEYS = {
+  cooldown: 'research.translate.reason.cooldown',
+  busy: 'research.translate.reason.busy',
+  budget: 'research.translate.reason.budget',
+  quota: 'research.translate.reason.quota',
+  bad_output: 'research.translate.reason.badOutput',
+  provider_rate_limited: 'research.translate.reason.providerRateLimited',
+  provider_timeout: 'research.translate.reason.providerTimeout',
+  provider: 'research.translate.reason.provider',
+  changed: 'research.translate.reason.changed',
+} as const;
 
 /** Resumen/cuerpo ingerido con traducción bajo demanda (Nico: traducir cada
  *  noticia desde la ficha y el feed). El original es inmutable: la traducción
  *  se pide al motor (cache por noticia, cadena gratuita) y se etiqueta; si
  *  no está disponible se queda el original y se muestra el motivo. */
 export function NewsSummary({ event }: { event: ResearchNewsEvent }) {
+  const t = useT();
   // El helper comparte la regla del resto de superficies: un resumen que solo
   // repite el titular no se pinta (la ingesta SEC sintética guarda
   // summary === title y pintarlo duplicaba el prefijo «TICKER »).
@@ -64,19 +65,19 @@ export function NewsSummary({ event }: { event: ResearchNewsEvent }) {
       <p className="text-sm text-gray-400">{showingTranslation ? translated : original}</p>
       {translated !== null ? (
         <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
-          <span>Traducción automática · español</span>
+          <span>{t('research.translate.autoLabel')}</span>
           <button className="min-h-11 text-teal-300 hover:text-teal-200 sm:min-h-0" type="button" onClick={() => setShowOriginal(v => !v)}>
-            {showOriginal ? 'Ver traducción' : 'Ver original'}
+            {showOriginal ? t('research.translate.viewTranslation') : t('research.translate.viewOriginal')}
           </button>
         </span>
       ) : translatable ? (
         <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
           <button className="min-h-11 text-teal-300 hover:text-teal-200 sm:min-h-0" type="button" disabled={busy} onClick={onTranslate}>
-            {busy ? 'Traduciendo…' : 'Traducir'}
+            {busy ? t('research.translate.translating') : t('research.translate.translate')}
           </button>
           {failure ? (
             <span className="text-gray-500" role="status">
-              {REASON_TEXT[failure] ?? GENERIC_FAILURE}
+              {Object.hasOwn(REASON_KEYS, failure) ? t(REASON_KEYS[failure as keyof typeof REASON_KEYS]) : t('research.translate.genericFailure')}
             </span>
           ) : null}
         </span>

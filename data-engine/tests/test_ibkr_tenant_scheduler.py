@@ -61,13 +61,19 @@ def test_schedule_is_opt_in_and_post_close_tracks_new_york_dst(monkeypatch):
     monkeypatch.setattr(settings, "ibkr_dedicated_sync_enabled", False)
     scheduler = sched.build_scheduler(background=True)
     assert scheduler.get_job("tenant_ibkr_post_close") is None
-    assert scheduler.get_job("tenant_ibkr_flex_sync").func == workers.sync_tenant_ibkr_connections.send
+    # Los crons encolan via coalesced_send (dedup "una copia en vuelo");
+    # el partial debe apuntar al actor IBKR que toca.
+    legacy = scheduler.get_job("tenant_ibkr_flex_sync").func
+    assert legacy.func is sched.coalesced_send
+    assert legacy.args == (workers.sync_tenant_ibkr_connections,)
     monkeypatch.setattr(settings, "ibkr_dedicated_sync_enabled", True)
     scheduler = sched.build_scheduler(background=True)
     morning = scheduler.get_job("tenant_ibkr_flex_sync")
     evening = scheduler.get_job("tenant_ibkr_post_close")
-    assert morning.func == workers.sync_tenant_ibkr_connections_dedicated.send
-    assert evening.func == workers.sync_tenant_ibkr_connections_dedicated.send
+    assert morning.func.func is sched.coalesced_send
+    assert morning.func.args == (workers.sync_tenant_ibkr_connections_dedicated,)
+    assert evening.func.func is sched.coalesced_send
+    assert evening.func.args == (workers.sync_tenant_ibkr_connections_dedicated,)
     for start, expected in [(datetime(2026, 7, 15, tzinfo=UTC), 22), (datetime(2026, 12, 15, tzinfo=UTC), 23)]:
         fire = evening.trigger.get_next_fire_time(None, start)
         assert fire.hour == 18

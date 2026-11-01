@@ -33,6 +33,16 @@ updates:
       time: "07:00"
       timezone: Europe/Madrid
     open-pull-requests-limit: 10
+    cooldown:
+      # Supply chain (regla dependabot-missing-cooldown): cada release nueva
+      # "hierve" una semana antes de que dependabot abra la PR, asi un paquete
+      # comprometido detectado por la comunidad no entra al dia cero.
+      # default-days subio de 3 a 7 para cumplir la regla del registry
+      # (exige >= 7; decision mia/main, reversible si la cadencia semanal
+      # resulta lenta). Las actualizaciones de SEGURIDAD no estan sujetas
+      # al cooldown.
+      default-days: 7
+      semver-major-days: 7
     groups:
       # Seguridad: una sola PR, rapida de revisar, con todo lo critico junto.
       npm-security:
@@ -54,6 +64,16 @@ updates:
       time: "07:00"
       timezone: Europe/Madrid
     open-pull-requests-limit: 10
+    cooldown:
+      # Supply chain (regla dependabot-missing-cooldown): cada release nueva
+      # "hierve" una semana antes de que dependabot abra la PR, asi un paquete
+      # comprometido detectado por la comunidad no entra al dia cero.
+      # default-days subio de 3 a 7 para cumplir la regla del registry
+      # (exige >= 7; decision mia/main, reversible si la cadencia semanal
+      # resulta lenta). Las actualizaciones de SEGURIDAD no estan sujetas
+      # al cooldown.
+      default-days: 7
+      semver-major-days: 7
     groups:
       uv-security:
         applies-to: security-updates
@@ -72,6 +92,16 @@ updates:
       time: "07:00"
       timezone: Europe/Madrid
     open-pull-requests-limit: 10
+    cooldown:
+      # Supply chain (regla dependabot-missing-cooldown): cada release nueva
+      # "hierve" una semana antes de que dependabot abra la PR, asi un paquete
+      # comprometido detectado por la comunidad no entra al dia cero.
+      # default-days subio de 3 a 7 para cumplir la regla del registry
+      # (exige >= 7; decision mia/main, reversible si la cadencia semanal
+      # resulta lenta). Las actualizaciones de SEGURIDAD no estan sujetas
+      # al cooldown.
+      default-days: 7
+      semver-major-days: 7
     groups:
       # Las actions de este repo son justo el vector de supply chain que escanea
       # sbom-scan.yml: actualizarlas de golpe y en una PR hace auditable quien

@@ -13,10 +13,17 @@ describe('analyst pagination by firm',()=>{
   expect(screen.queryByText('Firm 1')).not.toBeInTheDocument();
   expect(screen.getAllByText('Firm 6')).toHaveLength(2);
   expect(screen.getByRole('button',{name:'Siguiente'})).toBeDisabled();
-  expect(screen.getByText(/Consenso agregado de Yahoo: mediana/)).toBeInTheDocument();
+  expect(screen.getByText(/Consenso agregado de analistas: mediana/)).toBeInTheDocument();
   expect(screen.queryByText('Recorrido')).not.toBeInTheDocument();
   expect(screen.getAllByText('Potencial').length).toBeGreaterThan(0);
   fireEvent.click(screen.getByRole('button',{name:'Anterior'}));
   expect(screen.getAllByText('Firm 1')).toHaveLength(2);
+ });
+ it('sin etiqueta de fuente en el pie; se conserva la fecha y el aviso de no verificado',()=>{
+  render(<AnalystTargetsView data={data}/>);
+  expect(screen.queryByText(/Fuente:/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/ver en Yahoo Finance/)).not.toBeInTheDocument();
+  expect(screen.getByText(/Obtenido el/)).toBeInTheDocument();
+  expect(screen.getByText(/no verificado por GerarAI/)).toBeInTheDocument();
  });
 });

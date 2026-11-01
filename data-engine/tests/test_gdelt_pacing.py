@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+import uuid
 from types import SimpleNamespace
 
 import httpx
@@ -50,7 +51,46 @@ def fake_clock(monkeypatch):
         now[0] += max(0.0, seconds)
 
     monkeypatch.setattr(gdelt_mod, "asyncio", SimpleNamespace(sleep=_fake_sleep))
+
+    # Pacer por test: clave UNICA (sin fugas entre tests ni entre workers
+    # xdist en el Redis real compartido de CI), reloj de pared falso coherente
+    # con el monotonic falso y sleep async resuelto via el namespace del
+    # modulo (ya parcheado arriba). Sin esto, cool_down escribia con reloj
+    # REAL en el Redis compartido y otro test leia un cooldown ajeno
+    # (retry_after 3568s != suelo 60s, 31-oct).
+    from app.services.connectors.global_pacing import GlobalPacer
+
+    pacer_test = GlobalPacer(
+        f"gdelt-test-{uuid.uuid4().hex}",
+        min_interval_seconds=5.0,
+        redis_client_factory=gdelt_mod._gdelt_redis_client,
+        fallback_local=False,
+        wall_clock=lambda: 1_700_000_000 + now[0],
+        sleep_async=lambda seconds: gdelt_mod.asyncio.sleep(seconds),
+    )
+    monkeypatch.setattr(gdelt_mod, "_gdelt_pacer", pacer_test)
     yield now
+
+
+@pytest.fixture
+def pacer_sin_fugas(monkeypatch):
+    """Pacer aislado para los tests de pacing de CLASE (min_interval del
+    cliente): factory None -> sin esperas NI escrituras en el Redis real
+    compartido de CI (las corridas se encadenaban: la siguiente heredaba el
+    slot avanzado y se colgaba; cluster gdelt rojo, 31-oct). El pacer global
+    Redis tiene sus propios tests (test_global_pacing_*) y la integracion
+    cliente+pacer la cubren los tests de fake_clock con clave unica."""
+    import app.services.connectors.gdelt as gdelt_mod
+    from app.services.connectors.global_pacing import GlobalPacer
+
+    pacer_test = GlobalPacer(
+        f"gdelt-local-{uuid.uuid4().hex}",
+        min_interval_seconds=5.0,
+        redis_client_factory=lambda: None,
+        fallback_local=False,
+    )
+    monkeypatch.setattr(gdelt_mod, "_gdelt_pacer", pacer_test)
+    yield pacer_test
 
 
 def test_fake_clock_is_private_to_gdelt_not_the_event_loop(fake_clock):
@@ -65,7 +105,7 @@ def test_fake_clock_is_private_to_gdelt_not_the_event_loop(fake_clock):
     assert fake_clock[0] == started + 3
 
 
-def test_throttle_enforces_min_interval():
+def test_throttle_enforces_min_interval(pacer_sin_fugas):
     stub = _StubClient([_resp(200), _resp(200), _resp(200)])
     client = GDELTClient(client=stub, min_interval=0.05)
     GDELTClient._next_allowed_at = 0.0  # estado limpio para el test
@@ -79,7 +119,10 @@ def test_throttle_enforces_min_interval():
     assert all(gap >= 0.045 for gap in gaps), gaps
 
 
-def test_min_interval_zero_does_not_wait():
+def test_min_interval_zero_does_not_wait(fake_clock):
+    # fake_clock: con el Redis real de CI el pacer global (5s entre procesos)
+    # siempre espaciaria la segunda llamada; el reloj falso la hace instantanea
+    # y el assert mide solo el pacing de CLASE (min_interval=0 -> sin espera).
     stub = _StubClient([_resp(200), _resp(200)])
     client = GDELTClient(client=stub, min_interval=0)
     GDELTClient._next_allowed_at = 0.0
@@ -92,7 +135,7 @@ def test_min_interval_zero_does_not_wait():
     assert stub.calls[1] - stub.calls[0] < 0.045
 
 
-def test_throttle_holds_the_spacing_under_load():
+def test_throttle_holds_the_spacing_under_load(pacer_sin_fugas):
     """Un overrun del evento loop no debe colapsar el intervalo siguiente.
 
     The reservation used to be claimed BEFORE the sleep, so a call that woke up
@@ -135,7 +178,10 @@ def test_429_retry_after_then_success(fake_clock):
     assert fake_clock[0] - started == GDELTClient.RETRY_AFTER_FLOOR
 
 
-def test_429_retry_after_beyond_max_raises_without_retry():
+def test_429_retry_after_beyond_max_raises_without_retry(fake_clock):
+    # fake_clock: su cool_down(3600) iba al Redis compartido de CI con reloj
+    # REAL (pacer del modulo) y la corrida siguiente leia ese bloqueo ajeno
+    # (0 llamadas: subia antes de pedir). Con pacer por test no fuga.
     stub = _StubClient([_resp(429, retry_after="3600"), _resp(200, {"articles": []})])
     client = GDELTClient(client=stub, min_interval=0, max_429_retries=2)
     with pytest.raises(GdeltRateLimited) as excinfo:
@@ -209,11 +255,17 @@ def test_connector_still_degrades_other_errors():
     assert result.errors
 
 
-def test_gdelt_retry_helper_never_retries_before_the_window():
+def test_gdelt_retry_helper_never_retries_before_the_window(monkeypatch):
     """Nunca antes de la ventana real; suelo de 60s si viene 0 o ausente."""
     import dramatiq
 
     from app.workers.dramatiq_app import GDELT_RETRY_FLOOR_SECONDS, _raise_gdelt_retry
+
+    # Logica de delay pura: sin disyuntor ambiental. Con el Redis real de CI,
+    # el propio helper CUENTA cada 429 (incr) y la tercera llamada del test
+    # abria el disyuntor (racha 3) cambiando el delay al TTL de 30 min; la
+    # rama del disyuntor abierto la cubre test_gdelt_circuit.py.
+    monkeypatch.setattr("app.workers.dramatiq_app._redis_client", lambda: None)
 
     # Ventana normal: se honra exacta.
     with pytest.raises(dramatiq.Retry) as excinfo:
@@ -274,7 +326,7 @@ def test_block_for_suelo_60_en_ventana_cero():
     assert 55.0 < remaining <= GDELTClient.RETRY_AFTER_FLOOR
 
 
-def test_throttle_defiere_ventana_ip_mas_larga_que_la_corrida():
+def test_throttle_defiere_ventana_ip_mas_larga_que_la_corrida(pacer_sin_fugas):
     """Un cooldown POR IP > MAX_RETRY_AFTER no puede dormirse en el worker:
     el time_limit del actor lo mataria dentro. Sube tipada con la ventana
     restante para que el mensaje vaya a diferidos."""

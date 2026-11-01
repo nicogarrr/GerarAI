@@ -46,8 +46,12 @@ const planRoute = source('data-engine/app/api/routes/plan.py');
 
 /** Claves declaradas en un `const X: Record<string, string> = { ... };`. */
 function labelMapKeys(view: string): Set<string> {
+  // Los mapas de etiquetas viven dentro del componente (carril C: necesitan
+  // la t() del hook) o en funciones que la reciben: cierre indentado y
+  // forma `function f(...): Record<string, string> { return {...}; }`.
   const blocks = [
-    ...[...view.matchAll(/Record<string, string>\s*=\s*\{([\s\S]*?)\n\};/g)].map((match) => match[1]),
+    ...[...view.matchAll(/Record<string, string>\s*=\s*\{([\s\S]*?)\n\s*\};/g)].map((match) => match[1]),
+    ...[...view.matchAll(/Record<string, string> \{\s*return \{([\s\S]*?)\n\s*\};/g)].map((match) => match[1]),
     ...[...view.matchAll(/columnLabels=\{\{([\s\S]*?)\}\}/g)].map((match) => match[1]),
   ];
   const keys = new Set<string>();
@@ -146,7 +150,7 @@ void test('los valores anidados no se serializan como JSON crudo en la celda', (
   // `JSON.stringify` dentro de un line-clamp escondía el dato detrás de un
   // bloque de código truncado con las claves internas en crudo.
   assert.ok(!recordViews.includes('JSON.stringify(value)'));
-  assert.match(recordViews, /function describeValue\(value: unknown, depth: number\): string \{/);
+  assert.match(recordViews, /function describeValue\(value: unknown, depth: number(, t\?: TranslateFn)?\): string \{/);
   // Y lo que no cabe se cuenta, no desaparece sin aviso.
   assert.match(recordViews, /\+\$\{rest\} más/);
 });

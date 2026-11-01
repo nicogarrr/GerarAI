@@ -148,6 +148,13 @@ def test_actor_records_scheduler_run_and_error(monkeypatch):
 
     events.clear()
 
+    # El decorador de coalescencia retiene el claim ~20 h a proposito (drenado
+    # del backlog): la segunda invocacion del test necesita un claim fresco,
+    # lo mismo que el fixture autouse hace entre tests. Sin Redis es no-op.
+    from tests.conftest import reset_shared_redis_dedup_state
+
+    reset_shared_redis_dedup_state()
+
     def boom(db, **kwargs):
         raise ValueError("permanent")
 

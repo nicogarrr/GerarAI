@@ -1,16 +1,21 @@
+import logging
 import math
 from datetime import date
 from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Annotated, Literal
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, selectinload
 from starlette.concurrency import run_in_threadpool
 
+from app.core.cache import invalidate_market_data_cache, invalidate_portfolio_cache
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.errors import safe_detail
 from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.core.ui_errors import ui_error
@@ -20,11 +25,43 @@ from app.models import (
     FundamentalModelVersion,
     FXRate,
     MarketPrice,
+    Portfolio,
+    PortfolioDailySnapshot,
     Position,
     ThesisVersion,
     Transaction,
 )
+from app.schemas.api import (
+    CashBalanceOut,
+    FXRateOut,
+    PortfolioConfigurationOut,
+    PortfolioConfigurationUpdateOut,
+    PortfolioDataQualityOut,
+    PortfolioDividendProjectionOut,
+    PortfolioDividendSyncOut,
+    PortfolioDividendYieldsOut,
+    PortfolioForecastOut,
+    PortfolioIbkrCsvImportOut,
+    PortfolioIbkrImportOut,
+    PortfolioIbkrXmlImportOut,
+    PortfolioImportCommitOut,
+    PortfolioIntelligenceOut,
+    PortfolioPositionItemOut,
+    PortfolioPriceUpdateOut,
+    PortfolioRefreshMarketOut,
+    PortfolioRiskMatrixOut,
+    PortfolioSnapshotCaptureOut,
+    PortfolioSnapshotOut,
+    PortfolioSummaryOut,
+    PortfolioTearsheetOut,
+    PortfolioTransactionBatchOut,
+    PortfolioTransactionCreateOut,
+    PortfolioTransactionOut,
+    PortfolioTransactionPageOut,
+)
+from app.schemas.pagination import PageInfo, PaginatedResponse
 from app.services.async_bridge import run_from_any_context
+from app.services.audit_service import record_audit_event
 from app.services.company_resolver import resolve_company
 from app.services.connectors.ibkr import IBKRFlexClient
 from app.services.dividend_ingestion_service import DividendIngestionService
@@ -41,25 +78,38 @@ from app.services.portfolio_ledger_service import (
     ValuationHeldError,
 )
 from app.services.portfolio_snapshot_service import PortfolioSnapshotService
-from app.services.risk_service import RiskService
 from app.services.tax_report_service import (
     CASH_UNIT_QUANTITIES,
     ZERO_COST_REVIEW_LABEL,
     is_zero_cost_buy,
 )
 from app.services.tearsheet_service import TearsheetService
+from app.services.thesis_pdf_service import export_portfolio_pdf_report
 from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
+from app.services.transaction_import_service import (
+    MAX_IMPORT_BYTES,
+    TransactionImportCommitRequest,
+    TransactionImportPreviewResponse,
+    TransactionImportService,
+)
 from app.valuation.currency import canonical_currency_code
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
+# Un extracto Flex anual completo cabe con mucho en 15 MB; sin tope, un body
+# gigante se parsea entero en memoria (mismo vector que /import/file).
+MAX_IBKR_IMPORT_BYTES = 15 * 1024 * 1024
+
+
 class IBKRXmlImportRequest(BaseModel):
-    xml: str = Field(min_length=20)
+    xml: str = Field(min_length=20, max_length=MAX_IBKR_IMPORT_BYTES)
 
 
 class IBKRCsvImportRequest(BaseModel):
-    csv: str = Field(min_length=10)
+    csv: str = Field(min_length=10, max_length=MAX_IBKR_IMPORT_BYTES)
 
 
 # Umbral fiscal: más de 365 días en cartera = largo plazo.
@@ -229,6 +279,11 @@ class PortfolioPriceInput(BaseModel):
     _as_of_not_future = field_validator("as_of")(_not_in_the_future)
 
 
+class CreatePortfolioInput(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    base_currency: str = Field(default="EUR", min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")
+
+
 class PortfolioConfigurationInput(BaseModel):
     base_currency: str = Field(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")
 
@@ -261,9 +316,106 @@ def _transaction_payload(transaction: Transaction, company: Company) -> dict:
     }
 
 
-@router.get("/summary")
+@router.get("", response_model=None)
+@router.get("/", response_model=None)
+def list_portfolios(db: Session = Depends(get_db)) -> list[dict]:
+    tenant_id = db.info.get("tenant_id")
+    query = select(Portfolio)
+    if tenant_id is not None:
+        query = query.where(Portfolio.tenant_id == tenant_id)
+    portfolios = list(db.scalars(query.order_by(Portfolio.id)).all())
+    return [
+        {
+            "id": p.id,
+            "name": p.name,
+            "base_currency": p.base_currency,
+            "is_default": p.is_default,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+        for p in portfolios
+    ]
+
+
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=None)
+@router.post("/", status_code=status.HTTP_201_CREATED, response_model=None)
+def create_portfolio(
+    body: CreatePortfolioInput,
+    db: Session = Depends(get_db),
+) -> dict:
+    tenant_id = db.info.get("tenant_id")
+    clean_name = body.name.strip()
+    clean_currency = body.base_currency.strip().upper()
+
+    existing_query = select(Portfolio).where(Portfolio.name == clean_name)
+    if tenant_id is not None:
+        existing_query = existing_query.where(Portfolio.tenant_id == tenant_id)
+
+    existing = db.scalars(existing_query).first()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe una cartera con este nombre para el usuario.",
+        )
+
+    portfolio = Portfolio(
+        name=clean_name,
+        base_currency=clean_currency,
+        is_default=False,
+    )
+    if tenant_id is not None:
+        portfolio.tenant_id = tenant_id
+
+    db.add(portfolio)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe una cartera con este nombre para el usuario.",
+        ) from exc
+
+    db.refresh(portfolio)
+    record_audit_event(
+        db,
+        action="portfolio_created",
+        resource_type="portfolio",
+        resource_id=str(portfolio.id),
+        after_state={"name": portfolio.name, "base_currency": portfolio.base_currency},
+    )
+    db.commit()
+    return {
+        "id": portfolio.id,
+        "name": portfolio.name,
+        "base_currency": portfolio.base_currency,
+        "is_default": portfolio.is_default,
+        "created_at": portfolio.created_at.isoformat() if portfolio.created_at else None,
+    }
+
+
+@router.get("/{portfolio_id}/pdf")
+def portfolio_pdf_export(portfolio_id: int, db: Session = Depends(get_db)) -> Response:
+    """Exporta el informe consolidado de la cartera y sus posiciones a formato PDF."""
+    try:
+        content, filename = export_portfolio_pdf_report(db, portfolio_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/summary", response_model=PortfolioSummaryOut)
 def portfolio_summary(db: Session = Depends(get_db)) -> dict:
-    risk = RiskService().dashboard(db)
+    # Cache Redis de 10 min por tenant (categoria portfolio_valuation): se
+    # invalida por eventos ORM al escribir posiciones/transacciones/caja/FX y
+    # de forma explicita tras PATCH /prices y POST /refresh-market.
+    from app.services.cached_portfolio_valuation import risk_dashboard
+
+    risk = risk_dashboard(db)
     return {
         "total_value": risk["total_value"],
         "equity_value": risk["equity_value"],
@@ -286,7 +438,7 @@ def portfolio_summary(db: Session = Depends(get_db)) -> dict:
     }
 
 
-@router.get("/intelligence")
+@router.get("/intelligence", response_model=PortfolioIntelligenceOut, response_model_exclude_unset=True)
 def portfolio_intelligence(
     years: int = Query(default=5, ge=1, le=20),
     db: Session = Depends(get_db),
@@ -294,39 +446,79 @@ def portfolio_intelligence(
     return PortfolioIntelligenceService().build(db, years=years)
 
 
-@router.get("/data-quality")
+@router.get("/risk-matrix", response_model=PortfolioRiskMatrixOut, response_model_exclude_unset=True)
+def portfolio_risk_matrix(db: Session = Depends(get_db)) -> dict:
+    from app.services.portfolio_risk_matrix_service import PortfolioRiskMatrixService
+
+    return PortfolioRiskMatrixService().build(db)
+
+
+@router.get("/data-quality", response_model=PortfolioDataQualityOut, response_model_exclude_unset=True)
 def portfolio_data_quality(db: Session = Depends(get_db)) -> dict:
     from app.services.portfolio_quality_service import portfolio_quality
     return portfolio_quality(db)
 
 
-@router.get("/snapshots")
+def _snapshot_payload(snapshot: PortfolioDailySnapshot) -> dict:
+    return {
+        "id": snapshot.id,
+        "portfolio_id": snapshot.portfolio_id,
+        "snapshot_date": snapshot.snapshot_date,
+        "base_currency": snapshot.base_currency,
+        "positions_value_base": snapshot.positions_value_base,
+        "cash_value_base": snapshot.cash_value_base,
+        "total_value_base": snapshot.total_value_base,
+        "net_external_flow_base": snapshot.net_external_flow_base,
+        "daily_return": snapshot.daily_return,
+        "cumulative_twr": snapshot.cumulative_twr,
+        "pricing_coverage": snapshot.pricing_coverage,
+        "source": snapshot.source,
+        "metadata": snapshot.metadata_,
+    }
+
+
+@router.get("/snapshots", response_model=PaginatedResponse[PortfolioSnapshotOut])
 def portfolio_snapshots(
     start: date | None = None,
-    limit: int = Query(default=1000, ge=1, le=5000),
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=200)] = 20,
+    limit: Annotated[int | None, Query(ge=1, le=2000)] = None,
+    offset: Annotated[int | None, Query(ge=0)] = None,
     db: Session = Depends(get_db),
-) -> list[dict]:
-    return [
-        {
-            "id": snapshot.id,
-            "portfolio_id": snapshot.portfolio_id,
-            "snapshot_date": snapshot.snapshot_date,
-            "base_currency": snapshot.base_currency,
-            "positions_value_base": snapshot.positions_value_base,
-            "cash_value_base": snapshot.cash_value_base,
-            "total_value_base": snapshot.total_value_base,
-            "net_external_flow_base": snapshot.net_external_flow_base,
-            "daily_return": snapshot.daily_return,
-            "cumulative_twr": snapshot.cumulative_twr,
-            "pricing_coverage": snapshot.pricing_coverage,
-            "source": snapshot.source,
-            "metadata": snapshot.metadata_,
-        }
-        for snapshot in PortfolioSnapshotService().history(db, start=start, limit=limit)
+) -> dict:
+    # Contrato dual aditivo como en /positions (ver list_fx_rates).
+    service = PortfolioSnapshotService()
+    total = service.count_history(db, start=start)
+    if limit is not None:
+        exact_offset = offset or 0
+        items = [
+            _snapshot_payload(snapshot)
+            for snapshot in service.history(db, start=start, page_size=limit, offset=exact_offset)
+        ]
+        # page_info de la ventana real (has_next/has_prev del offset exacto,
+        # no de la division entera), como en /positions.
+        page_info = PageInfo(
+            page=exact_offset // limit + 1,
+            page_size=limit,
+            total_items=total,
+            total_pages=(total + limit - 1) // limit if limit > 0 else 0,
+            has_next=exact_offset + len(items) < total,
+            has_prev=exact_offset > 0,
+        )
+        return PaginatedResponse(items=items, page_info=page_info).model_dump()
+    if offset:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El parámetro offset solo tiene efecto junto a limit.",
+        )
+    items = [
+        _snapshot_payload(snapshot)
+        for snapshot in service.history(db, start=start, page=page, page_size=page_size)
     ]
+    return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
-@router.post("/snapshots/capture")
+@router.post("/snapshots/capture", response_model=PortfolioSnapshotCaptureOut)
 def capture_portfolio_snapshot(
     as_of: date | None = None,
     db: Session = Depends(get_db),
@@ -428,7 +620,7 @@ def _fx_source(db: Session, base_currency: str) -> dict:
     }
 
 
-@router.get("/configuration")
+@router.get("/configuration", response_model=PortfolioConfigurationOut)
 def portfolio_configuration(db: Session = Depends(get_db)) -> dict:
     portfolio = PortfolioFXService().portfolio(db)
     base_currency = portfolio.base_currency if portfolio else "EUR"
@@ -444,7 +636,7 @@ def portfolio_configuration(db: Session = Depends(get_db)) -> dict:
     }
 
 
-@router.put("/configuration")
+@router.put("/configuration", response_model=PortfolioConfigurationUpdateOut)
 def update_portfolio_configuration(
     payload: PortfolioConfigurationInput,
     db: Session = Depends(get_db),
@@ -472,13 +664,31 @@ def update_portfolio_configuration(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/fx-rates")
+@router.get("/fx-rates", response_model=PaginatedResponse[FXRateOut])
 def list_fx_rates(
-    limit: Annotated[int, Query(ge=1, le=2000)] = 500,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=200)] = 20,
+    limit: Annotated[int | None, Query(ge=1, le=2000)] = None,
+    offset: Annotated[int | None, Query(ge=0)] = None,
     db: Session = Depends(get_db),
-) -> list[dict]:
-    return [
+) -> dict:
+    # Contrato dual aditivo como en /positions: limit/offset (paginateAll del
+    # indice de /research) tiene precedencia; antes se descartaba en silencio.
+    use_window = limit is not None
+    if use_window:
+        page_size = limit
+        offset = offset or 0
+    elif offset:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El parámetro offset solo tiene efecto junto a limit.",
+        )
+    else:
+        offset = (page - 1) * page_size
+    total = db.scalar(
+        select(func.count()).select_from(FXRate).where(*tenant_filters(db, FXRate))
+    ) or 0
+    items = [
         {
             "id": row.id,
             "base_currency": row.base_currency,
@@ -490,13 +700,26 @@ def list_fx_rates(
         for row in db.scalars(
             select(FXRate)
             .order_by(desc(FXRate.rate_date), FXRate.base_currency, FXRate.quote_currency)
-            .limit(limit)
+            .limit(page_size)
             .offset(offset)
         ).all()
     ]
+    if use_window:
+        # page_info de la ventana real: con offset>0 la pagina derivada
+        # mentia (siempre page=1) y has_next salia de la division entera.
+        page_info = PageInfo(
+            page=offset // limit + 1,
+            page_size=limit,
+            total_items=total,
+            total_pages=(total + limit - 1) // limit if limit > 0 else 0,
+            has_next=offset + len(items) < total,
+            has_prev=offset > 0,
+        )
+        return PaginatedResponse(items=items, page_info=page_info).model_dump()
+    return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
-@router.post("/fx-rates", status_code=201)
+@router.post("/fx-rates", status_code=201, response_model=FXRateOut)
 def upsert_fx_rate(payload: FXRateInput, db: Session = Depends(get_db)) -> dict:
     service = PortfolioFXService()
     ledger = PortfolioLedgerService()
@@ -531,7 +754,7 @@ def upsert_fx_rate(payload: FXRateInput, db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/dividends/sync")
+@router.post("/dividends/sync", response_model=PortfolioDividendSyncOut, response_model_exclude_unset=True)
 async def sync_portfolio_dividends(db: Session = Depends(get_db)) -> dict:
     """Ingest declared dividends for every held company from the data provider.
 
@@ -546,7 +769,7 @@ async def sync_portfolio_dividends(db: Session = Depends(get_db)) -> dict:
     )
 
 
-@router.get("/dividends")
+@router.get("/dividends", response_model=PortfolioDividendYieldsOut)
 def portfolio_dividends(db: Session = Depends(get_db)) -> dict:
     """Trailing-12-month declared dividend yield per position and portfolio.
 
@@ -556,7 +779,7 @@ def portfolio_dividends(db: Session = Depends(get_db)) -> dict:
     return DividendIngestionService().portfolio_yields(db)
 
 
-@router.get("/dividends/projection")
+@router.get("/dividends/projection", response_model=PortfolioDividendProjectionOut, response_model_exclude_unset=True)
 def portfolio_dividend_projection(
     months: Annotated[int, Query(ge=1, le=24)] = 12,
     db: Session = Depends(get_db),
@@ -570,7 +793,7 @@ def portfolio_dividend_projection(
     return DividendProjectionService().project(db, months=months)
 
 
-@router.get("/tearsheet")
+@router.get("/tearsheet", response_model=PortfolioTearsheetOut, response_model_exclude_unset=True)
 def portfolio_tearsheet(db: Session = Depends(get_db)) -> dict:
     """Tearsheet del portfolio: Sharpe, Sortino, drawdown, win rate y exposición.
 
@@ -581,18 +804,46 @@ def portfolio_tearsheet(db: Session = Depends(get_db)) -> dict:
     return TearsheetService().build(db)
 
 
-@router.get("/positions")
+@router.get("/positions", response_model=PaginatedResponse[PortfolioPositionItemOut], response_model_exclude_unset=True)
 def positions(
-    limit: Annotated[int, Query(ge=1, le=2000)] = 500,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=200)] = 20,
+    limit: Annotated[int | None, Query(ge=1, le=2000)] = None,
+    offset: Annotated[int | None, Query(ge=0)] = None,
     db: Session = Depends(get_db),
-) -> list[dict]:
+) -> dict:
+    # Contrato dual (aditivo): page/page_size es el estilo documentado y
+    # limit/offset el que usa el indice de /research via paginateAll
+    # (?limit=2000&offset=N). Antes solo existian page/page_size y FastAPI
+    # descartaba limit/offset en silencio: cualquier tenant con mas de 20
+    # posiciones recibia solo la primera pagina rotulada como completa.
+    # limit/offset tiene precedencia cuando se pasa `limit`.
+    if limit is not None:
+        page_size = limit
+        offset_val = offset or 0
+        page = offset_val // limit + 1
+    elif offset:
+        # offset sin limit no significa nada en el contrato page/page_size:
+        # mejor un 422 explicito que ignorarlo en silencio (y un entero
+        # enorme no llega nunca a la BD; tests/test_huge_integer_params.py).
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El parámetro offset solo tiene efecto junto a limit.",
+        )
+    else:
+        offset_val = (page - 1) * page_size
+    total = db.scalar(
+        select(func.count())
+        .select_from(Position)
+        .join(Company, Position.company_id == Company.id)
+        .where(*tenant_filters(db, Position))
+    ) or 0
     rows = db.execute(
         select(Position, Company)
         .join(Company, Position.company_id == Company.id)
         .order_by(Company.ticker)
-        .limit(limit)
-        .offset(offset)
+        .limit(page_size)
+        .offset(offset_val)
     ).all()
     fiscal = _fiscal_info_batch(db, _holding_as_of(db, rows))
     analysis_states = tracked_statuses(db, [company.ticker for _, company in rows])
@@ -688,8 +939,23 @@ def positions(
         )
         if company.id in trade_price_fallbacks:
             payloads[-1].update(dict.fromkeys(_QUOTE_MISSING_PNL_KEYS))
-    return [mask_cost_under_review(payload, cost_checks.get(position.id))
+    items = [mask_cost_under_review(payload, cost_checks.get(position.id))
             for payload, (position, _) in zip(payloads, rows, strict=True)]
+    if limit is not None:
+        # Con limit/offset la ventana no tiene por que alinearse con paginas
+        # enteras: has_next/has_prev se derivan de la ventana real, no de la
+        # division entera (offset 19 con limit 10 y total 25 -> 6 items y
+        # has_next False; la pagina derivada daria True).
+        page_info = PageInfo(
+            page=offset_val // limit + 1,
+            page_size=limit,
+            total_items=total,
+            total_pages=(total + limit - 1) // limit if limit > 0 else 0,
+            has_next=offset_val + len(items) < total,
+            has_prev=offset_val > 0,
+        )
+        return PaginatedResponse(items=items, page_info=page_info).model_dump()
+    return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
 def _trade_filters(ticker: str | None, action: str | None) -> list:
@@ -701,27 +967,45 @@ def _trade_filters(ticker: str | None, action: str | None) -> list:
 
 
 def _list_trades(db: Session, limit: int, offset: int, ticker: str | None = None, action: str | None = None) -> list[dict]:
-    rows = db.execute(
-        select(Transaction, Company)
+    rows = db.scalars(
+        select(Transaction)
         .join(Company, Transaction.company_id == Company.id)
-        .where(*_trade_filters(ticker, action))
+        .where(*_trade_filters(ticker, action), *tenant_filters(db, Transaction))
+        .options(selectinload(Transaction.company))
         .order_by(desc(Transaction.trade_date), desc(Transaction.created_at), desc(Transaction.id))
         .limit(limit)
         .offset(offset)
     ).all()
-    return [_transaction_payload(transaction, company) for transaction, company in rows]
+    return [_transaction_payload(transaction, transaction.company) for transaction in rows]
 
 
-@router.get("/transactions")
+@router.get("/transactions", response_model=PaginatedResponse[PortfolioTransactionOut])
 def transactions(
-    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=200)] = 20,
+    ticker: Annotated[str | None, Query(max_length=32)] = None,
+    action: Annotated[Literal["buy", "sell"] | None, Query()] = None,
+    offset: Annotated[int | None, Query(ge=0)] = None,
     db: Session = Depends(get_db),
-) -> list[dict]:
-    return _list_trades(db, limit, offset)
+) -> dict:
+    if offset:
+        # /transactions usa page/page_size (el listado limit/offset vive en
+        # /transactions/page): offset suelto se rechaza en vez de ignorarlo.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El parámetro offset no aplica aquí; usa /transactions/page o page/page_size.",
+        )
+    offset = (page - 1) * page_size
+    total = db.scalar(
+        select(func.count()).select_from(Transaction)
+        .join(Company, Transaction.company_id == Company.id)
+        .where(*_trade_filters(ticker, action), *tenant_filters(db, Transaction))
+    ) or 0
+    items = _list_trades(db, page_size, offset, ticker, action)
+    return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
-@router.get("/transactions/page")
+@router.get("/transactions/page", response_model=PortfolioTransactionPageOut)
 def transactions_page(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
@@ -740,7 +1024,15 @@ def transactions_page(
     }
 
 
-@router.post("/transactions", status_code=201)
+@router.post("/add", status_code=201, response_model=PortfolioTransactionCreateOut)
+def add_portfolio_transaction(
+    payload: PortfolioTransactionInput, db: Session = Depends(get_db)
+) -> dict:
+    """Añade una transacción/posición a la cartera (alias para contratos de API)."""
+    return create_transaction(payload, db)
+
+
+@router.post("/transactions", status_code=201, response_model=PortfolioTransactionCreateOut)
 def create_transaction(
     payload: PortfolioTransactionInput, db: Session = Depends(get_db)
 ) -> dict:
@@ -829,7 +1121,192 @@ def _reject_noncanonical_cash_row(payload: PortfolioTransactionInput) -> None:
         )
 
 
-@router.put("/transactions/{transaction_id}")
+
+class PortfolioTransactionBatchInput(BaseModel):
+    transactions: list[PortfolioTransactionInput] = Field(min_length=1, max_length=1000)
+
+
+@router.post("/transactions/batch", status_code=201, response_model=PortfolioTransactionBatchOut)
+def create_transaction_batch(
+    payload: PortfolioTransactionBatchInput, db: Session = Depends(get_db)
+) -> dict:
+    """Bulk transaction creation with atomic commit.
+    
+    All transactions are validated before any are inserted. If any transaction
+    fails validation or causes a ledger error (oversell, mixed currency), the
+    entire batch is rolled back.
+    
+    Returns the count of created transactions and their IDs.
+    """
+    service = PortfolioLedgerService()
+    
+    # Step 1: Validate all transactions upfront
+    for i, tx_input in enumerate(payload.transactions):
+        try:
+            _reject_noncanonical_cash_row(tx_input)
+        except HTTPException as exc:
+            db.rollback()
+            raise HTTPException(
+                status_code=400,
+                detail=f"Transaction {i}: {exc.detail}"
+            ) from exc
+    
+    # Step 2: Insert all transactions without rebuilding positions (for performance)
+    created_transactions: list[tuple[Transaction, Company]] = []
+    company_ids_for_rebuild: set[int] = set()
+    company_ids_for_analysis: set[int] = set()
+    company_ids_for_backfill: set[int] = set()
+    
+    try:
+        portfolio = service.fx.ensure_portfolio(db)
+        
+        for i, tx_input in enumerate(payload.transactions):
+            try:
+                # Validate and create company
+                company = service.ensure_company(db, tx_input.ticker)
+                normalized_action = tx_input.action.lower()
+                
+                # Validation checks (from PortfolioLedgerService.create_transaction)
+                if normalized_action in {"buy", "sell"}:
+                    snapshot_position = db.scalar(
+                        select(Position).where(
+                            Position.company_id == company.id,
+                            *tenant_filters(db, Position),
+                            Position.source == "screenshot_confirmed",
+                        )
+                    )
+                    if snapshot_position is not None:
+                        raise ValueError(
+                            "Esta posición procede de una captura sin historial. "
+                            "Importa primero el fichero del bróker para conciliar antes de añadir compras o ventas"
+                        )
+                
+                # Oversell validation for sells
+                if normalized_action == "sell":
+                    held = service._held_quantity(db, company.id)
+                    if tx_input.quantity > held:
+                        raise PortfolioOversellError(
+                            f"Cannot sell {tx_input.quantity} {tx_input.ticker.upper()}: only {held} shares are "
+                            "available on the ledger."
+                        )
+                
+                # Create transaction without rebuilding position
+                transaction = Transaction(
+                    portfolio_id=portfolio.id,
+                    company_id=company.id,
+                    trade_date=tx_input.trade_date,
+                    action=normalized_action,
+                    quantity=tx_input.quantity,
+                    price=tx_input.price,
+                    fees=tx_input.fees,
+                    currency=canonical_currency_code(tx_input.currency),
+                    external_id=f"manual-{uuid4().hex}",
+                    raw_payload={"notes": tx_input.notes} if tx_input.notes else {},
+                )
+                db.add(transaction)
+                db.flush()
+                
+                created_transactions.append((transaction, company))
+                company_ids_for_rebuild.add(company.id)
+                
+                # Track companies for post-processing
+                if normalized_action in {"buy", "sell"}:
+                    company_ids_for_analysis.add(company.id)
+                if normalized_action == "buy":
+                    company_ids_for_backfill.add(company.id)
+                    
+            except (PortfolioOversellError, PortfolioMixedCurrencyError, ValueError) as exc:
+                db.rollback()
+                if isinstance(exc, PortfolioOversellError):
+                    status_code = 409
+                elif isinstance(exc, PortfolioMixedCurrencyError):
+                    status_code = 422
+                else:
+                    status_code = 400
+                raise HTTPException(
+                    status_code=status_code,
+                    detail=f"Transaction {i} ({tx_input.ticker} {tx_input.action}): {str(exc)}"
+                ) from exc
+        
+        # Step 3: Rebuild positions once per company (batch optimization)
+        for company_id in company_ids_for_rebuild:
+            service.rebuild_position(db, company_id)
+        
+        # Enqueue fundamentals seed for new companies
+        from app.services.fundamentals_seed_service import enqueue_fundamentals_seed
+        for transaction, company in created_transactions:
+            try:
+                enqueue_fundamentals_seed(db, company.ticker)
+            except Exception:  # noqa: BLE001
+                # Nunca bloquear el lote por un fallo de la cola de seeds,
+                # pero dejar rastro: un fallo silencioso deja empresas sin fundamentales.
+                logger.warning(
+                    "No se pudo encolar fundamentals seed para %s; el lote continua",
+                    company.ticker,
+                    exc_info=True,
+                )
+        
+        # Commit the batch
+        db.commit()
+        
+        # Step 4: Refresh all created transactions
+        for transaction, _ in created_transactions:
+            db.refresh(transaction)
+        
+        # Step 5: Post-processing (journal links and analysis queue)
+        if company_ids_for_analysis:
+            try:
+                from app.services.journal_trade_link import auto_link_journal_trades_best_effort
+                auto_link_journal_trades_best_effort(db, company_ids_for_analysis)
+            except Exception:
+                db.rollback()
+        
+        if company_ids_for_backfill:
+            try:
+                from app.services.market_close_sync import enqueue_price_backfills
+                tenant_id = db.info["tenant_id"] if type(db.info.get("tenant_id")) is int else None
+                user_id = str(db.info["user_id"]) if db.info.get("user_id") else None
+                
+                # Batch all company IDs into a single call for better performance
+                enqueue_price_backfills(
+                    db,
+                    list(company_ids_for_backfill),
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                )
+            except Exception:  # noqa: BLE001
+                db.rollback()
+        
+        # Enqueue analysis for buy transactions
+        for company_id in company_ids_for_backfill:
+            try:
+                company = db.get(Company, company_id)
+                if company:
+                    enqueue_tracked_analysis(db, company.ticker)
+            except Exception:
+                db.rollback()
+        
+        # Return summary and transaction details
+        return {
+            "created": len(created_transactions),
+            "transaction_ids": [tx.id for tx, _ in created_transactions],
+            "transactions": [
+                _transaction_payload(transaction, company)
+                for transaction, company in created_transactions
+            ],
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=safe_detail(exc, 500)
+        ) from exc
+
+
+@router.put("/transactions/{transaction_id}", response_model=PortfolioTransactionOut)
 def update_transaction(
     transaction_id: int,
     payload: PortfolioTransactionInput,
@@ -933,7 +1410,7 @@ def delete_holding(ticker: str, db: Session = Depends(get_db)) -> None:
     db.commit()
 
 
-@router.patch("/prices")
+@router.patch("/prices", response_model=PortfolioPriceUpdateOut)
 def update_price(payload: PortfolioPriceInput, db: Session = Depends(get_db)) -> dict:
     company = resolve_company(db, payload.ticker)
     if not company:
@@ -943,6 +1420,9 @@ def update_price(payload: PortfolioPriceInput, db: Session = Depends(get_db)) ->
             db, company_id=company.id, price=payload.price, as_of=payload.as_of
         )
         db.commit()
+        # Precio manual: limpia valoraciones y lectores de mercado cacheados.
+        invalidate_portfolio_cache(db=db)
+        invalidate_market_data_cache()
         return {"ticker": company.ticker, "market_price": float(position.market_price)}
     except ValuationHeldError as exc:
         db.rollback()
@@ -952,7 +1432,7 @@ def update_price(payload: PortfolioPriceInput, db: Session = Depends(get_db)) ->
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/refresh-market")
+@router.post("/refresh-market", response_model=PortfolioRefreshMarketOut, response_model_exclude_unset=True)
 def refresh_portfolio_market_data(
     as_of: date | None = None,
     db: Session = Depends(get_db),
@@ -970,7 +1450,7 @@ def refresh_portfolio_market_data(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/cash")
+@router.get("/cash", response_model=list[CashBalanceOut])
 def cash(db: Session = Depends(get_db)) -> list[dict]:
     return [
         {
@@ -998,7 +1478,7 @@ def _require_ibkr_owner(db: Session):
     return settings
 
 
-@router.post("/import/ibkr")
+@router.post("/import/ibkr", response_model=PortfolioIbkrImportOut, response_model_exclude_unset=True)
 async def import_ibkr(db: Session = Depends(get_db)) -> dict:
     # _require_ibkr_owner y la importacion del XML son sqlalchemy/parseo
     # sincronos: hilo del pool. fetch_latest_xml es red async y se queda.
@@ -1024,7 +1504,7 @@ async def import_ibkr(db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/import/ibkr/xml")
+@router.post("/import/ibkr/xml", response_model=PortfolioIbkrXmlImportOut)
 def import_ibkr_xml(payload: IBKRXmlImportRequest, db: Session = Depends(get_db)) -> dict:
     settings = _require_ibkr_owner(db)
     try:
@@ -1035,11 +1515,73 @@ def import_ibkr_xml(payload: IBKRXmlImportRequest, db: Session = Depends(get_db)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/import/ibkr/csv")
+@router.post("/import/ibkr/csv", response_model=PortfolioIbkrCsvImportOut)
 def import_ibkr_csv(payload: IBKRCsvImportRequest, db: Session = Depends(get_db)) -> dict:
     try:
         return IBKRImportService().import_ibkr_csv(db, payload.csv)
     except IBKRImportError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class CsvPreviewRequest(BaseModel):
+    # Tope duro: el preview parsea el contenido entero en memoria.
+    content: str = Field(max_length=MAX_IMPORT_BYTES)
+    filename: str = "import.csv"
+    column_mapping: dict[str, str] | None = None
+
+
+@router.post("/import/preview", response_model=TransactionImportPreviewResponse)
+def preview_transaction_import(
+    payload: CsvPreviewRequest,
+) -> TransactionImportPreviewResponse:
+    """Valida un archivo CSV o texto tabular y devuelve informe previo con errores y mapeo detectado."""
+    try:
+        service = TransactionImportService()
+        return service.preview_import(
+            file_bytes=payload.content.encode("utf-8"),
+            filename=payload.filename,
+            custom_mapping=payload.column_mapping,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/import/commit", response_model=PortfolioImportCommitOut)
+def commit_transaction_import(
+    payload: TransactionImportCommitRequest,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Inserta atómicamente el lote de transacciones validadas en la cartera."""
+    try:
+        service = TransactionImportService()
+        return service.commit_import(db, payload.transactions, source_filename=payload.source_filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/import/file", response_model=TransactionImportPreviewResponse)
+async def upload_transaction_import_file(
+    file: UploadFile = File(...),
+) -> TransactionImportPreviewResponse:
+    """Sube un archivo CSV o Excel (.xlsx) y realiza la validación previa de transacciones."""
+    # Lectura acotada en bloques (como knowledge/sources): un upload sin tope
+    # agotaria la memoria del worker con un solo archivo grande.
+    content = bytearray()
+    while chunk := await file.read(1024 * 1024):
+        content.extend(chunk)
+        if len(content) > MAX_IMPORT_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"El archivo supera el máximo de {MAX_IMPORT_BYTES // (1024 * 1024)} MB para importación",
+            )
+    content = bytes(content)
+    try:
+        service = TransactionImportService()
+        return service.preview_import(
+            file_bytes=content,
+            filename=file.filename or "uploaded.csv",
+        )
+    except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -1168,7 +1710,7 @@ def _intrinsic_for_comparison(
     return None, "legacy_basis_unverified"
 
 
-@router.get("/forecast")
+@router.get("/forecast", response_model=PortfolioForecastOut)
 def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
     """Prevision de rentabilidad de la cartera desde el valor intrinseco.
 

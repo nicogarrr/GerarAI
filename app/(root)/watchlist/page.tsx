@@ -3,12 +3,12 @@ import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { TrackedAnalysisStatus } from '@/components/common/TrackedAnalysisStatus';
 import type { TrackedAnalysisStatus as AnalysisStatus } from '@/lib/tracked-analysis-status';
 import type { Metadata } from 'next';
-import { formatMarketCap, formatMarketDate, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
+import { getFormat, getLocale, getT } from '@/lib/i18n/server';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { getWatchlistState, getWatchlistEntryData, getWatchlistMonitor, type WatchlistEntryData, type WatchlistMonitorItem } from '@/lib/actions/watchlist.actions';
 import { getResearchCompaniesBasics, getResearchCompanyBasics, type ResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
 import { getProfile } from '@/lib/actions/finnhub.actions';
-import { isTickerNotFound, NOT_FOUND_LABEL, NOT_FOUND_TITLE } from '@/lib/watchlist/lookup-status';
+import { isTickerNotFound } from '@/lib/watchlist/lookup-status';
 import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
@@ -39,11 +39,10 @@ import {
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-    title: 'Watchlist',
-    description:
-        'Seguimiento detallado de los símbolos que sigues: precio, cambio de sesión, market cap y PER de cada uno.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getT();
+    return { title: 'Watchlist', description: t('watchlist.page.metaDescription') };
+}
 
 interface WatchlistStock {
     analysis?: AnalysisStatus | null;
@@ -58,6 +57,7 @@ interface WatchlistStock {
     peRatio: number | null;
     peKind: 'ttm' | 'fy' | null;
     peSource: string | null;
+    peSourceLabel: string | null;
     priceKind: 'live' | 'close' | null;
     priceAsOf: string | null;
     metricsNotApplicable: boolean;
@@ -85,6 +85,9 @@ export default async function WatchlistPage({
     // userId para el alta de «Registrar compra» (misma sesión cacheada por
     // petición que usan las acciones de esta página).
     const { id: userId } = await requireAuthenticatedUser();
+    // Idioma elegido en Ajustes: textos y formatos (fechas, números) por locale.
+    const [t, locale] = await Promise.all([getT(), getLocale()]);
+    const { formatMarketCap, formatMarketDate, formatNumber, formatPercent, formatPrice, na: NA } = await getFormat();
     // A9: tipos de la cartera para convertir el objetivo de analistas de un ADR
     // (USD) a la divisa de la fila, como ya hace Cartera.
     const [{ items: watchlistItems, unavailable }, query, { fxRates, baseCurrency }] = await Promise.all([getWatchlistState(), searchParams, getPortfolioFxContext(userId)]);
@@ -101,8 +104,8 @@ export default async function WatchlistPage({
     const sort: SortKey = (SORT_KEYS as readonly string[]).includes(query.sort ?? '') ? (query.sort as SortKey) : 'added';
     const dir: 'asc' | 'desc' = query.dir === 'asc' ? 'asc' : 'desc';
     const SORT_LABELS: Record<SortKey, string> = {
-        added: 'Recientes', symbol: 'Símbolo', price: 'Precio', change: 'Cambio sesión',
-        marketCap: 'Capitalización', pe: 'PER', earnings: 'Próx. resultados',
+        added: t('watchlist.page.sort.added'), symbol: t('watchlist.page.sort.symbol'), price: t('watchlist.page.sort.price'), change: t('watchlist.page.sort.change'),
+        marketCap: t('watchlist.page.sort.marketCap'), pe: t('watchlist.page.sort.pe'), earnings: t('watchlist.page.sort.earnings'),
     };
     // Ordenar por métrica exige cotizar TODA la lista, no solo la página
     // visible: es una acción explícita del usuario y el coste se asume aquí.
@@ -212,6 +215,7 @@ export default async function WatchlistPage({
                     peRatio: null,
                     peKind: null,
                     peSource: null,
+                    peSourceLabel: null,
                     priceKind: null,
                     priceAsOf: null,
                     quoteSymbol: null,
@@ -244,6 +248,7 @@ export default async function WatchlistPage({
                     peRatio: data.peRatio,
                     peKind: data.peKind,
                     peSource: data.peSource,
+                    peSourceLabel: data.peSourceLabel,
                     quoteSymbol: data.quoteSymbol,
                     analysis: item.analysis,
                     monitor: monitorData.items[item.symbol.trim().toUpperCase()] ?? null,
@@ -268,6 +273,7 @@ export default async function WatchlistPage({
                     peRatio: null,
                     peKind: null,
                     peSource: null,
+                    peSourceLabel: null,
                     quoteSymbol: null,
                     analysis: item.analysis,
                     monitor: null,
@@ -302,14 +308,14 @@ export default async function WatchlistPage({
         }))
         .filter((group) => group.symbols.length > 0);
     const MARKET_CAP_GAP_TEXT = {
-        timedOut: 'la lectura tardó más de 3 s; recarga para verla',
-        notApplicable: 'la fuente no cubre la capitalización de ese mercado',
-        unverifiable: 'la fuente no facilita una capitalización verificable',
-    } as const;
+        timedOut: t('watchlist.page.capGap.timedOut'),
+        notApplicable: t('watchlist.page.capGap.notApplicable'),
+        unverifiable: t('watchlist.page.capGap.unverifiable'),
+    };
     const marketCapLegend = marketCapGaps.length > 0 ? (
         <div className="space-y-0.5 text-[11px] leading-relaxed text-gray-500" data-testid="watchlist-marketcap-legend">
             {marketCapGaps.map((group) => (
-                <p key={group.reason}>* Capitalización N/D en {group.symbols.length === displayStocks.length ? 'todas las empresas de esta página' : group.symbols.join(', ')}: {MARKET_CAP_GAP_TEXT[group.reason]}.</p>
+                <p key={group.reason}>{t('watchlist.page.capLegend', { who: group.symbols.length === displayStocks.length ? t('watchlist.page.capLegendAll') : group.symbols.join(', '), reason: MARKET_CAP_GAP_TEXT[group.reason] })}</p>
             ))}
         </div>
     ) : null;
@@ -338,8 +344,8 @@ export default async function WatchlistPage({
     const byThesis = judged.filter((stock) => stock.monitor?.fair_value_source === 'tesis').length;
     const byEngine = judged.length - byThesis;
     const fairValueSourceNote = [
-        byThesis > 0 ? `${byThesis} con tesis publicada` : null,
-        byEngine > 0 ? `${byEngine} con el motor de valoración` : null,
+        byThesis > 0 ? t('watchlist.page.fairValue.byThesis', { count: byThesis }) : null,
+        byEngine > 0 ? t('watchlist.page.fairValue.byEngine', { count: byEngine }) : null,
     ].filter(Boolean).join(', ');
 
     // Un único formateador para móvil y desktop: sin dato -> NA ('N/D'),
@@ -361,9 +367,9 @@ export default async function WatchlistPage({
     // earningsStatus != 'ok' y todas las fechas llegan null: un N/D pelado
     // parecería «sin fecha anunciada». Se explica la causa como en el cap.
     const earningsNote = monitorData.earningsStatus === 'unavailable'
-        ? 'Calendario de resultados no disponible ahora mismo.'
+        ? t('watchlist.page.earningsUnavailable')
         : monitorData.earningsStatus === 'partial'
-          ? 'Calendario de resultados incompleto: puede faltar alguna fecha.'
+          ? t('watchlist.page.earningsPartial')
           : null;
     const formatPriceCell = (price: number | null, currency: string | null) =>
         price === null ? NA : currency ? formatPrice(price, currency) : formatNumber(price);
@@ -383,7 +389,7 @@ export default async function WatchlistPage({
                     </h1>
                     {undervaluedCount + overvaluedCount > 0 ? (
                         <p className="text-xs text-gray-500">
-                            Según el valor justo ({fairValueSourceNote}): {undervaluedCount} infravaloradas · {overvaluedCount} sobrevaloradas
+                            {t('watchlist.page.fairValue.summary', { source: fairValueSourceNote, under: undervaluedCount, over: overvaluedCount })}
                         </p>
                     ) : null}
                 </div>
@@ -395,19 +401,18 @@ export default async function WatchlistPage({
             {unavailable ? (
                 <Card className="border-amber-900/60 bg-amber-950/20" role="alert" data-testid="watchlist-unavailable">
                     <CardContent className="px-4 py-8 text-center text-sm text-amber-200">
-                        No se pudo cargar tu watchlist (servicio no disponible). Esto no significa que
-                        esté vacía: recarga la página o inténtalo más tarde.
+                        {t('watchlist.page.unavailable')}
                     </CardContent>
                 </Card>
             ) : watchlistStocks.length === 0 ? (
                 <Card className="border-gray-700 bg-gray-800/50">
                     <CardContent className="flex flex-col items-center justify-center px-4 py-12 text-center sm:py-16">
                         <Eye className="mb-4 h-12 w-12 text-gray-500 sm:h-16 sm:w-16" aria-hidden="true" />
-                        <h2 className="mb-2 text-lg font-semibold text-gray-300 sm:text-xl">Tu watchlist está vacía</h2>
+                        <h2 className="mb-2 text-lg font-semibold text-gray-300 sm:text-xl">{t('watchlist.page.empty.title')}</h2>
                         <p className="mb-6 max-w-md text-sm text-gray-500 sm:text-base">
-                            Pulsa &ldquo;Añadir empresa&rdquo; y búscala por nombre o símbolo para seguirla aquí.
+                            {t('watchlist.page.empty.body')}
                             {/* El atajo de teclado solo tiene sentido con teclado físico: en móvil se oculta. */}
-                            <span className="hidden md:inline"> También puedes abrir la búsqueda con Ctrl+K desde cualquier pantalla.</span>
+                            <span className="hidden md:inline"> {t('watchlist.page.empty.shortcut')}</span>
                         </p>
                         <div className="flex flex-wrap items-center justify-center gap-3">
                             <WatchlistAddButton followedSymbols={[]} />
@@ -415,19 +420,19 @@ export default async function WatchlistPage({
                                 href="/search"
                                 className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-teal-400/20 px-5 text-sm text-teal-400 transition-colors hover:text-teal-300"
                             >
-                                Ir a buscar acciones
+                                {t('watchlist.page.empty.searchCta')}
                             </Link>
                         </div>
                     </CardContent>
                 </Card>
             ) : (
                 <>
-                    <nav aria-label="Páginas de watchlist" className="flex flex-nowrap items-center justify-between gap-2 text-xs text-gray-400">
+                    <nav aria-label={t('watchlist.page.pagesNav')} className="flex flex-nowrap items-center justify-between gap-2 text-xs text-gray-400">
                         <WatchlistCount symbols={watchlistItems.map((item) => item.symbol)} page={page} totalPages={totalPages} />
                         {/* Ordenar también sin cabeceras de tabla (móvil/tablet con tarjetas): menú de enlaces, sin JS. */}
                         <details className="relative xl:hidden">
                             <summary className="min-h-[44px] cursor-pointer list-none rounded px-2 py-2 text-xs text-gray-300 hover:text-gray-100">
-                                Ordenar: {SORT_LABELS[sort]}{sort !== 'added' ? <span aria-hidden="true" className="text-teal-400"> {dir === 'asc' ? '▲' : '▼'}</span> : null}
+                                {t('watchlist.page.sortBy')}: {SORT_LABELS[sort]}{sort !== 'added' ? <span aria-hidden="true" className="text-teal-400"> {dir === 'asc' ? '▲' : '▼'}</span> : null}
                             </summary>
                             <div className="absolute z-10 mt-1 min-w-44 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
                                 {SORT_KEYS.map((key) => (
@@ -443,8 +448,8 @@ export default async function WatchlistPage({
                             </div>
                         </details>
                         <div className="flex gap-3">
-                            {page > 1 ? <Link className="inline-flex min-h-[44px] items-center text-teal-300" href={pageHref(page - 1)}>Anterior</Link> : null}
-                            {page < totalPages ? <Link className="inline-flex min-h-[44px] items-center text-teal-300" href={pageHref(page + 1)}>Siguiente</Link> : null}
+                            {page > 1 ? <Link className="inline-flex min-h-[44px] items-center text-teal-300" href={pageHref(page - 1)}>{t('watchlist.page.prev')}</Link> : null}
+                            {page < totalPages ? <Link className="inline-flex min-h-[44px] items-center text-teal-300" href={pageHref(page + 1)}>{t('watchlist.page.next')}</Link> : null}
                         </div>
                     </nav>
                     {/* Móvil y tablet (<xl): cards apiladas con acciones táctiles ≥44px.
@@ -465,12 +470,12 @@ export default async function WatchlistPage({
                                         </Link>
                                         {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <p className="truncate text-xs text-gray-500" title={stock.name}>{stock.name}</p> : null}<TrackedAnalysisStatus analysis={stock.analysis} /><DcaLevelBadge item={dcaBySymbol.get(stock.symbol.toUpperCase())} signalMonths={dcaSignalMonths} compact />
                                         {stock.notFound ? (
-                                            <Badge variant="outline" className="mt-1 border-amber-800/60 text-amber-300/90" title={NOT_FOUND_TITLE}>
-                                                {NOT_FOUND_LABEL}
+                                            <Badge variant="outline" className="mt-1 border-amber-800/60 text-amber-300/90" title={t('watchlist.page.notFound.title')}>
+                                                {t('watchlist.page.notFound.label')}
                                             </Badge>
                                         ) : stock.price === null ? (
                                             <Badge variant="outline" className="mt-1 border-gray-700 text-gray-400">
-                                                {stock.timedOut ? 'sin datos: la lectura tardó más de 3 s, recarga' : 'sin datos'}
+                                                {stock.timedOut ? t('watchlist.page.noDataTimedOut') : t('watchlist.page.noData')}
                                             </Badge>
                                         ) : null}
                                     </div>
@@ -486,36 +491,36 @@ export default async function WatchlistPage({
                                         <dt className="text-[11px] text-gray-500">Precio</dt>
                                         <dd className="truncate font-mono text-sm font-medium text-gray-200">{formatPriceCell(stock.price, stock.currency)}</dd>
                                         {stock.priceKind === 'close' ? (
-                                            <dd className="break-words text-[10px] leading-relaxed text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</dd>
+                                            <dd className="break-words text-[10px] leading-relaxed text-gray-500">{stock.priceAsOf ? t('watchlist.page.closeOn', { date: formatMarketDate(stock.priceAsOf) }) : t('watchlist.page.closeUndated')}</dd>
                                         ) : null}
                                         <ExtendedHoursLine symbol={stock.symbol} currency={stock.currency} as="dd" />
                                     </div>
                                     <div className="min-w-0">
-                                        <dt className="text-[11px] text-gray-500">Próx. resultados</dt>
+                                        <dt className="text-[11px] text-gray-500">{t('watchlist.page.sort.earnings')}</dt>
                                         <dd className="font-mono text-sm text-gray-300">{stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}{!stock.monitor?.next_earnings_date && earningsNote ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}</dd>
                                     </div>
                                     <div className="min-w-0">
-                                        <dt className="text-[11px] text-gray-500">Capitalización</dt>
-                                        <dd className="break-words font-mono text-sm text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
-                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· derivado</span> : null}{stock.marketCap === null ? <sup aria-hidden="true" className="ml-0.5 font-sans text-[10px] text-gray-500">*</sup> : null}
+                                        <dt className="text-[11px] text-gray-500">{t('watchlist.page.sort.marketCap')}</dt>
+                                        <dd className="break-words font-mono text-sm text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? t('watchlist.page.noMetricsTitle') : undefined}>
+                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· {t('watchlist.page.derived')}</span> : null}{stock.marketCap === null ? <sup aria-hidden="true" className="ml-0.5 font-sans text-[10px] text-gray-500">*</sup> : null}
                                         </dd>
                                     </div>
                                     <div className="min-w-0">
-                                        <dt className="text-[11px] text-gray-500">{stock.peKind === 'fy' ? 'PER (FY)' : 'PER (TTM)'}</dt>
-                                        <dd className="font-mono text-sm text-gray-300" title={stock.peSource ?? (stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined)}>{formatPeRatio(stock.peRatio)}{stock.peRatio === null ? (stock.timedOut ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La lectura tardó más de 3 s; recarga para verla.</span> : stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null) : null}</dd>
+                                        <dt className="text-[11px] text-gray-500">{stock.peKind === 'fy' ? t('watchlist.page.peFy') : t('watchlist.page.peTtm')}</dt>
+                                        <dd className="font-mono text-sm text-gray-300" title={stock.peSource ?? (stock.peRatio === null && stock.metricsNotApplicable ? t('watchlist.page.noMetricsTitle') : undefined)}>{formatPeRatio(stock.peRatio)}{stock.peRatio !== null && stock.peSourceLabel ? <span className="ml-1 font-sans text-[11px] text-gray-500">· {stock.peSourceLabel}</span> : null}{stock.peRatio === null ? (stock.timedOut ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{t('watchlist.page.readTimedOut')}</span> : stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{t('watchlist.page.peNotCovered')}</span> : null) : null}</dd>
                                     </div>
                                     <div className="min-w-0">
-                                        <dt className="text-[11px] text-gray-500" title="Consenso medio de precios objetivo por firma. Fuente: Yahoo Finance (no oficial).">Obj. analistas</dt>
+                                        <dt className="text-[11px] text-gray-500" title={t('watchlist.page.analystTitle')}>{t('watchlist.page.analystTarget')}</dt>
                                         <dd className="text-sm"><AnalystTargetLine symbol={stock.symbol} quoteSymbol={stock.quoteSymbol} currency={stock.currency} referencePrice={stock.price} fxRates={fxRates} baseCurrency={baseCurrency} /></dd>
                                     </div>
                                 </dl>
                                 <div className="mt-2 flex items-center gap-2">
                                     <Link
                                         href={`/research/${stock.symbol}`}
-                                        aria-label={`Ver análisis de ${stock.symbol}`}
+                                        aria-label={t('watchlist.page.viewAnalysisOf', { symbol: stock.symbol })}
                                         className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-800 px-4 text-sm font-medium text-gray-200 transition-colors hover:bg-gray-700 hover:text-white"
                                     >
-                                        Ver análisis
+                                        {t('watchlist.page.viewAnalysis')}
                                         <ArrowRight className="h-4 w-4" aria-hidden="true" />
                                     </Link>
                                     <WatchlistBuyAction userId={userId} symbol={stock.symbol} companyName={stock.name} currency={stock.currency} variant="button" />
@@ -528,30 +533,30 @@ export default async function WatchlistPage({
 
                     {/* Desktop (≥xl): tabla completa */}
                     <div className="hidden overflow-hidden rounded-lg border border-gray-700 bg-gray-900/50 xl:block">
-                        <Table regionLabel="Watchlist: precio, cambio, market cap y PER">
-                            <TableCaption className="sr-only">Valoración y métricas de cada símbolo de tu watchlist: precio, cambio de sesión, market cap y PER</TableCaption>
+                        <Table regionLabel={t('watchlist.page.tableRegion')}>
+                            <TableCaption className="sr-only">{t('watchlist.page.tableCaption')}</TableCaption>
                             <TableHeader className="bg-gray-800/80">
                                 <TableRow className="border-gray-700 hover:bg-gray-800/80">
                                     <TableHead className="text-gray-300" aria-sort={ariaSortFor('symbol')}>
-                                        <Link href={sortHref('symbol')} className="inline-flex min-h-[44px] items-center gap-1 hover:text-gray-100">Símbolo{sortIndicator('symbol')}</Link>
+                                        <Link href={sortHref('symbol')} className="inline-flex min-h-[44px] items-center gap-1 hover:text-gray-100">{t('watchlist.page.sort.symbol')}{sortIndicator('symbol')}</Link>
                                     </TableHead>
                                     <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('price')}>
-                                        <Link href={sortHref('price')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">Precio{sortIndicator('price')}</Link>
+                                        <Link href={sortHref('price')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">{t('watchlist.page.sort.price')}{sortIndicator('price')}</Link>
                                     </TableHead>
                                     <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('change')}>
-                                        <Link href={sortHref('change')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">Cambio sesión{sortIndicator('change')}</Link>
+                                        <Link href={sortHref('change')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">{t('watchlist.page.sort.change')}{sortIndicator('change')}</Link>
                                     </TableHead>
                                     <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('marketCap')}>
-                                        <Link href={sortHref('marketCap')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">Capitalización{sortIndicator('marketCap')}</Link>
+                                        <Link href={sortHref('marketCap')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">{t('watchlist.page.sort.marketCap')}{sortIndicator('marketCap')}</Link>
                                     </TableHead>
                                     <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('pe')}>
-                                        <Link href={sortHref('pe')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">PER{sortIndicator('pe')}</Link>
+                                        <Link href={sortHref('pe')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">{t('watchlist.page.sort.pe')}{sortIndicator('pe')}</Link>
                                     </TableHead>
-                                    <TableHead className="text-right text-gray-300" title="Consenso medio de precios objetivo por firma. Fuente: Yahoo Finance (no oficial).">
-                                        Obj. analistas
+                                    <TableHead className="text-right text-gray-300" title={t('watchlist.page.analystTitle')}>
+                                        {t('watchlist.page.analystTarget')}
                                     </TableHead>
                                     <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('earnings')}>
-                                        <Link href={sortHref('earnings')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">Próx. resultados{sortIndicator('earnings')}</Link>
+                                        <Link href={sortHref('earnings')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">{t('watchlist.page.sort.earnings')}{sortIndicator('earnings')}</Link>
                                     </TableHead>
 
                                 </TableRow>
@@ -566,17 +571,17 @@ export default async function WatchlistPage({
                                                     <div className="flex items-center gap-2 font-bold text-gray-200 transition-colors group-hover:text-blue-400">
                                                         {stock.symbol}
                                                         {stock.notFound ? (
-                                                            <Badge variant="outline" className="border-amber-800/60 font-normal text-amber-300/90" title={NOT_FOUND_TITLE}>
-                                                                {NOT_FOUND_LABEL}
+                                                            <Badge variant="outline" className="border-amber-800/60 font-normal text-amber-300/90" title={t('watchlist.page.notFound.title')}>
+                                                                {t('watchlist.page.notFound.label')}
                                                             </Badge>
                                                         ) : stock.price === null ? (
                                                             <Badge variant="outline" className="border-gray-700 font-normal text-gray-400">
-                                                                {stock.timedOut ? 'sin datos: la lectura tardó más de 3 s, recarga' : 'sin datos'}
+                                                                {stock.timedOut ? t('watchlist.page.noDataTimedOut') : t('watchlist.page.noData')}
                                                             </Badge>
                                                         ) : null}
                                                         {stock.monitor && stock.price !== null && stock.monitor.low_52w !== null && stock.monitor.low_52w_sessions >= 120 && stock.price <= stock.monitor.low_52w * 1.02 ? (
-                                                            <Badge variant="outline" className="border-amber-800/60 font-normal text-amber-300/90" title={`Mínimo de 52 semanas: ${stock.monitor.currency ? formatPrice(stock.monitor.low_52w, stock.monitor.currency) : formatNumber(stock.monitor.low_52w)} (${stock.monitor.low_52w_sessions} cierres en la serie propia)`}>
-                                                                Mínimo 52 sem
+                                                            <Badge variant="outline" className="border-amber-800/60 font-normal text-amber-300/90" title={t('watchlist.page.low52Title', { price: stock.monitor.currency ? formatPrice(stock.monitor.low_52w, stock.monitor.currency) : formatNumber(stock.monitor.low_52w), sessions: stock.monitor.low_52w_sessions })}>
+                                                                {t('watchlist.page.low52')}
                                                             </Badge>
                                                         ) : null}
                                                     </div>
@@ -585,9 +590,9 @@ export default async function WatchlistPage({
                                             </Link>
                                             <div className="ml-2 flex items-center gap-1">
                                                 <details className="relative inline-block align-middle">
-                                                    <summary className="min-h-9 cursor-pointer rounded px-2 py-2 text-xs text-gray-400 hover:text-gray-100" aria-label={`Opciones de ${stock.symbol}`}>Opciones</summary>
+                                                    <summary className="min-h-9 cursor-pointer rounded px-2 py-2 text-xs text-gray-400 hover:text-gray-100" aria-label={t('watchlist.page.optionsOf', { symbol: stock.symbol })}>{t('watchlist.page.options')}</summary>
                                                     <div className="mt-1 min-w-40 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
-                                                        <Link href={`/research/${stock.symbol}`} className="flex min-h-11 items-center px-3 py-2 text-xs text-teal-300">Ver análisis</Link>
+                                                        <Link href={`/research/${stock.symbol}`} className="flex min-h-11 items-center px-3 py-2 text-xs text-teal-300">{t('watchlist.page.viewAnalysis')}</Link>
                                                         <WatchlistBuyAction userId={userId} symbol={stock.symbol} companyName={stock.name} currency={stock.currency} variant="menu-item" />
                                                     </div>
                                                 </details>
@@ -598,7 +603,7 @@ export default async function WatchlistPage({
                                         <TableCell className="text-right font-mono font-medium text-gray-200">
                                             {formatPriceCell(stock.price, stock.currency)}
                                             {stock.priceKind === 'close' ? (
-                                                <div className="text-[10px] font-normal text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</div>
+                                                <div className="text-[10px] font-normal text-gray-500">{stock.priceAsOf ? t('watchlist.page.closeOn', { date: formatMarketDate(stock.priceAsOf) }) : t('watchlist.page.closeUndated')}</div>
                                             ) : null}
                                             <ExtendedHoursLine symbol={stock.symbol} currency={stock.currency} />
                                         </TableCell>
@@ -614,8 +619,8 @@ export default async function WatchlistPage({
                                                 </div>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-right font-mono text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
-                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· derivado</span> : null}{stock.marketCap === null ? <sup aria-hidden="true" className="ml-0.5 font-sans text-[10px] text-gray-500">*</sup> : null}
+                                        <TableCell className="text-right font-mono text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? t('watchlist.page.noMetricsTitle') : undefined}>
+                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· {t('watchlist.page.derived')}</span> : null}{stock.marketCap === null ? <sup aria-hidden="true" className="ml-0.5 font-sans text-[10px] text-gray-500">*</sup> : null}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {stock.peRatio !== null && stock.peRatio !== undefined && Number.isFinite(stock.peRatio) ? (
@@ -625,7 +630,7 @@ export default async function WatchlistPage({
                                                 // una app de «datos, no recomendaciones». Color
                                                 // neutro, como en la vista de tarjetas.
                                                 <Badge variant="outline" className="border-gray-700 font-mono text-gray-300" title={stock.peSource ?? undefined}>
-                                                    {formatPeRatio(stock.peRatio)}{stock.peRatio !== null && stock.peKind === 'fy' ? <span className="ml-1 font-sans text-[11px] text-gray-500">· FY</span> : null}{stock.peRatio === null ? (stock.timedOut ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La lectura tardó más de 3 s; recarga para verla.</span> : stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null) : null}
+                                                    {formatPeRatio(stock.peRatio)}{stock.peRatio !== null && stock.peKind === 'fy' ? <span className="ml-1 font-sans text-[11px] text-gray-500">· FY</span> : null}{stock.peRatio !== null && stock.peSourceLabel ? <span className="ml-1 font-sans text-[11px] text-gray-500">· {stock.peSourceLabel}</span> : null}{stock.peRatio === null ? (stock.timedOut ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{t('watchlist.page.readTimedOut')}</span> : stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{t('watchlist.page.peNotCovered')}</span> : null) : null}
                                                 </Badge>
                                             ) : (
                                                 <span className="text-gray-500">{NA}</span>
@@ -647,7 +652,7 @@ export default async function WatchlistPage({
                 </>
             )}
 
-            <DcaSignalsPanel data={dca.data} unavailable={dca.unavailable} />
+            <DcaSignalsPanel data={dca.data} unavailable={dca.unavailable} ti={t} locale={locale} />
         <ValuationSummaryGrid quotes={watchlistStocks.map(s => ({ symbol: s.symbol, price: s.price, currency: s.currency }))} />
         </main>
         </WatchlistMembership>

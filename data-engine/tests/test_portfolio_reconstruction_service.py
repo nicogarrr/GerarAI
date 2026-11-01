@@ -159,3 +159,59 @@ def test_normalize_currency_is_memoized_and_unchanged():
     assert normalize_currency(None) == (None, 1)
     assert normalize_currency("") == (None, 1)
     assert getattr(normalize_currency, "cache_info", None) is not None
+
+
+def test_applied_split_does_not_fabricate_a_boundary_crash(db):
+    """Split 2:1 aplicado (patas ya reescritas en terminos post-split por
+    corporate_actions_service): los cierres crudos anteriores al split deben
+    dividirse por el ratio o la serie vale el doble antes del split y la TWR
+    inventa un -50 % en la frontera."""
+    from app.models.entities import CorporateAction
+
+    a = _company(db)
+    # Pata YA ajustada por apply_action (cantidad x2, precio /2, fecha intacta).
+    _tx(db, a, D0, "buy", "20", "50")
+    _price(db, a, D0, 100)          # cierres crudos (sin ajustar por el split)
+    _price(db, a, D0 + timedelta(days=1), 100)
+    _price(db, a, D0 + timedelta(days=2), 50)   # split efectivo aqui
+    _price(db, a, D0 + timedelta(days=3), 52)
+    db.add(CorporateAction(
+        company_id=a.id, action_type="split", ratio=Decimal("2"),
+        effective_date=D0 + timedelta(days=2), applied=True, source="t",
+    ))
+    _position(db, a, "20", "1040")
+    db.commit()
+
+    result = PortfolioReconstructionService().build(db)
+
+    assert result.status == "ok"
+    # En terminos post-split la cartera vale 1000-1000-1000-1040: sin salto.
+    assert [row["value_base"] for row in result.series] == [1000.0, 1000.0, 1000.0, 1040.0]
+    assert result.returns[D0 + timedelta(days=2)] == pytest.approx(0.0)
+    assert result.returns[D0 + timedelta(days=3)] == pytest.approx(0.04)
+    assert result.twr == pytest.approx(0.04)
+
+
+def test_unapplied_split_keeps_raw_closes_and_quantities(db):
+    """Split ingerido pero NO aplicado (patas en terminos pre-split): ajustar
+    los precios romperia la coherencia; la serie sigue en terminos crudos."""
+    from app.models.entities import CorporateAction
+
+    a = _company(db)
+    _tx(db, a, D0, "buy", "10", "100")
+    _price(db, a, D0, 100)
+    _price(db, a, D0 + timedelta(days=1), 100)
+    _price(db, a, D0 + timedelta(days=2), 50)
+    _price(db, a, D0 + timedelta(days=3), 52)
+    db.add(CorporateAction(
+        company_id=a.id, action_type="split", ratio=Decimal("2"),
+        effective_date=D0 + timedelta(days=2), applied=False, source="t",
+    ))
+    _position(db, a, "10", "520")
+    db.commit()
+
+    result = PortfolioReconstructionService().build(db)
+
+    # Sin ajuste: la serie es la cruda (1000-1000-500-520); el -50 % del split
+    # sin aplicar es visible y real para este libro (cantidad sin reescalar).
+    assert [row["value_base"] for row in result.series] == [1000.0, 1000.0, 500.0, 520.0]

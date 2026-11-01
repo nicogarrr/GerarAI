@@ -143,3 +143,64 @@ def solve_required_growth(inputs: ReverseDCFInputs, iterations: int = 60) -> dic
             "out_of_bounds": False,
         },
     }
+
+
+def value_split(
+    *,
+    revenue: float,
+    growth: float,
+    fcf_margin: float,
+    wacc: float,
+    terminal_growth: float,
+    years: int,
+) -> dict[str, float] | None:
+    """Reparto del valor descontado: años 1–5, 6–10 y 11 en adelante (valor terminal).
+
+    Misma convención que ``run_dcf`` (FCF = ingresos × margen, descuento al WACC a final
+    de año): los años del horizonte crecen a ``growth`` y, si el horizonte es menor de 10,
+    los años restantes hasta el 10 crecen ya al crecimiento terminal (es la misma
+    perpetuidad, solo desplegada), así que los tres trozos suman el valor del modelo.
+    """
+    if revenue <= 0 or fcf_margin <= 0 or wacc <= terminal_growth:
+        return None
+    last = max(10, years)
+    buckets = {"years_1_5": 0.0, "years_6_10": 0.0, "years_11_plus": 0.0}
+    current = revenue
+    fcf = 0.0
+    for year in range(1, last + 1):
+        current *= 1 + (growth if year <= years else terminal_growth)
+        fcf = current * fcf_margin
+        key = "years_1_5" if year <= 5 else "years_6_10" if year <= 10 else "years_11_plus"
+        buckets[key] += fcf / (1 + wacc) ** year
+    buckets["years_11_plus"] += fcf * (1 + terminal_growth) / (wacc - terminal_growth) / (1 + wacc) ** last
+    total = sum(buckets.values())
+    if total <= 0:
+        return None
+    return {key: round(value / total, 4) for key, value in buckets.items()}
+
+
+def implied_perpetual_growth(*, fcf: float, enterprise_value: float, wacc: float) -> float | None:
+    """Crecimiento perpetuo que descuenta el precio: g = WACC − FCF / EV (None si EV ≤ 0)."""
+    if enterprise_value <= 0:
+        return None
+    return round(wacc - fcf / enterprise_value, 4)
+
+
+def growth_sensitivity(inputs: ReverseDCFInputs, *, wacc_step: float = 0.01, margin_step: float = 0.02) -> dict:
+    """Crecimiento exigido con WACC ±1 punto y margen FCF ±2 puntos (rejilla 3×3)."""
+    waccs = [round(inputs.wacc + d, 4) for d in (-wacc_step, 0.0, wacc_step)]
+    margins = [round(inputs.fcf_margin + d, 4) for d in (-margin_step, 0.0, margin_step)]
+    rows = []
+    for wacc in waccs:
+        row: list[float | None] = []
+        for margin in margins:
+            if wacc <= inputs.terminal_growth or margin <= 0:
+                row.append(None)
+                continue
+            solved = solve_required_growth(
+                ReverseDCFInputs(**{**inputs.__dict__, "wacc": wacc, "fcf_margin": margin})
+            )
+            value = solved.get("required_revenue_growth")
+            row.append(round(value, 4) if value is not None else None)
+        rows.append(row)
+    return {"wacc": waccs, "fcf_margin": margins, "required_growth": rows}

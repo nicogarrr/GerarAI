@@ -25,7 +25,7 @@ describe('coverage label honesty guard (F147)', () => {
         // El copy vive en lib/audit-status-copy.ts (F243) y ambas páginas lo
         // componen con auditScoreText: las etiquetas se verifican en el helper.
         const label = 'puntuación de respaldo de afirmaciones';
-        const penalty = '(penaliza baja confianza)';
+        const penalty = '(penaliza baja confianza y una conciliación SEC/FMP ausente)';
         const helper = readSource('lib/audit-status-copy.ts');
         assert.ok(helper.includes(label), 'el helper debe nombrar la puntuación de respaldo');
         assert.ok(helper.includes(penalty), 'el helper debe declarar la penalización por baja confianza');
@@ -41,7 +41,8 @@ describe('coverage label honesty guard (F147)', () => {
     it('el modelo usa publishable como puerta y nunca oculta la causa', () => {
         const src = readSource('components/research/FundamentalModelPanels.tsx');
         assert.ok(
-            src.includes("model.publishable ? '' : ' · modelo no publicable'"),
+            src.includes("model.publishable ? '' : ti('research.model.notPublishableTag')") &&
+                JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).model.notPublishableTag === ' · modelo no publicable',
             'la puerta de estado debe ser model.publishable (cubre missing_inputs, bloqueos y cobertura <60)',
         );
         assert.ok(
@@ -49,7 +50,7 @@ describe('coverage label honesty guard (F147)', () => {
             'missing_inputs solo no basta: publishable=false también por cobertura <60 con inputs completos',
         );
         assert.ok(
-            src.includes('valores con fuente'),
+            src.includes("ti('research.model.coverage'") && JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).model.coverage.includes('valores con fuente'),
             'el porcentaje siempre lleva su alcance: valores presentes con fuente',
         );
         assert.ok(

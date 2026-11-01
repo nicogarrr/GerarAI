@@ -42,15 +42,20 @@ test('F305: el aviso de la vista general enlaza capa a capa (no un solo enlace a
 });
 
 test('F309: los estados vacíos de la vista financieros ya no mandan a importar documentos', () => {
-    const factTable = page.slice(page.indexOf('function FactTable'), page.indexOf('function MetricsGrid'));
+    // FactTable vive en FactsPanels (ultima funcion del fichero).
+    const panels = readFileSync('components/research/FactsPanels.tsx', 'utf8');
+    const factTable = panels.slice(panels.indexOf('export function FactTable'));
     assert.doesNotMatch(factTable, /view=documents/);
     assert.match(factTable, /refreshLabel/);
     assert.match(factTable, /Pulsa «\$\{refreshLabel\}» arriba para traerlos del proveedor indicado/);
     assert.match(factTable, /no hay datos persistidos: comprueba el resultado del refresh y la fuente/);
     const metrics = page.slice(page.indexOf('function MetricsGrid'), page.indexOf('function ValuationView'));
     assert.doesNotMatch(metrics, /view=documents/);
-    assert.match(metrics, /pulsa «Recalcular» arriba/);
-    assert.match(metrics, /botón de actualización correspondiente/);
+    assert.match(metrics, /t\('research\.ficha\.metricsEmptyDescription'\)/);
+    const fichaEs = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).ficha;
+    assert.match(fichaEs.metricsEmptyDescription, /pulsa «Recalcular» arriba/);
+    assert.match(fichaEs.metricsEmptyDescription, /botón de actualización correspondiente/);
+    assert.doesNotMatch(fichaEs.metricsEmptyDescription, /fuente oficial/);
     // «Fuente oficial» solo cuando el flujo lo sea: FMP es proveedor comercial.
     assert.doesNotMatch(factTable, /fuente oficial/);
     assert.doesNotMatch(metrics, /fuente oficial/);
@@ -58,7 +63,7 @@ test('F309: los estados vacíos de la vista financieros ya no mandan a importar 
 
 test('F309: FactTable recibe el nombre exacto del botón de refresh según el mercado', () => {
     assert.match(page, /refreshLabel=\{/);
-    assert.match(page, /'Refrescar financieros \(FMP\)'/);
-    assert.match(page, /'Refrescar ESEF'/);
-    assert.match(page, /'Refrescar SEC'/);
+    assert.match(page, /t\('research\.fichaRefreshFinancialsFmp'\)/);
+    assert.match(page, /t\('research\.fichaRefreshEsef'\)/);
+    assert.match(page, /t\('research\.fichaRefreshSec'\)/);
 });

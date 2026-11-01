@@ -18,7 +18,7 @@ test('F359: remount/focus recovers the server job, never starts it again', () =>
 
 test('F359: dispatch recovery runs server-side, enqueue does no enrichment', () => {
     assert.match(scheduler, /_register\(scheduler, reconcile_thesis_dispatches, "interval",\s*job_id="thesis_dispatch_recovery", minutes=1\)/);
-    const enqueue = route.slice(route.indexOf('def generate_thesis_async'), route.indexOf('@router.get("/jobs/{run_id}")'));
+    const enqueue = route.slice(route.indexOf('def generate_thesis_async'), route.indexOf('@router.get("/jobs/{run_id}", response_model=ThesisJobStatusOut)'));
     assert.doesNotMatch(enqueue, /ensure_company_stub/);
-    assert.match(route, /@router.get\("\/jobs"\)/);
+    assert.match(route, /@router.get\("\/jobs", response_model=ThesisLatestJobOut\)/);
 });

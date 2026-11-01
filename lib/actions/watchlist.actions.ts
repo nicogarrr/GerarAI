@@ -1,6 +1,7 @@
 'use server';
 
 import type { TrackedAnalysisStatus } from '@/lib/tracked-analysis-status';
+import type { components } from '@/lib/research/openapi.generated';
 import { revalidatePath } from 'next/cache';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest, jsonBody } from '@/lib/research/client';
@@ -36,13 +37,8 @@ function failure(error: unknown): WatchlistMutationResult {
     };
 }
 
-/** Entrada devuelta por GET /api/watchlist del backend research. */
-interface WatchlistEntry {
-    analysis?: TrackedAnalysisStatus | null;
-    symbol: string;
-    company?: string | null;
-    created_at?: string;
-}
+/** Entrada devuelta por GET /api/watchlist del backend research (tipo del OpenAPI generado). */
+type WatchlistEntry = components['schemas']['WatchlistItemOut'];
 
 // Obtener watchlist del usuario actual desde el backend research (/api/watchlist).
 // `unavailable` distingue un fallo del backend de una watchlist realmente vacía (F386).
@@ -167,6 +163,8 @@ export type WatchlistEntryData = {
     peKind: 'ttm' | 'fy' | null;
     /** Procedencia del PER visible: Finnhub (TTM, línea US) o la cadena del backend («PER: cierre … / eps_diluido FY…»). Null sin PER. */
     peSource: string | null;
+    /** Etiqueta corta de la fuente del PER para mostrar junto al número («Finnhub» o la fuente del cálculo propio). Null sin PER. */
+    peSourceLabel: string | null;
     // F358: frescura del precio: 'live' = sesión en curso; 'close' = último
     // cierre fechado (con fecha en priceAsOf si se conoce). Un cierre NUNCA
     // se pinta como cotización actual.
@@ -178,12 +176,7 @@ export type WatchlistEntryData = {
     quoteSymbol: string | null;
 };
 
-type BackendWatchlistMetrics = {
-    market_cap: number | null;
-    per: number | null;
-    currency: string | null;
-    sources: string[];
-};
+type BackendWatchlistMetrics = components['schemas']['WatchlistMetricsOut'];
 
 function fetchBackendMetrics(symbol: string): Promise<BackendWatchlistMetrics | null> {
     return researchRequest<BackendWatchlistMetrics>(
@@ -214,6 +207,7 @@ export async function getWatchlistEntryData(
         peRatio: null,
         peKind: null,
         peSource: null,
+        peSourceLabel: null,
         priceKind: null,
         priceAsOf: null,
         metricsNotApplicable: false,
@@ -274,6 +268,10 @@ export async function getWatchlistEntryData(
     const backendPer = backendAll && typeof backendAll.per === 'number' && Number.isFinite(backendAll.per) ? backendAll.per : null;
     const backendDerived = (backendAll?.sources ?? []).some((src) => src.toLowerCase().includes('derivada'));
     const backendPerSource = (backendAll?.sources ?? []).find((src) => src.startsWith('PER:')) ?? null;
+    // Etiqueta corta de la fuente del PER de respaldo: la cadena «PER: …»
+    // termina con la fuente entre paréntesis («(SEC)», «(ESEF)»…); sin ella,
+    // sin etiqueta (nunca se inventa la procedencia).
+    const backendPerLabel = backendPerSource?.match(/\(([^)]+)\)\s*$/)?.[1] ?? null;
 
     return {
         ...base,
@@ -311,6 +309,10 @@ export async function getWatchlistEntryData(
         // Trazabilidad del número: sin fuente visible un PER erróneo (QA
         // 2026-10-19: AENA 2,0x por EPS FY mal cargado) parece dato oficial.
         peSource: peRatio !== null ? 'PER TTM (Finnhub)' : backendPerSource,
+        // Fuente visible a primera vista: el PER del proveedor y el EPS TTM
+        // propio (SEC) son series distintas y sin etiqueta parecen una sola
+        // (QA 31-oct-2026: GOOGL PER 14,5x Finnhub vs EPS TTM SEC 19,91).
+        peSourceLabel: peRatio !== null ? 'Finnhub' : backendPerLabel,
         priceKind,
         priceAsOf,
         metricsNotApplicable: !usListing,
@@ -323,24 +325,7 @@ export async function getWatchlistEntryData(
 // /api/calendar/earnings) y comparacion con el valor justo unico (tesis
 // publicada o motor, con su etiqueta de procedencia).
 // Cualquier pieza sin dato llega a null: la UI pinta N/D, nunca inventa.
-export type WatchlistMonitorItem = {
-    low_52w: number | null;
-    low_52w_date: string | null;
-    low_52w_sessions: number;
-    last_close: number | null;
-    last_close_date: string | null;
-    fair_value: number | null;
-    fair_value_thesis_version: number | null;
-    /** Procedencia del valor justo único (misma cifra que inicio y screener). */
-    fair_value_source?: 'tesis' | 'motor' | 'motor_orientativo' | null;
-    fair_value_label?: string | null;
-    fair_value_as_of?: string | null;
-    fair_value_publishable?: boolean | null;
-    valuation_side: 'infravalorada' | 'sobrevalorada' | null;
-    currency: string | null;
-    next_earnings_date: string | null;
-    next_earnings_source: string | null;
-};
+export type WatchlistMonitorItem = components['schemas']['WatchlistMonitorItemOut'];
 
 export async function getWatchlistMonitor(
     symbols: string[],
@@ -367,4 +352,22 @@ export async function getExtendedQuote(symbol: string): Promise<ExtendedQuote | 
     } catch {
         return null;
     }
+}
+
+/** Límite defensivo del batch de cotizaciones extendidas (una página entera cabe de sobras). */
+const EXTENDED_QUOTES_BATCH_MAX = 100;
+
+/**
+ * Versión batch de getExtendedQuote: UNA invocación serverless por página en
+ * vez de una por fila (medido en prod: 12 POSTs de acción por carga de
+ * /watchlist solo para cotizaciones extendidas). Las peticiones al backend
+ * salen en paralelo dentro de la misma invocación.
+ */
+export async function getExtendedQuotes(symbols: string[]): Promise<Record<string, ExtendedQuote | null>> {
+    await requireAuthenticatedUser();
+    const unique = [...new Set(symbols.map((s) => s.trim().toUpperCase()).filter(Boolean))].slice(0, EXTENDED_QUOTES_BATCH_MAX);
+    const entries = await Promise.all(
+        unique.map(async (symbol) => [symbol, await getExtendedQuote(symbol)] as const),
+    );
+    return Object.fromEntries(entries);
 }

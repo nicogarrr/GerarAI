@@ -38,6 +38,9 @@ _TEST_DB_PATH = Path(
     os.environ.get("CAVAAI_TEST_DB")
     or f"cavaai_test_{os.getpid()}_{uuid4().hex[:8]}.db"
 )
+# Los tests gated a CI Postgres (round-trips reales de Alembic) necesitan la
+# URL original del job; sin esta copia la pierden al forzar el sqlite hermetico.
+os.environ.setdefault("CAVAAI_ORIGINAL_DATABASE_URL", os.environ.get("DATABASE_URL", ""))
 os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB_PATH.as_posix()}"
 
 
@@ -224,3 +227,142 @@ def _reset_historical_stress_failure_cache():
     historical_stress_service._FAILED_UNTIL.clear()
     yield
     historical_stress_service._FAILED_UNTIL.clear()
+
+
+# ---------------------------------------------------------------------------
+# Aislamiento del Redis compartido del job de CI
+# ---------------------------------------------------------------------------
+#
+# Backend quality instala un redis-server real y corre xdist -n 2. Los claims
+# de coalescencia (coalesce:*, coalesce-enq:*, ventanas de hasta 20 h), los
+# leases de jobs (cavaai:job-lease:*), el pacing global (global_pacer:*) y
+# los disyuntores (gdelt:circuit:*, sec_breaker:*) sobreviven entre tests y
+# se comparten entre los dos workers: el cluster DCA del 31-oct (77 fallos)
+# era el claim coalesce:evaluate_dca_signals:7 (ventana 20 h) de un test
+# haciendo fresh_or_running al siguiente, antes de sus monkeypatches.
+#
+# Dos medidas que se complementan:
+# 1. Una DB logica por worker de xdist (gw0 -> db0, gw1 -> db1): el Redis deja
+#    de ser compartido entre procesos y la limpieza de abajo ya no puede
+#    borrar el claim fresco del otro worker.
+# 2. Limpieza ANTES de cada test, solo de las claves de la app, dentro de la
+#    DB propia del worker. Solo antes (no despues): el siguiente test ya
+#    empieza limpio y cada borrado extra solo abre ventanas para pisar
+#    estado que otro test aun esta usando.
+#
+# OPT-IN EXPLICITO (revision del piloto): TEST_REDIS_EPHEMERAL=1 declara que
+# el Redis alcanzable es desechable; lo pone el workflow de CI, que instala
+# un redis-server solo para el job. Sin el NO se limpia nada NI se reasigna
+# DB: APP_ENV=test no prueba que el Redis sea desechable (este propio
+# conftest lo fija con setdefault) y un REDIS_URL heredado del stack de
+# desarrollo apunta a una BD con datos reales que no se toca.
+#
+# Sin Redis alcanzable la app usa su fallback local en proceso: fail-open.
+
+_TEST_REDIS_EPHEMERAL_VAR = "TEST_REDIS_EPHEMERAL"
+
+# Los tres primeros son dedup/lease del scheduler; global_pacer y los dos
+# breakers son el estado compartido en Redis de los commits de colas del
+# 31-oct (d2b567c pacing global, 9092063 disyuntores, d1f2578 cache live de
+# fair-value): mismo patron de fuga.
+_REDIS_TEST_KEY_PREFIXES = (
+    "cavaai:*",
+    "coalesce:*",
+    "coalesce-enq:*",
+    "global_pacer:*",
+    "gdelt:circuit:*",
+    "sec_breaker:*",
+    "fair_value_live:*",
+)
+
+
+def _test_redis_ephemeral() -> bool:
+    return os.environ.get(_TEST_REDIS_EPHEMERAL_VAR) == "1"
+
+
+def _redis_test_url() -> str | None:
+    try:
+        from app.core.config import get_settings
+
+        return get_settings().redis_url
+    except Exception:  # noqa: BLE001 - sin settings no hay nada que limpiar
+        return None
+
+
+def _worker_redis_url() -> str | None:
+    """URL de Redis con la DB logica propia del worker, o None si no procede.
+
+    Solo con el opt-in explicito y bajo xdist: sin el no se reasigna nada,
+    porque un REDIS_URL heredado apunta al Redis del stack de desarrollo.
+    """
+    if not _test_redis_ephemeral():
+        return None
+    worker = os.environ.get("PYTEST_XDIST_WORKER")
+    if not worker:
+        return None
+    import re
+    from urllib.parse import urlsplit, urlunsplit
+
+    match = re.fullmatch(r"gw(\d+)", worker)
+    db = int(match.group(1)) if match else 0
+    base = os.environ.get("REDIS_URL") or "redis://localhost:6379/0"
+    parts = urlsplit(base)
+    return urlunsplit(parts._replace(path=f"/{db}"))
+
+
+def reset_shared_redis_dedup_state() -> None:
+    """Borra las claves de dedup/lease/pacing de la app en la DB del worker.
+
+    Solo con el opt-in TEST_REDIS_EPHEMERAL=1 (Redis desechable declarado):
+    sin el no se borra absolutamente nada.
+    """
+    if not _test_redis_ephemeral():
+        return
+    url = _redis_test_url()
+    if not url:
+        return
+    try:
+        import redis as redis_sync
+
+        from app.core.redis_retry import no_retry
+
+        client = redis_sync.Redis.from_url(
+            url, socket_connect_timeout=0.25, socket_timeout=0.5, retry=no_retry()
+        )
+        try:
+            for pattern in _REDIS_TEST_KEY_PREFIXES:
+                cursor = 0
+                while True:
+                    cursor, keys = client.scan(cursor=cursor, match=pattern, count=200)
+                    if keys:
+                        client.delete(*keys)
+                    if cursor == 0:
+                        break
+        finally:
+            client.close()
+    except Exception:  # noqa: BLE001 - sin Redis no hay estado compartido que limpiar
+        pass
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _redis_db_por_worker():
+    """Una DB logica de Redis por worker de xdist (gw0 -> db0, gw1 -> db1).
+
+    Se reescribe REDIS_URL antes de que corra ningun test: _redis_client() es
+    perezoso por proceso y get_settings se re-levanta en cada test (ver
+    reset_settings_cache), asi que todos los accesos posteriores usan la DB
+    propia del worker. Sin TEST_REDIS_EPHEMERAL=1 no se toca la URL.
+    """
+    url = _worker_redis_url()
+    if url is not None:
+        os.environ["REDIS_URL"] = url
+        from app.core.config import get_settings
+
+        get_settings.cache_clear()
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_shared_redis_dedup_state():
+    reset_shared_redis_dedup_state()
+    yield

@@ -17,7 +17,7 @@ def fake_count(text: str) -> int:
 
 
 def _h(word: str, mod: int) -> int:
-    return int(hashlib.md5(word.lower().encode()).hexdigest(), 16) % mod  # noqa: S324
+    return int(hashlib.md5(word.lower().encode()).hexdigest(), 16) % mod  # noqa: S324  # nosemgrep: python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5 -- fixture: hash no criptografico para reparto determinista de palabras en tests; no protege secretos
 
 
 class FakeEmbedder:

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useT } from '@/lib/i18n/client';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
@@ -22,6 +23,7 @@ import { SYMBOL_VALIDATION } from '@/lib/constants';
  */
 export default function WatchlistAddDialog({ followedSymbols }: { followedSymbols: string[] }) {
     const router = useRouter();
+    const t = useT();
     const [term, setTerm] = useState('');
     const [adding, setAdding] = useState<string | null>(null);
     const [added, setAdded] = useState<Set<string>>(new Set());
@@ -48,13 +50,13 @@ export default function WatchlistAddDialog({ followedSymbols }: { followedSymbol
             const res = await addToWatchlistCanonical(stock.symbol, stock.name || undefined);
             if (res.success) {
                 setAdded((current) => new Set(current).add(stock.symbol.toUpperCase()));
-                toast.success(`${stock.symbol} añadido a la watchlist`);
+                toast.success(t('watchlist.add.added', { symbol: stock.symbol }));
                 router.refresh();
             } else {
                 if (res.code === 'duplicate') {
                     setAdded((current) => new Set(current).add(stock.symbol.toUpperCase()));
                 }
-                showErrorToast(res.message ?? 'No se pudo añadir a la watchlist', {
+                showErrorToast(res.message ?? t('watchlist.add.failed'), {
                     duplicateMessage: 'Ya sigues este ticker.',
                     onRetry: () => handleAdd(stock),
                 });
@@ -67,11 +69,11 @@ export default function WatchlistAddDialog({ followedSymbols }: { followedSymbol
     };
 
     return (
-        <DialogContent className="border-gray-700 bg-gray-900 text-gray-200 sm:max-w-md">
+        <DialogContent className="border-gray-700 bg-gray-900 text-gray-200 sm:max-w-md max-h-[90dvh] overflow-y-auto">
             <DialogHeader>
-                <DialogTitle>Añadir a la watchlist</DialogTitle>
+                <DialogTitle>{t('watchlist.add.title')}</DialogTitle>
                 <DialogDescription className="text-gray-400">
-                    Busca por símbolo o empresa y añádela a tu seguimiento.
+                    {t('watchlist.add.description')}
                 </DialogDescription>
             </DialogHeader>
             <TickerSearchInput
@@ -85,29 +87,29 @@ export default function WatchlistAddDialog({ followedSymbols }: { followedSymbol
                 }}
                 disabledSymbols={[...followed]}
                 disabled={adding !== null}
-                placeholder="Buscar acciones (p. ej. SAN o Santander)"
-                ariaLabel="Buscar acciones para añadir a la watchlist"
+                placeholder={t('watchlist.add.placeholder')}
+                ariaLabel={t('watchlist.add.searchLabel')}
                 className="w-full border-gray-700 bg-gray-950 text-gray-200"
             />
             {canAddManual && !adding ? (
                 <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
-                    <span>¿No aparece en la lista?</span>
+                    <span>{t('watchlist.add.notListed')}</span>
                     <Button
                         type="button"
                         variant="ghost"
                         onClick={() => void handleAdd({ symbol: manualSymbol, name: '', exchange: '', type: '', isInWatchlist: false })}
                         className="min-h-[44px] px-2 text-teal-300 hover:bg-teal-950/40 hover:text-teal-200"
                     >
-                        Añadir «{manualSymbol}» por su símbolo
+                        {t('watchlist.add.bySymbol', { symbol: manualSymbol })}
                     </Button>
                 </div>
             ) : null}
             {alreadyFollowed && !adding ? (
                 <p role="status" className="text-sm text-gray-400">
-                    Ya sigues «{manualSymbol}»: está en tu watchlist.
+                    {t('watchlist.add.alreadyFollowed', { symbol: manualSymbol })}
                 </p>
             ) : null}
-            {adding ? <p role="status" className="text-sm text-gray-400">Añadiendo {adding}…</p> : null}
+            {adding ? <p role="status" className="text-sm text-gray-400">{t('watchlist.add.adding', { symbol: adding })}</p> : null}
         </DialogContent>
     );
 }

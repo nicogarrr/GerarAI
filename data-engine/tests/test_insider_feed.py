@@ -269,3 +269,37 @@ def test_build_feed_ticker_filter_matches_multiclass_separators():
     finally:
         _cleanup(db)
         db.close()
+
+
+def test_feed_no_materializa_entidades_orm():
+    """Perf: el feed sirve ~limit filas pero antes instanciaba TODAS las
+    entidades ORM de la ventana (medido 2026-10-31: consulta+ORM = 64% del
+    tiempo en benchmark sintetico de 45k filas; columnas-only = 34% de ese
+    coste). La consulta principal debe leer solo columnas."""
+    db = _db()
+    try:
+        _cleanup(db)
+        _persist(db)
+        # La identity_map es debil: no basta mirarla despues. Hay que contar
+        # las instancias ORM cargadas DURANTE la llamada.
+        from sqlalchemy import event
+
+        loaded: list[object] = []
+
+        def on_loaded(session, instance):
+            if isinstance(instance, (InsiderTransaction, InsiderFiling)):
+                loaded.append(instance)
+
+        from sqlalchemy.orm import Session as _Session
+
+        event.listen(_Session, "loaded_as_persistent", on_loaded)
+        try:
+            feed = insider_feed.build_feed(db, days=3650, today=date(2024, 3, 20))
+        finally:
+            event.remove(_Session, "loaded_as_persistent", on_loaded)
+        assert feed["status"] == "ok"
+        assert feed["count"] >= 1
+        assert loaded == [], "build_feed materializo entidades ORM"
+    finally:
+        _cleanup(db)
+        db.close()

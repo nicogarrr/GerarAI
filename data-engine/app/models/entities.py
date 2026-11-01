@@ -11,6 +11,7 @@ from decimal import Decimal
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -21,9 +22,13 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    desc,
     event,
+    text,
 )
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy.sql.elements import TextClause
 
 from app.core.database import Base
 
@@ -92,6 +97,22 @@ class Portfolio(TenantOwnedMixin, Base, TimestampMixin):
     base_currency: Mapped[str] = mapped_column(String(10), default="EUR")
     is_default: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
+    positions: Mapped[list["Position"]] = relationship(
+        "Position", back_populates="portfolio", cascade="all, delete-orphan"
+    )
+    transactions: Mapped[list["Transaction"]] = relationship(
+        "Transaction", back_populates="portfolio", cascade="all, delete-orphan"
+    )
+    daily_snapshots: Mapped[list["PortfolioDailySnapshot"]] = relationship(
+        "PortfolioDailySnapshot", back_populates="portfolio", cascade="all, delete-orphan"
+    )
+    tax_reports: Mapped[list["TaxReport"]] = relationship(
+        "TaxReport", back_populates="portfolio", cascade="all, delete-orphan"
+    )
+    investment_plans: Mapped[list["InvestmentPlan"]] = relationship(
+        "InvestmentPlan", back_populates="portfolio", cascade="all, delete-orphan"
+    )
+
 
 class WatchItem(TenantOwnedMixin, Base, TimestampMixin):
     """A symbol the tenant is following (research watchlist)."""
@@ -121,7 +142,7 @@ class DcaSignalState(TenantOwnedMixin, Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     symbol: Mapped[str] = mapped_column(String(20), index=True)
-    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)
     level: Mapped[int] = mapped_column(Integer)
     previous_level: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20))
@@ -260,7 +281,7 @@ class Company(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     ticker: Mapped[str] = mapped_column(String(20), unique=True, index=True)
-    name: Mapped[str] = mapped_column(String(255))
+    name: Mapped[str] = mapped_column(String(200))
     exchange: Mapped[str] = mapped_column(String(50))
     currency: Mapped[str] = mapped_column(String(10), default="USD")
     sector: Mapped[str] = mapped_column(String(120), default="Unknown")
@@ -288,17 +309,22 @@ class Company(Base, TimestampMixin):
     thesis_versions: Mapped[list["ThesisVersion"]] = relationship(back_populates="company")
     claims: Mapped[list["Claim"]] = relationship(back_populates="company")
     memory_items: Mapped[list["MemoryItem"]] = relationship(back_populates="company")
+    transactions: Mapped[list["Transaction"]] = relationship("Transaction", foreign_keys="[Transaction.company_id]")
 
 
 class Position(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "positions"
     __table_args__ = (
         Index("ix_positions_portfolio_company", "portfolio_id", "company_id"),
+        # Sin CHECK de quantity >= 0 (0108 la puso y 0111 la retira): el dominio
+        # admite cortos (quantity < 0) — tax_modelo720, historical_stress y
+        # portfolio_reconstruction los modelan, y un import IBKR con corto
+        # reventaba contra la restriccion.
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     portfolio_id: Mapped[int | None] = mapped_column(
-        ForeignKey("portfolios.id"), nullable=True, index=True
+        ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=True, index=True
     )
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(20, 6), default=0)
@@ -343,6 +369,7 @@ class Position(TenantOwnedMixin, Base, TimestampMixin):
     valuation_hold_since: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     company: Mapped[Company] = relationship(back_populates="positions")
+    portfolio: Mapped["Portfolio | None"] = relationship("Portfolio", back_populates="positions")
 
 
 class CashBalance(TenantOwnedMixin, Base, TimestampMixin):
@@ -363,11 +390,21 @@ class Transaction(TenantOwnedMixin, Base, TimestampMixin):
         UniqueConstraint("tenant_id", "external_id", name="uq_transaction_tenant_external"),
         Index("ix_transactions_portfolio_trade_date", "portfolio_id", "trade_date"),
         Index("ix_transactions_company_action", "company_id", "action"),
+        CheckConstraint("quantity >= 0", name="ck_transactions_quantity_non_negative"),
+        # El signo solo es ilegal en las patas de compraventa: las filas de caja
+        # (withholding/fee/interest/cash_misc) llevan la direccion en el signo
+        # (IBKR Flex trae la retencion con importe NEGATIVO; ver
+        # test_xirr_withholding_and_fee_negative_amounts_are_outflows).
+        CheckConstraint(
+            "price >= 0 OR action NOT IN ('buy', 'sell')",
+            name="ck_transactions_price_non_negative",
+        ),
+        CheckConstraint("fees >= 0", name="ck_transactions_fees_non_negative"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     portfolio_id: Mapped[int | None] = mapped_column(
-        ForeignKey("portfolios.id"), nullable=True, index=True
+        ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=True, index=True
     )
     company_id: Mapped[int | None] = mapped_column(
         ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
@@ -381,6 +418,9 @@ class Transaction(TenantOwnedMixin, Base, TimestampMixin):
     currency: Mapped[str] = mapped_column(String(10), default="USD")
     external_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     raw_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    company: Mapped["Company"] = relationship("Company", foreign_keys=[company_id], overlaps="transactions")
+    portfolio: Mapped["Portfolio | None"] = relationship("Portfolio", back_populates="transactions")
 
 
 class IbkrRawRow(TenantOwnedMixin, Base, TimestampMixin):
@@ -467,7 +507,7 @@ class PortfolioDailySnapshot(TenantOwnedMixin, Base, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id"), index=True)
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id", ondelete="CASCADE"), index=True)
     snapshot_date: Mapped[date] = mapped_column(Date, index=True)
     base_currency: Mapped[str] = mapped_column(String(10))
     positions_value_base: Mapped[Decimal] = mapped_column(Numeric(24, 6))
@@ -486,6 +526,8 @@ class PortfolioDailySnapshot(TenantOwnedMixin, Base, TimestampMixin):
     source: Mapped[str] = mapped_column(String(80), default="market_refresh")
     metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
 
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", back_populates="daily_snapshots")
+
 
 class PositionDailySnapshot(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "position_daily_snapshots"
@@ -501,7 +543,7 @@ class PositionDailySnapshot(TenantOwnedMixin, Base, TimestampMixin):
     portfolio_snapshot_id: Mapped[int] = mapped_column(
         ForeignKey("portfolio_daily_snapshots.id", ondelete="CASCADE"), index=True
     )
-    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id"), index=True)
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id", ondelete="CASCADE"), index=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     snapshot_date: Mapped[date] = mapped_column(Date, index=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(20, 6))
@@ -530,7 +572,7 @@ class CashDailySnapshot(TenantOwnedMixin, Base, TimestampMixin):
     portfolio_snapshot_id: Mapped[int] = mapped_column(
         ForeignKey("portfolio_daily_snapshots.id", ondelete="CASCADE"), index=True
     )
-    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id"), index=True)
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id", ondelete="CASCADE"), index=True)
     snapshot_date: Mapped[date] = mapped_column(Date, index=True)
     currency: Mapped[str] = mapped_column(String(10), index=True)
     balance_native: Mapped[Decimal] = mapped_column(Numeric(24, 6))
@@ -550,6 +592,14 @@ class InsiderFiling(TenantOwnedMixin, Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("tenant_id", "accession_number", name="uq_insider_filings_tenant_accession"),
         Index("ix_insider_filings_issuer", "issuer_cik"),
+        # /api/insider/filings lista y cuenta por issuer_ticker ordenando por
+        # filing_date DESC; sin este indice era Seq Scan por peticion.
+        Index(
+            "ix_insider_filings_tenant_ticker_date",
+            "tenant_id",
+            "issuer_ticker",
+            "filing_date",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -559,7 +609,7 @@ class InsiderFiling(TenantOwnedMixin, Base, TimestampMixin):
     amends_accession: Mapped[str | None] = mapped_column(String(40), nullable=True)
     issuer_cik: Mapped[str] = mapped_column(String(20))
     issuer_ticker: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    issuer_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    issuer_name: Mapped[str | None] = mapped_column(String(250), nullable=True)
     filing_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
     report_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
     period_of_report: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -665,13 +715,25 @@ class Document(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "documents"
     __table_args__ = (
         Index("ix_documents_company_id", "company_id"),
+        # 0122: barrido perezoso (skip scan) del panel data-health.
+        Index(
+            "ix_docs_health_src_cid",
+            "tenant_id", "source_type", "company_id",
+            postgresql_where=text("source_type NOT IN ('seed', 'manual', 'test', 'dummy', 'placeholder') AND company_id IS NOT NULL"),
+        ),
+        # 0122: barrido perezoso (skip scan) del panel data-health.
+        Index(
+            "ix_docs_health_src_upd",
+            "tenant_id", "source_type", "updated_at",
+            postgresql_where=text("source_type NOT IN ('seed', 'manual', 'test', 'dummy', 'placeholder') AND company_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int | None] = mapped_column(
         ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
     )
-    title: Mapped[str] = mapped_column(String(500))
+    title: Mapped[str] = mapped_column(String(400))
     source_type: Mapped[str] = mapped_column(String(80), index=True)
     source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     storage_uri: Mapped[str | None] = mapped_column(String(1000), nullable=True)
@@ -765,6 +827,23 @@ class FinancialFact(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "financial_facts"
     __table_args__ = (
         Index("ix_financial_facts_company_metric_year", "company_id", "metric", "fiscal_year"),
+        # 0122: barrido perezoso (skip scan) del panel data-health / metric-coverage.
+        Index(
+            "ix_facts_health_src_cid",
+            "tenant_id", "source_type", "company_id",
+            postgresql_where=text("is_reported AND source_type NOT IN ('seed', 'manual', 'test', 'dummy', 'placeholder') AND company_id IS NOT NULL"),
+        ),
+        # 0122: barrido perezoso (skip scan) del panel data-health / metric-coverage.
+        Index(
+            "ix_facts_health_src_upd",
+            "tenant_id", "source_type", "updated_at",
+            postgresql_where=text("is_reported AND source_type NOT IN ('seed', 'manual', 'test', 'dummy', 'placeholder') AND company_id IS NOT NULL"),
+        ),
+        # 0122: barrido perezoso (skip scan) del panel data-health / metric-coverage.
+        Index(
+            "ix_facts_tenant_metric",
+            "tenant_id", "metric"
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -776,7 +855,7 @@ class FinancialFact(TenantOwnedMixin, Base, TimestampMixin):
     fiscal_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     fiscal_quarter: Mapped[str | None] = mapped_column(String(10), nullable=True)
     source_id: Mapped[int | None] = mapped_column(
-        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True
     )
     source_type: Mapped[str] = mapped_column(String(80), default="seed")
     is_reported: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -879,6 +958,26 @@ class KPIExtractionCandidate(TenantOwnedMixin, Base, TimestampMixin):
     trace: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
+class _DescNullsLast(TextClause):
+    """'col DESC NULLS LAST' en Postgres; 'col DESC' en sqlite.
+
+    sqlite no acepta NULLS LAST dentro de CREATE INDEX ("unsupported use"),
+    asi que la variante sqlite lo omite: mismo orden de filas no nulas,
+    que es lo unico que recorren las consultas. El texto base es el DDL
+    fiel de Postgres para que el rachet de deriva (compare_metadata contra
+    la BD reflejada) coincida.
+    """
+
+    def __init__(self, columna: str) -> None:
+        super().__init__(f"{columna} DESC NULLS LAST")
+        self.columna = columna
+
+
+@compiles(_DescNullsLast, "sqlite")
+def _desc_nulls_last_sqlite(element, compiler, **kw):  # noqa: ANN001, ANN202, ARG001
+    return f"{element.columna} DESC"
+
+
 class CalculatedMetric(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "calculated_metrics"
     __table_args__ = (
@@ -891,6 +990,28 @@ class CalculatedMetric(TenantOwnedMixin, Base, TimestampMixin):
             name="uq_calculated_metric_definition_period",
         ),
         Index("ix_calculated_metrics_company_metric", "company_id", "metric"),
+        # metric-coverage (0119): distinct metric filtrado por status/value.
+        Index(
+            "ix_calc_metrics_tenant_metric_ok",
+            "tenant_id",
+            "metric",
+            postgresql_where=text("status = 'ok' AND value IS NOT NULL"),
+        ),
+        # 0120: la ventana row_number del screener (particion company+metric,
+        # orden fiscal_year DESC NULLS LAST, id DESC) la recorre sin sort.
+        # Variante por dialecto como la propia migracion 0120: el texto del
+        # modelo es el DDL fiel de PG (lo que compara el rachet de deriva
+        # contra la BD reflejada) y sqlite emite la misma columna sin NULLS
+        # LAST, que no acepta en CREATE INDEX.
+        Index(
+            "ix_calc_metrics_screener_window",
+            "tenant_id",
+            "company_id",
+            "metric",
+            _DescNullsLast("fiscal_year"),
+            text("id DESC"),
+            postgresql_where=text("status = 'ok' AND value IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -921,7 +1042,7 @@ class FinancialStatement(TenantOwnedMixin, Base, TimestampMixin):
     fiscal_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     fiscal_quarter: Mapped[str | None] = mapped_column(String(10), nullable=True)
     source_id: Mapped[int | None] = mapped_column(
-        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True
     )
     facts: Mapped[dict] = mapped_column(JSON, default=dict)
 
@@ -988,7 +1109,26 @@ class PortfolioMoveDigest(TenantOwnedMixin, Base, TimestampMixin):
 
 class MarketPrice(Base, TimestampMixin):
     __tablename__ = "market_prices"
-    __table_args__ = (UniqueConstraint("company_id", "date", name="uq_market_price_company_date"),)
+    __table_args__ = (
+        UniqueConstraint("company_id", "date", name="uq_market_price_company_date"),
+        # data-health (0119): group by source con close > 0 era Seq Scan con
+        # spill; market_prices es global, sin ix_tenant_id de 0117.
+        Index(
+            "ix_market_prices_source_cov",
+            "source",
+            "company_id",
+            "updated_at",
+            postgresql_where=text("close > 0"),
+        ),
+        # 0122: max(updated_at) por fuente en una sonda hacia atras.
+        Index(
+            "ix_prices_source_upd",
+            "source",
+            "updated_at",
+            postgresql_where=text("close > 0"),
+        ),
+        CheckConstraint("close >= 0", name="ck_market_prices_close_non_negative"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
@@ -1196,13 +1336,40 @@ class NewsEvent(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "news_events"
     __table_args__ = (
         Index("ix_news_events_company_date", "company_id", "date"),
+        # 0122: barrido perezoso (skip scan) del panel data-health.
+        Index(
+            "ix_news_health_src_cid",
+            "tenant_id", "source", "company_id",
+            postgresql_where=text("source NOT IN ('seed', 'manual', 'test', 'dummy', 'placeholder') AND company_id IS NOT NULL"),
+        ),
+        # 0122: barrido perezoso (skip scan) del panel data-health.
+        Index(
+            "ix_news_health_src_upd",
+            "tenant_id", "source", "updated_at",
+            postgresql_where=text("source NOT IN ('seed', 'manual', 'test', 'dummy', 'placeholder') AND company_id IS NOT NULL"),
+        ),
+        # 0120: portada del feed ordena por (date DESC, id DESC) y para al
+        # llenar la pagina; antes era Seq Scan + sort de toda la tabla.
+        Index("ix_news_events_date_id", desc("date"), desc("id")),
+        # 0120: carril macro (lane + frescura 72h) sondea este parcial.
+        Index(
+            "ix_news_events_macro_date_id",
+            desc("date"),
+            desc("id"),
+            postgresql_where=text("(metadata ->> 'news_lane') = 'macro'"),
+        ),
+        UniqueConstraint("sec_filing_identity", name="uq_news_sec_filing_identity"),
     )
+
+    sec_filing_identity: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int | None] = mapped_column(
         ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True
     )
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # VARCHAR(500): prod guarda titulos de hasta 467 caracteres (MEDIDO
+    # 2026-10-31); la reduccion a 400 de 0105 se retiro para no perderlos.
     title: Mapped[str] = mapped_column(String(500))
     source: Mapped[str] = mapped_column(String(120), default="manual")
     url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
@@ -1222,10 +1389,10 @@ class ExternalClaim(TenantOwnedMixin, Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int | None] = mapped_column(
-        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True
     )
     source_id: Mapped[int | None] = mapped_column(
-        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True
     )
     claim: Mapped[str] = mapped_column(Text)
     claim_type: Mapped[str] = mapped_column(String(80))
@@ -1243,7 +1410,7 @@ class Transcript(TenantOwnedMixin, Base, TimestampMixin):
     title: Mapped[str] = mapped_column(String(500))
     period: Mapped[str] = mapped_column(String(40))
     source_id: Mapped[int | None] = mapped_column(
-        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True
     )
     transcript_text: Mapped[str] = mapped_column(Text, default="")
 
@@ -1279,7 +1446,7 @@ class Catalyst(TenantOwnedMixin, Base, TimestampMixin):
     materiality_score: Mapped[int] = mapped_column(Integer, default=5)
     status: Mapped[str] = mapped_column(String(40), default="open")
     source_id: Mapped[int | None] = mapped_column(
-        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
 
@@ -1468,6 +1635,9 @@ class ThesisChange(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "thesis_changes"
     __table_args__ = (
         Index("ix_thesis_changes_company_created", "company_id", "created_at"),
+        # /api/attention-thesis: sondas del nestloop por (tenant, company, id);
+        # sin el id en el indice cada sonda leia ~64 filas y descartaba 63.
+        Index("ix_thesis_changes_tenant_company_id", "tenant_id", "company_id", "id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -1527,7 +1697,7 @@ class SourceAudit(TenantOwnedMixin, Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     thesis_version_id: Mapped[int | None] = mapped_column(
-        ForeignKey("thesis_versions.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("thesis_versions.id", ondelete="SET NULL"), nullable=True, index=True
     )
     passed: Mapped[bool] = mapped_column(Boolean, default=False)
     source_coverage_score: Mapped[int] = mapped_column(Integer, default=0)
@@ -1720,6 +1890,15 @@ class ResearchAlert(TenantOwnedMixin, Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("tenant_id", "fingerprint", name="uq_research_alert_fingerprint"),
         Index("ix_research_alerts_company_status", "company_id", "status"),
+        # 0121: el feed del inicio ordena por ultimo disparo real
+        # (coalesce(last_triggered_at, created_at) DESC, id DESC) con scope
+        # de tenant; antes era Seq Scan + sort para devolver 3 filas.
+        Index(
+            "ix_research_alerts_home_feed",
+            "tenant_id",
+            text("coalesce(last_triggered_at, created_at) DESC"),
+            desc("id"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -1881,7 +2060,7 @@ class ConnectorState(TenantOwnedMixin, Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     connector: Mapped[str] = mapped_column(String(80), index=True)
     company_id: Mapped[int | None] = mapped_column(
-        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True
     )
     feed_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     cursor: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -2018,6 +2197,12 @@ class FundamentalValuationSnapshot(TenantOwnedMixin, Base, TimestampMixin):
             "market_snapshot_fingerprint",
             name="uq_fundamental_valuation_market_snapshot",
         ),
+        # MEDIDO: el nombre autogenerado (ix_<tabla>_<columna>, 65 chars) supera
+        # el limite de identificadores de PostgreSQL (63); nombre explicito.
+        Index(
+            "ix_fundamental_valuation_snapshots_valuation_fp",
+            "valuation_snapshot_fingerprint",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -2027,7 +2212,7 @@ class FundamentalValuationSnapshot(TenantOwnedMixin, Base, TimestampMixin):
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     current_price: Mapped[Decimal | None] = mapped_column(Numeric(20, 6), nullable=True)
     market_snapshot_fingerprint: Mapped[str] = mapped_column(String(64), index=True)
-    valuation_snapshot_fingerprint: Mapped[str] = mapped_column(String(64), index=True)
+    valuation_snapshot_fingerprint: Mapped[str] = mapped_column(String(64))
     snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
@@ -2203,7 +2388,7 @@ class KnowledgeDocument(TenantOwnedMixin, Base, TimestampMixin):
     source_document_id: Mapped[int | None] = mapped_column(
         ForeignKey("documents.id"), nullable=True, unique=True
     )
-    title: Mapped[str] = mapped_column(String(500))
+    title: Mapped[str] = mapped_column(String(400))
     author: Mapped[str | None] = mapped_column(String(240), nullable=True, index=True)
     document_type: Mapped[str] = mapped_column(String(80), index=True)
     source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
@@ -2329,13 +2514,19 @@ class InvestmentCaseStudy(TenantOwnedMixin, Base, TimestampMixin):
 
 class DecisionLesson(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "decision_lessons"
+    # MEDIDO: la migracion creo un CONSTRAINT unique (no indice) con este
+    # nombre; el modelo lo declara igual para que la deriva sea cero. La
+    # unicidad (y su indice de soporte en PG) es identica.
+    __table_args__ = (
+        UniqueConstraint("expectation_review_id", name="uq_decision_lesson_expectation_review"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     decision_journal_entry_id: Mapped[int | None] = mapped_column(
         ForeignKey("decision_journal_entries.id"), nullable=True, index=True
     )
     expectation_review_id: Mapped[int | None] = mapped_column(
-        ForeignKey("expectation_reviews.id"), nullable=True, unique=True, index=True
+        ForeignKey("expectation_reviews.id"), nullable=True
     )
     company_id: Mapped[int | None] = mapped_column(
         ForeignKey("companies.id"), nullable=True, index=True
@@ -2508,6 +2699,11 @@ class KnowledgeGraphEdge(TenantOwnedMixin, Base, TimestampMixin):
 
 class ManagementPromise(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "management_promises"
+    # MEDIDO: la BD tiene el unique como constraint con nombre automatico de
+    # PG (columna UNIQUE en el CREATE TABLE); el modelo lo declara igual.
+    __table_args__ = (
+        UniqueConstraint("call_claim_id", name="management_promises_call_claim_id_key"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
@@ -2515,7 +2711,7 @@ class ManagementPromise(TenantOwnedMixin, Base, TimestampMixin):
         ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True
     )
     call_claim_id: Mapped[int | None] = mapped_column(
-        ForeignKey("call_claims.id", ondelete="SET NULL"), nullable=True, unique=True, index=True
+        ForeignKey("call_claims.id", ondelete="SET NULL"), nullable=True
     )
     promise: Mapped[str] = mapped_column(Text)
     promise_date: Mapped[date] = mapped_column(Date, index=True)
@@ -2546,7 +2742,7 @@ class TaxReport(TenantOwnedMixin, Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     portfolio_id: Mapped[int | None] = mapped_column(
-        ForeignKey("portfolios.id"), nullable=True, index=True
+        ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=True, index=True
     )
     fiscal_year: Mapped[int] = mapped_column(Integer, index=True)
     base_currency: Mapped[str] = mapped_column(String(10), default="EUR")
@@ -2558,13 +2754,15 @@ class TaxReport(TenantOwnedMixin, Base, TimestampMixin):
         DateTime(timezone=True), default=utcnow
     )
 
+    portfolio: Mapped["Portfolio | None"] = relationship("Portfolio", back_populates="tax_reports")
+
 
 class InvestmentPlan(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "investment_plans"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     portfolio_id: Mapped[int | None] = mapped_column(
-        ForeignKey("portfolios.id"), nullable=True, index=True
+        ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=True, index=True
     )
     monthly_contribution: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     # Divisa de la aportacion mensual. NULL = «divisa no registrada» (planes
@@ -2577,6 +2775,8 @@ class InvestmentPlan(TenantOwnedMixin, Base, TimestampMixin):
     horizon_years: Mapped[int] = mapped_column(Integer, default=30)
     target_allocations: Mapped[list[dict]] = mapped_column(JSON, default=list)
     status: Mapped[str] = mapped_column(String(40), default="active", index=True)
+
+    portfolio: Mapped["Portfolio | None"] = relationship("Portfolio", back_populates="investment_plans")
 
 
 class PlanContribution(TenantOwnedMixin, Base, TimestampMixin):
@@ -3032,6 +3232,31 @@ class PrivacyAuditEvent(Base):
     )
     user_id: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+
+
+class AuditLog(Base):
+    """Registro inmutable de auditoria para operaciones criticas del sistema.
+
+    Fulfills: VAL-DB-008
+    Append-only: las filas nunca se actualizan ni se eliminan.
+    """
+
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String(80), index=True)
+    resource_type: Mapped[str] = mapped_column(String(80), index=True)
+    resource_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    before_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    after_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, index=True
     )
