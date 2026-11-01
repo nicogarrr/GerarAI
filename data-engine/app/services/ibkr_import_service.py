@@ -123,6 +123,56 @@ def _flex_position_amount_errors(where: str, element: ElementTree.Element) -> li
     )
 
 
+_MAX_NUMERIC_10_6 = Decimal("9999.999999")
+
+
+def _flex_secondary_errors(
+    where: str,
+    element: ElementTree.Element,
+    checks: tuple[tuple[str, tuple[str, ...], Decimal], ...],
+    skipped: str,
+) -> list[str]:
+    """Atributos secundarios del Flex que no son número o no caben.
+
+    ``fifoPnlUnrealized``, ``settledCash`` e ``interestRate`` pasaban directos a
+    ``_decimal``: ``validate_flex_xml`` daba el fichero por bueno y la
+    importación lanzaba (se perdía el fichero entero, también al sincronizar);
+    uno que no cabe en su columna llegaba al INSERT (500 en Postgres).
+    Ahora solo se omite esa fila, como con #4062.
+    """
+    errors: list[str] = []
+    for word, names, ceiling in checks:
+        raw = _attr(element, *names)
+        if raw is None:
+            continue
+        if not _is_number(raw):
+            errors.append(f"{where}: {word} '{raw}' {_nan_reason(raw)}. {skipped}; corrige el valor o excluye la fila.")
+        elif _exceeds(raw, ceiling):
+            errors.append(f"{where}: {word} '{raw}' es demasiado grande. {skipped}; revísala a mano.")
+    return errors
+
+
+def _flex_position_pnl_errors(where: str, element: ElementTree.Element) -> list[str]:
+    return _flex_secondary_errors(
+        where,
+        element,
+        (("la plusvalía latente", ("fifoPnlUnrealized", "unrealizedPnl"), _MAX_NUMERIC_20_2),),
+        "Esa posición se omite",
+    )
+
+
+def _flex_cash_extra_errors(where: str, element: ElementTree.Element) -> list[str]:
+    return _flex_secondary_errors(
+        where,
+        element,
+        (
+            ("el saldo liquidado", ("settledCash", "endingSettledCash"), _MAX_NUMERIC_20_2),
+            ("el tipo de interés", ("interestRate",), _MAX_NUMERIC_10_6),
+        ),
+        "Ese saldo se omite",
+    )
+
+
 def _is_negative_number(value: str | None) -> bool:
     """Un precio de operación negativo no cabe en la cartera (la BD lo rechaza)."""
     if value in (None, ""):
@@ -275,6 +325,7 @@ def _validate_flex_xml(xml_text: str) -> list[str]:
                     break
             if symbol and not missing_fields:
                 errors.extend(_flex_position_amount_errors(f"Fila {index} (OpenPosition {symbol})", element))
+                errors.extend(_flex_position_pnl_errors(f"Fila {index} (OpenPosition {symbol})", element))
         elif tag == "Trade":
             symbol = _attr(element, "symbol", "underlyingSymbol")
             if not symbol:
@@ -337,6 +388,8 @@ def _validate_flex_xml(xml_text: str) -> list[str]:
                     "Corrige el valor o excluye la fila."
                 )
             errors.extend(_flex_amount_errors(f"Fila {index} (CashReport)", (("el saldo", raw_cash, _MAX_NUMERIC_20_2),)))
+            cash_currency = _attr(element, "currency") or "?"
+            errors.extend(_flex_cash_extra_errors(f"Fila {index} (CashReport {cash_currency})", element))
     return errors
 
 
@@ -1559,7 +1612,7 @@ class IBKRImportService:
                 if any(
                     raw is not None and not _is_number(raw)
                     for raw in (raw_quantity, raw_price, raw_value, raw_cost)
-                ) or _flex_position_amount_errors("", element):
+                ) or _flex_position_amount_errors("", element) or _flex_position_pnl_errors("", element):
                     rows_skipped += 1
                     position_rows_skipped += 1
                     continue
@@ -1683,6 +1736,7 @@ class IBKRImportService:
                     raw_cash is None
                     or not _is_number(raw_cash)
                     or _exceeds(raw_cash, _MAX_NUMERIC_20_2)
+                    or _flex_cash_extra_errors("", element)
                 ):
                     # A missing amount is not zero: it would overwrite a real
                     # CashBalance with 0 (same rule as OpenPosition, F377).
