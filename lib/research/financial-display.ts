@@ -58,8 +58,9 @@ export function financialFormula(value: string, locale: 'es' | 'en' = 'es'): str
   return text.replace(/\b[A-Za-z][A-Za-z0-9_]*\b/g, (word) => WORDS[word] ?? word);
 }
 
-export function financialSegment(value: string): string {
-  return value === 'consolidated' ? 'Consolidado' : value;
+export function financialSegment(value: string, locale: 'es' | 'en' = 'es'): string {
+  if (value === 'consolidated') return locale === 'en' ? 'Consolidated' : 'Consolidado';
+  return value;
 }
 
 const DEFINITIONS: Record<string, string> = {
@@ -88,7 +89,9 @@ const DEFINITIONS: Record<string, string> = {
     'Beneficio del propietario de Buffett (carta de Berkshire Hathaway de 1986): beneficio neto + depreciación y amortización + variación del capital circulante (con el signo del flujo de caja: negativa cuando el circulante absorbe caja) − inversión de mantenimiento (estimada como mínimo(|capex|, D&A) si no se publica).',
 };
 
-export function financialDefinition(value: string): string {
+export function financialDefinition(value: string, locale: 'es' | 'en' = 'es'): string {
+  // El backend entrega la definición en inglés: en EN se muestra tal cual.
+  if (locale === 'en') return value;
   return DEFINITIONS[value] ?? financialFormula(value);
 }
 

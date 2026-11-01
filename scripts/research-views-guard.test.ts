@@ -114,7 +114,7 @@ describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
         // Las secciones no principales degradan a aviso inline, nunca a vacío.
         assert.ok(page.includes("optionalSection('terminal', t('research.fichaSecTerminal')"), 'terminal con título i18n');
         assert.equal(esResearch['fichaSecTerminal'], 'Terminal financiero', 'el literal ES visible no cambia');
-        assert.match(page, /<SectionLoadError retryHref=/);
+        assert.match(page, /<SectionLoadError locale=\{locale\} retryHref=/);
     });
 
     it('el resumen conserva el acceso al modelo completo en su ancla canónica', () => {

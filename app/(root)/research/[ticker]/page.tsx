@@ -1450,7 +1450,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         )}
         <GuideContextPanel ticker={ticker} context={guideContext} hideReviews />
         <DecisionAndRealityPanel ticker={ticker} decisions={data.decisions} reviews={data.expectations} trades={data.trades} t={t} locale={locale} />
-        <CompanyPaperTrades state={paperTrades} ticker={ticker} />
+        <CompanyPaperTrades locale={locale} state={paperTrades} ticker={ticker} />
       </div>
     );
   };
@@ -1778,9 +1778,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   const buildTerminalSection = async (): Promise<React.ReactNode> => {
     const terminal = await viewData('terminal');
     if (!terminal) return <EmptyState title={t('research.fichaTerminalEmpty')} />;
-    return <FinancialTerminalSection metrics={terminalQuery.metrics} periodicity={terminalQuery.periodicity} terminal={terminal} years={terminalQuery.years} />;
+    return <FinancialTerminalSection locale={locale} metrics={terminalQuery.metrics} periodicity={terminalQuery.periodicity} terminal={terminal} years={terminalQuery.years} />;
   };
-  const buildCapitalSection = async (): Promise<React.ReactNode> => <ShareCapitalSection data={await viewData('capital')} ticker={ticker} />;
+  const buildCapitalSection = async (): Promise<React.ReactNode> => <ShareCapitalSection data={await viewData('capital')} locale={locale} ticker={ticker} />;
   const buildSupuestosSection = async (): Promise<React.ReactNode> => <DriverAssumptionsSection assumptions={await viewData('supuestos')} locale={locale} ticker={ticker} />;
   const buildDirectivaSection = async (): Promise<React.ReactNode> => {
     const dashboard = await viewData('directiva');
@@ -1799,7 +1799,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       return { id, title, node: await build() };
     } catch (error) {
       console.warn(`[research] ${ticker} · sección ${id} falló: ${error instanceof Error ? error.message : String(error)}`);
-      return { id, title, node: <SectionLoadError retryHref={`${tabHref(ticker, tabOfView(activeView))}#${id}`} title={title} /> };
+      return { id, title, node: <SectionLoadError locale={locale} retryHref={`${tabHref(ticker, tabOfView(activeView))}#${id}`} title={title} /> };
     }
   };
 

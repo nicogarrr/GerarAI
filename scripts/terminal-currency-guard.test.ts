@@ -9,7 +9,10 @@ test('terminal uses declared currency with English scale and no duplicate raw su
  assert.doesNotMatch(formatProvenanceValue(19360000000,'EUR'), /US\$/);
  // El terminal es una sección de la pestaña Finanzas desde el 29-oct-2026.
  const page=readFileSync('components/research/sections/FinancialTerminalSection.tsx','utf8');
- assert.match(page,/formatProvenanceValue\(raw, unit\)/);
+ assert.match(page,/formatProvenanceValue\(raw, unit, locale\)/);
  assert.doesNotMatch(page,/>\{point.unit\}<\/span>/);
- assert.match(page,/N\/D \(unidad no disponible\)/);
+ // El literal vive en el diccionario (Ajustes → Idioma); en español no cambia.
+ assert.match(page,/t\('research\.terminalSection\.noUnit'\)/);
+ const es=JSON.parse(readFileSync('lib/i18n/messages/es/research.json','utf8'));
+ assert.equal(es.terminalSection.noUnit,'N/D (unidad no disponible)');
 });

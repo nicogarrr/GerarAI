@@ -1,5 +1,5 @@
 // @ts-expect-error TS5097: explicit extension for node strip-types guards.
-import { formatMoneyCompact } from '../format.ts';
+import { formatMoneyCompact, naFor } from '../format.ts';
 
 /**
  * Fichas «etiqueta / valor» para los inputs inferidos de una tesis (F4).
@@ -70,14 +70,16 @@ function plainNumber(parsed: number): string {
 export function formatProvenanceValue(
     value: number | string | null | undefined,
     unit?: string | null,
+    locale: "es" | "en" = "es",
 ): string {
     const parsed = toNumber(value);
     if (parsed === null) {
         if (typeof value === "string" && value.trim() !== "") return value.trim();
-        return NA;
+        return locale === "en" ? naFor("en") : NA;
     }
     const rawUnit = (unit ?? "").trim();
     const lower = rawUnit.toLowerCase();
+    if (locale === "en") return formatProvenanceValueEn(parsed, rawUnit, lower);
     if (RATIO_UNITS.has(lower) || PERCENT_UNITS.has(lower)) {
         const ratio = PERCENT_UNITS.has(lower) ? parsed / 100 : parsed;
         return new Intl.NumberFormat("es-ES", {
@@ -92,6 +94,31 @@ export function formatProvenanceValue(
     if (perUnit) return `${plainNumber(parsed)} ${perUnit[1].toUpperCase()} por unidad`;
     if (rawUnit) return `${plainNumber(parsed)} ${UNIT_NAMES[lower] ?? rawUnit}`;
     return plainNumber(parsed);
+}
+
+/**
+ * Versión en inglés (Ajustes → Idioma): mismas unidades y escala, con
+ * separadores y nombres en inglés («$70.92M», «14.4%», «1,234 shares»).
+ */
+function formatProvenanceValueEn(parsed: number, rawUnit: string, lower: string): string {
+    const plain = (n: number) => new Intl.NumberFormat("en-US", Math.abs(n) >= 1e6
+        ? { notation: "compact", minimumFractionDigits: 2, maximumFractionDigits: 2 }
+        : { maximumFractionDigits: 2 }).format(n);
+    if (RATIO_UNITS.has(lower) || PERCENT_UNITS.has(lower)) {
+        const ratio = PERCENT_UNITS.has(lower) ? parsed / 100 : parsed;
+        return new Intl.NumberFormat("en-US", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(ratio);
+    }
+    if (isCurrencyCode(rawUnit)) {
+        const abs = Math.abs(parsed);
+        return new Intl.NumberFormat("en-US", abs >= 1e6
+            ? { style: "currency", currency: rawUnit, notation: "compact", minimumFractionDigits: 2, maximumFractionDigits: 2 }
+            : { style: "currency", currency: rawUnit, maximumFractionDigits: abs >= 100 ? 0 : 2, minimumFractionDigits: abs >= 100 ? 0 : 2 }).format(parsed);
+    }
+    if (['pure', 'unitless', 'dimensionless', 'count', 'number', 'units', 'unit'].includes(lower)) return plain(parsed);
+    const perUnit = /^([A-Za-z]{3})_per_unit$/.exec(rawUnit);
+    if (perUnit) return `${plain(parsed)} ${perUnit[1].toUpperCase()} per unit`;
+    if (rawUnit) return `${plain(parsed)} ${rawUnit.replaceAll("_", " ")}`;
+    return plain(parsed);
 }
 
 /** "addressable_subscribers" -> "Suscriptores direccionables" (primera letra en mayuscula). */
