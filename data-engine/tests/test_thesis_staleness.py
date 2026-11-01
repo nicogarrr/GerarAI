@@ -16,7 +16,7 @@ from sqlalchemy import select
 
 import main
 from app.core.database import SessionLocal, init_db
-from app.models import Company, FinancialFact, ThesisVersion
+from app.models import Company, Document, FinancialFact, MarketPrice, NewsEvent, ThesisVersion
 from app.seed import seed
 
 TICKER = "ASTS"
@@ -27,7 +27,10 @@ def _clean() -> None:
     try:
         company = db.scalar(select(Company).where(Company.ticker == TICKER))
         if company:
-            db.query(FinancialFact).filter(FinancialFact.company_id == company.id).delete()
+            # Freshness checks all four inputs, not only financial facts.
+            # Earlier suites can leave ASTS prices/news/documents behind.
+            for model in (FinancialFact, MarketPrice, NewsEvent, Document):
+                db.query(model).filter(model.company_id == company.id).delete()
             db.query(ThesisVersion).filter(ThesisVersion.company_id == company.id).delete()
             db.commit()
     finally:
