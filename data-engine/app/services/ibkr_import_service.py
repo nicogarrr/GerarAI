@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import re
+import unicodedata
 from collections import Counter
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta
@@ -173,6 +174,42 @@ def _flex_cash_extra_errors(where: str, element: ElementTree.Element) -> list[st
     )
 
 
+_MAX_SYMBOL_LENGTH = 20  # Company.ticker es String(20)
+_SYMBOL_ROW_TAGS = frozenset({"OpenPosition", "Trade", "CashTransaction"})
+
+
+def _symbol_problem(symbol: str | None) -> str | None:
+    """Por qué un símbolo no puede ser el ticker de una ficha (o None si vale).
+
+    Uno de más de 20 caracteres o con un NUL hacía fallar el INSERT de la ficha
+    en Postgres (500: se perdía el fichero entero); uno con salto de línea o sin
+    letras ni cifras («.») creaba una ficha basura. «BRK B» sigue valiendo.
+    """
+    if not symbol:
+        return None
+    if any(unicodedata.category(char) in {"Cc", "Zl", "Zp"} for char in symbol):
+        return "lleva saltos de línea o caracteres de control"
+    if len(symbol.strip()) > _MAX_SYMBOL_LENGTH:
+        return f"tiene más de {_MAX_SYMBOL_LENGTH} caracteres"
+    if not any(char.isalnum() for char in symbol):
+        return "no tiene letras ni cifras"
+    return None
+
+
+def _shown_symbol(symbol: str) -> str:
+    shown = "".join(char if char.isprintable() else "?" for char in symbol)
+    return shown if len(shown) <= 30 else shown[:30] + "…"
+
+
+def _flex_symbol_problem(element: ElementTree.Element) -> str | None:
+    """Símbolo imposible en una fila que se importaría como acción, fondo o cobro."""
+    if _tag_name(element) not in _SYMBOL_ROW_TAGS or _is_non_share_row(element):
+        return None
+    if (_attr(element, "assetCategory") or "").upper() == "CASH":
+        return None  # cambio de divisa (EUR.USD): va al libro de divisas
+    return _symbol_problem(_attr(element, "symbol", "underlyingSymbol"))
+
+
 def _is_negative_number(value: str | None) -> bool:
     """Un precio de operación negativo no cabe en la cartera (la BD lo rechaza)."""
     if value in (None, ""):
@@ -236,8 +273,20 @@ def _is_date(value: str | None) -> bool:
     return False
 
 
+def _trim_xml_lead(xml_text: str) -> str:
+    """Quita BOM y líneas en blanco delante de «<?xml …?>» (copiar desde el navegador).
+
+    El parser exige la declaración en el primer carácter: antes salía «XML or text
+    declaration not at start of entity» y se rechazaba un Flex correcto.
+    """
+    if isinstance(xml_text, str):
+        return xml_text.lstrip("\ufeff \t\r\n")
+    return xml_text
+
+
 def validate_flex_xml(xml_text: str) -> list[str]:
     """Valida un Flex Query XML de IBKR (fechas con barra: orden por fichero)."""
+    xml_text = _trim_xml_lead(xml_text)
     try:
         root = DefusedElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
     except EntitiesForbidden:
@@ -292,6 +341,14 @@ def _validate_flex_xml(xml_text: str) -> list[str]:
                 return [_PNL_NOT_READY_MESSAGE]
     for index, element in enumerate(root.iter(), start=1):
         tag = _tag_name(element)
+        symbol_problem = _flex_symbol_problem(element)
+        if symbol_problem:
+            raw_symbol = _attr(element, "symbol", "underlyingSymbol") or ""
+            errors.append(
+                f"Fila {index} ({tag}): el símbolo '{_shown_symbol(raw_symbol)}' {symbol_problem}. "
+                "Esa fila se omite; revísala a mano."
+            )
+            continue
         if tag == "OpenPosition":
             symbol = _attr(element, "symbol", "underlyingSymbol")
             if not symbol:
@@ -582,6 +639,15 @@ def validate_ibkr_csv(csv_text: str) -> list[str]:
         if not symbol:
             errors.append(
                 f"Fila {line_number} del CSV: falta el símbolo. Indica el ticker (p. ej. AAPL) o elimina la fila."
+            )
+            continue
+        category_at = mapping.get("asset_category")
+        category = row[category_at].strip().upper() if category_at is not None and category_at < len(row) else ""
+        symbol_problem = None if category in _CSV_NON_SHARE_ASSET_CATEGORIES else _symbol_problem(symbol)
+        if symbol_problem:
+            errors.append(
+                f"Fila {line_number} del CSV: el símbolo '{_shown_symbol(symbol)}' {symbol_problem}. "
+                "Corrige el ticker o elimina la fila."
             )
             continue
         raw_action = row[mapping["action"]].strip() if mapping["action"] < len(row) else ""
@@ -1356,6 +1422,7 @@ class IBKRImportService:
         Query configurada con dd/MM/yyyy fechaba el 05/03 como 3 de mayo y
         omitía el 15/03 por «fecha no reconocida».
         """
+        xml_text = _trim_xml_lead(xml_text)
         try:
             root = DefusedElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
         except EntitiesForbidden as exc:
@@ -1594,6 +1661,12 @@ class IBKRImportService:
                 )
                 if notice not in row_errors:
                     row_errors.append(notice)
+                continue
+            if _flex_symbol_problem(element):
+                # validate_flex_xml ya lo devuelve en row_errors.
+                rows_skipped += 1
+                if tag == "OpenPosition":
+                    position_rows_skipped += 1
                 continue
             if tag == "OpenPosition":
                 symbol = _attr(element, "symbol", "underlyingSymbol")
