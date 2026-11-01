@@ -101,3 +101,55 @@ def test_actor_error_transitorio_relancia_para_reintento(engine, monkeypatch):
     _fake_service(monkeypatch, exc=redis_exc.ConnectionError("redis caido"))
     with pytest.raises(redis_exc.ConnectionError):
         dramatiq_app.extract_document_kpis.fn(doc_id)  # dramatiq reintenta
+
+
+# ---------- 429 del proveedor LLM (dead-letter de prod, 1-nov-2026) ----------
+
+
+def _current(monkeypatch, retries):
+    import time
+
+    message = SimpleNamespace(
+        options={"retries": retries}, actor_name="extract_document_kpis", message_timestamp=time.time() * 1000
+    )
+    monkeypatch.setattr(dramatiq_app.CurrentMessage, "get_current_message", classmethod(lambda cls: message))
+
+
+def test_actor_429_del_proveedor_reintenta_con_espera_larga(engine, monkeypatch):
+    import dramatiq
+
+    from app.llm.errors import ProviderHTTPError
+
+    monkeypatch.setattr(dramatiq_app, "_session", lambda *a: _open(engine))
+    doc_id = _document(engine, metadata={"kpi_deferred": {"attempts": 0}})
+    _fake_service(monkeypatch, exc=ProviderHTTPError("openrouter", 429))
+    _current(monkeypatch, retries=1)
+    with pytest.raises(dramatiq.Retry) as caught:
+        dramatiq_app.extract_document_kpis.fn(doc_id)
+    # Antes: backoff del actor de 15-30 s; la ventana del proveedor seguia cerrada.
+    assert caught.value.delay >= 2 * dramatiq_app.KPI_RATE_LIMIT_BASE_SECONDS * 1000
+
+
+def test_actor_429_en_el_ultimo_intento_no_va_a_dead_letter_y_queda_diferido(engine, monkeypatch):
+    from app.llm.errors import ProviderHTTPError
+
+    monkeypatch.setattr(dramatiq_app, "_session", lambda *a: _open(engine))
+    doc_id = _document(engine, metadata={"kpi_deferred": {"attempts": 0, "queued_at": 1}})
+    _fake_service(monkeypatch, exc=ProviderHTTPError("openrouter", 429))
+    _current(monkeypatch, retries=dramatiq_app.extract_document_kpis.options["max_retries"])
+    out = dramatiq_app.extract_document_kpis.fn(doc_id)
+    assert out["status"] == "skipped"
+    assert out["reason"] == "rate_limited_retries_exhausted"
+    with _open(engine) as db:
+        # La marca diferida sigue: backfill_document_kpis lo vuelve a encolar.
+        assert "kpi_deferred" in db.get(Document, doc_id).metadata_
+
+
+def test_actor_5xx_del_proveedor_sigue_el_reintento_normal(engine, monkeypatch):
+    from app.llm.errors import ProviderHTTPError
+
+    monkeypatch.setattr(dramatiq_app, "_session", lambda *a: _open(engine))
+    doc_id = _document(engine)
+    _fake_service(monkeypatch, exc=ProviderHTTPError("openrouter", 503))
+    with pytest.raises(ProviderHTTPError):
+        dramatiq_app.extract_document_kpis.fn(doc_id)
