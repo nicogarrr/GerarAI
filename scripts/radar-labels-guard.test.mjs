@@ -9,7 +9,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const view = readFileSync(new URL('../components/proPicks/RadarGlobalView.tsx', import.meta.url), 'utf8');
+const view =
+    readFileSync(new URL('../components/proPicks/RadarGlobalView.tsx', import.meta.url), 'utf8') +
+    JSON.stringify(JSON.parse(readFileSync(new URL('../lib/i18n/messages/es/propicks.json', import.meta.url), 'utf8')).radar);
 
 test('el enlace de cotejo oficial HKEXnews se mantiene', () => {
     assert.match(view, /Cotejar en HKEXnews \(fuente oficial\)/);

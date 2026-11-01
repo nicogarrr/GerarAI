@@ -14,7 +14,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const view = readFileSync('components/proPicks/GemsView.tsx', 'utf8');
+const view = readFileSync('components/proPicks/GemsView.tsx', 'utf8') + JSON.stringify(JSON.parse(readFileSync('lib/i18n/messages/es/propicks.json', 'utf8')).gems);
 
 describe('ProPicks Joyas: «Revisar con IA» informa del resultado', () => {
     it('guarda un estado de revisión tras cada llamada', () => {
@@ -23,7 +23,7 @@ describe('ProPicks Joyas: «Revisar con IA» informa del resultado', () => {
     });
 
     it('distingue revisión completada de revisión IA no disponible', () => {
-        assert.match(view, /Revisión IA completada: /);
+        assert.match(view, /Revisión IA completada: \{reviewed\} de \{total\}/);
         assert.match(view, /La revisión IA no está disponible ahora mismo/);
         assert.match(view, /selección determinista/);
     });

@@ -23,7 +23,7 @@ test('watchlist: tooltip de consenso sin "fuente de mercado"', () => {
 });
 
 test('radar global: candidatos sin etiqueta de fuente', () => {
-    const view = read('components/proPicks/RadarGlobalView.tsx');
+    const view = read('components/proPicks/RadarGlobalView.tsx') + JSON.stringify(JSON.parse(read('lib/i18n/messages/es/propicks.json')).radar);
     assert.doesNotMatch(view, /fuente de mercado/i);
     assert.match(view, /Candidatos sin verificar; conviene cotejo oficial/);
     assert.match(view, /Consulta en vivo al pulsar el botón/);
@@ -58,7 +58,7 @@ test('paper trading: nota de dividendos sin Yahoo/FMP', () => {
 });
 
 test('deep value: desacuerdo de fuentes sin nombrar la fuente', () => {
-    const view = read('components/proPicks/DeepValueView.tsx');
+    const view = read('components/proPicks/DeepValueView.tsx') + JSON.stringify(JSON.parse(read('lib/i18n/messages/es/propicks.json')).deepValue);
     assert.doesNotMatch(view, /Finnhub indica/);
     assert.match(view, /Fuentes en desacuerdo: otra fuente indica/);
 });
