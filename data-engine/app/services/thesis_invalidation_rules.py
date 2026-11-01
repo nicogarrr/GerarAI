@@ -450,7 +450,7 @@ def observe(db: Session, rule: AlertRule) -> tuple[Decimal | None, dict[str, Any
     return None, {**base, "status": "unsupported_target"}
 
 
-def alert_message(company: Company, rule: AlertRule, observed: Any) -> str:
+def alert_message(company: Company, rule: AlertRule, observed: Any, language: str = "es") -> str:
     target = rule.target or {}
     condition = rule.condition or {}
     item = {
@@ -460,9 +460,42 @@ def alert_message(company: Company, rule: AlertRule, observed: Any) -> str:
     }
     percent = str(target.get("metric")) in PERCENT_METRICS
     version = target.get("thesis_version")
+    description = target.get("description")
+    if language == "en":
+        head = f"{company.ticker}: a thesis invalidation criterion was triggered"
+        if version is not None:
+            head += f" (v{version})"
+        rule_text = _describe_rule_en(item)
+        body = f"«{description}» ({rule_text})" if description else rule_text
+        return f"{head}: {body}. Current value: {_format_en(observed, percent=percent)}."
     head = f"{company.ticker}: salta un criterio de invalidación de la tesis"
     if version is not None:
         head += f" (v{version})"
-    description = target.get("description")
     body = f"«{description}» ({describe_rule(item)})" if description else describe_rule(item)
     return f"{head}: {body}. Valor actual: {format_es(observed, percent=percent)}."
+
+
+_METRIC_LABELS_EN: dict[str, str] = {
+    PRICE: "price",
+    MARGIN_OF_SAFETY_PCT: "margin of safety",
+    CHANGE_SINCE_THESIS_PCT: "change since the thesis",
+}
+
+
+def _format_en(value: Any, *, percent: bool = False) -> str:
+    """Numero en formato ingles (punto decimal, coma de miles)."""
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return str(value)
+    text = f"{number:,.2f}"
+    return f"{text}%" if percent else text
+
+
+def _describe_rule_en(rule: dict[str, Any]) -> str:
+    metric = str(rule.get("metric") or "")
+    label = _METRIC_LABELS_EN.get(metric) or metric_label(metric)
+    return (
+        f"{label} {_OPERATOR_TEXT.get(str(rule.get('operator')), rule.get('operator'))} "
+        f"{_format_en(rule.get('threshold'), percent=metric in PERCENT_METRICS)}"
+    )
