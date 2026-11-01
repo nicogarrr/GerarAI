@@ -336,3 +336,40 @@ def test_recency_window_skips_old_purchases_and_unreadable_dates():
     finally:
         _cleanup(db)
         db.close()
+
+
+def test_alerts_in_english_when_saved_language_is_english(monkeypatch):
+    monkeypatch.setattr(insider_alerts, "_company_id_for", lambda db, ticker: None)
+    txs = [
+        _fake_tx(1, value=1_390_347, shares=18146, price=76.62, day="2026-09-21"),
+        _fake_tx(2, value=2_477_526, shares=33122, price=74.8, day="2026-09-18"),
+    ]
+    alerts, _ = insider_alerts._build_alerts(None, txs, "en")
+    big = [a for a in alerts if a["rule"] == "big_buy"][0]
+    assert big["title"] == "Large insider purchase — LEN, LEN.B"
+    assert big["message"] == (
+        "BERKSHIRE HATHAWAY INC / BUFFETT WARREN E bought shares in 2 transactions worth $3.87M in total, "
+        "average price $75.44, between 18 Sep 2026 and 21 Sep 2026. "
+        "Purchase reported on Form 4; it may be on the open market or private."
+    )
+    single, _ = insider_alerts._build_alerts(None, [_fake_tx(3, value=2_000_000, shares=1000, price=2000, day="2026-09-21")], "en")
+    assert "bought shares worth $2.00M (1,000 shares at $2,000.00), on 21 Sep 2026." in single[0]["message"]
+    spanish, _ = insider_alerts._build_alerts(None, txs)
+    assert spanish[0]["title"] == "Compra insider grande — LEN, LEN.B"
+
+
+def test_cluster_and_c_suite_alerts_follow_saved_language(monkeypatch):
+    db = _db()
+    try:
+        _cleanup(db)
+        _seed_big_buy(db)
+        monkeypatch.setattr(insider_alerts, "generation_language", lambda db: "en")
+        insider_alerts.evaluate(db)
+        rows = db.scalars(select(ResearchAlert)).all()
+        assert rows and all("Compra" not in r.title for r in rows)
+        c_suite = [r for r in rows if r.alert_type == "insider_c_suite_buy"][0]
+        assert c_suite.title.startswith("C-suite purchase — ")
+        assert "Purchase reported on Form 4" in c_suite.message
+    finally:
+        _cleanup(db)
+        db.close()
