@@ -655,6 +655,9 @@ _PERFORMANCE_RE = re.compile(
     # «¿Qué tal va mi UBER?», «¿Gano o pierdo con UBER?», «¿Cuánto me ha
     # costado MSFT?»: antes, el volcado de la empresa.
     r"|qu[eé]\s+tal\s+van?\s+(?:mi|mis)|gano\s+o\s+pierdo|cu[aá]nto\s+me\s+ha\s+costado"
+    # «¿Cuánto me ha rentado UBER?», «¿Qué beneficio tengo en UBER?»: tu
+    # rentabilidad (no el beneficio neto de la empresa).
+    r"|cu[aá]nto\s+me\s+han?\s+rentado|qu[eé]\s+beneficio\s+(?:tengo|llevo)"
     # «¿Cuál es mi plusvalía latente?»: lo no realizado de las posiciones abiertas.
     r"|(?:plus|minus)val[ií]as?\s+(?:latentes?|no\s+realizadas?|potencial\w*))\b"
     r"(?![^.!?\n]*\bsi\b)"
@@ -694,9 +697,11 @@ _PORTFOLIO_QUERY_RE = re.compile(
 # Pregunta por la posicion de un ticker concreto ("peso de ASTS",
 # "cuanto tengo en ASTS", "acciones de ASTS que tengo").
 _POSITION_QUERY_RE = re.compile(
-    r"(?i)\b(?:peso|posici[oó]n|acciones)\b[^.!?\n]{0,40}\b(?:cartera|tengo|mis)\b"
+    r"(?i)\b(?:peso|posici[oó]n|acciones|t[ií]tulos)\b[^.!?\n]{0,40}\b(?:cartera|tengo|mis)\b"
     r"|\b(?:peso|posici[oó]n)\s+(?:de|en|que)\b"
-    r"|\bcu[aá]nt[oa]s?\s+(?:acciones\s+)?(?:tengo|vale|valen|tienen)\b"
+    r"|\bcu[aá]nt[oa]s?\s+(?:acciones\s+|t[ií]tulos\s+)?(?:tengo|vale|valen|tienen)\b"
+    # «¿Cuánto representa UBER en mi cartera?»: su peso.
+    r"|\bcu[aá]nto\s+representan?\b[^.!?\n]{0,40}\bcartera\b"
     # «¿Cuántas UBER tengo?»: el ticker entre «cuántas» y «tengo».
     r"|\bcu[aá]nt[oa]s\s+(?:acciones\s+(?:de\s+)?)?[A-Z][A-Z0-9.\-]{0,9}\s+tengo\b"
     # "cuánto pesa ASTS (en mi cartera)" / "qué peso tiene ASTS": la forma
