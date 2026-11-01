@@ -11,6 +11,7 @@ import {
     disableTwoFactor,
     enableTwoFactorTotp,
 } from '@/lib/actions/auth.actions';
+import { useT } from '@/lib/i18n/client';
 
 // qrcode.react (~10 KB gz) solo se usa al activar 2FA, no al abrir /security:
 // el QR se pinta tras enviar la contraseña, así que carga diferido. El chunk
@@ -41,6 +42,7 @@ function totpSecretFromUri(uri: string): string | null {
 }
 
 export default function TwoFactorSettings({ initiallyEnabled }: Props) {
+    const t = useT();
     const [enabled, setEnabled] = useState(initiallyEnabled);
     const [setup, setSetup] = useState<{ totpURI: string; backupCodes: string[] } | null>(null);
     const [busy, setBusy] = useState(false);
@@ -60,7 +62,7 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
         try {
             const result = await enableTwoFactorTotp({ password });
             if (!result.success || !result.data?.totpURI) {
-                toast.error('No se pudo activar 2FA', { description: result.error ?? 'Inténtalo de nuevo.' });
+                toast.error(t('security.twoFactor.enableFailed'), { description: result.error ?? t('security.twoFactor.tryAgain') });
                 return;
             }
             setSetup({
@@ -78,13 +80,13 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
         try {
             const result = await activateTwoFactorTotp({ totpCode });
             if (!result.success) {
-                toast.error('Verificación fallida', { description: result.error ?? 'Código no válido.' });
+                toast.error(t('security.twoFactor.verifyFailed'), { description: result.error ?? t('security.twoFactor.invalidCode') });
                 return;
             }
             setSetup(null);
             setEnabled(true);
             totpForm.reset();
-            toast.success('Verificación en dos pasos activada');
+            toast.success(t('security.twoFactor.enabledToast'));
         } finally {
             setBusy(false);
         }
@@ -95,12 +97,12 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
         try {
             const result = await disableTwoFactor({ password });
             if (!result.success) {
-                toast.error('No se pudo desactivar 2FA', { description: result.error ?? 'Inténtalo de nuevo.' });
+                toast.error(t('security.twoFactor.disableFailed'), { description: result.error ?? t('security.twoFactor.tryAgain') });
                 return;
             }
             setEnabled(false);
             passwordForm.reset();
-            toast.success('Verificación en dos pasos desactivada');
+            toast.success(t('security.twoFactor.disabledToast'));
         } finally {
             setBusy(false);
         }
@@ -110,9 +112,9 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
         if (!setup) return;
         try {
             await navigator.clipboard.writeText(setup.backupCodes.join('\n'));
-            toast.success('Códigos de respaldo copiados');
+            toast.success(t('security.twoFactor.codesCopied'));
         } catch {
-            toast.error('No se pudieron copiar — anótalos a mano');
+            toast.error(t('security.twoFactor.codesCopyFailed'));
         }
     };
 
@@ -120,90 +122,86 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
         if (!totpSecret) return;
         try {
             await navigator.clipboard.writeText(totpSecret);
-            toast.success('Clave de configuración copiada');
+            toast.success(t('security.twoFactor.keyCopied'));
         } catch {
-            toast.error('No se pudo copiar — selecciona la clave y cópiala a mano');
+            toast.error(t('security.twoFactor.keyCopyFailed'));
         }
     };
 
     return (
         <div className="max-w-xl space-y-6">
             <div>
-                <h2 className="text-xl font-semibold text-white">Verificación en dos pasos (2FA)</h2>
+                <h2 className="text-xl font-semibold text-white">{t('security.twoFactor.title')}</h2>
                 <p className="text-sm text-gray-400 mt-1">
-                    Protege tu cuenta con un código temporal de una app de autenticación
-                    (Google Authenticator, 1Password, Authy&hellip;).
+                    {t('security.twoFactor.subtitle')}
                 </p>
             </div>
 
             {enabled && (
                 <div className="rounded-lg border border-green-800/50 bg-green-950/20 p-4">
-                    <p className="text-sm text-green-400 font-medium">✓ La verificación en dos pasos está activada</p>
+                    <p className="text-sm text-green-400 font-medium">{t('security.twoFactor.enabledStatus')}</p>
                     <p className="text-xs text-gray-400 mt-1">
-                        Cada inicio de sesión pedirá el código de tu app además de la contraseña.
+                        {t('security.twoFactor.enabledHint')}
                     </p>
                 </div>
             )}
 
             {!enabled && !setup && (
                 <form onSubmit={passwordForm.handleSubmit(handleEnable)} className="space-y-4 rounded-lg border border-gray-800 p-5">
-                    <p className="text-sm text-gray-300">Para activar 2FA, confirma tu contraseña:</p>
+                    <p className="text-sm text-gray-300">{t('security.twoFactor.confirmToEnable')}</p>
                     <InputField
                         name="password"
-                        label="Tu contraseña"
-                        placeholder="Introduce tu contraseña"
+                        label={t('security.twoFactor.passwordLabel')}
+                        placeholder={t('security.twoFactor.passwordPlaceholder')}
                         type="password"
                         register={passwordForm.register}
                         error={passwordForm.formState.errors.password}
-                        validation={{ required: 'La contraseña es obligatoria' }}
+                        validation={{ required: t('security.twoFactor.passwordRequired') }}
                     />
                     <Button type="submit" disabled={busy} className="brand-btn">
-                        {busy ? 'Generando…' : 'Activar 2FA'}
+                        {busy ? t('security.twoFactor.generating') : t('security.twoFactor.enable')}
                     </Button>
                 </form>
             )}
 
             {setup && (
                 <div className="space-y-5 rounded-lg border border-gray-800 p-5">
-                    <p className="text-sm text-gray-300 font-medium">1 · Escanea el código QR</p>
+                    <p className="text-sm text-gray-300 font-medium">{t('security.twoFactor.step1')}</p>
                     <div className="flex items-center gap-5">
                         <div
                             className="rounded-lg bg-white p-3"
                             role="img"
-                            aria-label="Código QR para configurar la verificación en dos pasos"
+                            aria-label={t('security.twoFactor.qrAria')}
                         >
                             <QRCodeSVG value={setup.totpURI} size={160} aria-hidden="true" />
                         </div>
                         <p className="text-xs text-gray-400 max-w-[220px]">
-                            Abre tu app de autenticación y escanea este código, o introduce
-                            la clave manualmente desde los ajustes de la app.
+                            {t('security.twoFactor.scanHint')}
                         </p>
                     </div>
 
                     {totpSecret ? (
                         <div className="rounded-lg border border-gray-800 bg-gray-900/60 p-3">
-                            <p className="text-sm text-gray-300 font-medium">Clave manual (Base32)</p>
+                            <p className="text-sm text-gray-300 font-medium">{t('security.twoFactor.manualKey')}</p>
                             <p className="mt-1 text-xs text-gray-500">
-                                Si no puedes escanear el QR, elige «introducir clave manualmente» en tu app
-                                y pega esta clave. Es el mismo secreto, no un código de un solo uso.
+                                {t('security.twoFactor.manualKeyHint')}
                             </p>
                             <code
-                                aria-label="Clave TOTP en Base32"
+                                aria-label={t('security.twoFactor.secretAria')}
                                 className="mt-2 block break-all rounded bg-gray-950 p-2 font-mono text-xs text-gray-200 select-all"
                             >
                                 {totpSecret}
                             </code>
                             <Button type="button" variant="outline" size="sm" className="mt-2" onClick={copyTotpSecret}>
-                                Copiar clave
+                                {t('security.twoFactor.copyKey')}
                             </Button>
                         </div>
                     ) : null}
 
                     <div>
-                        <p className="text-sm text-gray-300 font-medium">2 · Guarda tus códigos de respaldo</p>
+                        <p className="text-sm text-gray-300 font-medium">{t('security.twoFactor.step2')}</p>
                         <p className="text-xs text-gray-500 mt-1">
-                            Estos códigos de un solo uso te permiten recuperar el acceso si
-                            pierdes tu autenticador. Guárdalos en un lugar seguro.
+                            {t('security.twoFactor.backupHint')}
                         </p>
                         <div className="mt-2 rounded-md bg-gray-900 border border-gray-800 p-3 font-mono text-xs text-gray-300 grid grid-cols-2 gap-1">
                             {setup.backupCodes.map((code) => (
@@ -211,33 +209,33 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
                             ))}
                         </div>
                         <Button type="button" variant="outline" size="sm" className="mt-2" onClick={copyBackupCodes}>
-                            Copiar códigos
+                            {t('security.twoFactor.copyCodes')}
                         </Button>
                     </div>
 
                     <form onSubmit={totpForm.handleSubmit(handleActivate)} className="space-y-4 pt-2">
-                        <p className="text-sm text-gray-300 font-medium">3 · Confirma el código</p>
+                        <p className="text-sm text-gray-300 font-medium">{t('security.twoFactor.step3')}</p>
                         <InputField
                             name="totpCode"
-                            label="Código de 6 dígitos"
+                            label={t('security.twoFactor.codeLabel')}
                             placeholder="000000"
                             autoComplete="one-time-code"
                             register={totpForm.register}
                             error={totpForm.formState.errors.totpCode}
                             validation={{
-                                required: 'El código es obligatorio',
-                                pattern: { value: /^\d{6}$/, message: 'El código debe tener 6 dígitos' },
+                                required: t('security.twoFactor.codeRequired'),
+                                pattern: { value: /^\d{6}$/, message: t('security.twoFactor.codeDigits') },
                             }}
                         />
                         <Button type="submit" disabled={busy} className="brand-btn">
-                            {busy ? 'Verificando…' : 'Activar 2FA'}
+                            {busy ? t('security.twoFactor.verifying') : t('security.twoFactor.enable')}
                         </Button>
                         <button
                             type="button"
                             className="block text-sm text-gray-500 hover:text-gray-300"
                             onClick={() => setSetup(null)}
                         >
-                            Cancelar
+                            {t('security.twoFactor.cancel')}
                         </button>
                     </form>
                 </div>
@@ -245,18 +243,18 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
 
             {enabled && (
                 <form onSubmit={passwordForm.handleSubmit(handleDisable)} className="space-y-4 rounded-lg border border-gray-800 p-5">
-                    <p className="text-sm text-gray-300">Para desactivar 2FA, confirma tu contraseña:</p>
+                    <p className="text-sm text-gray-300">{t('security.twoFactor.confirmToDisable')}</p>
                     <InputField
                         name="password"
-                        label="Tu contraseña"
-                        placeholder="Introduce tu contraseña"
+                        label={t('security.twoFactor.passwordLabel')}
+                        placeholder={t('security.twoFactor.passwordPlaceholder')}
                         type="password"
                         register={passwordForm.register}
                         error={passwordForm.formState.errors.password}
-                        validation={{ required: 'La contraseña es obligatoria' }}
+                        validation={{ required: t('security.twoFactor.passwordRequired') }}
                     />
                     <Button type="submit" disabled={busy} variant="destructive" className="w-full sm:w-auto">
-                        {busy ? 'Desactivando…' : 'Desactivar 2FA'}
+                        {busy ? t('security.twoFactor.disabling') : t('security.twoFactor.disable')}
                     </Button>
                 </form>
             )}
