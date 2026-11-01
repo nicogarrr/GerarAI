@@ -136,7 +136,8 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
         r"|\bmi\s+(?:rentabilidad|rendimiento)\s+(?:por|de|del)\s+dividendos?\b",
         question,
     ))
-    company = None if portfolio else _company_in_question(db, question)
+    named = _company_in_question(db, question)
+    company = None if portfolio else named
     if company is not None:
         kept, uncertain = resolve_yahoo_events(db.scalars(select(DividendRecord).where(
             DividendRecord.company_id == company.id, DividendRecord.tenant_id == tenant,
@@ -167,6 +168,13 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
         Position.tenant_id == tenant, Position.quantity > 0)).all()
     if not rows:
         return _response(["No hay posiciones abiertas en tu cartera."], [], "portfolio_dividends")
+    # «¿Cuántos dividendos he cobrado de MSFT?»: solo esa posición (antes,
+    # toda la cartera).
+    if named is not None:
+        rows = [row for row in rows if row[1].id == named.id]
+        if not rows:
+            return _response([f"No tienes {named.ticker} en tu cartera ahora mismo; los dividendos de la cartera "
+                              "se calculan con las acciones que tienes hoy."], [], "portfolio_dividends")
     lines, sources, totals, without, uncertain_tickers = [], [], {}, [], []
     # Lote anti N+1: una consulta de dividendos del año para TODAS las
     # posiciones (misma ventana y orden por ex_date), agrupada por empresa.
