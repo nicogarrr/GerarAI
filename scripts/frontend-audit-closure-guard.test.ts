@@ -96,7 +96,15 @@ test('el 404 público no enlaza al espacio privado', () => {
 });
 
 test('el screener distingue «sin filtros guardados» de «motor caído»', () => {
-    const page = read('app/(root)/screener/page.tsx');
+    // El copy vive en es/screener.json: solo se añaden las claves de estado del motor y los datos.
+    const esScreener = JSON.parse(read('lib/i18n/messages/es/screener.json'));
+    const page = read('app/(root)/screener/page.tsx') + JSON.stringify({
+        marketDataUnavailable: esScreener.marketDataUnavailable,
+        indicesUnavailable: esScreener.indicesUnavailable,
+        noSavedFiltersBadge: esScreener.noSavedFiltersBadge,
+        noSavedFiltersText: esScreener.noSavedFiltersText,
+        engineDownBadge: esScreener.engineDownBadge,
+    });
     assert.ok(!page.includes('Motor operativo pero sin filtros guardados'));
     assert.ok(!page.includes('Motor de análisis desconectado'));
     assert.ok(page.includes('Datos de mercado no disponibles'));

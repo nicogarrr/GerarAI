@@ -283,8 +283,8 @@ describe('screener: solo usa la divisa confirmada por el proveedor', () => {
         const row = generated.slice(generated.indexOf('ScreenerRealItemOut: {'), generated.indexOf('ScreenerRealOut: {'));
         assert.match(row, /currency: string \| null/);
         assert.ok(page.includes('isValidCurrencyCode(currency)'));
-        assert.ok(page.includes('formatPrice(price, currency)'));
-        assert.ok(page.includes('screenerPrice(r.price, r.currency)'));
+        assert.ok(page.includes('formatPrice(price, currency'));
+        assert.ok(page.includes('screenerPrice(r.price, r.currency'));
         assert.ok(!page.includes('backend no la expone'));
     });
 });

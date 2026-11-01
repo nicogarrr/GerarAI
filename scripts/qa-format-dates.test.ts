@@ -23,6 +23,7 @@ test('screener: una fecha de barra diaria no certifica cierre ni tiempo real', (
   const page = readFileSync('app/(root)/screener/page.tsx', 'utf8');
   // Las barras diarias también pueden proceder de backfills durante sesión.
   // La fecha no prueba cierre: no inferirlo del origen ni de la hora local.
-  assert.match(page, /r\.priceDate \? `Dato diario del \$\{formatMarketDate\(r\.priceDate\)\}` : quoteObserved\(r\.priceAsOf, r\.priceTimestampKind\)/);
+  assert.match(page, /r\.priceDate \? t\('screener\.dailyData', \{ date: formatMarketDate\(r\.priceDate[,)].*\}\) : quoteObserved\(r\.priceAsOf, r\.priceTimestampKind[,)]/);
+  assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/screener.json', 'utf8')).dailyData, 'Dato diario del {date}');
   assert.doesNotMatch(page, /`Cierre \$\{formatMarketDate\(r\.priceDate\)\}`/);
 });

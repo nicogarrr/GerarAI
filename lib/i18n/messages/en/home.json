@@ -42,6 +42,7 @@
   },
   "fair": {
     "none": "No fair value",
+    "abbr": "FV",
     "title": "Fair value · {label}",
     "source": {
       "tesis": "thesis",
