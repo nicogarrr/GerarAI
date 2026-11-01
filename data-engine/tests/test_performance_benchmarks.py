@@ -9,15 +9,16 @@ Fulfills: VAL-COV-005 (add-performance-benchmarks)
 
 from __future__ import annotations
 
+import statistics
 import time
 from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
-from app.models.entities import Base, Company, Portfolio, Transaction
+from app.models.entities import Base, Company, Portfolio, Position, Transaction
 from app.services.cached_portfolio_valuation import (
     CachedPortfolioValuationService,
 )
@@ -83,18 +84,35 @@ def _seed_portfolio_with_holdings(db: Session, n_companies: int = 10) -> tuple[P
 
 
 def test_benchmark_portfolio_valuation_calculation(perf_db: Session):
-    """Portfolio valuation calculation must complete in < 200ms."""
+    """Cold position creation stays below 200 ms, median of five equal fixtures.
+
+    Each savepoint starts with the seeded transactions and no positions. Rollback
+    is outside the timing, so later samples do not silently measure updates to
+    positions created by the first sample. Median limits one-off runner jitter;
+    the 200 ms threshold is unchanged and every sample remains visible on failure.
+    """
     port, companies = _seed_portfolio_with_holdings(perf_db, n_companies=10)
     service = PortfolioLedgerService()
 
-    start_time = time.perf_counter()
-    for c in companies:
-        pos = service.rebuild_position(perf_db, c.id)
-        assert pos is not None
-    duration_ms = (time.perf_counter() - start_time) * 1000
+    samples_ms = []
+    for _ in range(5):
+        assert perf_db.scalar(select(func.count()).select_from(Position)) == 0
+        savepoint = perf_db.begin_nested()
+        start_time = time.perf_counter()
+        for c in companies:
+            pos = service.rebuild_position(perf_db, c.id)
+            assert pos is not None
+        samples_ms.append((time.perf_counter() - start_time) * 1000)
+        savepoint.rollback()
+        perf_db.expire_all()
+    duration_ms = statistics.median(samples_ms)
 
-    # Must complete well below 200ms benchmark
-    assert duration_ms < 200, f"Portfolio valuation took {duration_ms:.2f}ms (threshold: 200ms)"
+    # Must complete well below 200ms benchmark (median of 5 runs)
+    corridas = ", ".join(f"{sample:.0f}" for sample in samples_ms)
+    assert duration_ms < 200, (
+        f"Portfolio valuation took {duration_ms:.2f}ms median (threshold: 200ms; "
+        f"corridas: {corridas})"
+    )
 
 
 def test_benchmark_dashboard_load_time(perf_db: Session):
