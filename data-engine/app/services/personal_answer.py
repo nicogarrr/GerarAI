@@ -78,6 +78,31 @@ _LATENT_GAIN = re.compile(r"\b(?:plusvalias?|ganancias?|perdidas?|minusvalias?)\
 # realizada de ese año (bloque fiscal), no la rentabilidad acumulada de hoy.
 _YEAR_GAIN = re.compile(r"\b(?:(?:he|hemos)\s+(?:ganado|perdido)|gane|perdi)\b")
 _GAIN_YEAR = re.compile(r"\b(?:20\d{2}|(?:el )?(?:ano|ejercicio) pasado)\b")
+# Inglés (solo con el inglés elegido): «How much tax did I pay in 2025?»,
+# «my capital gains for 2026», «How much did I make last year?».
+_FISCAL_EN = re.compile(
+    r"\b(?:tax(?:es)?|irpf|capital gains?|realized (?:gains?|loss(?:es)?)|withholding|withheld|"
+    r"tax (?:summary|report|return))\b"
+)
+_FISCAL_SELF_EN = re.compile(r"\b(?:(?:did|do|will|have|should) i (?:pay|paid|owe|declare)|i (?:paid|owe))\b")
+_YEAR_GAIN_EN = re.compile(r"\b(?:(?:did|have) i (?:gain|make|earn|lose|made|gained|earned|lost)|i (?:made|gained|earned|lost))\b")
+_GAIN_YEAR_EN = re.compile(r"\b(?:20\d{2}|last year|this year)\b")
+
+
+def _english() -> bool:
+    from app.core.i18n import current_language
+
+    return current_language() == "en"
+
+
+def _fiscal_en(text: str) -> bool:
+    """Pregunta fiscal propia en inglés (texto ya sin tildes y en minúsculas)."""
+    if _LATENT_GAIN.search(text) or re.search(r"\bunreali[sz]ed\b", text):
+        return False
+    fiscal = bool(_FISCAL_EN.search(text)) and bool(_PERSONAL.search(text) or _FISCAL_SELF_EN.search(text))
+    return fiscal or bool(_YEAR_GAIN_EN.search(text) and _GAIN_YEAR_EN.search(text))
+
+
 _CHEAP = re.compile(
     r"\b(?:barat\w*|infravalorad\w*|margen de seguridad|descuento|oportunidad\w*|chollo\w*|"
     r"zona de compra|niveles? dca|[1-4]x|que (?:compro|debo comprar|deberia comprar|comprar|me compro)|"
@@ -110,7 +135,7 @@ def detect_personal_intent(question: str) -> PersonalIntent | None:
         # de las posiciones abiertas, no el bloque fiscal de lo vendido.
         fiscal = False
     year_gain = bool(_YEAR_GAIN.search(text) and _GAIN_YEAR.search(text)) and not concept
-    if fiscal or year_gain:
+    if fiscal or year_gain or (not concept and _english() and _fiscal_en(text)):
         kind = "fiscal"
     elif _CHEAP.search(text) and not concept:
         kind = "barato"
@@ -370,6 +395,8 @@ def _response(
 _YEAR_RE = re.compile(r"\b(20\d{2})\b")
 _THIS_YEAR_RE = re.compile(r"(?i)\b(?:este|esta|en\s+lo\s+que\s+va\s+de)\s+(?:a[nñ]o|ejercicio)\b")
 _LAST_YEAR_RE = re.compile(r"(?i)\b(?:el\s+)?(?:a[nñ]o|ejercicio)\s+pasado\b")
+_THIS_YEAR_EN_RE = re.compile(r"(?i)\bthis\s+(?:year|tax\s+year)\b|\byear\s+to\s+date\b")
+_LAST_YEAR_EN_RE = re.compile(r"(?i)\b(?:last|previous)\s+(?:year|tax\s+year)\b")
 
 
 def _fiscal_year_in(question: str) -> int | None:
@@ -387,6 +414,10 @@ def _fiscal_year_in(question: str) -> int | None:
         return local_today().year
     if _LAST_YEAR_RE.search(question or ""):
         return local_today().year - 1
+    if _english() and _THIS_YEAR_EN_RE.search(question or ""):
+        return local_today().year
+    if _english() and _LAST_YEAR_EN_RE.search(question or ""):
+        return local_today().year - 1
     return None
 
 
@@ -401,14 +432,23 @@ async def answer_personal_question(
     dca_reader: Any | None = None,
 ) -> ChatResponse | None:
     """Respuesta anclada a los datos del usuario; None si no hay tenant."""
+    english_fiscal = intent.kind == "fiscal" and _english()
     ctx = build_user_context(
         db,
         sections=intent.sections,
         dca_reader=dca_reader,
         fiscal_year=_fiscal_year_in(question) if intent.kind == "fiscal" else None,
+        english=english_fiscal,
     )
     if ctx is None:
         return None
+    if english_fiscal:
+        # Inglés: el resumen fiscal del ejercicio, tal cual, sin LLM (las
+        # instrucciones del modelo son en español).
+        lines = ["Your tax data in GerarAI (Taxes):", *_block_lines(ctx, "fiscal")]
+        return _response("\n".join(lines), ctx, intent, model="deterministic",
+                         trace={"context_chars": len(ctx.render()), "context_truncated": ctx.truncated,
+                                "generated": False, "provider_calls": 0}, confidence=0.85)
     context_text = ctx.render()
     fallback = "\n".join(deterministic_lines(intent, ctx, db))
     base_trace: dict[str, Any] = {"context_chars": len(context_text), "context_truncated": ctx.truncated}
