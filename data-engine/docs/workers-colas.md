@@ -33,7 +33,13 @@ siguiente solo mapea cada clase a donde corre hoy ese trabajo.
    NO es la dead-letter, es la cola DELAYED (reintentos con backoff y envios
    con delay). Inspeccion: `ZCARD <namespace>:<cola>.XQ`; reencolado manual
    moviendo el mensaje de `.XQ.msgs` de vuelta a `<cola>.msgs`.
-4. **Sin caducidad en cola**: ningun actor declara `max_age`; un mensaje
+4. **429 sin dead-letter** (`app/workers/rate_limit_retry.py`): ante el
+   limite de una fuente (GDELT, ESEF, proveedor LLM) la espera crece por
+   intento (exponencial con jitter; el `Retry-After` del servidor manda si es
+   mayor) y en el ultimo intento el mensaje se da por terminado con
+   `status=skipped`, `reason=rate_limited_retries_exhausted`: el siguiente
+   ciclo programado repone el trabajo y la XQ queda para fallos reales.
+5. **Sin caducidad en cola**: ningun actor declara `max_age`; un mensaje
    aceptado no expira esperando worker (contrato en el test).
 
 ## Importaciones aceptadas: time_limit

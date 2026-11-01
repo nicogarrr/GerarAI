@@ -116,7 +116,8 @@ def test_retry_honors_server_window_below_threshold(monkeypatch):
     exc.retry_after = 240.0
     with pytest.raises(dramatiq.Retry) as caught:
         _raise_gdelt_retry(exc)
-    assert caught.value.delay == 240_000
+    # Jitter: nunca antes de la ventana, como mucho un 20 % despues.
+    assert 240_000 <= caught.value.delay < (240_000) * 1.2
     assert not _gdelt_circuit_open(client)
 
 
@@ -130,7 +131,8 @@ def test_retry_waits_the_circuit_ttl_once_open(monkeypatch):
         with pytest.raises(dramatiq.Retry) as caught:
             _raise_gdelt_retry(exc)
         delay = caught.value.delay
-    assert delay == GDELT_CIRCUIT_TTL_SECONDS * 1000
+    # Jitter: nunca antes de la ventana, como mucho un 20 % despues.
+    assert GDELT_CIRCUIT_TTL_SECONDS * 1000 <= delay < (GDELT_CIRCUIT_TTL_SECONDS * 1000) * 1.2
     assert _gdelt_circuit_open(client)
 
 
@@ -171,7 +173,8 @@ def test_retry_message_is_rescheduled_not_acked(monkeypatch):
     )
     with pytest.raises(dramatiq.Retry) as caught:
         dramatiq_app.refresh_news.fn(None, None)
-    assert caught.value.delay == GDELT_CIRCUIT_TTL_SECONDS * 1000
+    # Jitter: nunca antes de la ventana, como mucho un 20 % despues.
+    assert GDELT_CIRCUIT_TTL_SECONDS * 1000 <= caught.value.delay < (GDELT_CIRCUIT_TTL_SECONDS * 1000) * 1.2
     # El claim del coalescer se libera: el lote reprogramado puede reclamar.
     assert "coalesce:refresh_news:None" not in client.store
 
@@ -206,4 +209,5 @@ def test_server_window_longer_than_circuit_ttl_wins(monkeypatch):
             _raise_gdelt_retry(exc)
         delay = caught.value.delay
     assert _gdelt_circuit_open(client)
-    assert delay == 3_600_000
+    # Jitter: nunca antes de la ventana, como mucho un 20 % despues.
+    assert 3_600_000 <= delay < (3_600_000) * 1.2

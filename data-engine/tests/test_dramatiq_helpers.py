@@ -139,14 +139,16 @@ def test_raise_gdelt_retry_respeta_ventana_y_suelo():
 
     with pytest.raises(dramatiq.Retry) as exc:
         da._raise_gdelt_retry(_E("cerrado"))
-    assert exc.value.delay == 3_600_000
+    # Jitter: nunca antes de la ventana, como mucho un 20 % despues.
+    assert 3_600_000 <= exc.value.delay < (3_600_000) * 1.2
 
     class _E0(Exception):
         retry_after = 0.0
 
     with pytest.raises(dramatiq.Retry) as exc0:
         da._raise_gdelt_retry(_E0("sin ventana"))
-    assert exc0.value.delay == int(da.GDELT_RETRY_FLOOR_SECONDS * 1000)
+    # Jitter: nunca antes de la ventana, como mucho un 20 % despues.
+    assert int(da.GDELT_RETRY_FLOOR_SECONDS * 1000) <= exc0.value.delay < (int(da.GDELT_RETRY_FLOOR_SECONDS * 1000)) * 1.2
 
 
 def test_handle_actor_error_relancia_transitorios_y_registra_permanentes():

@@ -213,6 +213,9 @@ def _status_from_message(text: str) -> int | None:
 # Retry(delay=0) eludiria el min_backoff del actor y el lote podria buclear
 # contra el 429. La regla es NUNCA reintentar antes de la ventana real.
 GDELT_RETRY_FLOOR_SECONDS = 60.0
+# Techo del crecimiento exponencial entre reintentos por 429 (la ventana del
+# servidor, si es mayor, sigue mandando).
+GDELT_RETRY_CAP_SECONDS = 30 * 60.0
 
 
 # Disyuntor GDELT compartido entre procesos (scheduler y workers). Medido en
@@ -284,7 +287,13 @@ def _raise_gdelt_retry(exc: Exception) -> None:
     reintento pasa a esperar el TTL del disyuntor (30 min) en vez de la
     ventana de 4-5 min del servidor, y durante ese tiempo los nuevos ticks
     skippean al entrar (ver la guarda al inicio de los actores GDELT).
+
+    Reintentos del mismo lote: la espera crece por intento (exponencial con
+    jitter) y en el ultimo intento el lote se descarta sin dead-letter
+    (RateLimitRetriesExhausted -> skipped): el siguiente tick lo repone.
     """
+    from app.workers.rate_limit_retry import RateLimitRetriesExhausted, retry_or_drop
+
     retry_after = float(getattr(exc, "retry_after", 0.0) or 0.0)
     try:
         client = _redis_client()
@@ -293,14 +302,17 @@ def _raise_gdelt_retry(exc: Exception) -> None:
     if _gdelt_429_recorded(client):
         # Disyuntor abierto: esperar AL MENOS su TTL, pero nunca menos de lo
         # que pide el servidor (una ventana de 1 h manda sobre los 30 min).
-        delay_seconds = max(retry_after, float(GDELT_CIRCUIT_TTL_SECONDS))
+        base = cap = float(GDELT_CIRCUIT_TTL_SECONDS)
+        retry_after = max(retry_after, base)
     else:
-        delay_seconds = retry_after if retry_after > 0 else GDELT_RETRY_FLOOR_SECONDS
-    delay_ms = int(delay_seconds * 1000)
-    raise dramatiq.Retry(
-        f"GDELT cerro la ventana (429): lote reencolado tras {delay_ms // 1000}s",
-        delay=delay_ms,
-    ) from exc
+        # Exponencial por intento (60 s, 120 s, ... hasta 30 min): con 60 s
+        # fijos los 6 reintentos se agotaban en 6 min contra la misma
+        # ventana cerrada y el lote acababa en dead-letter (prod, 1-nov).
+        base, cap = GDELT_RETRY_FLOOR_SECONDS, GDELT_RETRY_CAP_SECONDS
+    try:
+        retry_or_drop("GDELT", base=base, cap=cap, retry_after=retry_after)
+    except (dramatiq.Retry, RateLimitRetriesExhausted) as signal:
+        raise signal from exc
 
 
 def _retry_jitter_ms(max_ms: int = 30_000) -> int:
@@ -318,6 +330,12 @@ def _handle_actor_error(actor: str, exc: Exception, **context: Any) -> dict[str,
     all exceptions were swallowed into the failure payload. Permanent errors
     keep the previous behavior: a structured result the scheduler can log.
     """
+    from app.workers.rate_limit_retry import RateLimitRetriesExhausted
+
+    if isinstance(exc, RateLimitRetriesExhausted):
+        # Ultimo intento contra una fuente que sigue limitando (429): ack sin
+        # dead-letter; el siguiente ciclo programado repone el trabajo.
+        return {"status": "skipped", "actor": actor, "reason": "rate_limited_retries_exhausted"}
     if _is_transient(exc):
         raise exc
     return _failure(actor, exc, **context)
@@ -3127,13 +3145,18 @@ def refresh_news(
     except Exception:  # noqa: BLE001 - fail-open
         gdelt_client = None
     if _gdelt_circuit_open(gdelt_client):
-        if _current_message_is_retry_or_delayed():
+        from app.workers.rate_limit_retry import retries_exhausted
+
+        if _current_message_is_retry_or_delayed() and not retries_exhausted():
             # Trabajo ya aceptado: NO se ack sin trabajar. Se reprograma
-            # tras el TTL del disyuntor; el coalescer libera su claim al
-            # propagarse el Retry (except BaseException -> _release).
+            # tras el TTL del disyuntor (con jitter: los lotes reprogramados
+            # no vuelven todos en el mismo segundo); el coalescer libera su
+            # claim al propagarse el Retry (except BaseException -> _release).
+            # En el ultimo intento se descarta en silencio: otro Retry iria
+            # a dead-letter y el siguiente tick repone el lote.
             raise dramatiq.Retry(
                 "Disyuntor GDELT abierto: lote reprogramado tras su TTL",
-                delay=GDELT_CIRCUIT_TTL_SECONDS * 1000,
+                delay=GDELT_CIRCUIT_TTL_SECONDS * 1000 + _retry_jitter_ms(GDELT_CIRCUIT_TTL_SECONDS * 100),
             )
         return {"status": "skipped", "actor": actor_name, "reason": "gdelt_circuit_open"}
     try:
@@ -3517,13 +3540,18 @@ def refresh_macro_news(
     except Exception:  # noqa: BLE001 - fail-open
         gdelt_client = None
     if _gdelt_circuit_open(gdelt_client):
-        if _current_message_is_retry_or_delayed():
+        from app.workers.rate_limit_retry import retries_exhausted
+
+        if _current_message_is_retry_or_delayed() and not retries_exhausted():
             # Trabajo ya aceptado: NO se ack sin trabajar. Se reprograma
-            # tras el TTL del disyuntor; el coalescer libera su claim al
-            # propagarse el Retry (except BaseException -> _release).
+            # tras el TTL del disyuntor (con jitter: los lotes reprogramados
+            # no vuelven todos en el mismo segundo); el coalescer libera su
+            # claim al propagarse el Retry (except BaseException -> _release).
+            # En el ultimo intento se descarta en silencio: otro Retry iria
+            # a dead-letter y el siguiente tick repone el lote.
             raise dramatiq.Retry(
                 "Disyuntor GDELT abierto: lote reprogramado tras su TTL",
-                delay=GDELT_CIRCUIT_TTL_SECONDS * 1000,
+                delay=GDELT_CIRCUIT_TTL_SECONDS * 1000 + _retry_jitter_ms(GDELT_CIRCUIT_TTL_SECONDS * 100),
             )
         return {"status": "skipped", "actor": actor_name, "reason": "gdelt_circuit_open"}
     try:
