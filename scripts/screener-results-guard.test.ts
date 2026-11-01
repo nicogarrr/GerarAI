@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-const adHoc = readFileSync('app/(root)/screeners/page.tsx', 'utf8');
+const adHoc = readFileSync('app/(root)/screeners/page.tsx', 'utf8') + JSON.stringify(JSON.parse(readFileSync('lib/i18n/messages/es/screener.json', 'utf8')).screens);
 const saved = readFileSync('app/(root)/screeners/[screenId]/page.tsx', 'utf8');
 const formatter = readFileSync('lib/screener-results.ts', 'utf8');
 test('ambas vistas muestran coincidencias y aceptan rank Decimal string', () => {

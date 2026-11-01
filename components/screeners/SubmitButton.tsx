@@ -4,6 +4,7 @@ import { useFormStatus } from 'react-dom';
 import { Loader2, Play } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Botón de submit para el form ad-hoc de screeners (GET server-side):
@@ -12,10 +13,11 @@ import { Button } from '@/components/ui/button';
  */
 export function SubmitButton() {
   const { pending } = useFormStatus();
+  const t = useT();
   return (
     <Button aria-disabled={pending} disabled={pending} type="submit">
       {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-      {pending ? 'Ejecutando…' : 'Ejecutar'}
+      {pending ? t('screener.screens.running') : t('screener.screens.run')}
     </Button>
   );
 }

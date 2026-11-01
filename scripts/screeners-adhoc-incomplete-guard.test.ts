@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 const PAGE = 'app/(root)/screeners/page.tsx';
 
 void test('un envío ad-hoc incompleto muestra un aviso role=alert junto al formulario', () => {
-    const page = readFileSync(PAGE, 'utf8');
+    const page = readFileSync(PAGE, 'utf8') + JSON.stringify(JSON.parse(readFileSync('lib/i18n/messages/es/screener.json', 'utf8')).screens);
     assert.match(page, /const attemptedRun = query\.left !== undefined \|\| query\.right !== undefined \|\| query\.ranking !== undefined;/, 'detecta el intento de ejecución por los parámetros de la URL');
     assert.match(page, /const incompleteRun = attemptedRun && \(!query\.left \|\| !query\.right\);/, 'incompleto = intento sin métrica o sin valor');
     assert.match(page, /result = incompleteRun \? null : await runAdHocScreen/, 'no consulta al backend con la condición incompleta');
@@ -24,7 +24,7 @@ void test('un envío ad-hoc incompleto muestra un aviso role=alert junto al form
 });
 
 void test('la carga limpia de /screeners no puede mostrar el aviso', () => {
-    const page = readFileSync(PAGE, 'utf8');
+    const page = readFileSync(PAGE, 'utf8') + JSON.stringify(JSON.parse(readFileSync('lib/i18n/messages/es/screener.json', 'utf8')).screens);
     // Sin parámetros en la URL, attemptedRun es false: el aviso depende
     // de que el usuario haya enviado el formulario, nunca aparece en la
     // primera pintada.
