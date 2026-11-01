@@ -29,7 +29,8 @@ describe('cartas: anterior y siguiente del mismo autor', () => {
     });
 
     it('el lector enlaza ambas y la lista enlaza el título de cada carta', () => {
-        const reader = readFileSync('app/(root)/inversores/cartas/[id]/page.tsx', 'utf8');
+        // Los textos viven en el diccionario español (sección reader de investors.json).
+        const reader = readFileSync('app/(root)/inversores/cartas/[id]/page.tsx', 'utf8') + JSON.stringify(JSON.parse(readFileSync('lib/i18n/messages/es/investors.json', 'utf8')).reader);
         expect(reader).toContain('letterNeighbors(groupLetters(await getKnowledgeLetters()), letterId)');
         expect(reader).toContain('← Carta anterior');
         expect(reader).toContain('Carta siguiente →');

@@ -19,7 +19,7 @@ test('ficha: selector de inversor y contenido propio sin otra barra', () => {
     const letters = read('app/(root)/inversores/_components/InvestorLetters.tsx');
     assert.match(letters, /paginate\(letters, pagina, 12\)/);
     assert.match(letters, /letter.source_url/);
-    assert.match(letters, /letter.publication_date \?\? "N\/D"/);
+    assert.match(letters, /letter.publication_date \?\? na/);
     assert.match(letters, /publicLetters.map/);
     assert.doesNotMatch(letters, /slice\(0, 4\)/);
 });
@@ -66,9 +66,15 @@ test('Munger: enlaces del perfil público no son cartas propias', async () => {
         if (name === 'next/link') return { default: ({ children, ...props }: { children: unknown }) => React.createElement('a', props, children) };
         if (name === './Pagination') return { paginate: (items: unknown[]) => ({ items, page: 1, total: 1 }), Pagination: () => null };
         if (name === '../cartas/investor-letters') return { investorLetters: () => [] };
+        if (name === '@/lib/i18n/server') {
+            // Textos en español del diccionario real (la ficha por defecto sale en español).
+            const es = JSON.parse(read('lib/i18n/messages/es/investors.json'));
+            const t = (key: string) => key.split('.').slice(1).reduce((node: unknown, part: string) => (node as Record<string, unknown> | undefined)?.[part], es) ?? key;
+            return { getT: async () => t, getFormat: async () => ({ na: 'N/D' }) };
+        }
         return require(name);
     } });
-    const html = renderToStaticMarkup(exports.InvestorLetters({ slug: 'munger', documents: [], publicLetters }));
+    const html = renderToStaticMarkup(await (exports.InvestorLetters({ slug: 'munger', documents: [], publicLetters }) as Promise<unknown>));
     const sections = html.split('</section>');
     assert.match(sections[0], /N\/D · Sin cartas indexadas/);
     assert.doesNotMatch(sections[0], /Comunicado de Berkshire|Todas las cartas de Berkshire|2023ltr.pdf/);

@@ -5,6 +5,7 @@ import LetterReaderPage from '@/app/(root)/inversores/cartas/[id]/page';
 const mocks=vi.hoisted(()=>({document:vi.fn(),chunks:vi.fn()}));
 vi.mock('@/lib/actions/research-tools.actions',()=>({getKnowledgeDocument:mocks.document,getKnowledgeDocumentChunkPage:mocks.chunks}));
 vi.mock('next/link',()=>({default:({children,...props}:React.AnchorHTMLAttributes<HTMLAnchorElement>)=><a {...props}>{children}</a>}));
+vi.mock('next/headers',()=>({cookies:async()=>({get:()=>undefined})}));
 vi.mock('next/navigation',()=>({notFound:()=>{throw Error('NOT_FOUND');}}));
 vi.mock('@/app/(root)/inversores/_components/LibraryChat',()=>({LibraryChat:()=>null}));
 vi.mock('@/app/(root)/inversores/_components/Pagination',()=>({Pagination:()=>null}));
