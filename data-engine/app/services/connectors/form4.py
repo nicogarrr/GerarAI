@@ -53,6 +53,9 @@ def _record_sec_outcome(registry, started: float) -> None:
 
 
 def _record_sec_http_failure(registry, exc) -> None:
+    from app.services.connectors.sec_pacing import rate_limited
+
+    rate_limited(exc.response)
     registry.record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
 
 
@@ -249,6 +252,9 @@ def _get_text(url: str, client: httpx.Client | None) -> str:
         except httpx.TransportError as exc:
             _record_sec_transport_failure(get_data_source_registry(), exc)
             raise
+        from app.services.connectors.sec_pacing import rate_limited
+
+        rate_limited(response)
         if getattr(response, "status_code", 200) in RETRY_STATUSES and attempt < len(RETRY_BACKOFF_SECONDS):
             _sleep(RETRY_BACKOFF_SECONDS[attempt])
             attempt += 1

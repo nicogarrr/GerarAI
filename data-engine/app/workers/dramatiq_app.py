@@ -330,8 +330,18 @@ def _handle_actor_error(actor: str, exc: Exception, **context: Any) -> dict[str,
     all exceptions were swallowed into the failure payload. Permanent errors
     keep the previous behavior: a structured result the scheduler can log.
     """
+    from app.services.connectors.sec_pacing import SecQuotaDeferred
     from app.workers.rate_limit_retry import RateLimitRetriesExhausted
 
+    if isinstance(exc, SecQuotaDeferred):
+        # Accepted document work is NOT discarded. Defer on the broker,
+        # keeping its normal retry budget and failure trace when exhausted.
+        import math
+
+        raise dramatiq.Retry(
+            "SEC shared quota: deferred until provider window reopens",
+            delay=math.ceil(exc.retry_after * 1000),
+        ) from exc
     if isinstance(exc, RateLimitRetriesExhausted):
         # Ultimo intento contra una fuente que sigue limitando (429): ack sin
         # dead-letter; el siguiente ciclo programado repone el trabajo.

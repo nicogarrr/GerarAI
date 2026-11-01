@@ -101,6 +101,9 @@ def reset_sec_client_state() -> None:
     with _cache_lock:
         _json_cache.clear()
     _json_inflight.clear()
+    from app.services.connectors.sec_pacing import pacer
+
+    pacer.reset()
 
 
 def _cache_get(url: str) -> dict | None:
@@ -180,6 +183,8 @@ class SECClient:
         (o N instancias de SECClient, o varios event loops) salen separadas
         por el intervalo y ninguna bloquea el loop.
         """
+        from app.services.connectors.sec_pacing import pacer
+
         global _next_slot_at
         with _pacing_lock:
             now = time.monotonic()
@@ -188,6 +193,7 @@ class SECClient:
         delay = slot - now
         if delay > 0:
             await asyncio.sleep(delay)
+        await pacer.wait()
 
     async def _get(self, url: str) -> httpx.Response:
         """GET con ritmo compartido y reintentos con backoff exponencial.
@@ -218,6 +224,9 @@ class SECClient:
                 await asyncio.sleep(min(delay, _BACKOFF_CAP_SECONDS))
                 delay *= 2
                 continue
+            from app.services.connectors.sec_pacing import rate_limited
+
+            rate_limited(response)
             if response.status_code in _RETRYABLE_STATUS and attempt < max_retries:
                 wait = retry_after_seconds(response, cap=_BACKOFF_CAP_SECONDS) or delay
                 logger.warning(

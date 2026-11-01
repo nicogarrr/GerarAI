@@ -70,12 +70,18 @@ _sec_rate_limiter = SecRateLimiter()
 
 def sec_throttle() -> None:
     """Bloquea hasta poder emitir otra peticion a la SEC sin pasar de 10 req/s."""
+    from app.services.connectors.sec_pacing import pacer
+
     _sec_rate_limiter.wait()
+    pacer.wait_sync()
 
 
 def reset_sec_rate_limiter() -> None:
     """Solo para tests: reinicia el reloj global de la SEC."""
+    from app.services.connectors.sec_pacing import pacer
+
     _sec_rate_limiter.reset()
+    pacer.reset()
 
 
 # Tope de reintentos por llamada y espera maxima por uno. El presupuesto

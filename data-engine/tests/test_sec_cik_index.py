@@ -63,7 +63,9 @@ def test_many_lookups_reuse_one_index_without_copying_the_map(monkeypatch):
     real_deepcopy = copy.deepcopy
 
     def counting_deepcopy(obj, *a, **k):
-        copies["n"] += 1
+        # Count ticker-map copies, not Redis client retry configuration.
+        if isinstance(obj, dict) and obj == MAP:
+            copies["n"] += 1
         return real_deepcopy(obj, *a, **k)
 
     monkeypatch.setattr(sec.copy, "deepcopy", counting_deepcopy)
