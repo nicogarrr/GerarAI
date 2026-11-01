@@ -20,8 +20,8 @@ test('mobile and desktop facts both call the audit with ticker and use N/D', () 
   // La tabla/tarjetas de hechos viven en FactsPanels; la ficha las compone.
   const panels = readFileSync('components/research/FactsPanels.tsx', 'utf8');
   const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-  assert.match(panels, /const audit = factDisplayAudit\(ticker, fact\)/);
-  assert.match(panels, /audit \? 'N\/D' : <><FactValueLink/);
-  assert.match(panels, /factDisplayAudit\(ticker, fact\) \? <span/);
+  assert.match(panels, /const audit = factDisplayAudit\(ticker, fact, locale\)/);
+  assert.match(panels, /audit \? naFor\(locale\) : <><FactValueLink/);
+  assert.match(panels, /factDisplayAudit\(ticker, fact, locale\) \? <span className="text-gray-400">\{naFor\(locale\)\}/);
   assert.match(page, /<FactTable ticker=\{ticker\}/);
 });

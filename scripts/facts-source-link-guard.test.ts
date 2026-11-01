@@ -14,15 +14,15 @@ describe('cifras de la ficha enlazadas a su fuente', () => {
     it('la fuente solo enlaza con URL real del backend', () => {
         // #3527: la etiqueta textual de fuente (FactSource) se elimino; la
         // cifra sigue enlazando a la URL que devuelve el backend via FactValueLink.
-        assert.ok(panels.includes('function FactValueLink({ fact, children }: { fact: ResearchFact; children: ReactNode })'));
+        assert.ok(panels.includes('function FactValueLink({ fact, children, locale }: { fact: ResearchFact; children: ReactNode; locale: Locale })'));
         assert.ok(panels.includes('if (!fact.source_url) return <>{children}</>;'));
         assert.ok(panels.includes('href={fact.source_url}'));
         assert.ok(panels.includes('rel="noopener noreferrer"'));
         assert.ok(panels.includes('target="_blank"'));
     });
     it('la cifra enlaza a su fuente en tabla de escritorio y en tarjeta móvil', () => {
-        assert.ok(panels.includes('<FactValueLink fact={fact}>{metricValue(fact.value, fact.unit)}</FactValueLink>'));
-        assert.equal((panels.match(/<FactValueLink fact=\{fact\}>/g) ?? []).length, 2, 'tarjeta móvil y tabla de escritorio');
+        assert.ok(panels.includes('<FactValueLink fact={fact} locale={locale}>{metricValue(fact.value, fact.unit, locale)}</FactValueLink>'));
+        assert.equal((panels.match(/<FactValueLink fact=\{fact\} locale=\{locale\}>/g) ?? []).length, 2, 'tarjeta móvil y tabla de escritorio');
     });
     it('sin documento de origen la cifra queda como texto plano', () => {
         // Sin URL solo texto; nunca un enlace ni URLs construidas a mano.

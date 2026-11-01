@@ -1391,9 +1391,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           )}
         </Panel>
         </div>
-        <ThesisScenariosPanel adrRatio={data.thesis?.valuation_basis?.adr_ratio} currency={company.currency} data={data.scenarios} />
+        <ThesisScenariosPanel adrRatio={data.thesis?.valuation_basis?.adr_ratio} currency={company.currency} data={data.scenarios} locale={locale} />
         <Panel title={t('research.fichaClaimsEvidence')}>
-          <ResearchClaimForm action={createResearchClaim.bind(null, ticker)} />
+          <ResearchClaimForm action={createResearchClaim.bind(null, ticker)} locale={locale} />
           <div className="space-y-3">
             {data.claims.length ? groupClaimsByVersion(data.claims, data.history).map((group) => (
               <details key={group.key} open={group.claims.some((claim) => claim.thesis_version_id === data.thesis?.id)} className="rounded-lg border border-gray-800 p-3">
@@ -1573,7 +1573,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </div>
         <Panel title={t('research.fichaCurrentFundamentals')}><TtmPanel ttm={data.ttm} /></Panel>
         <Panel title={t('research.fichaTraceableMetrics')}><MetricsGrid metrics={data.calculatedMetrics} /></Panel>
-        <Panel title={t('research.fichaCanonicalFacts')}><FactTable ticker={ticker} facts={data.facts} refreshLabel={
+        <Panel title={t('research.fichaCanonicalFacts')}><FactTable ticker={ticker} locale={locale} facts={data.facts} refreshLabel={
             fmpCovers(ticker, company.exchange)
               ? t('research.fichaRefreshFinancialsFmp')
               : isEsefIssuerProfile(ticker, company.exchange)

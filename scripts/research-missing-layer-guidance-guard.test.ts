@@ -47,8 +47,10 @@ test('F309: los estados vacíos de la vista financieros ya no mandan a importar 
     const factTable = panels.slice(panels.indexOf('export function FactTable'));
     assert.doesNotMatch(factTable, /view=documents/);
     assert.match(factTable, /refreshLabel/);
-    assert.match(factTable, /Pulsa «\$\{refreshLabel\}» arriba para traerlos del proveedor indicado/);
-    assert.match(factTable, /no hay datos persistidos: comprueba el resultado del refresh y la fuente/);
+    assert.match(factTable, /t\('research\.facts\.emptyDescription', \{ label: refreshLabel \}\)/);
+    const factsEs = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).facts;
+    assert.match(factsEs.emptyDescription, /Pulsa «\{label\}» arriba para traerlos del proveedor indicado/);
+    assert.match(factsEs.emptyDescription, /no hay datos persistidos: comprueba el resultado del refresh y la fuente/);
     const metrics = page.slice(page.indexOf('function MetricsGrid'), page.indexOf('function ValuationView'));
     assert.doesNotMatch(metrics, /view=documents/);
     assert.match(metrics, /t\('research\.ficha\.metricsEmptyDescription'\)/);

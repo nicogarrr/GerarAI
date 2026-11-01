@@ -1571,5 +1571,33 @@
     "high": "Máximo",
     "low": "Mínimo",
     "previousClose": "Cierre anterior"
+  },
+  "facts": {
+    "unknown": "desconocido",
+    "sourceTitle": "Fuente del dato",
+    "emptyTitle": "Todavía no hay hechos financieros persistidos.",
+    "emptyDescription": "Pulsa «{label}» arriba para traerlos del proveedor indicado. Si sigue vacío, no hay datos persistidos: comprueba el resultado del refresh y la fuente.",
+    "unofficial": "Incluye cifras no oficiales, sin auditar ni contrastar con el emisor.",
+    "label": "Hechos financieros",
+    "caption": "Hechos financieros de la empresa (oficiales y, si se indica, no oficiales): métrica, periodo y valor",
+    "colMetric": "Métrica",
+    "colPeriod": "Periodo",
+    "colValue": "Valor"
+  },
+  "claimForm": {
+    "created": "Afirmación creada",
+    "statementLabel": "Afirmación",
+    "statementPlaceholder": "Una afirmación falsable y específica de la empresa",
+    "materiality": "Materialidad (0 a 10)",
+    "submit": "Añadir afirmación"
+  },
+  "scenarios": {
+    "title": "Escenarios a 5 años",
+    "revenue": "Ingresos",
+    "fcf": "Flujo de caja libre",
+    "eps": "Beneficio por acción",
+    "year": "Ejercicio",
+    "unverifiedCurrency": "Divisa del emisor no verificada.",
+    "source": "Proyección del modelo {model} v{version}, corte {date}."
   }
 }

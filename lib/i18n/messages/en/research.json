@@ -1571,5 +1571,33 @@
     "high": "High",
     "low": "Low",
     "previousClose": "Previous close"
+  },
+  "facts": {
+    "unknown": "unknown",
+    "sourceTitle": "Data source",
+    "emptyTitle": "There are no stored financial facts yet.",
+    "emptyDescription": "Press «{label}» above to fetch them from the listed provider. If it stays empty, nothing has been stored: check the refresh result and the source.",
+    "unofficial": "Includes unofficial figures, unaudited and not checked against the issuer.",
+    "label": "Financial facts",
+    "caption": "Company financial facts (official and, where stated, unofficial): metric, period and value",
+    "colMetric": "Metric",
+    "colPeriod": "Period",
+    "colValue": "Value"
+  },
+  "claimForm": {
+    "created": "Claim added",
+    "statementLabel": "Claim",
+    "statementPlaceholder": "A specific, falsifiable claim about the company",
+    "materiality": "Materiality (0 to 10)",
+    "submit": "Add claim"
+  },
+  "scenarios": {
+    "title": "5-year scenarios",
+    "revenue": "Revenue",
+    "fcf": "Free cash flow",
+    "eps": "Earnings per share",
+    "year": "Fiscal year",
+    "unverifiedCurrency": "Issuer currency not verified.",
+    "source": "Model projection {model} v{version}, as of {date}."
   }
 }

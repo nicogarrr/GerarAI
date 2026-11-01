@@ -40,7 +40,9 @@ test('objetivos de analistas: aviso de divisa sin fuente', () => {
 test('facts panels: cifras no oficiales sin etiqueta de fuente', () => {
     const view = read('components/research/FactsPanels.tsx');
     assert.doesNotMatch(view, /fuente no oficial|fuente de mercado/i);
-    assert.match(view, /Incluye cifras no oficiales, sin auditar ni contrastar/);
+    const factsEs = JSON.parse(read('lib/i18n/messages/es/research.json')).facts;
+    assert.match(view, /t\('research\.facts\.unofficial'\)/);
+    assert.match(factsEs.unofficial, /Incluye cifras no oficiales, sin auditar ni contrastar/);
 });
 
 test('screener: lectura offline sin nombre de proveedor', () => {
