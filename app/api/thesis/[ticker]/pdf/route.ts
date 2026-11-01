@@ -41,7 +41,8 @@ async function getHandler(
   }
   const markdown = await upstream.text();
   const pdf = await buildMemoPdf(markdown);
-  const version = markdown.match(/^Versión (\d+)/m)?.[1];
+  // «Versión N» (castellano) o «Version N» (memo en inglés, Ajustes).
+  const version = markdown.match(/^Versi[oó]n (\d+)/m)?.[1];
   const filename = `tesis-${ticker.toLowerCase()}${version ? `-v${version}` : ''}${draft ? '-borrador' : ''}.pdf`;
   return new NextResponse(new Uint8Array(pdf), {
     status: 200,

@@ -55,4 +55,19 @@ describe('GET /api/thesis/[ticker]/pdf', () => {
         expect(response.headers.get('Content-Disposition')).toBe('attachment; filename="tesis-pdft-v1-borrador.pdf"');
         expect(response.headers.get('Cache-Control')).toBe('no-store');
     });
+
+    it('reads the version of an English memo for the file name', async () => {
+        const english = '# Thesis memo — PDFT (Pdft)\n\nVersion 3 · status published · rating buy\n';
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(english, { status: 200 })));
+        const { GET } = await import('@/app/api/thesis/[ticker]/pdf/route');
+
+        const response = await GET(
+            new NextRequest('http://localhost/api/thesis/pdft/pdf'),
+            { params: Promise.resolve({ ticker: 'pdft' }) },
+        );
+
+        expect(response.status).toBe(200);
+        expect(buildMemoPdf).toHaveBeenCalledWith(english);
+        expect(response.headers.get('Content-Disposition')).toBe('attachment; filename="tesis-pdft-v3.pdf"');
+    });
 });
