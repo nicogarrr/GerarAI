@@ -25,6 +25,11 @@
  *   acompanan de la cobertura "N de M".
  */
 
+// @ts-expect-error TS5097
+import { DEFAULT_LOCALE, type Locale } from '../i18n/locale.ts';
+// @ts-expect-error TS5097
+import { createTranslator } from '../i18n/translate.ts';
+
 export type ValuationCurrency = 'EUR' | 'USD';
 
 export type ValuationPosition = {
@@ -95,11 +100,12 @@ export function symbolFromKey(instrumentKey: string): string | null {
 export type QuoteCurrency = { currency: ValuationCurrency | null; basis: 'finnhub-listado' | null; reason: string | null };
 
 /** Divisa de la cotizacion SOLO si viene verificada en quote.currency; nunca por sufijo ni por ausencia de el. */
-export function resolveQuoteCurrency(quote: ValuationQuote): QuoteCurrency {
+export function resolveQuoteCurrency(quote: ValuationQuote, locale: Locale = DEFAULT_LOCALE): QuoteCurrency {
     const declared = typeof quote.currency === 'string' ? quote.currency.trim() : '';
     if (declared === 'EUR' || declared === 'USD') return { currency: declared, basis: 'finnhub-listado', reason: null };
-    if (declared) return { currency: null, basis: null, reason: `El listado indica ${declared}: no hay conversión, N/D.` };
-    return { currency: null, basis: null, reason: 'Divisa de la cotización no verificada en el listado: N/D (no se infiere del símbolo).' };
+    const t = createTranslator(locale);
+    if (declared) return { currency: null, basis: null, reason: t('paperTrading.valuation.rowNotes.listingCurrency', { currency: declared }) };
+    return { currency: null, basis: null, reason: t('paperTrading.valuation.rowNotes.currencyNotVerifiedListing') };
 }
 
 /** Mapa simbolo -> divisa del listado US de Finnhub (/stock/symbol); ignora entradas sin simbolo o divisa. */
@@ -114,32 +120,38 @@ export function parseListingCurrencies(payload: unknown): Map<string, string> {
     return map;
 }
 
-const TIME_FORMAT = new Intl.DateTimeFormat('es-ES', {
-    timeZone: 'Europe/Madrid',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-});
-const DATE_FORMAT = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', day: 'numeric', month: 'short' });
+const TIME_FORMATS = {
+    es: new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
+    en: new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
+} as const;
+const DATE_FORMATS = {
+    es: new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', day: 'numeric', month: 'short' }),
+    en: new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Madrid', day: 'numeric', month: 'short' }),
+} as const;
 
-function closeDateLabel(iso: string): string {
-    const parsed = new Date(`${iso}T12:00:00Z`);
-    return DATE_FORMAT.format(parsed).replace('.', '');
+function formatsFor(locale: Locale) {
+    return locale === 'en' ? { time: TIME_FORMATS.en, date: DATE_FORMATS.en } : { time: TIME_FORMATS.es, date: DATE_FORMATS.es };
+}
+
+function shortDate(d: Date, locale: Locale): string {
+    return formatsFor(locale).date.format(d).replace('.', '');
 }
 
 /** Etiqueta honesta de hora/fecha de una cotizacion, sin nombrar la fuente. */
-export function quoteLabel(quote: ValuationQuote): string {
+export function quoteLabel(quote: ValuationQuote, locale: Locale = DEFAULT_LOCALE): string {
     // Etiqueta de calidad sin nombrar la fuente (orden de Nico, 31-oct): la
     // procedencia sigue en la pestana Fuentes y en la API.
+    const t = createTranslator(locale);
+    const { time } = formatsFor(locale);
     if (quote.kind === 'live' && typeof quote.t === 'number' && quote.t > 0) {
-        return `${TIME_FORMAT.format(new Date(quote.t * 1000))} (hora de Madrid) · en vivo`;
+        return t('paperTrading.valuation.quoteLabels.live', { time: time.format(new Date(quote.t * 1000)) });
     }
-    if (quote.closeDate) return `cierre del ${closeDateLabel(quote.closeDate)}`;
+    if (quote.closeDate) return t('paperTrading.valuation.quoteLabels.close', { date: shortDate(new Date(`${quote.closeDate}T12:00:00Z`), locale) });
     if (typeof quote.t === 'number' && quote.t > 0) {
         const d = new Date(quote.t * 1000);
-        return `último cierre, dato de ${DATE_FORMAT.format(d).replace('.', '')} ${TIME_FORMAT.format(d)}`;
+        return t('paperTrading.valuation.quoteLabels.lastClose', { date: shortDate(d, locale), time: time.format(d) });
     }
-    return `cierre de fecha desconocida`;
+    return t('paperTrading.valuation.quoteLabels.unknownClose');
 }
 
 function unvalued(position: ValuationPosition, status: ValuationStatus, note: string, label: string | null = null): ValuedPosition {
@@ -170,47 +182,45 @@ const cents = (n: number): number => Math.round(n * 100) / 100;
 export function valuePositions(
     positions: ValuationPosition[],
     quotes: Record<string, ValuationQuote | null | undefined>,
-    options: { notQueried?: ReadonlySet<string>; currencyUnverified?: ReadonlySet<string> } = {},
+    options: { notQueried?: ReadonlySet<string>; currencyUnverified?: ReadonlySet<string>; locale?: Locale } = {},
 ): DemoValuation {
+    const locale: Locale = options.locale ?? DEFAULT_LOCALE;
+    const t = createTranslator(locale);
     const rows: ValuedPosition[] = positions.map((position) => {
         if (position.kind === 'opcion') {
-            return unvalued(
-                position,
-                'opcion-no-valorada',
-                'Opción sin valorar: no hay cotización de la prima del contrato y la del subyacente no es su precio.',
-            );
+            return unvalued(position, 'opcion-no-valorada', t('paperTrading.valuation.rowNotes.optionNotValued'));
         }
         const symbol = symbolFromKey(position.instrumentKey);
-        if (!symbol) return unvalued(position, 'sin-cotizacion', 'Instrumento sin símbolo reconocible.');
+        if (!symbol) return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.noSymbol'));
         if (options.notQueried?.has(symbol.toUpperCase())) {
-            return unvalued(position, 'no-consultada', 'No consultada: límite de 25 símbolos por consulta.');
+            return unvalued(position, 'no-consultada', t('paperTrading.valuation.rowNotes.notQueried'));
         }
         if (options.currencyUnverified?.has(symbol.toUpperCase())) {
             // No se intento ninguna cotizacion: no hay divisa verificable (listado caido o simbolo ausente).
-            return unvalued(position, 'divisa-no-coincide', 'No se pudo verificar la divisa de la cotización.');
+            return unvalued(position, 'divisa-no-coincide', t('paperTrading.valuation.rowNotes.currencyUnverified'));
         }
         const quote = quotes[symbol.toUpperCase()];
         if (!quote || !Number.isFinite(quote.c) || quote.c <= 0) {
-            return unvalued(position, 'sin-cotizacion', 'Sin cotización disponible de las fuentes admitidas (no se usa el precio de tus operaciones).');
+            return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.noQuote'));
         }
-        const label = quoteLabel(quote);
+        const label = quoteLabel(quote, locale);
         if (quote.source !== 'Finnhub') {
             return unvalued(
                 position,
                 'fuente-no-aprobada',
-                'Sin cotización disponible de las fuentes admitidas.',
+                t('paperTrading.valuation.rowNotes.sourceNotApproved'),
                 null,
             );
         }
-        const resolved = resolveQuoteCurrency(quote);
+        const resolved = resolveQuoteCurrency(quote, locale);
         if (resolved.currency === null) {
-            return unvalued(position, 'divisa-no-coincide', resolved.reason ?? 'Divisa de la cotización desconocida: N/D.', label);
+            return unvalued(position, 'divisa-no-coincide', resolved.reason ?? t('paperTrading.valuation.rowNotes.currencyUnknown'), label);
         }
         if (resolved.currency !== position.currency) {
             return unvalued(
                 position,
                 'divisa-no-coincide',
-                `La cotización está en ${resolved.currency} y la posición en ${position.currency}; no hay conversión: N/D.`,
+                t('paperTrading.valuation.rowNotes.currencyMismatch', { quote: resolved.currency, position: position.currency }),
                 label,
             );
         }

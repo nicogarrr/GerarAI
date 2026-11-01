@@ -91,7 +91,6 @@
   "lib/labels.ts": 122,
   "lib/logos/site-icon.ts": 1,
   "lib/market/chart-ranges.ts": 2,
-  "lib/market/demo-valuation.ts": 10,
   "lib/market/extended-quote.ts": 3,
   "lib/market/live-quotes.ts": 3,
   "lib/market/price-events.ts": 3,

@@ -38,7 +38,25 @@
     "refreshError": "No se pudieron actualizar las cotizaciones: {error}",
     "refreshErrorNetwork": "No se pudieron actualizar las cotizaciones: fallo de red o del servidor.",
     "stale": "Sin actualizar: las posiciones han cambiado desde la última consulta de cotizaciones. Se reconsultan solas con la pestaña visible, o puedes pedirlo con el botón.",
-    "unavailable": "Valoración no disponible todavía: sin cotizaciones consultadas. Se consultan solas con la pestaña visible, o puedes pedirlo con el botón."
+    "unavailable": "Valoración no disponible todavía: sin cotizaciones consultadas. Se consultan solas con la pestaña visible, o puedes pedirlo con el botón.",
+    "rowNotes": {
+      "listingCurrency": "El listado indica {currency}: no hay conversión, N/D.",
+      "currencyNotVerifiedListing": "Divisa de la cotización no verificada en el listado: N/D (no se infiere del símbolo).",
+      "optionNotValued": "Opción sin valorar: no hay cotización de la prima del contrato y la del subyacente no es su precio.",
+      "noSymbol": "Instrumento sin símbolo reconocible.",
+      "notQueried": "No consultada: límite de 25 símbolos por consulta.",
+      "currencyUnverified": "No se pudo verificar la divisa de la cotización.",
+      "noQuote": "Sin cotización disponible de las fuentes admitidas (no se usa el precio de tus operaciones).",
+      "sourceNotApproved": "Sin cotización disponible de las fuentes admitidas.",
+      "currencyUnknown": "Divisa de la cotización desconocida: N/D.",
+      "currencyMismatch": "La cotización está en {quote} y la posición en {position}; no hay conversión: N/D."
+    },
+    "quoteLabels": {
+      "live": "{time} (hora de Madrid) · en vivo",
+      "close": "cierre del {date}",
+      "lastClose": "último cierre, dato de {date} {time}",
+      "unknownClose": "cierre de fecha desconocida"
+    }
   },
   "account": {
     "ariaLabel": "Saldo de la cuenta demo",

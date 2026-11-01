@@ -39,6 +39,7 @@ import { formatNumber } from '@/lib/format';
 import { sanitizeFinnhubQuote } from '@/lib/market/quote-freshness';
 import { combineAbortSignals, createQuoteCache, type CachedQuote, type QuoteFetchAttempt } from '@/lib/market/quote-cache';
 import { parseListingCurrencies, symbolFromKey, valuePositions, type DemoValuation, type ValuationQuote } from '@/lib/market/demo-valuation';
+import { requestLocale } from '@/lib/research/backend-error-locale';
 import { computeManualDemoAccount } from '@/lib/paper-trading/accounting';
 import { docsToLedger } from '@/lib/paper-trading/ledger-adapter';
 import { buildOptionFill, expiryBadge } from '@/lib/paper-trading/options';
@@ -917,7 +918,7 @@ export async function getManualDemoValuation(): Promise<ManualDemoValuationResul
         });
         return {
             ok: true,
-            valuation: valuePositions(positions, quotes, { notQueried, currencyUnverified }),
+            valuation: valuePositions(positions, quotes, { notQueried, currencyUnverified, locale: await requestLocale() }),
             // min(fetchedAt): la cotización más vieja servida manda (cambio
             // de semántica documentado arriba: antes era Date.now() siempre).
             asOf: oldestQuoteAt ?? Date.now(),

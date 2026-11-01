@@ -130,3 +130,30 @@ describe('helpers de valoración', () => {
         expect(valuationRowKey({ currency: 'EUR', instrumentKey: 'A:SAN' })).toBe('EUR|A:SAN');
     });
 });
+
+describe('valuePositions - inglés (Ajustes → Idioma)', () => {
+    it('motivos sin valorar y etiquetas de cotización en inglés', () => {
+        const en = { locale: 'en' as const };
+        const v = valuePositions(
+            [pos({ kind: 'opcion', instrumentKey: 'O:ASTS' }), pos({ instrumentKey: 'A:NOQ' }), pos({ instrumentKey: 'A:EURX' }), pos({ instrumentKey: 'A:GBP' })],
+            { EURX: q({ currency: 'EUR' }), GBP: q({ currency: 'GBP' }) },
+            en,
+        );
+        expect(v.rows[0].note).toBe("Option not valued: there is no quote for the contract's premium, and the underlying's quote is not its price.");
+        expect(v.rows[1].note).toBe('No quote available from the approved sources (your trade prices are not used).');
+        expect(v.rows[2].note).toBe('The quote is in EUR and the position in USD; there is no conversion: N/A.');
+        expect(v.rows[3].note).toBe('The listing says GBP: there is no conversion, N/A.');
+        expect(v.rows[2].quoteLabel).toBe('16:30 (Madrid time) · live');
+        const nq = valuePositions([pos()], {}, { notQueried: new Set(['ASTS']), locale: 'en' });
+        expect(nq.rows[0].note).toBe('Not checked: limit of 25 tickers per request.');
+        expect(quoteLabel(q({ kind: 'close', closeDate: '2026-10-27' }), 'en')).toBe('close of Oct 27');
+        expect(quoteLabel(q({ kind: 'close', closeDate: null, t: Date.UTC(2026, 9, 27, 21, 0) / 1000 }), 'en')).toBe('last close, data from Oct 27 22:00');
+        expect(quoteLabel({ c: 1, t: null, kind: 'close' }, 'en')).toBe('close, date unknown');
+        expect(resolveQuoteCurrency(q({ currency: null }), 'en').reason).toBe('Quote currency not verified in the listing: N/A (it is not inferred from the ticker).');
+    });
+    it('en español no cambia nada', () => {
+        const v = valuePositions([pos({ instrumentKey: 'A:NOQ' })], {}, { locale: 'es' });
+        expect(v.rows[0].note).toBe('Sin cotización disponible de las fuentes admitidas (no se usa el precio de tus operaciones).');
+        expect(quoteLabel(q(), 'es')).toBe('16:30 (hora de Madrid) · en vivo');
+    });
+});
