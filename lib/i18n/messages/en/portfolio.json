@@ -737,7 +737,15 @@
     "rmReasonCalendar": "incompatible trading calendar",
     "rmReasonFallback": "not enough data",
     "rmColWeightIncluded": "Weight in matrix",
-    "rmCoverageNote": "Contributions computed only over the {n} included positions: their weights are renormalized to sum to 100%. Excluded ones are listed below with their reason."
+    "rmCoverageNote": "Contributions computed only over the {n} included positions: their weights are renormalized to sum to 100%. Excluded ones are listed below with their reason.",
+    "xirrReasons": {
+      "missingFx": "exchange rates or values needed to include every cash flow and the final value are missing",
+      "ambiguousCash": "there are ambiguous cash flows in the record",
+      "missingCashBalance": "contributions are recorded but the account's cash balance is missing",
+      "insufficientCashflows": "cash flows are missing from the transaction record",
+      "noRoot": "it does not converge with the recorded cash flows",
+      "default": "not enough cash flows in the transaction record"
+    }
   },
   "ledgerRejection": {
     "deleteInsufficient": "It can't be deleted: a later sale would be left without shares. Delete or fix that sale first.",

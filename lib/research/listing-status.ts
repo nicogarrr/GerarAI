@@ -1,3 +1,9 @@
+// @ts-expect-error TS5097: node --test (--experimental-strip-types) necesita la extensión.
+import { t as esT, type TranslationKey, type TranslationVars } from '../i18n/t.ts';
+
+/** Traductor del idioma elegido; por defecto el español de referencia. */
+type TiFn = (key: TranslationKey, vars?: TranslationVars) => string;
+
 // F34: una ficha sin cotización vigente no puede mostrar salud 0/100 como dato.
 const STALE_DAYS = 30;
 
@@ -34,6 +40,8 @@ export function listingStatus(
   priceAsOf: string | null | undefined,
   now: Date,
   currentQuote = false,
+  ti: TiFn = esT,
+  formatDate: (iso: string) => string = esDate,
 ): ListingStatus {
   if (currentQuote) return { stale: false };
   const unknownExchange = !exchange || ['UNKNOWN', 'UNKNOWN_EXCHANGE'].includes(exchange.trim().toUpperCase());
@@ -44,8 +52,8 @@ export function listingStatus(
   return {
     stale: true,
     message: asOf
-      ? `Ticker sin cotización vigente (último cierre ${esDate(asOf)})`
-      : 'Ticker sin cotización vigente (sin cierre conocido)',
+      ? ti('research.listingStale.withClose', { date: formatDate(asOf.slice(0, 10)) })
+      : ti('research.listingStale.noClose'),
   };
 }
 
