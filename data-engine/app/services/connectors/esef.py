@@ -24,6 +24,8 @@ converts that into an honest degraded state.
 
 from __future__ import annotations
 
+import asyncio
+import random
 import re
 import time
 from dataclasses import dataclass, field
@@ -44,8 +46,17 @@ FILINGS_API = "/api/filings"
 ENTITIES_API = "/api/entities"
 USER_AGENT = "GerarAI/1.0 (research; contact: single-user app)"
 DEFAULT_PAGE_SIZE = 100
-_MIN_INTERVAL_S = 1.0  # undocumented rate limits -> conservative polling
+# Limites no documentados. 1 s entre peticiones acababa en 429 en /api/filings
+# (dead-letter de prod, 1-nov-2026): 2 s deja el build semanal (~200-300
+# peticiones) en ~10 min, dentro del time_limit de 30 min del actor.
+_MIN_INTERVAL_S = 2.0
 _last_request_at = 0.0
+# 429: reintentos en linea con el Retry-After del servidor (o backoff
+# exponencial con jitter si no lo manda); una ventana mayor que el techo no se
+# duerme aqui: sube como EsefRateLimited para que el actor reencole.
+_MAX_429_RETRIES = 3
+_RETRY_BASE_S = 10.0
+_RETRY_CAP_S = 120.0
 
 
 BASE_DIMENSIONS = frozenset({"concept", "entity", "period", "unit"})
@@ -53,6 +64,37 @@ BASE_DIMENSIONS = frozenset({"concept", "entity", "period", "unit"})
 
 class EsefError(RuntimeError):
     """filings.xbrl.org schema drift or transport failure; degrade honestly."""
+
+
+class EsefRateLimited(EsefError):
+    """filings.xbrl.org sigue respondiendo 429 tras los reintentos en linea."""
+
+    def __init__(self, url: str, retry_after: float) -> None:
+        super().__init__(f"GET {url}: limite de filings.xbrl.org (429), reintentar tras {retry_after:.0f}s")
+        self.retry_after = retry_after
+
+
+async def _pause(seconds: float) -> None:
+    await asyncio.sleep(seconds)
+
+
+def _retry_after_header(response: httpx.Response) -> float | None:
+    raw = response.headers.get("Retry-After")
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    return value if value >= 0 and value != float("inf") else None
+
+
+def _wait_for_429(attempt: int, server: float | None) -> float:
+    """Ventana del servidor si la da; si no, exponencial con jitter."""
+    if server is not None and server > 0:
+        return server
+    expo = min(_RETRY_CAP_S, _RETRY_BASE_S * (2**attempt))
+    return expo * (1.0 + 0.2 * random.random())
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,12 +271,26 @@ class EsefClient:
     async def _get_json(
         self, url: str, params: dict[str, Any] | None = None, accept: str | None = None
     ) -> dict[str, Any]:
-        _throttle()
         registry = get_data_source_registry()
-        started = time.monotonic()
+        headers = {"Accept": accept} if accept else None
+        attempt = 0
+        while True:
+            _throttle()
+            started = time.monotonic()
+            try:
+                resp = await self._client.get(url, params=params, headers=headers)
+            except httpx.HTTPError as exc:
+                registry.record_failure(REGISTRY_KEY, f"{type(exc).__name__}")
+                raise EsefError(f"GET {url} failed: {exc!r}") from exc
+            if resp.status_code != 429:
+                break
+            wait = _wait_for_429(attempt, _retry_after_header(resp))
+            if wait > _RETRY_CAP_S or attempt >= _MAX_429_RETRIES:
+                registry.record_failure(REGISTRY_KEY, "HTTP 429")
+                raise EsefRateLimited(url, wait)
+            attempt += 1
+            await _pause(wait)
         try:
-            headers = {"Accept": accept} if accept else None
-            resp = await self._client.get(url, params=params, headers=headers)
             resp.raise_for_status()
             payload = resp.json()
         except httpx.HTTPStatusError as exc:
