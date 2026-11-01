@@ -1340,6 +1340,13 @@ class ChatService:
         if sale_tax is not None:
             sale_tax.context = context_echo
             return sale_tax
+        # Datos de tu cuenta (variación de hoy…): solo lectura y solo tu tenant.
+        from app.services.brain_account_tools import answer_account_question
+
+        account = answer_account_question(db, question or "")
+        if account is not None:
+            account.context = context_echo
+            return account
         from app.services.brain_data_tools import (
             answer_data_question,
             dividend_ticker_without_records,
