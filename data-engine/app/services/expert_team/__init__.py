@@ -22,6 +22,8 @@ from app.services.expert_team.models import (
     ToolOutput,
     ToolSpec,
 )
+from app.services.expert_team.roster import default_experts
+from app.services.expert_team.tools import build_tools
 
 
 def expert_team_enabled() -> bool:
@@ -43,5 +45,7 @@ __all__ = [
     "TeamResult",
     "ToolOutput",
     "ToolSpec",
+    "build_tools",
+    "default_experts",
     "expert_team_enabled",
 ]

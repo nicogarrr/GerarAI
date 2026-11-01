@@ -69,7 +69,7 @@ class ExpertTeam:
                 continue
             if spec.applies is not None and not spec.applies(ctx):
                 continue
-            if ctx.mode == "chat" and not any(k in question for k in spec.keywords):
+            if ctx.mode == "chat" and not any(re.search(rf"\b{re.escape(k)}", question) for k in spec.keywords):
                 continue
             chosen.append(spec.name)
         return chosen
