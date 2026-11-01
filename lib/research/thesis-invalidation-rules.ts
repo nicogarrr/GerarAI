@@ -55,9 +55,32 @@ export function isPercentMetric(metric: string): boolean {
   return INVALIDATION_METRICS.some((item) => item.value === metric && item.percent);
 }
 
-export function invalidationMetricLabel(metric: string): string {
+/** Etiqueta y ayuda de cada métrica en inglés (Ajustes → Idioma). */
+const INVALIDATION_METRICS_EN: Record<string, { label: string; hint: string }> = {
+  precio: { label: 'Price', hint: 'Latest close, in the trading currency.' },
+  margen_seguridad_pct: {
+    label: 'Margin of safety (%)',
+    hint: 'Expected value of the thesis vs. today’s price. E.g. < -10 = trading 10% above the expected value.',
+  },
+  variacion_desde_tesis_pct: {
+    label: 'Change since the thesis (%)',
+    hint: 'Today’s price vs. the price when the thesis was generated.',
+  },
+  [CUSTOM_METRIC_PREFIX]: {
+    label: 'Financial metric…',
+    hint: 'Name of the computed metric (e.g. roic, gross_margin). Threshold in its unit: 0.08 = 8%.',
+  },
+};
+
+/** Las métricas del selector en el idioma de la interfaz (mismo `value`). */
+export function invalidationMetrics(locale: 'es' | 'en' = 'es'): ReadonlyArray<{ value: string; label: string; percent: boolean; hint: string }> {
+  if (locale !== 'en') return INVALIDATION_METRICS;
+  return INVALIDATION_METRICS.map((item) => ({ ...item, ...(INVALIDATION_METRICS_EN[item.value] ?? {}) }));
+}
+
+export function invalidationMetricLabel(metric: string, locale: 'es' | 'en' = 'es'): string {
   if (metric.startsWith(CUSTOM_METRIC_PREFIX)) return metric.slice(CUSTOM_METRIC_PREFIX.length).trim();
-  const known = INVALIDATION_METRICS.find((item) => item.value === metric);
+  const known = invalidationMetrics(locale).find((item) => item.value === metric);
   return known ? known.label.replace(' (%)', '').toLowerCase() : metric;
 }
 
@@ -67,11 +90,16 @@ export function formatThresholdEs(value: number, percent: boolean): string {
   return percent ? `${text} %` : text;
 }
 
-export function describeInvalidationRule(rule: ThesisInvalidationRule): string {
-  return `${invalidationMetricLabel(rule.metric)} ${OPERATOR_TEXT[rule.operator] ?? rule.operator} ${formatThresholdEs(
-    rule.threshold,
-    isPercentMetric(rule.metric),
-  )}`;
+/** Número en inglés con 2 decimales (punto decimal, «%» pegado). */
+function formatThresholdEn(value: number, percent: boolean): string {
+  const text = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false }).format(value);
+  return percent ? `${text}%` : text;
+}
+
+export function describeInvalidationRule(rule: ThesisInvalidationRule, locale: 'es' | 'en' = 'es'): string {
+  const percent = isPercentMetric(rule.metric);
+  const threshold = locale === 'en' ? formatThresholdEn(rule.threshold, percent) : formatThresholdEs(rule.threshold, percent);
+  return `${invalidationMetricLabel(rule.metric, locale)} ${OPERATOR_TEXT[rule.operator] ?? rule.operator} ${threshold}`;
 }
 
 /** Acepta coma o punto decimal ("−10,5", "0.08"). null si no es un número finito. */

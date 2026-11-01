@@ -26,8 +26,10 @@ describe('polling de tesis: corte y estado desconocido', () => {
         assert.match(button, /if \(!active \|\| !jobId \|\| pollExhausted\) return;/);
     });
     it('el copy pasa a «Estado desconocido» y no promete progreso', () => {
-        assert.match(button, /Estado desconocido: la generación no responde/);
-        assert.match(button, /El trabajo del servidor no se cancela/);
+        assert.match(button, /t\('research\.thesisGenerate\.unknownState'\)/);
+        const unknownState: string = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).thesisGenerate.unknownState;
+        assert.match(unknownState, /Estado desconocido: la generación no responde/);
+        assert.match(unknownState, /El trabajo del servidor no se cancela/);
     });
     it('un job nuevo reinicia la ventana de polling', () => {
         // El contador arranca con el efecto de polling y el agotamiento se

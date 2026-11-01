@@ -1415,5 +1415,61 @@
     "publishEffect": "Al publicarla pasa a la Biblioteca y el Cerebro la usará como referencia.",
     "publishAnyway": "Publicar igualmente",
     "cancel": "Cancelar"
+  },
+  "thesisHumanInput": {
+    "ambiguous": "Formato de número ambiguo: usa la coma para los decimales y el punto para los miles (ej. 1.234,56).",
+    "invalid": "Introduce un valor numérico válido en la unidad del driver.",
+    "saved": "Supuesto guardado. Regenera la tesis para incorporarlo; no se ha convertido en un dato verificado.",
+    "saveFailed": "No se pudo guardar el supuesto.",
+    "summary": "Aportar un supuesto humano",
+    "intro": "Se guarda como supuesto, con fuente y justificación. Usa la clave exacta de un driver del modelo, por ejemplo revenue. Un dato financiero pendiente no se completa con un supuesto como si fuera un hecho.",
+    "driverKey": "Clave del driver",
+    "fiscalYear": "Ejercicio fiscal",
+    "scenario": "Escenario",
+    "value": "Valor (unidad del driver)",
+    "source": "Fuente o referencia",
+    "rationale": "Justificación",
+    "saving": "Guardando...",
+    "save": "Guardar supuesto"
+  },
+  "thesisInvalidation": {
+    "none": "Sin criterios medibles: no se vigila nada.",
+    "savedOne": "Guardado. Se vigila 1 criterio en cada pasada de alertas.",
+    "savedMany": "Guardado. Se vigilan {count} criterios en cada pasada de alertas.",
+    "thresholdInvalid": "El umbral debe ser un número (admite coma decimal).",
+    "metricNameRequired": "Escribe el nombre de la métrica financiera.",
+    "title": "Criterios medibles con aviso",
+    "removeAria": "Quitar criterio {rule}",
+    "remove": "Quitar",
+    "empty": "Ninguno todavía. Añade uno y te aviso cuando se cumpla.",
+    "add": "Añadir criterio medible",
+    "metric": "Métrica",
+    "name": "Nombre",
+    "operator": "Operador",
+    "threshold": "Umbral",
+    "description": "Descripción (opcional)",
+    "descriptionPlaceholder": "La acción cotiza por encima del valor esperado",
+    "saving": "Guardando…",
+    "save": "Guardar criterio"
+  },
+  "thesisGenerate": {
+    "status": {
+      "insufficientData": "datos insuficientes",
+      "failedAudit": "no superó la auditoría"
+    },
+    "generate": "Generar tesis",
+    "recoverFailed": "No se pudo recuperar la generación. Reintentando…",
+    "submitUnconfirmed": "No se pudo confirmar el envío. Recuperando el estado del servidor…",
+    "recovering": "Recuperando generación…",
+    "queuing": "Encolando…",
+    "generating": "Generando…",
+    "unknownState": "Estado desconocido: la generación no responde desde hace 30 min. El trabajo del servidor no se cancela; recarga la página para volver a leer su estado.",
+    "waitingQueue": "Esperando reconexión de la cola",
+    "retrying": "Reintentando en el servidor",
+    "preparing": "Preparando la generación",
+    "queued": "En cola",
+    "generated": "Tesis v{version} generada",
+    "view": "Ver tesis v{version}",
+    "failed": "La generación falló{errorClass}. Puedes reintentar."
   }
 }

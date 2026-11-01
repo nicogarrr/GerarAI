@@ -18,8 +18,13 @@ test('selected node detail translates the type too', () => {
 
 test('SEC refresh phase has a human label and unknown phases stay nontechnical', () => {
  const source = readFileSync('components/research/ThesisGenerateButton.tsx','utf8');
- assert.match(source, /refresh_sec: 'Actualizando financieros SEC'/);
+ // Las etiquetas de fase viven en lib/research/thesis-progress.ts (es y en); el botón las pide ahí.
+ const progress = readFileSync('lib/research/thesis-progress.ts','utf8');
+ assert.match(progress, /refresh_sec: 'Actualizando financieros SEC'/);
+ assert.match(progress, /refresh_sec: 'Updating SEC financials'/);
+ assert.match(source, /thesisPhaseLabel\(job.current_phase, locale\)/);
  assert.doesNotMatch(source, /PHASE_LABELS\[job.current_phase\] \?\? job.current_phase/);
+ assert.match(progress, /\?\? 'Análisis en curso'/);
 });
 
 test('node type labels follow the active locale through knowledgeGraph.nodeType.* keys', () => {

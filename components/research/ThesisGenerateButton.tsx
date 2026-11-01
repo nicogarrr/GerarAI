@@ -7,23 +7,13 @@ import { scrollToIdWhenReady } from '@/lib/utils/scroll-anchor';
 import { BrainCircuit, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getLatestThesisJob, getThesisJobStatus, startThesisJob, type ThesisJobStatus } from '@/lib/actions/thesis-jobs.actions';
-import { thesisProgressText } from '@/lib/research/thesis-progress';
+import { thesisPhaseLabel, thesisProgressText } from '@/lib/research/thesis-progress';
+import { useLocale, useT } from '@/lib/i18n/client';
 
-const PHASE_LABELS: Record<string, string> = {
-    refresh_sec: 'Actualizando financieros SEC',
-    collect_evidence: 'Recopilando evidencia (SEC, noticias, filings)',
-    build_fundamental_model: 'Construyendo modelo fundamental',
-    run_valuation: 'Ejecutando valoración determinista',
-    persist_valuation_snapshot: 'Guardando valoración y snapshot',
-    source_audit: 'Auditoría de fuentes y claims',
-    compose_thesis: 'Redactando la tesis',
-    persist_thesis: 'Persistiendo la versión',
-};
-
-const THESIS_STATUS_LABELS: Record<string, string> = {
-    insufficient_data: 'datos insuficientes',
-    draft_failed_audit: 'no superó la auditoría',
-};
+const THESIS_STATUS_LABELS = {
+    insufficient_data: 'research.thesisGenerate.status.insufficientData',
+    draft_failed_audit: 'research.thesisGenerate.status.failedAudit',
+} as const;
 
 const POLL_MS = 3000;
 // 600 polls x 3 s = 30 min de espera continua por job. Sin corte, un job
@@ -31,8 +21,10 @@ const POLL_MS = 3000;
 // maximo el estado es DESCONOCIDO y se dice, no se sigue fingiendo progreso.
 const MAX_POLLS = 600;
 
-export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', emptyCopy }: { ticker: string; label?: string; emptyCopy?: string }) {
+export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { ticker: string; label?: string; emptyCopy?: string }) {
     const router = useRouter();
+    const t = useT();
+    const locale = useLocale();
     const searchParams = useSearchParams();
     const [job, setJob] = useState<ThesisJobStatus | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -68,7 +60,7 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', 
                 }
             } catch {
                 if (!disposed) {
-                    setError('No se pudo recuperar la generación. Reintentando…');
+                    setError(t('research.thesisGenerate.recoverFailed'));
                     timer = setTimeout(recover, POLL_MS);
                 }
             }
@@ -156,7 +148,7 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', 
             }
             setRecovering(true);
             setRecoveryCycle((cycle) => cycle + 1);
-            setError('No se pudo confirmar el envío. Recuperando el estado del servidor…');
+            setError(t('research.thesisGenerate.submitUnconfirmed'));
         } finally {
             startingRef.current = false;
             setStarting(false);
@@ -168,8 +160,8 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', 
     // éxito (abajo) es la única verdad en la tarjeta. Sin router.refresh():
     // re-renderizaba la ruta entera y el lector perdía su sitio.
     const succeededHere = startedHere && job?.status === 'succeeded';
-    const phaseLabel = job?.current_phase ? PHASE_LABELS[job.current_phase] ?? 'Análisis en curso' : null;
-    const progressText = thesisProgressText(job, polledAt);
+    const phaseLabel = job?.current_phase ? thesisPhaseLabel(job.current_phase, locale) : null;
+    const progressText = thesisProgressText(job, polledAt, locale);
 
     return (
         <div className="flex flex-col gap-2">
@@ -182,21 +174,21 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', 
                     ) : (
                         <BrainCircuit aria-hidden="true" className="mr-2 h-4 w-4" />
                     )}
-                    {recovering ? 'Recuperando generación…' : starting ? 'Encolando…' : active ? 'Generando…' : label}
+                    {recovering ? t('research.thesisGenerate.recovering') : starting ? t('research.thesisGenerate.queuing') : active ? t('research.thesisGenerate.generating') : label ?? t('research.thesisGenerate.generate')}
                 </Button>
                 )}
                 {active ? (
                     <span className="text-sm text-gray-400">
                         {pollExhausted
-                            ? 'Estado desconocido: la generación no responde desde hace 30 min. El trabajo del servidor no se cancela; recarga la página para volver a leer su estado.'
-                            : progressText ?? (phaseLabel ?? (job?.status === 'dispatch_failed' ? 'Esperando reconexión de la cola' : job?.status === 'retrying' ? 'Reintentando en el servidor' : job?.status === 'running' ? 'Preparando la generación' : 'En cola'))}
+                            ? t('research.thesisGenerate.unknownState')
+                            : progressText ?? (phaseLabel ?? (job?.status === 'dispatch_failed' ? t('research.thesisGenerate.waitingQueue') : job?.status === 'retrying' ? t('research.thesisGenerate.retrying') : job?.status === 'running' ? t('research.thesisGenerate.preparing') : t('research.thesisGenerate.queued')))}
                     </span>
                 ) : null}
             </div>
             {startedHere && job?.status === 'succeeded' ? (
                 <p className="text-sm text-teal-300">
-                    Tesis v{job.result?.version} generada
-                    {job.result?.status && THESIS_STATUS_LABELS[job.result.status] ? ` (${THESIS_STATUS_LABELS[job.result.status]})` : ''}.
+                    {t('research.thesisGenerate.generated', { version: job.result?.version ?? '?' })}
+                    {job.result?.status && Object.hasOwn(THESIS_STATUS_LABELS, job.result.status) ? ` (${t(THESIS_STATUS_LABELS[job.result.status as keyof typeof THESIS_STATUS_LABELS])})` : ''}.
                     {' '}
                     <Link
                         href={`/research/${encodeURIComponent(ticker)}?view=thesis`}
@@ -213,13 +205,13 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', 
                         }}
                         className="font-medium underline decoration-teal-700 underline-offset-4 hover:text-teal-200"
                     >
-                        Ver tesis v{job.result?.version}
+                        {t('research.thesisGenerate.view', { version: job.result?.version ?? '?' })}
                     </Link>
                 </p>
             ) : null}
             {job?.status === 'failed' ? (
                 <p className="text-sm text-red-300">
-                    La generación falló{job.error_class ? ` (${job.error_class})` : ''}. Puedes reintentar.
+                    {t('research.thesisGenerate.failed', { errorClass: job.error_class ? ` (${job.error_class})` : '' })}
                 </p>
             ) : null}
             {error ? <p className="text-sm text-red-300">{error}</p> : null}
