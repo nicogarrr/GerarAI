@@ -332,10 +332,10 @@ function moatDefinition(type: string, locale: Locale): string | null {
   return key ? glossaryFor(locale)[key].short : null;
 }
 
-function metricValue(value: number | string | null | undefined, unit: string, t: TranslateFn) {
+function metricValue(value: number | string | null | undefined, unit: string, t: TranslateFn, locale: Locale) {
   const parsed = number(value);
   if (parsed === null) return t('research.ficha.unknownValue');
-  return formatResearchMetric(parsed, unit);
+  return formatResearchMetric(parsed, unit, locale);
 }
 
 /** Un borrador o una tesis en revisión no enseña veredicto ni cifras (regla vigente, igual que el memo y el PDF). */
@@ -365,7 +365,7 @@ async function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] })
             <span className="min-w-0 break-all font-medium text-gray-200">{metricLabel(metric.metric, locale)}</span>
             <Badge className="shrink-0" variant="outline">{label(metric.status, locale)}</Badge>
           </div>
-          <div className="mt-2 text-xl text-teal-300">{metricValue(metric.value, metric.unit, t)}</div>
+          <div className="mt-2 text-xl text-teal-300">{metricValue(metric.value, metric.unit, t, locale)}</div>
           <div className="mt-2 text-xs text-gray-500">{financialPeriod(metric.period, locale)} · {financialVersionLabel(metric.definition_version, locale)}</div>
           <div className="mt-2 text-xs leading-5 text-gray-400">{financialFormula(metric.formula, locale)}</div>
         </div>
@@ -498,9 +498,9 @@ async function MarketOpportunityView({ model, ticker }: { model: ResearchLongTer
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Stat label={t('research.ficha.tam')} value={metricValue(opportunity.top_down.tam.value, opportunity.top_down.tam.unit, t)} />
-        <Stat label={t('research.ficha.sam')} value={metricValue(opportunity.top_down.sam.value, opportunity.top_down.sam.unit, t)} />
-        <Stat label={t('research.ficha.som')} value={metricValue(opportunity.top_down.som.value, opportunity.top_down.som.unit, t)} />
+        <Stat label={t('research.ficha.tam')} value={metricValue(opportunity.top_down.tam.value, opportunity.top_down.tam.unit, t, locale)} />
+        <Stat label={t('research.ficha.sam')} value={metricValue(opportunity.top_down.sam.value, opportunity.top_down.sam.unit, t, locale)} />
+        <Stat label={t('research.ficha.som')} value={metricValue(opportunity.top_down.som.value, opportunity.top_down.som.unit, t, locale)} />
       </div>
       <Panel title={t('research.ficha.verdictTitle')}>
         <div className="flex flex-wrap gap-2">
@@ -516,7 +516,7 @@ async function MarketOpportunityView({ model, ticker }: { model: ResearchLongTer
             <div className="rounded-lg border border-gray-800 p-3" key={formula.label}>
               <div className="flex justify-between gap-4 text-sm">
                 <span className="text-gray-200">{formula.label}</span>
-                <span className="text-teal-300">{formula.value === null ? label(formula.status, locale) : metricValue(formula.value, formula.unit ?? '', t)}</span>
+                <span className="text-teal-300">{formula.value === null ? label(formula.status, locale) : metricValue(formula.value, formula.unit ?? '', t, locale)}</span>
               </div>
               {formula.missing_inputs?.length ? <p className="mt-2 text-xs text-amber-300">{t('research.ficha.missingInputsShort', { list: formula.missing_inputs.map((item) => termLabel(item, locale)).join(', ') })}</p> : null}
             </div>

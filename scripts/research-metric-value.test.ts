@@ -13,7 +13,7 @@ test('financial facts retain their declared currency and share-count basis', () 
  assert.equal(formatResearchMetric(null,'USD'),'N/D');
  assert.equal(formatResearchMetric('NaN','USD'),'N/D');
  const src=readFileSync('app/(root)/research/[ticker]/page.tsx','utf8');
- assert.ok(src.includes('return formatResearchMetric(parsed, unit)'));
+ assert.ok(src.includes('return formatResearchMetric(parsed, unit, locale)'));
 });
 test('quote header formats every currency in es-ES, never the listing currency swapped', () => {
  const src=readFileSync('components/research/CompanyHeaderQuote.tsx','utf8');
@@ -29,6 +29,6 @@ test('formulas cannot invent USD and per-share figures retain cents', () => {
  assert.equal(formatResearchMetric(250.75, 'EUR/share'), '250,75\u00a0€/acción');
  assert.equal(formatResearchMetric(148.4, 'USD_millions'), '148,4');
  const src=readFileSync('app/(root)/research/[ticker]/page.tsx','utf8');
- assert.ok(src.includes("metricValue(formula.value, formula.unit ?? '', t)"));
+ assert.ok(src.includes("metricValue(formula.value, formula.unit ?? '', t, locale)"));
  assert.ok(!src.includes("metricValue(formula.value, 'USD')"));
 });
