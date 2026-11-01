@@ -68,11 +68,12 @@ _IMPERATIVE_ORDER = re.compile(r"^\W*(?:compra|vende|ejecuta|buy|sell|vender|com
 _CONCEPT = re.compile(r"\b(?:que es|que son|que significa|como se calcula|en que consiste|define|explica(?:me)?)\b")
 _FISCAL = re.compile(
     r"\b(?:fiscal\w*|impuestos?|hacienda|irpf|renta \d{4}|declaracion de la renta|modelo 720|plusvalias?|"
-    r"retencion(?:es)?|base del ahorro|(?:ganancias?|perdidas?)(?: y (?:ganancias?|perdidas?))? patrimonial(?:es)?)\b"
+    r"retencion(?:es)?|retien\w*|retenid\w*|declarar\w*|compensab\w*|compensar\w*|base del ahorro|(?:ganancias?|perdidas?)(?: y (?:ganancias?|perdidas?))? patrimonial(?:es)?)\b"
 )
 # «¿Cuánto IRPF pagaré este año?», «¿qué impuestos pago?»: el verbo en primera
 # persona ya hace la pregunta personal aunque no haya «mi» ni «me».
-_FISCAL_SELF_VERB = re.compile(r"\b(?:pagare|pague|pago|pagamos|he pagado|declarare|declaro)\b")
+_FISCAL_SELF_VERB = re.compile(r"\b(?:pagare|pague|pago|pagamos|he pagado|declarare|declaro|debo|puedo)\b")
+_LATENT_GAIN = re.compile(r"\b(?:plusvalias?|ganancias?|perdidas?|minusvalias?)\s+(?:latentes?|no\s+realizadas?|potencial\w*)\b")
 # «¿Cuánto he ganado en 2025?»: con un ejercicio concreto es la ganancia
 # realizada de ese año (bloque fiscal), no la rentabilidad acumulada de hoy.
 _YEAR_GAIN = re.compile(r"\b(?:(?:he|hemos)\s+(?:ganado|perdido)|gane|perdi)\b")
@@ -104,6 +105,10 @@ def detect_personal_intent(question: str) -> PersonalIntent | None:
     concept = bool(_CONCEPT.search(text))
     kind: str | None = None
     fiscal = bool(_FISCAL.search(text)) and (personal or "resumen" in text or bool(_FISCAL_SELF_VERB.search(text)))
+    if _LATENT_GAIN.search(text):
+        # «¿Cuál es mi plusvalía latente?»: lo no realizado es la rentabilidad
+        # de las posiciones abiertas, no el bloque fiscal de lo vendido.
+        fiscal = False
     year_gain = bool(_YEAR_GAIN.search(text) and _GAIN_YEAR.search(text)) and not concept
     if fiscal or year_gain:
         kind = "fiscal"

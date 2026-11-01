@@ -654,9 +654,18 @@ _PERFORMANCE_RE = re.compile(
     r"|cu[aá]nto\s+(?:dinero\s+)?(?:he|tengo)\s+invertido"
     # «¿Qué tal va mi UBER?», «¿Gano o pierdo con UBER?», «¿Cuánto me ha
     # costado MSFT?»: antes, el volcado de la empresa.
-    r"|qu[eé]\s+tal\s+van?\s+(?:mi|mis)|gano\s+o\s+pierdo|cu[aá]nto\s+me\s+ha\s+costado)\b"
+    r"|qu[eé]\s+tal\s+van?\s+(?:mi|mis)|gano\s+o\s+pierdo|cu[aá]nto\s+me\s+ha\s+costado"
+    # «¿Cuál es mi plusvalía latente?»: lo no realizado de las posiciones abiertas.
+    r"|(?:plus|minus)val[ií]as?\s+(?:latentes?|no\s+realizadas?|potencial\w*))\b"
     r"(?![^.!?\n]*\bsi\b)"
 )
+
+# «¿Cuál es mi rentabilidad por dividendo?» no es la rentabilidad sobre coste
+# (que excluye los dividendos): va a la ruta de dividendos.
+_DIVIDEND_YIELD_RE = re.compile(
+    r"(?i)\b(?:rentabilidad|rendimiento)\s+(?:por|de|del|de\s+los)\s+dividendos?\b|\bdividend\s+yield\b"
+)
+
 
 
 def _asks_fiscal(question: str) -> bool:
@@ -1395,6 +1404,7 @@ class ChatService:
             and not _CONCEPT_QUESTION_RE.search(question or "")
             and not _ORDER_VERB_RE.search(question or "")
             and not _asks_fiscal(question or "")
+            and not _DIVIDEND_YIELD_RE.search(question or "")
         ):
             performance_answer = self._portfolio_performance(db, question or "", company)
             if performance_answer is not None:
