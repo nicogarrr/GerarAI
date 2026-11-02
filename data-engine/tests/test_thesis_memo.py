@@ -558,3 +558,72 @@ def test_sparse_thesis_memo_in_english_says_pending():
     assert "status draft" in memo
     assert "> Unpublished DRAFT." in memo
     assert "_Pending._" in memo and "_Pendiente._" not in memo
+
+
+def test_archived_thesis_memo_in_english():
+    """Tesis archivada (publicada con modelo no publicable): aviso y pie en inglés."""
+    from app.models import FundamentalModelVersion
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        company = _company(session)
+        for model in session.query(FundamentalModelVersion).all():
+            model.publishable = False
+        thesis = ThesisVersion(
+            company_id=company.id, version=4, status="published", thesis_markdown="# t",
+            executive_summary="resumen archivado", created_at=datetime(2026, 9, 1, tzinfo=UTC),
+        )
+        session.add(thesis)
+        session.commit()
+        english = build_memo_markdown(session, company, thesis, language="en")
+        spanish = build_memo_markdown(session, company, thesis)
+    assert english == (
+        "# Thesis memo - AAPL\n\n"
+        "Archived thesis v4 (2026-09-01): The model is not publishable; the archived text and "
+        "figures are not current analysis.\n\n"
+        "The stored original is kept; this document does not publish its archived analysis.\n\n"
+        "Informational research document. It is NOT financial advice or a recommendation to buy or sell.\n"
+    )
+    assert "resumen archivado" not in english
+    # El castellano no cambia.
+    assert spanish.startswith("# Memo de tesis - AAPL\n\nTesis archivada v4 (2026-09-01): El modelo no es")
+    assert "El original persistido se conserva" in spanish
+
+
+def test_english_memo_formats_amounts_and_dates_in_english(db):
+    """Inglés: importes no USD con separadores ingleses (€ como símbolo) y fechas «Oct 20, 2026»."""
+    company = _company(db)
+    company.currency = "EUR"
+    thesis = _full_thesis(db, company.id)
+    thesis.created_at = datetime(2026, 10, 20, 14, 3, tzinfo=UTC)
+    thesis.updated_at = datetime(2026, 10, 24, 9, 41, tzinfo=UTC)
+    thesis.bull_value = 1234.5
+    thesis.valuation_basis = {"price_as_of": "2026-10-24"}
+    db.commit()
+
+    english = build_memo_markdown(
+        db, company, thesis, language="en", stale=True, latest_data_at=datetime(2026, 10, 27, tzinfo=UTC),
+    )
+    assert "generated Oct 20, 2026, 14:03 UTC · updated Oct 24, 2026, 09:41 UTC" in english
+    assert "(up to Oct 27, 2026)" in english
+    assert "| Bear | €150.00 | 20% |" in english
+    assert "| Bull | €1,234.50 | 25% |" in english
+    assert "Model price as of Oct 24, 2026: €200.00 · Expected value: €235.00" in english
+    assert re.search(r"Generated [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{2}:\d{2} UTC", english)
+    for spanish in ("oct 2026", "EUR", "1.234,50"):
+        assert spanish not in english
+
+    # El castellano no cambia: código de divisa y formato es-ES.
+    spanish = build_memo_markdown(db, company, thesis)
+    assert "| Alcista | 1.234,50 EUR | 25 % |" in spanish
+    assert "generada 20 oct 2026, 14:03 UTC" in spanish
+
+
+def test_english_memo_other_currency_keeps_its_code():
+    from app.services.thesis_memo import _money_en
+
+    assert _money_en(1234.5, "GBP") == "1,234.50 GBP"
+    assert _money_en(-12, "EUR") == "-€12.00"
+    assert _money_en(343.46, "USD") == "$343.46"
+    assert _money_en(None, "EUR") == "pending"

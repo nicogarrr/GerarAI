@@ -480,15 +480,17 @@ def thesis_memo(
     from app.core.i18n import generation_language
 
     # Idioma guardado / de la peticion (Ajustes): andamiaje del memo en ingles.
+    language = generation_language(db)
     markdown = build_memo_markdown(
         db, company, thesis, stale=stale, latest_data_at=latest_data_at, draft=draft,
-        language=generation_language(db),
+        language=language,
     )
+    prefix = "thesis" if language == "en" else "tesis"
     return PlainTextResponse(
         markdown,
         media_type="text/markdown; charset=utf-8",
         headers={
-            "Content-Disposition": f'attachment; filename="tesis-{company.ticker.lower()}-v{thesis.version}.md"'
+            "Content-Disposition": f'attachment; filename="{prefix}-{company.ticker.lower()}-v{thesis.version}.md"'
         },
     )
 

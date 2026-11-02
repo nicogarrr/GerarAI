@@ -170,6 +170,41 @@ const KNOWN: ReadonlyArray<readonly [RegExp, string]> = [
   [/^Ticket no encontrado para este ticker$/, 'Ticket not found for this ticker.'],
   [/^Sin CIK para (\S+): este emisor no reporta a la SEC; usa la fuente de su mercado local \(ESEF para emisores de la UE\)$/, 'No CIK for $1: this issuer does not report to the SEC; use its local market source (ESEF for EU issuers).'],
   [/^Sin snapshot ESEF local para (\S+): por ahora solo hay cobertura de emisores IBEX revisados$/, 'No local ESEF snapshot for $1: for now only reviewed IBEX issuers are covered.'],
+  // Sincronización IBKR Flex (Ajustes)
+  [/^La sincronización necesita PostgreSQL\.?$/, 'Sync needs PostgreSQL.'],
+  [/^El extracto es demasiado grande\. Reduce el período de la consulta Flex\.?$/, 'The statement is too large. Shorten the period of the Flex query.'],
+  [/^IBKR aún prepara los costes del extracto\. Reintenta más tarde\.?$/, 'IBKR is still preparing the statement costs. Retry later.'],
+  [/^El extracto Flex está incompleto o IBKR aún prepara los costes\. Revisa la consulta y vuelve a intentarlo más tarde\.?$/, 'The Flex statement is incomplete or IBKR is still preparing the costs. Check the query and try again later.'],
+  [/^La cuenta o la fecha del extracto no coincide\. Selecciona una sola cuenta y un extracto reciente en IBKR\.?$/, 'The statement account or date does not match. Select a single account and a recent statement in IBKR.'],
+  [/^La consulta debe incluir Open Positions y Cash Report, también cuando estén vacíos\.?$/, 'The query must include Open Positions and Cash Report, even when they are empty.'],
+  [/^Incluye la fecha del informe en posiciones y caja para no mezclar fechas\.?$/, 'Include the report date in positions and cash so dates are not mixed.'],
+  [/^El extracto es anterior al último verificado\. Conservamos los datos más recientes\.?$/, 'The statement is older than the last verified one. The most recent data is kept.'],
+  [/^No se pudo descifrar el token guardado\. Vuelve a conectar IBKR\.?$/, 'The saved token could not be decrypted. Reconnect IBKR.'],
+  [/^La conexión cambió durante la descarga\. No se ha importado nada\.?$/, 'The connection changed during the download. Nothing was imported.'],
+  [/^El intento de sincronización ya no es válido\.?$/, 'The sync attempt is no longer valid.'],
+  [/^No se ha podido importar el extracto\. Revisa la consulta Flex\.?$/, 'The statement could not be imported. Check the Flex query.'],
+  // Vinculación de Telegram
+  [/^Vinculación de Telegram sin configurar\.?$/, 'Telegram linking is not configured.'],
+  [/^Firma de bot no válida\.?$/, 'Invalid bot signature.'],
+  [/^Código de vinculación usado o caducado\.?$/, 'Link code already used or expired.'],
+  [/^Vinculación no encontrada\.?$/, 'Link not found.'],
+  [/^Vinculación sin prueba del bot, usada o caducada\.?$/, 'Link without bot proof, already used or expired.'],
+  [/^El chat no coincide con la prueba del bot\.?$/, 'The chat does not match the bot proof.'],
+  [/^Vinculación ya utilizada\.?$/, 'Link already used.'],
+  [/^Se requiere el chat privado del usuario del bot\.?$/, "The bot user's private chat is required."],
+  // Alertas, paper trading, watchlist y calendario
+  [/^El operador no coincide con la dirección de la alerta: «por encima» usa > o >=, «por debajo» usa < o <=\.?$/, 'The operator does not match the alert direction: «above» uses > or >=, «below» uses < or <=.'],
+  [/^Moneda no reconocida \(ISO 4217 o subunidad como GBp\)\.?$/, 'Unrecognised currency (ISO 4217 or a sub-unit such as GBp).'],
+  [/^Clave de propuesta duplicada o en conflicto\.?$/, 'Duplicate or conflicting proposal key.'],
+  [/^Espera (\d+) s antes de otra tanda\.?$/, 'Wait $1 s before another batch.'],
+  [/^scope debe ser uno de (\[.*\])$/, 'scope must be one of $1.'],
+  [/^ninguna empresa pasa el embudo: no se congela un mes vacío$/, 'No company passes the funnel: an empty month is not frozen.'],
+  [/^N\/D: sin extractos ingeridos con URL https para esta empresa$/, 'Unavailable: there are no ingested excerpts with an https URL for this company.'],
+  // Tesis archivada (p. ej. al debatir) y publicación rechazada
+  [/^Tesis archivada v(\d+) \((\d{4}-\d{2}-\d{2})\): El modelo no es publicable; el texto y las cifras archivados no son análisis actual\.?$/, 'Archived thesis v$1 ($2): The model is not publishable; the archived text and figures are not current analysis.'],
+  [/^Tesis archivada v(\d+) \((\d{4}-\d{2}-\d{2})\): No hay un modelo publicable verificado; el texto y las cifras archivados no son análisis actual\.?$/, 'Archived thesis v$1 ($2): There is no verified publishable model; the archived text and figures are not current analysis.'],
+  [/^Tesis archivada v(\d+) \((\d{4}-\d{2}-\d{2})\): Valoración no disponible: faltan ingresos modelados con fuente\. El modelo solo se podía calcular con un supuesto no verificado, así que no se publica ningún valor por acción\.?$/, 'Archived thesis v$1 ($2): Valuation not available: sourced modelled revenue is missing. The model could only be calculated with an unverified assumption, so no per-share value is published.'],
+  [/^thesis v(\d+) usa inputs inferidos: valoración no disponible, no se puede publicar$/, 'thesis v$1 uses inferred inputs: valuation not available, it cannot be published.'],
 ];
 
 /** Traducción inglesa de un mensaje fijo del motor; `null` si no es uno conocido. */

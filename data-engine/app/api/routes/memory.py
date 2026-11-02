@@ -65,6 +65,29 @@ def _require_enum(value: str, allowed: set[str], field: str) -> str:
     return value
 
 
+def _require_own_rows(
+    db: Session,
+    model: type[Claim] | type[Document],
+    ids: list[int],
+    company_id: int | None,
+    label: str,
+) -> None:
+    """Los ids llegan del cliente y se guardan en JSON sin FK: sin esta
+    comprobación se aceptaban ids inexistentes o de otro usuario. El select va
+    acotado por tenant; con empresa, la fila tiene que ser de esa empresa."""
+    wanted = set(ids)
+    if not wanted:
+        return
+    statement = select(model.id).where(model.id.in_(wanted))
+    if company_id is not None:
+        statement = statement.where(
+            (model.company_id == company_id) | (model.company_id.is_(None))
+        )
+    found = set(db.scalars(statement).all())
+    if wanted - found:
+        raise HTTPException(status_code=404, detail=f"{label} not found")
+
+
 def validate_memory_item_enums(
     *, scope: str, memory_type: str, status: str, source_type: str
 ) -> None:
@@ -420,6 +443,8 @@ def create_research_session(
 ) -> ResearchSession:
     _require_enum(payload.status, _RESEARCH_SESSION_STATUSES, "session status")
     company_id = _resolve_company_id(db, payload.ticker, payload.company_id)
+    _require_own_rows(db, Claim, payload.claim_ids, company_id, "Claim")
+    _require_own_rows(db, Document, payload.source_ids, company_id, "Source document")
     session = ResearchSession(
         company_id=company_id,
         title=payload.title,

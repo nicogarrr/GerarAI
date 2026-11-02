@@ -132,6 +132,14 @@
       "missingKey": "Falta tu clave API",
       "disabled": "Configuración desactivada"
     },
+    "statusMessage": {
+      "platformOn": "Estás usando el proveedor de GerarAI.",
+      "platformOff": "El proveedor de GerarAI no está configurado.",
+      "tenant": "Configurado con tu clave. El coste lo paga tu proveedor.",
+      "missingKey": "Falta la clave del proveedor: la IA está desactivada.",
+      "disabled": "La IA propia está desactivada o la configuración no es válida."
+    },
+    "providerCustom": "Otro compatible con OpenAI",
     "saved": "Ajustes de IA guardados",
     "testFailed": "No se pudo comprobar tu clave. Revisa proveedor y clave API; si sigue fallando, vuelve a intentarlo más tarde.",
     "formAria": "Configuración del modelo de IA",
