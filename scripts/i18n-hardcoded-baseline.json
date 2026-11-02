@@ -85,6 +85,7 @@
   "lib/market/extended-quote.ts": 3,
   "lib/market/flow-text.ts": 94,
   "lib/market/live-quotes.ts": 3,
+  "lib/market/price-events-text.ts": 2,
   "lib/market/price-events.ts": 3,
   "lib/market/quote-cache.ts": 1,
   "lib/market/quote-observed.ts": 2,

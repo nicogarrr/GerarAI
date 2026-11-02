@@ -17,6 +17,7 @@ import { adx, cleanBars, dailyPivots, fibonacci, rangeBars, sma, structure } fro
 import { getChartEvents, type ChartEvents } from '@/lib/actions/price-events.actions';
 import { availableIndicators, barsSince, detectMovements, eventsInRange, movementEvents, indicatorSeries, INDICATOR_KEYS, markersByDay, volumeSpikeFlags, type IndicatorKind, type PriceEventKind } from '@/lib/market/price-events';
 import { PriceEventsPanel } from '@/components/research/PriceEventsPanel';
+import { storedEventText } from '@/lib/market/price-events-text';
 
 function price(value: number, currency: string | null, { formatMoney, formatNumber }: Pick<Formatters, 'formatMoney' | 'formatNumber'>) {
     return isValidCurrencyCode(currency) ? formatMoney(value, currency) : formatNumber(value);
@@ -90,7 +91,7 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
     const spikes = useMemo(() => volumeSpikeFlags(visible), [visible]);
     const [hiddenKinds, setHiddenKinds] = useState<ReadonlySet<PriceEventKind>>(() => new Set());
     const [focusDate, setFocusDate] = useState<string | null>(null);
-    const storedEvents = useMemo(() => eventsInRange(eventData?.events ?? [], firstDay, lastDay), [eventData, firstDay, lastDay]);
+    const storedEvents = useMemo(() => eventsInRange((eventData?.events ?? []).map((event) => storedEventText(event, fmt.locale)), firstDay, lastDay), [eventData, firstDay, lastDay, fmt.locale]);
     // «¿Por qué se movió?»: los días de movimiento fuerte se listan con lo que pasó alrededor.
     const rangeEvents = useMemo(() => hourly ? storedEvents : eventsInRange([...storedEvents, ...movementEvents(detectMovements(visible), storedEvents, t, fmt.locale)], firstDay, lastDay), [storedEvents, visible, hourly, firstDay, lastDay, t, fmt.locale]);
     const markers = useMemo(() => hourly ? [] : markersByDay(rangeEvents, hiddenKinds), [rangeEvents, hiddenKinds, hourly]);

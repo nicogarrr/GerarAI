@@ -842,7 +842,18 @@
     "moveNoNews": "No saved news that day (or the day before or after).",
     "moveTitle": "Why did it move? {parts}",
     "moveSource": "GerarAI calculation from daily prices",
-    "loadingAria": "Loading price chart"
+    "loadingAria": "Loading price chart",
+    "storedEvent": {
+      "resultsTitle": "Results",
+      "resultsTitleLabel": "Results {label}",
+      "resultsConfirmed": "Date confirmed by the source",
+      "exDividendTitle": "Ex-dividend",
+      "exDividendDetail": "{amount} {currency} per share",
+      "insiderSomeone": "An insider",
+      "insiderBuys": "{name} buys shares",
+      "insiderSells": "{name} sells shares",
+      "insiderDetail": "${value} trade (form {form})"
+    }
   },
   "memo": {
     "ratingBuy": "buy",
