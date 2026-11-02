@@ -522,6 +522,7 @@ def _fees_answer(db: Session, tenant: int, year: int | None, only: set[str]) -> 
     from datetime import date
 
     from app.models import Company, Transaction
+    from app.valuation.currency import normalize_currency
 
     english = _english()
     query = (select(Transaction, Company.ticker).outerjoin(Company, Company.id == Transaction.company_id)
@@ -536,9 +537,13 @@ def _fees_answer(db: Session, tenant: int, year: int | None, only: set[str]) -> 
         if only and (ticker or "") not in only:
             continue
         action = (tx.action or "").lower()
-        currency = (tx.currency or "EUR").upper()
+        # Divisa principal y su divisor, como el libro de divisas del informe
+        # fiscal: en «GBp» la comisión va en peniques (``.upper()`` la dejaba
+        # en «GBP» sin dividir: 500 peniques salían 500 libras).
+        major, divisor = normalize_currency(tx.currency or "EUR")
+        currency = major or "EUR"
         if action in {"buy", "sell"} and tx.fees:
-            amount = abs(Decimal(tx.fees))
+            amount = abs(Decimal(tx.fees)) / divisor
             trade[currency] = trade.get(currency, Decimal("0")) + amount
             key = f"{ticker or '?'}|{currency}"
             by_ticker[key] = by_ticker.get(key, Decimal("0")) + amount
@@ -546,7 +551,7 @@ def _fees_answer(db: Session, tenant: int, year: int | None, only: set[str]) -> 
         elif action == "fee":
             from app.services.tax_report_service import cash_amount
 
-            other[currency] = other.get(currency, Decimal("0")) + abs(cash_amount(tx))
+            other[currency] = other.get(currency, Decimal("0")) + abs(cash_amount(tx)) / divisor
 
     def amounts(totals: dict[str, Decimal]) -> str:
         return " + ".join(_money(float(v), c, english=english) for c, v in sorted(totals.items()))
