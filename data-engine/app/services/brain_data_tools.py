@@ -170,6 +170,33 @@ def _year_in_question(question: str, today: date) -> int:
     return today.year
 
 
+def _ledger_dividends_line(db: Session, year: int, english: bool) -> str | None:
+    """Dividendos COBRADOS según tus operaciones guardadas (filas de dividendo del
+    libro, en euros como el informe fiscal), o None si no hay o no se pueden calcular.
+
+    El resto de la respuesta lee los dividendos DECLARADOS por el proveedor; sin
+    ellos decía «No hay dividendos guardados…» aunque tu libro (p. ej. el CSV de
+    IBKR) tuviera los cobros, y el bloque fiscal del mismo chat los contaba.
+    """
+    from app.services.tax_report_service import TaxReportService
+
+    try:
+        data = TaxReportService().compute_report(db, year, include_filing=False)
+    except Exception:  # noqa: BLE001 - el informe nunca rompe el chat
+        db.rollback()
+        return None
+    summary = (data or {}).get("summary") or {}
+    gross = summary.get("total_dividends_base")
+    if not gross:
+        return None
+    withheld = summary.get("total_withholding_base") or 0
+    if english:
+        return (f"In your saved trades for {year}: {_money_en(gross, 'EUR')} of gross dividends received and "
+                f"{_money_en(withheld, 'EUR')} withheld at source (in euros, as in the tax report).")
+    return (f"En tus operaciones guardadas de {year} constan {_money(gross, 'EUR')} de dividendos brutos cobrados "
+            f"y {_money(withheld, 'EUR')} de retención en origen (en euros, como en el informe fiscal).")
+
+
 def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | None:
     """Dividendos GUARDADOS (declarados por el proveedor); nada proyectado ni inventado."""
     today = local_today()  # año/día del usuario (Madrid), no el UTC del servidor
@@ -222,7 +249,10 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
     rows = db.execute(select(Position, Company).join(Company, Company.id == Position.company_id).where(
         Position.tenant_id == tenant, Position.quantity > 0)).all()
     if not rows:
-        return _response(["There are no open positions in your portfolio." if english
+        ledger = (_ledger_dividends_line(db, _year_in_question(question, today), english)
+                  if re.search(r"(?i)\bcobr\w*|\b(?:received|collected|earned)\b", question) else None)
+        return _response([*([ledger] if ledger else []),
+                          "There are no open positions in your portfolio." if english
                           else "No hay posiciones abiertas en tu cartera."], [], "portfolio_dividends")
     # «¿Cuántos dividendos he cobrado de MSFT?»: solo esa posición (antes,
     # toda la cartera).
@@ -275,6 +305,15 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
         sources.append(_source("dividend_record", records[-1].id,
                                f"{'Dividend' if english else 'Dividendo'} {comp.ticker} · {records[-1].ex_date}", _link(comp)))
     if not lines and not uncertain_tickers:
+        ledger = _ledger_dividends_line(db, year, english) if named is None else None
+        if ledger:
+            return _response([
+                ledger,
+                f"The provider has no saved declared dividends from your open positions for {year}."
+                if english else
+                f"El proveedor no tiene dividendos declarados guardados de tus posiciones abiertas para {year}.",
+            ], [_source("tax_report", year, f"{'Tax report' if english else 'Informe fiscal'} {year}", "/taxes")],
+                "portfolio_dividends")
         return _response([
             f"There are no saved dividends from your positions for {year}. I haven't checked the provider live."
             if english else
