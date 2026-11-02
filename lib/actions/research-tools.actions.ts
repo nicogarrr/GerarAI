@@ -2,18 +2,15 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { normalizeResearchBody, researchIdentityHeaders } from '@/lib/auth/research-identity';
 import { parseLocalizedNumberDetailed } from '@/lib/format';
-import { RESEARCH_TIMEOUTS, requestSignal } from '@/lib/research/client';
-import { researchErrorDetail } from '@/lib/research/error-detail';
-import { AppError, ExternalAPIError, ValidationError, isNextRedirectError } from '@/lib/types/errors';
+import { researchRequest } from '@/lib/research/client';
+import { AppError, ValidationError, isNextRedirectError } from '@/lib/types/errors';
 import { assertPositiveInt } from '@/lib/validation/pathParams';
 import { knowledgeTickerFormValue, libraryReadingsPath } from '@/lib/knowledge/document-ticker';
 import { backendMessageForRequest } from '@/lib/research/backend-error-locale';
 import type { components } from '@/lib/research/openapi.generated';
 import type { ScreenCriterion, ScreenResult } from '@/lib/screener-types';
 
-const BACKEND_URL = process.env.FMP_BACKEND_URL ?? 'http://localhost:8000';
 
 export type KnowledgeCollection = {
   id: number;
@@ -226,50 +223,6 @@ export type KnowledgeGraph = {
   edges: Array<{ id: number; from: number; to: number; type: string; weight: string | number; confidence: string | number; evidence: Array<Record<string, unknown>>; provenance: string }>;
 };
 
-async function apiError(response: Response, path: string): Promise<never> {
-  let detail = `${response.status} ${response.statusText}`.trim();
-  try {
-    detail = researchErrorDetail(await response.json(), detail);
-  } catch {
-    // Preserve the HTTP status when the service does not return JSON.
-  }
-  throw new AppError(detail, 'RESEARCH_API_ERROR', response.status, { path });
-}
-
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  try {
-    const normalized = await normalizeResearchBody(init?.body ?? null);
-    const identity = await researchIdentityHeaders({
-      method: init?.method ?? 'GET',
-      path,
-      body: normalized.body ?? null,
-    });
-    const response = await fetch(`${BACKEND_URL}${path}`, {
-      ...init,
-      body: normalized.body ?? undefined,
-      cache: 'no-store',
-      // Sin timeout una lectura lenta del engine dejaba la página colgada en
-      // silencio; respeta la señal del caller si la hay (mismo patrón que
-      // lib/research/client.ts).
-      signal: requestSignal(init?.signal, RESEARCH_TIMEOUTS.GLOBAL_MS),
-      headers: {
-        ...identity,
-        ...(normalized.contentType
-          ? { 'Content-Type': normalized.contentType }
-          : normalized.body != null
-            ? { 'Content-Type': 'application/json' }
-            : {}),
-        ...init?.headers,
-      },
-    });
-    if (!response.ok) return apiError(response, path);
-    if (response.status === 204) return undefined as T;
-    return (await response.json()) as T;
-  } catch (error) {
-    if (error instanceof AppError) throw error;
-    throw new ExternalAPIError(`Research API request failed: ${path}`, 'research-api', error);
-  }
-}
 
 function csv(value: string | undefined): string[] {
   return (value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
@@ -321,12 +274,12 @@ export async function getKnowledgeLibrary(options: { documentOffset?: number; pr
   // la página normal sigue dando el total y los recuentos por colección.
   const q = (options.q ?? '').trim().slice(0, 200);
   const [collections, documentPage, principlePage, jobs, search] = await Promise.all([
-    requestJson<KnowledgeCollection[]>('/api/knowledge/collections'),
-    requestJson<{ items: KnowledgeDocument[]; total: number; collection_counts: Record<string, number> }>(`/api/knowledge/documents/page?limit=${q ? 1 : 50}&offset=${q ? 0 : documentOffset}`),
-    requestJson<{ items: InvestmentPrinciple[]; total: number; proposed_total: number }>(`/api/knowledge/principles/page?limit=50&offset=${principleOffset}${status}`),
-    requestJson<KnowledgeProcessingJob[]>('/api/knowledge/jobs?limit=100'),
+    researchRequest<KnowledgeCollection[]>('/api/knowledge/collections'),
+    researchRequest<{ items: KnowledgeDocument[]; total: number; collection_counts: Record<string, number> }>(`/api/knowledge/documents/page?limit=${q ? 1 : 50}&offset=${q ? 0 : documentOffset}`),
+    researchRequest<{ items: InvestmentPrinciple[]; total: number; proposed_total: number }>(`/api/knowledge/principles/page?limit=50&offset=${principleOffset}${status}`),
+    researchRequest<KnowledgeProcessingJob[]>('/api/knowledge/jobs?limit=100'),
     q
-      ? requestJson<{ items: KnowledgeDocument[]; total: number; query: string }>(`/api/knowledge/documents/search?q=${encodeURIComponent(q)}&limit=50&offset=${documentOffset}`)
+      ? researchRequest<{ items: KnowledgeDocument[]; total: number; query: string }>(`/api/knowledge/documents/search?q=${encodeURIComponent(q)}&limit=50&offset=${documentOffset}`)
       : Promise.resolve(null),
   ]);
   return { collections, documents: search ? search.items : documentPage.items, documentTotal: documentPage.total,
@@ -340,7 +293,7 @@ export type CorpusIngestResult = { success: true } | { success: false; message: 
 /** Encola la primera descarga del corpus libre de cartas (202; el actor trabaja en segundo plano). */
 export async function ingestLettersCorpusNow(): Promise<CorpusIngestResult> {
   try {
-    await requestJson('/api/knowledge/corpus/ingest-async', { method: 'POST' });
+    await researchRequest('/api/knowledge/corpus/ingest-async', { method: 'POST' });
     return { success: true };
   } catch (error) {
     console.error('ingestLettersCorpusNow error:', error);
@@ -350,13 +303,13 @@ export async function ingestLettersCorpusNow(): Promise<CorpusIngestResult> {
 
 /** Lecturas de la biblioteca enlazadas a un ticker (para la ficha /research/[ticker]). */
 export async function getKnowledgeDocumentsForTicker(ticker: string) {
-  return requestJson<KnowledgeDocument[]>(libraryReadingsPath(ticker));
+  return researchRequest<KnowledgeDocument[]>(libraryReadingsPath(ticker));
 }
 
 /** Asigna, cambia o quita (campo vacío) el ticker de un documento de la biblioteca. */
 export async function setKnowledgeDocumentTicker(documentId: number, formData: FormData) {
   const ticker = knowledgeTickerFormValue(formData.get('ticker'));
-  await requestJson(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}`, {
+  await researchRequest(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}`, {
     method: 'PATCH',
     body: JSON.stringify({ ticker }),
   });
@@ -365,7 +318,7 @@ export async function setKnowledgeDocumentTicker(documentId: number, formData: F
 }
 
 export async function getKnowledgeDocuments() {
-  return requestJson<KnowledgeDocument[]>('/api/knowledge/documents?limit=500');
+  return researchRequest<KnowledgeDocument[]>('/api/knowledge/documents?limit=500');
 }
 
 /** Cartas listas: filtrar antes de paginar para no ocultarlas tras otros documentos. */
@@ -374,7 +327,7 @@ export async function getKnowledgeLetters() {
   const seen = new Set<number>();
   const limit = 500;
   for (let offset = 0; ; offset += limit) {
-    const page = await requestJson<KnowledgeDocument[]>(
+    const page = await researchRequest<KnowledgeDocument[]>(
       `/api/knowledge/documents?document_type=fund_letter&status=ready&limit=${limit}&offset=${offset}`,
     );
     if (page.some(doc => seen.has(doc.id))) {
@@ -394,7 +347,7 @@ export type DeleteDocumentResult = { success: true } | { success: false; message
 /** Borra un documento de conocimiento (y sus fragmentos) tras confirmación en la UI. */
 export async function deleteKnowledgeDocument(documentId: number): Promise<DeleteDocumentResult> {
   try {
-    await requestJson(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}`, { method: 'DELETE' });
+    await researchRequest(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}`, { method: 'DELETE' });
     revalidatePath('/knowledge');
     return { success: true };
   } catch (error) {
@@ -406,7 +359,7 @@ export async function deleteKnowledgeDocument(documentId: number): Promise<Delet
 /** Borra una colección VACÍA de conocimiento tras confirmación en la UI. El backend responde 409 si aún tiene documentos. */
 export async function deleteKnowledgeCollection(collectionId: number): Promise<DeleteDocumentResult> {
   try {
-    await requestJson(`/api/knowledge/collections/${assertPositiveInt(collectionId, 'collectionId')}`, { method: 'DELETE' });
+    await researchRequest(`/api/knowledge/collections/${assertPositiveInt(collectionId, 'collectionId')}`, { method: 'DELETE' });
     revalidatePath('/knowledge');
     return { success: true };
   } catch (error) {
@@ -417,7 +370,7 @@ export async function deleteKnowledgeCollection(collectionId: number): Promise<D
 
 export async function getKnowledgeDocument(documentId: number): Promise<KnowledgeDocumentDetail | null> {
   try {
-    return await requestJson<KnowledgeDocumentDetail>(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}`);
+    return await researchRequest<KnowledgeDocumentDetail>(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}`);
   } catch (error) {
     if (error instanceof AppError && error.code === 'RESEARCH_API_ERROR' && error.statusCode === 404) return null;
     throw error;
@@ -427,21 +380,21 @@ export async function getKnowledgeDocument(documentId: number): Promise<Knowledg
 /** Una pagina de fragmentos (orden de lectura) sin tope silencioso: el total viene de `chunk_count`. */
 export async function getKnowledgeDocumentChunkPage(documentId: number, offset: number, limit: number) {
   const id = assertPositiveInt(documentId, 'documentId');
-  return requestJson<KnowledgeChunk[]>(`/api/knowledge/documents/${id}/chunks?limit=${Math.min(Math.max(1, limit), 100)}&offset=${Math.max(0, offset)}`);
+  return researchRequest<KnowledgeChunk[]>(`/api/knowledge/documents/${id}/chunks?limit=${Math.min(Math.max(1, limit), 100)}&offset=${Math.max(0, offset)}`);
 }
 
 export async function getKnowledgeDocumentChunks(documentId: number | null) {
   if (!documentId) return [];
-  return requestJson<KnowledgeChunk[]>(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}/chunks?limit=300`);
+  return researchRequest<KnowledgeChunk[]>(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}/chunks?limit=300`);
 }
 
 export async function installKnowledgeDefaults() {
-  await requestJson('/api/knowledge/collections/defaults', { method: 'POST' });
+  await researchRequest('/api/knowledge/collections/defaults', { method: 'POST' });
   revalidatePath('/knowledge');
 }
 
 export async function createKnowledgeCollection(formData: FormData) {
-  await requestJson('/api/knowledge/collections', {
+  await researchRequest('/api/knowledge/collections', {
     method: 'POST',
     body: JSON.stringify({
       name: required(formData, 'name', 'Name'),
@@ -460,7 +413,7 @@ export async function uploadKnowledgeDocument(formData: FormData) {
   for (const key of ['collection_id', 'author', 'source_url', 'publication_date', 'ticker']) {
     if (!String(formData.get(key) ?? '').trim()) formData.delete(key);
   }
-  await requestJson('/api/knowledge/documents/upload', { method: 'POST', body: formData });
+  await researchRequest('/api/knowledge/documents/upload', { method: 'POST', body: formData });
   revalidatePath('/knowledge');
 }
 
@@ -523,7 +476,7 @@ export async function reviseKnowledgePrincipleResult(principleId: number, formDa
 }
 
 export async function extractKnowledgePrinciples(documentId: number) {
-  await requestJson(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}/extract-principles`, { method: 'POST' });
+  await researchRequest(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}/extract-principles`, { method: 'POST' });
   revalidatePath('/knowledge');
 }
 
@@ -531,7 +484,7 @@ export async function decideKnowledgePrinciple(
   principleId: number,
   action: 'approve' | 'reject',
 ) {
-  await requestJson(`/api/knowledge/principles/${assertPositiveInt(principleId, 'principleId')}/action`, {
+  await researchRequest(`/api/knowledge/principles/${assertPositiveInt(principleId, 'principleId')}/action`, {
     method: 'POST',
     body: JSON.stringify({ action, actor: 'user' }),
   });
@@ -539,7 +492,7 @@ export async function decideKnowledgePrinciple(
 }
 
 export async function mergeKnowledgePrinciple(principleId: number, canonicalId: number) {
-  await requestJson(`/api/knowledge/principles/${assertPositiveInt(principleId, 'principleId')}/action`, {
+  await researchRequest(`/api/knowledge/principles/${assertPositiveInt(principleId, 'principleId')}/action`, {
     method: 'POST',
     body: JSON.stringify({
       action: 'merge',
@@ -551,7 +504,7 @@ export async function mergeKnowledgePrinciple(principleId: number, canonicalId: 
 }
 
 export async function reviseKnowledgePrinciple(principleId: number, formData: FormData) {
-  await requestJson(`/api/knowledge/principles/${assertPositiveInt(principleId, 'principleId')}`, {
+  await researchRequest(`/api/knowledge/principles/${assertPositiveInt(principleId, 'principleId')}`, {
     method: 'PUT',
     body: JSON.stringify({
       principle: required(formData, 'principle', 'Principle'),
@@ -576,7 +529,7 @@ export async function searchResearchLibrary(input: {
   includeVector?: boolean;
 }): Promise<UniversalSearchResponse> {
   if (!input.query.trim()) return { query: '', total: 0, retrieval: {}, results: [] };
-  const raw = await requestJson<UniversalSearchWire>('/api/search', {
+  const raw = await researchRequest<UniversalSearchWire>('/api/search', {
     method: 'POST',
     body: JSON.stringify({
       query: input.query.trim(),
@@ -630,14 +583,14 @@ function criteriaFromForm(formData: FormData): ScreenCriterion[] {
 
 export async function getScreenerWorkspace() {
   const [metrics, screens] = await Promise.all([
-    requestJson<CustomMetric[]>('/api/screeners/custom-metrics'),
-    requestJson<SavedScreen[]>('/api/screeners/screens'),
+    researchRequest<CustomMetric[]>('/api/screeners/custom-metrics'),
+    researchRequest<SavedScreen[]>('/api/screeners/screens'),
   ]);
   return { metrics, screens };
 }
 
 export async function createCustomMetric(formData: FormData) {
-  await requestJson('/api/screeners/custom-metrics', {
+  await researchRequest('/api/screeners/custom-metrics', {
     method: 'POST',
     body: JSON.stringify({
       metric_key: required(formData, 'metric_key', 'Metric key'),
@@ -651,7 +604,7 @@ export async function createCustomMetric(formData: FormData) {
 }
 
 export async function createSavedScreen(formData: FormData) {
-  await requestJson('/api/screeners/screens', {
+  await researchRequest('/api/screeners/screens', {
     method: 'POST',
     body: JSON.stringify({
       name: required(formData, 'name', 'Name'),
@@ -667,7 +620,7 @@ export async function createSavedScreen(formData: FormData) {
 
 export async function updateSavedScreen(formData: FormData) {
   const id = assertPositiveInt(Number(formData.get('screen_id')), 'screen_id');
-  await requestJson(`/api/screeners/screens/${id}`, {
+  await researchRequest(`/api/screeners/screens/${id}`, {
     method: 'PUT',
     body: JSON.stringify({
       name: required(formData, 'name', 'Nombre'),
@@ -684,7 +637,7 @@ export async function updateSavedScreen(formData: FormData) {
 export async function deleteSavedScreen(formData: FormData) {
   if (formData.get('confirm') !== 'on') throw new Error('Confirma que quieres eliminar el filtro.');
   const id = assertPositiveInt(Number(formData.get('screen_id')), 'screen_id');
-  await requestJson(`/api/screeners/screens/${id}`, { method: 'DELETE' });
+  await researchRequest(`/api/screeners/screens/${id}`, { method: 'DELETE' });
   revalidatePath('/screeners');
 }
 
@@ -693,7 +646,7 @@ export async function getScreenerMetricCoverage(): Promise<string[] | null> {
   // answer, so the UI keeps its full static suggestion list instead of
   // offering nothing.
   try {
-    const payload = await requestJson<components['schemas']['ScreenerMetricCoverageOut']>('/api/screeners/metric-coverage');
+    const payload = await researchRequest<components['schemas']['ScreenerMetricCoverageOut']>('/api/screeners/metric-coverage');
     return Array.isArray(payload.metrics_with_data) ? payload.metrics_with_data : null;
   } catch {
     return null;
@@ -708,7 +661,7 @@ export async function runAdHocScreen(input: {
   rankingDirection?: 'asc' | 'desc';
 }): Promise<ScreenResult | null> {
   if (!input.left || !input.right) return null;
-  return requestJson('/api/screeners/run', {
+  return researchRequest('/api/screeners/run', {
     method: 'POST',
     body: JSON.stringify({
       criteria: [{ left: input.left, operator: input.operator, right: input.right }],
@@ -719,7 +672,7 @@ export async function runAdHocScreen(input: {
 }
 
 export async function runSavedScreen(screenId: number): Promise<ScreenResult> {
-  return requestJson(`/api/screeners/screens/${assertPositiveInt(screenId, 'screenId')}/run`, { method: 'POST' });
+  return researchRequest(`/api/screeners/screens/${assertPositiveInt(screenId, 'screenId')}/run`, { method: 'POST' });
 }
 
 export async function getFinancialTerminal(
@@ -731,15 +684,15 @@ export async function getFinancialTerminal(
     periodicity: input.periodicity ?? 'annual',
   });
   if (input.metrics?.trim()) params.set('metrics', input.metrics.trim());
-  return requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/financial-terminal?${params}`);
+  return researchRequest(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/financial-terminal?${params}`);
 }
 
 export async function getDriverAssumptions(ticker: string): Promise<DriverAssumption[]> {
-  return requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/driver-assumptions`);
+  return researchRequest(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/driver-assumptions`);
 }
 
 export async function createDriverAssumption(ticker: string, formData: FormData) {
-  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/driver-assumptions`, {
+  await researchRequest(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/driver-assumptions`, {
     method: 'POST',
     body: JSON.stringify({
       driver_key: required(formData, 'driver_key', 'Driver'),
@@ -759,19 +712,19 @@ export async function createDriverAssumption(ticker: string, formData: FormData)
 export async function getDecisionLessons(ticker: string) {
   const normalized = encodeURIComponent(ticker.toUpperCase());
   const [lessons, taxonomy] = await Promise.all([
-    requestJson<DecisionLesson[]>(`/api/companies/${normalized}/decision-lessons`),
-    requestJson<{ taxonomy: string[] }>(`/api/companies/${normalized}/decision-lessons/taxonomy`),
+    researchRequest<DecisionLesson[]>(`/api/companies/${normalized}/decision-lessons`),
+    researchRequest<{ taxonomy: string[] }>(`/api/companies/${normalized}/decision-lessons/taxonomy`),
   ]);
   return { lessons, taxonomy: taxonomy.taxonomy };
 }
 
 export async function proposeDecisionLessons(ticker: string) {
-  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/decision-lessons/propose`, { method: 'POST' });
+  await researchRequest(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/decision-lessons/propose`, { method: 'POST' });
   revalidatePath(`/research/${ticker.toUpperCase()}/decision-lessons`);
 }
 
 export async function updateDecisionLesson(ticker: string, lessonId: number, formData: FormData) {
-  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/decision-lessons/${assertPositiveInt(lessonId, 'lessonId')}`, {
+  await researchRequest(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/decision-lessons/${assertPositiveInt(lessonId, 'lessonId')}`, {
     method: 'PUT',
     body: JSON.stringify({
       taxonomy: required(formData, 'taxonomy', 'Taxonomy'),
@@ -785,7 +738,7 @@ export async function updateDecisionLesson(ticker: string, lessonId: number, for
 }
 
 export async function decideDecisionLesson(ticker: string, lessonId: number, action: 'approve' | 'reject') {
-  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/decision-lessons/${assertPositiveInt(lessonId, 'lessonId')}/action`, {
+  await researchRequest(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/decision-lessons/${assertPositiveInt(lessonId, 'lessonId')}/action`, {
     method: 'POST',
     body: JSON.stringify({ action }),
   });
@@ -793,13 +746,13 @@ export async function decideDecisionLesson(ticker: string, lessonId: number, act
 }
 
 export async function getManagementCredibility(ticker: string): Promise<ManagementCredibility> {
-  return requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility`);
+  return researchRequest(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility`);
 }
 
 export async function createManagementPromise(ticker: string, formData: FormData) {
   const target = localizedFormNumber(formData, 'target_value', 'El valor objetivo');
   const sourceDocument = String(formData.get('source_document_id') ?? '').trim();
-  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises`, {
+  await researchRequest(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises`, {
     method: 'POST',
     body: JSON.stringify({
       promise: required(formData, 'promise', 'Promise'),
@@ -816,17 +769,17 @@ export async function createManagementPromise(ticker: string, formData: FormData
 }
 
 export async function importManagementCallClaims(ticker: string) {
-  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/import-call-claims`, { method: 'POST' });
+  await researchRequest(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/import-call-claims`, { method: 'POST' });
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
 }
 
 export async function reconcileManagementCredibility(ticker: string) {
-  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/reconcile`, { method: 'POST' });
+  await researchRequest(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/reconcile`, { method: 'POST' });
   revalidatePath(`/research/${ticker.toUpperCase()}/management-credibility`);
 }
 
 export async function updateManagementExplanation(ticker: string, promiseId: number, formData: FormData) {
-  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${assertPositiveInt(promiseId, 'promiseId')}/explanation`, {
+  await researchRequest(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${assertPositiveInt(promiseId, 'promiseId')}/explanation`, {
     method: 'PUT',
     body: JSON.stringify({ explanation: required(formData, 'explanation', 'Explanation') }),
   });
@@ -834,30 +787,30 @@ export async function updateManagementExplanation(ticker: string, promiseId: num
 }
 
 export async function getPortfolioIntelligence(years = 5): Promise<PortfolioIntelligence> {
-  return requestJson(`/api/portfolio/intelligence?years=${Math.max(1, Math.min(20, years))}`);
+  return researchRequest(`/api/portfolio/intelligence?years=${Math.max(1, Math.min(20, years))}`);
 }
 
 export type PortfolioRiskMatrix = components['schemas']['PortfolioRiskMatrixOut'];
 
 /** GET /api/portfolio/risk-matrix — covarianza Ledoit-Wolf y contribución al riesgo por posición. */
 export async function getPortfolioRiskMatrix(): Promise<PortfolioRiskMatrix> {
-  return requestJson('/api/portfolio/risk-matrix');
+  return researchRequest('/api/portfolio/risk-matrix');
 }
 
 export async function getKnowledgeGraph(input: { nodeTypes?: string; ticker?: string; limit?: number } = {}): Promise<KnowledgeGraph> {
   const params = new URLSearchParams({ limit: String(Math.max(1, Math.min(500, input.limit ?? 120))) });
   if (input.nodeTypes?.trim()) params.set('node_types', input.nodeTypes.trim());
   if (input.ticker?.trim()) params.set('ticker', input.ticker.trim().toUpperCase());
-  return requestJson(`/api/knowledge-graph?${params}`);
+  return researchRequest(`/api/knowledge-graph?${params}`);
 }
 
 export async function syncKnowledgeGraph() {
-  await requestJson('/api/knowledge-graph/sync', { method: 'POST' });
+  await researchRequest('/api/knowledge-graph/sync', { method: 'POST' });
   revalidatePath('/knowledge-graph');
 }
 
 export async function getKnowledgeNeighborhood(nodeId: number, depth = 2): Promise<KnowledgeGraph> {
-  return requestJson(`/api/knowledge-graph/nodes/${assertPositiveInt(nodeId, 'nodeId')}/neighbors?depth=${Math.max(1, Math.min(4, depth))}`);
+  return researchRequest(`/api/knowledge-graph/nodes/${assertPositiveInt(nodeId, 'nodeId')}/neighbors?depth=${Math.max(1, Math.min(4, depth))}`);
 }
 
 export async function createCustomMetricResult(formData: FormData): Promise<FormMutationResult> {

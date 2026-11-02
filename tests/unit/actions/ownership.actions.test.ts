@@ -14,7 +14,6 @@ const { normalizeResearchBody, researchIdentityHeaders, revalidatePath } = vi.ho
     revalidatePath: vi.fn(),
 }));
 vi.mock('@/lib/auth/research-identity', () => ({ normalizeResearchBody, researchIdentityHeaders }));
-vi.mock('@/lib/research/client', () => ({ RESEARCH_TIMEOUTS: { GLOBAL_MS: 15000 }, requestSignal: (s: unknown) => s ?? undefined }));
 vi.mock('next/cache', () => ({ revalidatePath }));
 
 const fetchMock = vi.fn();
@@ -37,9 +36,9 @@ describe('ownership 13F', () => {
 
     it('no-ok -> ExternalAPIError con el status; red caída -> envuelta', async () => {
         fetchMock.mockResolvedValue({ ok: false, status: 404, json: async () => ({}) } as Response);
-        await expect(getManagerHoldings('x')).rejects.toMatchObject({ code: 'EXTERNAL_API_ERROR', message: expect.stringContaining('404') });
+        await expect(getManagerHoldings('x')).rejects.toMatchObject({ code: 'RESEARCH_API_ERROR', statusCode: 404 });
         fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
-        await expect(getManagerHoldings('x')).rejects.toMatchObject({ code: 'EXTERNAL_API_ERROR', message: expect.stringContaining('request failed') });
+        await expect(getManagerHoldings('x')).rejects.toMatchObject({ code: 'EXTERNAL_API_ERROR', message: expect.stringContaining('unavailable') });
     });
 
     it('sync -> POST y revalida /ownership', async () => {
