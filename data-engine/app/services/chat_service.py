@@ -212,6 +212,9 @@ def _sale_question_es(question: str) -> str:
     text = re.sub(r"(?i)\bvendo\s+(?:all\s+(?:of\s+)?)?my\b", "vendo mis", text)
     text = re.sub(r"(?i)\bvendo\s+all\b", "vendo todo", text)
     text = re.sub(r"(?i)\bshares\b", "acciones", text)
+    # «sell 10 of my 30 shares at $30» → «vendo 10 de mis 30 acciones a $30»: con
+    # «of my» sin traducir el precio dado se perdía y se usaba la cotización.
+    text = re.sub(r"(?i)(?<=\d)\s+of\s+my\b", " de mis", text)
     text = re.sub(r"(?i)\s+(?:per\s+cent|percent)\b", " %", text)
     return re.sub(r"(?i)\bat\s+(?=[$€£]?\s*\d)", "a ", text)
 
