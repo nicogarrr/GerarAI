@@ -181,6 +181,28 @@ def test_fund_purchase_in_currency_is_out_of_scope(db):
     assert s["currency_ledger_status"] == "incomplete" and "V0775-21" in s["currency_ledger_reason"]
 
 
+def test_currency_ledger_notes_singular_with_one_row(db):
+    """Con un solo movimiento u operación, la nota va en singular («1 movimiento…»)."""
+    _flow(db)
+    _tx(db, "dividend", 1, 10, date(2025, 2, 1))
+    company = db.scalars(select(Company)).first()
+    db.add(Transaction(company_id=company.id, trade_date=date(2025, 1, 3), action="buy", quantity=D(1), price=D(1), fees=D(0),
+                       currency="USD", raw_payload={"assetCategory": "FUND"}))
+    db.commit()
+    reason = TaxReportService().compute_report(db, 2025, fx_opening_complete=True)["summary"]["currency_ledger_reason"]
+    assert "1 movimiento en USD sin modelar (dividendos" in reason
+    assert "1 operación con fondos/ETF en USD (V0775-21" in reason
+    assert "1 movimientos" not in reason and "1 operaciones" not in reason
+
+
+def test_currency_ledger_notes_plural_unchanged(db):
+    _flow(db)
+    _tx(db, "dividend", 1, 10, date(2025, 2, 1))
+    _tx(db, "dividend", 1, 12, date(2025, 2, 2))
+    reason = TaxReportService().compute_report(db, 2025, fx_opening_complete=True)["summary"]["currency_ledger_reason"]
+    assert "2 movimientos en USD sin modelar (dividendos" in reason
+
+
 def test_flex_datetime_feeds_same_day_rule(db):
     # compra de divisa (EUR->USD) 10:00 el mismo dia que la conversion USD->EUR con perdida a las 09:00
     _rates(db)

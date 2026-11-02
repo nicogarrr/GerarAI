@@ -1440,13 +1440,19 @@ class TaxReportService:
             )
             notes = []
             if unmodeled:
+                # Singular con un solo movimiento (antes «1 movimientos…»).
                 notes.append(
-                    f"{len(unmodeled)} movimientos en {currency} sin modelar (dividendos, intereses, retenciones u otros; "
+                    f"1 movimiento en {currency} sin modelar (dividendos, intereses, retenciones u otros; "
+                    "activar fx_income_by_analogy para tratarlos por analogia)"
+                    if len(unmodeled) == 1
+                    else f"{len(unmodeled)} movimientos en {currency} sin modelar (dividendos, intereses, retenciones u otros; "
                     "activar fx_income_by_analogy para tratarlos por analogia)"
                 )
             if fund_like:
                 notes.append(
-                    f"{fund_like} operaciones con fondos/ETF en {currency} (V0775-21, diferencia imputada al reembolsar): fuera de alcance"
+                    f"1 operación con fondos/ETF en {currency} (V0775-21, diferencia imputada al reembolsar): fuera de alcance"
+                    if fund_like == 1
+                    else f"{fund_like} operaciones con fondos/ETF en {currency} (V0775-21, diferencia imputada al reembolsar): fuera de alcance"
                 )
             if income_by_analogy and any(
                 k in (t.action or "").lower() for t, _ in tx_rows for k in ("dividend", "interest", "withholding")

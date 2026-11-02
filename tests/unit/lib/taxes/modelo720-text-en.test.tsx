@@ -60,6 +60,11 @@ describe('Modelo 720 en inglés: motivos, notas y avisos del motor fiscal', () =
     expect(taxText('dividendos/intereses como entradas: criterio por analogía, sin consulta', 'en')).toBe('dividends/interest as inflows: criterion by analogy, without a ruling');
   });
 
+  it('notas del libro de divisas en singular (frase real del backend con un solo movimiento u operación)', () => {
+    expect(taxText('1 movimiento en USD sin modelar (dividendos, intereses, retenciones u otros; activar fx_income_by_analogy para tratarlos por analogia); 1 operación con fondos/ETF en USD (V0775-21, diferencia imputada al reembolsar): fuera de alcance', 'en'))
+      .toBe('1 USD movement not modelled (dividends, interest, withholdings or others; turn on income by analogy to treat them by analogy); 1 fund/ETF trade in USD (V0775-21, difference assigned on redemption): out of scope');
+  });
+
   it('el resumen del informe pasa por la traducción solo en inglés', () => {
     const view = readFileSync('components/taxes/TaxesView.tsx', 'utf8');
     expect(view).toContain("i18n.f.locale === 'en' ? taxText(value, 'en') : value");
