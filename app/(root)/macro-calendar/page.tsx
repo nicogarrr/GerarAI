@@ -10,6 +10,7 @@ import {
 } from '@/lib/actions/macro-calendar.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getT, getFormat } from '@/lib/i18n/server';
+import { eightKItemTitle, eightKReason } from '@/lib/calendar/eight-k-text';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 
 export const dynamic = 'force-dynamic';
@@ -105,7 +106,7 @@ export default async function MacroCalendarPage({ searchParams }: PageProps) {
                 <h2 id="k8-title" className="text-xl font-semibold text-gray-100">{ti('calendar.macro.k8Title')}</h2>
                 <p className="mt-1 text-xs text-gray-500">{ti('calendar.macro.k8Note')}</p>
                 {digest.items.length === 0 ? (
-                    <p className="mt-4 text-sm text-gray-400">{digest.reason ?? ti('calendar.macro.k8EmptyDefault')}</p>
+                    <p className="mt-4 text-sm text-gray-400">{eightKReason(digest.reason, f.locale) ?? ti('calendar.macro.k8EmptyDefault')}</p>
                 ) : (
                     <ul className="mt-4 flex flex-col gap-4">
                         {digest.items.map((entry) => (
@@ -121,13 +122,13 @@ export default async function MacroCalendarPage({ searchParams }: PageProps) {
                                     <a className="ml-auto inline-flex min-h-11 min-w-11 items-center text-xs text-teal-300 hover:underline" href={entry.source_url} target="_blank" rel="noopener noreferrer">{ti('calendar.macro.secDocument')}</a>
                                 </div>
                                 {entry.status === 'insufficient_data' ? (
-                                    <p className="mt-3 text-sm text-gray-400">{entry.reason}</p>
+                                    <p className="mt-3 text-sm text-gray-400">{eightKReason(entry.reason, f.locale)}</p>
                                 ) : null}
                                 {entry.items.length > 0 ? (
                                     <ul className="mt-3 flex flex-col gap-3">
                                         {entry.items.map((item) => (
                                             <li key={item.code}>
-                                                <p className="text-sm font-medium text-gray-200">Item {item.code} · {item.title}</p>
+                                                <p className="text-sm font-medium text-gray-200">Item {item.code} · {eightKItemTitle(item, f.locale)}</p>
                                                 {item.excerpts.map((excerpt) => (
                                                     <blockquote key={excerpt.chunk_id + excerpt.text} lang="en" className="mt-1 border-l-2 border-gray-700 pl-3 text-sm leading-6 text-gray-400">{excerpt.text}</blockquote>
                                                 ))}
