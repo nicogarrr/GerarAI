@@ -477,8 +477,12 @@ def thesis_memo(
     company = resolve_company(db, ticker)
     latest_data_at = service.data_freshness(db, thesis.company_id, as_of=thesis.updated_at)
     stale = latest_data_at is not None and latest_data_at > thesis.updated_at
+    from app.core.i18n import generation_language
+
+    # Idioma guardado / de la peticion (Ajustes): andamiaje del memo en ingles.
     markdown = build_memo_markdown(
-        db, company, thesis, stale=stale, latest_data_at=latest_data_at, draft=draft
+        db, company, thesis, stale=stale, latest_data_at=latest_data_at, draft=draft,
+        language=generation_language(db),
     )
     return PlainTextResponse(
         markdown,

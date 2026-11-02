@@ -149,3 +149,32 @@ def test_memo_404_without_thesis():
     client = TestClient(main.app)
     response = client.get(f"/api/thesis/{TICKER}/memo.md")
     assert response.status_code == 404
+
+
+def test_memo_markdown_in_english_with_english_selected(monkeypatch):
+    from app.core.config import get_settings
+
+    seed()
+    _clean()
+    _seed_two_versions()
+    db = SessionLocal()
+    try:
+        db.query(ThesisVersion).filter(ThesisVersion.version == 2).update({"version": 0})
+        db.commit()
+    finally:
+        db.close()
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
+    get_settings.cache_clear()
+    try:
+        client = TestClient(main.app)
+        english = client.get(f"/api/thesis/{TICKER}/memo.md", headers={"x-gerarai-language": "en"}).text
+        spanish = client.get(f"/api/thesis/{TICKER}/memo.md", headers={"x-gerarai-language": "es"}).text
+    finally:
+        monkeypatch.delenv("I18N_GENERATION_ENABLED")
+        get_settings.cache_clear()
+        _clean()
+    assert f"Thesis memo — {TICKER}" in english
+    assert "| Bear | $10.00 | 20% |" in english
+    assert "La red directa a celular se monetiza" in english
+    assert "NOT financial advice" in english
+    assert f"Memo de tesis — {TICKER}" in spanish and "| Bajista | $10.00 | 20 % |" in spanish

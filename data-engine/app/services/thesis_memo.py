@@ -142,6 +142,22 @@ def _money(value, currency: str | None) -> str:
     return money_thesis(float(value), currency) if value is not None else "pendiente"
 
 
+_ENGLISH_LABELS: dict[str, str] = {
+    "changes_requested": "changes requested",
+    "draft_failed_audit": "draft (audit not passed)",
+    "incomplete_price": "incomplete price",
+    "insufficient_data": "insufficient data",
+}
+
+
+def _english_label(value: str | None) -> str:
+    """Rating/estado guardado (clave inglesa) legible en ingles."""
+    key = (value or "").strip()
+    if not key:
+        return "n/a"
+    return _ENGLISH_LABELS.get(key, key.replace("_", " "))
+
+
 def build_memo_markdown(
     db: Session,
     company: Company,
@@ -151,6 +167,7 @@ def build_memo_markdown(
     latest_data_at: datetime | None = None,
     draft: bool = False,
     isolated: bool = False,
+    language: str = "es",
 ) -> str:
     """``draft=True``: memo de un borrador sin publicar, por lista blanca.
 
@@ -186,38 +203,65 @@ def build_memo_markdown(
     ).all()
 
     probs = thesis.scenario_probabilities or {}
+    # Ingles (Ajustes): solo el andamiaje fijo del memo; el contenido persistido
+    # (hipotesis, secciones, catalizadores...) sale en el idioma en que se genero.
+    en = language == "en"
+
+    def tr(es: str, english: str) -> str:
+        return english if en else es
+
+    def pct(value: float, decimals: int = 1) -> str:
+        return f"{value * 100:.{decimals}f}%" if en else percent_es(value, decimals=decimals)
+
+    def money(value) -> str:
+        return "pending" if en and value is None else _money(value, company.currency)
+
+    pending = tr("_Pendiente._", "_Pending._")
 
     def _prob(key: str) -> str:
         value = probs.get(key)
-        return percent_es(float(value), decimals=0) if isinstance(value, (int, float)) else "pendiente"
+        return pct(float(value), decimals=0) if isinstance(value, (int, float)) else tr("pendiente", "pending")
 
     lines: list[str] = []
-    lines.append(f"# Memo de tesis — {company.ticker} ({company.name or company.ticker})")
+    lines.append(f"# {tr('Memo de tesis', 'Thesis memo')} — {company.ticker} ({company.name or company.ticker})")
     lines.append("")
-    rating_part = "" if draft else f"rating {label_es(RATING_ES, thesis.rating)} · "
-    lines.append(
-        f"Versión {thesis.version} · estado {label_es(STATUS_ES, thesis.status)} · "
-        f"{rating_part}"
-        f"generada {_fecha_hora_utc(thesis.created_at)} · actualizada {_fecha_hora_utc(thesis.updated_at)}"
-    )
+    if en:
+        rating_part = "" if draft else f"rating {_english_label(thesis.rating)} · "
+        lines.append(
+            f"Version {thesis.version} · status {_english_label(thesis.status)} · {rating_part}"
+            f"generated {_fecha_hora_utc(thesis.created_at)} · updated {_fecha_hora_utc(thesis.updated_at)}"
+        )
+    else:
+        rating_part = "" if draft else f"rating {label_es(RATING_ES, thesis.rating)} · "
+        lines.append(
+            f"Versión {thesis.version} · estado {label_es(STATUS_ES, thesis.status)} · "
+            f"{rating_part}"
+            f"generada {_fecha_hora_utc(thesis.created_at)} · actualizada {_fecha_hora_utc(thesis.updated_at)}"
+        )
     if stale:
-        when = fecha_es(latest_data_at) if latest_data_at else "desconocida"
-        lines.append(f"\n> AVISO: tesis potencialmente DESACTUALIZADA: hay datos mas nuevos (hasta {when}).")
+        when = fecha_es(latest_data_at) if latest_data_at else tr("desconocida", "unknown")
+        lines.append(tr(f"\n> AVISO: tesis potencialmente DESACTUALIZADA: hay datos mas nuevos (hasta {when}).",
+                        f"\n> WARNING: thesis possibly OUT OF DATE: there is newer data (up to {when})."))
     lines.append("")
 
     if not draft and thesis.margin_of_safety is not None:
         convention = (thesis.valuation_basis or {}).get("margin_of_safety_convention")
         if convention == MARGIN_OF_SAFETY_CONVENTION:
-            lines.append(
+            lines.append(tr(
                 f"> Convención del margen de seguridad: {MARGIN_OF_SAFETY_FORMULA}; "
-                "V es el valor de referencia del modelo y P el precio comparable de esta versión."
-            )
+                "V es el valor de referencia del modelo y P el precio comparable de esta versión.",
+                f"> Margin of safety convention: {MARGIN_OF_SAFETY_FORMULA}; "
+                "V is the model's reference value and P the comparable price of this version.",
+            ))
         else:
-            lines.append(
+            lines.append(tr(
                 "> AVISO: margen de seguridad histórico sin convención de fórmula verificada. "
                 "Se conserva la cifra y el texto originales; no se ha recalculado. "
-                "No comparar este porcentaje con el margen actual (V - P) / V."
-            )
+                "No comparar este porcentaje con el margen actual (V - P) / V.",
+                "> WARNING: historical margin of safety without a verified formula convention. "
+                "The original figure and text are kept; it has not been recalculated. "
+                "Do not compare this percentage with the current margin (V - P) / V.",
+            ))
         lines.append("")
 
     if not draft:
@@ -228,35 +272,44 @@ def build_memo_markdown(
             .limit(1)
         ).first()
         if audit is not None and not audit.passed:
-            lines.append(
+            lines.append(tr(
                 "> AVISO: la auditoría de fuentes de esta versión NO pasó. La valoración puede estar "
-                "incompleta y es solo indicativa, no un veredicto. Correcciones pendientes de la auditoría:"
-            )
+                "incompleta y es solo indicativa, no un veredicto. Correcciones pendientes de la auditoría:",
+                "> WARNING: the source audit of this version did NOT pass. The valuation may be "
+                "incomplete and is only indicative, not a verdict. Fixes pending from the audit:",
+            ))
             for fix in (audit.required_fixes or [])[:5]:
                 lines.append(f"> - {fix}")
             lines.append("")
         elif audit is None:
-            lines.append("> Sin auditoría de fuentes registrada para esta versión.")
+            lines.append(tr("> Sin auditoría de fuentes registrada para esta versión.",
+                            "> No source audit recorded for this version."))
             lines.append("")
 
     if isolated:
-        lines.append(
+        lines.append(tr(
             "> ARTEFACTO DE PRUEBA AISLADA: generada en una transacción con rollback; NO está "
-            "persistida, ni publicada ni aprobada."
-        )
+            "persistida, ni publicada ni aprobada.",
+            "> ISOLATED TEST ARTIFACT: generated in a rolled-back transaction; it is NOT "
+            "stored, published or approved.",
+        ))
         lines.append("")
     if not draft and thesis.status != "published":
-        lines.append(
+        lines.append(tr(
             f"> ESTADO: versión en estado «{label_es(STATUS_ES, thesis.status)}», no publicada ni "
-            "aprobada. Es una lectura de seguimiento, no un veredicto ni una recomendación."
-        )
+            "aprobada. Es una lectura de seguimiento, no un veredicto ni una recomendación.",
+            f"> STATUS: version in status «{_english_label(thesis.status)}», not published or "
+            "approved. It is a follow-up reading, not a verdict or a recommendation.",
+        ))
         lines.append("")
 
     if draft:
-        lines.append(
+        lines.append(tr(
             "> BORRADOR sin publicar. No incluye veredicto, hipótesis, resumen, "
-            "valoración ni secciones de la tesis."
-        )
+            "valoración ni secciones de la tesis.",
+            "> Unpublished DRAFT. It does not include the verdict, hypothesis, summary, "
+            "valuation or sections of the thesis.",
+        ))
         lines.append("")
     else:
         same_text = bool(thesis.hypothesis) and (thesis.hypothesis or "").strip() == (
@@ -264,37 +317,39 @@ def build_memo_markdown(
         ).strip()
         if same_text:
             # Hipótesis y resumen idénticos: se dice una vez, no dos.
-            lines.append("## Hipótesis y resumen ejecutivo")
-            lines.append(thesis.executive_summary or "_Pendiente._")
+            lines.append(tr("## Hipótesis y resumen ejecutivo", "## Hypothesis and executive summary"))
+            lines.append(thesis.executive_summary or pending)
             lines.append("")
         else:
-            lines.append("## Hipótesis")
-            lines.append(thesis.hypothesis or "_Pendiente._")
+            lines.append(tr("## Hipótesis", "## Hypothesis"))
+            lines.append(thesis.hypothesis or pending)
             lines.append("")
 
-            lines.append("## Resumen ejecutivo")
-            lines.append(thesis.executive_summary or "_Pendiente._")
+            lines.append(tr("## Resumen ejecutivo", "## Executive summary"))
+            lines.append(thesis.executive_summary or pending)
             lines.append("")
 
-        lines.append("## Valoración y escenarios")
-        lines.append("| Escenario | Valor | Probabilidad |")
+        lines.append(tr("## Valoración y escenarios", "## Valuation and scenarios"))
+        lines.append(tr("| Escenario | Valor | Probabilidad |", "| Scenario | Value | Probability |"))
         lines.append("|---|---|---|")
-        lines.append(f"| Bajista | {_money(thesis.bear_value, company.currency)} | {_prob('bear')} |")
-        lines.append(f"| Base | {_money(thesis.base_value, company.currency)} | {_prob('base')} |")
-        lines.append(f"| Alcista | {_money(thesis.bull_value, company.currency)} | {_prob('bull')} |")
+        lines.append(f"| {tr('Bajista', 'Bear')} | {money(thesis.bear_value)} | {_prob('bear')} |")
+        lines.append(f"| Base | {money(thesis.base_value)} | {_prob('base')} |")
+        lines.append(f"| {tr('Alcista', 'Bull')} | {money(thesis.bull_value)} | {_prob('bull')} |")
         # El precio guardado es el que usó el modelo al generar la versión,
         # no la cotización de hoy: se rotula como tal, con la fecha de la
         # cotización solo si quedó persistida (nunca una fecha inventada).
         price_as_of = (thesis.valuation_basis or {}).get("price_as_of")
-        price_label = "Precio del modelo" + (f" al {fecha_es(price_as_of)}" if price_as_of else "")
+        price_label = tr("Precio del modelo", "Model price") + (
+            f" {tr('al', 'as of')} {fecha_es(price_as_of)}" if price_as_of else ""
+        )
         lines.append(
-            f"\n{price_label}: {_money(thesis.current_price, company.currency)} · Valor esperado: "
-            f"{_money(thesis.expected_value, company.currency)} · Margen de seguridad: "
-            + (percent_es(float(thesis.margin_of_safety)) if thesis.margin_of_safety is not None else "pendiente")
+            f"\n{price_label}: {money(thesis.current_price)} · {tr('Valor esperado', 'Expected value')}: "
+            f"{money(thesis.expected_value)} · {tr('Margen de seguridad', 'Margin of safety')}: "
+            + (pct(float(thesis.margin_of_safety)) if thesis.margin_of_safety is not None else tr("pendiente", "pending"))
         )
         lines.append("")
 
-    lines.append("## Catalizadores")
+    lines.append(tr("## Catalizadores", "## Catalysts"))
     catalysts = thesis.catalysts or []
     if catalysts:
         for item in catalysts:
@@ -305,24 +360,27 @@ def build_memo_markdown(
             else:
                 lines.append(f"- {item}")
     else:
-        lines.append("_Pendiente._")
+        lines.append(pending)
     lines.append("")
 
-    lines.append("## Criterios de invalidación")
+    lines.append(tr("## Criterios de invalidación", "## Invalidation criteria"))
     criteria = thesis.invalidation_criteria or []
     if criteria:
         for item in criteria:
             lines.append(f"- {item}")
     else:
-        lines.append("_Pendiente._")
+        lines.append(pending)
     lines.append("")
 
-    lines.append("## Calidad de la evidencia")
-    lines.append(
+    lines.append(tr("## Calidad de la evidencia", "## Evidence quality"))
+    lines.append(tr(
         f"Confianza de datos {thesis.data_confidence_score}/100 · cobertura de fuentes "
         f"{thesis.source_coverage_score}/100 · red-team {thesis.red_team_score}/100 · "
-        f"riesgo de valoración {thesis.valuation_risk_score}/100"
-    )
+        f"riesgo de valoración {thesis.valuation_risk_score}/100",
+        f"Data confidence {thesis.data_confidence_score}/100 · source coverage "
+        f"{thesis.source_coverage_score}/100 · red-team {thesis.red_team_score}/100 · "
+        f"valuation risk {thesis.valuation_risk_score}/100",
+    ))
     lines.append("")
 
     if not draft:
@@ -330,34 +388,38 @@ def build_memo_markdown(
         sections = [sec for sec in sections if sec.title != APPROVAL_SECTION_TITLE]
         narrative = _narrative_lines(thesis.narrative_sections)
         if narrative:
-            lines.append("## Análisis narrativo")
+            lines.append(tr("## Análisis narrativo", "## Narrative analysis"))
             lines.extend(narrative)
 
         if sections:
-            lines.append("## Secciones")
+            lines.append(tr("## Secciones", "## Sections"))
             for section in sections:
                 lines.append(f"### {section.title}")
-                lines.append(section.body or "_Pendiente._")
+                lines.append(section.body or pending)
                 lines.append("")
 
         analysis = _full_analysis_lines(thesis.thesis_markdown or "")
         if any(item.strip() for item in analysis):
-            lines.append("## Análisis completo")
+            lines.append(tr("## Análisis completo", "## Full analysis"))
             origin = (
-                "Texto de la tesis de una ejecución aislada (no persistida)"
+                tr("Texto de la tesis de una ejecución aislada (no persistida)",
+                   "Thesis text from an isolated run (not stored)")
                 if isolated
-                else "Texto de la tesis persistida (misma versión que la ficha)"
+                else tr("Texto de la tesis persistida (misma versión que la ficha)",
+                        "Stored thesis text (same version as the company page)")
             )
-            lines.append(
+            lines.append(tr(
                 f"{origin}. Descriptivo: no garantiza que cifras, fuentes o inferencias "
-                "estén validadas."
-            )
+                "estén validadas.",
+                f"{origin}. Descriptive: it does not guarantee that figures, sources or inferences "
+                "are validated.",
+            ))
             lines.append("")
             lines.extend(analysis)
             lines.append("")
 
         if evidence_rows:
-            lines.append("## Fuentes")
+            lines.append(tr("## Fuentes", "## Sources"))
             for statement, url, tier in evidence_rows:
                 short = (statement or "")[:110].replace("\n", " ")
                 lines.append(f"- [{tier}] {short} — {url}")
@@ -365,17 +427,23 @@ def build_memo_markdown(
 
     lines.append("---")
     if isolated:
-        lines.append(
+        lines.append(tr(
             f"Generado {_fecha_hora_utc(datetime.now(UTC))} desde una ejecución aislada "
-            "(rollback, no persistida; sin fingerprint persistido)."
-        )
+            "(rollback, no persistida; sin fingerprint persistido).",
+            f"Generated {_fecha_hora_utc(datetime.now(UTC))} from an isolated run "
+            "(rolled back, not stored; no stored fingerprint).",
+        ))
     else:
-        lines.append(
+        lines.append(tr(
             f"Generado {_fecha_hora_utc(datetime.now(UTC))} desde la versión persistida "
-            f"{thesis.version} (fingerprint {thesis.input_fingerprint or 'n/a'})."
-        )
-    lines.append(
+            f"{thesis.version} (fingerprint {thesis.input_fingerprint or 'n/a'}).",
+            f"Generated {_fecha_hora_utc(datetime.now(UTC))} from stored version "
+            f"{thesis.version} (fingerprint {thesis.input_fingerprint or 'n/a'}).",
+        ))
+    lines.append(tr(
         "Documento informativo de investigación. NO es asesoramiento financiero "
-        "ni recomendación de compra o venta."
-    )
+        "ni recomendación de compra o venta.",
+        "Informational research document. It is NOT financial advice "
+        "or a recommendation to buy or sell.",
+    ))
     return "\n".join(lines) + "\n"
