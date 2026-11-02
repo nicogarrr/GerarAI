@@ -1491,12 +1491,32 @@ def _trades_period(text: str) -> tuple[date, date, str, str] | None:
     return None
 
 
-def _trades_answer(db: Session, tenant: int, text: str) -> ChatResponse:
+#: «¿cuándo compré KO?», «mis operaciones de KO», «when did I buy KO?», «my KO trades»:
+#: historial de un ticker (antes: datos de la empresa o «no ejecuto órdenes»).
+_TICKER_TRADES = re.compile(
+    r"\bcuando\s+(?:compre|vendi|he\s+comprado|he\s+vendido)\b"
+    r"|\bmis\s+(?:operaciones|compras|ventas|compraventas)\s+(?:de|en|con)\b"
+    r"|\bque\s+operaciones\s+(?:he\s+hecho|hice)\s+(?:de|en|con)\b"
+    r"|\bwhen\s+(?:did\s+i\s+(?:buy|sell)|have\s+i\s+(?:bought|sold))\b"
+    r"|\bmy\s+(?:trades|transactions|purchases)\s+(?:of|in|on|for)\b|\bmy\s+[a-z0-9.]{1,6}\s+trades\b"
+)
+
+
+def _ticker_trades(text: str, question: str) -> str | None:
+    """Ticker por el que se pregunta en «¿cuándo compré KO?», o None."""
+    if (not _TICKER_TRADES.search(text) or _TAX_WORD.search(text)
+            or re.search(r"\b(?:precio|price|cost\w*|coste)\b", text)):
+        return None
+    tickers = _tickers_in(question)
+    return next(iter(tickers)) if len(tickers) == 1 else None
+
+
+def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = None) -> ChatResponse:
     """Compras y ventas guardadas, la más reciente primero (solo lectura, solo del tenant)."""
     from app.models import Company, Portfolio, Transaction
 
     english = _english()
-    period = _trades_period(text)
+    period = None if ticker else _trades_period(text)
     sources = [_source("transactions", None, "Operaciones" if not english else "Trades", "/portfolio")]
     query = (select(Transaction, Company.ticker, Portfolio.name)
              .outerjoin(Company, Company.id == Transaction.company_id)
@@ -1504,11 +1524,16 @@ def _trades_answer(db: Session, tenant: int, text: str) -> ChatResponse:
              .where(Transaction.tenant_id == tenant, Transaction.action.in_(("buy", "sell"))))
     if period is not None:
         query = query.where(Transaction.trade_date >= period[0], Transaction.trade_date <= period[1])
+    if ticker:
+        query = query.where(Company.ticker == ticker)
     rows = db.execute(
         query.order_by(Transaction.trade_date.desc(), Transaction.id.desc()).limit(_MAX_TRADES + 1)
     ).all()
     if not rows:
-        if period is not None:
+        if ticker:
+            text_out = (f"You have no saved buys or sells of {ticker}." if english
+                        else f"No tienes compras ni ventas guardadas de {ticker}.")
+        elif period is not None:
             text_out = (f"There are no saved buys or sells in {period[3]}." if english
                         else f"No hay compras ni ventas guardadas de {period[2]}.")
         else:
@@ -1516,7 +1541,10 @@ def _trades_answer(db: Session, tenant: int, text: str) -> ChatResponse:
                         else "No tienes compras ni ventas guardadas. Puedes importarlas en Cartera.")
         return _response(text_out, sources, "account_trades")
     portfolios = db.scalar(select(func.count(Portfolio.id)).where(Portfolio.tenant_id == tenant)) or 0
-    if period is not None:
+    if ticker:
+        lines = [f"Your saved buys and sells of {ticker} (most recent first):" if english
+                 else f"Tus compras y ventas guardadas de {ticker} (la más reciente primero):"]
+    elif period is not None:
         lines = [f"Your saved buys and sells in {period[3]}:" if english
                  else f"Tus compras y ventas guardadas de {period[2]}:"]
     else:
@@ -1680,6 +1708,9 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     if tenant is None:
         return None
     text = _fold(question)
+    ticker_trades = _ticker_trades(text, question)
+    if ticker_trades:
+        return _trades_answer(db, tenant, text, ticker_trades)
     if _asks_daily_change(text):
         return _daily_change_answer(db, tenant)
     if _asks_history(text, question):
