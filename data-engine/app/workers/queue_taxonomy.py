@@ -82,6 +82,7 @@ ACTOR_CLASS: dict[str, str] = {
     "refresh_portfolio_prices_intraday": INGESTA,
     "refresh_rss_feeds": INGESTA,
     "refresh_sec_filings": INGESTA,
+    "refresh_subtel_decrees": INGESTA,
     "refresh_ticker_news": INGESTA,
     "scan_insider_watchlist": INGESTA,
     "scan_schedule13dg_watchlist": INGESTA,
