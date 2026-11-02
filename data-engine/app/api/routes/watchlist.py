@@ -33,7 +33,7 @@ from app.schemas.api import (
     WatchlistMonitorOut,
 )
 from app.services.connectors.earnings_calendar import fetch_earnings_range
-from app.services.dca_on_add import enqueue_dca_on_add, is_preparing
+from app.services.dca_on_add import enqueue_dca_on_add, enqueue_market_data_on_add, is_preparing
 from app.services.derived_market_cap_service import DERIVED_SOURCE
 from app.services.earnings_dates_service import is_fresh
 from app.services.fair_value_service import resolve_fair_values
@@ -135,6 +135,8 @@ def upsert_watch_item(
         enqueue_fundamentals_seed(db, symbol)
         # Señal DCA en segundo plano: la ficha no espera al barrido diario.
         enqueue_dca_on_add(db, [symbol])
+        # Historial de precios y noticias del ticker, sin esperar a los barridos.
+        enqueue_market_data_on_add(db, symbol)
     # Alta o cambio de ticker: el listado DCA cacheado incluye la watchlist.
     invalidate_dca_cache(db=db)
     return _payload(item)
