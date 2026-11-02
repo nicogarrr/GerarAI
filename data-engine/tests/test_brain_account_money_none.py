@@ -23,6 +23,7 @@ def test_daily_missing_total_does_not_claim_change(monkeypatch, english, unknown
                              snapshot_date=date(2026, 11, 1), daily_return=Decimal("0.1"))
     previous = SimpleNamespace(total_value_base=Decimal("100"))
     db = Mock()
+    db.scalars.return_value.all.return_value = [1]  # una sola cartera con foto
     db.scalar.side_effect = [latest, previous]
     answer = tools._daily_change_answer(db, 1).answer
     assert unknown in answer
