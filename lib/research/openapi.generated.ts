@@ -8819,6 +8819,11 @@ export interface components {
              * @default true
              */
             is_latest: boolean;
+            /**
+             * Judge Timed Out
+             * @default false
+             */
+            judge_timed_out: boolean;
             /** Plan */
             plan?: string[];
             /** Run Id */
@@ -8840,6 +8845,11 @@ export interface components {
             answered?: string[];
             /** Finished At */
             finished_at?: string | null;
+            /**
+             * Judge Timed Out
+             * @default false
+             */
+            judge_timed_out: boolean;
             /** Run Id */
             run_id: number;
             /** Timed Out */

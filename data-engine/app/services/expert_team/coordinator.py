@@ -62,6 +62,10 @@ def _fold(text: str) -> str:
     return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
 
 
+#: Espera máxima a que los expertos cancelados por el tope total terminen de cancelarse.
+CANCEL_GRACE_S = 0.5
+
+
 class ExpertTeam:
     def __init__(
         self,
@@ -75,6 +79,7 @@ class ExpertTeam:
         guard: run_guard.LLMRunGuard | None = None,
         judge_prompt: str = "thesis_debate_judge",
         judge_timeout_s: float = 30.0,
+        cancel_grace_s: float = CANCEL_GRACE_S,
     ) -> None:
         for spec in experts:
             missing = [t for t in spec.tools if t not in tools]
@@ -90,6 +95,9 @@ class ExpertTeam:
         self.validator = validator or citation_validator()
         self.guard = guard
         self.judge_prompt = judge_prompt
+        #: Al vencer el tope total, cuánto se espera como mucho a que los
+        #: expertos cancelados terminen de cancelarse (corto: cabe en el margen del chat).
+        self.cancel_grace_s = cancel_grace_s
         #: Tope propio del juez: si no llega, el equipo contesta sin veredicto
         #: en vez de perder todo lo que dijeron los expertos.
         self.judge_timeout_s = judge_timeout_s
@@ -140,6 +148,11 @@ class ExpertTeam:
             done, pending = await asyncio.wait(tasks, timeout=self.total_timeout_s) if tasks else (set(), set())
             for task in pending:
                 task.cancel()
+            if pending:
+                # Esperarlas (con tope corto) para que ningún experto siga vivo
+                # cuando el equipo ya contestó; uno que no se deja cancelar no
+                # bloquea la respuesta y cuenta como «no respondió a tiempo».
+                await asyncio.wait(pending, timeout=max(0.0, self.cancel_grace_s))
             reports = [
                 t.result() if t in done else ExpertReport(expert=s.name, status="timeout")
                 for s, t in zip(specs, tasks, strict=True)
