@@ -479,7 +479,11 @@ class PortfolioIntelligenceService:
             },
             "exposures": exposures,
             "xray": portfolio_xray(
-                {"weights": {company.ticker: weights[company.id] for _, company in rows if company.id in weights}},
+                {
+                    "weights": {
+                        company.ticker: weights[company.id] for _, company in rows if company.id in weights
+                    }
+                },
                 exposures,
                 base_currency,
             ),
@@ -593,10 +597,14 @@ class PortfolioIntelligenceService:
         inventa un precio ajustado entre dos cierres ajustados). Sin esto, con
         14 filas spot al final, total_return, atribucion y retornos diarios
         salian None en las 8 posiciones."""
+        # Desde el final: lo normal es que la ultima fila ya sea valida y
+        # basta mirar una, en vez de recorrer anos de cierres por posicion.
         last_valid = -1
-        for index, row in enumerate(series):
-            if row.adj_close and row.adj_close > 0:
+        for index in range(len(series) - 1, -1, -1):
+            adj_close = series[index].adj_close
+            if adj_close and adj_close > 0:
                 last_valid = index
+                break
         if last_valid < 0 or last_valid == len(series) - 1:
             return series
         filled = list(series[: last_valid + 1])
@@ -650,27 +658,43 @@ class PortfolioIntelligenceService:
         sin sentido. Ahora se exige que AMBOS lados sean validos, y el par se
         descarta en lugar de fabricar un retorno.
         """
+        # Una pasada: cada cierre se lee y valida una vez (antes dos, como
+        # «anterior» y como «actual»). Misma division Decimal, mismo float.
         result = {}
-        for previous, current in zip(series, series[1:]):
-            prev_close = previous.adj_close
-            curr_close = current.adj_close
-            if prev_close and curr_close and prev_close > 0 and curr_close > 0:
-                result[current.date] = float(curr_close / prev_close - 1)
+        previous_valid = None
+        for row in series:
+            close = row.adj_close
+            if close and close > 0:
+                if previous_valid is not None:
+                    result[row.date] = float(close / previous_valid - 1)
+                previous_valid = close
+            else:
+                previous_valid = None
         return result
 
     @staticmethod
     def _portfolio_returns(
         returns: dict[int, dict[date, float]], weights: dict[int, float]
     ) -> dict[date, float]:
-        by_date: dict[date, list[tuple[float, float]]] = defaultdict(list)
+        # Pesos y retornos de cada dia en dos listas paralelas, en el mismo
+        # orden que antes: sum(pesos) y sum(map(mul, ...)) suman los mismos
+        # terminos en el mismo orden que los generadores, asi que el resultado
+        # es identico bit a bit; el peso de cada serie se busca una vez.
+        by_date: dict[date, tuple[list[float], list[float]]] = {}
         for company_id, series in returns.items():
+            weight = weights.get(company_id, 0)
             for day, value in series.items():
-                by_date[day].append((weights.get(company_id, 0), value))
+                entry = by_date.get(day)
+                if entry is None:
+                    entry = by_date[day] = ([], [])
+                entry[0].append(weight)
+                entry[1].append(value)
         result = {}
-        for day, values in sorted(by_date.items()):
-            active_weight = sum(weight for weight, _ in values)
+        for day in sorted(by_date):
+            day_weights, day_values = by_date[day]
+            active_weight = sum(day_weights)
             if active_weight > 0:
-                result[day] = sum(weight * value for weight, value in values) / active_weight
+                result[day] = sum(map(mul, day_weights, day_values)) / active_weight
         return result
 
     @staticmethod
