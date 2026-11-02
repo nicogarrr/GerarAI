@@ -84,15 +84,22 @@ export function invalidationMetricLabel(metric: string, locale: 'es' | 'en' = 'e
   return known ? known.label.replace(' (%)', '').toLowerCase() : metric;
 }
 
-/** Número en es-ES con 2 decimales (coma decimal). */
+/**
+ * Decimales del umbral: 2 como mínimo y los que haga falta hasta 8, como la
+ * etiqueta del backend. Con 2 fijos, «ROIC < 0,075» se veía «< 0,08», igual
+ * que el criterio 0,08.
+ */
+const THRESHOLD_DIGITS = { minimumFractionDigits: 2, maximumFractionDigits: 8 } as const;
+
+/** Número en es-ES con 2 a 8 decimales (coma decimal). */
 export function formatThresholdEs(value: number, percent: boolean): string {
-  const text = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+  const text = new Intl.NumberFormat('es-ES', THRESHOLD_DIGITS).format(value);
   return percent ? `${text} %` : text;
 }
 
-/** Número en inglés con 2 decimales (punto decimal, «%» pegado). */
+/** Número en inglés con 2 a 8 decimales (punto decimal, «%» pegado). */
 function formatThresholdEn(value: number, percent: boolean): string {
-  const text = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false }).format(value);
+  const text = new Intl.NumberFormat('en-US', { ...THRESHOLD_DIGITS, useGrouping: false }).format(value);
   return percent ? `${text}%` : text;
 }
 
