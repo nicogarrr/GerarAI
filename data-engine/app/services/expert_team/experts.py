@@ -112,6 +112,19 @@ def _parse_claims(raw: Any) -> list[Claim]:
     return claims
 
 
+def _checked_summary(
+    summary: str, evidence: list[dict[str, Any]], ledger: EvidenceLedger, spec: ExpertSpec, validator: Validator
+) -> str:
+    """El resumen se pinta junto a las afirmaciones: sus cifras deben salir de la
+    evidencia de ESTE experto, igual que las de una afirmación. Si alguna no
+    sale, el resumen se quita (las afirmaciones validadas siguen)."""
+    if not summary or not evidence:
+        return summary
+    probe = Claim(text=summary, citations=tuple(ev["id"] for ev in evidence))
+    reason = validator(probe, ledger, spec)
+    return "" if reason else summary
+
+
 async def run_expert(
     spec: ExpertSpec,
     ctx: RunContext,
@@ -153,7 +166,7 @@ async def run_expert(
         return report
     stance = str(parsed.get("stance") or "neutral").lower()
     report.stance = stance if stance in _STANCES else "neutral"  # type: ignore[assignment]
-    report.summary = str(parsed.get("summary") or "").strip()
+    report.summary = _checked_summary(str(parsed.get("summary") or "").strip(), evidence, ledger, spec, validator)
     for claim in _parse_claims(parsed.get("claims")):
         claim.reason = validator(claim, ledger, spec)
         # Motivo con prefijo «mark:» = se conserva marcada como «sin fuente».
