@@ -170,16 +170,19 @@ def alerts_answer(
 # ---------------------------------------------------------------- riesgo
 
 
-def _snapshot_metrics(db: Session, tenant: int, *, today: date | None = None) -> dict | None:
-    """TWR, caída máxima y volatilidad de los últimos 12 meses de snapshots diarios."""
+def _snapshot_metrics(
+    db: Session, tenant: int, *, today: date | None = None, portfolio_id: int | None = None
+) -> dict | None:
+    """TWR, caída máxima y volatilidad de los últimos 12 meses de snapshots diarios.
+
+    ``portfolio_id``: las fotos de esa cartera; sin él, la de la foto más reciente.
+    """
     today = today or date.today()
     start = today - timedelta(days=365)
-    latest = db.scalar(
-        select(PortfolioDailySnapshot)
-        .where(PortfolioDailySnapshot.tenant_id == tenant)
-        .order_by(PortfolioDailySnapshot.snapshot_date.desc())
-        .limit(1)
-    )
+    latest_query = select(PortfolioDailySnapshot).where(PortfolioDailySnapshot.tenant_id == tenant)
+    if portfolio_id is not None:
+        latest_query = latest_query.where(PortfolioDailySnapshot.portfolio_id == portfolio_id)
+    latest = db.scalar(latest_query.order_by(PortfolioDailySnapshot.snapshot_date.desc()).limit(1))
     if latest is None:
         return None
     rows = db.scalars(
@@ -254,6 +257,48 @@ def _date_en(value: date | datetime | None) -> str:
     return f"{value:%b} {value.day}, {value.year}"
 
 
+def _history_lines(
+    db: Session, tenant: int, today: date | None, english: bool, portfolio_id: int | None
+) -> tuple[list[str], list[dict]]:
+    """Líneas del histórico (TWR, caída máxima, volatilidad) de UNA cartera."""
+    lines: list[str] = []
+    sources: list[dict] = []
+    metrics = _snapshot_metrics(db, tenant, today=today, portfolio_id=portfolio_id)
+    if metrics and metrics.get("count") and english:
+        part = (
+            f"Portfolio history ({_date_en(metrics['first'])} to {_date_en(metrics['last'])}, "
+            f"{metrics['count']} closes): TWR return {_pct_en(metrics['twr'])}, "
+            f"max drawdown {_pct_en(metrics['max_drawdown'])}"
+        )
+        if metrics.get("volatility") is not None:
+            part += f", annualized volatility {_pct_en(metrics['volatility'])}"
+        lines.append(part + ".")
+        coverage = float(metrics["latest"].pricing_coverage or 0)
+        if coverage < 1:
+            lines.append(f"The latest snapshot has a price for {_pct_en(coverage, 0)} of the portfolio.")
+        sources.append(_source("portfolio_snapshot", metrics["latest"].id,
+                               f"Portfolio snapshot {_date_en(metrics['latest'].snapshot_date)}", "/portfolio"))
+    elif metrics and metrics.get("count"):
+        part = (
+            f"Histórico de la cartera ({fecha_es(metrics['first'])} a {fecha_es(metrics['last'])}, "
+            f"{metrics['count']} cierres): rentabilidad TWR {_pct(metrics['twr'])}, "
+            f"caída máxima {_pct(metrics['max_drawdown'])}"
+        )
+        if metrics.get("volatility") is not None:
+            part += f", volatilidad anualizada {_pct(metrics['volatility'])}"
+        lines.append(part + ".")
+        coverage = float(metrics["latest"].pricing_coverage or 0)
+        if coverage < 1:
+            lines.append(f"El último snapshot tiene precio para el {_pct(coverage, 0)} de la cartera.")
+        sources.append(_source("portfolio_snapshot", metrics["latest"].id,
+                               f"Snapshot de cartera {fecha_es(metrics['latest'].snapshot_date)}", "/portfolio"))
+    elif metrics is not None and english:
+        lines.append("There are portfolio snapshots, but no daily returns: no TWR or max drawdown calculated.")
+    elif metrics is not None:
+        lines.append("Hay snapshots de la cartera, pero sin rentabilidades diarias: no calculo TWR ni caída máxima.")
+    return lines, sources
+
+
 def portfolio_risk_lines(
     db: Session, tenant: int, *, today: date | None = None, english: bool = False
 ) -> tuple[list[str], list[dict]]:
@@ -306,39 +351,28 @@ def portfolio_risk_lines(
         sources.append(_source("risk_dashboard", "dashboard",
                                f"Risk panel (data as of {dashboard.get('data_as_of') or 'N/A'})" if english else
                                f"Panel de riesgo (datos a {dashboard.get('data_as_of') or 'N/D'})", "/risk"))
-    metrics = _snapshot_metrics(db, tenant, today=today)
-    if metrics and metrics.get("count") and english:
-        part = (
-            f"Portfolio history ({_date_en(metrics['first'])} to {_date_en(metrics['last'])}, "
-            f"{metrics['count']} closes): TWR return {_pct_en(metrics['twr'])}, "
-            f"max drawdown {_pct_en(metrics['max_drawdown'])}"
-        )
-        if metrics.get("volatility") is not None:
-            part += f", annualized volatility {_pct_en(metrics['volatility'])}"
-        lines.append(part + ".")
-        coverage = float(metrics["latest"].pricing_coverage or 0)
-        if coverage < 1:
-            lines.append(f"The latest snapshot has a price for {_pct_en(coverage, 0)} of the portfolio.")
-        sources.append(_source("portfolio_snapshot", metrics["latest"].id,
-                               f"Portfolio snapshot {_date_en(metrics['latest'].snapshot_date)}", "/portfolio"))
-    elif metrics and metrics.get("count"):
-        part = (
-            f"Histórico de la cartera ({fecha_es(metrics['first'])} a {fecha_es(metrics['last'])}, "
-            f"{metrics['count']} cierres): rentabilidad TWR {_pct(metrics['twr'])}, "
-            f"caída máxima {_pct(metrics['max_drawdown'])}"
-        )
-        if metrics.get("volatility") is not None:
-            part += f", volatilidad anualizada {_pct(metrics['volatility'])}"
-        lines.append(part + ".")
-        coverage = float(metrics["latest"].pricing_coverage or 0)
-        if coverage < 1:
-            lines.append(f"El último snapshot tiene precio para el {_pct(coverage, 0)} de la cartera.")
-        sources.append(_source("portfolio_snapshot", metrics["latest"].id,
-                               f"Snapshot de cartera {fecha_es(metrics['latest'].snapshot_date)}", "/portfolio"))
-    elif metrics is not None and english:
-        lines.append("There are portfolio snapshots, but no daily returns: no TWR or max drawdown calculated.")
-    elif metrics is not None:
-        lines.append("Hay snapshots de la cartera, pero sin rentabilidades diarias: no calculo TWR ni caída máxima.")
+    # Cada cartera con su histórico: con varias, antes solo se describía la de
+    # la foto más reciente de cualquiera, como si fuera toda tu cartera.
+    portfolio_ids = sorted(db.scalars(
+        select(PortfolioDailySnapshot.portfolio_id).where(PortfolioDailySnapshot.tenant_id == tenant).distinct()
+    ).all())
+    if len(portfolio_ids) <= 1:
+        history, history_sources = _history_lines(db, tenant, today, english, None)
+        lines.extend(history)
+        sources.extend(history_sources)
+        return lines, sources
+    from app.models import Portfolio
+
+    names = dict(db.execute(
+        select(Portfolio.id, Portfolio.name).where(Portfolio.tenant_id == tenant, Portfolio.id.in_(portfolio_ids))
+    ).all())
+    lines.append(f"You have {len(portfolio_ids)} portfolios with daily snapshots; each one separately:" if english
+                 else f"Tienes {len(portfolio_ids)} carteras con fotos diarias; cada una por separado:")
+    for portfolio_id in portfolio_ids:
+        history, history_sources = _history_lines(db, tenant, today, english, portfolio_id)
+        if history:
+            lines.append(f"- «{names.get(portfolio_id) or portfolio_id}»: " + " ".join(history))
+        sources.extend(history_sources)
     return lines, sources
 
 
