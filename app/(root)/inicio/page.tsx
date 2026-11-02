@@ -3,9 +3,8 @@ import { Suspense } from 'react';
 
 import PersonalizedOverview from '@/components/PersonalizedOverview';
 import EarningsDayStrip from '@/components/calendar/EarningsDayStrip';
-import NewsSection from '@/components/NewsSection';
-import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 import { NewsLoadingSkeleton } from '@/components/LoadingState';
+import { PortfolioNews } from './PortfolioNews';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { redirectToSignIn } from '@/lib/auth/sign-in-redirect';
 import { getT } from '@/lib/i18n/server';
@@ -34,10 +33,6 @@ async function getUserId(): Promise<string> {
 
 export default async function Home() {
     const userId = await getUserId();
-    // Noticias de Inicio: solo de la cartera del usuario (decisión 29-oct-2026,
-    // vista Noticias por acción). Degradación honesta: sin cartera, lista
-    // general como antes.
-    const { portfolioTickers } = await getTickerContext().catch(() => ({ portfolioTickers: [] as string[], watchlistTickers: [] as string[] }));
 
     return (
         <main id="content" tabIndex={-1} className="flex w-full max-w-full min-w-0 flex-col gap-6 overflow-x-clip sm:gap-8">
@@ -62,7 +57,7 @@ export default async function Home() {
                 )}
             />
             <Suspense fallback={<NewsLoadingSkeleton />}>
-                <NewsSection symbols={portfolioTickers.length ? portfolioTickers : undefined} />
+                <PortfolioNews />
             </Suspense>
         </main>
     );
