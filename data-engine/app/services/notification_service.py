@@ -463,7 +463,10 @@ class NotificationService:
             date = payload.get("event_date")
             if isinstance(date, datetime):
                 # Label a GDELT first-seen as detection, never publication.
-                date_label = date.strftime("%d/%m/%Y")
+                # Stored in UTC; the user reads Madrid's day (as in the app).
+                from app.core.local_date import local_today
+
+                date_label = local_today(date).strftime("%d/%m/%Y")
                 detected = "detected " if en else "detectada "
                 suffix = f" · {detected if payload.get('event_date_source') == 'gdelt_first_seen' else ''}{date_label}"
             else:
