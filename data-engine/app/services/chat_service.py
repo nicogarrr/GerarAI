@@ -1119,6 +1119,10 @@ _PERFORMANCE_EN_RE = re.compile(
     r"|am\s+I\s+(?:up|down)|unreali[sz]ed\s+(?:gains?|loss(?:es)?|p&l))\b"
     r"(?![^.!?\n]*\bif\b)"
 )
+_YEAR_RETURN_RE = re.compile(
+    r"(?i)\b(?:este\s+a[nñ]o|en\s+lo\s+que\s+va\s+de\s+a[nñ]o|en\s+20\d\d|del\s+a[nñ]o"
+    r"|this\s+year|year\s+to\s+date|ytd|in\s+20\d\d)\b"
+)
 _CONCEPT_QUESTION_EN_RE = re.compile(
     r"(?i)\b(?:what\s+does\s+.{1,40}\s+mean|how\s+(?:is|are)\s+.{1,40}\s+calculated|what\s+is\s+an?\s)"
 )
@@ -2550,10 +2554,15 @@ class ChatService:
             return f"+{_fmt_number_es(value, 2)}" if value >= 0 else _fmt_number_es(value, 2)
 
         as_of = max(pos.as_of for pos, _ in rows)
+        # «¿mi rentabilidad este año?»: la cifra es desde la compra; se dice (sin flujos
+        # de caja no hay rentabilidad del año calculada). La cifra no cambia.
+        year_note = bool(_YEAR_RETURN_RE.search(question or ""))
         if english:
             answer = self._performance_text_en(
                 company, pct, pnl, total_value, total_cost, cur, as_of.isoformat(), unknown_cost,
             )
+            if year_note:
+                answer += " It is since purchase, not for a single year: the return by year is not calculated."
             return ChatResponse(
                 answer=answer,
                 sources=[
@@ -2581,6 +2590,8 @@ class ChatService:
                 + (f" y {len(unknown_cost) - 10} más" if len(unknown_cost) > 10 else "")
                 + "."
             )
+        if year_note:
+            answer += " Es desde la compra, no la de un año: la rentabilidad por año no está calculada."
         sources = [
             self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))
             for pos, comp in rows[:15]
