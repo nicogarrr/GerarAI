@@ -34,7 +34,7 @@ import asyncio
 import logging
 import os
 from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import desc, select
@@ -49,6 +49,7 @@ from app.services.connectors.finnhub import FinnhubClient
 from app.services.connectors.ir import IRConnector
 from app.services.date_format import format_date_es
 from app.services.fact_deletion import delete_financial_facts
+from app.services.number_parsing import parse_machine_decimal as _decimal
 
 logger = logging.getLogger(__name__)
 
@@ -138,15 +139,6 @@ def _await_sync(factory, timeout: float = FETCH_TIMEOUT_S):
     from app.services.async_bridge import run_from_any_context
 
     return run_from_any_context(_bounded())
-
-
-def _decimal(value: Any) -> Decimal | None:
-    if value is None or value == "":
-        return None
-    try:
-        return Decimal(str(value))
-    except (InvalidOperation, ValueError):
-        return None
 
 
 def _log_source_failure(source: str, ticker: str | None, exc: BaseException) -> None:

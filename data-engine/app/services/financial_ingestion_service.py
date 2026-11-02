@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from datetime import UTC, date, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any, cast
 
 from sqlalchemy import delete, or_, select, tuple_
@@ -23,6 +23,7 @@ from app.services.fact_deletion import (
     drop_shadowed_facts,
     tenant_condition,
 )
+from app.services.number_parsing import parse_machine_decimal as _decimal
 from app.services.price_units import price_in_currency
 from app.services.ttm_fundamentals import (
     NON_ADDITIVE_FLOWS,
@@ -473,15 +474,6 @@ DERIVED_PAIR_METRICS: tuple[str, ...] = (
     "net_debt",
     "revenue_growth",
 )
-
-
-def _decimal(value: Any) -> Decimal | None:
-    if value is None or value == "":
-        return None
-    try:
-        return Decimal(str(value))
-    except (InvalidOperation, ValueError):
-        return None
 
 
 def is_summed_component(metric: str) -> bool:
