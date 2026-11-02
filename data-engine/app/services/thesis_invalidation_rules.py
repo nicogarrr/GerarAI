@@ -128,7 +128,10 @@ def normalize_rules(raw: Any) -> list[dict[str, Any]]:
     if len(raw) > MAX_RULES:
         raise ValueError(f"Máximo {MAX_RULES} criterios de invalidación por tesis.")
     rules: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, Decimal]] = set()
+    # Clave = el criterio tal como se ve (y como se nombra su regla de aviso):
+    # «0,075» y «0,0750000001», o «1e-9» y «2e-9» («0,00»), se ven igual y
+    # daban dos reglas con el mismo nombre (500 por uq_alert_rule_name).
+    seen: set[str] = set()
     for index, item in enumerate(raw, start=1):
         if not isinstance(item, dict):
             raise ValueError(f"Criterio {index}: formato no válido (métrica, operador y umbral).")
@@ -141,7 +144,7 @@ def normalize_rules(raw: Any) -> list[dict[str, Any]]:
         threshold = _parse_threshold(item.get("threshold"))
         if threshold is None:
             raise ValueError(f"Criterio {index}: el umbral debe ser un número finito.")
-        key = (metric, operator, threshold.normalize())
+        key = describe_rule({"metric": metric, "operator": operator, "threshold": float(threshold)})
         if key in seen:
             continue
         seen.add(key)
