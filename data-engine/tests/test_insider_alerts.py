@@ -251,7 +251,9 @@ def test_a_cluster_with_a_missing_figure_publishes_a_minimum_total():
         # El total son los $100,000 conocidos, NO $100,000 de "$0" contados.
         assert "$100,000" in cluster.message
         assert "$150,000" not in cluster.message
-        assert "como minimo" in cluster.message
+        # Castellano con tildes: «como mínimo», «30 días», «Código P».
+        assert "como mínimo" in cluster.message
+        assert "en 30 días (" in cluster.message and "Código P:" in cluster.message
         assert "1 de 3 compras sin cifra" in cluster.message
         assert cluster.metadata_["window_transactions"] == 3
         assert cluster.metadata_["window_value_missing"] == 1
