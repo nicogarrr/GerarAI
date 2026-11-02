@@ -1105,6 +1105,8 @@ _PURCHASE_COST_EN_RE = re.compile(
 _PERFORMANCE_EN_RE = re.compile(
     r"(?i)\b(?:(?:my|the)\s+return|return\s+on\s+my"
     r"|how\s+much\s+(?:money\s+)?(?:have|did)\s+I\s+(?:made|make|gained|gain|lost|lose|earned|earn)"
+    # «how much have I invested?»: el coste de compra, como «¿cuánto he invertido?».
+    r"|how\s+much\s+(?:money\s+)?(?:have\s+I|do\s+I\s+have)\s+invested"
     r"|(?:my|what(?:'s|\s+is)\s+my)\s+(?:profit|gain|loss|p&l|performance)"
     r"|am\s+I\s+(?:up|down)|unreali[sz]ed\s+(?:gains?|loss(?:es)?|p&l))\b"
     r"(?![^.!?\n]*\bif\b)"
