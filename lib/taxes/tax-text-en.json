@@ -1,0 +1,115 @@
+{
+  "exact": {
+    "Sin portfolio activo: no hay snapshots que evaluar.": "No active portfolio: there are no snapshots to evaluate.",
+    "Snapshot heredado sin provenance de valoración (sin clave 'missing_pricing' en su metadata): no consta la fecha del precio en la captura; fuera del total.": "Legacy snapshot with no valuation provenance: the price date at capture is not recorded; left out of the total.",
+    "Sin tipo de cambio a fecha del snapshot: fuera del total EUR, valorar a mano.": "No exchange rate on the snapshot date: left out of the EUR total, value it by hand.",
+    "Posición corta (valor negativo): no es un bien en el extranjero a efectos del 720.": "Short position (negative value): not a foreign asset for Modelo 720 purposes.",
+    "Custodia no declarada para esta partida: importar del bróker no acredita dónde está depositada. Declara tax_declarant.custody (ISIN/ticker → país ISO2) en la metadata del tenant; mientras tanto, fuera del total.": "Custody not declared for this item: importing from the broker does not prove where it is held. Declare its custody (ISIN/ticker → ISO2 country) in your tax details; until then, it stays out of the total.",
+    "Custodia declarada en España: no es bien en el extranjero; no computa en el 720.": "Custody declared in Spain: not a foreign asset; it does not count for Modelo 720.",
+    "Saldo 0 a 31/12 y cuenta declarada en España: no es un bien en el extranjero, así que no entra en el 720.": "Balance 0 on 31 Dec and account declared in Spain: not a foreign asset, so it is not part of Modelo 720.",
+    "Saldo 0 a 31/12 y sin capturas suficientes del 4.º trimestre para calcular su saldo medio: no se incluye en el total de cuentas. El 720 también mira el saldo medio del 4.º trimestre; si la cuenta tuvo saldo entre octubre y diciembre, compruébalo en los extractos del bróker.": "Balance 0 on 31 Dec and not enough Q4 captures to compute its average balance: not included in the accounts total. Modelo 720 also looks at the Q4 average balance; if the account had a balance between October and December, check it against the broker statements.",
+    "Saldo 0 a 31/12 y saldo medio del 4.º trimestre también 0: no suma nada al umbral de cuentas, por eso no se incluye en el total.": "Balance 0 on 31 Dec and Q4 average balance also 0: it adds nothing to the accounts threshold, so it is not included in the total.",
+    "Saldo 0 a 31/12 pero saldo medio del 4.º trimestre distinto de 0, sin tipo de cambio: fuera del total EUR, valorar a mano.": "Balance 0 on 31 Dec but a non-zero Q4 average balance, with no exchange rate: left out of the EUR total, value it by hand.",
+    "Sin tipo de cambio para el saldo: fuera del total EUR, valorar a mano.": "No exchange rate for the balance: left out of the EUR total, value it by hand.",
+    "Cuenta declarada en España: no es bien en el extranjero; no computa en el 720.": "Account declared in Spain: not a foreign asset; it does not count for Modelo 720.",
+    "Posición actual sin snapshot de valoración a cierre del ejercicio: fuera del total, valorar a mano.": "Current position with no valuation snapshot at year end: left out of the total, value it by hand.",
+    "Saldo actual sin snapshot a cierre del ejercicio: fuera del total, valorar a mano.": "Current balance with no snapshot at year end: left out of the total, value it by hand.",
+    "Sin snapshots de valoración a cierre del ejercicio: no se puede afirmar nada sobre esta categoría.": "No valuation snapshots at year end: nothing can be stated about this category.",
+    "El total computado supera el umbral, pero hay partidas fuera del cómputo: revisarlas igualmente.": "The computed total is above the threshold, but some items are left out of it: review them anyway.",
+    "Hay partidas fuera del total (sin valorar, custodia no verificada o snapshot antiguo): un 'por_debajo' sería falso verde.": "Some items are left out of the total (not valued, custody not verified or an old snapshot): a “below” result would be a false all-clear.",
+    "El saldo a 31/12 no supera el umbral, pero falta el saldo medio del 4.º trimestre (que también puede superarlo): resultado no concluyente.": "The 31 Dec balance is not above the threshold, but the Q4 average balance is missing (it can also exceed it): inconclusive result.",
+    "Los saldos de efectivo no son atribuibles por cartera (cash_balances no registra portfolio_id): con varias carteras no se puede descartar duplicación de un mismo saldo global. La categoría no es concluyente.": "Cash balances cannot be attributed to a portfolio: with several portfolios, the same overall balance being counted twice cannot be ruled out. The category is inconclusive.",
+    "El total neto supera el umbral, pero los saldos están agrupados por divisa y no por cuenta real (identificador de cuenta y entidad): sin ese dato no se puede validar el neteo ni la ubicación por entidad. Resultado no concluyente.": "The net total is above the threshold, but balances are grouped by currency and not by real account (account number and institution): without that, netting and location by institution cannot be validated. Inconclusive result.",
+    "No computable con datos de bróker: los inmuebles en el extranjero se declaran aparte. No se afirma ni que superan ni que no superan el umbral.": "Not computable from broker data: foreign real estate is declared separately. Nothing is stated about whether it is above or below the threshold.",
+    "Faltan datos identificativos del declarante: el registro de tipo 1 exige NIF y apellidos y nombre, y no se inventan. Guárdalos en la metadata del tenant bajo la clave 'tax_declarant' (nif, apellidos_nombre, numero_declaracion, custody_country, first_acquisition_dates...).": "Declarant identification is missing: the type 1 record requires the tax ID (NIF) and full name, and they are never made up. Save them in your tax details (declarant data).",
+    "Falta 'numero_declaracion' válido en tax_declarant: la spec exige 13 dígitos que comiencen por 720 (número secuencial de la declaración). No se genera un fichero con ese campo inventado.": "A valid declaration number is missing from your declarant data: the spec requires 13 digits starting with 720 (the declaration's sequence number). No file is generated with that field made up.",
+    "Falta 'custody' en tax_declarant: mapa por partida (ISIN/ticker → país ISO2 de depósito/gestión, 'cash:<DIVISA>' para cuentas). El país no se infiere del ISIN ni se declara uno único para toda la cartera.": "Custody is missing from your declarant data: a map per item (ISIN/ticker → ISO2 country where it is held or managed, “<CURRENCY> cash” for accounts). The country is not inferred from the ISIN, and no single country is declared for the whole portfolio.",
+    "Falta 'filed_720_before' (booleano true/false) en tax_declarant: sin historial de presentación no se puede asignar el origen (A primera declaración / M modificación) sin inventarlo.": "Whether you filed Modelo 720 before (yes/no) is missing from your declarant data: without the filing history, the origin (A first filing / M change) cannot be assigned without making it up.",
+    "Ya se presentó el 720 en ejercicios anteriores: el origen (A/M) exige los importes de la última declaración para evaluar el incremento conjunto >20.000 € por categoría, dato que no tenemos. Declarar manualmente o aportar esos importes.": "Modelo 720 was filed in previous years: the origin (A/M) needs the amounts of the last filing to check the combined increase above €20,000 per category, which we don't have. Declare it by hand or provide those amounts.",
+    "Contradicción: filed_720_before=false pero hay previous_year_isins declarados. Reconcilia el historial en tax_declarant antes de generar.": "Contradiction: you said Modelo 720 was never filed, but previous-year ISINs are declared. Reconcile the history in your declarant data before generating.",
+    "Sin ISIN: la clave 2 (valores sin ISIN) exige 'Z'+país emisor, dato no disponible. Declarar manualmente.": "No ISIN: key 2 (securities without ISIN) requires “Z” + issuer country, which is not available. Declare it by hand.",
+    "Sin país de custodia declarado para este ISIN en tax_declarant.custody: el campo 129-130 no se infiere. Declarar manualmente.": "No custody country declared for this ISIN in your declarant data: field 129-130 is not inferred. Declare it by hand.",
+    "Custodia declarada en España: no es bien en el extranjero, no va en el 720.": "Custody declared in Spain: not a foreign asset, it does not go in Modelo 720.",
+    "ISIN declarado el año anterior y ya no poseído: posible BAJA. Requiere la fecha efectiva de extinción; declarar manualmente.": "ISIN declared last year and no longer held: possible DISPOSAL. It needs the actual date it ended; declare it by hand.",
+    "La categoría CUENTAS supera el umbral, pero el registro C exige identificador de cuenta, identidad de la entidad y saldo medio del 4.º trimestre: no se genera fichero para cuentas. Declarar manualmente.": "The ACCOUNTS category is above the threshold, but record C requires the account number, the institution's identity and the Q4 average balance: no file is generated for accounts. Declare them by hand.",
+    "Ninguna categoría generable supera los 50.000 € o todos los registros quedaron excluidos por datos incompletos. Sin fichero generado (revisa 'excluded' y 'manual_review').": "No category that can be generated is above €50,000, or every record was excluded for incomplete data. No file generated (check the excluded items and manual review).",
+    "Fichero conforme al diseño de registro oficial AEAT (500 bytes, ISO-8859-1): AYUDA DE CÓMPUTO — revisar antes de presentar por TGVI Online.": "File following the official AEAT record layout (500 bytes, ISO-8859-1): a CALCULATION AID — review it before filing through TGVI Online.",
+    "Origen siempre 'A': si la categoría ya se declaró y el incremento conjunto supera 20.000 € corresponde 'M' (ver 'manual_review').": "Origin is always “A”: if the category was already declared and the combined increase exceeds €20,000, “M” applies (see manual review).",
+    "Un ISIN comprado en lotes con fechas distintas exige un registro por lote: aquí se genera uno con la fecha aportada; si hubo varias fechas, revisar manualmente.": "An ISIN bought in lots on different dates needs one record per lot: here one is generated with the date provided; if there were several dates, review it by hand.",
+    "Cuentas (clave C) y bajas no se generan: requieren datos que no tenemos (ver 'manual_review').": "Accounts (key C) and disposals are not generated: they need data we don't have (see manual review)."
+  },
+  "templates": [
+    [
+      "La divisa base del portfolio es {currency}, no EUR: sin tipo de cambio oficial a 31/12 no hay conversión fiable y el umbral de 50.000 € no se evalúa.",
+      "The portfolio's base currency is {currency}, not EUR: without an official exchange rate on 31 Dec there is no reliable conversion, so the €50,000 threshold is not evaluated."
+    ],
+    [
+      "Snapshot de {date} ({lag} días antes del cierre): demasiado antiguo para afirmar el valor a 31/12 de ESTA partida; fuera del total.",
+      "Snapshot from {date} ({lag} days before year end): too old to state THIS item's value on 31 Dec; left out of the total."
+    ],
+    [
+      "La valoración de la captura está fechada {date}: no afirma el valor a 31/12 (provenance histórica del snapshot). Fuera del total.",
+      "The snapshot's valuation is dated {date}: it does not state the value on 31 Dec (historical snapshot provenance). Left out of the total."
+    ],
+    [
+      "Cuenta en {currency} (cartera «{name}»)",
+      "{currency} account (portfolio “{name}”)"
+    ],
+    [
+      "Cuenta en {currency}",
+      "{currency} account"
+    ],
+    [
+      "Saldo 0 a 31/12 pero saldo medio del 4.º trimestre distinto de 0 (también cuenta para el umbral). Ubicación de la cuenta no declarada (la divisa no es el país): declara tax_declarant.custody con la clave 'cash:{currency}' en la metadata del tenant; mientras tanto, fuera del total.",
+      "Balance 0 on 31 Dec but a non-zero Q4 average balance (it also counts for the threshold). Account location not declared (the currency is not the country): declare the custody of “{currency} cash” in your tax details; until then, it stays out of the total."
+    ],
+    [
+      "Ubicación de la cuenta no declarada (la divisa no es el país). Declara tax_declarant.custody con la clave 'cash:{currency}' en la metadata del tenant; mientras tanto, fuera del total.",
+      "Account location not declared (the currency is not the country). Declare the custody of “{currency} cash” in your tax details; until then, it stays out of the total."
+    ],
+    [
+      "Partidas con snapshot demasiado antiguo ({tickers}): cada valor afirma su 31/12 con SU snapshot; uno reciente no certifica a otro viejo. Resultado no concluyente.",
+      "Items with a snapshot that is too old ({tickers}): each item states its 31 Dec value with ITS OWN snapshot; a recent one does not vouch for an old one. Inconclusive result."
+    ],
+    [
+      "Saldo medio del 4.º trimestre ESTIMADO ({list}): faltan saldos diarios y cada día sin captura toma el saldo de la última captura anterior. No es el saldo medio diario exacto que pide el modelo; contrastar con el extracto del banco o bróker.",
+      "ESTIMATED Q4 average balance ({list}): daily balances are missing and each day without a capture takes the balance of the previous capture. It is not the exact daily average balance the form asks for; check it against the bank or broker statement."
+    ],
+    [
+      "Sin capturas de saldo suficientes en el 4.º trimestre para reconstruir el saldo medio ({list}): hace falta al menos una por semana del 1/10 al 31/12.",
+      "Not enough Q4 balance captures to rebuild the average balance ({list}): at least one per week from 1 Oct to 31 Dec is needed."
+    ],
+    [
+      "Hay carteras con base no EUR ({names}): sus valores (incluidos los vendidos durante el ejercicio, que ya no dejan fila) no son convertibles a EUR a 31/12 sin FX oficial. El total mostrado es solo la parte EUR; la categoría no es concluyente.",
+      "Some portfolios have a non-EUR base ({names}): their securities (including those sold during the year, which no longer leave a row) cannot be converted to EUR on 31 Dec without an official FX rate. The total shown is only the EUR part; the category is inconclusive."
+    ],
+    [
+      "Hay carteras con base no EUR ({names}): sus saldos no son convertibles a EUR a 31/12 sin FX oficial. La categoría no es concluyente.",
+      "Some portfolios have a non-EUR base ({names}): their balances cannot be converted to EUR on 31 Dec without an official FX rate. The category is inconclusive."
+    ],
+    [
+      "Falta 'custody_entities' para '{item}' en tax_declarant (name, nif, street, city, zip, country de la entidad depositaria REAL de ESA partida): la entidad se liga a cada ISIN/cuenta, no se agrupa por país.",
+      "The custody institution is missing for “{item}” in your declarant data (name, tax ID, street, city, postcode and country of the ACTUAL depositary of THAT item): the institution is tied to each ISIN/account, not grouped by country."
+    ],
+    [
+      "Incoherencia en '{item}': la entidad declara país de domicilio '{entityCountry}' pero la custodia de la partida es '{country}'. Corrige custody / custody_entities.",
+      "Mismatch in “{item}”: the institution's country of residence is “{entityCountry}” but the item's custody is “{country}”. Fix the custody or the custody institutions."
+    ],
+    [
+      "Falta la fecha de primera adquisición (obligatoria, posiciones 415-422) para: {list}. Aporta tax_declarant.first_acquisition_dates (ISIN → fecha YYYYMMDD).",
+      "The first acquisition date (mandatory, positions 415-422) is missing for: {list}. Provide the first acquisition dates (ISIN → date YYYYMMDD) in your declarant data."
+    ],
+    [
+      "Configuración no representable: el mismo ISIN aparece en varias carteras ({list}) y podría estar depositado en custodios distintos; la declaración por ISIN no puede distinguirlos. Declarar manualmente con la entidad correcta por cartera.",
+      "Setup that cannot be represented: the same ISIN appears in several portfolios ({list}) and could be held with different custodians; a per-ISIN filing cannot tell them apart. Declare it by hand with the right institution for each portfolio."
+    ],
+    [
+      "{ticker} ({isin}) tiene lotes con fechas de adquisición distintas: la norma exige un registro por fecha y no tenemos las cantidades por lote. Declarar manualmente.",
+      "{ticker} ({isin}) has lots with different acquisition dates: the rules require one record per date and we don't have the quantity per lot. Declare it by hand."
+    ],
+    [
+      "La fecha de primera adquisición de {ticker} ('{date}') no es YYYYMMDD: corrígela en tax_declarant.first_acquisition_dates.",
+      "The first acquisition date of {ticker} (“{date}”) is not YYYYMMDD: fix it in the first acquisition dates of your declarant data."
+    ]
+  ]
+}
