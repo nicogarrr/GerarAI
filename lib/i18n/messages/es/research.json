@@ -1640,6 +1640,11 @@
     "bearTitle": "Caso bajista",
     "bearEmpty": "Sin caso bajista registrado.",
     "verdict": "veredicto: {verdict}",
+    "verdictLabels": {
+      "bullish": "alcista",
+      "bearish": "bajista",
+      "neutral": "neutral"
+    },
     "notPersisted": "veredicto no persistido (se muestra igual)",
     "empty": "Sin debate persistido. Genera el debate para contrastar la tesis con su contraparte bajista antes de aprobarla."
   },

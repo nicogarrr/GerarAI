@@ -1640,6 +1640,11 @@
     "bearTitle": "Bear case",
     "bearEmpty": "Bear case not recorded.",
     "verdict": "verdict: {verdict}",
+    "verdictLabels": {
+      "bullish": "bullish",
+      "bearish": "bearish",
+      "neutral": "neutral"
+    },
     "notPersisted": "verdict not saved (shown anyway)",
     "empty": "Debate not saved yet. Generate the debate to test the thesis against its bear case before approving it."
   },

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useT } from '@/lib/i18n/client';
 import { runThesisDebate, type ThesisDebateResult } from '@/lib/actions/thesis-jobs.actions';
 import { isNextRedirectError } from '@/lib/types/errors';
+import { debateVerdict, parsePersistedVerdict, type DebateVerdict } from '@/lib/research/debate-verdict';
 
 interface ThesisDebatePanelProps {
     ticker: string;
@@ -24,6 +25,17 @@ export default function ThesisDebatePanel({ ticker, initialVerdict }: ThesisDeba
     const [debate, setDebate] = useState<ThesisDebateResult | null>(null);
     const [running, setRunning] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const verdictLabel = (verdict: DebateVerdict) =>
+        verdict === 'bullish'
+            ? t('research.thesisDebate.verdictLabels.bullish')
+            : verdict === 'bearish'
+              ? t('research.thesisDebate.verdictLabels.bearish')
+              : t('research.thesisDebate.verdictLabels.neutral');
+    const shownVerdict = (value: string) => {
+        const known = debateVerdict(value);
+        return known ? verdictLabel(known) : value;
+    };
+    const persisted = parsePersistedVerdict(initialVerdict);
 
     const run = async () => {
         setRunning(true);
@@ -96,7 +108,7 @@ export default function ThesisDebatePanel({ ticker, initialVerdict }: ThesisDeba
                             <Badge
                                 variant={debate.verdict === 'bearish' ? 'outline' : 'default'}
                             >
-                                {t('research.thesisDebate.verdict', { verdict: debate.verdict })}
+                                {t('research.thesisDebate.verdict', { verdict: shownVerdict(debate.verdict) })}
                             </Badge>
                             {debate.persisted === false ? (
                                 <span className="text-xs text-amber-300">
@@ -111,7 +123,11 @@ export default function ThesisDebatePanel({ ticker, initialVerdict }: ThesisDeba
                 </div>
             ) : initialVerdict ? (
                 <p className="rounded-lg border border-gray-800 bg-black/20 p-4 text-sm leading-6 text-gray-400">
-                    {initialVerdict}
+                    {persisted
+                        ? [t('research.thesisDebate.verdict', { verdict: verdictLabel(persisted.verdict) }), persisted.rationale]
+                              .filter(Boolean)
+                              .join(' · ')
+                        : initialVerdict}
                 </p>
             ) : (
                 <p className="text-sm text-gray-500">

@@ -31,7 +31,7 @@ describe('Thesis bull bear panel with mocked generation', () => {
         expect(screen.getByText('2 llamadas LLM · modelo fixture')).toBeVisible();
         expect(screen.getByText('Caso alcista sintético')).toBeVisible();
         expect(screen.getByText('Caso bajista sintético')).toBeVisible();
-        expect(screen.getByText('veredicto: bullish')).toBeVisible();
+        expect(screen.getByText('veredicto: alcista')).toBeVisible();
         expect(screen.getByText('Razón sintética')).toBeVisible();
         expect(screen.getByRole('button', { name: 'Reintentar debate' })).toBeEnabled();
     });
@@ -43,7 +43,7 @@ describe('Thesis bull bear panel with mocked generation', () => {
         expect(screen.getByText('Sin caso alcista registrado.')).toBeVisible();
         expect(screen.getByText('Sin caso bajista registrado.')).toBeVisible();
         expect(screen.getByText('veredicto no persistido (se muestra igual)')).toBeVisible();
-        expect(screen.getByText('veredicto: bearish')).toBeVisible();
+        expect(screen.getByText('veredicto: bajista')).toBeVisible();
     });
     it.each(['returned', 'error', 'unknown'])('shows %s failure and recovers with an explicit retry', async mode => {
         if (mode === 'returned') mocks.run.mockResolvedValueOnce({ ok: false, error: 'Fuera de servicio' });
