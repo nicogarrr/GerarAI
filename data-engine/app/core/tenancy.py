@@ -55,3 +55,16 @@ def tenant_filters(
             )
         return []
     return [model.tenant_id == tenant_id for model in models]
+
+
+def session_tenant_id(db: Session) -> int | None:
+    """Tenant activo leido de ``db.info`` (lo fija el middleware por peticion).
+
+    ``None`` cuando la sesion no lleva tenant valido (tareas sin contexto de
+    peticion, enteros no positivos o valores que no son int): los callers
+    deben tratarlo como "sin tenant", nunca como tenant 0.
+    """
+    tenant = db.info.get("tenant_id")
+    if type(tenant) is not int or tenant <= 0:
+        return None
+    return tenant

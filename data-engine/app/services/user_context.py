@@ -41,6 +41,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.local_date import local_today
+from app.core.tenancy import session_tenant_id as _tenant
 from app.models import (
     AlertRule,
     Company,
@@ -208,13 +209,6 @@ class UserContext:
                 break
         self.truncated = truncated
         return "\n".join(out)
-
-
-def _tenant(db: Session) -> int | None:
-    tenant = db.info.get("tenant_id")
-    if type(tenant) is not int or tenant <= 0:
-        return None
-    return tenant
 
 
 def _f(value: Any) -> float | None:

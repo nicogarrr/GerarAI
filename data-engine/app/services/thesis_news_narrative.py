@@ -28,6 +28,7 @@ from app.services.llm_output_guard import complete_guarded, inspect_text
 from app.services.llm_proposal_runner import paid_model_risk
 from app.services.llm_proposal_service import _TransientRetryProvider
 from app.services.prompt_registry import get_prompt
+from app.services.thesis_narrative_common import narrative_reasoning_effort as _effort
 
 logger = logging.getLogger(__name__)
 NETWORK_TIMEOUT_SECONDS = 60
@@ -84,13 +85,6 @@ def _prompt():
 
 
 _AGGREGATOR_HOSTS = ("news.google.com", "google.com")
-
-
-def _effort(section: str, explicit: str | None) -> str | None:
-    """Valor explicito del env si existe; si no, la tabla por seccion."""
-    if explicit is not None and explicit.strip():
-        return explicit.strip()
-    return get_settings().reasoning_effort_for(section)
 
 
 def _canonical_url(url: str | None) -> str | None:

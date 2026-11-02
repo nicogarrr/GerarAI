@@ -48,6 +48,7 @@ from app.services.memo_text_es import date_es, percent_es
 from app.services.number_format import format_compact_es
 from app.services.prompt_registry import get_prompt
 from app.services.text_clip import clip_words
+from app.services.thesis_narrative_common import narrative_reasoning_effort as _effort
 from app.services.thesis_narrative_llm import _source_locator
 from app.valuation.engines.base import margin_of_safety_reference
 
@@ -168,13 +169,6 @@ _VERDICT_RE = re.compile(
 _MD_EM_RE = re.compile(r"\*\*([^*]+)\*\*|__([^_]+)__|`([^`]+)`")
 _MD_HEADER_RE = re.compile(r"^#{1,6}\s+", re.MULTILINE)
 _HTML_TAG_RE = re.compile(r"<[a-zA-Z/][^>]*>")
-
-
-def _effort(section: str, explicit: str | None) -> str | None:
-    """Valor explicito del env si existe; si no, la tabla por seccion."""
-    if explicit is not None and explicit.strip():
-        return explicit.strip()
-    return get_settings().reasoning_effort_for(section)
 
 
 def _strip_markup(text: str) -> str:

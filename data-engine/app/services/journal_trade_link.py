@@ -19,6 +19,7 @@ from typing import Any
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import as_date as _as_date
 from app.core.tenancy import tenant_filters
 from app.models import (
     Company,
@@ -51,14 +52,6 @@ AUTO_LINK_WINDOW_DAYS = 3
 AUTO_LINK_MAX_PRICE_GAP = Decimal("0.25")
 THESIS_MAX_AGE_DAYS = 180
 _ACTION_LABELS = {"buy": "Compra", "sell": "Venta"}
-
-
-def _as_date(value: object) -> date | None:
-    if isinstance(value, datetime):
-        return value.date()
-    if isinstance(value, date):
-        return value
-    return None
 
 
 def _known_on(row: ThesisVersion | ValuationModel, day: date) -> bool:
