@@ -13,7 +13,9 @@ test('external translation preserves linked original and uses authenticated sign
  assert.ok(!ui.includes('tail = job'), 'la cola serie de 1 queda sustituida por la cola con concurrencia 2');
  const route=readFileSync('app/api/news/translate-headline/route.ts','utf8');
  assert.ok(route.includes('requireAuthenticatedUser'));
- assert.ok(route.includes("researchIdentityHeaders({method:'POST',path,body})"));
+ const proxy=readFileSync('lib/research/post-proxy.ts','utf8');
+ assert.ok(route.includes('proxyResearchPost'), 'la mecánica del POST firmado vive en el helper compartido');
+ assert.ok(proxy.includes("researchIdentityHeaders({method:'POST',path,body})"));
 });
 test('dashboard badges are in their own row, not over headlines',()=>{
  const s=readFileSync('components/NewsSection.tsx','utf8');
