@@ -64,113 +64,15 @@ function toFinite(value: NumericInput): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export type LocalizedNumberError = 'empty' | 'invalid' | 'ambiguous';
-
-const INT_PLAIN = /^\d+$/;
-// Miles es-ES estrictos: grupos de 3 tras el primero («1.234», «12.345.678»).
-// El primer grupo nunca es «0»: «0.125» es 0,125 y no 125 (factor 1000).
-const INT_GROUPS_ES = /^[1-9]\d{0,2}(?:\.\d{3})+$/;
-
-/**
- * Parsea números escritos por el usuario en formato es-ES sin adivinar.
- *
- * Gramática admitida:
- * - «32,5» / «1.234,56» / «12.345.678,9»: coma decimal, punto solo como
- *   separador de miles en grupos exactos de 3 antes de la coma.
- * - «1.234» -> 1234 (miles es-ES) y «1234.56» / «32.5» -> decimal con punto
- *   cuando el punto NO forma grupos de 3.
- * - Signo «-» inicial opcional.
- *
- * Se RECHAZA (error, nunca un valor reinterpretado) todo formato ambiguo:
- * - «1,234.5» (orden US mezclado) y «1,234» (¿1.234 es ó 1234 US?): antes
- *   «1,234.5» se leía como 1,2345, un factor 1000 silencioso en dinero.
- *   Excepción: «0,001» es decimal (nadie agrupa miles con un 0 delante).
- * - «1e3», «0x10», «1 000», «Infinity»: Number() los aceptaba en silencio.
- *
- * El error «ambiguous» permite al formulario explicar el formato esperado
- * en lugar del genérico «introduce un número válido».
- */
-export function parseLocalizedNumberDetailed(
-  value: string,
-  locale: Locale = DEFAULT_LOCALE,
-): { ok: true; value: number } | { ok: false; error: LocalizedNumberError } {
-  const trimmed = value.trim();
-  if (!trimmed) return { ok: false, error: 'empty' };
-  const negative = trimmed.startsWith('-');
-  const body = negative ? trimmed.slice(1) : trimmed;
-  const finish = (magnitude: number) => {
-    const signed = negative ? -magnitude : magnitude;
-    return Number.isFinite(signed)
-      ? { ok: true as const, value: signed }
-      : { ok: false as const, error: 'invalid' as const };
-  };
-
-  if (locale === 'en') {
-    // Gramática en-US: la coma es SOLO separador de miles en grupos de 3
-    // («1,234», «1,234.56») y el punto es el decimal («32.5», «.5», «5.»).
-    // Misma regla de honestidad que en es-ES: lo ambiguo se rechaza («32,5»,
-    // «1.234,56», «1.234.567»), nunca se reinterpreta.
-    const match = /^([1-9]\d{0,2}(?:,\d{3})+|\d+)?(?:\.(\d*))?$/.exec(body);
-    if (match && (match[1] !== undefined || (match[2] ?? '') !== '')) {
-      const intPart = (match[1] ?? '').replace(/,/g, '');
-      const decPart = match[2] ?? '';
-      if (intPart === '' && decPart === '') return { ok: false, error: 'invalid' };
-      return finish(Number(`${intPart || '0'}.${decPart || '0'}`));
-    }
-    return { ok: false, error: /[.,]/.test(body) ? 'ambiguous' : 'invalid' };
-  }
-
-  const commaParts = body.split(',');
-  if (commaParts.length > 2) return { ok: false, error: 'ambiguous' };
-  if (commaParts.length === 2) {
-    const [intPart, decPart] = commaParts;
-    if (!INT_PLAIN.test(decPart)) return { ok: false, error: 'ambiguous' }; // «1,234.5», «32,», «1,2e3»
-    if (intPart === '') return finish(Number(`0.${decPart}`)); // «,5»
-    if (INT_GROUPS_ES.test(intPart)) {
-      return finish(Number(`${intPart.replace(/\./g, '')}.${decPart}`)); // «1.234,56»
-    }
-    if (INT_PLAIN.test(intPart)) {
-      // Coma seguida de exactamente 3 dígitos («1,234»): ¿decimal es-ES 1,234
-      // o miles US 1234? Ambiguo y en dinero no se adivina; «0,001» sí es
-      // decimal porque los miles nunca empiezan por 0.
-      if (decPart.length === 3 && intPart !== '0') return { ok: false, error: 'ambiguous' };
-      return finish(Number(`${intPart}.${decPart}`));
-    }
-    return { ok: false, error: 'ambiguous' }; // «12.34,5»: grupo de miles roto
-  }
-
-  const dotParts = body.split('.');
-  if (dotParts.length === 1) {
-    if (!INT_PLAIN.test(body)) return { ok: false, error: 'invalid' }; // «1e3», «abc», «0x10», «1 000», «+3», «-»
-    return finish(Number(body));
-  }
-  if (dotParts.some((part) => part === '')) {
-    // «.5» y «5.» se admiten; «1..2» no.
-    if (dotParts.length === 2 && INT_PLAIN.test(dotParts[0] + dotParts[1])) {
-      return finish(Number(`${dotParts[0] || '0'}.${dotParts[1] || '0'}`));
-    }
-    return { ok: false, error: 'ambiguous' };
-  }
-  if (dotParts.length > 2) {
-    if (INT_GROUPS_ES.test(body)) return finish(Number(body.replace(/\./g, ''))); // «1.234.567»
-    return { ok: false, error: 'ambiguous' };
-  }
-  // Un solo punto: grupos de 3 = miles es-ES («1.234» -> 1234); si no,
-  // decimal con punto («32.5», «1.23», «1.2345»).
-  if (INT_GROUPS_ES.test(body)) return finish(Number(body.replace(/\./g, '')));
-  return finish(Number(body));
-}
-
-/**
- * Parsea números escritos por el usuario tolerando el formato es-ES.
- * Devuelve null ante entrada vacía, inválida o AMBIGUA (nunca reinterpreta:
- * mejor un error visible que un factor 1000 silencioso en dinero). Para
- * distinguir el motivo y mensajear al usuario, usa parseLocalizedNumberDetailed.
- */
-export function parseLocalizedNumber(value: string, locale: Locale = DEFAULT_LOCALE): number | null {
-  const result = parseLocalizedNumberDetailed(value, locale);
-  return result.ok ? result.value : null;
-}
+// Parser de números del usuario: UNA sola implementación, la de
+// lib/i18n/parse-number.ts (antes había otra aquí con la gramática es
+// idéntica pero la en más laxa: aceptaba «1.567» como decimal cuando puede
+// ser miles es-ES — un factor 1000 silencioso en dinero, contra la regla de
+// honestidad del propio módulo). Se reexporta para no romper importadores.
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { parseLocalizedNumber, parseLocalizedNumberDetailed, type LocalizedNumberError } from './i18n/parse-number.ts';
+export { parseLocalizedNumber, parseLocalizedNumberDetailed };
+export type { LocalizedNumberError };
 
 /**
  * Precarga de inputs numéricos: el number del backend (p.ej. 6.0572 o 1e-7)
