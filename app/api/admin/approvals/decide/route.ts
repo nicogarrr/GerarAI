@@ -7,6 +7,7 @@ import { connectToDatabase } from '@/database/mongoose';
 import { AccountApproval, type AccountApprovalDoc } from '@/database/models/account-approval.model';
 import { verifyDecisionToken, type ApprovalAction } from '@/lib/auth/account-approval';
 import { notifyAccountApproved } from '@/lib/auth/approval-notify';
+import { approvalPage, escapeHtml } from '@/lib/auth/approval-page';
 import { LOCALE_COOKIE, parseLocale, type Locale } from '@/lib/i18n/locale';
 import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 
@@ -36,12 +37,6 @@ export const dynamic = 'force-dynamic';
 
 const CLAIM_STALE_MS = 2 * 60 * 1000;
 
-function escapeHtml(value: string): string {
-    return value
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
 /** Idioma de la página: la cookie de Ajustes → Idioma si el navegador la lleva; si no, español. */
 function requestT(request: NextRequest): { t: TranslateFn; locale: Locale } {
     const locale = parseLocale(request.cookies.get(LOCALE_COOKIE)?.value);
@@ -49,19 +44,7 @@ function requestT(request: NextRequest): { t: TranslateFn; locale: Locale } {
 }
 
 function page(title: string, bodyHtml: string, status: number, locale: Locale = 'es'): NextResponse {
-    const html = [
-        `<!doctype html><html lang="${locale}"><head><meta charset="utf-8">`,
-        '<meta name="viewport" content="width=device-width, initial-scale=1">',
-        `<title>${escapeHtml(title)} - GerarAI</title></head>`,
-        '<body style="font-family: system-ui, sans-serif; max-width: 32rem; margin: 4rem auto; padding: 0 1rem;">',
-        `<h1>${escapeHtml(title)}</h1>`,
-        bodyHtml,
-        '</body></html>',
-    ].join('');
-    return new NextResponse(html, {
-        status,
-        headers: { 'content-type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
-    });
+    return approvalPage(title, bodyHtml, status, locale, '32rem');
 }
 
 const ACTION_COPY = {

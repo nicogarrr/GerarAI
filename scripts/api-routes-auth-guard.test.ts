@@ -76,7 +76,11 @@ describe('excepciones públicas app/api/admin/approvals: propiedades exigidas', 
             assert.doesNotMatch(source, /requireAuthenticatedUser|cookies\(|headers\(\)/);
         });
         it(`${rel}: sin caché y sin estado compartido (force-dynamic)`, () => {
-            assert.match(source, /Cache-Control': 'no-store'/);
+            // La página HTML sale por el helper compartido (approval-page.ts):
+            // el no-store se audita allí una sola vez.
+            assert.match(source, /approvalPage\(/, 'la página HTML sale por el helper compartido');
+            const helper = readFileSync(join(root, 'lib', 'auth', 'approval-page.ts'), 'utf8');
+            assert.match(helper, /Cache-Control': 'no-store'/);
             assert.match(source, /export const dynamic = 'force-dynamic'/);
         });
     }
