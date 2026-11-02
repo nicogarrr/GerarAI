@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 import { levelTone, type ContributionSplit } from '@/lib/plan/contribution-split';
 import { useFormat, useT } from '@/lib/i18n/client';
+import { splitNoteText, splitReasonText, splitSummaryText } from '@/lib/plan/split-text';
 
 /** «Este mes X € a POOL, Y € a UBER»: la cuota del plan repartida por nivel DCA. */
 export default function ContributionSplitCard({ split }: { split: ContributionSplit | null }) {
@@ -46,7 +47,7 @@ export default function ContributionSplitCard({ split }: { split: ContributionSp
                     <p className="text-sm text-gray-500">{empty}</p>
                 ) : (
                     <>
-                        {split?.summary ? <p className="text-base font-medium text-gray-100">{split.summary}</p> : null}
+                        {split?.summary ? <p className="text-base font-medium text-gray-100">{splitSummaryText(split, f.locale, (value) => formatSplitAmount(value, currency))}</p> : null}
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
@@ -68,7 +69,7 @@ export default function ContributionSplitCard({ split }: { split: ContributionSp
                                             <td className="py-2 pr-4 text-right tabular-nums text-gray-100">{formatSplitAmount(row.amount, currency)}</td>
                                             <td className="py-2 pr-4 text-right tabular-nums text-gray-400">{f.formatNumber(row.share_pct, { maximumFractionDigits: 1 })} %</td>
                                             <td className={`py-2 ${levelTone(row.dca_level)}`} title={row.dca_period ? t('plan.split.periodTitle', { period: row.dca_period, status: row.dca_status ?? t('plan.split.noData') }) : undefined}>
-                                                {row.reason}
+                                                {splitReasonText(row, f.locale)}
                                             </td>
                                         </tr>
                                     ))}
@@ -82,7 +83,7 @@ export default function ContributionSplitCard({ split }: { split: ContributionSp
                 )}
                 {split?.notes?.length ? (
                     <ul className="space-y-1 text-xs text-gray-500">
-                        {split.notes.map((note) => <li key={note}>{note}</li>)}
+                        {split.notes.map((note) => <li key={note}>{splitNoteText(note, f.locale)}</li>)}
                     </ul>
                 ) : null}
                 <p className="text-xs text-gray-500">{t('plan.split.weightNote')}</p>
