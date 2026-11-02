@@ -877,6 +877,17 @@ _PORTFOLIO_QUERY_RE = re.compile(
     r"|\bqu[eé]\s+tengo\s+en\s+(?:mi\s+)?cartera\b"
     r"|\b(?:what|which)\s+(?:stocks|shares|companies|positions)\s+do\s+i\s+(?:own|have|hold)\b"
     r"|\bwhat\s+do\s+i\s+(?:own|hold)\b"
+    # «How many positions do I have?» iba al modelo general (en castellano ya iba aquí).
+    r"|\bhow\s+many\s+(?:positions|stocks|holdings|companies)\s+(?:do\s+i\s+(?:have|own|hold)|am\s+i\s+holding)\b"
+)
+# «¿Qué diversificación tengo?», «¿en qué sectores estoy?», «which sectors am I
+# in?»: hablan de tu cartera sin decir «mi cartera» y caían al modelo general.
+_PORTFOLIO_EXPOSURE_RE = re.compile(
+    r"(?i)\b(?:qu[eé]|cu[aá]nta)\s+diversificaci[oó]n\s+tengo\b"
+    r"|\ben\s+qu[eé]\s+sectores\s+(?:estoy|tengo\s+dinero|invierto)\b"
+    r"|\bmy\s+(?:diversification|sector\s+(?:split|breakdown|exposure)|currency\s+exposure)\b"
+    r"|\bwhich\s+sectors\s+am\s+i\s+in\b|\bwhat\s+(?:sectors|currencies)\s+am\s+i\s+(?:in|exposed\s+to)\b"
+    r"|\bhow\s+diversified\s+am\s+i\b"
 )
 # Pregunta por la posicion de un ticker concreto ("peso de ASTS",
 # "cuanto tengo en ASTS", "acciones de ASTS que tengo").
@@ -1764,8 +1775,10 @@ class ChatService:
         if (
             company is None
             and not ticker
-            and _PORTFOLIO_SELF_RE.search(question or "")
-            and _asks_portfolio_analysis(question or "")
+            and (
+                (_PORTFOLIO_SELF_RE.search(question or "") and _asks_portfolio_analysis(question or ""))
+                or _PORTFOLIO_EXPOSURE_RE.search(question or "")
+            )
             and not _ORDER_VERB_RE.search(question or "")
             and not doctrine_question
         ):
