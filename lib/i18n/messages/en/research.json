@@ -149,6 +149,7 @@
   "fichaLatestNews": "Latest news",
   "fichaNewsLoadError": "The news could not be loaded. Try again in a few seconds.",
   "fichaNoRecentNews": "No recent news for this company.",
+  "fichaNewsPreparing": "Preparing this company's news: they are being fetched in the background and will show up here in a few minutes.",
   "fichaViewAllChanges": "View all changes",
   "fichaLatestChanges": "Latest changes",
   "fichaMaterialityScore": "Materiality {score}",

@@ -151,6 +151,7 @@
   "fichaLatestNews": "Últimas noticias",
   "fichaNewsLoadError": "No se pudieron cargar las noticias. Reintenta en unos segundos.",
   "fichaNoRecentNews": "Sin noticias recientes de esta empresa.",
+  "fichaNewsPreparing": "Preparando las noticias de esta empresa: se están buscando en segundo plano y aparecerán aquí en unos minutos.",
   "fichaViewAllChanges": "Ver todos los cambios",
   "fichaLatestChanges": "Últimos cambios",
   "fichaMaterialityScore": "Materialidad {score}",

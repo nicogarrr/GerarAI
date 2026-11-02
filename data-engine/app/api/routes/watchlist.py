@@ -33,7 +33,12 @@ from app.schemas.api import (
     WatchlistMonitorOut,
 )
 from app.services.connectors.earnings_calendar import fetch_earnings_range
-from app.services.dca_on_add import enqueue_dca_on_add, enqueue_market_data_on_add, is_preparing
+from app.services.dca_on_add import (
+    enqueue_dca_on_add,
+    enqueue_market_data_on_add,
+    is_news_preparing,
+    is_preparing,
+)
 from app.services.derived_market_cap_service import DERIVED_SOURCE
 from app.services.earnings_dates_service import is_fresh
 from app.services.fair_value_service import resolve_fair_values
@@ -915,6 +920,23 @@ def manual_dca_status(run_id: int, db: Session = Depends(get_db)) -> dict:
     payload = run_payload(row) or {}
     return {"run_id": row.id, "status": "running" if row.status == "queued" and datetime.now(UTC) - (row.started_at if row.started_at.tzinfo else row.started_at.replace(tzinfo=UTC)) < timedelta(minutes=40) else ("interrupted" if row.status == "queued" else payload.get("status", "interrupted")),
         "summary": (row.detail or {}).get("summary"), "error": payload.get("error")}
+
+
+class NewsPreparingOut(BaseModel):
+    symbol: str
+    preparing: bool = False
+
+
+@router.get("/news-preparing/{symbol}", response_model=NewsPreparingOut)
+def news_preparing(symbol: str, db: Session = Depends(get_db)) -> dict:
+    """¿Se están pidiendo ahora las noticias de este ticker recién añadido?
+
+    La ficha lo pregunta solo cuando no tiene noticias que enseñar: con una
+    petición pendiente dice «preparando» y se recarga sola; sin ella, su vacío
+    de siempre.
+    """
+    key = symbol.strip().upper()
+    return {"symbol": key, "preparing": is_news_preparing(db, key)}
 
 
 @router.get("/dca-signals/{symbol}/hit-rates", response_model=DcaHitRatesOut)

@@ -191,10 +191,72 @@ def enqueue_market_data_on_add(
     except Exception:  # noqa: BLE001 - el alta manda
         logger.warning("on-add: no se pudo encolar el historial de %s", ticker, exc_info=True)
         db.rollback()
+    enqueue_news_on_add(db, ticker, news_sender=news_sender)
+
+
+def news_mark_key(tenant_id: Any, symbol: str) -> str:
+    return f"cavaai:news-on-add:{tenant_id}:{symbol.strip().upper()}"
+
+
+def enqueue_news_on_add(
+    db: Session,
+    symbol: str,
+    *,
+    client: Any = None,
+    news_sender: Callable[[int, str, str], None] | None = None,
+) -> None:
+    """Pide las noticias del ticker recién añadido (watchlist o compra) y deja
+    una marca para que la ficha diga «preparando» mientras tanto. La marca la
+    borra el job al terminar (salga como salga) y caduca sola. Nunca lanza."""
+    tenant_id = db.info.get("tenant_id")
+    user_id = db.info.get("user_id")
+    ticker = (symbol or "").strip().upper()
+    if tenant_id is None or not user_id or not ticker:
+        return
     try:
         (news_sender or _send_ticker_news)(int(tenant_id), str(user_id), ticker)
     except Exception:  # noqa: BLE001 - el alta manda
         logger.warning("on-add: no se pudieron encolar las noticias de %s", ticker, exc_info=True)
+        return
+    own_client = client is None
+    try:
+        client = client or redis_client()
+        # Con una copia ya en vuelo (envío suprimido) también hay petición pendiente.
+        client.set(news_mark_key(tenant_id, ticker), "queued", ex=MARK_TTL_SECONDS)
+    except Exception:  # noqa: BLE001 - sin marca la ficha dice lo de siempre
+        logger.warning("on-add: no se pudo marcar las noticias de %s", ticker, exc_info=True)
+    finally:
+        if own_client and client is not None:
+            client.close()
+
+
+def is_news_preparing(db: Session, symbol: str, *, client: Any = None) -> bool:
+    """¿Hay una petición de noticias al añadir pendiente para este símbolo?"""
+    tenant_id = db.info.get("tenant_id")
+    if tenant_id is None:
+        return False
+    own_client = client is None
+    try:
+        client = client or redis_client()
+        return bool(client.exists(news_mark_key(tenant_id, symbol)))
+    except Exception:  # noqa: BLE001 - sin Redis la ficha dice lo de siempre
+        return False
+    finally:
+        if own_client and client is not None:
+            client.close()
+
+
+def clear_news_mark(tenant_id: Any, symbol: str) -> None:
+    """La petición de noticias del ticker ha terminado: fuera el «preparando». Nunca lanza."""
+    client = None
+    try:
+        client = redis_client()
+        client.delete(news_mark_key(tenant_id, symbol))
+    except Exception:  # noqa: BLE001 - la marca caduca sola
+        logger.warning("on-add: no se pudo borrar la marca de noticias de %s", symbol, exc_info=True)
+    finally:
+        if client is not None:
+            client.close()
 
 
 def is_preparing(db: Session, symbol: str, *, client: Any = None) -> bool:
