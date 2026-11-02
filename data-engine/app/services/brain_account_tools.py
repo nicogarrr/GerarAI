@@ -706,12 +706,13 @@ def _asks_return_ranking(text: str, question: str) -> bool:
     return bool(_RANK_RETURN.search(text)) and not _tickers_in(question)
 
 
-_HOLDINGS = r"\b(?:posiciones|acciones|valores|empresas|inversiones|positions|stocks|holdings|investments)\b"
+_HOLDINGS = r"\b(?:posiciones|acciones|valores|empresas|inversiones|positions|stocks|holdings|investments|companies)\b"
 _LOSERS = re.compile(_HOLDINGS + r".*\b(?:en\s+(?:perdidas|negativo|rojo)|pierden|losing|in\s+the\s+red|at\s+a\s+loss)\b")
 _WINNERS = re.compile(_HOLDINGS + r".*\b(?:en\s+(?:ganancias|positivo|verde|beneficios?)|winning|in\s+the\s+green"
                       r"|at\s+a\s+(?:gain|profit)|making\s+money)\b")
 #: «posiciones»/«positions» ya son las del usuario; «acciones»/«stocks» necesitan «mis/my».
-_HOLDINGS_MINE = re.compile(r"\b(?:tengo|mis|mi\s+cartera|my|i\s+(?:have|own|hold)|posiciones|positions|holdings)\b")
+#: «which companies am I losing money on?»: «am I» también es tuyo (antes, modelo general).
+_HOLDINGS_MINE = re.compile(r"\b(?:tengo|mis|mi\s+cartera|my|i\s+(?:have|own|hold)|am\s+i|posiciones|positions|holdings)\b")
 
 
 def _asks_losers_winners(text: str, question: str) -> str | None:
