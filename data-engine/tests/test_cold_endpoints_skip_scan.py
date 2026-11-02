@@ -357,6 +357,6 @@ def test_postgres_inventory_uses_bounded_probes_and_matches_portable_result(db, 
     bounded = inventory(db, now=now)
     assert bounded == portable
     recursive = [statement for statement in statements if "WITH RECURSIVE" in statement]
-    assert len(recursive) == 4
+    assert len(recursive) == 3
     assert all("company_id >= -2147483648" in statement for statement in recursive)
     assert all("tenant_id = ?" in statement for statement in recursive if "FROM market_prices" not in statement)

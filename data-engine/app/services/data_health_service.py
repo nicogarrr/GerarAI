@@ -138,7 +138,7 @@ def inventory(db: Session, *, now: datetime | None = None) -> dict:
     for label, model, source_field, max_age in LAYERS:
         source = getattr(model, source_field)
         try:
-            if db.get_bind().dialect.name == "postgresql":
+            if db.get_bind().dialect.name == "postgresql" and model is not MarketPrice:
                 groups = _coverage_groups(
                     db, table=model.__tablename__, source_col=source_field,
                     tenant=tenant, reported=model is FinancialFact,

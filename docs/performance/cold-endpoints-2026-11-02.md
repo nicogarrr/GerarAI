@@ -18,3 +18,5 @@ Additional measured probes during backup (not A/B evidence):
 - Existing partial index stats: valid/ready/live all true. Source schema is public, PostgreSQL 17.11 aarch64. No memory, planner or global database configuration changed.
 
 Validation: Python 3.12 targeted combined suite 89 pass, one environment skip; all 2722 repository guards pass with the repository's module-mock flag. Initial guard invocation omitted that flag and used a node_modules symlink, causing two environment failures; rerun after fixing both passed. Ruff and diff whitespace checks pass. No guard relaxed.
+
+Prices remain on the previous group-by path: the source/company probes are not assumed faster for its shape. Only tenant-owned facts/documents/news use the bounded candidate. New A/B must compare this final candidate.
