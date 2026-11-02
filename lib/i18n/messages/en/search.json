@@ -34,5 +34,8 @@
   "companies": "Companies",
   "following": "Following",
   "submitSearch": "Search",
-  "libraryLink": "Library"
+  "libraryLink": "Library",
+  "command": {
+    "heading": "Command"
+  }
 }

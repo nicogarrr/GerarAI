@@ -5,6 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { useT } from "@/lib/i18n/client"
 
 function Dialog({
   ...props
@@ -57,6 +58,7 @@ function DialogContent({
   /** Clase extra para el overlay (p.ej. elevar z-index por encima del drawer movil). */
   overlayClassName?: string
 }) {
+  const t = useT()
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay className={overlayClassName} />
@@ -75,7 +77,7 @@ function DialogContent({
             className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity before:absolute before:-inset-3.5 before:content-[''] hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
             <XIcon aria-hidden="true" />
-            <span className="sr-only">Cerrar</span>
+            <span className="sr-only">{t("common.actions.close")}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>

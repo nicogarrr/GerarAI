@@ -1,3 +1,4 @@
+import { getT } from '@/lib/i18n/server';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 
@@ -6,10 +7,11 @@ import { Card } from '@/components/ui/card';
  * de pintar; sin esto la pantalla queda en blanco hasta el final (FCP = fin
  * del render de servidor). Mismo `main` que la página real.
  */
-export default function Loading() {
+export default async function Loading() {
+  const ti = await getT();
   return (
     <main id="content" tabIndex={-1} aria-busy="true" className="mx-auto flex w-full max-w-full min-w-0 flex-col space-y-6 overflow-x-clip">
-      <span className="sr-only" role="status">Cargando…</span>
+      <span className="sr-only" role="status">{ti('common.states.loading')}</span>
       <div aria-hidden="true" className="space-y-6">
         <div className="flex items-center gap-2 sm:gap-3">
           <Skeleton className="h-7 w-7 shrink-0 rounded-md sm:h-8 sm:w-8" />

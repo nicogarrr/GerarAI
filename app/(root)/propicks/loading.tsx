@@ -1,3 +1,4 @@
+import { getT } from '@/lib/i18n/server';
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card } from "@/components/ui/card"
 
@@ -12,10 +13,11 @@ import { Card } from "@/components/ui/card"
  * Accesibilidad: mismo patrón que components/LoadingState.tsx — el texto va en
  * un nodo `sr-only` y el esqueleto entero es `aria-hidden`.
  */
-export default function Loading() {
+export default async function Loading() {
+  const ti = await getT();
     return (
         <main id="content" tabIndex={-1} aria-busy="true" className="mx-auto flex w-full min-w-0 max-w-7xl flex-col overflow-x-clip p-4 sm:p-6">
-            <span className="sr-only" role="status">Cargando…</span>
+            <span className="sr-only" role="status">{ti('common.states.loading')}</span>
             <div aria-hidden="true">
                 {/* Encabezado: icono 28/32px, h1 text-2xl sm:text-3xl y los dos párrafos. */}
                 <div className="mb-8">

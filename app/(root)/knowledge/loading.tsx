@@ -1,11 +1,13 @@
+import { getT } from '@/lib/i18n/server';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 
 /** Esqueleto de /knowledge mientras el servidor reúne biblioteca, colecciones y trabajos. */
-export default function Loading() {
+export default async function Loading() {
+  const ti = await getT();
   return (
     <main id="content" tabIndex={-1} aria-busy="true" className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6 overflow-x-clip md:pr-20">
-      <span className="sr-only" role="status">Cargando…</span>
+      <span className="sr-only" role="status">{ti('common.states.loading')}</span>
       <div aria-hidden="true" className="flex flex-col gap-6">
         <div className="flex flex-col gap-3 border-b border-gray-800 pb-5">
           <Skeleton className="h-3 w-40" />

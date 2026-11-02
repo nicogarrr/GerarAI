@@ -34,5 +34,8 @@
   "companies": "Empresas",
   "following": "Siguiendo",
   "submitSearch": "Buscar",
-  "libraryLink": "Biblioteca"
+  "libraryLink": "Biblioteca",
+  "command": {
+    "heading": "Comando"
+  }
 }

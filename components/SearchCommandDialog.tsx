@@ -283,7 +283,7 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                         se muestra aunque Finnhub este cargando o haya fallado,
                         porque es una ruta local de la app. */}
                     {exactCommand ? (
-                        <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading="Comando">
+                        <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading={t('search.command.heading')}>
                                     <CommandItem
                                         key={exactCommand.command.code}
                                         value={`cmd:${exactCommand.command.code}`}

@@ -43,7 +43,7 @@ export function FactCard({ fact, ticker, staleness, locale = 'es' }: { fact: Res
     <div className="rounded-lg border border-gray-800 p-3">
       <div className="flex items-center justify-between gap-2">
         <span className="font-medium text-gray-200">{metricLabel(fact.metric, locale)}</span>
-        <span className={`text-sm font-semibold ${audit ? 'text-gray-400' : 'text-teal-300'}`}>{audit ? naFor(locale) : <><FactValueLink fact={fact} locale={locale}>{metricValue(fact.value, fact.unit, locale)}</FactValueLink><FactCalculatedLabel fact={fact} /></>}</span>
+        <span className={`text-sm font-semibold ${audit ? 'text-gray-400' : 'text-teal-300'}`}>{audit ? naFor(locale) : <><FactValueLink fact={fact} locale={locale}>{metricValue(fact.value, fact.unit, locale)}</FactValueLink><FactCalculatedLabel fact={fact} locale={locale} /></>}</span>
       </div>
       {audit ? <p className="mt-2 text-xs text-amber-300">{audit}</p> : null}
       {!audit && staleness ? <p className="mt-2 text-xs text-amber-300">{staleness}</p> : null}
@@ -105,7 +105,7 @@ export function FactTable({ facts, refreshLabel, ticker, locale = 'es' }: { fact
             <tr key={fact.id} className="text-gray-300">
               <th className="border-b border-gray-900 py-2 text-left text-sm font-medium" scope="row">{metricLabel(fact.metric, locale)}</th>
               <td className="border-b border-gray-900 py-2">{financialPeriod(fact.period, locale)}</td>
-              <td className="border-b border-gray-900 py-2 text-right">{factDisplayAudit(ticker, fact, locale) ? <span className="text-gray-400">{naFor(locale)}<span className="mt-1 block text-xs text-amber-300">{factDisplayAudit(ticker, fact, locale)}</span></span> : <><FactValueLink fact={fact} locale={locale}>{metricValue(fact.value, fact.unit, locale)}</FactValueLink><FactCalculatedLabel fact={fact} />{stalenessOf(fact) ? <span className="mt-1 block text-xs text-amber-300">{stalenessOf(fact)}</span> : null}</>}</td>
+              <td className="border-b border-gray-900 py-2 text-right">{factDisplayAudit(ticker, fact, locale) ? <span className="text-gray-400">{naFor(locale)}<span className="mt-1 block text-xs text-amber-300">{factDisplayAudit(ticker, fact, locale)}</span></span> : <><FactValueLink fact={fact} locale={locale}>{metricValue(fact.value, fact.unit, locale)}</FactValueLink><FactCalculatedLabel fact={fact} locale={locale} />{stalenessOf(fact) ? <span className="mt-1 block text-xs text-amber-300">{stalenessOf(fact)}</span> : null}</>}</td>
             </tr>
           ))}
         </tbody>
