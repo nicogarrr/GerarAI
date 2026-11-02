@@ -12,12 +12,13 @@ from app.services.connectors.gdelt import GDELTClient, GDELTConnector, GdeltRate
 
 
 class _StubClient:
-    def __init__(self, responses):
+    def __init__(self, responses, *, clock=time.monotonic):
+        self.clock = clock
         self.responses = list(responses)
         self.calls: list[float] = []
 
     async def get(self, url, params=None):
-        self.calls.append(time.monotonic())
+        self.calls.append(self.clock())
         return self.responses.pop(0)
 
 
@@ -119,11 +120,10 @@ def test_throttle_enforces_min_interval(pacer_sin_fugas):
     assert all(gap >= 0.045 for gap in gaps), gaps
 
 
-def test_min_interval_zero_does_not_wait(fake_clock):
-    # fake_clock: con el Redis real de CI el pacer global (5s entre procesos)
-    # siempre espaciaria la segunda llamada; el reloj falso la hace instantanea
-    # y el assert mide solo el pacing de CLASE (min_interval=0 -> sin espera).
-    stub = _StubClient([_resp(200), _resp(200)])
+def test_min_interval_zero_does_not_wait(fake_clock, pacer_sin_fugas):
+    # Same injected clock for connector and observations: CPU scheduling is
+    # not a pacing delay. Global Redis pacing is covered independently.
+    stub = _StubClient([_resp(200), _resp(200)], clock=lambda: fake_clock[0])
     client = GDELTClient(client=stub, min_interval=0)
     GDELTClient._next_allowed_at = 0.0
 
@@ -132,7 +132,21 @@ def test_min_interval_zero_does_not_wait(fake_clock):
             await client.news_search("apple")
 
     asyncio.run(run())
-    assert stub.calls[1] - stub.calls[0] < 0.045
+    assert len(stub.calls) == 2
+    assert stub.calls[1] - stub.calls[0] == 0
+
+
+def test_injected_clock_detects_a_real_class_pacing_wait(fake_clock, pacer_sin_fugas):
+    stub = _StubClient([_resp(200), _resp(200)], clock=lambda: fake_clock[0])
+    client = GDELTClient(client=stub, min_interval=0.05)
+
+    async def run():
+        for _ in range(2):
+            await client.news_search("apple")
+
+    asyncio.run(run())
+    assert len(stub.calls) == 2
+    assert stub.calls[1] - stub.calls[0] == pytest.approx(0.05)
 
 
 def test_throttle_holds_the_spacing_under_load(pacer_sin_fugas):
