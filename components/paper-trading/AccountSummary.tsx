@@ -3,7 +3,8 @@
 import { AlertTriangle, Info } from 'lucide-react';
 
 import { Stat } from '@/components/ui/stat';
-import { useT, useFormat } from '@/lib/i18n/client';
+import { useLocale, useT, useFormat } from '@/lib/i18n/client';
+import { paperTradingMessage } from '@/lib/paper-trading/messages-en';
 import type { Currency } from '@/lib/paper-trading/types';
 import type { DemoStateView } from './submit';
 
@@ -21,6 +22,7 @@ import type { DemoStateView } from './submit';
 export function AccountSummary({ account }: { account: DemoStateView }) {
     const ti = useT();
     const f = useFormat();
+    const locale = useLocale();
     const cash: { label: string; value: number; currency: Currency }[] = [
         { label: ti('paperTrading.account.cashEur'), value: account.cashEUR, currency: 'EUR' },
         { label: ti('paperTrading.account.cashUsd'), value: account.cashUSD, currency: 'USD' },
@@ -62,7 +64,7 @@ export function AccountSummary({ account }: { account: DemoStateView }) {
                     </p>
                     <ul className="mt-1 list-disc space-y-0.5 pl-6">
                         {account.violations.map((violation) => (
-                            <li key={violation}>{violation}</li>
+                            <li key={violation}>{paperTradingMessage(violation, locale)}</li>
                         ))}
                     </ul>
                 </div>
@@ -75,7 +77,7 @@ export function AccountSummary({ account }: { account: DemoStateView }) {
                     </p>
                     <ul className="mt-1 list-disc space-y-0.5 pl-6">
                         {account.notices.map((notice) => (
-                            <li key={notice}>{notice}</li>
+                            <li key={notice}>{paperTradingMessage(notice, locale)}</li>
                         ))}
                     </ul>
                 </div>

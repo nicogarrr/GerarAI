@@ -300,14 +300,14 @@ class DecisionJournalTradeLink(BaseModel):
 
 
 class DriverAssumptionCreate(BaseModel):
-    driver_key: str = Field(min_length=1, max_length=160)
+    driver_key: Annotated[str, not_blank()] = Field(min_length=1, max_length=160)
     fiscal_year: int = Field(ge=1900, le=2200)
     scenario: Literal["bear", "base", "bull"] = "base"
     value: Decimal
-    source: str = Field(min_length=1, max_length=240)
+    source: Annotated[str, not_blank()] = Field(min_length=1, max_length=240)
     user_override: bool = True
     confidence: Decimal = Field(default=Decimal("1"), ge=0, le=1)
-    rationale: str = Field(min_length=1, max_length=5000)
+    rationale: Annotated[str, not_blank()] = Field(min_length=1, max_length=5000)
 
 
 class InferredInputCreate(BaseModel):
@@ -333,10 +333,10 @@ class DecisionLessonUpdate(BaseModel):
         "ignoring_cyclicality",
         "thesis_drift",
     ]
-    cause: str = Field(min_length=3, max_length=5000)
-    error: str = Field(min_length=3, max_length=5000)
-    lesson: str = Field(min_length=3, max_length=5000)
-    future_application: str = Field(min_length=3, max_length=5000)
+    cause: Annotated[str, not_blank(3)] = Field(min_length=3, max_length=5000)
+    error: Annotated[str, not_blank(3)] = Field(min_length=3, max_length=5000)
+    lesson: Annotated[str, not_blank(3)] = Field(min_length=3, max_length=5000)
+    future_application: Annotated[str, not_blank(3)] = Field(min_length=3, max_length=5000)
 
 
 class DecisionLessonAction(BaseModel):
@@ -344,9 +344,9 @@ class DecisionLessonAction(BaseModel):
 
 
 class ManagementPromiseCreate(BaseModel):
-    promise: str = Field(min_length=3, max_length=5000)
+    promise: Annotated[str, not_blank(3)] = Field(min_length=3, max_length=5000)
     promise_date: date
-    expected_period: str = Field(min_length=1, max_length=80)
+    expected_period: Annotated[str, not_blank()] = Field(min_length=1, max_length=80)
     metric: str | None = Field(default=None, max_length=160)
     operator: Literal[">", ">=", "<", "<=", "=="] | None = None
     target_value: Decimal | None = None
@@ -355,7 +355,7 @@ class ManagementPromiseCreate(BaseModel):
 
 
 class ManagementExplanationUpdate(BaseModel):
-    explanation: str = Field(min_length=3, max_length=5000)
+    explanation: Annotated[str, not_blank(3)] = Field(min_length=3, max_length=5000)
 
 
 def _trust_client_identity() -> bool:
