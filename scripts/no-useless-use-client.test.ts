@@ -238,6 +238,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/portfolio/PortfolioTransactions.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner, importa cliente: components/portfolio/EditTransactionDialog.tsx, importa cliente: components/portfolio/ImportIBKRButton.tsx',
   'components/portfolio/RefreshPortfolioButton.tsx': 'useState, useRouter, jsx-onClick, libreria cliente: sonner',
   'components/portfolio/SyncDividendsButton.tsx': 'useState, useRouter, jsx-onClick, libreria cliente: sonner',
+  'components/portfolio/TransactionFormFields.tsx': 'cuerpo de campos compartido de alta/edición de operaciones: hooks i18n useT, jsx-onChange, jsx-onValueChange, importa cliente: components/ui/select.tsx',
   'components/proPicks/EnhancedProPicksContent.tsx': 'useState, useRef, jsx-onFiltersChange, jsx-onApply, jsx-onClick, libreria cliente: sonner, importa cliente: components/proPicks/EnhancedProPicksFilters.tsx',
   'components/proPicks/EnhancedProPicksFilters.tsx': 'jsx-onClick, jsx-onValueChange, importa cliente: components/ui/label.tsx, importa cliente: components/ui/select.tsx',
   'components/proPicks/GemsView.tsx': 'useState, useEffect, jsx-onClick',

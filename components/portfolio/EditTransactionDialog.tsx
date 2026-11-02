@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import {
     Dialog,
     DialogContent,
@@ -10,18 +11,15 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { TickerSearchInput } from '@/components/search/TickerSearchInput';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Pencil } from 'lucide-react';
 import { updateTransaction, type PortfolioTransaction } from '@/lib/actions/portfolio.actions';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { isNextRedirectError } from '@/lib/types/errors';
-import { currencyOptions } from './transactionCurrencies';
 import { hasTransactionErrors, validateTransactionForm, type TransactionFormErrors } from './transactionValidation';
+import { TransactionFormFields } from './TransactionFormFields';
 import { parseLocalizedNumber } from '@/lib/i18n/parse-number';
 import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 import type { Formatters } from '@/lib/format';
@@ -154,119 +152,17 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                         )}
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="edit-currency" className="text-gray-300">{ti('portfolio.addTransaction.currencyLabel')}</Label>
-                        <Select value={formData.currency} onValueChange={(currency) => setFormData({ ...formData, currency })}>
-                            <SelectTrigger id="edit-currency" className="bg-gray-800 border-gray-700 text-gray-100"><SelectValue /></SelectTrigger>
-                            <SelectContent className="bg-gray-800 border-gray-700">
-                                {currencyOptions(formData.currency).map((currency) => <SelectItem value={currency} key={currency}>{currency}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="type" className="text-gray-300">{ti('portfolio.addTransaction.typeLabel')}</Label>
-                        <Select
-                            value={formData.type}
-                            onValueChange={(value: 'buy' | 'sell') => setFormData({ ...formData, type: value })}
-                        >
-                            <SelectTrigger className="bg-gray-800 border-gray-700 text-gray-100">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-gray-800 border-gray-700">
-                                <SelectItem value="buy">{ti('portfolio.addTransaction.typeBuy')}</SelectItem>
-                                <SelectItem value="sell">{ti('portfolio.addTransaction.typeSell')}</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="quantity" className="text-gray-300">{ti('portfolio.addTransaction.quantityLabel')}</Label>
-                            <Input
-                                id="quantity"
-                                type="text"
-                                inputMode="decimal"
-                                value={formData.quantity}
-                                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                                required
-                                className="bg-gray-800 border-gray-700 text-gray-100"
-                            />
-                            {fieldErrors.quantity && (
-                                <p role="alert" className="text-sm text-red-400">{fieldErrors.quantity}</p>
-                            )}
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="price" className="text-gray-300">{ti('portfolio.addTransaction.priceLabel', { currency: formData.currency })}</Label>
-                            <Input
-                                id="price"
-                                type="text"
-                                inputMode="decimal"
-                                value={formData.price}
-                                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                required
-                                className="bg-gray-800 border-gray-700 text-gray-100"
-                            />
-                            {fieldErrors.price && (
-                                <p role="alert" className="text-sm text-red-400">{fieldErrors.price}</p>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-fees" className="text-gray-300">{ti('portfolio.addTransaction.feesLabel', { currency: formData.currency })}</Label>
-                      <Input
-                        id="edit-fees"
-                        type="text"
-                                inputMode="decimal"
-                        placeholder={ti('portfolio.addTransaction.feesPlaceholder')}
-                        value={formData.fees}
-                        onChange={(e) => setFormData({ ...formData, fees: e.target.value })}
-                        className="bg-gray-800 border-gray-700 text-gray-100"
-                      />
-                      {fieldErrors.fees && (
-                        <p role="alert" className="text-sm text-red-400">{fieldErrors.fees}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="date" className="text-gray-300">{ti('portfolio.addTransaction.dateLabel')}</Label>
-                        <Input
-                            id="date"
-                            type="date"
-                            value={formData.date}
-                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                            required
-                            className="bg-gray-800 border-gray-700 text-gray-100"
-                        />
-                        {fieldErrors.date && (
-                            <p role="alert" className="text-sm text-red-400">{fieldErrors.date}</p>
-                        )}
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="notes" className="text-gray-300">{ti('portfolio.addTransaction.notesLabel')}</Label>
-                        <Input
-                            id="notes"
-                            value={formData.notes}
-                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                            className="bg-gray-800 border-gray-700 text-gray-100"
-                        />
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                            {ti('common.actions.cancel')}
-                        </Button>
-                        <Button
-                            type="submit"
-                            disabled={loading}
-                            aria-busy={loading}
-                        >
-                            {loading ? ti('portfolio.addTransaction.saving') : ti('portfolio.editTransaction.save')}
-                        </Button>
-                    </div>
+                    <TransactionFormFields
+                        formData={formData}
+                        onPatch={(patch) => setFormData({ ...formData, ...patch })}
+                        fieldErrors={fieldErrors}
+                        currencyId="edit-currency"
+                        feesId="edit-fees"
+                        onCancel={() => setOpen(false)}
+                        saveLabel={ti('portfolio.editTransaction.save')}
+                        loading={loading}
+                        busy
+                    />
                 </form>
             </DialogContent>
         </Dialog>
