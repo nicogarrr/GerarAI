@@ -68,7 +68,17 @@ class PlanUpsertInput(BaseModel):
         # la API no debe guardar un plan que el reparto y la desviacion leerian
         # como pesos imposibles (espejo de lib/plan/target-totals.ts).
         totals: dict[str, float] = {}
+        seen: set[tuple[str, str]] = set()
         for target in self.target_allocations:
+            # Mismo objetivo dos veces («NVDA»/«nvda», «Tecnología»/«tecnología»):
+            # la desviacion saldria duplicada y con sugerencias contradictorias.
+            # El formulario ya lo impide (plan.setup.errorDuplicate).
+            key = (target.kind, target.label.casefold())
+            if key in seen:
+                raise ValueError(
+                    f"El objetivo «{target.label}» está repetido en {target.kind}: no repitas el mismo objetivo dentro de una categoría."
+                )
+            seen.add(key)
             totals[target.kind] = totals.get(target.kind, 0.0) + target.target_pct
         for kind, total in totals.items():
             if total > 100 + 1e-9:
