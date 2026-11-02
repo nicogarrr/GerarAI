@@ -94,6 +94,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/ValuationSummaryGrid.tsx': 'useState y useEffect para carga batch asíncrona y descarte de respuestas de selección anterior',
   'components/alerts/PushNotifications.tsx': 'useState/useEffect para permiso Notification, registro serviceWorker, PushManager y preferencias opt-in del navegador',
   'components/research/ChangesFeed.tsx': 'useState y useMemo para filtros y paginación interactiva de sucesos',
+  'components/research/DcaPreparingRefresh.tsx': 'useEffect y useRouter: refresca la ficha cada 15 s mientras la señal DCA recién encolada se evalúa',
   'components/research/AnalystTargetsView.tsx': 'useState para la paginación de firmas (5 por página) sin recargar la ficha',
   'components/research/DocumentsList.tsx': 'useState y useMemo, onChange para búsqueda y página actual',
   'components/research/ExpectationsList.tsx': 'useState para paginación de comparaciones y previsiones',

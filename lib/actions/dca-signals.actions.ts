@@ -53,6 +53,7 @@ export async function getDcaManualJob(runId: number): Promise<DcaMutationResult 
 export type DcaHitRatesState =
     | { status: 'ok'; data: DcaHitRates }
     | { status: 'not_evaluated' }
+    | { status: 'preparing' }
     | { status: 'unavailable' };
 
 /** Como `getDcaHitRates` pero distingue «el backend dice que no hay señal
@@ -61,6 +62,7 @@ export async function getDcaHitRatesState(symbol: string): Promise<DcaHitRatesSt
     try {
         await requireAuthenticatedUser();
         const data = await researchRequest<DcaHitRates>(`/api/watchlist/dca-signals/${encodeURIComponent(symbol)}/hit-rates`);
+        if (data?.preparing) return { status: 'preparing' };  // recién añadido: se evalúa en segundo plano
         return data ? { status: 'ok', data } : { status: 'unavailable' };
     } catch (error) {
         // Solo el 404 ESPECÍFICO del backend cuenta como «sin señal evaluada»; un

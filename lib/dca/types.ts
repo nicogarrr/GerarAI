@@ -136,6 +136,8 @@ export interface DcaZoneVisits {
 export interface DcaHitRates {
     symbol: string;
     available: boolean;
+    /** Recién añadido a watchlist/cartera: la señal se está evaluando en segundo plano. */
+    preparing?: boolean;
     reason: string | null;
     months_completed: number;
     first_period: string | null;

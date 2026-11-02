@@ -30,6 +30,11 @@ describe('getDcaHitRatesState', () => {
     request.mockRejectedValue(Object.assign(new Error('x'), { statusCode: 502 }));
     expect(await getDcaHitRatesState('AAPL')).toEqual({ status: 'unavailable' });
   });
+  it('recién añadido (preparing) -> preparing, sin tarjeta', async () => {
+    request.mockResolvedValue({ symbol: 'AAPL', available: false, preparing: true });
+    expect(await getDcaHitRatesState('AAPL')).toEqual({ status: 'preparing' });
+    expect(await getDcaHitRates('AAPL')).toBeNull();
+  });
   it('dato -> ok', async () => {
     request.mockResolvedValue({ available: true });
     expect(await getDcaHitRatesState('AAPL')).toEqual({ status: 'ok', data: { available: true } });
