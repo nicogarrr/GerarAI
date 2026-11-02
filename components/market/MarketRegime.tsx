@@ -194,6 +194,8 @@ const TEXTO_REGIMEN_EN: Record<string, string> = {
   'DGS10 menos DGS2 en la misma fecha': 'DGS10 minus DGS2 on the same date',
   'cov(retorno activo, retorno S&P 500) / var(retorno S&P 500); cierres ajustados pareados':
     'cov(active return, S&P 500 return) / var(S&P 500 return); paired adjusted closes',
+  'Probabilidades filtradas sin etiqueta económica; métricas faltantes indican sin datos.':
+    'Filtered probabilities with no economic label; missing metrics mean no data.',
 };
 
 export function textoRegimen(text: string, locale: Locale = 'es'): string {
@@ -276,7 +278,7 @@ export async function MarketRegimeVista() {
             <TarjetaConcentracion top={regimen.metrics.top_ten_sp500} t={t} fmt={fmt} />
             <TarjetaBeta beta={regimen.portfolio_beta ?? regimen.metrics.portfolio_beta} t={t} locale={fmt.locale} />
           </div>
-          {regimen.note ? <p className="text-xs text-gray-500">{regimen.note}</p> : null}
+          {regimen.note ? <p className="text-xs text-gray-500">{textoRegimen(regimen.note, fmt.locale)}</p> : null}
         </>
       )}
     </div>

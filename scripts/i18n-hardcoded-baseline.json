@@ -37,7 +37,7 @@
   "components/help/HelpTabs.tsx": 46,
   "components/insider/InsiderFeed.tsx": 1,
   "components/knowledge-graph/KnowledgeGraphCanvas.tsx": 1,
-  "components/market/MarketRegime.tsx": 34,
+  "components/market/MarketRegime.tsx": 36,
   "components/paper-trading/ManualDemoPanel.tsx": 1,
   "components/paper-trading/submit.ts": 1,
   "components/PersonalizedOverview.tsx": 1,
