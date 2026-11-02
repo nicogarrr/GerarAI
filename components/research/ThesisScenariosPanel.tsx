@@ -3,7 +3,7 @@ import { naFor } from '@/lib/format';
 import type { Locale } from '@/lib/i18n/locale';
 import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 import { formatScenarioMoney, scenarioCurrency } from '@/lib/research/scenario-format';
-import { scenarioCoherenceText, scenarioNameText } from '@/lib/research/thesis-scenarios-text';
+import { scenarioCoherenceText, scenarioNameText, scenarioReasonText } from '@/lib/research/thesis-scenarios-text';
 import type { ScenarioKey, ScenarioMetric, ThesisScenarios } from '@/lib/actions/thesis-scenarios.actions';
 
 const KEYS: ScenarioKey[] = ['bear', 'base', 'bull'];
@@ -54,10 +54,10 @@ export function ThesisScenariosPanel({
                     {KEYS.map((key) => {
                       const cell = data.escenarios[key].proyecciones.find((row) => row.ejercicio === year)?.[metric.key];
                       const text = formatScenarioMoney(cell?.valor ?? null, money, metric.digits);
-                      const reason = cell?.motivo ?? (cell?.valor != null && !text ? t('research.scenarios.unverifiedCurrency') : null);
+                      const reason = cell?.motivo ? scenarioReasonText(cell.motivo, locale) : (cell?.valor != null && !text ? t('research.scenarios.unverifiedCurrency') : null);
                       return (
                         <td className="px-3 py-1 text-right tabular-nums text-gray-200" key={key} title={reason ?? undefined}>
-                          {text ?? (cell?.etiqueta && cell.etiqueta !== 'INFERIDO' ? cell.etiqueta : NA)}
+                          {text ?? (cell?.etiqueta && cell.etiqueta !== 'INFERIDO' && cell.etiqueta !== 'N/D' ? cell.etiqueta : NA)}
                           {reason ? <span className="sr-only"> {reason}</span> : null}
                         </td>
                       );
