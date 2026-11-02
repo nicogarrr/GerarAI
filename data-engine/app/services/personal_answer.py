@@ -108,7 +108,12 @@ _CHEAP = re.compile(
     r"zona de compra|niveles? dca|[1-4]x|que (?:compro|debo comprar|deberia comprar|comprar|me compro)|"
     r"donde (?:meto|invierto|pongo|aporto)|cheap|undervalued)\b"
 )
-_WATCHLIST = re.compile(r"\b(?:watch\s?-?list|lista de seguimiento|seguimiento|(?:valores|empresas|acciones) que sigo)\b")
+_WATCHLIST = re.compile(
+    r"\b(?:watch\s?-?list|lista de seguimiento|seguimiento|(?:valores|empresas|acciones) que sigo)\b"
+    # «¿Qué empresas sigo?», «which companies am I following?»: iban al modelo general.
+    r"|\b(?:que|cuales)\s+(?:valores|empresas|acciones|companias)\s+(?:sigo|vigilo|tengo\s+en\s+vigilancia)\b(?!\s+\w+(?:ando|iendo)\b)"
+    r"|\b(?:companies|stocks|tickers|names)\s+(?:am\s+i|i\s*'?m|do\s+i)\s+(?:following|follow|watching|watch|tracking|track)\b"
+)
 _RISK = re.compile(
     r"\b(?:riesgos?|arriesgad\w*|expuest\w*|exposicion|concentrad\w*|concentracion|vulnerab\w*|"
     r"me preocupa\w*|drawdown|risk\w*)\b"
