@@ -175,3 +175,47 @@ def test_actor_skips_when_source_unavailable_or_lease_held(db, monkeypatch):
     monkeypatch.setattr(dramatiq_app, "acquire_job_lease", lambda *a, **k: None)
     assert dramatiq_app.dispatch_macro_reminders.fn(1, "owner")["reason"] == "lease_held"
     assert db.scalar(select(ResearchAlert)) is None
+
+
+def test_reminder_in_english_for_a_user_with_english_saved(db, monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
+    get_settings.cache_clear()
+    try:
+        db.get(Tenant, 1).metadata_ = {"language": "en"}
+        db.commit()
+        mr.emit_macro_reminders(db, [CPI], at("2026-11-09", 12))
+        mr.emit_macro_reminders(db, [FOMC], at("2026-12-08", 9))
+        cpi, fomc = sorted(db.scalars(select(ResearchAlert)), key=lambda row: row.id)
+        assert cpi.title == "US CPI (inflation): in about 20 h"
+        assert cpi.message == (
+            "US CPI (inflation) on 2026-11-10, 08:30 (New York time). "
+            "Source: BLS (OFFICIAL). https://www.bls.gov/schedule/news_release/"
+        )
+        assert fomc.title == "FOMC meeting (rate decision): tomorrow"
+        assert fomc.message.startswith(
+            "FOMC meeting (rate decision) on 2026-12-09, time not published by the source. "
+            "With economic projections. Source: Federal Reserve (OFFICIAL)."
+        )
+        assert cpi.metadata_["language"] == "en"
+    finally:
+        monkeypatch.delenv("I18N_GENERATION_ENABLED")
+        get_settings.cache_clear()
+
+
+def test_unknown_event_keeps_its_own_title_in_english(db, monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
+    get_settings.cache_clear()
+    try:
+        db.get(Tenant, 1).metadata_ = {"language": "en"}
+        db.commit()
+        odd = {**CPI, "kind": "other", "title": "Some release"}
+        mr.emit_macro_reminders(db, [odd], at("2026-11-10", 7, 45))
+        alert = db.scalar(select(ResearchAlert))
+        assert alert.title == "Some release: in 45 min"
+    finally:
+        monkeypatch.delenv("I18N_GENERATION_ENABLED")
+        get_settings.cache_clear()
