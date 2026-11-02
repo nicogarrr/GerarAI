@@ -56,6 +56,22 @@ const EXACT_EN: Record<string, string> = {
   'Los datos de la orden no forman un fill válido.': 'The order data do not make a valid fill.',
   'La cuenta estaba procesando otra orden a la vez. Inténtalo de nuevo.': 'The account was processing another order at the same time. Please retry.',
   'La cuenta estaba procesando otra operación a la vez. Inténtalo de nuevo.': 'The account was processing another operation at the same time. Please retry.',
+  "side debe ser 'buy' o 'sell'.": "side must be 'buy' or 'sell'.",
+  "La divisa debe ser 'EUR' o 'USD'.": "The currency must be 'EUR' or 'USD'.",
+  "En opciones, openClose debe ser 'open' o 'close'.": "For options, openClose must be 'open' or 'close'.",
+  "instrument.kind debe ser 'accion' u 'opcion'.": "instrument.kind must be 'accion' or 'opcion'.",
+  "La divisa origen debe ser 'EUR' o 'USD'.": "The source currency must be 'EUR' or 'USD'.",
+  "La divisa destino debe ser 'EUR' o 'USD'.": "The target currency must be 'EUR' or 'USD'.",
+  'Cursor de historial inválido.': 'Invalid history cursor.',
+  // Avisos fijos que acompañan a toda respuesta de la cuenta demo (DEMO_NOTICES)
+  'Cuenta demo manual: el dinero es ficticio y no toca tu broker real.':
+    'Manual demo account: the money is fictitious and does not touch your real broker.',
+  'Cada ejecución es un fill manual simulado: introduces tú el precio; no se comprueba contra ninguna cotización en vivo y no equivale a una ejecución real.':
+    'Each execution is a simulated manual fill: you enter the price; it is not checked against any live quote and is not a real execution.',
+  'Comisiones: las órdenes registradas desde este formulario se anotan con comisión 0 simulada (simplificación de la demo, no la tarifa de ningún bróker); las comisiones históricas registradas se conservan tal cual y solo mueven el efectivo.':
+    'Fees: orders recorded from this form are booked with a simulated fee of 0 (a demo simplification, not any broker’s rate); recorded historical fees are kept as they are and only move cash.',
+  'El libro no aplica acciones corporativas (splits, dividendos): una posición mantenida a través de una queda descuadrada.':
+    'The ledger does not apply corporate actions (splits, dividends): a position held through one is left out of balance.',
 };
 
 /** Textos con cifras: el patrón español y su versión inglesa. */
@@ -69,12 +85,49 @@ const PATTERNS_EN: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
     (m) => `You cannot sell ${m[1]} shares of ${m[2]}: the ${m[3]} position is ${m[4]}.`,
   ],
   [
+    /^Saldo (\w+) insuficiente: la compra cuesta (.+?) y hay (.+?)\.$/,
+    (m) => `Insufficient ${m[1]} balance: the purchase costs ${m[2]} and there is ${m[3]}.`,
+  ],
+  [
+    /^Saldo (\w+) insuficiente para convertir (.+?): hay (.+?)\.$/,
+    (m) => `Insufficient ${m[1]} balance to convert ${m[2]}: there is ${m[3]}.`,
+  ],
+  [
     /^La comisión \((.+?)\) supera el efectivo disponible tras la venta \((.+?)\): la demo no admite sobregiro\.$/,
     (m) => `The fee (${m[1]}) exceeds the cash available after the sale (${m[2]}): the demo does not allow overdrafts.`,
   ],
   [
+    /^La comisión \((.+?)\) supera el efectivo disponible tras el cierre \((.+?)\): la demo no admite sobregiro\.$/,
+    (m) => `The fee (${m[1]}) exceeds the cash available after the close (${m[2]}): the demo does not allow overdrafts.`,
+  ],
+  [/^La prima admite como máximo (\d+) decimales\.$/, (m) => `The premium allows at most ${m[1]} decimals.`],
+  [
+    /^No se pueden cerrar (.+?) contratos: solo hay (.+?) abiertos\.$/,
+    (m) => `You cannot close ${m[1]} contracts: only ${m[2]} are open.`,
+  ],
+  [
     /^La operación no cuadra en su fecha de ejecución \(el libro se recalcula por fecha, no por orden de alta\): ([\s\S]+)$/,
-    (m) => `The operation does not balance on its execution date (the ledger is recalculated by date, not by entry order): ${m[1]}`,
+    (m) => `The operation does not balance on its execution date (the ledger is recalculated by date, not by entry order): ${paperTradingMessage(m[1], 'en')}`,
+  ],
+  // Violaciones del recálculo del libro (lib/paper-trading/accounting.ts), visibles en el resumen de la cuenta.
+  [
+    /^compra (\S+) \((.+?)\): saldo (\w+) insuficiente \((.+?)\)$/,
+    (m) => `buy ${m[1]} (${m[2]}): insufficient ${m[3]} balance (${m[4]})`,
+  ],
+  [
+    /^venta (\S+) \((.+?)\): pedida x(.+?), posición x(.+?); orden rechazada entera, sin movimiento$/,
+    (m) => `sell ${m[1]} (${m[2]}): requested x${m[3]}, position x${m[4]}; whole order rejected, nothing moved`,
+  ],
+  [
+    /^venta (\S+) \((.+?)\): comisión (.+?) supera el efectivo disponible tras la venta \((.+?)\); orden rechazada entera, sin movimiento$/,
+    (m) => `sell ${m[1]} (${m[2]}): fee ${m[3]} exceeds the cash available after the sale (${m[4]}); whole order rejected, nothing moved`,
+  ],
+  [/^fx (\S+): saldo (\w+) insuficiente \((.+?)\)$/, (m) => `fx ${m[1]}: insufficient ${m[2]} balance (${m[3]})`],
+  [/^fx (\S+): divisa origen y destino iguales \((.+?)\); rechazada$/, (m) => `fx ${m[1]}: same source and target currency (${m[2]}); rejected`],
+  [/^fx (\S+): importe o tipo inválido$/, (m) => `fx ${m[1]}: invalid amount or rate`],
+  [
+    /^Caché de saldos descuadrada \(cuenta (.+?) frente a libro (.+?)\); reparada desde el libro\.$/,
+    (m) => `Balance cache out of sync (account ${m[1]} versus ledger ${m[2]}); repaired from the ledger.`,
   ],
 ];
 

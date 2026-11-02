@@ -14,6 +14,7 @@ import { OrderTicket } from './OrderTicket';
 import { PositionsTable } from './PositionsTable';
 import { formatCountEs } from '@/lib/format';
 import { useT, useLocale, useFormat } from '@/lib/i18n/client';
+import { paperTradingMessage } from '@/lib/paper-trading/messages-en';
 import { valuationMatches, type DemoValuation } from '@/lib/market/demo-valuation';
 import type { DemoStateView, HistoryPageResult, HistoryRow, SubmitFill, SubmitFx } from './submit';
 
@@ -110,6 +111,7 @@ function ValuationSummary({ valuation, asOf, onRefresh, pending, error }: {
  */
 export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuation: initialValuation = null, valuationAsOf = null, refreshValuation, historyHasMore = false, historyNextBefore = null, loadMoreHistory }: ManualDemoPanelProps) {
     const ti = useT();
+    const locale = useLocale();
     const wired = account !== null;
     const [valuation, setValuation] = useState<DemoValuation | null>(initialValuation);
     const [asOf, setAsOf] = useState<number | null>(valuationAsOf);
@@ -157,7 +159,7 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
             setLoadMoreError(null);
             const result = await loadMoreHistory(before);
             if (!result.ok) {
-                setLoadMoreError(result.message);
+                setLoadMoreError(paperTradingMessage(result.message, locale));
                 return;
             }
             // Dedupe por clientOrderId (único por cuenta): si entre página y

@@ -100,7 +100,7 @@
   "lib/paginated-backend.ts": 4,
   "lib/paper-trading/accounting.ts": 4,
   "lib/paper-trading/ledger-adapter.ts": 7,
-  "lib/paper-trading/messages-en.ts": 41,
+  "lib/paper-trading/messages-en.ts": 49,
   "lib/paper-trading/options.ts": 20,
   "lib/plan/contribution-split.ts": 2,
   "lib/portfolio/holding-signals.ts": 8,
