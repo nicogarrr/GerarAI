@@ -109,6 +109,7 @@
   "lib/plan/split-text.ts": 6,
   "lib/portfolio-dividends-text.ts": 27,
   "lib/portfolio/holding-signals.ts": 8,
+  "lib/portfolio/image-import.ts": 2,
   "lib/research/analyst-rating-es.ts": 19,
   "lib/research/assistant-client.ts": 6,
   "lib/research/ast-catalog-text.ts": 2,

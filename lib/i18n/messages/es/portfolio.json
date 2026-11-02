@@ -418,7 +418,9 @@
     "pendingBadQuantityMany": "{n} cantidades no válidas",
     "pendingUncheckedOne": "{n} fila sin marcar como revisada",
     "pendingUncheckedMany": "{n} filas sin marcar como revisadas",
-    "pendingMissing": "Falta: {items}."
+    "pendingMissing": "Falta: {items}.",
+    "previewNoRows": "No se reconocieron filas con cabecera de cantidad. Recorta la tabla incluyendo la cabecera o usa un fichero/manual.",
+    "previewRows": "Selecciona explícitamente cada instrumento y revisa las filas. Los precios de la captura no se importan."
   },
   "savings": {
     "title": "Tu ahorro a largo plazo",

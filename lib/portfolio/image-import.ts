@@ -50,3 +50,16 @@ export function imageRowsPending(rows: Array<{ instrument: unknown; checked: boo
     if (unchecked) missing.push(t(unchecked === 1 ? 'portfolio.importImage.pendingUncheckedOne' : 'portfolio.importImage.pendingUncheckedMany', { n: unchecked }));
     return missing.length ? t('portfolio.importImage.pendingMissing', { items: missing.join(', ') }) : null;
 }
+
+/** Aviso de la vista previa (portfolio_image_ocr.py): el backend lo manda solo en
+ *  castellano; se reconoce y se pinta en el idioma de la interfaz. Lo que no se
+ *  reconoce pasa tal cual. */
+const PREVIEW_MESSAGES: Record<string, 'portfolio.importImage.previewNoRows' | 'portfolio.importImage.previewRows'> = {
+    'No se reconocieron filas con cabecera de cantidad. Recorta la tabla incluyendo la cabecera o usa un fichero/manual.': 'portfolio.importImage.previewNoRows',
+    'Selecciona explícitamente cada instrumento y revisa las filas. Los precios de la captura no se importan.': 'portfolio.importImage.previewRows',
+};
+
+export function imagePreviewMessage(message: string, t: TranslateFn): string {
+    const key = PREVIEW_MESSAGES[message];
+    return key ? t(key) : message;
+}
