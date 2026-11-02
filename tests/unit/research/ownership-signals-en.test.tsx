@@ -6,7 +6,7 @@ import { holderChangeLabel, holdersLines, insiderLines, ownershipMoney, type Own
 const signals: OwnershipSignals = {
     ticker: 'MSFT',
     insider: {
-        status: 'ok', window_days: 90, source: 'SEC', net_value: -50000, cluster_buying: false, last_date: '2026-10-20', reading: 'Neutral',
+        status: 'ok', window_days: 90, source: 'SEC', net_value: -50000, cluster_buying: false, last_date: '2026-10-20', reading: 'Ventas netas de insiders',
         buys: { trades: 1, insiders: 1, shares: 10, value: 10000 },
         sells: { trades: 3, insiders: 2, shares: 30, value: 60000, planned_10b5_1: 2 },
     },
@@ -48,10 +48,11 @@ describe('ownership signals in English', () => {
         render(<OwnershipSignalsPanel locale="en" signals={signals} ticker="MSFT" />);
         expect(screen.getAllByText('What insiders and large funds are buying and selling').length).toBeGreaterThan(0);
         expect(screen.getByText('Insider buys and sells (Form 4) · 90 days')).toBeInTheDocument();
+        expect(screen.getByText('Net insider selling')).toBeInTheDocument();
         expect(screen.getByText('12 managers')).toBeInTheDocument();
         expect(screen.getByText('Fund A: $50,000 (new position)')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'View owners' })).toHaveAttribute('href', '/research/MSFT?view=holders');
-        expect(screen.queryByText(/directivos|gestores/)).toBeNull();
+        expect(screen.queryByText(/directivos|gestores|Ventas netas/)).toBeNull();
     });
 
     it('panel when the summary failed', () => {

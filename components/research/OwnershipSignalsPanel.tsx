@@ -12,6 +12,7 @@ import {
   insiderLines,
   insiderTone,
   ownershipMoney,
+  ownershipText,
   type OwnershipSignals,
   type OwnershipTone,
 } from '@/lib/research/ownership-signals';
@@ -48,7 +49,7 @@ export function OwnershipSignalsPanel({ ticker, signals, locale = DEFAULT_LOCALE
         <section aria-label={t('research.ownershipSignals.insidersLabel')}>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold text-gray-200">{t('research.ownershipSignals.insidersTitle')}{insider.status === 'ok' ? t('research.ownershipSignals.windowDays', { days: insider.window_days }) : ''}</h3>
-            {insider.status === 'ok' ? <Badge className={TONE_CLASS[insiderTone(insider)]} variant="outline">{insider.reading}</Badge> : null}
+            {insider.status === 'ok' ? <Badge className={TONE_CLASS[insiderTone(insider)]} variant="outline">{ownershipText(insider.reading, locale)}</Badge> : null}
           </div>
           <ul className="space-y-1 text-sm text-gray-400">
             {insiderLines(insider, locale).map((line) => <li key={line}>{line}</li>)}
