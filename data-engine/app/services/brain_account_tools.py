@@ -1330,11 +1330,14 @@ _UPDIV_ES = re.compile(
     r"\bproxim[oa]s?\s+dividendos?\b|\bdividendos?\s+(?:pendientes|por\s+cobrar)\b"
     r"|\b(?:voy\s+a|me\s+van\s+a|vaya\s+a)\s+(?:cobrar|pagar|recibir|ingresar)\b"
     r"|\bcuando\s+(?:cobro|me\s+pagan|recibo|me\s+ingresan)\b"
+    # «calendario de dividendos» caía al modelo general sin fuentes.
+    r"|\bcalendario\s+de\s+(?:mis\s+)?dividendos?\b"
 )
 _UPDIV_EN = re.compile(
     r"\b(?:upcoming|next)\s+dividends?\b"
     r"|\b(?:will|am)\s+i\s+(?:get|receive|collect|be\s+paid)\b|\bam\s+i\s+going\s+to\s+(?:get|receive|collect)\b"
     r"|\bwhen\s+(?:do|will)\s+i\s+(?:get|receive|collect)\b"
+    r"|\bdividends?\s+calendar\b"
 )
 
 
