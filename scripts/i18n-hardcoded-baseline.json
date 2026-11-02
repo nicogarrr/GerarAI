@@ -40,7 +40,7 @@
   "components/market/MarketRegime.tsx": 34,
   "components/paper-trading/ManualDemoPanel.tsx": 1,
   "components/paper-trading/submit.ts": 1,
-  "components/PersonalizedOverview.tsx": 2,
+  "components/PersonalizedOverview.tsx": 1,
   "components/plan/PlanView.tsx": 1,
   "components/portfolio/transactionValidation.ts": 7,
   "components/proPicks/category-display.ts": 12,
