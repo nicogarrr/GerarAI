@@ -134,7 +134,7 @@
   "lib/research/metric-labels.ts": 102,
   "lib/research/openapi.generated.ts": 1,
   "lib/research/ownership-display.ts": 13,
-  "lib/research/ownership-signals.ts": 12,
+  "lib/research/ownership-signals.ts": 29,
   "lib/research/peer-format.ts": 1,
   "lib/research/provenance-format.ts": 2,
   "lib/research/provenance-groups.ts": 7,

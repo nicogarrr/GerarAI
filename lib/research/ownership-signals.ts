@@ -94,9 +94,48 @@ export function holdersTone(block: HoldersOwnershipBlock): OwnershipTone {
   return 'neutro';
 }
 
+/**
+ * Textos del backend (ticker_ownership_signals.py e investor_overlap.py) que
+ * llegan solo en castellano: la lectura del bloque insider y el motivo de un
+ * bloque sin datos. En inglés se traducen; en castellano, y con un texto que
+ * no se reconoce, pasan tal cual.
+ */
+const TEXT_EN: Record<string, string> = {
+  'Compras en grupo de insiders (3 o más)': 'Cluster buying by insiders (3 or more)',
+  'Compras netas de insiders': 'Net insider buying',
+  'Ventas netas de insiders': 'Net insider selling',
+  'Sin balance claro de insiders': 'No clear insider balance',
+  'Sin CUSIP verificado para cruzar los 13F (emisor no estadounidense o identidad pendiente).':
+    'No verified CUSIP to cross-check 13F filings (non-US issuer or identity pending).',
+  'Aún no hay 13F sincronizados de los gestores revisados en tu cuenta. Se actualizan automáticamente cada lunes por la mañana.':
+    'No 13F filings from the reviewed managers are synced to your account yet. They update automatically every Monday morning.',
+  'No se pudo leer este bloque ahora mismo.': 'This block could not be read right now.',
+  'Identidad en conflicto: la referencia no corresponde al ticker.': 'Conflicting identity: the reference does not match the ticker.',
+  'Identidad en conflicto: los ISIN registrados no coinciden.': 'Conflicting identity: the recorded ISINs do not match.',
+  'Referencia CUSIP inválida.': 'Invalid CUSIP reference.',
+  'Identidad en conflicto: CUSIP e ISIN de la referencia.': "Conflicting identity: the reference's CUSIP and ISIN.",
+  'Identidad en conflicto: CUSIP de referencia e ISIN de cartera.': 'Conflicting identity: reference CUSIP and portfolio ISIN.',
+  'ISIN registrado sin CUSIP derivable verificado.': 'Recorded ISIN without a verified derivable CUSIP.',
+  'ISIN de referencia sin CUSIP derivable verificado.': 'Reference ISIN without a verified derivable CUSIP.',
+};
+
+const NO_TRADES_RE = /^Sin compras ni ventas de insiders en mercado abierto \(Form 4\) persistidas para (.+) en los últimos (\d+) días\.$/;
+const NOT_IN_UNIVERSE_RE = /^(.+) no está en el universo de empresas: sin cruce 13F\.$/;
+
+/** Lectura o motivo del backend en el idioma de la pantalla. */
+export function ownershipText(text: string, locale: OwnershipLocale = 'es'): string {
+  if (locale !== 'en') return text;
+  if (Object.hasOwn(TEXT_EN, text)) return TEXT_EN[text];
+  const noTrades = NO_TRADES_RE.exec(text);
+  if (noTrades) return `No open-market insider buys or sells (Form 4) stored for ${noTrades[1]} in the last ${noTrades[2]} days.`;
+  const notInUniverse = NOT_IN_UNIVERSE_RE.exec(text);
+  if (notInUniverse) return `${notInUniverse[1]} is not in the company universe: no 13F cross-check.`;
+  return text;
+}
+
 /** Líneas legibles del bloque insider (o su motivo si no hay datos). */
 export function insiderLines(block: InsiderOwnershipBlock, locale: OwnershipLocale = 'es'): string[] {
-  if (block.status !== 'ok') return [block.detail ?? (locale === 'en' ? 'No insider data.' : 'Sin datos de insiders.')];
+  if (block.status !== 'ok') return [block.detail ? ownershipText(block.detail, locale) : (locale === 'en' ? 'No insider data.' : 'Sin datos de insiders.')];
   const planned = block.sells.planned_10b5_1 ?? 0;
   if (locale === 'en') {
     const money = (value: number) => ownershipMoney(value, 'en');
@@ -115,7 +154,7 @@ export function insiderLines(block: InsiderOwnershipBlock, locale: OwnershipLoca
 
 /** Líneas legibles del bloque 13F (o su motivo si no hay datos). */
 export function holdersLines(block: HoldersOwnershipBlock, locale: OwnershipLocale = 'es'): string[] {
-  if (block.status !== 'ok') return [block.detail ?? (locale === 'en' ? 'No 13F data.' : 'Sin datos 13F.')];
+  if (block.status !== 'ok') return [block.detail ? ownershipText(block.detail, locale) : (locale === 'en' ? 'No 13F data.' : 'Sin datos 13F.')];
   const { changes } = block;
   if (locale === 'en') {
     const lines = [
