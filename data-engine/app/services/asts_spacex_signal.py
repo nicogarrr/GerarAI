@@ -16,6 +16,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.i18n import generation_language
 from app.core.tenancy import tenant_filters
 from app.models import Company, NewsEvent, Position, ResearchAlert, WatchItem
 from app.services.notification_service import record_in_app_delivery
@@ -94,6 +95,28 @@ def _aware(value: datetime) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
+def _date_label(language: str, gdelt: bool) -> str:
+    if language == "en":
+        return "detected by GDELT" if gdelt else "dated by the source"
+    return "detectada por GDELT" if gdelt else "fechada por la fuente"
+
+
+def _copy(language: str, headline: str, source: str, day: str, gdelt: bool) -> tuple[str, str]:
+    """Titulo y mensaje del aviso en el idioma guardado; el titular de la fuente no se traduce."""
+    if language == "en":
+        date_phrase = f"detected by GDELT on {day}" if gdelt else f"dated {day} by the source"
+        return (f"ASTS signal: {headline}"[:300],
+                f"Article from {source}, {date_phrase}: {headline}. "
+                "Watch signal: if SpaceX closes deals with large carriers, the argument that AST's moat is its "
+                "carrier agreements weakens. Check the source; the headline alone does not confirm the facts.")
+    date_phrase = f"detectado por GDELT el {day}" if gdelt else f"fechado el {day} por la fuente"
+    return (f"Señal ASTS: {headline}"[:300],
+            f"Artículo de {source}, {date_phrase}: {headline}. "
+            "Señal de vigilancia: si SpaceX cierra acuerdos con operadoras grandes, "
+            "el argumento de que el foso de AST son sus acuerdos con operadoras se debilita. "
+            "Revisa la fuente; el titular no confirma por sí solo los hechos.")
+
+
 def evaluate(db: Session, *, now: datetime | None = None) -> dict:
     tenant_id = db.info.get("tenant_id")
     if tenant_id is None:
@@ -156,20 +179,19 @@ def evaluate(db: Session, *, now: datetime | None = None) -> dict:
             continue
         published = _aware(event.date)
         headline = headline.strip()
-        date_phrase = (f"detectado por GDELT el {published.date().isoformat()}" if date_source == "gdelt_first_seen"
-                       else f"fechado el {published.date().isoformat()} por la fuente")
+        # Idioma guardado del usuario (Ajustes); sin preferencia, espanol como siempre.
+        language = generation_language(db)
+        title, message = _copy(language, headline, str(event.source), published.date().isoformat(),
+                               date_source == "gdelt_first_seen")
         alert = ResearchAlert(
             tenant_id=tenant_id, company_id=asts.id, severity="high", status="open",
-            alert_type=ALERT_TYPE, title=f"Señal ASTS: {headline}"[:300],
-            message=(f"Artículo de {event.source}, {date_phrase}: {headline}. "
-                     "Señal de vigilancia: si SpaceX cierra acuerdos con operadoras grandes, "
-                     "el argumento de que el foso de AST son sus acuerdos con operadoras se debilita. "
-                     "Revisa la fuente; el titular no confirma por sí solo los hechos."),
+            alert_type=ALERT_TYPE, title=title, message=message,
             fingerprint=fp, channels=["in_app"], last_triggered_at=now,
             metadata_={"news_event_id": event.id, "source_url": url, "source": event.source,
                        "published_at": published.isoformat(), "rule_version": VERSION,
-                       "date_label": "detectada por GDELT" if date_source == "gdelt_first_seen" else "fechada por la fuente",
-                       "date_source": date_source, "source_headline": headline},
+                       "date_label": _date_label(language, date_source == "gdelt_first_seen"),
+                       "date_source": date_source, "source_headline": headline,
+                       **({"language": language} if language != "es" else {})},
         )
         try:
             with db.begin_nested():

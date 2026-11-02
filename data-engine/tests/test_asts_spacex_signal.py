@@ -131,3 +131,40 @@ def test_url_without_host_and_gdelt_distinction(db):
     alert = db.scalars(select(ResearchAlert)).one()
     assert "detectado por GDELT" in alert.message and alert.metadata_["date_source"] == "gdelt_first_seen"
     assert alert.metadata_["source_url"] == "https://publisher.example/g"
+
+
+def test_alert_in_english_for_a_user_with_english_saved(db, monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
+    get_settings.cache_clear()
+    try:
+        t1, t2, a, s = _setup(db)
+        db.add(WatchItem(tenant_id=t2.id, symbol="ASTS"))
+        t1.metadata_ = {"language": "en"}
+        db.commit()
+        title = "SpaceX signs agreement with Verizon"
+        _news(db, t1, s, title, "https://publisher.example/en",
+              meta={"connector": "gdelt", "date_source": "gdelt_first_seen", "source_headline": title})
+        _news(db, t2, s, title, "https://publisher.example/es")
+        db.info["tenant_id"] = t1.id
+        assert evaluate(db, now=NOW)["created"] == 1
+        english = db.scalars(select(ResearchAlert)).one()
+        db.info["tenant_id"] = t2.id
+        assert evaluate(db, now=NOW)["created"] == 1
+        spanish = db.scalars(select(ResearchAlert).where(ResearchAlert.id != english.id)).one()
+        assert english.title == "ASTS signal: SpaceX signs agreement with Verizon"
+        assert english.message == (
+            "Article from publisher.example, detected by GDELT on 2026-10-09: SpaceX signs agreement with Verizon. "
+            "Watch signal: if SpaceX closes deals with large carriers, the argument that AST's moat is its "
+            "carrier agreements weakens. Check the source; the headline alone does not confirm the facts."
+        )
+        assert english.metadata_["language"] == "en"
+        assert english.metadata_["date_label"] == "detected by GDELT"
+        assert spanish.title == "Señal ASTS: SpaceX signs agreement with Verizon"
+        assert spanish.message.startswith("Artículo de publisher.example, fechado el 2026-10-09 por la fuente")
+        assert spanish.metadata_["date_label"] == "fechada por la fuente"
+        assert "language" not in spanish.metadata_
+    finally:
+        monkeypatch.delenv("I18N_GENERATION_ENABLED")
+        get_settings.cache_clear()
