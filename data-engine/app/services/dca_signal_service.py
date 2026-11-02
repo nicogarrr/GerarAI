@@ -74,6 +74,7 @@ from app.services.dca_signal_engine import (
     hit_rates,
     zone_visits,
 )
+from app.services.market_calendar import ticker_market_closed
 
 logger = logging.getLogger(__name__)
 
@@ -532,8 +533,14 @@ def evaluate_watchlist(
     params: DcaParams = DEFAULT_PARAMS,
     use_db_fallback: bool = True,
     symbols: set[str] | None = None,
+    skip_closed_markets: bool = False,
 ) -> dict[str, Any]:
-    """Evalua watchlist + cartera del tenant de la sesion. Devuelve un resumen."""
+    """Evalua watchlist + cartera del tenant de la sesion. Devuelve un resumen.
+
+    Con ``skip_closed_markets`` (la pasada diaria del scheduler) no se evalua
+    un ticker cuya bolsa no tuvo sesion el dia evaluado (``today``, el dia del
+    cierre): festivos de Madrid, Londres o la NYSE. Su estado queda como estaba.
+    """
     settings = get_settings()
     now = now or datetime.now(UTC)
     today = today or now.astimezone(_NY).date()
@@ -557,6 +564,9 @@ def evaluate_watchlist(
     }
     for symbol, item in tracked.items():
         if symbols is not None and symbol not in symbols:
+            continue
+        if skip_closed_markets and ticker_market_closed(symbol, today):
+            summary["skipped"].append({"symbol": symbol, "reason": "mercado_cerrado", "day": today.isoformat()})
             continue
         history = FetchedHistory(rows=[])
         source = None

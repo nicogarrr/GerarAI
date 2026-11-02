@@ -15,7 +15,11 @@ Tres planes con el mismo calendario de compras:
   informativos y cuentan como 1X, no se vende nada). Usa MAS dinero.
 * ``fixed_budget``: entra ``base`` cada mes; en 1X invierte la mitad y guarda
   el resto en caja para gastarlo (hasta ``nivel x base/2``) en meses 2X-4X.
-  Mismo dinero que ``plain``: es la comparacion honesta de presupuesto cerrado.
+  Mismo dinero que ``plain``, pero NO es la forma de ganarle con el mismo
+  presupuesto: fuera de muestra pierde contra el plano (backtest
+  gerarai-dcaplano, 2-nov-2026: -1,7 puntos de TIR en 2013-2026, 491 valores
+  del S&P 500). Con el mismo dinero gana repartir la aportacion entre varios
+  valores con peso nivel² (``plan_contribution_split``), no guardar caja.
 """
 
 from __future__ import annotations

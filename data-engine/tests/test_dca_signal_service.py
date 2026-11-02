@@ -511,8 +511,8 @@ def test_actor_with_alerts_disabled_persists_levels_and_sends_no_email(db, monke
     real_evaluate = svc.evaluate_watchlist
     dispatched: list[int] = []
     monkeypatch.setattr(
-        svc, "evaluate_watchlist", lambda session: real_evaluate(
-            session, fetcher=fetcher, now=NOW, today=date(2026, 10, 27), params=PARAMS
+        svc, "evaluate_watchlist", lambda session, **kw: real_evaluate(
+            session, fetcher=fetcher, now=NOW, today=date(2026, 10, 27), params=PARAMS, **kw
         )
     )
     monkeypatch.setattr(NotificationService, "dispatch", lambda self, session, alert: dispatched.append(alert.id) or {})

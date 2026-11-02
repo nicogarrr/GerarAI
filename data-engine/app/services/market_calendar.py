@@ -1,7 +1,8 @@
 """¿Abre la bolsa ese día? Calendarios oficiales de Madrid, Nueva York y Londres.
 
-Solo un helper: NO está cableado en el scheduler ni en ningún job (cuándo se
-evalúan DCA y alertas es decisión de Nico). Usa ``exchange_calendars``
+No cambia el scheduler ni la cadencia de ningún job: solo responde, por ticker,
+si su bolsa abre ese día (lo usan la pasada diaria de DCA y las alertas de
+precio para no evaluar en días sin sesión). Usa ``exchange_calendars``
 (Apache-2.0, Python puro), que publica los festivos y sesiones de cada bolsa:
 Viernes Santo, Lunes de Pascua y 26 de diciembre en Madrid y Londres, los bank
 holidays británicos, Acción de Gracias o el 4 de julio en Nueva York, etc.
@@ -12,6 +13,7 @@ Rango cubierto: desde 2000 hasta dos años después del año en curso. Fuera de
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from functools import lru_cache
 from typing import Any
@@ -47,3 +49,37 @@ def is_market_open_day(exchange: str, day: date) -> bool:
     if session < CALENDAR_START or session > date(last.year, 12, 31) or session < date(first.year, 1, 1):
         raise ValueError(f"Fecha fuera del calendario de {code}: {session.isoformat()}")
     return bool(calendar.is_session(session.isoformat()))
+
+
+# Sufijo del ticker (estilo Yahoo) -> bolsa. Sin sufijo, un ticker de EE. UU.
+# (AAPL, BRK-B) va con el calendario de la NYSE (mismo que NASDAQ).
+_SUFFIX_EXCHANGES: dict[str, str] = {"MC": "XMAD", "L": "XLON"}
+_US_TICKER = re.compile(r"^[A-Z]{1,5}(-[A-Z])?$")
+
+
+def exchange_for_ticker(ticker: str | None) -> str | None:
+    """MIC de la bolsa del ticker (.MC -> XMAD, .L -> XLON, sin sufijo -> XNYS).
+
+    ``None`` cuando no se sabe (otro sufijo, índices ``^``, divisas ``=X``,
+    cripto ``BTC-USD``...): quien llama se comporta como siempre.
+    """
+    symbol = (ticker or "").strip().upper()
+    if not symbol:
+        return None
+    if "." in symbol:
+        return _SUFFIX_EXCHANGES.get(symbol.rsplit(".", 1)[1])
+    return "XNYS" if _US_TICKER.match(symbol) else None
+
+
+def ticker_market_closed(ticker: str | None, day: date) -> bool:
+    """True solo si la bolsa del ticker es conocida y ese día no tiene sesión.
+
+    Bolsa desconocida o fecha fuera del calendario: False (se evalúa como hoy).
+    """
+    exchange = exchange_for_ticker(ticker)
+    if exchange is None:
+        return False
+    try:
+        return not is_market_open_day(exchange, day)
+    except ValueError:
+        return False

@@ -73,7 +73,7 @@ def test_actor_evaluates_even_with_alerts_disabled(monkeypatch):
     monkeypatch.setattr(dramatiq_app, "release_job_lease", lambda name, token, **kw: calls.append(f"release:{token}"))
     monkeypatch.setattr(
         "app.services.dca_signal_service.evaluate_watchlist",
-        lambda db: calls.append("evaluate") or {"evaluated": 2, "alerted": [], "alerts_enabled": False},
+        lambda db, **kw: calls.append("evaluate") or {"evaluated": 2, "alerted": [], "alerts_enabled": False},
     )
     try:
         out = dramatiq_app.evaluate_dca_signals.fn(7, "u-1")
@@ -86,6 +86,7 @@ def test_actor_evaluates_even_with_alerts_disabled(monkeypatch):
 
 def test_actor_takes_lease_and_runs_service(monkeypatch):
     calls: list[str] = []
+    seen: list[dict] = []
 
     monkeypatch.setattr("app.services.plan_proactivity.review_savings_plan", lambda db: {"plan_exists": False, "new_in_app_alerts": 0})
 
@@ -101,9 +102,11 @@ def test_actor_takes_lease_and_runs_service(monkeypatch):
     monkeypatch.setattr(dramatiq_app, "release_job_lease", lambda name, token, **kw: calls.append(f"release:{token}"))
     monkeypatch.setattr(
         "app.services.dca_signal_service.evaluate_watchlist",
-        lambda db: {"evaluated": 3, "alerted": []},
+        lambda db, **kw: seen.append(kw) or {"evaluated": 3, "alerted": []},
     )
     out = dramatiq_app.evaluate_dca_signals.fn(7, "u-1")
+    # La pasada diaria salta los tickers con su bolsa cerrada ese día.
+    assert seen == [{"skip_closed_markets": True}]
     assert out["actor"] == "evaluate_dca_signals" and out["evaluated"] == 3
     assert calls == ["evaluate_dca_signals:7", "release:tok", "close"]
 

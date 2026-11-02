@@ -10,6 +10,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from tenacity import (
+    AsyncRetrying,
+    RetryCallState,
+    retry_if_exception_type,
+    retry_if_result,
+    stop_after_attempt,
+)
+
 # ---------------- Ritmo de salida a la SEC (estado GLOBAL de proceso) ----------------
 
 # SEC fair-use: maximo 10 peticiones/segundo. El limite lo aplica la SEC por
@@ -182,19 +190,11 @@ dentro de la misma corrida.
     """
     import httpx
 
-    last_exc: Exception | None = None
-    for attempt in range(max_retries + 1):
-        try:
-            response = await fetch()
-        except (httpx.TimeoutException, httpx.TransportError) as exc:
-            last_exc = exc
-            if attempt >= max_retries:
-                raise
-            await asyncio.sleep(min(base_seconds * (2**attempt), cap_seconds))
-            continue
-
-        status = getattr(response, "status_code", 200)
-        if status == 429:
+    # Bucle de reintento con tenacity: mismos intentos (max_retries + 1), mismas
+    # esperas y mismas excepciones finales que el bucle escrito a mano.
+    async def attempt_once() -> Any:
+        response = await fetch()
+        if getattr(response, "status_code", 200) == 429:
             raw_retry_after = _raw_retry_after(response)
             if raw_retry_after is not None and raw_retry_after > cap_seconds:
                 # El proveedor pide esperar mas de lo que esta corrida puede
@@ -206,27 +206,49 @@ dentro de la misma corrida.
                     f"(> cap {cap_seconds:.0f}s): pospuesto sin reintento inline",
                     retry_after=raw_retry_after,
                 )
-            if attempt < max_retries:
-                await asyncio.sleep(
-                    max(
-                        retry_after_seconds(response, cap_seconds),
-                        _backoff_seconds(attempt, base_seconds, cap_seconds, jitter=jitter),
-                    )
-                )
-                continue
-            raise UpstreamRateLimited(
-                f"upstream rate limited after {max_retries} retries",
-                retry_after=raw_retry_after,
-            )
-        if status >= 500 and attempt < max_retries:
-            await asyncio.sleep(_backoff_seconds(attempt, base_seconds, cap_seconds, jitter=jitter))
-            continue
-        response.raise_for_status()
         return response
 
-    if last_exc is not None:  # pragma: no cover - solo por tipos
-        raise last_exc
-    raise RuntimeError("unreachable")  # pragma: no cover
+    def retryable_response(response: Any) -> bool:
+        status = getattr(response, "status_code", 200)
+        return status == 429 or status >= 500
+
+    def wait_seconds(state: RetryCallState) -> float:
+        attempt = state.attempt_number - 1
+        outcome = state.outcome
+        if outcome is None or outcome.failed:
+            # Timeout / error de transporte: exponencial acotado, sin jitter.
+            return min(base_seconds * (2**attempt), cap_seconds)
+        response = outcome.result()
+        backoff = _backoff_seconds(attempt, base_seconds, cap_seconds, jitter=jitter)
+        if getattr(response, "status_code", 200) == 429:
+            return max(retry_after_seconds(response, cap_seconds), backoff)
+        return backoff
+
+    async def sleep(seconds: float) -> None:
+        await asyncio.sleep(seconds)
+
+    def last_outcome(state: RetryCallState) -> Any:
+        # Sin mas intentos: una excepcion de transporte se relanza tal cual; una
+        # respuesta 429/5xx sale para el tratamiento final de abajo.
+        assert state.outcome is not None
+        return state.outcome.result()
+
+    retrying = AsyncRetrying(
+        stop=stop_after_attempt(max_retries + 1),
+        wait=wait_seconds,
+        retry=retry_if_exception_type((httpx.TimeoutException, httpx.TransportError))
+        | retry_if_result(retryable_response),
+        sleep=sleep,
+        retry_error_callback=last_outcome,
+    )
+    response = await retrying(attempt_once)
+    if getattr(response, "status_code", 200) == 429:
+        raise UpstreamRateLimited(
+            f"upstream rate limited after {max_retries} retries",
+            retry_after=_raw_retry_after(response),
+        )
+    response.raise_for_status()
+    return response
 
 
 @dataclass(slots=True)

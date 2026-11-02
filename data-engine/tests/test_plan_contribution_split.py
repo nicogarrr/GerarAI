@@ -2,8 +2,8 @@
 
 «Este mes X EUR a POOL, Y EUR a UBER»: la cuota mensual se reparte entre los
 tickers del plan (objetivos por ticker o, sin ellos, posiciones vivas a partes
-iguales) multiplicando cada peso por el nivel DCA del motor (4X pesa 4, 1X pesa
-1, recorte pesa 0). Degrada limpio: sin tabla dca_signal_states o sin nivel
+iguales) multiplicando cada peso por el cuadrado del nivel DCA del motor (4X pesa 16,
+3X 9, 2X 4, 1X 1, recorte pesa 0). Degrada limpio: sin tabla dca_signal_states o sin nivel
 para un ticker, ese ticker pesa como 1X y se dice.
 """
 
@@ -84,10 +84,45 @@ def _cand(ticker: str, weight: str, level: int | None) -> SplitCandidate:
 
 
 def test_pure_split_weights_by_dca_level():
+    # 3X pesa 9 y 1X pesa 1: 9/10 y 1/10 de los 300.
     result = split_contribution(Decimal("300"), [_cand("POOL", "50", 3), _cand("UBER", "50", 1)])
     amounts = {row["ticker"]: row["amount"] for row in result["allocations"]}
-    assert amounts == {"POOL": 225.0, "UBER": 75.0}
+    assert amounts == {"POOL": 270.0, "UBER": 30.0}
     assert result["unallocated"] == 0.0
+
+
+def test_weight_is_the_square_of_the_dca_level():
+    """Peso nivel² (1X→1, 2X→4, 3X→9, 4X→16): backtest gerarai-dcaplano, +1,3 puntos de TIR fuera de muestra."""
+    result = split_contribution(
+        Decimal("300"), [_cand(t, "1", level) for t, level in (("A", 4), ("B", 3), ("C", 2), ("D", 1))]
+    )
+    rows = {row["ticker"]: row for row in result["allocations"]}
+    assert {t: rows[t]["multiplier"] for t in "ABCD"} == {"A": 16, "B": 9, "C": 4, "D": 1}
+    assert rows["A"]["reason"] == "4X DCA: peso ×16"
+    assert rows["D"]["reason"] == "1X DCA: peso ×1"
+    # 16 : 9 : 4 : 1 sobre 30 partes de 300 -> 160 / 90 / 40 / 10.
+    assert {t: rows[t]["amount"] for t in "ABCD"} == {"A": 160.0, "B": 90.0, "C": 40.0, "D": 10.0}
+
+
+@pytest.mark.parametrize(
+    "levels",
+    [
+        (4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (4, 3, 2, 1, -1, -2, None),
+        (2, 2, 3),
+        (1, 1, 1),
+        (4, -1),
+    ],
+)
+@pytest.mark.parametrize("amount", ["300", "1000", "123.45", "0.07"])
+def test_monthly_budget_is_unchanged_only_the_split_moves(levels, amount):
+    """Mismo dinero total al mes que antes: el cuadrado solo cambia el reparto, nunca la cuota."""
+    candidates = [_cand(f"T{i}", "1", level) for i, level in enumerate(levels)]
+    result = split_contribution(Decimal(amount), candidates)
+    spent = sum(Decimal(str(row["amount"])) for row in result["allocations"])
+    assert spent == Decimal(amount)
+    assert result["unallocated"] == 0.0
+    assert result["status"] == "ok"
 
 
 def test_trim_level_gets_nothing_and_missing_level_is_1x():
@@ -99,9 +134,10 @@ def test_trim_level_gets_nothing_and_missing_level_is_1x():
     assert rows["UBER"]["multiplier"] == 0
     assert rows["MSFT"]["multiplier"] == 1
     assert "sin nivel DCA" in rows["MSFT"]["reason"]
-    # 2 : 0 : 1 -> 66,67 / 0 / 33,33 y la suma cuadra al centimo.
-    assert rows["POOL"]["amount"] == 66.67
-    assert rows["MSFT"]["amount"] == 33.33
+    # 2X pesa 4: 4 : 0 : 1 -> 80 / 0 / 20 y la suma cuadra al centimo.
+    assert rows["POOL"]["multiplier"] == 4
+    assert rows["POOL"]["amount"] == 80.0
+    assert rows["MSFT"]["amount"] == 20.0
     assert sum(row["amount"] for row in result["allocations"]) == 100.0
 
 
@@ -157,11 +193,11 @@ def test_targets_weighted_by_dca_levels(db):
     result = build_contribution_split(db)
     assert result["dca_available"] is True
     rows = {row["ticker"]: row for row in result["allocations"]}
-    assert rows["POOL"]["amount"] == 225.0
+    assert rows["POOL"]["amount"] == 270.0
     assert rows["POOL"]["dca_label"] == "3X DCA"
-    assert rows["UBER"]["amount"] == 75.0
+    assert rows["UBER"]["amount"] == 30.0
     assert result["currency"] == "EUR"
-    assert "225,00 EUR a POOL" in result["summary"]
+    assert "270,00 EUR a POOL" in result["summary"]
 
 
 def test_other_tenant_dca_rows_are_ignored(db):
@@ -187,7 +223,8 @@ def test_without_ticker_targets_uses_live_positions_equally(db):
     result = build_contribution_split(db)
     assert result["basis"] == "posiciones_iguales"
     rows = {row["ticker"]: row["amount"] for row in result["allocations"]}
-    assert rows == {"POOL": 200.0, "UBER": 100.0}
+    # POOL 2X pesa 4 frente al 1 de UBER (sin nivel).
+    assert rows == {"POOL": 240.0, "UBER": 60.0}
 
 
 def test_no_candidates_says_so(db):
@@ -308,3 +345,171 @@ def test_stale_trim_level_does_not_freeze_the_contribution(db):
     result = build_contribution_split(db)
     assert result["status"] == "ok"
     assert result["allocations"][0]["amount"] == 300.0
+
+
+# --- Tope de concentración: sin aportación nueva a lo que ya pesa más del doble de su peso base ---
+
+
+def _capped(ticker: str, weight: str, level: int | None, share: str, base: str) -> SplitCandidate:
+    return SplitCandidate(
+        ticker=ticker,
+        base_weight=Decimal(weight),
+        dca_level=level,
+        concentration_capped=True,
+        market_share_pct=Decimal(share),
+        base_share_pct=Decimal(base),
+    )
+
+
+def test_capped_holding_gets_nothing_and_the_budget_goes_to_the_rest():
+    result = split_contribution(
+        Decimal("300"), [_capped("POOL", "1", 4, "80", "33.3"), _cand("UBER", "1", 1), _cand("MSFT", "1", 2)]
+    )
+    rows = {row["ticker"]: row for row in result["allocations"]}
+    assert rows["POOL"]["amount"] == 0.0
+    assert rows["POOL"]["multiplier"] == 16  # el nivel no cambia; solo el tope lo deja fuera este mes
+    assert rows["POOL"]["concentration_capped"] is True
+    assert rows["POOL"]["market_share_pct"] == 80.0 and rows["POOL"]["base_share_pct"] == 33.3
+    assert rows["POOL"]["reason"] == (
+        "4X DCA: ya pesa el 80,0 % del plan, más del doble de su peso objetivo (33,3 %); "
+        "este mes no recibe aportación"
+    )
+    # 1X pesa 1 y 2X pesa 4: 60 / 240, y la cuota del mes no cambia.
+    assert rows["UBER"]["amount"] == 60.0 and rows["MSFT"]["amount"] == 240.0
+    assert rows["UBER"]["concentration_capped"] is False
+    assert result["unallocated"] == 0.0
+
+
+def test_cap_never_leaves_the_month_without_a_destination():
+    """Si el tope dejaría todo a cero (el resto está en recorte), se ignora: la cuota se aporta igual."""
+    result = split_contribution(Decimal("300"), [_capped("POOL", "1", 2, "90", "50"), _cand("UBER", "1", -1)])
+    rows = {row["ticker"]: row for row in result["allocations"]}
+    assert result["status"] == "ok"
+    assert rows["POOL"]["amount"] == 300.0
+    assert rows["POOL"]["concentration_capped"] is False
+    assert rows["POOL"]["reason"] == "2X DCA: peso ×4"
+
+
+def _position(db: Session, company: Company, qty: str, value_base: str | None, base: str = "EUR") -> None:
+    db.add(
+        Position(
+            company_id=company.id,
+            quantity=Decimal(qty),
+            currency="USD",
+            base_currency=base,
+            market_value_base=None if value_base is None else Decimal(value_base),
+        )
+    )
+
+
+def test_build_caps_a_holding_over_twice_its_equal_weight(db):
+    pool, uber, msft = (_company(db, t) for t in ("POOL", "UBER", "MSFT"))
+    _plan(db, [{"kind": "sector", "label": "Tech", "target_pct": 50, "band_pct": 5}])
+    # Peso base 1/3 cada una; POOL ya es el 80 % (> 2 × 33,3 %).
+    for company, value in ((pool, "800"), (uber, "100"), (msft, "100")):
+        _position(db, company, "1", value)
+    db.commit()
+    _dca_table(db, [("POOL", pool.id, 4), ("UBER", uber.id, 1), ("MSFT", msft.id, 2)])
+    result = build_contribution_split(db)
+    rows = {row["ticker"]: row for row in result["allocations"]}
+    assert rows["POOL"]["amount"] == 0.0 and rows["POOL"]["concentration_capped"] is True
+    assert rows["UBER"]["amount"] == 60.0 and rows["MSFT"]["amount"] == 240.0
+    assert sum(row["amount"] for row in result["allocations"]) == 300.0
+    assert (
+        "Sin aportación nueva este mes a POOL: ya pesa más del doble de su peso objetivo en el plan."
+        in result["notes"]
+    )
+
+
+def test_build_uses_ticker_targets_as_base_weight_and_sums_portfolios(db):
+    pool, uber = _company(db, "POOL"), _company(db, "UBER")
+    _plan(
+        db,
+        [
+            {"kind": "ticker", "label": "POOL", "target_pct": 20, "band_pct": 5},
+            {"kind": "ticker", "label": "UBER", "target_pct": 80, "band_pct": 5},
+        ],
+    )
+    # POOL en dos carteras: 300 + 200 = 500 de 1.000 = 50 % > 2 × 20 %.
+    _position(db, pool, "1", "300")
+    _position(db, pool, "1", "200")
+    _position(db, uber, "1", "500")
+    db.commit()
+    _dca_table(db, [("POOL", pool.id, 1), ("UBER", uber.id, 1)])
+    rows = {row["ticker"]: row for row in build_contribution_split(db)["allocations"]}
+    assert rows["POOL"]["concentration_capped"] is True and rows["POOL"]["amount"] == 0.0
+    assert rows["POOL"]["market_share_pct"] == 50.0 and rows["POOL"]["base_share_pct"] == 20.0
+    assert rows["UBER"]["amount"] == 300.0
+
+
+def test_build_at_exactly_twice_is_not_capped_and_plan_tickers_without_position_count_zero(db):
+    pool, uber, msft = (_company(db, t) for t in ("POOL", "UBER", "MSFT"))
+    _plan(
+        db,
+        [
+            {"kind": "ticker", "label": t, "target_pct": 25, "band_pct": 5}
+            for t in ("POOL", "UBER", "MSFT", "NVDA")
+        ],
+    )
+    # POOL 50 % = 2 × 25 %: justo en el límite, no se topa. NVDA sin posición ni empresa: valor 0.
+    _position(db, pool, "1", "500")
+    _position(db, uber, "1", "250")
+    _position(db, msft, "1", "250")
+    db.commit()
+    rows = {row["ticker"]: row for row in build_contribution_split(db)["allocations"]}
+    assert not any(row["concentration_capped"] for row in rows.values())
+    assert rows["POOL"]["market_share_pct"] == 50.0
+    assert rows["NVDA"]["market_share_pct"] == 0.0
+    assert all(row["amount"] == 75.0 for row in rows.values())
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        ("800", None, "100"),  # una posición viva sin valor de mercado: no se sabe cuánto pesa
+        ("800", "0", "100"),  # valor 0 con cantidad > 0 = sin precio
+    ],
+)
+def test_build_without_reliable_market_values_does_not_cap(db, values):
+    companies = [_company(db, t) for t in ("POOL", "UBER", "MSFT")]
+    _plan(db, [{"kind": "sector", "label": "Tech", "target_pct": 50, "band_pct": 5}])
+    for company, value in zip(companies, values, strict=True):
+        _position(db, company, "1", value)
+    db.commit()
+    rows = build_contribution_split(db)["allocations"]
+    assert not any(row["concentration_capped"] for row in rows)
+    assert all(row["market_share_pct"] is None for row in rows)
+    assert sorted(row["amount"] for row in rows) == [100.0, 100.0, 100.0]
+
+
+def test_build_with_mixed_base_currencies_does_not_cap(db):
+    pool, uber, msft = (_company(db, t) for t in ("POOL", "UBER", "MSFT"))
+    _plan(db, [{"kind": "sector", "label": "Tech", "target_pct": 50, "band_pct": 5}])
+    _position(db, pool, "1", "800", base="USD")
+    _position(db, uber, "1", "100")
+    _position(db, msft, "1", "100")
+    db.commit()
+    rows = build_contribution_split(db)["allocations"]
+    assert not any(row["concentration_capped"] for row in rows)
+
+
+def test_other_tenant_positions_do_not_count_for_the_cap(db):
+    from sqlalchemy import text as _text
+
+    pool, uber, msft = (_company(db, t) for t in ("POOL", "UBER", "MSFT"))
+    _plan(db, [{"kind": "sector", "label": "Tech", "target_pct": 50, "band_pct": 5}])
+    for company in (pool, uber, msft):
+        _position(db, company, "1", "100")
+    db.commit()
+    # Otro usuario con 10.000 en POOL: no puede topar el plan de este.
+    db.execute(_text(
+        "INSERT INTO positions (tenant_id, company_id, quantity, average_cost, market_price, market_value,"
+        " unrealized_pnl, realized_pnl, currency, base_currency, market_value_base, source, as_of, created_at,"
+        " updated_at) VALUES ('otro', :c, 1, 0, 0, 0, 0, 0, 'USD', 'EUR', 10000, 'manual', '2026-10-01',"
+        " '2026-10-01', '2026-10-01')"
+    ), {"c": pool.id})
+    db.commit()
+    rows = {row["ticker"]: row for row in build_contribution_split(db)["allocations"]}
+    assert rows["POOL"]["concentration_capped"] is False
+    assert rows["POOL"]["market_share_pct"] == 33.3
+    assert rows["POOL"]["amount"] == 100.0

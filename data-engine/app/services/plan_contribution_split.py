@@ -9,9 +9,24 @@ entre sus tickers:
 - Base ``posiciones_iguales``: sin objetivos por ticker, las posiciones vivas
   (cantidad > 0) a partes iguales.
 
-Cada peso base se multiplica por el nivel DCA del motor (``dca_signal_states``):
-4X pesa 4, 3X 3, 2X 2, 1X 1 y las zonas de recorte (-1/-2) pesan 0: no se
-aporta dinero nuevo a un valor que el motor manda recortar.
+Cada peso base se multiplica por el cuadrado del nivel DCA del motor
+(``dca_signal_states``): 4X pesa 16, 3X 9, 2X 4, 1X 1 y las zonas de recorte
+(-1/-2) pesan 0: no se aporta dinero nuevo a un valor que el motor manda
+recortar. La cuota del mes no cambia: el nivel solo mueve el reparto.
+
+Por que el cuadrado (backtest gerarai-dcaplano, 2-nov-2026, 600 carteras
+aleatorias de 10-20 valores del S&P 500, mismo dinero y fechas que el DCA
+plano): fuera de muestra (2013-2026) nivel² gana al DCA plano por +1,3 puntos
+de TIR en el 82 % de las carteras, frente a +0,6 del peso ×nivel anterior; al
+reves (1996-2012) +1,2, y gana en las 21 ventanas de 10 anos.
+
+Tope de concentracion: un ticker que ya pesa mas del doble de su peso base en
+la cartera del plan (valor de mercado en divisa base de sus posiciones vivas,
+sumando carteras) no recibe aportacion este mes; su parte va al resto. Mismo
+backtest: el peso maximo mediano baja del 44 % al 39 % y conserva +1,1 puntos.
+Solo se aplica con valores fiables (todas las posiciones vivas del plan con
+valor > 0 en una misma divisa base) y nunca deja el mes sin destino: si el tope
+dejaria todo a cero, se ignora.
 
 Degrada limpio: si la tabla ``dca_signal_states`` no existe (el motor DCA aun
 no esta desplegado) o un ticker no tiene nivel, ese ticker pesa como 1X y la
@@ -21,7 +36,7 @@ cuota queda sin asignar (liquidez) y se dice.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
@@ -35,7 +50,8 @@ from app.models import Company, Position
 from app.services.investment_plan_service import InvestmentPlanService
 
 DCA_TABLE = "dca_signal_states"
-DCA_MULTIPLIER: dict[int, int] = {4: 4, 3: 3, 2: 2, 1: 1, -1: 0, -2: 0}
+# Peso = nivel² (ver docstring); los recortes no reciben aportacion.
+DCA_MULTIPLIER: dict[int, int] = {4: 16, 3: 9, 2: 4, 1: 1, -1: 0, -2: 0}
 DCA_LABELS: dict[int, str] = {
     4: "4X DCA",
     3: "3X DCA",
@@ -48,6 +64,8 @@ _CENT = Decimal("0.01")
 # Un nivel DCA vale para el mes en formacion o el ultimo confirmado. Uno mas
 # viejo (ticker que dejo de evaluarse, motor parado) no dice nada de este mes.
 DCA_MAX_AGE_MONTHS = 1
+# Sin aportacion nueva a un ticker que pesa mas de CONCENTRATION_CAP x su peso base.
+CONCENTRATION_CAP = Decimal(2)
 
 
 def _today() -> date:
@@ -74,12 +92,20 @@ class SplitCandidate:
     dca_period: str | None = None
     dca_status: str | None = None
     dca_stale: bool = False
+    concentration_capped: bool = False
+    market_share_pct: Decimal | None = None
+    base_share_pct: Decimal | None = None
 
 
 def _money_es(value: Decimal) -> str:
     """225.5 -> «225,50» (miles con punto)."""
     text = f"{value.quantize(_CENT, rounding=ROUND_HALF_UP):,.2f}"
     return text.replace(",", "_").replace(".", ",").replace("_", ".")
+
+
+def _pct_es(value: Decimal) -> str:
+    """80 -> «80,0»."""
+    return f"{value.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP)}".replace(".", ",")
 
 
 def _multiplier(level: int | None) -> int:
@@ -90,6 +116,17 @@ def _multiplier(level: int | None) -> int:
 
 def _reason(candidate: SplitCandidate) -> str:
     level = candidate.dca_level
+    if candidate.concentration_capped:
+        if level is not None:
+            label = DCA_LABELS.get(int(level), f"nivel {level}")
+        else:
+            label = "nivel DCA caducado" if candidate.dca_stale else "sin nivel DCA"
+        share = _pct_es(candidate.market_share_pct or Decimal(0))
+        base = _pct_es(candidate.base_share_pct or Decimal(0))
+        return (
+            f"{label}: ya pesa el {share} % del plan, más del doble de su peso objetivo ({base} %); "
+            "este mes no recibe aportación"
+        )
     if candidate.dca_stale:
         return f"nivel DCA caducado (mes {candidate.dca_period or 's/d'}): peso normal (1X) hasta reevaluar"
     if level is None:
@@ -103,10 +140,16 @@ def _reason(candidate: SplitCandidate) -> str:
 def split_contribution(amount: Decimal, candidates: list[SplitCandidate]) -> dict[str, Any]:
     """Reparto puro: importes al centimo y la suma cuadra con ``amount``."""
     amount = Decimal(amount).quantize(_CENT, rounding=ROUND_HALF_UP)
-    effective = [
-        (candidate, max(Decimal(candidate.base_weight), Decimal(0)) * _multiplier(candidate.dca_level))
-        for candidate in candidates
-    ]
+
+    def _weight(candidate: SplitCandidate) -> Decimal:
+        if candidate.concentration_capped:
+            return Decimal(0)
+        return max(Decimal(candidate.base_weight), Decimal(0)) * _multiplier(candidate.dca_level)
+
+    if candidates and sum((_weight(c) for c in candidates), Decimal(0)) <= 0:
+        # El tope nunca deja el mes sin destino: si todo lo demas esta en recorte, se ignora.
+        candidates = [replace(c, concentration_capped=False) for c in candidates]
+    effective = [(candidate, _weight(candidate)) for candidate in candidates]
     total_weight = sum((weight for _, weight in effective), Decimal(0))
     amounts: list[Decimal] = []
     if total_weight > 0:
@@ -139,6 +182,9 @@ def split_contribution(amount: Decimal, candidates: list[SplitCandidate]) -> dic
                 "dca_status": candidate.dca_status,
                 "dca_stale": candidate.dca_stale,
                 "multiplier": _multiplier(candidate.dca_level),
+                "concentration_capped": candidate.concentration_capped,
+                "market_share_pct": _pct_float(candidate.market_share_pct),
+                "base_share_pct": _pct_float(candidate.base_share_pct),
                 "reason": _reason(candidate),
             }
         )
@@ -154,6 +200,64 @@ def split_contribution(amount: Decimal, candidates: list[SplitCandidate]) -> dic
         "allocations": allocations,
         "unallocated": float(amount - allocated),
     }
+
+
+def _pct_float(value: Decimal | None) -> float | None:
+    return None if value is None else float(value.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
+
+
+def _plan_market_values(db: Session, companies: dict[str, Company]) -> dict[str, Decimal] | None:
+    """Valor de mercado en divisa base de las posiciones vivas de cada ticker del plan.
+
+    None si no es fiable: alguna posicion viva sin valor (o con valor 0, sin
+    precio), divisas base distintas o nada invertido. Entonces no hay tope.
+    """
+    tickers_by_id = {company.id: ticker for ticker, company in companies.items()}
+    if not tickers_by_id:
+        return None
+    statement = select(Position.company_id, Position.market_value_base, Position.base_currency).where(
+        Position.company_id.in_(list(tickers_by_id)), Position.quantity > 0
+    )
+    tenant_id = db.info.get("tenant_id")
+    if tenant_id is not None:
+        # Segunda capa sobre el filtro de tenant de la sesion: solo posiciones del usuario.
+        statement = statement.where(Position.tenant_id == tenant_id)
+    rows = db.execute(statement).all()
+    values: dict[str, Decimal] = {}
+    base_currencies: set[str] = set()
+    for company_id, value, base_currency in rows:
+        if value is None or Decimal(value) <= 0:
+            return None
+        base_currencies.add(str(base_currency or "").upper())
+        ticker = tickers_by_id[company_id]
+        values[ticker] = values.get(ticker, Decimal(0)) + Decimal(value)
+    if len(base_currencies) != 1 or sum(values.values(), Decimal(0)) <= 0:
+        return None
+    return values
+
+
+def _apply_concentration_cap(
+    candidates: list[SplitCandidate], values: dict[str, Decimal] | None
+) -> list[SplitCandidate]:
+    if values is None:
+        return candidates
+    total_value = sum(values.values(), Decimal(0))
+    total_base = sum((max(Decimal(c.base_weight), Decimal(0)) for c in candidates), Decimal(0))
+    if total_value <= 0 or total_base <= 0:
+        return candidates
+    capped: list[SplitCandidate] = []
+    for candidate in candidates:
+        share = values.get(candidate.ticker, Decimal(0)) / total_value * 100
+        base = max(Decimal(candidate.base_weight), Decimal(0)) / total_base * 100
+        capped.append(
+            replace(
+                candidate,
+                concentration_capped=share > CONCENTRATION_CAP * base,
+                market_share_pct=share,
+                base_share_pct=base,
+            )
+        )
+    return capped
 
 
 def dca_table_available(db: Session) -> bool:
@@ -272,8 +376,17 @@ def build_contribution_split(db: Session) -> dict[str, Any]:
     if dca_available and candidates and all(c.dca_level is None and not c.dca_stale for c in candidates):
         notes.append("Ningún ticker del plan tiene nivel DCA calculado: todos pesan como 1X.")
 
+    candidates = _apply_concentration_cap(candidates, _plan_market_values(db, companies))
     amount = Decimal(plan.monthly_contribution)
     result = split_contribution(amount, candidates)
+    capped_tickers = [row["ticker"] for row in result["allocations"] if row["concentration_capped"]]
+    if capped_tickers:
+        notes.append(
+            "Sin aportación nueva este mes a "
+            + ", ".join(capped_tickers)
+            + (": ya pesan" if len(capped_tickers) > 1 else ": ya pesa")
+            + " más del doble de su peso objetivo en el plan."
+        )
     unit = f" {currency}" if currency else ""
     summary = None
     funded = [row for row in result["allocations"] if row["amount"] > 0]

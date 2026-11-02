@@ -108,6 +108,14 @@ async def lifespan(_: FastAPI):
         _start_embedder_warmup(settings)
 
     if settings.app_env.lower() != "test":
+        # Lo vivo tras el arranque (modulos, ORM, esquemas) ya no lo recorre el
+        # GC en cada peticion: /portfolio/intelligence 1,72 -> 1,49 s con 300
+        # posiciones. En tests no: el proceso de pytest arranca muchas apps.
+        from app.core.gc_tuning import freeze_startup_heap
+
+        freeze_startup_heap()
+
+    if settings.app_env.lower() != "test":
         # FastAPI construye cada ruta perezosamente en la primera peticion que
         # la recorre (cientos de ms tras cada arranque). Se adelanta en un hilo
         # de fondo; en tests no, porque cada TestClient arrancaria otro hilo.
