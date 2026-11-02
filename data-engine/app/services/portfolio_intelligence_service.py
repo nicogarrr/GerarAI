@@ -1088,36 +1088,44 @@ class PortfolioIntelligenceService:
             return canon.setdefault(candidate, candidate)
 
         computed: dict[tuple[int, int], tuple[float | None, int]] = {}
-        for _, left_company in rows:
-            result[left_company.ticker] = {}
-            observations[left_company.ticker] = {}
-            for _, right_company in rows:
-                mirrored = computed.get((right_company.id, left_company.id))
+        # Id y ticker de cada fila leidos una vez: el doble bucle hace P^2
+        # iteraciones (90.000 con 300 posiciones) y cada acceso a un atributo
+        # ORM (company.id, company.ticker) pasa por el descriptor de
+        # SQLAlchemy; eran ~1 millon de lecturas por peticion. Mismas
+        # escrituras, en el mismo orden, sobre los mismos diccionarios.
+        entries = [(company.id, company.ticker) for _, company in rows]
+        for left_id, left_ticker in entries:
+            result_row: dict[str, float | None] = {}
+            observations_row: dict[str, int] = {}
+            result[left_ticker] = result_row
+            observations[left_ticker] = observations_row
+            left = returns.get(left_id, {})
+            for right_id, right_ticker in entries:
+                mirrored = computed.get((right_id, left_id))
                 if mirrored is not None:
                     correlation, count = mirrored
-                    observations[left_company.ticker][right_company.ticker] = count
-                    result[left_company.ticker][right_company.ticker] = correlation
+                    observations_row[right_ticker] = count
+                    result_row[right_ticker] = correlation
                     continue
-                left = returns.get(left_company.id, {})
-                right = returns.get(right_company.id, {})
-                dates = _common_dates(left_company.id, left, right_company.id, right)
-                observations[left_company.ticker][right_company.ticker] = len(dates)
-                if left_company.id == right_company.id and dates:
+                right = returns.get(right_id, {})
+                dates = _common_dates(left_id, left, right_id, right)
+                observations_row[right_ticker] = len(dates)
+                if left_id == right_id and dates:
                     correlation: float | None = 1.0
                 elif len(dates) < cls.MIN_CORRELATION_OBSERVATIONS:
                     # Historico insuficiente: N/D, no un coeficiente de ruido.
                     correlation = None
                 else:
-                    x_dev, x_ss = _cached_deviations(left_company.id, left, dates)
-                    y_dev, y_ss = _cached_deviations(right_company.id, right, dates)
+                    x_dev, x_ss = _cached_deviations(left_id, left, dates)
+                    y_dev, y_ss = _cached_deviations(right_id, right, dates)
                     # sum(map(mul, ...)) suma los mismos productos en el mismo
                     # orden que el generador con zip: identico bit a bit, ~2x
                     # mas rapido al ejecutar la multiplicacion en C.
                     numerator = sum(map(mul, x_dev, y_dev))
                     denominator = math.sqrt(x_ss * y_ss)
                     correlation = numerator / denominator if denominator else None
-                computed[(left_company.id, right_company.id)] = (correlation, len(dates))
-                result[left_company.ticker][right_company.ticker] = correlation
+                computed[(left_id, right_id)] = (correlation, len(dates))
+                result_row[right_ticker] = correlation
         return result, observations
 
     @staticmethod
