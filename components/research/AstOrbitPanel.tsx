@@ -6,6 +6,7 @@ import { Panel } from '@/components/ui/panel';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locale';
 import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 import { AstSmaChart } from '@/components/research/AstSmaChart';
+import { astCatalogReading, astUsageNote } from '@/lib/research/ast-catalog-text';
 
 function SourceObjects({ objects, t, locale }: { objects: AstOrbitObject[]; t: TranslateFn; locale: Locale }) {
   const num = (value: number | null, options: Intl.NumberFormatOptions) => formatNumber(value, options, undefined, locale);
@@ -23,16 +24,17 @@ function SourceObjects({ objects, t, locale }: { objects: AstOrbitObject[]; t: T
   </ul>;
 }
 
-function CatalogReading({ analysis, t }: { analysis: AstsAnalysis | null; t: TranslateFn }) {
+function CatalogReading({ analysis, t, locale }: { analysis: AstsAnalysis | null; t: TranslateFn; locale: Locale }) {
   const reading = analysis?.status === 'disponible' ? analysis.analysis : null;
   if (!analysis || !reading) {
     return <Panel title={t('research.astOrbit.catalogReading')}><p className="text-sm text-gray-400">{analysis ? t('research.astOrbit.catalogStale') : t('research.astOrbit.catalogUnavailable')}</p></Panel>;
   }
   const interpretation = reading.llm_interpretation;
+  const shown = astCatalogReading(reading, analysis.source?.fetched_at, locale);
   return <Panel title={t('research.astOrbit.catalogReading')}>
-    <p className="text-sm leading-6 text-gray-300">{reading.summary}</p>
+    <p className="text-sm leading-6 text-gray-300">{shown.summary}</p>
     <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-gray-300">
-      {reading.observations.map((item) => <li key={item.text}>{item.text}</li>)}
+      {shown.observations.map((item) => <li key={item.text}>{item.text}</li>)}
     </ul>
     {interpretation ? <div className="mt-4 rounded-md border border-gray-800 p-3">
       <h3 className="text-sm font-semibold text-gray-100">{t('research.astOrbit.aiInterpretation')}</h3>
@@ -50,10 +52,10 @@ export function AstOrbitPanel({ data, analysis, locale = DEFAULT_LOCALE }: { dat
   const supgp = data?.supgp;
   return <div className="space-y-5">
     <Panel title={t('research.astOrbit.title')} description={t('research.astOrbit.description')}>
-      <p className="text-sm leading-6 text-gray-300">{data?.usage_note ?? t('research.astOrbit.usageFallback')}</p>
+      <p className="text-sm leading-6 text-gray-300">{astUsageNote(data?.usage_note, locale) ?? t('research.astOrbit.usageFallback')}</p>
       <p className="mt-3 text-xs text-gray-500">{t('research.astOrbit.cadence', { hours: data?.cadence_hours ?? 2 })}</p>
     </Panel>
-    <CatalogReading analysis={analysis} t={t} />
+    <CatalogReading analysis={analysis} locale={locale} t={t} />
     <section className="space-y-3" aria-label={t('research.astOrbit.gpHistory')}>
       <h2 className="text-lg font-semibold text-gray-100">{t('research.astOrbit.gpCatalog')}</h2>
       <p className="text-xs text-gray-400">{t('research.astOrbit.gpLastDownload', { date: data?.fetched_at ? dt(data.fetched_at) : t('research.astOrbit.noData') })}</p>

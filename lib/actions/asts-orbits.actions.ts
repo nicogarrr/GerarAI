@@ -51,6 +51,18 @@ export type AstsAnalysis = {
     summary: string;
     observations: { text: string }[];
     llm_interpretation: { summary: string; observations: { text: string }[] } | null;
+    // Agregados del catálogo con los que el backend escribe la lectura determinista.
+    aggregates?: {
+      count: number;
+      families: Record<string, number>;
+      epoch_min: string;
+      epoch_max: string;
+      inclination_deg_min: number;
+      inclination_deg_max: number;
+      mean_motion_rev_day_min: number;
+      mean_motion_rev_day_max: number;
+      eccentricity_max: number;
+    };
   } | null;
 };
 
