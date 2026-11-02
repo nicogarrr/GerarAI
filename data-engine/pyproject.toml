@@ -40,6 +40,9 @@ dependencies = [
     # XIRR en Rust (portfolio_intelligence_service.solve_xirr): wheels para
     # linux x86_64 y aarch64 (VM ARM) en cp312; sin dependencias.
     "pyxirr>=0.10.8,<0.11",
+    # Calendarios oficiales de bolsa (app/services/market_calendar.py, solo
+    # helper sin cablear): Python puro (wheel py3-none-any, vale en ARM).
+    "exchange-calendars>=4.13.2,<5",
     "hmmlearn>=0.3.3,<0.4",
     "numpy>=1.24.0,<3",
     "matplotlib>=3.7.0,<4",
