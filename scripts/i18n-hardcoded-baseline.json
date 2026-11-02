@@ -54,6 +54,7 @@
   "components/research/SourceAuditDetail.tsx": 1,
   "components/research/ThesisExportMenu.tsx": 2,
   "components/research/ThesisMemo.tsx": 12,
+  "components/settings/LlmSettingsForm.tsx": 4,
   "lib/access-request.ts": 8,
   "lib/alerts/delivery-labels.ts": 1,
   "lib/audit-status-copy.ts": 11,

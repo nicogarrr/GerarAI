@@ -142,6 +142,15 @@
     "providerCustom": "Other OpenAI-compatible",
     "saved": "AI settings saved",
     "testFailed": "Couldn't check your key. Check the provider and API key; if it keeps failing, try again later.",
+    "testMessage": {
+      "timeout": "The provider did not answer within 5 seconds.",
+      "unreachable": "Could not connect to the provider.",
+      "nonPublic": "The provider URL points to a non-public address.",
+      "http": "The provider answered HTTP {code}.",
+      "noModelList": "The provider answered, but without a readable model list: the model could not be checked.",
+      "modelMissing": "The model '{model}' does not exist at this provider. Check the exact name in its model list.",
+      "ok": "Connection OK."
+    },
     "formAria": "AI model settings",
     "billingTenant": "The key and the cost are yours",
     "billingPlatform": "Paid by GerarAI",

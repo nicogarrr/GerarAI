@@ -18,6 +18,7 @@ import {
     type LlmTestResult,
 } from '@/lib/actions/llm-settings.actions';
 import { useT } from '@/lib/i18n/client';
+import type { TranslationKey } from '@/lib/i18n/t';
 import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 import { showErrorToast } from '@/lib/toast';
 
@@ -64,6 +65,27 @@ export function statusMessage(settings: LlmSettings, t: TranslateFn = esT): stri
         if (settings.status === 'disabled') return t('settings.llm.statusMessage.disabled');
     }
     return settings.message;
+}
+
+/** Resultado de «Probar conexión»: el servidor manda la frase solo en castellano
+ *  (tenant_llm_settings_service.py). Se reconoce y se pinta en el idioma de la
+ *  interfaz; si no se reconoce, se usa la suya. */
+const TEST_FIXED: Record<string, TranslationKey> = {
+    'El proveedor no respondio en 5 segundos.': 'settings.llm.testMessage.timeout',
+    'No se pudo conectar con el proveedor.': 'settings.llm.testMessage.unreachable',
+    'La URL del proveedor apunta a una direccion no publica.': 'settings.llm.testMessage.nonPublic',
+    'El proveedor respondio, pero sin una lista de modelos legible: no se pudo verificar el modelo.': 'settings.llm.testMessage.noModelList',
+    'Conexion correcta.': 'settings.llm.testMessage.ok',
+};
+
+export function testResultMessage(result: Pick<LlmTestResult, 'message' | 'model'>, t: TranslateFn = esT): string {
+    const fixed = TEST_FIXED[result.message];
+    if (fixed) return t(fixed);
+    const http = /^El proveedor respondio HTTP (\d{3})\.$/.exec(result.message);
+    if (http) return t('settings.llm.testMessage.http', { code: http[1] });
+    const missing = /^El modelo '(.*)' no existe en este proveedor\. Revisa el nombre exacto en su lista de modelos\.$/.exec(result.message);
+    if (missing) return t('settings.llm.testMessage.modelMissing', { model: missing[1] });
+    return result.message;
 }
 
 /** Nombre del proveedor: el «otro compatible» viene del servidor en castellano. */
@@ -156,11 +178,12 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                 base_url: isCustom ? baseUrl.trim() : null,
                 ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}),
             });
-            setTestResult(result);
+            const message = testResultMessage(result, t);
+            setTestResult({ ...result, message });
             if (result.ok) {
-                toast.success(result.message);
+                toast.success(message);
             } else {
-                toast.error(result.message);
+                toast.error(message);
             }
         } catch {
             // Never reflect an upstream URL/key. Keep recovery in the form,
