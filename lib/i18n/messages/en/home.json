@@ -87,6 +87,7 @@
     "weightsNote": "Weights over the gross value of the positions.",
     "empty": "You have no positions yet. Add your first investment to see here what changed since the purchase.",
     "noCostBasis": "We don't have the cost basis of your positions yet. Once it's loaded, you'll see here how your portfolio is doing since the purchase.",
+    "noQuote": "There's no quote for your positions yet. Once there is, you'll see here how your portfolio is doing since the purchase.",
     "partial": "Among the positions with a cost basis: the gain/loss does not include the others.",
     "reviewMover": "Review {symbol} (largest move since purchase)",
     "reviewAll": "Review your portfolio"
@@ -113,6 +114,7 @@
     "lastNOfTotal": "The latest {n} added of {total}",
     "totalCount": "{total} in total",
     "empty": "You are not following any companies yet.",
+    "addCompanies": "Add companies",
     "seeFullList": "see the full list"
   },
   "opportunities": {
