@@ -433,7 +433,7 @@ class ThesisProjectionService:
             cagr,
             LABEL_INFERIDO,
             f"CAGR de ingresos FY{first_year}-FY{last_year} sobre facts anuales "
-            f"({span} años); la historia no garantiza el futuro",
+            f"({span} {'año' if span == 1 else 'años'}); la historia no garantiza el futuro",
         )
 
     def _growth(
