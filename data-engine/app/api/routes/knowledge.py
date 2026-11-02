@@ -1,10 +1,10 @@
 import logging
 from datetime import date
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
-from pydantic import BaseModel, Field, HttpUrl, TypeAdapter, ValidationError
+from pydantic import BaseModel, Field, HttpUrl, TypeAdapter, ValidationError, field_validator
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -13,6 +13,7 @@ from app.core.database import get_db
 from app.core.errors import safe_detail
 from app.core.tenancy import tenant_filters
 from app.models import (
+    Company,
     InvestmentPrinciple,
     KnowledgeChunk,
     KnowledgeCollection,
@@ -123,6 +124,13 @@ class PrincipleRevision(BaseModel):
     author: str | None = Field(default=None, max_length=240)
     confidence: float | None = Field(default=None, ge=0, le=1)
     actor: str = Field(default="user", min_length=1, max_length=160)
+
+    @field_validator("principle", "category", "exact_fragment", mode="before")
+    @classmethod
+    def _strip_before_length(cls, value: Any) -> Any:
+        # La longitud mínima se mide sin espacios: «     » pasaba min_length y
+        # acababa en 409 (principio) o guardado vacío (categoría, fragmento).
+        return value.strip() if isinstance(value, str) else value
 
 
 def _collection(collection: KnowledgeCollection) -> dict:
@@ -609,6 +617,14 @@ def revise_principle(
     changes = payload.model_dump(exclude={"actor"}, exclude_none=True)
     if not changes:
         raise HTTPException(status_code=400, detail="At least one revision field is required")
+    if "applies_to_company_ids" in changes:
+        # Antes se guardaba cualquier id (0, negativos, empresas inexistentes).
+        company_ids = list(dict.fromkeys(changes["applies_to_company_ids"]))
+        known = set(db.scalars(select(Company.id).where(Company.id.in_(company_ids))))
+        missing = [item for item in company_ids if item not in known]
+        if missing:
+            raise HTTPException(status_code=422, detail=f"Unknown company ids: {missing}")
+        changes["applies_to_company_ids"] = company_ids
     try:
         return _principle(
             KnowledgeLibraryService().revise_principle(
