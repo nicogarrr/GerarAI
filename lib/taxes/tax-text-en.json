@@ -154,6 +154,14 @@
       "{n} fund/ETF trades in {currency} (V0775-21, difference assigned on redemption): out of scope"
     ],
     [
+      "1 movimiento en {currency} sin modelar (dividendos, intereses, retenciones u otros; activar fx_income_by_analogy para tratarlos por analogia)",
+      "1 {currency} movement not modelled (dividends, interest, withholdings or others; turn on income by analogy to treat them by analogy)"
+    ],
+    [
+      "1 operación con fondos/ETF en {currency} (V0775-21, diferencia imputada al reembolsar): fuera de alcance",
+      "1 fund/ETF trade in {currency} (V0775-21, difference assigned on redemption): out of scope"
+    ],
+    [
       "cambios a otra divisa distinta de EUR no soportados: {list}",
       "conversions to a currency other than EUR not supported: {list}"
     ],
