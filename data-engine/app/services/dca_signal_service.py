@@ -46,7 +46,7 @@ from time import monotonic as _monotonic
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import Float, cast, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -317,20 +317,23 @@ def _db_history(db: Session, company: Company | None) -> FetchedHistory:
     # Columnas, no entidades: son años de cierres por ticker y construir un
     # MarketPrice ORM por fila era casi todo el coste de la evaluacion DCA
     # (400 tickers x 5 años = ~520.000 objetos). MarketPrice no es de tenant.
-    # El cierre se pasa a float una vez (antes dos: al filtrar y al escalar).
+    # Los cierres llegan ya como float (CAST a double en la base: el mismo
+    # redondeo correcto que float(Decimal), sin un Decimal por fila) y por Core
+    # (sin la capa de resultados ORM; al no ser de tenant no hay criteria que
+    # perder). Fijado por tests/test_dca_db_history_float.py.
     prices = [
-        (day, close_float, adj_close, quote_currency)
-        for day, close, adj_close, quote_currency in db.execute(
+        (day, close, adj_close, quote_currency)
+        for day, close, adj_close, quote_currency in db.connection().execute(
             select(
                 MarketPrice.date,
-                MarketPrice.close,
-                MarketPrice.adj_close,
+                cast(MarketPrice.close, Float),
+                cast(MarketPrice.adj_close, Float),
                 MarketPrice.quote_currency,
             )
             .where(MarketPrice.company_id == company.id)
             .order_by(MarketPrice.date)
         )
-        if close and (close_float := float(close)) > 0
+        if close and close > 0
     ]
     declared = [quote for _day, _close, _adj, quote in prices if quote]
     unit = declared[-1] if declared else company.currency
