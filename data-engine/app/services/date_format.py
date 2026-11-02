@@ -12,10 +12,43 @@ from __future__ import annotations
 from datetime import date, datetime
 
 # Meses abreviados igual que Intl.DateTimeFormat('es-ES', {month: 'short'}).
+MONTHS_EN = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 MONTHS_ES = (
     "ene", "feb", "mar", "abr", "may", "jun",
     "jul", "ago", "sept", "oct", "nov", "dic",
 )
+
+
+def _as_day(value: date | datetime | str | None) -> date | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            return date.fromisoformat(text[:10])
+        except ValueError:
+            return None
+    return None
+
+
+def format_date_en(value: date | datetime | str | None) -> str | None:
+    """Fecha corta en-US («Sep 30, 2026»), como ``formatDate`` en inglés. None si no es fecha."""
+    parsed = _as_day(value)
+    if parsed is None:
+        return None
+    return f"{MONTHS_EN[parsed.month - 1]} {parsed.day}, {parsed.year}"
+
+
+def readable_date(value: date | datetime | str | None, language: str = "es") -> str:
+    """Fecha visible en el idioma pedido; si no es fecha reconocible, el texto tal cual."""
+    formatted = format_date_en(value) if language == "en" else format_date_es(value)
+    return formatted if formatted is not None else ("" if value is None else str(value))
 
 
 def format_date_es(value: date | datetime | str | None) -> str | None:

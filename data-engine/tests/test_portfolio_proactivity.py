@@ -57,7 +57,7 @@ def test_negative_cash_is_dated_not_debt_or_live_and_in_app_only(db):
     assert alert.metadata_['current_balance_verified'] is False
     assert alert.metadata_['debt_confirmed'] is False
     assert alert.metadata_['orders_enabled'] is False
-    assert '2026-01-01' in alert.message
+    assert '1 ene 2026' in alert.message and '2026-01-01' not in alert.message
     assert review_portfolio_data(db)['new_in_app_alerts'] == 0
     alert.status = 'resolved'; db.commit()
     assert review_portfolio_data(db)['new_in_app_alerts'] == 0
@@ -88,6 +88,10 @@ def test_explicit_band_uses_net_nav_with_cash_not_gross_and_is_dated(db):
     assert alert.metadata_['snapshot_is_live'] is False
     assert alert.channels == ['in_app']
     assert 'no es una orden' in alert.message
+    # Auditoría F1: la foto con su fecha legible, nunca ISO crudo.
+    snapshot_day = date.fromisoformat(alert.metadata_['as_of'])
+    assert f'En la foto del {snapshot_day.day} ' in alert.message
+    assert alert.metadata_['as_of'] not in alert.message
     assert review_portfolio_data(db)['new_in_app_alerts'] == 0
     alert.status = 'resolved'; db.commit()
     assert review_portfolio_data(db)['new_in_app_alerts'] == 0
@@ -129,4 +133,4 @@ def test_negative_cash_amount_in_spanish_number_format(db):
     db.add(CashBalance(tenant_id=1, currency='EUR', balance=Decimal('-1234.50'), source='ibkr', as_of=date(2026, 1, 1)))
     db.commit()
     assert review_portfolio_data(db)['new_in_app_alerts'] == 1
-    assert 'saldo de -1.234,50 EUR fechado' in alerts(db)[0].message
+    assert 'saldo de -1.234,50 EUR fechado el 1 ene 2026 ' in alerts(db)[0].message

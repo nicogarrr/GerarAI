@@ -17,6 +17,7 @@ from app.models import (
     PositionDailySnapshot,
     ResearchAlert,
 )
+from app.services.date_format import readable_date
 from app.services.number_format import format_number_es
 from app.services.review_alert_service import ReviewAlertService
 
@@ -57,7 +58,7 @@ def review_portfolio_data(db) -> dict:
         key = f'{currency}:{cash.balance}'
         emitted += _emit(db, kind='negative_cash_record', key=key,
             title=f'Revisa la caja registrada en {currency}',
-            message=f'Hay un saldo de {_money_es(cash.balance)} {currency} fechado {cash.as_of.isoformat()} '
+            message=f'Hay un saldo de {_money_es(cash.balance)} {currency} fechado el {readable_date(cash.as_of)} '
                 f'(fuente {cash.source}). Puede ser margen, un apunte pendiente o un dato antiguo: '
                 'no confirma deuda ni caja disponible hoy. Concílialo con tu broker antes de interpretar compras o el plan.',
             metadata={'currency': currency, 'recorded_balance': str(cash.balance),
@@ -102,7 +103,7 @@ def review_portfolio_data(db) -> dict:
         key = hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
         emitted += _emit(db, kind='above_saved_ticker_band', key=key,
             title=f'{ticker} supera la banda que guardaste en el plan',
-            message=f'En la foto del {snapshot.snapshot_date.isoformat()}, {ticker} pesa '
+            message=f'En la foto del {readable_date(snapshot.snapshot_date)}, {ticker} pesa '
                 f'{format_number_es(current)} % sobre patrimonio neto con caja ({snapshot.base_currency}). '
                 f'Tu objetivo guardado es {format_number_es(target_pct)} % con banda de '
                 f"{format_number_es(band)} punto{'' if band == 1 else 's'}. Revisa el reparto y los datos; "

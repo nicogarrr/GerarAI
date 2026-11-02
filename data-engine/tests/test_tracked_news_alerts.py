@@ -225,12 +225,12 @@ def test_alert_in_english_for_user_with_english_saved(db, monkeypatch):
         spanish = db.scalars(select(ResearchAlert)).one()
         assert english.title == "News about ASTS: ASTS ITU filing submitted"
         assert english.message == (
-            "Article from publisher.example, dated 2026-09-27 by publisher.example: ASTS ITU filing submitted. "
+            "Article from publisher.example, dated Sep 27, 2026 by publisher.example: ASTS ITU filing submitted. "
             "Check the source; the GDELT date is not the publication date and the headline alone does not confirm the facts."
         )
         assert english.metadata_["language"] == "en"
         assert spanish.title == "Noticia sobre ASTS: ASTS acquisition report"
-        assert spanish.message.startswith("Artículo de publisher.example, fechada el 2026-09-27 por publisher.example")
+        assert spanish.message.startswith("Artículo de publisher.example, fechada el 27 sept 2026 por publisher.example")
         assert "language" not in spanish.metadata_
     finally:
         monkeypatch.delenv("I18N_GENERATION_ENABLED")
@@ -245,4 +245,5 @@ def test_message_date_is_madrid_day_not_utc(db):
     db.info["tenant_id"] = t1.id
     assert evaluate(db, now=NOW)["created"] == 1
     alert = db.scalars(select(ResearchAlert)).one()
-    assert "2026-09-27" in alert.message and "2026-09-26" not in alert.message
+    assert "27 sept 2026" in alert.message and "26 sept 2026" not in alert.message
+    assert "2026-09-27" not in alert.message  # auditoría F1: nunca ISO crudo

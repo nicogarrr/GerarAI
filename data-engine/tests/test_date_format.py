@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from app.services.date_format import format_date_es
+from app.services.date_format import format_date_en, format_date_es, readable_date
 from app.services.number_format import format_percent_es
 
 
@@ -44,3 +44,12 @@ def test_porcentaje_negativo_que_redondea_a_cero_es_cero():
 def test_porcentaje_no_numerico_es_none():
     assert format_percent_es(None) is None
     assert format_percent_es("abc") is None
+
+
+def test_fecha_corta_en_y_readable_date():
+    assert format_date_en(date(2026, 9, 30)) == "Sep 30, 2026"
+    assert format_date_en("2026-11-03") == "Nov 3, 2026"
+    assert format_date_en("no es fecha") is None
+    assert readable_date("2026-11-03") == "3 nov 2026"
+    assert readable_date("2026-11-03", "en") == "Nov 3, 2026"
+    assert readable_date("mañana") == "mañana"

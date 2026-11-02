@@ -50,7 +50,8 @@ def test_caja_negativa_de_hoy_avisa_aunque_en_utc_sea_ayer(db, monkeypatch):
 
     assert proactivity.review_portfolio_data(db)["new_in_app_alerts"] == 1
     alert = db.scalars(select(ResearchAlert)).one()
-    assert MADRID_DAY.isoformat() in alert.message
+    # Día de Madrid, con la fecha legible (auditoría F1): «16 mar 2026».
+    assert f"fechado el {MADRID_DAY.day} mar {MADRID_DAY.year}" in alert.message
 
 
 def test_valoracion_retenida_hoy_queda_fechada_en_madrid(db, monkeypatch):
