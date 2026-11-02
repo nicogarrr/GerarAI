@@ -2,6 +2,7 @@ import ValuationSummaryGrid from '@/components/research/ValuationSummaryGrid';
 import { quoteObserved } from '@/lib/market/quote-observed';
 import type { Metadata } from 'next';
 import { getMarketIndicesResult, getMarketMoversResult } from '@/lib/actions/market.actions';
+import { marketIndexName } from '@/lib/market/index-name';
 import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 import { MoversTable } from '@/components/market/MoversTable';
 import BackendOffline from '@/components/system/BackendOffline';
@@ -392,7 +393,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
                 <div className="space-y-3">
                   {validIndices.map((i) => (
                     <div key={i.symbol} className="min-w-0 space-y-1 border-b border-gray-800 pb-3 last:border-0 last:pb-0">
-                      <span className="block text-sm leading-5 text-gray-300">{i.name}</span>
+                      <span className="block text-sm leading-5 text-gray-300">{marketIndexName(i, locale)}</span>
                       <div className="text-right">
                         <span className="font-semibold text-gray-100">{formatIndexValue(i)}{i.unit === 'index' ? ` ${t('screener.indexPoints')}` : ''}</span>
                       </div>
