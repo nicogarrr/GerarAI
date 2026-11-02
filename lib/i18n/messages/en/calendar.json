@@ -64,6 +64,11 @@
     "materialsNone": "No earnings 8-K in the SEC (checked)",
     "materialsDocTitle": "SEC document ({exhibit}), filed on {date}",
     "materialsSec": "SEC · {date}",
+    "materialKind": {
+      "notaPrensa": "Earnings release",
+      "presentacion": "Presentation",
+      "documento": "SEC document"
+    },
     "irTip": "Official company link, verified on {date}. The live stream, recording and transcript appear there if the company publishes them.",
     "irTipGeneral": " It is the general section, not this event's page.",
     "irEvent": "Event {period} in IR",
