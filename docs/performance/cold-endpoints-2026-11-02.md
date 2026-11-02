@@ -20,3 +20,40 @@ Additional measured probes during backup (not A/B evidence):
 Validation: Python 3.12 targeted combined suite 89 pass, one environment skip; all 2722 repository guards pass with the repository's module-mock flag. Initial guard invocation omitted that flag and used a node_modules symlink, causing two environment failures; rerun after fixing both passed. Ruff and diff whitespace checks pass. No guard relaxed.
 
 Prices remain on the previous group-by path: the source/company probes are not assumed faster for its shape. Only tenant-owned facts/documents/news use the bounded candidate. New A/B must compare this final candidate.
+
+## Final production-volume A/B without backup
+
+The postdeploy backup and isolated restores finished before this measurement.
+Baseline is deployed fc6478e8eb0a7dedbce9f6cac61e176403a11480, candidate modules
+loaded from /tmp only, never replacing the deployed /app. Six rounds per service
+in ABBAAB order, same Session, read-only repeatable-read transaction, tenant 2,
+and fixed `now`. SQL timers exclude hydration; total service times include it.
+
+| Service | Baseline ms (A) | Candidate ms (B) | Median A / B |
+|---|---|---|---|
+| data-health | 22480.315,16346.690,12640.646 | 593.771,445.408,552.132 | 16346.690 / 552.132 (-96.6%) |
+| metric-coverage | 4767.582,2400.440,2656.200 | 2391.759,2211.936,2238.268 | 2656.200 / 2238.268 (-15.7%) |
+
+All 12 results equal the baseline exactly. Data-health includes 406 sources;
+metric coverage includes 87 names. Prices retain the old group-by path.
+This is uncached service measurement, not a claim about browser load times.
+
+Tenant defense-in-depth was then added explicitly to both margin functions,
+for models AND outputs. The global ORM hook already adds tenant criteria to
+entity and column reads; no actual production disclosure was demonstrated.
+A regression covers foreign-tenant models, malformed cross-tenant outputs and
+a newer foreign-tenant version. The deliberate malformed fixture uses Core SQL,
+not an ORM tenant mutation, which is correctly rejected by the write guard.
+
+A second ABBAAB for metric-coverage with the final explicit predicates gave:
+A 2609.490,2749.143,2877.100 ms; B 2645.948,2260.868,2240.976 ms.
+Medians 2749.143 / 2260.868 ms (-17.8%), all six results exactly equal.
+Both runs exited 0. Full query/timing evidence is in the adjacent evidence files.
+
+Plan comparison on PostgreSQL17 additionally confirms two independent issues:
+`is_reported IS TRUE` does not imply the existing partial index predicate;
+`is_reported` or `= TRUE` does. The redundant full INTEGER company-ID lower
+bound is also required for the desired ordered Index Only Scan on this instance.
+No database schema, indexes, planner settings, memory or tenant data changed.
+Final targeted regression suite: 70 passed; Ruff clean. Existing 2722 guards
+had passed before the explicit tenant-only hardening; recheck remains CI-gated.

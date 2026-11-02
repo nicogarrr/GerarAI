@@ -62,7 +62,7 @@ def _margin_of_safety(db: Session) -> dict[int, Any]:
     Observation = _observation_cls()
     latest: dict[int, ValuationModel] = {}
     for model in db.scalars(
-        select(ValuationModel).order_by(ValuationModel.company_id, desc(ValuationModel.version))
+        select(ValuationModel).where(*tenant_filters(db, ValuationModel)).order_by(ValuationModel.company_id, desc(ValuationModel.version))
     ).all():
         latest.setdefault(model.company_id, model)
     result: dict[int, Any] = {}
@@ -71,7 +71,10 @@ def _margin_of_safety(db: Session) -> dict[int, Any]:
             continue
         outputs = list(
             db.scalars(
-                select(ValuationOutput).where(ValuationOutput.valuation_model_id == model.id)
+                select(ValuationOutput).where(
+                    *tenant_filters(db, ValuationOutput),
+                    ValuationOutput.valuation_model_id == model.id,
+                )
             ).all()
         )
         outputs.sort(key=lambda row: row.scenario != "base")
@@ -230,7 +233,8 @@ def _any_margin_of_safety(db: Session) -> bool:
     for model in db.execute(select(
         ValuationModel.id, ValuationModel.company_id,
         ValuationModel.version, ValuationModel.status,
-    ).order_by(ValuationModel.company_id, desc(ValuationModel.version))).all():
+    ).where(*tenant_filters(db, ValuationModel))
+      .order_by(ValuationModel.company_id, desc(ValuationModel.version))).all():
         latest.setdefault(model.company_id, model)
     ids = [model.id for model in latest.values() if model.status != "insufficient_data"]
     # Existence only: no calculation_trace, scenario projections or full output
@@ -246,7 +250,8 @@ def _any_margin_of_safety(db: Session) -> bool:
             ValuationOutput.output_payload["margin_of_safety"],
             ValuationOutput.output_payload["trace"]["margin_of_safety_convention"],
             margin_type,
-        ).where(ValuationOutput.valuation_model_id.in_(ids[start:start + 5000]))).all()
+        ).where(*tenant_filters(db, ValuationOutput),
+                ValuationOutput.valuation_model_id.in_(ids[start:start + 5000]))).all()
         for margin, convention, value_type in rows:
             if value_type in {"boolean", "true", "false"}:
                 continue

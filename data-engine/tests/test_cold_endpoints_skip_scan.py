@@ -360,3 +360,32 @@ def test_postgres_inventory_uses_bounded_probes_and_matches_portable_result(db, 
     assert len(recursive) == 3
     assert all("company_id >= -2147483648" in statement for statement in recursive)
     assert all("tenant_id = ?" in statement for statement in recursive if "FROM market_prices" not in statement)
+
+
+def test_margin_isolated_on_both_models_and_outputs(db):
+    models = _montar_empresas_valoradas(db, 1)
+    model = models[0]
+    out = db.scalar(sa.select(ValuationOutput).where(ValuationOutput.valuation_model_id == model.id))
+    db.info["tenant_id"] = 2
+    assert not scm._any_margin_of_safety(db)
+    assert scm._margin_of_safety(db) == {}
+    db.info["tenant_id"] = 1
+    # A malformed cross-tenant output must not leak even for our own model.
+    db.connection().execute(sa.text("UPDATE valuation_outputs SET tenant_id=2 WHERE id=:id"),
+                            {"id": out.id})
+    db.commit()
+    assert not scm._any_margin_of_safety(db)
+    assert scm._margin_of_safety(db) == {}
+    db.connection().execute(sa.text("UPDATE valuation_outputs SET tenant_id=1 WHERE id=:id"),
+                            {"id": out.id})
+    db.commit()
+    assert scm._any_margin_of_safety(db)
+    assert model.company_id in scm._margin_of_safety(db)
+    # A newer version owned by another tenant must not suppress ours.
+    db.info.pop("tenant_id")
+    db.add(ValuationModel(company_id=model.company_id, tenant_id=2, model_type="dcf",
+                          version=99, status="insufficient_data"))
+    db.commit()
+    db.info["tenant_id"] = 1
+    assert scm._any_margin_of_safety(db)
+    assert model.company_id in scm._margin_of_safety(db)
