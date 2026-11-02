@@ -375,9 +375,14 @@ def current_verdict(
     *,
     params: DcaParams = DEFAULT_PARAMS,
     today: date | None = None,
+    verdicts: Sequence[MonthlyVerdict] | None = None,
 ) -> MonthlyVerdict | None:
-    """Veredicto mas reciente (normalmente el del mes en formacion)."""
-    series = evaluate_series(bars, params=params, today=today)
+    """Veredicto mas reciente (normalmente el del mes en formacion).
+
+    ``verdicts``: la salida de ``evaluate_series`` con las MISMAS barras,
+    parametros y fecha, si el llamante ya la tiene (evita recalcularla).
+    """
+    series = verdicts if verdicts is not None else evaluate_series(bars, params=params, today=today)
     return series[-1] if series else None
 
 
@@ -398,6 +403,7 @@ def hit_rates(
     horizons: Sequence[int] = HIT_RATE_HORIZONS,
     start: str | None = None,
     end: str | None = None,
+    verdicts: Sequence[MonthlyVerdict] | None = None,
 ) -> dict:
     """"¿Cuántas veces estaba más arriba?" por nivel de compra (histórico).
 
@@ -408,7 +414,9 @@ def hit_rates(
     más alto y rentabilidad media del precio (sin dividendos si las barras no
     están ajustadas). Histórico e hipotético; no predice resultados.
     """
-    series = [v for v in evaluate_series(bars, params=params, today=today) if v.status == "confirmed"]
+    if verdicts is None:
+        verdicts = evaluate_series(bars, params=params, today=today)
+    series = [v for v in verdicts if v.status == "confirmed"]
     # ``start``/``end`` (YYYY-MM) acotan los meses CON SENAL; el resultado a N
     # meses puede caer despues de ``end`` si ese mes ya esta cerrado.
     index = {v.period: i for i, v in enumerate(series)}
@@ -466,6 +474,7 @@ def zone_visits(
     params: DcaParams = DEFAULT_PARAMS,
     today: date | None = None,
     levels: Sequence[int] = BUY_VISIT_LEVELS,
+    verdicts: Sequence[MonthlyVerdict] | None = None,
 ) -> dict:
     """Duración de las visitas a la zona de compra (2X-4X), en meses.
 
@@ -476,7 +485,8 @@ def zone_visits(
     formación no entra (misma disciplina sin look-ahead que ``hit_rates``).
     Histórico e hipotético; no predice resultados.
     """
-    verdicts = evaluate_series(bars, params=params, today=today)
+    if verdicts is None:
+        verdicts = evaluate_series(bars, params=params, today=today)
     series = [v for v in verdicts if v.status == "confirmed"]
     forming_period = (
         verdicts[-1].period if verdicts and verdicts[-1].status == "forming" else None

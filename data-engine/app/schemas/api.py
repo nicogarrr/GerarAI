@@ -557,8 +557,8 @@ class ThesisChangeOut(BaseModel):
 class ResearchSessionCreate(BaseModel):
     ticker: str | None = Field(default=None, max_length=20)
     company_id: int | None = None
-    title: str = Field(min_length=1, max_length=300)
-    question: str = Field(min_length=3)
+    title: Annotated[str, not_blank()] = Field(min_length=1, max_length=300)
+    question: Annotated[str, not_blank(3)] = Field(min_length=3)
     status: str = "open"
     summary: str = ""
     source_ids: list[int] = Field(default_factory=list)

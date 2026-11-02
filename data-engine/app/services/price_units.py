@@ -12,14 +12,15 @@ from app.valuation.currency import (
 )
 
 
-def price_in_currency(
-    value: Decimal, *, quote_currency: str | None, target_currency: str, company,
-) -> Decimal | None:
-    """No FX here: only exact major/minor-unit conversion for the same money.
+def price_unit_factor(
+    *, quote_currency: str | None, target_currency: str, company,
+) -> tuple[int, int] | None:
+    """(divisor destino, divisor origen) para pasar un cierre a ``target_currency``.
 
-    Legacy rows on potentially minor-unit listings cannot establish their unit.
-    Keep ordinary major-unit legacy rows compatible only if listing metadata
-    and the ledger agree. Never infer pence from .L, source or price magnitude.
+    None si no es la misma moneda o la unidad no se puede establecer. Depende
+    solo de (quote_currency, target_currency, ticker y divisa del listado), no
+    del valor: quien convierte miles de cierres de una empresa lo calcula una
+    vez. Mismas reglas que ``price_in_currency``.
     """
     raw = quote_currency
     if not raw:
@@ -33,6 +34,24 @@ def price_in_currency(
     target_major, target_divisor = normalize_currency(target_currency)
     if not major or major != target_major:
         return None
+    return target_divisor, divisor
+
+
+def price_in_currency(
+    value: Decimal, *, quote_currency: str | None, target_currency: str, company,
+) -> Decimal | None:
+    """No FX here: only exact major/minor-unit conversion for the same money.
+
+    Legacy rows on potentially minor-unit listings cannot establish their unit.
+    Keep ordinary major-unit legacy rows compatible only if listing metadata
+    and the ledger agree. Never infer pence from .L, source or price magnitude.
+    """
+    factor = price_unit_factor(
+        quote_currency=quote_currency, target_currency=target_currency, company=company
+    )
+    if factor is None:
+        return None
+    target_divisor, divisor = factor
     return value * Decimal(target_divisor) / Decimal(divisor)
 
 

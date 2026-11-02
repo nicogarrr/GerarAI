@@ -58,6 +58,7 @@ from app.schemas.api import (
     PortfolioTransactionCreateOut,
     PortfolioTransactionOut,
     PortfolioTransactionPageOut,
+    not_blank,
 )
 from app.schemas.pagination import PageInfo, PaginatedResponse
 from app.services.async_bridge import run_from_any_context
@@ -307,7 +308,8 @@ def _fx_currency(value: str) -> str:
 
 
 class CreatePortfolioInput(BaseModel):
-    name: str = Field(min_length=1, max_length=160)
+    # «   » pasaba min_length y, recortado, se guardaba una cartera sin nombre.
+    name: Annotated[str, not_blank()] = Field(min_length=1, max_length=160)
     base_currency: str = Field(default="EUR", min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")
 
     _base_is_iso = field_validator("base_currency")(_iso_base_currency)
