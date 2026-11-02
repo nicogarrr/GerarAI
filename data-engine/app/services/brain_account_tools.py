@@ -1797,6 +1797,80 @@ def _sell_count_answer(rows, period, sources: list[dict], english: bool) -> Chat
     return _response("\n".join(lines), sources, "account_trade_count")
 
 
+# ------------------------------------------------------- lecciones del diario
+
+#: «¿qué lecciones he aprendido?», «what lessons have I learned?»: antes caía al
+#: modelo general. Exige «mis/he/tengo/my/I» para no tomar «¿qué lecciones dejó
+#: la crisis de 2008?» por las tuyas.
+_LESSONS = re.compile(
+    r"\b(?:que|cuales|cuantas)\s+(?:son\s+)?(?:mis\s+)?lecciones\b|\bmis\s+lecciones\b"
+    r"|\b(?:what|which|how\s+many)\s+(?:are\s+)?(?:my\s+)?lessons\b|\bmy\s+lessons\b"
+)
+_MAX_LESSONS = 10
+
+
+def _asks_lessons(text: str, question: str) -> bool:
+    return bool(_LESSONS.search(text) and not _tickers_in(question)
+                and re.search(r"\b(?:mis|he|hemos|tengo|my|i|i've|ive)\b", text))
+
+
+def _lessons_answer(db: Session, tenant: int) -> ChatResponse:
+    """Lecciones aprobadas del diario, tal cual se guardaron (solo lectura, solo del tenant)."""
+    from app.models import Company, DecisionLesson
+
+    english = _english()
+    sources: list[dict] = []
+    rows = db.execute(
+        select(DecisionLesson, Company.ticker).outerjoin(Company, Company.id == DecisionLesson.company_id)
+        .where(DecisionLesson.tenant_id == tenant, DecisionLesson.status.in_(("approved", "proposed")))
+        .order_by(DecisionLesson.created_at.desc(), DecisionLesson.id.desc())
+    ).all()
+    approved = [(lesson, ticker) for lesson, ticker in rows if lesson.status == "approved"]
+    proposed = len(rows) - len(approved)
+    if english:
+        pending = f"{proposed} proposed lesson{'s' if proposed != 1 else ''} pending review"
+    else:
+        pending = (f"{proposed} lección propuesta pendiente de revisar" if proposed == 1
+                   else f"{proposed} lecciones propuestas pendientes de revisar")
+    if not approved:
+        if proposed:
+            text_out = (f"You have no approved lessons yet. There {'is' if proposed == 1 else 'are'} {pending} "
+                        "in each company's decision journal." if english else
+                        f"No tienes lecciones aprobadas todavía. Hay {pending} en el diario de decisiones "
+                        "de cada empresa.")
+        else:
+            text_out = ("You have no saved lessons. They come from reviewing the decisions in each company's "
+                        "journal." if english else
+                        "No tienes lecciones guardadas. Salen al revisar las decisiones del diario de cada empresa.")
+        return _response(text_out, sources, "account_lessons")
+    count = len(approved)
+    if english:
+        lines = [f"You have {count} approved lesson{'s' if count != 1 else ''} in the decision journal "
+                 "(most recent first):"]
+    else:
+        lines = [(f"Tienes {count} lección aprobada" if count == 1 else f"Tienes {count} lecciones aprobadas")
+                 + " en el diario de decisiones (la más reciente primero):"]
+    for lesson, ticker in approved[:_MAX_LESSONS]:
+        label = ticker or "General"
+        if ticker and all(src["title"] != f"Diario {ticker}" for src in sources):
+            sources.append(_source("journal_lesson", lesson.id, f"Diario {ticker}",
+                                   f"/research/{quote(ticker, safe='')}/decision-lessons"))
+        when = ""
+        if lesson.created_at is not None:
+            day = local_today(lesson.created_at)
+            when = f" ({_date_en(day) if english else fecha_es(day)})"
+        lines.append(f"- {label}{when}: {(lesson.lesson or '').strip()}")
+    if count > _MAX_LESSONS:
+        lines.append(f"And {count - _MAX_LESSONS} more in the journal." if english
+                     else f"Y {count - _MAX_LESSONS} más en el diario.")
+    if proposed:
+        lines.append(f"There {'is' if proposed == 1 else 'are'} also {pending}." if english
+                     else f"Además hay {pending}.")
+    lines.append("They are in each company's decision journal." if english
+                 else "Están en el diario de decisiones de cada empresa.")
+    return _response("\n".join(lines), sources, "account_lessons")
+
+
 def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     """Respuesta de datos de la cuenta, o None si la pregunta no es de este módulo."""
     tenant = _tenant(db)
@@ -1818,6 +1892,8 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
         return _documents_answer(db, tenant)
     if _asks_saved_screens(text, question):
         return _saved_screens_answer(db, tenant)
+    if _asks_lessons(text, question):
+        return _lessons_answer(db, tenant)
     if _asks_alert_rules(text, question):
         return _alert_rules_answer(db, tenant)
     if _asks_upcoming_earnings(text, question):
