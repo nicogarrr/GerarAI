@@ -2,9 +2,10 @@
 
 Cada par repetia tres sumas sobre ~500 dias; dos de ellas (las sumas de
 cuadrados) solo dependen de la serie y de las fechas, no del par. Con 30
-posiciones son 435 pares. Este test fija que el resultado es IDENTICO (==, no
-aproximado) a la formula de Pearson de antes, incluidos los pares con fechas
-distintas, los N/D por historico corto y la diagonal.
+posiciones son 435 pares. Este test fija que el resultado coincide con la
+formula de Pearson de antes (hasta 1e-9: desde el calculo con numpy, aceptado
+por Nico), incluidos los pares con fechas distintas, los N/D por historico
+corto y la diagonal.
 """
 
 import math
@@ -49,5 +50,9 @@ def test_correlations_identical_to_reference_formula():
         for _, b in rows:
             expected, count = _reference(returns[a.id], returns[b.id], S.MIN_CORRELATION_OBSERVATIONS)
             assert observations[a.ticker][b.ticker] == count
-            assert result[a.ticker][b.ticker] == expected, (a.ticker, b.ticker)
+            got = result[a.ticker][b.ticker]
+            if expected is None:
+                assert got is None, (a.ticker, b.ticker)
+            else:
+                assert abs(got - expected) <= 1e-9, (a.ticker, b.ticker)
     assert result["T8"]["T1"] is None

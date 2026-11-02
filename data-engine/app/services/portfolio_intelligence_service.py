@@ -278,6 +278,19 @@ CLOSES_COLUMNS = ("company_id", "date", "close", "adj_close", "source", "quote_c
 _CLOSE_DATE_ADJ = itemgetter(CLOSES_COLUMNS.index("date"), CLOSES_COLUMNS.index("adj_close"))
 
 
+def _centre(values: np.ndarray) -> float:
+    """Media de una serie de retornos para centrarla (Pearson).
+
+    Suma compensada (math.fsum): a lo sumo 1 ulp de la media exacta. Una
+    serie constante devuelve su valor tal cual, asi sus desviaciones son
+    exactamente 0 y la correlacion queda N/D como siempre.
+    """
+    first = float(values[0])
+    if bool((values == first).all()):
+        return first
+    return math.fsum(values.tolist()) / len(values)
+
+
 class PortfolioIntelligenceService:
     def build(self, db: Session, *, years: int = 5) -> dict[str, Any]:
         years = max(1, min(years, 20))
@@ -1069,26 +1082,10 @@ class PortfolioIntelligenceService:
                 bucket.append(dates)
         # Tuplas de fechas canonicas por CONTENIDO (un hash O(D) por par, no
         # dos por desviacion): todos los pares con el mismo calendario comun
-        # comparten objeto, asi las desviaciones se calculan una vez por
-        # (serie, calendario) aunque la interseccion salga de pares distintos.
+        # comparten objeto, asi los pares se agrupan por calendario comun (cada
+        # grupo se calcula con numpy de una vez) aunque la interseccion salga
+        # de pares distintos.
         canon: dict[tuple[date, ...], tuple[date, ...]] = {dates: dates for dates in sorted_dates.values()}
-        # Desviaciones por (serie, id de tupla canonica): hash O(1) por par.
-        # La tupla determina el calculo, y tuplas con el mismo contenido
-        # producen desviaciones identicas.
-        deviations: dict[tuple[int, int], tuple[list[float], float]] = {}
-
-        def _cached_deviations(
-            company_id: int, series: dict[date, float], dates: tuple[date, ...]
-        ) -> tuple[list[float], float]:
-            key = (company_id, id(dates))
-            cached = deviations.get(key)
-            if cached is None:
-                values = [series[day] for day in dates]
-                centre = mean(values)
-                deltas = [value - centre for value in values]
-                cached = (deltas, sum(delta**2 for delta in deltas))
-                deviations[key] = cached
-            return cached
 
         def _common_dates(
             left_id: int, left: dict[date, float], right_id: int, right: dict[date, float]
@@ -1117,44 +1114,80 @@ class PortfolioIntelligenceService:
                 candidate = tuple(day for day in small_dates if day in big)
             return canon.setdefault(candidate, candidate)
 
-        computed: dict[tuple[int, int], tuple[float | None, int]] = {}
-        # Id y ticker de cada fila leidos una vez: el doble bucle hace P^2
-        # iteraciones (90.000 con 300 posiciones) y cada acceso a un atributo
-        # ORM (company.id, company.ticker) pasa por el descriptor de
-        # SQLAlchemy; eran ~1 millon de lecturas por peticion. Mismas
-        # escrituras, en el mismo orden, sobre los mismos diccionarios.
         entries = [(company.id, company.ticker) for _, company in rows]
+        # Id y ticker de cada fila leidos una vez (el doble bucle de abajo hace
+        # P^2 iteraciones y cada acceso ORM pasa por el descriptor).
+        unique_ids = list(dict.fromkeys(company_id for company_id, _ in entries))
+        computed: dict[tuple[int, int], tuple[float | None, int]] = {}
+        # Pares con historico suficiente agrupados por su calendario comun
+        # (tupla canonica): cada grupo se calcula con numpy de una vez.
+        groups: dict[int, tuple[tuple[date, ...], list[tuple[int, int]]]] = {}
+        for index, left_id in enumerate(unique_ids):
+            left = returns.get(left_id, {})
+            own_dates = sorted_dates[left_id]
+            computed[(left_id, left_id)] = (1.0 if own_dates else None, len(own_dates))
+            for right_id in unique_ids[index + 1 :]:
+                dates = _common_dates(left_id, left, right_id, returns.get(right_id, {}))
+                if len(dates) < cls.MIN_CORRELATION_OBSERVATIONS:
+                    # Historico insuficiente: N/D, no un coeficiente de ruido.
+                    computed[(left_id, right_id)] = (None, len(dates))
+                else:
+                    groups.setdefault(id(dates), (dates, []))[1].append((left_id, right_id))
+
+        # Valores de cada serie en su propio calendario, como array, una vez.
+        full_values: dict[int, np.ndarray] = {}
+        for dates, pairs in groups.values():
+            members = list(dict.fromkeys(company_id for pair in pairs for company_id in pair))
+            position = {company_id: slot for slot, company_id in enumerate(members)}
+            deviations = np.empty((len(members), len(dates)))
+            for slot, company_id in enumerate(members):
+                if sorted_dates[company_id] is dates:
+                    values = full_values.get(company_id)
+                    if values is None:
+                        series = returns[company_id]
+                        values = np.fromiter((series[day] for day in dates), float, len(dates))
+                        full_values[company_id] = values
+                else:
+                    series = returns[company_id]
+                    values = np.fromiter((series[day] for day in dates), float, len(dates))
+                deviations[slot] = values - _centre(values)
+            squares = np.einsum("ij,ij->i", deviations, deviations)
+            left_slots = np.fromiter((position[a] for a, _ in pairs), np.intp, len(pairs))
+            right_slots = np.fromiter((position[b] for _, b in pairs), np.intp, len(pairs))
+            if 8 * len(pairs) >= len(members) ** 2:
+                # Grupo denso (lo habitual: mismo calendario bursatil): una
+                # multiplicacion de matrices da todos los productos cruzados.
+                numerators = (deviations @ deviations.T)[left_slots, right_slots]
+            else:
+                numerators = np.concatenate(
+                    [
+                        np.einsum(
+                            "ij,ij->i",
+                            deviations[left_slots[chunk : chunk + 2048]],
+                            deviations[right_slots[chunk : chunk + 2048]],
+                        )
+                        for chunk in range(0, len(pairs), 2048)
+                    ]
+                )
+            denominators = np.sqrt(squares[left_slots] * squares[right_slots])
+            with np.errstate(divide="ignore", invalid="ignore"):
+                coefficients = numerators / denominators
+            for (left_id, right_id), coefficient, denominator in zip(
+                pairs, coefficients.tolist(), denominators.tolist(), strict=True
+            ):
+                computed[(left_id, right_id)] = (coefficient if denominator else None, len(dates))
+
+        rank = {company_id: index for index, company_id in enumerate(unique_ids)}
         for left_id, left_ticker in entries:
             result_row: dict[str, float | None] = {}
             observations_row: dict[str, int] = {}
             result[left_ticker] = result_row
             observations[left_ticker] = observations_row
-            left = returns.get(left_id, {})
+            left_rank = rank[left_id]
             for right_id, right_ticker in entries:
-                mirrored = computed.get((right_id, left_id))
-                if mirrored is not None:
-                    correlation, count = mirrored
-                    observations_row[right_ticker] = count
-                    result_row[right_ticker] = correlation
-                    continue
-                right = returns.get(right_id, {})
-                dates = _common_dates(left_id, left, right_id, right)
-                observations_row[right_ticker] = len(dates)
-                if left_id == right_id and dates:
-                    correlation: float | None = 1.0
-                elif len(dates) < cls.MIN_CORRELATION_OBSERVATIONS:
-                    # Historico insuficiente: N/D, no un coeficiente de ruido.
-                    correlation = None
-                else:
-                    x_dev, x_ss = _cached_deviations(left_id, left, dates)
-                    y_dev, y_ss = _cached_deviations(right_id, right, dates)
-                    # sum(map(mul, ...)) suma los mismos productos en el mismo
-                    # orden que el generador con zip: identico bit a bit, ~2x
-                    # mas rapido al ejecutar la multiplicacion en C.
-                    numerator = sum(map(mul, x_dev, y_dev))
-                    denominator = math.sqrt(x_ss * y_ss)
-                    correlation = numerator / denominator if denominator else None
-                computed[(left_id, right_id)] = (correlation, len(dates))
+                key = (left_id, right_id) if left_rank <= rank[right_id] else (right_id, left_id)
+                correlation, count = computed[key]
+                observations_row[right_ticker] = count
                 result_row[right_ticker] = correlation
         return result, observations
 

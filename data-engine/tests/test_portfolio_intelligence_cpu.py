@@ -5,8 +5,8 @@ una media exacta de n valores por cada una de las n observaciones (O(n^2); con
 5 años de historia, ~1.250 x 1.250). ``_correlations`` calculaba 2 medias por
 par y cada par dos veces (a-b y b-a): 684 medias con 19 posiciones. El
 endpoint tardaba ~1 s por peticion en CPU pura. Estos tests fijan cuantas
-medias se calculan y que los valores son EXACTAMENTE los de la formula de
-siempre (mismas sumas, mismo orden).
+medias se calculan y que los valores son los de la formula de siempre
+(exactos en la beta; hasta 1e-9 en las correlaciones, calculadas con numpy).
 """
 
 from __future__ import annotations
@@ -57,12 +57,20 @@ def _filas(n: int):
     ]
 
 
-def test_correlaciones_calculan_cada_media_una_vez(contador_de_medias):
+def test_correlaciones_calculan_cada_media_una_vez(monkeypatch):
+    llamadas = {"n": 0}
+    real_centre = module._centre
+
+    def _centre(values):
+        llamadas["n"] += 1
+        return real_centre(values)
+
+    monkeypatch.setattr(module, "_centre", _centre)
     filas = _filas(12)
     returns = {i: _serie(i, 300) for i in range(12)}
     PortfolioIntelligenceService._correlations(returns, filas)
     # Mismas fechas para todas: una media por serie, no 2 por par ordenado.
-    assert contador_de_medias["n"] == 12
+    assert llamadas["n"] == 12
 
 
 def test_correlaciones_identicas_a_la_formula_y_simetricas():
@@ -75,7 +83,8 @@ def test_correlaciones_identicas_a_la_formula_y_simetricas():
         for j in range(6):
             a, b = f"T{i:02d}", f"T{j:02d}"
             esperado = 1.0 if i == j else _correlacion_referencia(returns[i], returns[j])
-            assert result[a][b] == esperado
+            assert esperado is not None
+            assert abs(result[a][b] - esperado) <= 1e-9
             assert result[a][b] == result[b][a]
             assert observations[a][b] == len(returns[i].keys() & returns[j].keys())
 

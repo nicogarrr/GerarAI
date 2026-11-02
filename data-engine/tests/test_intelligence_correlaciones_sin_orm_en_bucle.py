@@ -3,9 +3,10 @@
 El doble bucle de ``_correlations`` hace P^2 iteraciones (90.000 con 300
 posiciones) y leia ``company.id``/``company.ticker`` varias veces en cada una:
 ~1 millon de lecturas de atributos ORM por peticion. Ahora se leen una vez por
-fila. Estos tests fijan cuantas lecturas se hacen y que la matriz (valores,
-conteos y orden de las claves) es IDENTICA a la formula de siempre, tambien
-con posiciones repetidas de la misma empresa.
+fila. Estos tests fijan cuantas lecturas se hacen y que la matriz (conteos y
+orden de las claves identicos; valores hasta 1e-9 desde el calculo con numpy)
+es la de la formula de siempre, tambien con posiciones repetidas de la misma
+empresa.
 """
 
 from __future__ import annotations
@@ -83,7 +84,13 @@ def test_matriz_identica_a_la_formula_de_siempre():
     result, observations = PortfolioIntelligenceService._correlations(returns, rows)  # noqa: SLF001
     esperado, esperadas = _referencia(returns, rows)
     assert observations == esperadas
-    assert result == esperado
+    for fila, valores in esperado.items():
+        for columna, valor in valores.items():
+            obtenido = result[fila][columna]
+            if valor is None:
+                assert obtenido is None, (fila, columna)
+            else:
+                assert abs(obtenido - valor) <= 1e-9, (fila, columna)
     assert [list(fila) for fila in result.values()] == [list(fila) for fila in esperado.values()]
     assert list(result) == list(esperado)
 
