@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.entities import Claim, Portfolio, Position, ThesisSection, ThesisVersion
 from app.services.company_resolver import resolve_company
 from app.services.thesis_publication_gate import archived_thesis_notice, thesis_withheld_reason
+from app.services.user_context import num_es
 from app.valuation.currency import normalize_currency
 
 
@@ -183,13 +184,13 @@ def build_thesis_pdf(data: ThesisPdfData) -> bytes:
             def _fmt_money(v: float | None, ccy: str, is_cost: bool = False) -> str:
                 if v is None:
                     return "n/d"
-                lbl = f"{v:,.2f} {ccy}".strip()
+                lbl = f"{num_es(v)} {ccy}".strip()
                 return lbl + (" *" if is_cost else "")
 
             for h in data.holdings[:6]:
                 price_lbl = _fmt_money(h.price, h.currency, h.price_is_cost)
                 value_lbl = _fmt_money(h.value, h.value_currency)
-                table_data.append([h.ticker, f"{h.shares:,.2f}", price_lbl, value_lbl, h.weight])
+                table_data.append([h.ticker, num_es(h.shares), price_lbl, value_lbl, h.weight])
 
             tbl = ax1.table(
                 cellText=table_data,
@@ -406,7 +407,7 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
     same_ccy = len({(base_ccy if r[6] else r[4]) for r in valued_rows}) <= 1
     total_val = sum(r[5] for r in valued_rows) if (all_base or same_ccy) else 0.0
     for p, qty, px, price_is_cost, native_ccy, val, is_base in rows:
-        weight = "n/d" if val is None or total_val <= 0 else f"{(val / total_val * 100):.1f}%"
+        weight = "n/d" if val is None or total_val <= 0 else f"{num_es(val / total_val * 100, 1)} %"
         ticker_name = p.company.ticker if p.company else f"ACT-{p.company_id}"
         holdings.append(
             HoldingItem(
@@ -429,7 +430,7 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
             top = sorted(valued_rows, key=lambda r: r[5], reverse=True)[:3]
             lines = []
             for p, _qty, _px, _pc, _ccy, val, _ib in top:
-                share = f"{(val / total_val * 100):.1f}%"
+                share = f"{num_es(val / total_val * 100, 1)} %"
                 name = p.company.ticker if p.company else f"ACT-{p.company_id}"
                 lines.append(f"{name}: {share}")
             composition_body = "Mayores posiciones por peso estimado: " + ", ".join(lines) + "."
@@ -466,9 +467,11 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
     # Divisa del total: la común a todas las valoraciones (base si hay valor
     # consolidado; la nativa compartida si no), nunca la base por defecto.
     total_ccy = base_ccy if all_base else (ccys[0] if len(ccys) == 1 else "")
-    summary = f"Informe consolidado de la cartera {portfolio.name}. Consta de {len(positions)} posiciones activas"
+    n_active = len(positions)
+    summary = (f"Informe consolidado de la cartera {portfolio.name}. Consta de {n_active} "
+               f"{'posición activa' if n_active == 1 else 'posiciones activas'}")
     if total_val > 0 and total_ccy:
-        summary += f" con un valor total estimado de {total_val:,.2f} {total_ccy}"
+        summary += f" con un valor total estimado de {num_es(total_val)} {total_ccy}"
     summary += "."
 
     data = ThesisPdfData(
