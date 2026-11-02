@@ -8,7 +8,7 @@ import re
 import unicodedata
 from itertools import zip_longest
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import KnowledgeChunk, KnowledgeDocument
@@ -211,10 +211,9 @@ def lexical_library_context(db: Session, question: str, *, authors: list[str], l
     spanish = [es for es, _en in _ES_EN_TERMS if " " in es and _fold(es) in folded_question]
     terms = list(dict.fromkeys([*entities, *spanish, *terms]))
     terms = [t for t in terms if _fold(t) not in INVESTOR_AUTHORS and t.lower() not in {"carta", "cartas", "letter", "letters"}]
-    terms = [
-        t.replace("%", "").replace("_", "") for t in terms
-        if len(t) > 3 and _fold(t) not in _CHAT_WORDS
-    ][:24]
+    # «_» y «%» se escapan en el LIKE (icontains con autoescape): antes se
+    # quitaban y «free_cash_flow» buscaba «freecashflow».
+    terms = [t for t in terms if len(t) > 3 and _fold(t) not in _CHAT_WORDS][:24]
     if not terms:
         return []
     statement = select(KnowledgeChunk, KnowledgeDocument).join(
@@ -224,7 +223,7 @@ def lexical_library_context(db: Session, question: str, *, authors: list[str], l
     if authors:
         statement = statement.where(or_(*[KnowledgeDocument.author.ilike(f"%{a}%") for a in authors]))
     try:
-        rows = list(db.execute(statement.where(or_(*[KnowledgeChunk.content.ilike(f"%{t}%") for t in terms]))
+        rows = list(db.execute(statement.where(or_(*[KnowledgeChunk.content.icontains(t, autoescape=True) for t in terms]))
                                .order_by(KnowledgeChunk.id).limit(_LEXICAL_CANDIDATES)).all())
     except Exception:
         return []
@@ -403,7 +402,8 @@ def company_library_context(db: Session, company, question: str, *, limit: int =
                     KnowledgeDocument.tenant_id == tenant_id,
                     KnowledgeDocument.status == "ready",
                     KnowledgeDocument.ticker.is_not(None),
-                    KnowledgeDocument.ticker.ilike(ticker),
+                    # Igualdad sin distinguir mayúsculas: «_» del ticker no es comodín.
+                    func.upper(KnowledgeDocument.ticker) == ticker.upper(),
                 )
                 .order_by(KnowledgeDocument.id.desc(), KnowledgeChunk.chunk_index)
                 .limit(400)

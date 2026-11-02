@@ -348,7 +348,7 @@ def company_passages(db: Session, company: Company, question: str, limit: int = 
         select(DocumentChunk, Document)
         .join(Document, DocumentChunk.document_id == Document.id)
         .where(Document.company_id == company.id)
-        .where(or_(*[DocumentChunk.text.ilike(f"%{t.replace('%', '').replace('_', '')}%") for t in terms]))
+        .where(or_(*[DocumentChunk.text.icontains(t, autoescape=True) for t in terms]))
         .limit(MAX_CANDIDATES)
     )
     if tenant_id is not None:
