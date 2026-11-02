@@ -140,7 +140,7 @@ def test_engine_valuation_answer_uses_the_engine_output(db, monkeypatch):
     assert resp.llm_trace["path"] == "engine_valuation"
     assert "orientativo" in resp.answer
     assert "bajista 60,00 USD, base 90,00 USD, alcista 130,00 USD, esperado 92,50 USD" in resp.answer
-    assert "Precio usado 75,00 USD (cierre del 2026-10-24)" in resp.answer
+    assert "Precio usado 75,00 USD (cierre del 24 oct 2026)" in resp.answer
     assert "Margen de seguridad del motor: 18,9 %" in resp.answer
     assert "WACC sin fuente datada" in resp.answer
     assert resp.sources[0]["url"] == "/research/UBER?view=valuation"

@@ -16,6 +16,12 @@ describe('formatCountEs', () => {
         expect(formatCountEs(0, 'mes', 'meses')).toBe('0 meses');
         expect(formatCountEs(2, 'mes', 'meses')).toBe('2 meses');
     });
+    it('la concordancia sigue a la cifra redondeada que se pinta', () => {
+        expect(formatCountEs(0.6, 'día', 'días')).toBe('1 día');
+        expect(formatCountEs(1.4, 'día', 'días')).toBe('1 día');
+        expect(formatCountEs(1.6, 'día', 'días')).toBe('2 días');
+        expect(formatCountEs(0.4, 'día', 'días')).toBe('0 días');
+    });
     it('miles con separador es-ES', () => {
         expect(formatCountEs(12345, 'registro de detalle', 'registros de detalle'))
             .toBe('12.345 registros de detalle');

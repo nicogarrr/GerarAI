@@ -593,7 +593,7 @@ def engine_valuation_answer(db: Session, company: Company) -> ChatResponse:
     as_of = (result.get("trace") or {}).get("price_as_of")
     if price is not None:
         lines.append(f"Precio usado {_fmt_close(float(price), ccy)}"
-                     f"{f' (cierre del {as_of})' if as_of else ''}; no es una cotización en directo.")
+                     f"{f' (cierre del {fecha_es(as_of)})' if as_of else ''}; no es una cotización en directo.")
     mos = result.get("margin_of_safety")
     if mos is not None:
         lines.append(f"Margen de seguridad del motor: {_pct(float(mos))}.")

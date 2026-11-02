@@ -45,6 +45,7 @@ from sqlalchemy.orm import Session
 from app.core.local_date import as_date as _as_date
 from app.core.tenancy import tenant_filters
 from app.models import Company, ThesisVersion, ValuationModel, ValuationOutput
+from app.services.date_format import readable_date
 from app.services.thesis_publication_gate import thesis_withheld_reasons
 
 logger = logging.getLogger(__name__)
@@ -131,7 +132,7 @@ def choose(
     elif engine is not None:
         # Borrador orientativo caducado (o sin fecha): no se sirve el numero.
         age_text = (
-            f" de hace {engine_age} dias (> {max_age_days})"
+            f" de hace {engine_age} {'día' if engine_age == 1 else 'días'} (> {max_age_days})"
             if engine_age is not None
             else " sin fecha"
         )
@@ -269,7 +270,7 @@ def _engine_block(model: ValuationModel) -> EngineBlock:
     if not detail:
         detail = "el motor no pudo calcular un valor con los datos disponibles"
     as_of = _as_date(model.created_at)
-    when = f" del {as_of.isoformat()}" if as_of else ""
+    when = f" del {readable_date(as_of)}" if as_of else ""
     return EngineBlock(
         kind="insufficient_data",
         reason=f"La última valoración del motor{when} no dio cifra: {detail}.",

@@ -46,6 +46,7 @@ from app.models import (
     ValuationModel,
     ValuationOutput,
 )
+from app.services.date_format import readable_date
 from app.services.inferred_input_service import InferredInputService
 from app.services.valuation_service import (
     ValuationService,
@@ -670,8 +671,9 @@ class ThesisProjectionService:
                         base += f"; por ADR ({per_listed:g} acciones ordinarias)"
                     if capped:
                         base += (
-                            f"; acotado al multiplo de mercado actual ({market_multiple:.1f}x, "
-                            f"precio del {price_date}), sin expansion de multiplo"
+                            f"; acotado al múltiplo de mercado actual "
+                            f"({f'{market_multiple:.1f}'.replace('.', ',')}x, "
+                            f"precio del {readable_date(price_date)}), sin expansión de múltiplo"
                         )
             # MOS solo contra precio FECHADO: un mark de Position sin fecha no
             # dice cuando era cierto, y comparar contra el seria silenciarlo.
