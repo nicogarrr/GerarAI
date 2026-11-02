@@ -26,6 +26,7 @@ Sin dato no dispara nunca: la observacion queda como ``missing``.
 
 from __future__ import annotations
 
+import math
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -99,7 +100,10 @@ def _parse_threshold(value: Any) -> Decimal | None:
         parsed = Decimal(str(value).strip().replace(",", "."))
     except (InvalidOperation, ValueError):
         return None
-    return parsed if parsed.is_finite() else None
+    if not parsed.is_finite():
+        return None
+    # Se guarda como float: «1e400» es un Decimal finito pero un float infinito.
+    return parsed if math.isfinite(float(parsed)) else None
 
 
 def _valid_metric(metric: str) -> bool:
