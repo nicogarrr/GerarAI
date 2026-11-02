@@ -16,6 +16,10 @@ Cada corrida:
   (connector="schedule13dg_monitor"). Todo es best-effort por filing: un
   documento roto no detiene la corrida; un fallo global incrementa
   consecutive_errors y deja last_error, nunca lanza al caller del actor.
+
+El watermark y el manejo del fallo fatal viven en ``monitor_common.py``,
+compartidos con ``insider_monitor``: este monitor nacio espejo suyo y el
+esqueleto ya se habia desalineado a mano; ahora es por construccion.
 """
 
 from __future__ import annotations
@@ -23,15 +27,13 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.errors import redact_secrets
-from app.models.entities import ConnectorState, Schedule13DGFiling
-from app.services import schedule13dg_persistence
+from app.models.entities import Schedule13DGFiling
+from app.services import monitor_common, schedule13dg_persistence
 from app.services.connectors import form13dg as form13dg_connector
 from app.services.insider_monitor import resolve_ciks, watchlist_tickers
 
@@ -47,46 +49,12 @@ DEFAULT_LOOKBACK = 40
 DEFAULT_MAX_NEW_FETCHES = 10
 
 
-def _utcnow() -> datetime:
-    return datetime.now(UTC)
-
-
 def _normalize_cik(cik: str | int) -> str:
     """CIK sin ceros a la izquierda para comparar (EDGAR lo sirve de ambas)."""
     try:
         return str(int(str(cik).strip()))
     except ValueError:
         return str(cik).strip()
-
-
-def _connector_state(db: Session, tenant_id: int | None) -> ConnectorState:
-    state = db.scalar(
-        select(ConnectorState).where(
-            ConnectorState.connector == CONNECTOR_NAME,
-            ConnectorState.tenant_id.is_(tenant_id) if tenant_id is None
-            else ConnectorState.tenant_id == tenant_id,
-            ConnectorState.company_id.is_(None),
-        )
-    )
-    if state is None:
-        state = ConnectorState(tenant_id=tenant_id, connector=CONNECTOR_NAME)
-        db.add(state)
-        db.flush()
-    return state
-
-
-def _record_success(db: Session, state: ConnectorState, stats: dict[str, Any]) -> None:
-    state.last_success_at = _utcnow()
-    state.consecutive_errors = 0
-    state.last_error = None
-    state.cursor = stats.get("status")
-    meta = dict(state.metadata_ or {})
-    meta["runs"] = int(meta.get("runs", 0)) + 1
-    meta["filings_new_total"] = int(meta.get("filings_new_total", 0)) + stats["filings_new"]
-    meta["last_run"] = stats
-    state.metadata_ = meta
-    db.add(state)
-    db.commit()
 
 
 def scan(
@@ -102,8 +70,8 @@ def scan(
     fetcher: Callable[[dict], str] | None = None,
 ) -> dict[str, Any]:
     """Una corrida acotada del monitor. Devuelve stats; nunca lanza."""
-    state = _connector_state(db, tenant_id)
-    state.last_started_at = _utcnow()
+    state = monitor_common.connector_state(db, tenant_id, CONNECTOR_NAME)
+    state.last_started_at = monitor_common.utcnow()
     db.add(state)
     db.commit()
 
@@ -127,7 +95,7 @@ def scan(
         if not symbols:
             stats["status"] = "skipped"
             stats["reason"] = "watchlist and portfolio are empty"
-            _record_success(db, state, stats)
+            monitor_common.record_success(db, state, stats)
             return stats
         ciks = resolve_ciks(db, symbols, client=client)
         missing = [t for t in symbols if t not in ciks]
@@ -211,30 +179,14 @@ def scan(
 
         if stats["errors"]:
             stats["status"] = "partial" if stats["tickers_scanned"] else "error"
-        _record_success(db, state, stats)
+        monitor_common.record_success(db, state, stats)
         return stats
     except Exception as exc:  # noqa: BLE001 - el actor jamas recibe una excepcion
-        stats["status"] = "error"
-        # El mensaje de la excepcion NO va a la respuesta de la API (stats):
-        # razon publica constante. En last_error (persistido para ops, no se
-        # sirve en ninguna respuesta) va el detalle con secretos redactados,
-        # y el detalle completo queda en el log del servidor.
+        # Este stats SI se sirve en la API (ownership.scan): solo razon
+        # publica constante, nada derivado de la excepcion (el detalle
+        # completo queda en el log del servidor).
         logger.exception("13D/G: fallo fatal en scan")
-        fatal_error = redact_secrets(f"{type(exc).__name__}: {exc}")[:1000]
-        stats["errors"].append("fatal: schedule13dg_scan_fatal")
-        # Si el fallo vino de la sesion (p. ej. un commit roto), hay que hacer
-        # rollback ANTES de tocar nada mas; commitear sobre una sesion
-        # envenenada lanzaria PendingRollbackError y perderia el estado.
-        db.rollback()
-        # Revalidar el estado: el objeto previo pudo quedar deshacerse con el
-        # rollback; se relee (o recrea) desde la base.
-        state = _connector_state(db, tenant_id)
-        state.consecutive_errors = (state.consecutive_errors or 0) + 1
-        state.last_error = fatal_error
-        meta = dict(state.metadata_ or {})
-        meta["runs"] = int(meta.get("runs", 0)) + 1
-        meta["last_run"] = stats
-        state.metadata_ = meta
-        db.add(state)
-        db.commit()
+        monitor_common.record_fatal(
+            db, tenant_id, CONNECTOR_NAME, stats, exc, public_reason="schedule13dg_scan_fatal"
+        )
         return stats

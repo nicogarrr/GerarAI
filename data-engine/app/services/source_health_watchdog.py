@@ -21,11 +21,9 @@ import threading
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import ResearchAlert
+from app.services.in_app_alerts import InAppAlert, persist_in_app_alerts
 
 VERSION = "source-health-v1"
 ALERT_TYPE = "source_health"
@@ -140,52 +138,30 @@ def emit_source_health_alerts(
 
     sources = _collect_sources(registry)
     transitions = detect_transitions(sources, tenant_id=tenant_id, last_states=last_states)
-    created: list[int] = []
-    existing = 0
+    prepared: list[InAppAlert] = []
     for source in transitions:
-        fingerprint = f"{VERSION}:{tenant_id}:{source['key']}:{source['status']}:{now.date().isoformat()}"
-        if (
-            db.scalar(
-                select(ResearchAlert.id).where(
-                    ResearchAlert.tenant_id == tenant_id,
-                    ResearchAlert.fingerprint == fingerprint,
-                )
-            )
-            is not None
-        ):
-            existing += 1
-            continue
         severity, title, message = _message(source)
-        alert = ResearchAlert(
-            tenant_id=tenant_id,
-            company_id=None,
-            severity=severity,
-            status="open",
-            alert_type=ALERT_TYPE,
-            title=title,
-            message=message,
-            fingerprint=fingerprint,
-            channels=["in_app"],
-            last_triggered_at=now,
-            metadata_={
-                "rule_version": VERSION,
-                "source_key": source["key"],
-                "source_status": source["status"],
-                "circuit_state": source["circuit_state"],
-                "consecutive_failures": source["consecutive_failures"],
-                "fallback_source": source.get("fallback_source"),
-                "measured_at": source.get("last_checked_at"),
-            },
+        prepared.append(
+            InAppAlert(
+                fingerprint=(
+                    f"{VERSION}:{tenant_id}:{source['key']}:{source['status']}:{now.date().isoformat()}"
+                ),
+                alert_type=ALERT_TYPE,
+                severity=severity,
+                title=title,
+                message=message,
+                metadata={
+                    "rule_version": VERSION,
+                    "source_key": source["key"],
+                    "source_status": source["status"],
+                    "circuit_state": source["circuit_state"],
+                    "consecutive_failures": source["consecutive_failures"],
+                    "fallback_source": source.get("fallback_source"),
+                    "measured_at": source.get("last_checked_at"),
+                },
+            )
         )
-        try:
-            with db.begin_nested():
-                db.add(alert)
-                db.flush()
-        except IntegrityError:
-            existing += 1
-            continue
-        created.append(alert.id)
-    db.commit()
+    created, existing = persist_in_app_alerts(db, tenant_id=tenant_id, now=now, alerts=prepared)
     # Solo tras el commit: un rollback no consume las transiciones y el
     # siguiente ciclo las reintenta (el fingerprint las deduplica).
     record_states(sources, tenant_id=tenant_id, last_states=last_states)

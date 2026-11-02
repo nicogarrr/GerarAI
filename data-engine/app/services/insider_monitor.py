@@ -15,38 +15,37 @@ Los schedulers (intervalo 15 min, catch-up diario, reconciliacion semanal)
 solo varian `lookback` y `max_new_fetches`. Todo es best-effort por filing:
 un XML roto no detiene la corrida; un fallo global incrementa
 consecutive_errors y deja last_error, nunca lanza al caller del actor.
+
+El watermark en connector_states y el manejo del fallo fatal viven en
+``monitor_common.py``, compartidos con ``schedule13dg_monitor`` (que nacio
+espejo de este modulo: ahora el espejo es por construccion). El handler
+fatal hereda el endurecimiento del 13D/G: rollback antes de regrabar el
+estado, por si el fallo vino de la propia sesion.
 """
 
 from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.errors import redact_secrets
 from app.models.entities import (
     Company,
-    ConnectorState,
     InsiderFiling,
     InsiderTransaction,
     Position,
     WatchItem,
 )
-from app.services import insider_persistence
+from app.services import insider_persistence, monitor_common
 from app.services.connectors import form4 as form4_connector
 from app.services.insider_persistence import PARSER_VERSION as INSIDER_PARSER_VERSION
 from app.services.insider_service import _cik_for_ticker
 
 CONNECTOR_NAME = "insider_monitor"
 DEFAULT_DELAY_SECONDS = 0.15
-
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC)
 
 
 def watchlist_tickers(db: Session, tenant_id: int | None = None) -> list[str]:
@@ -98,22 +97,6 @@ def resolve_ciks(
     return resolved
 
 
-def _connector_state(db: Session, tenant_id: int | None) -> ConnectorState:
-    state = db.scalar(
-        select(ConnectorState).where(
-            ConnectorState.connector == CONNECTOR_NAME,
-            ConnectorState.tenant_id.is_(tenant_id) if tenant_id is None
-            else ConnectorState.tenant_id == tenant_id,
-            ConnectorState.company_id.is_(None),
-        )
-    )
-    if state is None:
-        state = ConnectorState(tenant_id=tenant_id, connector=CONNECTOR_NAME)
-        db.add(state)
-        db.flush()
-    return state
-
-
 def scan(
     db: Session,
     *,
@@ -127,8 +110,8 @@ def scan(
     backfill: bool = False,
 ) -> dict[str, Any]:
     """Una corrida acotada del monitor. Devuelve stats; nunca lanza."""
-    state = _connector_state(db, tenant_id)
-    state.last_started_at = _utcnow()
+    state = monitor_common.connector_state(db, tenant_id, CONNECTOR_NAME)
+    state.last_started_at = monitor_common.utcnow()
     db.add(state)
     db.commit()
 
@@ -147,7 +130,9 @@ def scan(
         if not tickers:
             stats["status"] = "skipped"
             stats["reason"] = "watchlist and portfolio are empty"
-            _record_success(db, state, stats)
+            monitor_common.record_success(
+                db, state, stats, extra_totals={"transactions_created": "transactions_total"}
+            )
             return stats
         ciks = resolve_ciks(db, tickers, client=client)
         missing = [t for t in tickers if t not in ciks]
@@ -229,22 +214,15 @@ def scan(
             )
         if stats["errors"]:
             stats["status"] = "partial" if stats["tickers_scanned"] else "error"
-        _record_success(db, state, stats)
+        monitor_common.record_success(
+            db, state, stats, extra_totals={"transactions_created": "transactions_total"}
+        )
         return stats
     except Exception as exc:  # noqa: BLE001 - el actor jamas recibe una excepcion
-        stats["status"] = "error"
-        # last_error y last_run se guardan y se ven en la API de estado del
-        # conector: un fallo de red de httpx trae la URL con su token tal cual.
-        fatal_error = redact_secrets(f"{type(exc).__name__}: {exc}")[:1000]
-        stats["errors"].append(f"fatal: {fatal_error}")
-        state.consecutive_errors = (state.consecutive_errors or 0) + 1
-        state.last_error = fatal_error
-        meta = dict(state.metadata_ or {})
-        meta["runs"] = int(meta.get("runs", 0)) + 1
-        meta["last_run"] = stats
-        state.metadata_ = meta
-        db.add(state)
-        db.commit()
+        # Sin public_reason: este stats NO se sirve en ninguna ruta, asi que
+        # conserva el detalle redactado (ver monitor_common.record_fatal y
+        # tests/test_monitor_last_error_redaction.py).
+        monitor_common.record_fatal(db, tenant_id, CONNECTOR_NAME, stats, exc)
         return stats
 
 
@@ -413,19 +391,3 @@ def backfill_rule_10b5_1(
             sleeper(delay_seconds)
     return stats
 
-
-def _record_success(db: Session, state: ConnectorState, stats: dict[str, Any]) -> None:
-    state.last_success_at = _utcnow()
-    state.consecutive_errors = 0
-    state.last_error = None
-    state.cursor = stats.get("status")
-    meta = dict(state.metadata_ or {})
-    meta["runs"] = int(meta.get("runs", 0)) + 1
-    meta["filings_new_total"] = int(meta.get("filings_new_total", 0)) + stats["filings_new"]
-    meta["transactions_total"] = (
-        int(meta.get("transactions_total", 0)) + stats["transactions_created"]
-    )
-    meta["last_run"] = stats
-    state.metadata_ = meta
-    db.add(state)
-    db.commit()

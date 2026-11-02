@@ -32,11 +32,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import ResearchAlert
+from app.services.in_app_alerts import InAppAlert, persist_in_app_alerts
 
 logger = logging.getLogger(__name__)
 
@@ -304,44 +302,20 @@ def emit_queue_stuck_alerts(
                              tick_lock_seconds=tick_lock_seconds)
     except Exception:  # noqa: BLE001 - Redis caido o lectura corrupta: fail-open
         return {"status": "skipped", "reason": "redis_unavailable", "created": []}
-    created: list[int] = []
-    existing = 0
+    prepared: list[InAppAlert] = []
     for item in result["stuck"]:
-        fingerprint = f"{VERSION}:{tenant_id}:{item['queue']}:{now.date().isoformat()}"
-        if (
-            db.scalar(
-                select(ResearchAlert.id).where(
-                    ResearchAlert.tenant_id == tenant_id,
-                    ResearchAlert.fingerprint == fingerprint,
-                )
-            )
-            is not None
-        ):
-            existing += 1
-            continue
         severity, title, message = _message(item)
-        alert = ResearchAlert(
-            tenant_id=tenant_id,
-            company_id=None,
-            severity=severity,
-            status="open",
-            alert_type=ALERT_TYPE,
-            title=title,
-            message=message,
-            fingerprint=fingerprint,
-            channels=["in_app"],
-            last_triggered_at=now,
-            metadata_={"rule_version": VERSION, **item},
+        prepared.append(
+            InAppAlert(
+                fingerprint=f"{VERSION}:{tenant_id}:{item['queue']}:{now.date().isoformat()}",
+                alert_type=ALERT_TYPE,
+                severity=severity,
+                title=title,
+                message=message,
+                metadata={"rule_version": VERSION, **item},
+            )
         )
-        try:
-            with db.begin_nested():
-                db.add(alert)
-                db.flush()
-        except IntegrityError:
-            existing += 1
-            continue
-        created.append(alert.id)
-    db.commit()
+    created, existing = persist_in_app_alerts(db, tenant_id=tenant_id, now=now, alerts=prepared)
     return {
         "status": "ok",
         "queues": result["queues"],
