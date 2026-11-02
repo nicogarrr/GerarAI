@@ -18,6 +18,7 @@ import WatchlistBuyAction from '@/components/watchlist/WatchlistBuyAction';
 import WatchlistAddButton from '@/components/watchlist/WatchlistAddButton';
 import DcaLevelBadge from '@/components/watchlist/DcaLevelBadge';
 import { sortWatchlistRows } from '@/lib/watchlist/sort-rows';
+import { emptyWatchlistEntry } from '@/lib/watchlist/entry-fallback';
 import DcaSignalsPanel from '@/components/watchlist/DcaSignalsPanel';
 import { getDcaSignals } from '@/lib/actions/dca-signals.actions';
 import { getPortfolioFxContext } from '@/lib/actions/portfolio.actions';
@@ -188,25 +189,7 @@ export default async function WatchlistPage({
                 // CON nombre y divisa del master (un cierre en € no sale en $).
                 const timedOut = settled.value === null;
                 const basics: ResearchCompanyBasics | null = basicsList[index] ?? null;
-                const entry: WatchlistEntryData = settled.value ?? {
-                    symbol: item.symbol.trim().toUpperCase(),
-                    name: basics?.name || item.symbol,
-                    exchange: basics?.exchange || null,
-                    currency: basics?.currency || null,
-                    price: null,
-                    change: null,
-                    changePercent: null,
-                    marketCap: null,
-                    marketCapDerived: false,
-                    peRatio: null,
-                    peKind: null,
-                    peSource: null,
-                    peSourceLabel: null,
-                    priceKind: null,
-                    priceAsOf: null,
-                    quoteSymbol: null,
-                    metricsNotApplicable: false,
-                };
+                const entry: WatchlistEntryData = settled.value ?? emptyWatchlistEntry(item.symbol.trim().toUpperCase(), basics, null);
                 // Mismo cierre datado y mismo % que Movers y Mercado.
                 const dated = entry.priceKind === 'live' ? undefined : datedChanges[item.symbol.trim().toUpperCase()];
                 const data = dated
@@ -220,23 +203,7 @@ export default async function WatchlistPage({
                       }
                     : entry;
                 return {
-                    symbol: data.symbol,
-                    name: data.name,
-                    exchange: data.exchange,
-                    price: data.price,
-                    change: data.change,
-                    changePercent: data.changePercent,
-                    priceKind: data.priceKind,
-                    priceAsOf: data.priceAsOf,
-                    metricsNotApplicable: data.metricsNotApplicable,
-                    currency: data.currency,
-                    marketCap: data.marketCap,
-                    marketCapDerived: data.marketCapDerived,
-                    peRatio: data.peRatio,
-                    peKind: data.peKind,
-                    peSource: data.peSource,
-                    peSourceLabel: data.peSourceLabel,
-                    quoteSymbol: data.quoteSymbol,
+                    ...data,
                     analysis: item.analysis,
                     monitor: monitorData.items[item.symbol.trim().toUpperCase()] ?? null,
                     timedOut,
@@ -246,23 +213,7 @@ export default async function WatchlistPage({
             } catch {
                 // Fallo de red/proveedor: todo a null para pintar NA ('N/D') + badge «sin datos».
                 return {
-                    symbol: item.symbol,
-                    name: item.symbol,
-                    exchange: null,
-                    price: null,
-                    change: null,
-                    changePercent: null,
-                    priceKind: null,
-                    priceAsOf: null,
-                    metricsNotApplicable: false,
-                    currency: null,
-                    marketCap: null,
-                    marketCapDerived: false,
-                    peRatio: null,
-                    peKind: null,
-                    peSource: null,
-                    peSourceLabel: null,
-                    quoteSymbol: null,
+                    ...emptyWatchlistEntry(item.symbol, null, null),
                     analysis: item.analysis,
                     monitor: null,
                     timedOut: false,

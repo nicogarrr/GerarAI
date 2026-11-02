@@ -10,6 +10,7 @@ import { requestCache } from '@/lib/cache/requestCache';
 import { AppError, classifyError, getFriendlyErrorMessage, type ErrorCause } from '@/lib/types/errors';
 import { getStockQuote, getStockValuationBasics } from '@/lib/actions/finnhub.actions';
 import { getResearchCompanyBasics, type ResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
+import { emptyWatchlistEntry } from '@/lib/watchlist/entry-fallback';
 import { isUsQuoteLine, quoteSymbolFor } from '@/lib/market/quote-symbol';
 import { chartPriceUnit } from '@/lib/market/chart-price-units';
 import { hasPriorClose } from '@/lib/market/session-change';
@@ -195,26 +196,9 @@ export async function getWatchlistEntryData(
     // el resto de consumidores (inicio) la leen aquí como siempre.
     const basics = precomputedBasics !== undefined ? precomputedBasics : await getResearchCompanyBasics(normalized);
     const quoteSymbol = quoteSymbolFor(basics, normalized);
-    const base: WatchlistEntryData = {
-        symbol: normalized,
-        name: basics?.name || normalized,
-        exchange: basics?.exchange || null,
-        currency: basics?.currency || null,
-        price: null,
-        change: null,
-        changePercent: null,
-        marketCap: null,
-        marketCapDerived: false,
-        peRatio: null,
-        peKind: null,
-        peSource: null,
-        peSourceLabel: null,
-        priceKind: null,
-        priceAsOf: null,
-        metricsNotApplicable: false,
-        quoteSymbol,
-    };
+    const base = emptyWatchlistEntry(normalized, basics, quoteSymbol);
     if (!quoteSymbol) return base;
+
 
     // Linea US derivada de bolsa/divisa, no de quoteSymbol === ticker (CGEO.L
     // cumple la igualdad y cotiza en GBX: sus metricas no son las de Finnhub).
