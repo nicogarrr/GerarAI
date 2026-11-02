@@ -1373,7 +1373,8 @@ def evaluate_alert_rules(
 
     db = _session(tenant_id, user_id)
     try:
-        results = AlertRuleService().evaluate_all(db)
+        # Pasada periódica: las reglas de precio no se evalúan con la bolsa cerrada.
+        results = AlertRuleService().evaluate_all(db, skip_closed_markets=True)
         return {
             "status": "ok",
             "actor": "evaluate_alert_rules",
@@ -2785,7 +2786,8 @@ def evaluate_dca_signals(
 
     run = dca_run_log.start_run(db, "scheduler")
     try:
-        summary = evaluate_watchlist(db)
+        # Pasada diaria: no evalua tickers cuya bolsa no abrio el dia del cierre.
+        summary = evaluate_watchlist(db, skip_closed_markets=True)
         from app.services.plan_proactivity import review_savings_plan
 
         summary["savings_plan_review"] = review_savings_plan(db)

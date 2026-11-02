@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.i18n import generation_language
+from app.core.local_date import local_today
 from app.models import (
     AlertRule,
     Company,
@@ -20,6 +21,7 @@ from app.models import (
     Position,
     ResearchAlert,
 )
+from app.services.market_calendar import ticker_market_closed
 from app.services.notification_service import NotificationService
 from app.services.portfolio_ledger_service import trade_price_fallbacks
 from app.services.price_freshness import close_is_stale
@@ -33,6 +35,7 @@ from app.services.trading_sessions import missing_sessions
 _OPERATORS = frozenset({">", "<", ">=", "<=", "==", "!="})
 
 _NUMERIC_RULE_TYPES = frozenset({"price_above", "price_below", "price_change"})
+_PRICE_KINDS = frozenset({"market_price", "price_change_percent"})
 
 
 def _numeric_threshold(value: Any) -> float | None:
@@ -123,7 +126,13 @@ class AlertRuleService:
         db.refresh(rule)
         return rule
 
-    def evaluate_all(self, db: Session) -> list[dict[str, Any]]:
+    def evaluate_all(
+        self,
+        db: Session,
+        *,
+        skip_closed_markets: bool = False,
+        market_day: date | None = None,
+    ) -> list[dict[str, Any]]:
         # Los criterios medibles de las tesis entran como reglas
         # `thesis_invalidation` antes de la pasada: mismo evaluador, mismo
         # cooldown y misma entrega por canales que el resto de reglas.
@@ -137,7 +146,28 @@ class AlertRuleService:
                 .order_by(AlertRule.id)
             ).all()
         )
-        results = [self.evaluate(db, rule, commit=False) for rule in rules]
+        # Con ``skip_closed_markets`` (la pasada periódica del scheduler) las
+        # reglas de precio no se evalúan un día sin sesión en la bolsa del
+        # ticker (festivo de Madrid, Londres o la NYSE, fin de semana); la regla
+        # queda como estaba. «Hoy» es el día de Madrid del usuario.
+        market_day = market_day or local_today()
+        companies: dict[int, Company | None] = {}
+        results: list[dict[str, Any]] = []
+        for rule in rules:
+            kind = str((rule.target or {}).get("kind") or "")
+            if skip_closed_markets and kind in _PRICE_KINDS and rule.company_id is not None:
+                if rule.company_id not in companies:
+                    companies[rule.company_id] = db.get(Company, rule.company_id)
+                company = companies[rule.company_id]
+                if company is not None and ticker_market_closed(company.ticker, market_day):
+                    results.append({
+                        "rule_id": rule.id,
+                        "status": "skipped_market_closed",
+                        "matched": False,
+                        "market_day": market_day.isoformat(),
+                    })
+                    continue
+            results.append(self.evaluate(db, rule, commit=False))
         db.commit()
         return results
 
