@@ -498,6 +498,13 @@ def create_memory_item(payload: MemoryItemCreate, db: Session = Depends(get_db))
         source_type=payload.source_type,
     )
     company_id = _resolve_company_id(db, payload.ticker, payload.company_id)
+    # El chat trae, para cualquier empresa, sus notas y TODAS las de ámbito
+    # «portfolio»: una nota de ACME guardada con el ámbito por defecto salía en
+    # el chat de BETA. Con empresa, la nota es de empresa (como «recuerda …»);
+    # «company» sin empresa no aparecería en ningún sitio.
+    scope = "company" if company_id is not None else payload.scope
+    if scope == "company" and company_id is None:
+        raise HTTPException(status_code=400, detail="Company scope requires a company")
     session = db.get(ResearchSession, payload.research_session_id) if payload.research_session_id else None
     if payload.research_session_id and not session:
         raise HTTPException(status_code=404, detail="Research session not found")
@@ -514,7 +521,7 @@ def create_memory_item(payload: MemoryItemCreate, db: Session = Depends(get_db))
     item = MemoryItem(
         company_id=company_id,
         research_session_id=payload.research_session_id,
-        scope=payload.scope,
+        scope=scope,
         memory_type=payload.memory_type,
         importance=payload.importance,
         content=payload.content,

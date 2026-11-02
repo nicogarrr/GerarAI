@@ -65,8 +65,11 @@ class MemoryService:
         query_tokens = _tokens(query)
         statement = select(MemoryItem).where(MemoryItem.status == "active")
         if company:
+            # Las de cartera son las que no son de ninguna empresa: una nota de
+            # ACME guardada antes con ámbito «portfolio» no entra en el chat de BETA.
             statement = statement.where(
-                (MemoryItem.company_id == company.id) | (MemoryItem.scope == "portfolio")
+                (MemoryItem.company_id == company.id)
+                | ((MemoryItem.scope == "portfolio") & MemoryItem.company_id.is_(None))
             )
         else:
             statement = statement.where(MemoryItem.scope == scope)
