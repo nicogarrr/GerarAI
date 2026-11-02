@@ -69,9 +69,10 @@ function toFinite(value: NumericInput): number | null {
 // idéntica pero la en más laxa: aceptaba «1.567» como decimal cuando puede
 // ser miles es-ES — un factor 1000 silencioso en dinero, contra la regla de
 // honestidad del propio módulo). Se reexporta para no romper importadores.
-export { parseLocalizedNumber, parseLocalizedNumberDetailed } from '@/lib/i18n/parse-number';
-export type { LocalizedNumberError } from '@/lib/i18n/parse-number';
-import { parseLocalizedNumber, parseLocalizedNumberDetailed, type LocalizedNumberError } from '@/lib/i18n/parse-number';
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { parseLocalizedNumber, parseLocalizedNumberDetailed, type LocalizedNumberError } from './i18n/parse-number.ts';
+export { parseLocalizedNumber, parseLocalizedNumberDetailed };
+export type { LocalizedNumberError };
 
 /**
  * Precarga de inputs numéricos: el number del backend (p.ej. 6.0572 o 1e-7)

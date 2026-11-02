@@ -64,7 +64,7 @@ async function renderForecast(payload: PortfolioForecast): Promise<string> {
         // Compile the real locale context and translator, not a translation stub.
         mkdirSync(`${dir}/i18n/messages`, { recursive: true });
         cpSync('lib/i18n/messages', `${dir}/i18n/messages`, { recursive: true });
-        for (const file of ['client.tsx', 'locale.ts', 'translate.ts', 't.ts', 'messages/index.ts']) {
+        for (const file of ['client.tsx', 'locale.ts', 'parse-number.ts', 'translate.ts', 't.ts', 'messages/index.ts']) {
             const target = file.replace(/\.tsx?$/, '.mjs');
             writeFileSync(`${dir}/i18n/${target}`, compile(`lib/i18n/${file}`).replace(/\.ts(['"])/g, '.mjs$1'));
         }
@@ -73,7 +73,7 @@ async function renderForecast(payload: PortfolioForecast): Promise<string> {
         writeFileSync(`${dir}/locale.mjs`, compile('lib/i18n/locale.ts'));
         writeFileSync(
             `${dir}/format.mjs`,
-            compile('lib/format.ts').replaceAll("'./i18n/locale.ts'", "'./i18n/locale.mjs'"),
+            compile('lib/format.ts').replaceAll('./i18n/parse-number.ts', './i18n/parse-number.mjs').replaceAll("'./i18n/locale.ts'", "'./i18n/locale.mjs'"),
         );
         writeFileSync(
             `${dir}/panel.mjs`,
