@@ -33,6 +33,7 @@ from app.schemas.api import (
     WatchlistMonitorOut,
 )
 from app.services.connectors.earnings_calendar import fetch_earnings_range
+from app.services.dca_on_add import enqueue_dca_on_add, is_preparing
 from app.services.derived_market_cap_service import DERIVED_SOURCE
 from app.services.earnings_dates_service import is_fresh
 from app.services.fair_value_service import resolve_fair_values
@@ -132,6 +133,8 @@ def upsert_watch_item(
         # Los hechos son por tenant: siembra automatica para que la ficha no
         # salga vacia hasta pulsar «Refrescar SEC» (hallazgo del tester).
         enqueue_fundamentals_seed(db, symbol)
+        # Señal DCA en segundo plano: la ficha no espera al barrido diario.
+        enqueue_dca_on_add(db, [symbol])
     # Alta o cambio de ticker: el listado DCA cacheado incluye la watchlist.
     invalidate_dca_cache(db=db)
     return _payload(item)
@@ -544,6 +547,7 @@ class DcaZoneVisitsOut(BaseModel):
 class DcaHitRatesOut(BaseModel):
     symbol: str
     available: bool
+    preparing: bool = False
     reason: str | None = None
     months_completed: int = 0
     first_period: str | None = None
@@ -925,6 +929,10 @@ def dca_hit_rates(symbol: str, db: Session = Depends(get_db)) -> dict:
         select(DcaSignalState).where(DcaSignalState.symbol == key, *tenant_filters(db, DcaSignalState))
     )
     if state is None:
+        if is_preparing(db, key):
+            # Recién añadido: la evaluación al añadir está en cola o en curso.
+            return {"symbol": key, "available": False, "preparing": True,
+                    "reason": "Preparando la señal DCA: se está evaluando en segundo plano"}
         raise HTTPException(status_code=404, detail=ui_error(422, "ticker_without_dca_signal").detail)
     data = state.hit_rates or {}
     if not data.get("rows"):
