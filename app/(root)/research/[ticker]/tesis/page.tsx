@@ -32,6 +32,7 @@ import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenanc
 import { metricLabel } from '@/lib/research/metric-labels';
 import { publicEditorial } from '@/lib/public-fonts-editorial';
 import { cn } from '@/lib/utils';
+import { thesisCatalystLabel } from '@/lib/research/catalyst-label';
 
 export const dynamic = 'force-dynamic';
 
@@ -434,7 +435,7 @@ export default async function ThesisReadingPage({ params, searchParams }: PagePr
                 <ul className={LIST}>
                   {(latest.catalysts ?? []).map((catalyst, index) => (
                     <li key={index}>
-                      {catalyst.label ?? t('research.thesisDoc.catalyst')}{catalyst.date ? ` (${formatUserDate(catalyst.date)})` : ''}
+                      {catalyst.label ? thesisCatalystLabel(catalyst.label, locale, t) : t('research.thesisDoc.catalyst')}{catalyst.date ? ` (${formatUserDate(catalyst.date)})` : ''}
                     </li>
                   ))}
                 </ul>
@@ -639,7 +640,7 @@ export default async function ThesisReadingPage({ params, searchParams }: PagePr
                 <ul className={LIST}>
                   {(published.catalysts ?? []).map((catalyst, index) => (
                     <li key={index}>
-                      {catalyst.label ?? t('research.thesisDoc.catalyst')}{catalyst.date ? ` (${formatUserDate(catalyst.date)})` : ''}
+                      {catalyst.label ? thesisCatalystLabel(catalyst.label, locale, t) : t('research.thesisDoc.catalyst')}{catalyst.date ? ` (${formatUserDate(catalyst.date)})` : ''}
                     </li>
                   ))}
                 </ul>

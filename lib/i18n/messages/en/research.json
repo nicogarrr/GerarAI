@@ -856,6 +856,7 @@
     }
   },
   "memo": {
+    "catalystNextEarnings": "Upcoming earnings",
     "ratingBuy": "buy",
     "ratingAccumulate": "accumulate",
     "ratingOverweight": "overweight",
