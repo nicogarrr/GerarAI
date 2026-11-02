@@ -36,7 +36,7 @@ _ALERT_ACTION_RE = re.compile(
     r"create|add|set\s+(?:up\s+)?an?|alert\s+me|notify|delete|remove|disable|enable|mute|snooze|pause)\b"
 )
 # «my alerts», «show my alerts», «which alerts are set?»: en inglés iban al modelo general.
-_ALERTS_RE = re.compile(r"(?i)\b(?:avisos?|alertas?)\b|\b(?:my|any|open|which|what|show|list)\s+(?:\w+\s+)?alerts\b")
+_ALERTS_RE = re.compile(r"(?i)\b(?:avisos?|alertas?)\b|\b(?:my|any|open|which|what|show|list)\s+(?:\w+\s+)?alerts\b|\bhow\s+many\s+(?:open\s+)?alerts\b")
 _RISK_METRIC_RE = re.compile(
     r"(?i)\b(?:drawdown|ca[ií]da\s+m[aá]xima|volatilidad|twr|panel\s+de\s+riesgo|"
     r"(?:avisos?|alertas?|reglas?|l[ií]mites?)\s+de\s+riesgo)\b"

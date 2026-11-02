@@ -509,6 +509,7 @@ def dividend_ticker_without_records(db: Session, question: str) -> str | None:
 _MY_THESES_EN_RE = re.compile(
     r"(?i)\b(?:my|active|current|open)\s+(?:investment\s+)?theses\b"
     r"|\b(?:what|which)\s+(?:investment\s+)?theses\s+(?:do\s+i\s+have|have\s+i)\b"
+    r"|\bhow\s+many\s+(?:investment\s+)?theses\b"
 )
 
 

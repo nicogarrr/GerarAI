@@ -1194,7 +1194,7 @@ def _alert_rules_answer(db: Session, tenant: int) -> ChatResponse:
 
 
 _SCREENS = re.compile(
-    r"\b(?:pantallas|screens?|screeners?|filtros)\s+(?:que\s+tengo\s+)?(?:guardad\w*|del\s+screener|en\s+el\s+screener)"
+    r"\b(?:pantallas|screens?|screeners?|filtros)\s+(?:(?:que\s+)?tengo\s+)?(?:guardad\w*|del\s+screener|en\s+el\s+screener)"
     r"|\bmis\s+(?:pantallas|screens?|screeners?)\b|\btengo\s+guardad\w+\s+en\s+el\s+screener\b"
     r"|\bmy\s+(?:saved\s+)?screens?\b|\bsaved\s+screens?\b"
 )

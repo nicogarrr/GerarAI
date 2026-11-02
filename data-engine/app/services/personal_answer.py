@@ -111,7 +111,7 @@ _CHEAP = re.compile(
 _WATCHLIST = re.compile(
     r"\b(?:watch\s?-?list|lista de seguimiento|seguimiento|(?:valores|empresas|acciones) que sigo)\b"
     # «¿Qué empresas sigo?», «which companies am I following?»: iban al modelo general.
-    r"|\b(?:que|cuales)\s+(?:valores|empresas|acciones|companias)\s+(?:sigo|vigilo|tengo\s+en\s+vigilancia)\b(?!\s+\w+(?:ando|iendo)\b)"
+    r"|\b(?:que|cuales|cuant[ao]s)\s+(?:valores|empresas|acciones|companias)\s+(?:sigo|vigilo|tengo\s+en\s+vigilancia)\b(?!\s+\w+(?:ando|iendo)\b)"
     r"|\b(?:companies|stocks|tickers|names)\s+(?:am\s+i|i\s*'?m|do\s+i)\s+(?:following|follow|watching|watch|tracking|track)\b"
 )
 _RISK = re.compile(
