@@ -6,10 +6,12 @@ import type { Metadata } from 'next';
 import { getFormat, getLocale, getT } from '@/lib/i18n/server';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { getWatchlistState, getWatchlistEntryData, getWatchlistMonitor, type WatchlistEntryData, type WatchlistMonitorItem } from '@/lib/actions/watchlist.actions';
+import type { TranslateFn } from '@/lib/i18n/translate';
 import { getResearchCompaniesBasics, getResearchCompanyBasics, type ResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
 import { getProfile } from '@/lib/actions/finnhub.actions';
 import { isTickerNotFound } from '@/lib/watchlist/lookup-status';
 import { fetchDatedChanges } from '@/lib/market/dated-change';
+import { Suspense } from 'react';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { WatchlistMembership, WatchlistEntry, WatchlistCount } from '@/components/watchlist/WatchlistMembership';
@@ -175,7 +177,16 @@ export default async function WatchlistPage({
             })
             .catch(() => false),
     );
-    const [datedChanges, monitorData, basicsList, notFoundList] = await Promise.all([datedChangesPromise, monitorPromise, Promise.all(basicsPromises), Promise.all(notFoundPromises)]);
+    // El monitor denso (52 sem, valor justo, próximos resultados) NO se espera
+    // antes del primer byte salvo que la ordenación lo necesite
+    // (sort=earnings): su cola externa (calendario público NASDAQ, deadline de
+    // 8 s en el conector) estiraba el TTFB de la página (medido en prod: ~2-20 s
+    // hasta contenido). En el camino normal las celdas densas llegan por
+    // streaming con Suspense sobre la MISMA promesa en vuelo, y la tabla base
+    // (cotización con su presupuesto de 3 s) pinta de inmediato.
+    const monitorUpfront = sort === 'earnings';
+    const monitorData = monitorUpfront ? await monitorPromise : null;
+    const [datedChanges, basicsList, notFoundList] = await Promise.all([datedChangesPromise, Promise.all(basicsPromises), Promise.all(notFoundPromises)]);
     const watchlistStocks: WatchlistStock[] = await Promise.all(
         pageItems.map(async (item, index) => {
             try {
@@ -205,7 +216,7 @@ export default async function WatchlistPage({
                 return {
                     ...data,
                     analysis: item.analysis,
-                    monitor: monitorData.items[item.symbol.trim().toUpperCase()] ?? null,
+                    monitor: monitorData ? (monitorData.items[item.symbol.trim().toUpperCase()] ?? null) : null,
                     timedOut,
                     notFound: notFoundList[index] === true && data.price === null,
                     addedAt: item.addedAt
@@ -275,18 +286,6 @@ export default async function WatchlistPage({
         sort === key ? (dir === 'asc' ? 'ascending' : 'descending') : undefined;
     const sortIndicator = (key: SortKey) =>
         sort === key ? <span aria-hidden="true" className="text-teal-400">{dir === 'asc' ? '▲' : '▼'}</span> : null;
-    // Solo cuentan tickers con valor justo ÚNICO (tesis publicada de K o motor,
-    // misma cifra que inicio y screener); sin valoración no se juzga caro/barato.
-    const undervaluedCount = watchlistStocks.filter((stock) => stock.monitor?.valuation_side === 'infravalorada').length;
-    const overvaluedCount = watchlistStocks.filter((stock) => stock.monitor?.valuation_side === 'sobrevalorada').length;
-    const judged = watchlistStocks.filter((stock) => stock.monitor?.valuation_side);
-    const byThesis = judged.filter((stock) => stock.monitor?.fair_value_source === 'tesis').length;
-    const byEngine = judged.length - byThesis;
-    const fairValueSourceNote = [
-        byThesis > 0 ? t('watchlist.page.fairValue.byThesis', { count: byThesis }) : null,
-        byEngine > 0 ? t('watchlist.page.fairValue.byEngine', { count: byEngine }) : null,
-    ].filter(Boolean).join(', ');
-
     // Un único formateador para móvil y desktop: sin dato -> NA ('N/D'),
     // nunca un número interpolado sin guarda.
     const formatPeRatio = (peRatio: number | null) => {
@@ -302,14 +301,6 @@ export default async function WatchlistPage({
 
     // La divisa la fija el listado real; sin divisa verificada se muestra el
     // número pelado, nunca un «US$» asumido (F253).
-    // Cuando el calendario de resultados (NASDAQ) cae, el backend devuelve
-    // earningsStatus != 'ok' y todas las fechas llegan null: un N/D pelado
-    // parecería «sin fecha anunciada». Se explica la causa como en el cap.
-    const earningsNote = monitorData.earningsStatus === 'unavailable'
-        ? t('watchlist.page.earningsUnavailable')
-        : monitorData.earningsStatus === 'partial'
-          ? t('watchlist.page.earningsPartial')
-          : null;
     const formatPriceCell = (price: number | null, currency: string | null) =>
         price === null ? NA : currency ? formatPrice(price, currency) : formatNumber(price);
 
@@ -326,11 +317,9 @@ export default async function WatchlistPage({
                         <Eye className="h-5 w-5 shrink-0 text-purple-400" aria-hidden="true" />
                         Watchlist
                     </h1>
-                    {undervaluedCount + overvaluedCount > 0 ? (
-                        <p className="text-xs text-gray-500">
-                            {t('watchlist.page.fairValue.summary', { source: fairValueSourceNote, under: undervaluedCount, over: overvaluedCount })}
-                        </p>
-                    ) : null}
+                    <Suspense fallback={null}>
+                        <MonitorFairValueSummary promise={monitorPromise} t={t} />
+                    </Suspense>
                 </div>
                 {/* Alta directa desde la página (QA 2026-10-19: antes solo se
                     podía añadir desde la ficha research o el screener). */}
@@ -436,7 +425,9 @@ export default async function WatchlistPage({
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">{t('watchlist.page.sort.earnings')}</dt>
-                                        <dd className="font-mono text-sm text-gray-300">{stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}{!stock.monitor?.next_earnings_date && earningsNote ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}</dd>
+                                        <Suspense fallback={<dd className="font-mono text-sm text-gray-600" aria-busy="true"><span aria-hidden="true" className="animate-pulse">…</span></dd>}>
+                                            <MonitorEarningsDd promise={monitorPromise} symbol={stock.symbol} t={t} NA={NA} formatMarketDate={formatMarketDate} />
+                                        </Suspense>
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">{t('watchlist.page.sort.marketCap')}</dt>
@@ -518,11 +509,9 @@ export default async function WatchlistPage({
                                                                 {stock.timedOut ? t('watchlist.page.noDataTimedOut') : t('watchlist.page.noData')}
                                                             </Badge>
                                                         ) : null}
-                                                        {stock.monitor && stock.price !== null && stock.monitor.low_52w !== null && stock.monitor.low_52w_sessions >= 120 && stock.price <= stock.monitor.low_52w * 1.02 ? (
-                                                            <Badge variant="outline" className="border-amber-800/60 font-normal text-amber-300/90" title={t('watchlist.page.low52Title', { price: stock.monitor.currency ? formatPrice(stock.monitor.low_52w, stock.monitor.currency) : formatNumber(stock.monitor.low_52w), sessions: stock.monitor.low_52w_sessions })}>
-                                                                {t('watchlist.page.low52')}
-                                                            </Badge>
-                                                        ) : null}
+                                                        <Suspense fallback={null}>
+                                                            <MonitorLow52Badge promise={monitorPromise} symbol={stock.symbol} price={stock.price} t={t} formatPrice={formatPrice} formatNumber={formatNumber} />
+                                                        </Suspense>
                                                     </div>
                                                     {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <div className="max-w-[150px] truncate text-xs text-gray-500" title={stock.name}>{stock.name}</div> : null}<TrackedAnalysisStatus analysis={stock.analysis} locale={locale} /><DcaLevelBadge item={dcaBySymbol.get(stock.symbol.toUpperCase())} signalMonths={dcaSignalMonths} compact />
                                                 </div>
@@ -578,9 +567,9 @@ export default async function WatchlistPage({
                                         <TableCell className="text-right text-sm">
                                             <AnalystTargetLine symbol={stock.symbol} quoteSymbol={stock.quoteSymbol} currency={stock.currency} referencePrice={stock.price} fxRates={fxRates} baseCurrency={baseCurrency} />
                                         </TableCell>
-                                        <TableCell className="text-right font-mono text-sm text-gray-300" title={stock.monitor?.next_earnings_source ?? (!stock.monitor?.next_earnings_date ? earningsNote ?? undefined : undefined)}>
-                                            {stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}{!stock.monitor?.next_earnings_date && earningsNote ? <span className="block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}
-                                        </TableCell>
+                                        <Suspense fallback={<TableCell className="text-right font-mono text-sm text-gray-600" aria-busy="true"><span aria-hidden="true" className="animate-pulse">…</span></TableCell>}>
+                                            <MonitorEarningsTableCell promise={monitorPromise} symbol={stock.symbol} t={t} NA={NA} formatMarketDate={formatMarketDate} />
+                                        </Suspense>
 
                                     </WatchlistEntry>
                                 ))}
@@ -598,3 +587,112 @@ export default async function WatchlistPage({
     );
 }
 
+
+// ---------------------------------------------------------------------------
+// Celdas densas del monitor, diferidas por streaming (Suspense).
+//
+// La página NO espera el monitor del backend para el primer byte: su cola
+// externa (calendario público NASDAQ, deadline 8 s en el conector) medida en
+// prod estiraba el TTFB a ~2-20 s. Todas estas piezas esperan la MISMA
+// promesa en vuelo (una sola llamada a /api/watchlist/monitor por página) y
+// llegan juntas en el stream cuando resuelve. Cuando la ordenación es por
+// resultados (sort=earnings) la promesa ya viene esperada arriba y los
+// boundaries resuelven en el mismo render. Los fallbacks muestran espera
+// («…» con aria-busy) o nada (adornos), nunca N/D: N/D significa «sin dato»
+// y aquí el dato puede existir.
+// ---------------------------------------------------------------------------
+
+type MonitorResult = { items: Record<string, WatchlistMonitorItem>; earningsStatus: string };
+type MonitorPromise = Promise<MonitorResult>;
+
+// Cuando el calendario de resultados (NASDAQ) cae, el backend devuelve
+// earningsStatus != 'ok' y todas las fechas llegan null: un N/D pelado
+// parecería «sin fecha anunciada». Se explica la causa como en el cap.
+function earningsNoteFor(status: string, t: TranslateFn): string | null {
+    return status === 'unavailable'
+        ? t('watchlist.page.earningsUnavailable')
+        : status === 'partial'
+          ? t('watchlist.page.earningsPartial')
+          : null;
+}
+
+// Resumen de valor justo de la cabecera. Solo cuentan tickers con valor
+// justo ÚNICO (tesis publicada o motor, misma cifra que inicio y screener);
+// sin valoración no se juzga caro/barato.
+async function MonitorFairValueSummary({ promise, t }: { promise: MonitorPromise; t: TranslateFn }) {
+    const { items } = await promise;
+    const rows = Object.values(items);
+    const undervaluedCount = rows.filter((monitor) => monitor.valuation_side === 'infravalorada').length;
+    const overvaluedCount = rows.filter((monitor) => monitor.valuation_side === 'sobrevalorada').length;
+    if (undervaluedCount + overvaluedCount === 0) return null;
+    const judged = rows.filter((monitor) => monitor.valuation_side);
+    const byThesis = judged.filter((monitor) => monitor.fair_value_source === 'tesis').length;
+    const byEngine = judged.length - byThesis;
+    const fairValueSourceNote = [
+        byThesis > 0 ? t('watchlist.page.fairValue.byThesis', { count: byThesis }) : null,
+        byEngine > 0 ? t('watchlist.page.fairValue.byEngine', { count: byEngine }) : null,
+    ].filter(Boolean).join(', ');
+    return (
+        <p className="text-xs text-gray-500">
+            {t('watchlist.page.fairValue.summary', { source: fairValueSourceNote, under: undervaluedCount, over: overvaluedCount })}
+        </p>
+    );
+}
+
+async function MonitorLow52Badge({
+    promise, symbol, price, t, formatPrice, formatNumber,
+}: {
+    promise: MonitorPromise;
+    symbol: string;
+    price: number | null;
+    t: TranslateFn;
+    formatPrice: (value: number, currency: string | null) => string;
+    formatNumber: (value: number) => string;
+}) {
+    const { items } = await promise;
+    const monitor = items[symbol] ?? null;
+    if (!monitor || price === null || monitor.low_52w === null || monitor.low_52w_sessions < 120 || price > monitor.low_52w * 1.02) {
+        return null;
+    }
+    return (
+        <Badge variant="outline" className="border-amber-800/60 font-normal text-amber-300/90" title={t('watchlist.page.low52Title', { price: monitor.currency ? formatPrice(monitor.low_52w, monitor.currency) : formatNumber(monitor.low_52w), sessions: monitor.low_52w_sessions })}>
+            {t('watchlist.page.low52')}
+        </Badge>
+    );
+}
+
+async function MonitorEarningsDd({
+    promise, symbol, t, NA, formatMarketDate,
+}: {
+    promise: MonitorPromise;
+    symbol: string;
+    t: TranslateFn;
+    NA: string;
+    formatMarketDate: (iso: string) => string;
+}) {
+    const { items, earningsStatus } = await promise;
+    const monitor = items[symbol] ?? null;
+    const note = earningsNoteFor(earningsStatus, t);
+    return (
+        <dd className="font-mono text-sm text-gray-300">{monitor?.next_earnings_date ? formatMarketDate(monitor.next_earnings_date) : NA}{!monitor?.next_earnings_date && note ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{note}</span> : null}</dd>
+    );
+}
+
+async function MonitorEarningsTableCell({
+    promise, symbol, t, NA, formatMarketDate,
+}: {
+    promise: MonitorPromise;
+    symbol: string;
+    t: TranslateFn;
+    NA: string;
+    formatMarketDate: (iso: string) => string;
+}) {
+    const { items, earningsStatus } = await promise;
+    const monitor = items[symbol] ?? null;
+    const note = earningsNoteFor(earningsStatus, t);
+    return (
+        <TableCell className="text-right font-mono text-sm text-gray-300" title={monitor?.next_earnings_source ?? (!monitor?.next_earnings_date ? note ?? undefined : undefined)}>
+            {monitor?.next_earnings_date ? formatMarketDate(monitor.next_earnings_date) : NA}{!monitor?.next_earnings_date && note ? <span className="block font-sans text-[11px] text-gray-500">{note}</span> : null}
+        </TableCell>
+    );
+}

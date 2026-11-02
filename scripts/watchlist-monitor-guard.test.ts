@@ -47,3 +47,26 @@ test('inicio y screener leen el mismo valor justo único, con etiqueta', () => {
 test('sin URLs de proveedor construidas a mano en el frontend', () => {
     assert.doesNotMatch(page, /nasdaq\.com|finance\.yahoo\.com/);
 });
+
+test('el monitor no bloquea el primer byte salvo ordenación por resultados', () => {
+    // Medido en prod: TTFB de /watchlist ~2-20 s (la cola externa del
+    // calendario, deadline 8 s, iba dentro del render). El monitor solo se
+    // espera cuando la ordenación lo necesita; el resto llega por streaming.
+    assert.match(page, /const monitorUpfront = sort === 'earnings'/);
+    assert.match(page, /const monitorData = monitorUpfront \? await monitorPromise : null/);
+    assert.doesNotMatch(page, /await Promise\.all\(\[datedChangesPromise, monitorPromise/);
+    // Las piezas densas (resumen valor justo, chip 52 sem, próx. resultados)
+    // van en boundaries de streaming sobre la promesa compartida.
+    for (const component of ['MonitorFairValueSummary', 'MonitorLow52Badge', 'MonitorEarningsDd', 'MonitorEarningsTableCell']) {
+        assert.match(page, new RegExp(`<Suspense[^>]*>[\\s\\S]{0,200}<${component} `), `${component} debe ir en Suspense`);
+    }
+});
+
+test('los fallbacks del monitor muestran espera, nunca N/D fabricado', () => {
+    // N/D significa «sin dato»; mientras el monitor está en vuelo el dato
+    // puede existir, así que el fallback es espera («…» con aria-busy) o nada.
+    const fallbacks = [...page.matchAll(/fallback=\{([^}]*)\}/g)].map((m) => m[1]);
+    assert.ok(fallbacks.length >= 4, 'debe haber fallbacks de Suspense');
+    assert.doesNotMatch([...page.matchAll(/fallback=\{<dd[\s\S]*?\}/g)].map((m) => m[0]).join(''), /\{NA\}/);
+    assert.doesNotMatch([...page.matchAll(/fallback=\{<TableCell[\s\S]*?\}/g)].map((m) => m[0]).join(''), /\{NA\}/);
+});
