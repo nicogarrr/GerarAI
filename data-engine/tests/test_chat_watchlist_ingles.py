@@ -92,7 +92,7 @@ def test_english_dca_level_in_english(english):
         reset_language_scope(token)
     assert resp is not None
     assert "- KO (Coca-Cola), no saved price, no fair value (neither a published thesis nor the engine), " \
-           "DCA level LIGHT TRIM (forming) (2026-10-30)." in resp.answer
+           "DCA level LIGHT TRIM (forming) (Oct 30, 2026)." in resp.answer
     assert "- NVDA: no GerarAI page yet (no price or fair value); no DCA level evaluated." in resp.answer
 
 

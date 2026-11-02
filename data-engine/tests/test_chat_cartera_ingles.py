@@ -86,7 +86,7 @@ def test_english_portfolio_fallback_in_english(english):
     resp = _fallback(_db())
     lines = resp.answer.splitlines()
     assert lines[0] == "Your portfolio (/portfolio):"
-    assert lines[1].startswith("- 1 position; base currency EUR; data as of 2026-10-30. Total value 550.00 EUR.")
+    assert lines[1].startswith("- 1 position; base currency EUR; data as of Oct 30, 2026. Total value 550.00 EUR.")
     assert "Unrealized P&L +50.00 EUR (+10.0% on cost)." in lines[1]
     assert lines[2].startswith("- KO (KO Inc), weight 100.0%, value 550.00 EUR, ")
     assert lines[-1] == "- Weight by sector: Consumer 100.0%."

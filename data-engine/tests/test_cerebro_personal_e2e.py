@@ -282,4 +282,4 @@ def test_purchase_fallback_keeps_plan_before_bounded_dca_candidates(db):
     response = asyncio.run(answer_personal_question(db, "¿Qué debo comprar hoy?", intent, None, use_llm=False))
     assert "300,00 EUR" in response.answer
     assert "no cotizaciones en directo" in response.answer
-    assert "2026-10-01" in response.answer
+    assert "1 oct 2026" in response.answer

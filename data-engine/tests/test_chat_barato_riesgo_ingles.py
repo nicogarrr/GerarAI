@@ -103,7 +103,7 @@ def test_cheap_on_watchlist_in_english(english):
     assert (resp.llm_trace or {}).get("intent") == "barato"
     lines = resp.answer.splitlines()
     assert lines[0] == "Saved readings, not live quotes or buy orders."
-    assert "- Monthly contribution 300.00 EUR; horizon 10 years; since 2026-01-01." in lines
+    assert "- Monthly contribution 300.00 EUR; horizon 10 years; since Jan 1, 2026." in lines
     assert "- 1 open alert; 0 active alert rules." in lines
     assert "No fair value (neither a published thesis nor the engine), so I can't say whether they're cheap: MSFT." in lines
     _no_spanish(resp.answer)
@@ -114,7 +114,7 @@ def test_risk_with_empty_portfolio_in_english(english):
     assert (resp.llm_trace or {}).get("intent") == "riesgo"
     assert resp.answer.startswith("You have no saved positions in your portfolio, so there's no portfolio risk")
     assert "Alerts: 1 open alert; 0 active alert rules." in resp.answer
-    assert "- KO: KO drops 5% (severity warning, 2026-10-31)." in resp.answer
+    assert "- KO: KO drops 5% (severity warning, Oct 31, 2026)." in resp.answer
     _no_spanish(resp.answer)
 
 
@@ -150,5 +150,5 @@ def test_spanish_unchanged():
     resp = asyncio.run(ChatService(provider=_NoLLM()).answer(db, "¿qué está barato de mi watchlist?", "global", None))
     lines = resp.answer.splitlines()
     assert lines[0] == "Lecturas guardadas, no cotizaciones en directo ni órdenes de compra."
-    assert "- Aportación mensual 300,00 EUR; horizonte 10 años; desde 2026-01-01." in lines
+    assert "- Aportación mensual 300,00 EUR; horizonte 10 años; desde 1 ene 2026." in lines
     assert "- 1 avisos abiertos; 0 reglas de aviso activas." in lines
