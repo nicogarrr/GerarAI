@@ -859,8 +859,13 @@ _PLAN = re.compile(
 _PLAN_NOT = re.compile(r"\bpensiones\b|\bque\s+compro\b|\bsegun\s+mi\s+plan\b|\bwhat\s+(?:should\s+i|to)\s+buy\b")
 
 
+# «¿Cuánto he aportado?» ya habla de lo tuyo sin «mi»: antes caía al modelo general.
+_PLAN_SELF = re.compile(r"\bhe\s+aportado\b|\bhave\s+i\s+contributed\b")
+
+
 def _asks_plan(text: str, question: str) -> bool:
-    return bool(_PLAN.search(text) and not _PLAN_NOT.search(text) and re.search(r"\b(?:mi|mis|my)\b", text)
+    return bool(_PLAN.search(text) and not _PLAN_NOT.search(text)
+                and (re.search(r"\b(?:mi|mis|my)\b", text) or _PLAN_SELF.search(text))
                 and not _tickers_in(question))
 
 
