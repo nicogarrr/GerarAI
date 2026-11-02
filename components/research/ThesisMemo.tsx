@@ -6,6 +6,7 @@ import { createFormatters, isValidCurrencyCode, type Formatters, marginOfSafetyD
 import type { Locale } from '@/lib/i18n/locale';
 import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 import type { TranslationKey } from '@/lib/i18n/t';
+import { RATING_KEYS } from '@/lib/research/rating-keys';
 import { PROVENANCE_GROUPS, provenanceBasis, provenanceGroup } from '@/lib/research/provenance-groups';
 import { isVerifiedOficial, provenanceUrls } from '@/lib/research/provenance-item';
 import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenance-format';
@@ -72,14 +73,6 @@ const CATALYST_TIME_LABELS: Record<string, string> = {
   'time-after-hours': 'tras el cierre',
   'before-market': 'antes de la apertura',
   'after-market': 'tras el cierre',
-};
-
-const RATING_KEYS: Record<string, TranslationKey> = {
-  buy: 'research.memo.ratingBuy', accumulate: 'research.memo.ratingAccumulate', overweight: 'research.memo.ratingOverweight',
-  hold: 'research.memo.ratingHold', underweight: 'research.memo.ratingUnderweight', trim: 'research.memo.ratingTrim',
-  sell: 'research.memo.ratingSell', avoid: 'research.memo.ratingAvoid', watch: 'research.memo.ratingWatch',
-  attractive: 'research.memo.ratingAttractive', expensive: 'research.memo.ratingExpensive',
-  incomplete_price: 'research.memo.ratingIncompletePrice', blocked: 'research.memo.ratingBlocked', insufficient_data: 'research.memo.insufficientData',
 };
 
 const STATUS_KEYS: Record<string, TranslationKey> = {

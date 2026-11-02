@@ -2,6 +2,7 @@ import { getLocale, getT } from '@/lib/i18n/server';
 import type { Locale } from '@/lib/i18n/locale';
 import type { TranslateFn } from '@/lib/i18n/translate';
 import type { TranslationKey } from '@/lib/i18n/t';
+import { RATING_KEYS } from '@/lib/research/rating-keys';
 import { canShowThesisText, WithheldThesisText } from '@/components/research/ThesisSummary';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -72,14 +73,6 @@ const STATUS_KEYS: Record<string, TranslationKey> = {
   approved: 'research.memo.statusApproved', published: 'research.memo.statusPublished', rejected: 'research.memo.statusRejected',
   stale: 'research.memo.statusStale', draft_failed_audit: 'research.memo.statusDraftFailedAudit',
   superseded: 'research.thesisDoc.statusSuperseded', insufficient_data: 'research.memo.insufficientData',
-};
-
-const RATING_KEYS: Record<string, TranslationKey> = {
-  buy: 'research.memo.ratingBuy', accumulate: 'research.memo.ratingAccumulate', overweight: 'research.memo.ratingOverweight',
-  hold: 'research.memo.ratingHold', underweight: 'research.memo.ratingUnderweight', trim: 'research.memo.ratingTrim',
-  sell: 'research.memo.ratingSell', avoid: 'research.memo.ratingAvoid', watch: 'research.memo.ratingWatch',
-  attractive: 'research.memo.ratingAttractive', expensive: 'research.memo.ratingExpensive',
-  incomplete_price: 'research.memo.ratingIncompletePrice', blocked: 'research.memo.ratingBlocked', insufficient_data: 'research.memo.insufficientData',
 };
 
 const PROVENANCE_GROUP_KEYS: Record<string, TranslationKey> = {
