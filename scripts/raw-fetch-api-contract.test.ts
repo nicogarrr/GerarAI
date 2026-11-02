@@ -173,12 +173,11 @@ function rawFetchCalls(file: string): { calls: Call[]; dynamic: number } {
  *  - ObsidianVaultCard: VAULT_URL es la constante literal '/api/obsidian/vault.zip' (existe app/api/obsidian/vault.zip/route.ts).
  *  - export.actions: EXPORT_PATHS deriva '/api/export/{year}' (en OpenAPI).
  *  - privacy.actions: backendUrl() tipa el path como union de literales '/api/privacy/export' | '/api/privacy/account' (ambos en OpenAPI).
- *  - obsidian/vault.zip y thesis/[ticker]/obsidian.zip (route handlers): path literal o template con ticker; ambos paths en OpenAPI.
+ *  - lib/research/zip-proxy: el helper de las rutas .zip (vault y tesis); path literal o con ticker, ambos en OpenAPI.
  *  - live-quotes, screener, newsSources, finnhub, propicksSignals: URLs de PROVEEDORES externos (Yahoo, Finnhub, FRED, stooq, Alpha Vantage, NewsAPI, Marketaux); ninguna toca '/api/'.
  */
 const DYNAMIC_KNOWN: Record<string, number> = {
-    'app/api/obsidian/vault.zip/route.ts': 1,
-    'app/api/thesis/[ticker]/obsidian.zip/route.ts': 1,
+    'lib/research/zip-proxy.ts': 1,
     'components/export/ObsidianVaultCard.tsx': 1,
     'lib/actions/export.actions.ts': 1,
     'lib/actions/live-quotes.actions.ts': 1,
@@ -217,7 +216,9 @@ test('contrato: todo fetch() crudo a /api/ apunta a una ruta que existe', () => 
     }
     assert.deepEqual(Object.fromEntries(dynamics), DYNAMIC_KNOWN,
         'fetch() con URL en variable fuera del censo auditado (o una conocida dejo de existir: encoge DYNAMIC_KNOWN en el mismo PR)');
-    assert.ok(checked >= 10, `solo ${checked} fetch crudos auditados (habia 10+ en 2026-10): fallo cerrado`);
+    // 2026-11-01: las dos descargas del memo (.md y .pdf) comparten ahora un
+    // unico fetch auditado en lib/thesis/fetch-memo.ts; eran 2 llamadas.
+    assert.ok(checked >= 9, `solo ${checked} fetch crudos auditados (habia 9+ en 2026-11): fallo cerrado`);
     assert.deepEqual(misses, [], `fetch() a rutas inexistentes:\n${misses.join('\n')}`);
 });
 

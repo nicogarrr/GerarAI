@@ -20,20 +20,25 @@ describe('vault Obsidian detrás del proxy same-origin', () => {
     it('el proxy existe y exige sesión antes de firmar', () => {
         assert.ok(existsSync(join(root, proxyPath)), 'debe existir el proxy /api/obsidian/vault.zip');
         const proxy = source(proxyPath);
-        assert.match(proxy, /await requireAuthenticatedUser\(\)/);
-        assert.match(proxy, /researchIdentityHeaders\(\{ method: 'GET', path \}\)/);
+        assert.match(proxy, /await requireAuthenticatedUser\(\)/, 'la sesión se exige en la ruta, antes de firmar');
+        assert.match(proxy, /proxyZipDownload\(/, 'la mecánica de descarga vive en el helper compartido');
+        const helper = source(join('lib', 'research', 'zip-proxy.ts'));
+        assert.match(helper, /researchIdentityHeaders\(\{ method: 'GET', path \}\)/, 'el helper firma con la identidad Research OS');
     });
 
     it('el proxy fija la ruta backend como constante (sin SSRF por cliente)', () => {
         const proxy = source(proxyPath);
-        assert.match(proxy, /const path = '\/api\/obsidian\/vault\.zip'/);
+        assert.match(proxy, /path: '\/api\/obsidian\/vault\.zip'/);
         assert.doesNotMatch(proxy, /fetch\(\s*`/);
+        const helper = source(join('lib', 'research', 'zip-proxy.ts'));
+        assert.match(helper, /new URL\(path, BACKEND_URL\)/, 'el helper solo junta path de la ruta con el backend configurado');
     });
 
     it('la respuesta es privada, no cacheable y con nosniff', () => {
+        const helper = source(join('lib', 'research', 'zip-proxy.ts'));
+        assert.match(helper, /private, no-store/);
+        assert.match(helper, /'x-content-type-options': 'nosniff'/);
         const proxy = source(proxyPath);
-        assert.match(proxy, /private, no-store/);
-        assert.match(proxy, /'x-content-type-options': 'nosniff'/);
         assert.match(proxy, /gerarai-obsidian-vault\.zip/);
     });
 
