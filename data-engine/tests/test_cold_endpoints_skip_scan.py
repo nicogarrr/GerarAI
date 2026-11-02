@@ -10,8 +10,8 @@ Estos tests fijan:
 1. EQUIVALENCIA exacta de resultados frente a la semantica anterior (mismos
    grupos, mismos conteos, mismo max por fuente; mismas metricas de
    contexto, incluida la regla rara de tesis_publicada).
-2. PLAN MEDIDO: data-health conserva GROUP BY tras descartar la CTE en
-   produccion (>96 s frente a 17-24 s, PR3929). metric-coverage conserva
+2. PLAN MEDIDO: sqlite conserva GROUP BY; PG usa sondas en dos niveles con
+   rango INTEGER explicito, no la CTE antigua descartada (>96 s, PR3929). metric-coverage conserva
    el barrido perezoso medido mas rapido y no escala con empresas (guardia de
    nº de sentencias; el codigo anterior hacia 1 consulta por empresa con
    valoracion y la supera de lejos).
@@ -264,3 +264,128 @@ def test_distinct_fact_metrics_keeps_tenant_on_seed_and_recursive_steps(db):
     for tenant, expected in ((1, ["bbb", "ddd"]), (2, ["aaa", "ccc", "eee"]), (3, [])):
         db.info["tenant_id"] = tenant
         assert _distinct_facts_metrics(db) == expected
+
+
+def test_calculated_distinct_probes_preserve_filters_and_tenant(db):
+    from app.models import CalculatedMetric
+    from app.services.screener_service import _distinct_calculated_metrics
+
+    db.info.pop("tenant_id")
+    for tenant, metric, value, status in (
+        (1, "bbb", 1, "ok"), (1, "bbb", 2, "ok"),
+        (1, "ddd", 3, "ok"), (1, "null_value", None, "ok"),
+        (1, "bad_status", 4, "error"),
+        (2, "aaa", 1, "ok"), (2, "ccc", 2, "ok"), (2, "eee", 3, "ok"),
+    ):
+        db.add(CalculatedMetric(tenant_id=tenant, company_id=1, metric=metric,
+            value=value, status=status, period=f"p{tenant}-{metric}-{value}",
+            definition_version=1, formula="1"))
+    db.commit()
+    statements = _contador(db.get_bind())
+    for tenant, expected in ((1, ["bbb", "ddd"]), (2, ["aaa", "ccc", "eee"]), (3, [])):
+        db.info["tenant_id"] = tenant
+        assert _distinct_calculated_metrics(db) == expected
+    assert len(statements) == 3
+    assert all("WITH RECURSIVE" in query for query in statements)
+    db.info.pop("tenant_id")
+    assert set(_distinct_calculated_metrics(db)) == {"aaa", "bbb", "ccc", "ddd", "eee"}
+
+
+def test_margin_existence_projects_only_required_payload_values(db):
+    _montar_empresas_valoradas(db, 3)
+    statements = _contador(db.get_bind())
+    assert scm._any_margin_of_safety(db)
+    assert len(statements) == 2
+    assert all("calculation_trace" not in statement for statement in statements)
+    outputs = next(statement for statement in statements if "FROM valuation_outputs" in statement)
+    assert "JSON_EXTRACT" in outputs
+    assert "valuation_outputs.equity_value" not in outputs
+
+
+@pytest.mark.parametrize("margin", [None, True, "NaN", "Infinity", "not-a-number", {}, []])
+def test_margin_existence_preserves_invalid_value_rejection(db, margin):
+    models = _montar_empresas_valoradas(db, 1)
+    out = db.scalar(sa.select(ValuationOutput).where(ValuationOutput.valuation_model_id == models[0].id))
+    out.output_payload = {"margin_of_safety": margin, "trace": {
+        "margin_of_safety_convention": "discount_to_value_v1"}}
+    db.commit()
+    assert not scm._any_margin_of_safety(db)
+
+
+def test_bounded_pair_counts_equal_groupby_for_all_integer_ids(db):
+    from app.models import Document
+    from app.services.data_health_service import _coverage_groups
+
+    now = datetime.now(UTC)
+    db.info.pop("tenant_id")
+    db.add_all([Company(id=i, ticker=f"NEG{i}", name="Boundary", exchange="X",
+        currency="EUR", company_type="mature", valuation_model="dcf")
+        for i in (-2147483648, -1, 0)])
+    db.flush()
+    for cid in (-2147483648, -1, 0, 1, 2):
+        db.add(_fact(cid, 1, "SEC", now))
+        db.add(_fact(cid, 1, "SEC", now - timedelta(days=1)))
+        db.add(Document(company_id=cid, tenant_id=1, title="doc", source_type="SEC", updated_at=now))
+    db.add(_fact(3, 2, "other", now))
+    db.add(_fact(3, 1, "seed", now))
+    db.commit()
+    db.info["tenant_id"] = 1
+    inventory_rows = inventory(db, now=now)["sources"]
+    for table, column, layer, reported in (
+        ("financial_facts", "source_type", "Fundamentales", True),
+        ("documents", "source_type", "Documentos", False),
+        ("news_events", "source", "Noticias", False),
+        ("market_prices", "source", "Precios diarios", False),
+    ):
+        actual = _coverage_groups(db, table=table, source_col=column, tenant=1,
+            reported=reported, prices=table == "market_prices")
+        expected = [(r["source"], r["covered"]) for r in inventory_rows
+            if r["layer"] == layer and r["source"] is not None]
+        assert sorted((src, count) for src, count, stamp in actual) == sorted(expected)
+        for src, count, stamp in actual:
+            assert stamp == now.replace(tzinfo=None)
+
+
+def test_postgres_inventory_uses_bounded_probes_and_matches_portable_result(db, monkeypatch):
+    now = datetime.now(UTC)
+    db.add(_fact(1, 1, "SEC", now))
+    db.add(NewsEvent(company_id=1, tenant_id=1, title="news", source="rss", updated_at=now))
+    db.commit()
+    portable = inventory(db, now=now)
+    statements = _contador(db.get_bind())
+    monkeypatch.setattr(db.get_bind().dialect, "name", "postgresql")
+    bounded = inventory(db, now=now)
+    assert bounded == portable
+    recursive = [statement for statement in statements if "WITH RECURSIVE" in statement]
+    assert len(recursive) == 3
+    assert all("company_id >= -2147483648" in statement for statement in recursive)
+    assert all("tenant_id = ?" in statement for statement in recursive if "FROM market_prices" not in statement)
+
+
+def test_margin_isolated_on_both_models_and_outputs(db):
+    models = _montar_empresas_valoradas(db, 1)
+    model = models[0]
+    out = db.scalar(sa.select(ValuationOutput).where(ValuationOutput.valuation_model_id == model.id))
+    db.info["tenant_id"] = 2
+    assert not scm._any_margin_of_safety(db)
+    assert scm._margin_of_safety(db) == {}
+    db.info["tenant_id"] = 1
+    # A malformed cross-tenant output must not leak even for our own model.
+    db.connection().execute(sa.text("UPDATE valuation_outputs SET tenant_id=2 WHERE id=:id"),
+                            {"id": out.id})
+    db.commit()
+    assert not scm._any_margin_of_safety(db)
+    assert scm._margin_of_safety(db) == {}
+    db.connection().execute(sa.text("UPDATE valuation_outputs SET tenant_id=1 WHERE id=:id"),
+                            {"id": out.id})
+    db.commit()
+    assert scm._any_margin_of_safety(db)
+    assert model.company_id in scm._margin_of_safety(db)
+    # A newer version owned by another tenant must not suppress ours.
+    db.info.pop("tenant_id")
+    db.add(ValuationModel(company_id=model.company_id, tenant_id=2, model_type="dcf",
+                          version=99, status="insufficient_data"))
+    db.commit()
+    db.info["tenant_id"] = 1
+    assert scm._any_margin_of_safety(db)
+    assert model.company_id in scm._margin_of_safety(db)
