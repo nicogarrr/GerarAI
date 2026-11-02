@@ -132,13 +132,13 @@ export async function createAlertResult(input: CreateAlertInput): Promise<Create
                 return { ok: false, cause: 'validation', message: error.message };
             }
             if (error.code === 'RESEARCH_API_ERROR' && error.statusCode === 409) {
-                return { ok: false, cause: 'duplicate', message: 'Ya tienes esta alerta configurada.' };
+                return { ok: false, cause: 'duplicate', message: await backendMessageForRequest('Ya tienes esta alerta configurada.') };
             }
             if (error.code === 'RESEARCH_API_ERROR' && [400, 404, 422].includes(error.statusCode)) {
                 const message = error.statusCode === 404
                     ? `Símbolo no reconocido: ${input.symbol.trim().toUpperCase()}. Comprueba que exista en bolsa.`
-                    : await backendMessageForRequest(error.message);
-                return { ok: false, cause: 'validation', message };
+                    : error.message;
+                return { ok: false, cause: 'validation', message: await backendMessageForRequest(message) };
             }
         }
         throw error;
