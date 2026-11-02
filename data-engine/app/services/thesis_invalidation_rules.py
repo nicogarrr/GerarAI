@@ -174,13 +174,25 @@ def metric_label(metric: str) -> str:
     return METRIC_LABELS.get(metric, metric)
 
 
-def format_es(value: Any, *, percent: bool = False) -> str:
+def _threshold_decimals(value: Any) -> int:
+    """Decimales para mostrar un umbral tal cual: 2 como minimo y los que haga
+    falta hasta 8. Con 2 fijos, «ROIC < 0,075» salia «< 0,08» y dos criterios
+    (0,075 y 0,08) daban el mismo nombre de regla: solo se vigilaba uno."""
+    try:
+        number = Decimal(str(value)).quantize(Decimal("1e-8")).normalize()
+    except (InvalidOperation, ValueError):
+        return 2
+    exponent = number.as_tuple().exponent
+    return max(2, -exponent) if isinstance(exponent, int) else 2
+
+
+def format_es(value: Any, *, percent: bool = False, decimals: int = 2) -> str:
     """Numero en formato es-ES (coma decimal, punto de miles)."""
     try:
         number = Decimal(str(value))
     except (InvalidOperation, ValueError):
         return str(value)
-    text = f"{number:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    text = f"{number:,.{decimals}f}".replace(",", "_").replace(".", ",").replace("_", ".")
     return f"{text} %" if percent else text
 
 
@@ -189,7 +201,7 @@ def describe_rule(rule: dict[str, Any]) -> str:
     percent = metric in PERCENT_METRICS
     return (
         f"{metric_label(metric)} {_OPERATOR_TEXT.get(str(rule.get('operator')), rule.get('operator'))} "
-        f"{format_es(rule.get('threshold'), percent=percent)}"
+        f"{format_es(rule.get('threshold'), percent=percent, decimals=_threshold_decimals(rule.get('threshold')))}"
     )
 
 
@@ -506,13 +518,13 @@ _METRIC_LABELS_EN: dict[str, str] = {
 }
 
 
-def _format_en(value: Any, *, percent: bool = False) -> str:
+def _format_en(value: Any, *, percent: bool = False, decimals: int = 2) -> str:
     """Numero en formato ingles (punto decimal, coma de miles)."""
     try:
         number = Decimal(str(value))
     except (InvalidOperation, ValueError):
         return str(value)
-    text = f"{number:,.2f}"
+    text = f"{number:,.{decimals}f}"
     return f"{text}%" if percent else text
 
 
@@ -521,5 +533,5 @@ def _describe_rule_en(rule: dict[str, Any]) -> str:
     label = _METRIC_LABELS_EN.get(metric) or metric_label(metric)
     return (
         f"{label} {_OPERATOR_TEXT.get(str(rule.get('operator')), rule.get('operator'))} "
-        f"{_format_en(rule.get('threshold'), percent=metric in PERCENT_METRICS)}"
+        f"{_format_en(rule.get('threshold'), percent=metric in PERCENT_METRICS, decimals=_threshold_decimals(rule.get('threshold')))}"
     )
