@@ -390,4 +390,3 @@ def backfill_rule_10b5_1(
         if delay_seconds > 0:
             sleeper(delay_seconds)
     return stats
-
