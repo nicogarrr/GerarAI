@@ -90,6 +90,7 @@ _DAILY_CHANGE_ES = re.compile(
     r"\b(?:(?:cuanto|como|que tal)\s+(?:ha\s+)?(?:subido|bajado|cambiado|variado|movido|ido|va|esta|lleva)"
     r"(?:\s+\w+){0,3}\s+hoy"
     r"|(?:he|hemos)\s+(?:ganado|perdido)\s+hoy"
+    r"|hoy\s+(?:\w+\s+){0,2}(?:he|hemos)\s+(?:ganado|perdido)"
     r"|(?:gano|pierdo|ganado|perdido)\s+hoy"
     r"|variacion\s+(?:diaria|de hoy|del dia)"
     r"|cambio\s+(?:diario|de hoy|del dia))\b"
@@ -97,7 +98,8 @@ _DAILY_CHANGE_ES = re.compile(
 _DAILY_CHANGE_EN = re.compile(
     r"\b(?:(?:up|down)\s+today|today'?s\s+(?:change|move|return|performance)"
     r"|daily\s+(?:change|move|return|performance)|(?:do|doing|did)\s+today"
-    r"|(?:gain|gained|lose|lost|made)\s+today)\b"
+    r"|(?:gain|gained|lose|lost|made)\s+today"
+    r"|(?:change|changed|move|moved|perform|performed|go|went)\s+today)\b"
 )
 _PORTFOLIO_WORD = re.compile(r"\b(?:cartera|portfolio|patrimonio|inversiones|he ganado|he perdido|gane|perdi|"
                              r"i (?:gain|gained|lose|lost|made))\b")
@@ -499,6 +501,10 @@ _FEES_ASK = re.compile(r"\b(?:cuant\w*|cuales|mis|pagad\w*|pago|pague|total|how\
 _CASH = re.compile(r"\b(?:efectivo|liquidez|caja|saldo|cash)\b")
 _CASH_ASK = re.compile(r"\b(?:cuant\w*|tengo|mi|mis|how\s+much|my|do\s+i\s+have)\b")
 _CASH_NOT = re.compile(r"flujo\s+de\s+caja|caja\s+libre|cash\s*flow|fcf|caja\s+neta\s+de|cash\s+per\s+share")
+#: «¿Cuánta caja tiene Apple?» / «How much cash does Apple have?»: la caja de otro
+#: (una empresa), salvo que la pregunta diga que es tuya («tiene mi cartera», «do I have»).
+_CASH_THIRD = re.compile(r"\b(?:tiene|tienen|tenia|tenian|genera|generan|does|has|have|holds?)\b")
+_CASH_MINE = re.compile(r"\b(?:tengo|mi|mis|my|i|me)\b")
 
 
 def _asks_fees(text: str) -> bool:
@@ -508,7 +514,8 @@ def _asks_fees(text: str) -> bool:
 
 def _asks_cash(text: str, question: str) -> bool:
     return bool(_CASH.search(text) and _CASH_ASK.search(text) and not _CASH_NOT.search(text)
-                and not _tickers_in(question))
+                and not _tickers_in(question)
+                and not (_CASH_THIRD.search(text) and not _CASH_MINE.search(text)))
 
 
 def _fees_answer(db: Session, tenant: int, year: int | None, only: set[str]) -> ChatResponse:
