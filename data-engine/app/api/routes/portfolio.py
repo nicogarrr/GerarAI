@@ -1629,9 +1629,15 @@ def commit_transaction_import(
     """Inserta atómicamente el lote de transacciones validadas en la cartera."""
     try:
         service = TransactionImportService()
-        return service.commit_import(db, payload.transactions, source_filename=payload.source_filename)
+        result = service.commit_import(db, payload.transactions, source_filename=payload.source_filename)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if result.get("imported_count"):
+        # Señal DCA de las empresas que la importación estrena (ya confirmada).
+        from app.services.dca_on_add import enqueue_dca_for_new_tracked
+
+        enqueue_dca_for_new_tracked(db)
+    return result
 
 
 @router.post("/import/file", response_model=TransactionImportPreviewResponse)
