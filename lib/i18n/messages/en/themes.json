@@ -32,6 +32,7 @@
     "noDate": "Data date not available",
     "partial": " · partial data",
     "stale": " · recalculating: showing the latest calculated version",
+    "methodSimpleAverage": "simple average",
     "methodology": "Methodology",
     "method": {
       "basket": "Each theme is a curated basket; its return is the simple (equal-weight) average of the stocks with data.",

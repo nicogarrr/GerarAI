@@ -32,6 +32,7 @@
     "noDate": "Sin fecha de datos disponible",
     "partial": " · datos parciales",
     "stale": " · recalculando: se muestra la última versión calculada",
+    "methodSimpleAverage": "media simple",
     "methodology": "Metodología",
     "method": {
       "basket": "Cada tema es una cesta curada; su rentabilidad es la media simple (mismo peso) de los valores con dato.",
