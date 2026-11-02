@@ -40,6 +40,8 @@ from app.valuation.engines.base import (
     margin_of_safety,
     normalize_scenario_display,
     resolve_rates,
+    scenario_definition_trace,
+    snapshot_trace,
 )
 from app.valuation.funding_gap import estimate_funding_gap
 from app.valuation.moat_framework import empty_moat_framework
@@ -450,13 +452,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
             if value > 0:
                 value *= 1.0 - min(extra_dilution, 0.80)
             scenario_results[scenario.name] = {
-                "definition": {
-                    "name": scenario.name,
-                    "probability": scenario.probability,
-                    "drivers": scenario.drivers,
-                    "description": scenario.description,
-                    "assumptions": scenario.assumptions,
-                },
+                "definition": scenario_definition_trace(scenario),
                 "value_per_share": value,
                 "undiluted_value_per_share": dcf.value_per_share,
                 "trace": dcf.trace,
@@ -594,13 +590,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
                 "evidence_confidence": evidence_confidence,
                 "fact_ids": snapshot.fact_ids(),
                 "periods": snapshot.periods(),
-                "snapshot": {
-                    "as_of": snapshot.as_of_period,
-                    "income_statement": snapshot.income_statement,
-                    "balance_sheet": snapshot.balance_sheet,
-                    "shares": snapshot.shares_period,
-                    "warnings": snapshot.warnings,
-                },
+                "snapshot": snapshot_trace(snapshot),
                 "funding_gap": {
                     "status": funding.status,
                     "funding_gap": funding.funding_gap,
@@ -787,13 +777,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
             if value > 0:
                 value *= 1.0 - min(extra_dilution, 0.80)
             scenario_results[scenario.name] = {
-                "definition": {
-                    "name": scenario.name,
-                    "probability": scenario.probability,
-                    "drivers": scenario.drivers,
-                    "description": scenario.description,
-                    "assumptions": scenario.assumptions,
-                },
+                "definition": scenario_definition_trace(scenario),
                 "value_per_share": value,
                 "undiluted_value_per_share": dcf.value_per_share,
                 "trace": dcf.trace,
@@ -915,13 +899,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
                         "indicative band used instead of blocking valuation."
                     ),
                 },
-                "snapshot": {
-                    "as_of": snapshot.as_of_period,
-                    "income_statement": snapshot.income_statement,
-                    "balance_sheet": snapshot.balance_sheet,
-                    "shares": snapshot.shares_period,
-                    "warnings": snapshot.warnings,
-                },
+                "snapshot": snapshot_trace(snapshot),
                 "funding_gap": {
                     "status": funding.status,
                     "funding_gap": funding.funding_gap,

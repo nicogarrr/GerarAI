@@ -49,6 +49,7 @@ from app.valuation.engines.base import (
     context_split_cutoff,
     is_adr_without_ratio,
     margin_of_safety,
+    snapshot_trace,
 )
 from app.valuation.engines.base import (
     insufficient_from_context as _insufficient,
@@ -561,13 +562,7 @@ class RelativeMultiplesEngine(ValuationEngine):
                     "publication_blockers": blockers,
                     "fact_ids": snapshot.fact_ids(),
                     "periods": snapshot.periods(),
-                    "snapshot": {
-                        "as_of": snapshot.as_of_period,
-                        "income_statement": snapshot.income_statement,
-                        "balance_sheet": snapshot.balance_sheet,
-                        "shares": snapshot.shares_period,
-                        "warnings": snapshot.warnings,
-                    },
+                    "snapshot": snapshot_trace(snapshot),
                     "screens": screens,
                     "weighted": weighted["trace"],
                     "formulas": {
