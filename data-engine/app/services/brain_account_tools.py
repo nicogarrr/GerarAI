@@ -692,14 +692,30 @@ def _cash_answer(db: Session, tenant: int) -> ChatResponse:
 
 # ------------------------------------------------------------ ranking por rentabilidad
 
+#: «mis 3 peores posiciones», «my two best stocks»: cuántas se piden (antes, modelo general).
+_RANK_COUNT = r"(?:(?P<n>\d{1,2}|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|two|three|four|five|six|seven|eight|nine|ten)\s+)?"
+_RANK_COUNT_WORDS = {"dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6, "siete": 7, "ocho": 8, "nueve": 9,
+                     "diez": 10, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
+                     "nine": 9, "ten": 10}
 _RANK_RETURN = re.compile(
-    r"\b(?:mi|mis)\s+(?:mejor|peor)(?:es)?\s+(?:posicion|accion|inversion|valor)"
+    r"\b(?:mi|mis)\s+" + _RANK_COUNT + r"(?:mejor|peor)(?:es)?\s+(?:posicion|accion|inversion|valor)"
     r"|\b(?:posicion|accion|inversion|valor)(?:es)?\s+(?:de\s+mi\s+cartera\s+)?(?:que\s+)?(?:va|van|me\s+va|esta|estan|lleva|llevan)\s+(?:peor|mejor)"
     r"|\b(?:ranking|ordena\w*|clasifica\w*)\b.*\brentab"
     r"|\bme\s+da\w*\s+(?:mas|menos)\s+rentab|\b(?:mas|menos)\s+rentables?\s+de\s+(?:mi|la)\s+cartera"
-    r"|\b(?:best|worst)[- ]performing\b|\bmy\s+(?:best|worst)\s+(?:position|stock|holding|investment)"
+    r"|\b(?:best|worst)[- ]performing\b|\bmy\s+" + _RANK_COUNT.replace("?P<n>", "?P<n_en>")
+    + r"(?:best|worst)\s+(?:position|stock|holding|investment)"
     r"|\bwhich\s+(?:position|stock|holding)\s+is\s+(?:doing\s+)?(?:best|worst)"
 )
+
+
+def _rank_count(text: str) -> int | None:
+    """Cuántas posiciones pide «mis 3 peores…» (≥ 2), o None."""
+    match = _RANK_RETURN.search(text)
+    raw = (match.group("n") or match.group("n_en")) if match else None
+    if raw is None:
+        return None
+    count = int(raw) if raw.isdigit() else _RANK_COUNT_WORDS[raw]
+    return count if count >= 2 else None
 
 
 def _asks_return_ranking(text: str, question: str) -> bool:
@@ -750,7 +766,8 @@ def _ranking_answer(db: Session, tenant: int, text: str, side: str | None = None
                     else "No tienes posiciones abiertas con valor y coste guardados: no puedo ordenarlas.")
         return _response(text_out, [], "account_return_ranking")
     ranked = sorted(known, key=lambda k: (k[1] - k[2]) / k[2], reverse=True)
-    worst_first = bool(re.search(r"\b(?:peor|menos|worst)\b", text))
+    # «mis peores posiciones»: «peores» también (antes salía la MEJOR primero).
+    worst_first = bool(re.search(r"\b(?:peor(?:es)?|menos|worst)\b", text))
 
     def line(item) -> str:
         ticker, value, cost, currency, _as_of = item
@@ -775,16 +792,25 @@ def _ranking_answer(db: Session, tenant: int, text: str, side: str | None = None
             lines = ([f"Ninguna de tus posiciones está {what} sobre su coste de compra (datos a {day})."] if not n else
                      [f"Tienes {n} posici{'ón' if n == 1 else 'ones'} {what} sobre su coste de compra "
                       f"(datos a {day}), la {'peor' if losing else 'mejor'} primero:"])
+    elif (count := _rank_count(text)) is not None:
+        # «mis 3 peores posiciones»: solo esas, no la primera y todas detrás.
+        count = min(count, len(ranked))
+        lines = ([f"Your {count} {'worst' if worst_first else 'best'} positions by return on purchase cost "
+                  f"(data as of {day}):"] if english else
+                 [f"Tus {count} {'peores' if worst_first else 'mejores'} posiciones por rentabilidad sobre el "
+                  f"coste de compra (datos a {day}):"])
     elif english:
         head = f"{'Worst' if worst_first else 'Best'} return on cost: {line(lead)}."
         lines = [head, f"All your positions by return on purchase cost (data as of {day}):"]
     else:
         head = f"La que {'peor' if worst_first else 'mejor'} va sobre su coste: {line(lead)}."
         lines = [head, f"Todas tus posiciones por rentabilidad sobre el coste de compra (datos a {day}):"]
+    limit = 15
     if side is None:
         order = list(reversed(ranked)) if worst_first else ranked
-    lines += [f"{i}. {line(item)}" for i, item in enumerate(order[:15], 1)]
-    if len(order) > 15:
+        limit = min(_rank_count(text) or 15, 15)
+    lines += [f"{i}. {line(item)}" for i, item in enumerate(order[:limit], 1)]
+    if len(order) > 15 and limit == 15:
         lines.append(f"… and {len(order) - 15} more" if english else f"… y {len(order) - 15} más")
     if unknown:
         lines.append(("No saved cost or value, left out: " if english else "Sin coste o valor guardado, fuera: ")
