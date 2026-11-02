@@ -81,7 +81,9 @@ class SafeFormula:
         # ValueError y los llamadores solo capturan ValueError, asi que crear la
         # metrica o el screen respondia 500 en vez de un error de formula.
         try:
-            self.tree = ast.parse(expression, mode="eval")
+            # Sin los espacios de los bordes: «␠pe_ratio» (pegado del movil)
+            # es IndentationError para ast y daba «Sintaxis no valida».
+            self.tree = ast.parse(expression.strip(), mode="eval")
             self._validate(self.tree)
         except SyntaxError as exc:
             raise ValueError("Sintaxis de fórmula no válida") from exc
