@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DcaSignalItem } from '@/lib/dca/types';
 import { dcaEngineText } from '@/lib/dca/engine-text';
+import { readableInk } from '@/lib/dca/readable-ink';
 import { useLocale, useT } from '@/lib/i18n/client';
 import { dcaDataAge, dcaMissingBadge, dcaPrice, dcaRsi, dcaSignalMetric, dcaStaleText, dcaStatusLabel } from '@/lib/dca/format';
 
@@ -59,7 +60,7 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
                     onPointerDown={(event) => event.preventDefault()}
                     onClick={(event) => { event.preventDefault(); setOpen((value) => !value); }}
                     className="relative before:absolute before:-inset-2.5 before:content-[''] inline-flex min-h-6 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap"
-                    style={{ backgroundColor: state.color, color: state.fg, borderColor: state.color === '#FFFFFF' ? '#9CA3AF' : state.color }}
+                    style={{ backgroundColor: state.color, color: readableInk(state.color, state.fg), borderColor: state.color === '#FFFFFF' ? '#9CA3AF' : state.color }}
                     aria-label={`${item?.symbol ?? ''}: ${dcaEngineText(state.label, t)}, ${dcaStatusLabel(state.status, t)}${staleText ? `, ${staleText}` : ''}`}
                 >
                     {dcaEngineText(state.label, t)}

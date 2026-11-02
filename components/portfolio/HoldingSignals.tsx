@@ -11,6 +11,7 @@ import {
 import { isValidCurrencyCode } from '@/lib/format';
 import { useLocale, useT, useFormat } from '@/lib/i18n/client';
 import { cn } from '@/lib/utils';
+import { readableInk } from '@/lib/dca/readable-ink';
 
 const EMPTY_SIGNALS: HoldingSignals = { fairValues: {}, dca: null };
 
@@ -58,7 +59,7 @@ export function DcaLevelChip({ symbol, signals }: { symbol: string; signals: Hol
                 'inline-flex shrink-0 items-center rounded border px-1.5 py-0.5 text-[11px] font-semibold',
                 level ? 'border-transparent' : 'border-gray-700 text-gray-500',
             )}
-            style={level?.color ? { backgroundColor: level.color, color: level.fg ?? undefined } : undefined}
+            style={level?.color ? { backgroundColor: level.color, color: readableInk(level.color, level.fg) } : undefined}
             title={title}
         >
             {dcaLevelText(level, locale)}
