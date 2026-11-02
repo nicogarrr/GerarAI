@@ -38,6 +38,8 @@ from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.portfolio_ledger_service import BUY_ACTIONS, SELL_ACTIONS
 from app.services.price_units import price_unit_factor
 
+_SAME_UNIT = (Decimal(1), Decimal(1))
+
 METHOD = "ledger_reconstruction"
 SCOPE = "positions_only_no_cash_no_dividends"
 
@@ -153,7 +155,11 @@ class PortfolioReconstructionService:
         first_trade = signed[0][0]
         lower = max(start, first_trade) if start else first_trade
         warmup = first_trade - timedelta(days=7)
-        prices: dict[tuple[int, date], Decimal] = {}
+        # Cierres por dia y empresa (no por clave (empresa, dia)): el bucle
+        # diario toma el dict del dia una vez y busca cada posicion por su id,
+        # sin crear una tupla por posicion y dia; tampoco quedan ~cientos de
+        # miles de tuplas vivas que el recolector de basura recorre.
+        prices_by_day: dict[date, dict[int, Decimal]] = {}
         # Columnas, no entidades: son años de cierres por valor (decenas de
         # miles de filas) y construir un MarketPrice ORM por fila era el mayor
         # coste de la reconstruccion. MarketPrice no es de tenant.
@@ -191,8 +197,15 @@ class PortfolioReconstructionService:
                     )
                     unit_factors[factor_key] = factor
                 if factor is not None:
-                    # Mismas operaciones que price_in_currency (x destino / origen).
-                    prices[(price_company_id, price_date)] = close * factor[0] / factor[1]
+                    day_prices = prices_by_day.get(price_date)
+                    if day_prices is None:
+                        day_prices = prices_by_day[price_date] = {}
+                    if factor == _SAME_UNIT:
+                        # x 1 / 1 es exacto: el mismo valor sin dos operaciones Decimal.
+                        day_prices[price_company_id] = close
+                    else:
+                        # Mismas operaciones que price_in_currency (x destino / origen).
+                        day_prices[price_company_id] = close * factor[0] / factor[1]
         # Splits APLICADOS (corporate_actions_service reescribe las patas a
         # terminos post-split: cantidad*ratio, precio/ratio): los cierres
         # crudos anteriores a la fecha efectiva hay que dividirlos por el
@@ -216,11 +229,14 @@ class PortfolioReconstructionService:
                     (action.effective_date, Decimal(str(action.ratio)))
                 )
         if applied_events:
-            prices = {
-                key: close / cumulative_split_factor_after(applied_events.get(key[0], []), key[1])
-                for key, close in prices.items()
+            prices_by_day = {
+                day: {
+                    cid: close / cumulative_split_factor_after(applied_events.get(cid, []), day)
+                    for cid, close in day_prices.items()
+                }
+                for day, day_prices in prices_by_day.items()
             }
-        days = sorted({d for (_, d) in prices if d >= warmup})
+        days = sorted(d for d in prices_by_day if d >= warmup)
         fx_table = fx.fx_table(
             db,
             currencies=set(currency.values()) | {base},
@@ -230,7 +246,8 @@ class PortfolioReconstructionService:
 
         price_diffs = []
         for t in transactions:
-            close = prices.get((t.company_id, t.trade_date))
+            trade_day_prices = prices_by_day.get(t.trade_date)
+            close = trade_day_prices.get(t.company_id) if trade_day_prices is not None else None
             if close and t.price and t.price > 0:
                 price_diffs.append(abs(float(t.price / close - 1)))
         price_check = {
@@ -263,13 +280,14 @@ class PortfolioReconstructionService:
                     )
                 pending_flow += flow * rate_flow
                 index += 1
-            held = [cid for cid, q in qty.items() if q > 0]
+            held = [(cid, q) for cid, q in qty.items() if q > 0]
+            day_prices = prices_by_day[day]
             value = Decimal("0")
             reason = None
             # Un tipo por divisa y dia (no uno por posicion y dia).
             day_rates: dict[str, Decimal | None] = {}
-            for cid in held:
-                close = prices.get((cid, day))
+            for cid, held_qty in held:
+                close = day_prices.get(cid)
                 cid_currency = currency[cid]
                 if cid_currency not in day_rates:
                     day_rates[cid_currency] = PortfolioFXService.rate_from_table(
@@ -282,7 +300,7 @@ class PortfolioReconstructionService:
                 if rate is None:
                     reason = f"sin FX {currency[cid]}/{base}: {tickers.get(cid)}"
                     break
-                value += qty[cid] * close * rate
+                value += held_qty * close * rate
             if reason:
                 excluded.append({"date": day.isoformat(), "reason": reason})
                 continue
