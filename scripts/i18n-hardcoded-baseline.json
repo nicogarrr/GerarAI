@@ -86,6 +86,7 @@
   "lib/logos/site-icon.ts": 1,
   "lib/market/chart-ranges.ts": 2,
   "lib/market/extended-quote.ts": 3,
+  "lib/market/flow-text.ts": 94,
   "lib/market/live-quotes.ts": 3,
   "lib/market/price-events.ts": 3,
   "lib/market/quote-cache.ts": 1,
