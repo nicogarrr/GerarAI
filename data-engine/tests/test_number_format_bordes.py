@@ -67,3 +67,12 @@ def test_redondeo_como_intl_half_expand_no_al_par():
     assert format_compact_es(Decimal("12345000")) == "12,35 M"
     # Cifras enormes no rompen la precisión del contexto.
     assert format_number_es(Decimal("1e30")) == "1." + ".".join(["000"] * 10)
+
+
+def test_billones_con_b_como_la_web():
+    """«3.414,5 mil M» se leía como tres mil cuatrocientos: desde 10^12, «B» (igual que formatCompact)."""
+    assert format_compact_es(3_414_500_000_000) == "3,41 B"
+    assert format_compact_es(-1_200_000_000_000) == "-1,2 B"
+    assert format_compact_es(999_999_000_000) == "1 B"
+    assert format_compact_es(999_995_000_000) == "1 B"
+    assert format_compact_es(416_160_000_000) == "416,16 mil M"

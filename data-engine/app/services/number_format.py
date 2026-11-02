@@ -54,7 +54,8 @@ def format_number_es(value: NumericLike, maximum_fraction_digits: int = 2) -> st
 
 
 def format_compact_es(value: NumericLike, maximum_fraction_digits: int = 2) -> str | None:
-    """Cifra compacta es-ES: 200966000000 -> "200,97 mil M"; 24000000 -> "24 M".
+    """Cifra compacta es-ES: 200966000000 -> "200,97 mil M"; 24000000 -> "24 M";
+    3414500000000 -> "3,41 B" (billones, como la web).
 
     La escala se fija siempre (M / mil M) porque Intl es-ES con notation
     "compact" es inconsistente para miles de millones. None si no es numérico.
@@ -67,6 +68,11 @@ def format_compact_es(value: NumericLike, maximum_fraction_digits: int = 2) -> s
     # «1 mil M», no «1.000 M».
     quantum = Decimal(1).scaleb(-maximum_fraction_digits)
     abs_value = abs(parsed)
+    # Billones (10^12), como formatCompact de la web: «3.414,5 mil M» se leía
+    # como tres mil cuatrocientos; desde 10^12 (o lo que redondea a 1.000 mil M), «3,41 B».
+    if abs_value >= Decimal("1e12") or (abs_value / Decimal("1e9")).quantize(quantum) >= 1000:
+        scaled = format_number_es(parsed / Decimal("1e12"), maximum_fraction_digits)
+        return f"{scaled} B"
     if abs_value >= Decimal("1e9") or (abs_value / Decimal("1e6")).quantize(quantum) >= 1000:
         scaled = format_number_es(parsed / Decimal("1e9"), maximum_fraction_digits)
         return f"{scaled} mil M"
