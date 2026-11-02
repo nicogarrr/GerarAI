@@ -142,6 +142,15 @@ class DecisionLearningService:
     ) -> DecisionLesson:
         if action not in {"approve", "reject"}:
             raise ValueError("Decision lesson action must be approve or reject")
+        # Solo se decide sobre una leccion propuesta (la ficha solo ofrece los
+        # botones entonces). Repetir la misma decision no cambia nada; la
+        # contraria daba la vuelta a una leccion aprobada «inmutable».
+        if lesson.status == ("approved" if action == "approve" else "rejected"):
+            return lesson
+        if lesson.status == "approved":
+            raise ValueError("Approved lessons are immutable; create a new review")
+        if lesson.status != "proposed":
+            raise ValueError("Only proposed lessons can be approved; edit and save it first")
         if action == "approve":
             incomplete = [
                 field
