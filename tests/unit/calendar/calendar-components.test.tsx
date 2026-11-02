@@ -267,8 +267,8 @@ describe('MaterialsLine', () => {
         expect(screen.getByText(/Sin 8-K de resultados/)).toBeInTheDocument();
     });
     it('ok con documentos enlaza cada uno en pestaña nueva y muestra la fecha de la SEC', () => {
-        render(<MaterialsLine materials={{ ...base, status: 'ok', documents: [{ url: 'https://sec.gov/a', label: 'Nota de prensa', exhibit: 'EX-99.1' }] as never }} />);
-        const link = screen.getByRole('link', { name: /Nota de prensa/ });
+        render(<MaterialsLine materials={{ ...base, status: 'ok', documents: [{ kind: 'nota_prensa', url: 'https://sec.gov/a', label: 'Nota de resultados', exhibit: 'EX-99.1' }] }} />);
+        const link = screen.getByRole('link', { name: /Nota de resultados/ });
         expect(link).toHaveAttribute('href', 'https://sec.gov/a');
         expect(link).toHaveAttribute('target', '_blank');
         expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));

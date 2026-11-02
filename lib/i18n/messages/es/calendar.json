@@ -64,6 +64,11 @@
     "materialsNone": "Sin 8-K de resultados en la SEC (revisado)",
     "materialsDocTitle": "Documento de la SEC ({exhibit}), presentado el {date}",
     "materialsSec": "SEC · {date}",
+    "materialKind": {
+      "notaPrensa": "Nota de resultados",
+      "presentacion": "Presentación",
+      "documento": "Documento SEC"
+    },
     "irTip": "Enlace oficial de la empresa, verificado el {date}. El directo, la grabación y la transcripción aparecen ahí si la empresa los publica.",
     "irTipGeneral": " Es la sección general, no la página de este evento.",
     "irEvent": "Evento {period} en IR",

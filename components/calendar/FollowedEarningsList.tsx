@@ -9,7 +9,7 @@ type TiFn = (key: TranslationKey, vars?: TranslationVars) => string;
 /** Fallback español sin RequestScope (tests y render directo): el acceso es de main (lib/i18n/t). */
 const esT: TiFn = t;
 import type { FollowedEarningsEvent } from '@/lib/actions/catalysts.actions';
-import type { EventMaterials } from '@/lib/earnings-materials';
+import type { EventMaterials, MaterialDocument } from '@/lib/earnings-materials';
 import { irLinksFor } from '@/lib/ir-registry';
 
 
@@ -27,6 +27,17 @@ export function dayHeading(day: string, today: string, ti: TiFn = esT): string {
     if (diff === 0) return ti('calendar.earnings.today', { date: formatMarketDate(day, { day: 'numeric', month: 'short' }) });
     if (diff === 1) return ti('calendar.earnings.tomorrow', { date: formatMarketDate(day, { day: 'numeric', month: 'short' }) });
     return base;
+}
+
+// earnings_materials_service.py manda la etiqueta en castellano (KIND_LABEL);
+// se nombra por su tipo para que el inglés no la enseñe tal cual.
+function materialLabel(doc: MaterialDocument, ti: TiFn): string {
+    switch (doc.kind) {
+        case 'nota_prensa': return ti('calendar.earnings.materialKind.notaPrensa');
+        case 'presentacion': return ti('calendar.earnings.materialKind.presentacion');
+        case 'documento': return ti('calendar.earnings.materialKind.documento');
+        default: return doc.label;
+    }
 }
 
 /** Material oficial de la SEC para resultados ya publicados; sin dato = no se pinta nada. */
@@ -49,7 +60,7 @@ export function MaterialsLine({ materials, ti = esT }: { materials: EventMateria
                     title={ti('calendar.earnings.materialsDocTitle', { exhibit: doc.exhibit, date: formatMarketDate(materials.filed_at) })}
                     className="inline-flex items-center gap-1 rounded-md border border-teal-800/60 px-1.5 py-0.5 font-medium text-teal-300 hover:bg-gray-800"
                 >
-                    {doc.label}
+                    {materialLabel(doc, ti)}
                     <ExternalLink aria-hidden="true" className="h-3 w-3" />
                 </a>
             ))}
