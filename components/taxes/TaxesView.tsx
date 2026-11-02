@@ -205,7 +205,7 @@ function humanizeTaxReport(summary: DataRecord, i18n: TaxI18n): DataRecord {
             // Compras a precio 0 (regalo / spin-off): aceptadas, pero a revisar.
             const rows = Array.isArray(value) ? (value as DataRecord[]) : [];
             display[label] = rows.length > 0
-                ? rows.map((row) => `${String(row.ticker)} ${String(row.date)} · ${String(row.label ?? tFn('taxes.values.zeroCostDefault'))}`).join(' · ')
+                ? rows.map((row) => `${String(row.ticker)} ${String(row.date)} · ${typeof row.label === 'string' && row.label ? summaryText(row.label, i18n) : tFn('taxes.values.zeroCostDefault')}`).join(' · ')
                 : tFn('taxes.values.noneF');
         } else if (key === 'wash_sale_rule') {
             display[label] = ({ 'es-irpf-2m': tFn('taxes.values.washRuleEsIrpf2m') } as Record<string, string>)[String(value)] ?? String(value);
