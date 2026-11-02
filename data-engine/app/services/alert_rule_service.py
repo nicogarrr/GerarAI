@@ -184,12 +184,17 @@ class AlertRuleService:
                 else f"{company.ticker}: se cumplió la regla «{rule.name}» "
                 f"(valor observado: {observed})."
             )
+            alert_title = rule.name
             if observation.get("kind") == "thesis_metric":
                 from app.services.thesis_invalidation_rules import (
                     alert_message as thesis_alert_message,
                 )
+                from app.services.thesis_invalidation_rules import (
+                    alert_title as thesis_alert_title,
+                )
 
                 alert_message = thesis_alert_message(company, rule, observed, language)
+                alert_title = thesis_alert_title(company, rule, language)
             news_event = None
             if observation.get("kind") == "news_event" and observation.get("news_event_id"):
                 news_event = db.get(NewsEvent, observation["news_event_id"])
@@ -247,7 +252,7 @@ class AlertRuleService:
                 company_id=company.id,
                 alert_type=rule.rule_type,
                 severity=rule.severity,
-                title=rule.name,
+                title=alert_title,
                 message=alert_message,
                 fingerprint_parts=[
                     "alert_rule",

@@ -11,6 +11,7 @@ from app.services.thesis_invalidation_rules import (
     MARGIN_OF_SAFETY_PCT,
     PRICE,
     alert_message,
+    alert_title,
 )
 
 COMPANY = SimpleNamespace(ticker="ASTS")
@@ -40,3 +41,17 @@ def test_thesis_rule_alert_unchanged_in_spanish():
         "ASTS: salta un criterio de invalidación de la tesis (v3): margen de seguridad < 10,00 %. "
         "Valor actual: 4,50 %."
     )
+
+
+def test_thesis_rule_alert_title_in_english_without_touching_the_stored_name():
+    rule = _rule(MARGIN_OF_SAFETY_PCT, "<", 10, thesis_version=3)
+    rule.name = "ASTS: invalidación de tesis · margen de seguridad < 10,00 %"
+    assert alert_title(COMPANY, rule, "en") == "ASTS: thesis invalidation · margin of safety < 10.00%"
+    assert rule.name == "ASTS: invalidación de tesis · margen de seguridad < 10,00 %"
+
+
+def test_thesis_rule_alert_title_in_spanish_is_the_stored_name():
+    rule = _rule(PRICE, "<=", 12, thesis_version=3)
+    rule.name = "ASTS: invalidación de tesis · precio ≤ 12,00"
+    assert alert_title(COMPANY, rule) == "ASTS: invalidación de tesis · precio ≤ 12,00"
+    assert alert_title(COMPANY, rule, "es") == rule.name
