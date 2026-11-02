@@ -395,6 +395,19 @@ def _current_message_is_retry_or_delayed() -> bool:
     return "retries" in options or "eta" in options
 
 
+def _current_message_retries() -> int:
+    """Reintentos ya hechos del mensaje en ejecucion (0 si no hay evidencia)."""
+    try:
+        message = CurrentMessage.get_current_message()
+    except Exception:  # noqa: BLE001 - sonda best-effort
+        return 0
+    options = getattr(message, "options", None) or {}
+    try:
+        return int(options.get("retries") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _current_message_age_seconds() -> float | None:
     """Edad del mensaje en ejecucion; None si la obsolescencia no aplica.
 
@@ -4914,7 +4927,8 @@ def evaluate_dca_on_add(tenant_id: int, user_id: str, symbols: list[str]) -> dic
     """Señal DCA de los símbolos recién añadidos a watchlist/cartera (sin esperar
     al barrido diario). Misma cola y worker que el manual (una descarga a la
     vez) y mismo lease por tenant que el diario y el manual: si está ocupado,
-    reintenta más tarde con backoff (la marca de «preparando» sigue viva)."""
+    reintenta más tarde con backoff (la marca de «preparando» sigue viva
+    hasta el último intento)."""
     from app.core.config import get_settings
     from app.services.dca_on_add import run_on_add
 
@@ -4923,6 +4937,12 @@ def evaluate_dca_on_add(tenant_id: int, user_id: str, symbols: list[str]) -> dic
     lease_name = f"evaluate_dca_signals:{tenant_id}"
     lease = acquire_job_lease(lease_name, ttl_seconds=600, redis_url=_lease_redis_url())
     if lease is None:
+        if _current_message_retries() >= int(evaluate_dca_on_add.options.get("max_retries", 3)):
+            # Último intento y el lease sigue ocupado: no habrá más intentos, así
+            # que la ficha deja de decir «preparando» (el diario lo cubrirá).
+            from app.services.dca_on_add import clear_marks
+
+            clear_marks(tenant_id, symbols)
         raise DcaOnAddLeaseHeld(lease_name)
     db = None
     try:

@@ -176,6 +176,31 @@ def test_actor_reutiliza_la_cola_dca_manual_y_reintenta_si_el_lease_esta_ocupado
         actor.fn(1, "u1", ["AAA"])
 
 
+def test_si_el_lease_sigue_ocupado_en_el_ultimo_intento_quita_el_preparando(monkeypatch):
+    """Agotados los reintentos (diario o manual ocupando el lease), la ficha no
+    se queda 20 min en «preparando»: vuelve a su aviso normal al momento."""
+    from types import SimpleNamespace as NS
+
+    from app.workers import dramatiq_app
+
+    redis = FakeRedis()
+    for symbol in ("AAA", "BBB"):
+        redis.set(dca_on_add.mark_key(1, symbol), "queued")
+    redis.set(dca_on_add.mark_key(1, "OTRO"), "queued")
+    monkeypatch.setattr(dca_on_add, "redis_client", lambda: redis)
+    monkeypatch.setattr(dramatiq_app, "acquire_job_lease", lambda *a, **k: None)
+    actor = dramatiq_app.evaluate_dca_on_add
+    message = NS(options={"retries": 1})
+    monkeypatch.setattr(dramatiq_app.CurrentMessage, "get_current_message", lambda: message)
+    with pytest.raises(dramatiq_app.DcaOnAddLeaseHeld):
+        actor.fn(1, "u1", ["aaa", "BBB"])
+    assert dca_on_add.mark_key(1, "AAA") in redis.data  # quedan reintentos: sigue preparando
+    message.options = {"retries": actor.options["max_retries"]}
+    with pytest.raises(dramatiq_app.DcaOnAddLeaseHeld):
+        actor.fn(1, "u1", ["aaa", "BBB"])
+    assert set(redis.data) == {dca_on_add.mark_key(1, "OTRO")}
+
+
 def test_importacion_solo_encola_lo_nunca_evaluado(db):
     _watch(db, 1, "NUEVO", "VIEJO")
     _state(db, 1, "VIEJO", age=timedelta(hours=30))  # lo refresca el diario, no la importación
