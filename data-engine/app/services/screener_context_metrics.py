@@ -221,36 +221,37 @@ def _any_margin_of_safety(db: Session) -> bool:
     """Alguna empresa tiene margen conocido en su ultima valoracion.
 
     Misma semantica que _margin_of_safety, pero de existencia: en vez de una
-    consulta de outputs POR empresa (N+1; en frio era la mayor parte de los
-    15-18 s de metric-coverage medidos en prod), trae los modelos (1 query,
-    como antes) y los outputs de los candidatos en consultas IN acotadas, y
-    evalua la misma logica de payload en Python. Sale en la primera empresa
-    con margen: el caso comun cuesta dos consultas.
+    consulta de outputs POR empresa (N+1), proyecta IDs/estado de modelos y
+    solo margen/convenio de los outputs en consultas IN acotadas. No hidrata
+    los traces ni las proyecciones completas para una prueba de existencia.
+    Conserva la seleccion de ultima version y validacion decimal original.
     """
-    latest: dict[int, ValuationModel] = {}
-    for model in db.scalars(
-        select(ValuationModel).order_by(ValuationModel.company_id, desc(ValuationModel.version))
-    ).all():
+    latest = {}
+    for model in db.execute(select(
+        ValuationModel.id, ValuationModel.company_id,
+        ValuationModel.version, ValuationModel.status,
+    ).order_by(ValuationModel.company_id, desc(ValuationModel.version))).all():
         latest.setdefault(model.company_id, model)
-    candidates = [m for m in latest.values() if m.status != "insufficient_data"]
-    if not candidates:
-        return False
-    outputs_by_model: dict[int, list[ValuationOutput]] = {}
-    ids = [m.id for m in candidates]
+    ids = [model.id for model in latest.values() if model.status != "insufficient_data"]
+    # Existence only: no calculation_trace, scenario projections or full output
+    # payloads need to cross the database connection. The convention still
+    # comes from the stored trace, never from the numeric column or its date.
+    margin_type = (
+        sa.func.json_type(ValuationOutput.output_payload, "$.margin_of_safety")
+        if db.get_bind().dialect.name == "sqlite"
+        else sa.func.json_typeof(ValuationOutput.output_payload["margin_of_safety"])
+    )
     for start in range(0, len(ids), 5000):
-        chunk = ids[start : start + 5000]
-        for out in db.scalars(
-            select(ValuationOutput).where(ValuationOutput.valuation_model_id.in_(chunk))
-        ).all():
-            outputs_by_model.setdefault(out.valuation_model_id, []).append(out)
-    for model in candidates:
-        outputs = outputs_by_model.get(model.id, [])
-        outputs.sort(key=lambda row: row.scenario != "base")
-        for output in outputs:
-            payload = output.output_payload or {}
-            if not margin_convention_known(payload.get("trace")):
+        rows = db.execute(select(
+            ValuationOutput.output_payload["margin_of_safety"],
+            ValuationOutput.output_payload["trace"]["margin_of_safety_convention"],
+            margin_type,
+        ).where(ValuationOutput.valuation_model_id.in_(ids[start:start + 5000]))).all()
+        for margin, convention, value_type in rows:
+            if value_type in {"boolean", "true", "false"}:
                 continue
-            if _decimal(payload.get("margin_of_safety")) is not None:
+            if (margin_convention_known({"margin_of_safety_convention": convention})
+                    and _decimal(margin) is not None):
                 return True
     return False
 

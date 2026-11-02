@@ -256,6 +256,31 @@ def _distinct_facts_metrics(db: Session) -> list[str]:
     return [row[0] for row in db.execute(sql, {"tenant": tenant_id}).all()]
 
 
+def _distinct_calculated_metrics(db: Session) -> list[str]:
+    """Probe once per metric rather than reading every matching metric row."""
+    tenant_id = db.info.get("tenant_id")
+    if tenant_id is None:
+        return list(db.scalars(select(CalculatedMetric.metric).where(
+            CalculatedMetric.value.is_not(None), CalculatedMetric.status == "ok",
+            *tenant_filters(db, CalculatedMetric),
+        ).distinct()).all())
+    # nosemgrep: gerarai-tenant-raw-sql -- seed and recursive probes bind the verified session tenant; cross-tenant regression below.
+    statement = sa.text("""
+        WITH RECURSIVE m(metric) AS (
+          SELECT * FROM (SELECT metric FROM calculated_metrics
+            WHERE tenant_id = :tenant AND status = 'ok' AND value IS NOT NULL
+            ORDER BY metric LIMIT 1)
+          UNION ALL
+          SELECT (SELECT t.metric FROM calculated_metrics t
+            WHERE t.tenant_id = :tenant AND t.status = 'ok' AND t.value IS NOT NULL
+              AND t.metric > m.metric ORDER BY t.metric LIMIT 1)
+          FROM m WHERE m.metric IS NOT NULL
+        )
+        SELECT metric FROM m WHERE metric IS NOT NULL
+    """)
+    return [row[0] for row in db.execute(statement, {"tenant": tenant_id}).all()]
+
+
 class ScreenerService:
     def create_screen(
         self,
@@ -347,17 +372,7 @@ class ScreenerService:
         return list(result)
 
     def _metric_coverage_uncached(self, db: Session) -> list[str]:
-        calculated = set(
-            db.scalars(
-                select(CalculatedMetric.metric)
-                .where(
-                    CalculatedMetric.value.is_not(None),
-                    CalculatedMetric.status == "ok",
-                    *tenant_filters(db, CalculatedMetric),
-                )
-                .distinct()
-            ).all()
-        )
+        calculated = set(_distinct_calculated_metrics(db))
         facts = set(_distinct_facts_metrics(db))
         return sorted(calculated | facts | set(context_metrics_with_data(db)))
 

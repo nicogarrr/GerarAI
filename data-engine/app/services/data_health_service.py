@@ -77,79 +77,52 @@ RSS_FEED_CONNECTOR = "rss"
 _NOT_SOURCES_SQL = "('seed', 'manual', 'test', 'dummy', 'placeholder')"
 
 
-def _coverage_groups(db: Session, *, model, source, table: str, source_col: str,
-                     tenant_clause: str, extra_clause: str, params: dict,
-                     tenant) -> list[tuple[str, int, object]]:
-    """(fuente, empresas distintas, ultima escritura) por capa, sin barrer la tabla.
+def _coverage_groups(db: Session, *, table: str, source_col: str,
+                     tenant: int, reported: bool = False,
+                     prices: bool = False) -> list:
+    """Count source/company pairs with bounded probes on existing indexes.
 
-    El group-by con count(distinct company_id) leia TODA la porcion de la capa
-    (medido en frio en prod por el piloto: 17-18 s tras la cache de 003c1644 y
-    los indices de 0119; el panel seguia pagando ese coste cada vez que un
-    worker entraba en frio). Lo que el panel necesita son los pares
-    (fuente, empresa) distintos: miles, no millones. La CTE recursiva hace un
-    barrido perezoso (loose index scan): una sonda de indice por par en vez de
-    leer cada fila. El max(updated_at) por fuente son sondas puntuales.
-
-    SQL portable (subconsultas escalares, sin LATERAL: sqlite lo ejecuta igual
-    y los tests lo cubren; en PG los indices parciales de 0122 hacen cada
-    sonda O(log n)). Resultado exactamente igual al group-by: mismos filtros,
-    mismos pares, mismo max. Medido en el laboratorio con forma de prod
-    (PG 14, 4,9M precios / 3,1M facts / 1M docs / 1M news, caliente):
-    1.088 ms -> 107 ms las cuatro capas; detalle en el PR.
-
-    table/source_col son literales fijos del propio modulo (LAYERS), nunca
-    entrada del usuario.
+    PG17 can discard a redundant IS NOT NULL on a NOT NULL integer column
+    before matching a partial index. An equivalent full INTEGER domain bound
+    keeps the predicate provable without excluding negative or zero IDs.
+    Table and column identifiers come only from the fixed LAYERS tuple.
     """
-    filtros = f"{source_col} NOT IN {_NOT_SOURCES_SQL} AND company_id IS NOT NULL{extra_clause}{tenant_clause}"
-    salto = (f"(t2.{source_col}, t2.company_id) > (pairs.src, pairs.cid)")
-    sql = sa.text(f"""
-        WITH RECURSIVE pairs(src, cid) AS (
-          SELECT * FROM (SELECT {source_col}, company_id FROM {table}
-           WHERE {filtros} ORDER BY {source_col}, company_id LIMIT 1)
-          UNION ALL
-          SELECT (SELECT t2.{source_col} FROM {table} t2
-                  WHERE {filtros.replace(source_col, 't2.' + source_col).replace('company_id IS NOT NULL', 't2.company_id IS NOT NULL')} AND {salto}
-                  ORDER BY t2.{source_col}, t2.company_id LIMIT 1),
-                 (SELECT t2.company_id FROM {table} t2
-                  WHERE {filtros.replace(source_col, 't2.' + source_col).replace('company_id IS NOT NULL', 't2.company_id IS NOT NULL')} AND {salto}
-                  ORDER BY t2.{source_col}, t2.company_id LIMIT 1)
-          FROM pairs WHERE pairs.src IS NOT NULL
-        )
-        SELECT src, count(*) FROM pairs WHERE src IS NOT NULL GROUP BY src
-    """)
-    grupos = []
-    for src_name, covered in db.execute(sql, params).all():
-        # Sonda max via ORM: misma consulta (indice (…, source, updated_at) de
-        # 0122), con la coercion de tipos del dialecto (text() devolvia str en
-        # sqlite y rompia utc()).
-        # max() en PG no salta al final del indice: lo agrega entero. La forma
-        # ORDER BY ... DESC LIMIT 1 con el filtro IS NOT NULL si lo hace
-        # (sonda hacia atras sobre ix_*_health_src_upd / ix_prices_source_upd)
-        # y devuelve lo mismo: max ignora NULLs; aqui el mayor no nulo, o None
-        # si no hay ninguno. Sin NULLS LAST a proposito: ese modificador no lo
-        # satisface el indice (DESC por defecto es NULLS FIRST) y forzaba un
-        # sort de toda la fuente; el filtro ya hace irrelevante el orden de
-        # los nulos. Medido: 103 ms -> 0,1 ms por fuente.
-        stamp_query = (
-            select(model.updated_at)
-            .where(
-                source == src_name,
-                source.not_in(["seed", "manual", "test", "dummy", "placeholder"]),
-                model.company_id.is_not(None),
-                model.updated_at.is_not(None),
-            )
-            .order_by(model.updated_at.desc())
-            .limit(1)
-        )
-        if model is not MarketPrice:
-            stamp_query = stamp_query.where(model.tenant_id == tenant)
-        if model is FinancialFact:
-            stamp_query = stamp_query.where(model.is_reported)
-        if model is MarketPrice:
-            stamp_query = stamp_query.where(model.close > 0)
-        stamp = db.scalar(stamp_query)
-        grupos.append((src_name, covered, stamp))
-    return grupos
+    filters = (
+        f"{source_col} NOT IN {_NOT_SOURCES_SQL} AND company_id IS NOT NULL"
+        " AND company_id >= -2147483648"
+    )
+    if not prices:
+        filters += " AND tenant_id = :tenant"
+    if reported:
+        filters += " AND is_reported"
+    if prices:
+        filters += " AND close > 0"
+    # nosemgrep: gerarai-tenant-raw-sql -- every tenant-owned probe includes tenant_id=:tenant; global prices are intentionally shared, as before.
+    statement = sa.text(f"""
+      WITH RECURSIVE sources(src) AS (
+        SELECT * FROM (SELECT {source_col} FROM {table} WHERE {filters}
+          ORDER BY {source_col} LIMIT 1)
+        UNION ALL
+        SELECT (SELECT {source_col} FROM {table} WHERE {filters}
+          AND {source_col} > sources.src ORDER BY {source_col} LIMIT 1)
+        FROM sources WHERE src IS NOT NULL
+      ), pairs(src, cid) AS (
+        SELECT src, (SELECT company_id FROM {table} WHERE {filters}
+          AND {source_col} = sources.src ORDER BY company_id LIMIT 1)
+        FROM sources WHERE src IS NOT NULL
+        UNION ALL
+        SELECT src, (SELECT company_id FROM {table} WHERE {filters}
+          AND {source_col} = pairs.src AND company_id > pairs.cid
+          ORDER BY company_id LIMIT 1)
+        FROM pairs WHERE cid IS NOT NULL
+      ), counts AS (
+        SELECT src, count(*) AS covered FROM pairs WHERE cid IS NOT NULL GROUP BY src
+      )
+      SELECT src, covered, (SELECT updated_at FROM {table} WHERE {filters}
+        AND {source_col} = counts.src AND updated_at IS NOT NULL
+        ORDER BY updated_at DESC LIMIT 1) AS stamp FROM counts ORDER BY src
+    """).columns(src=sa.String(), covered=sa.Integer(), stamp=sa.DateTime(timezone=True))
+    return list(db.execute(statement, {"tenant": tenant}).all())
 
 def utc(value: datetime | None) -> datetime | None:
     return value.replace(tzinfo=UTC) if value and value.tzinfo is None else value
@@ -165,18 +138,25 @@ def inventory(db: Session, *, now: datetime | None = None) -> dict:
     for label, model, source_field, max_age in LAYERS:
         source = getattr(model, source_field)
         try:
-            statement = select(source, func.count(distinct(model.company_id)),
-                               func.max(model.updated_at)).where(
-                source.not_in(["seed", "manual", "test", "dummy", "placeholder"]),
-                model.company_id.is_not(None),
-            ).group_by(source)
-            if model is not MarketPrice:
-                statement = statement.where(model.tenant_id == tenant)
-            if model is FinancialFact:
-                statement = statement.where(model.is_reported.is_(True))
-            if model is MarketPrice:
-                statement = statement.where(model.close > 0)
-            groups = db.execute(statement).all()
+            if db.get_bind().dialect.name == "postgresql":
+                groups = _coverage_groups(
+                    db, table=model.__tablename__, source_col=source_field,
+                    tenant=tenant, reported=model is FinancialFact,
+                    prices=model is MarketPrice,
+                )
+            else:
+                statement = select(source, func.count(distinct(model.company_id)),
+                                   func.max(model.updated_at)).where(
+                    source.not_in(["seed", "manual", "test", "dummy", "placeholder"]),
+                    model.company_id.is_not(None),
+                ).group_by(source)
+                if model is not MarketPrice:
+                    statement = statement.where(model.tenant_id == tenant)
+                if model is FinancialFact:
+                    statement = statement.where(model.is_reported.is_(True))
+                if model is MarketPrice:
+                    statement = statement.where(model.close > 0)
+                groups = db.execute(statement).all()
             for name, covered, stamp in groups:
                 stamp = utc(stamp)
                 status = "stale" if stamp and now - stamp > timedelta(days=max_age) else "available"
