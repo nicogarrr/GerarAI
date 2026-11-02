@@ -804,7 +804,8 @@ def _plan_answer(db: Session, tenant: int, text: str) -> ChatResponse:
     if targets:
         parts = ", ".join(
             f"{t['label']} {float(t.get('target_pct') or 0):g}%" if english
-            else f"{t['label']} {float(t.get('target_pct') or 0):g} %".replace(".", ",") for t in targets)
+            # Coma decimal solo en el número: la etiqueta va tal cual («EE.UU.», «BRK.B»).
+            else f"{t['label']} {format(float(t.get('target_pct') or 0), 'g').replace('.', ',')} %" for t in targets)
         lines.append(f"Target split: {parts}." if english else f"Reparto objetivo: {parts}.")
     if re.search(r"\bdca\b", text):
         from app.services.brain_context_tools import dca_answer
