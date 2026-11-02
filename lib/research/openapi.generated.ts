@@ -6466,6 +6466,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/watchlist/news-preparing/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * News Preparing
+         * @description ¿Se están pidiendo ahora las noticias de este ticker recién añadido?
+         *
+         *     La ficha lo pregunta solo cuando no tiene noticias que enseñar: con una
+         *     petición pendiente dice «preparando» y se recarga sola; sin ella, su vacío
+         *     de siempre.
+         */
+        get: operations["news_preparing_api_watchlist_news_preparing__symbol__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist/{symbol}": {
         parameters: {
             query?: never;
@@ -10445,6 +10469,16 @@ export interface components {
             skipped_duplicates: number;
             /** Status */
             status: string;
+        };
+        /** NewsPreparingOut */
+        NewsPreparingOut: {
+            /**
+             * Preparing
+             * @default false
+             */
+            preparing: boolean;
+            /** Symbol */
+            symbol: string;
         };
         /** NextEventOut */
         NextEventOut: {
@@ -29404,6 +29438,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WatchlistMonitorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    news_preparing_api_watchlist_news_preparing__symbol__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsPreparingOut"];
                 };
             };
             /** @description Validation Error */

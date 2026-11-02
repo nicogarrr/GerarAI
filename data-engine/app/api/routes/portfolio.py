@@ -1065,9 +1065,11 @@ def create_transaction(
                 enqueue_tracked_analysis(db, company.ticker)
             except Exception:
                 db.rollback()  # Never roll back the already committed purchase record.
-            from app.services.dca_on_add import enqueue_dca_on_add
+            from app.services import dca_on_add
 
-            enqueue_dca_on_add(db, [company.ticker])  # nunca lanza
+            dca_on_add.enqueue_dca_on_add(db, [company.ticker])  # nunca lanza
+            # Noticias del ticker sin esperar al barrido (la ficha dice «preparando»).
+            dca_on_add.enqueue_news_on_add(db, company.ticker)  # nunca lanza
             try:
                 from app.services.market_close_sync import enqueue_price_backfills
 

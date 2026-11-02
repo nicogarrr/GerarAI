@@ -3436,8 +3436,33 @@ def refresh_news(
         )
 
 
+def _clears_news_on_add_mark(fn):
+    """Al acabar el job de noticias de UN ticker (trabaje, se salte por copia
+    fresca o falle), borra su marca «preparando» de la ficha: así el aviso solo
+    dura mientras la petición está pendiente. El barrido sin ticker no la toca."""
+    import functools
+    import inspect
+
+    sig = inspect.signature(fn)
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            values = sig.bind_partial(*args, **kwargs).arguments
+            ticker, tenant_id = values.get("ticker"), values.get("tenant_id")
+            if ticker and tenant_id is not None:
+                from app.services.dca_on_add import clear_news_mark
+
+                clear_news_mark(tenant_id, str(ticker))
+
+    return wrapper
+
+
 @dramatiq.actor(max_retries=2, min_backoff=15_000, time_limit=2 * 3600 * 1000,
               queue_name=YAHOO_QUEUE_NAME)
+@_clears_news_on_add_mark
 @_coalesce_on_success(
     "refresh_ticker_news",
     lambda scope="tracked", **_: 20 * 60 if scope == "tracked" else 5 * 3600,

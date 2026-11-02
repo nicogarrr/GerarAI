@@ -71,6 +71,8 @@ import { DocumentsList } from '@/components/research/DocumentsList';
 import { ChangesFeed } from '@/components/research/ChangesFeed';
 import { AnalystTargetsSection } from '@/components/research/AnalystTargetsSection';
 import { DcaHitRatesSection } from '@/components/research/DcaHitRatesSection';
+import { NewsPreparingNotice } from '@/components/research/NewsPreparingNotice';
+import { getNewsPreparing } from '@/lib/research/news-preparing';
 import { TtmPanel } from '@/components/research/TtmPanel';
 import { GuideContextPanel } from '@/components/research/GuideContextPanel';
 import { getGuideContext } from '@/lib/research/assistant-client';
@@ -1118,7 +1120,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               {t('research.fichaNewsLoadError')}
             </p>
           ) : overviewNews.length === 0 ? (
-            <EmptyState title={t('research.fichaNoRecentNews')} />
+            <NewsPreparingNotice ticker={ticker} fallback={<EmptyState title={t('research.fichaNoRecentNews')} />} />
           ) : (
             <ul className="space-y-3">
               {overviewNews.map((event) => (
@@ -1257,6 +1259,15 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     const fetchedNews: Awaited<ReturnType<typeof getResearchNews>> = fichaNewsEntry && fichaNewsEntry.ok ? fichaNewsEntry.value : [];
     const newsHasMore = fetchedNews.length > NEWS_PAGE_SIZE;
     const newsEvents = dedupeNewsEvents(fetchedNews.slice(0, NEWS_PAGE_SIZE));
+    // Empresa recién añadida sin noticias aún: «preparando» mientras su
+    // petición está pendiente (sin nada pendiente, el vacío de siempre).
+    if (!fichaNewsError && newsEvents.length === 0 && newsPage === 1 && (await getNewsPreparing(ticker))) {
+      return (
+        <Panel title={t('research.fichaCompanyNews')}>
+          <NewsPreparingNotice ticker={ticker} fallback={null} />
+        </Panel>
+      );
+    }
     // El flujo ya trae su propia sección con cabecera; sin Panel extra.
     return fichaNewsError ? (
       <Panel title={t('research.fichaCompanyNews')}>
