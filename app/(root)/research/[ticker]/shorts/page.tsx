@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { getPublicShorts, refreshPublicShorts } from '@/lib/actions/public-shorts.actions';
 import { getFormat, getT } from '@/lib/i18n/server';
+import { shortsText } from '@/lib/research/shorts-text';
 import { MutationForm } from '@/components/forms/MutationForm';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
@@ -20,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ShortsPage({ params, searchParams }: { params: Promise<{ ticker: string }>; searchParams: Promise<{ page?: string }> }) {
   await requireAuthenticatedUser();
   const t = await getT();
-  const { formatMarketDate, formatNumber, formatUserDateTime, na: NA } = await getFormat();
+  const { formatMarketDate, formatNumber, formatUserDateTime, na: NA, locale } = await getFormat();
   const ticker = (await params).ticker.toUpperCase();
   const query = await searchParams;
   const result = await getPublicShorts(ticker).catch(() => null);
@@ -36,9 +37,9 @@ export default async function ShortsPage({ params, searchParams }: { params: Pro
     <Panel title={data?.source ?? t('research.publicShorts.noData')}>
       {!result ? <p>{t('research.publicShorts.readError')}</p> : <>
         <p className="mb-3 text-sm text-gray-400">{t('research.publicShorts.lastLookup', { date: result.fetched_at ? formatUserDateTime(result.fetched_at) : NA })}</p>
-        {result.reason && <p role="status" className="mb-3 text-amber-300">{result.reason}</p>}
+        {result.reason && <p role="status" className="mb-3 text-amber-300">{shortsText(result.reason, locale)}</p>}
         {data && <>
-          <p className="mb-4 text-sm text-gray-400">{data.note}</p>
+          <p className="mb-4 text-sm text-gray-400">{shortsText(data.note, locale)}</p>
           <a href={data.source_url} target="_blank" rel="noopener noreferrer" className="text-teal-300">{t('research.publicShorts.officialSource', { source: data.source })}</a>
           {data.source === 'CNMV' ? <>
             <p className="my-4 text-2xl">{t('research.publicShorts.publicTotal', { percent: data.public_total_percent == null ? NA : `${formatNumber(data.public_total_percent, { maximumFractionDigits: 2 })}%` })} <span className="text-xs text-gray-400">{derived}</span></p>
