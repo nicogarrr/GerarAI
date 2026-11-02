@@ -4878,6 +4878,39 @@ def evaluate_manual_dca(run_id: int, token: str, tenant_id: int, user_id: str) -
         db.close()
 
 
+class DcaOnAddLeaseHeld(RuntimeError):
+    """El barrido diario o el manual del tenant está corriendo: reintentar luego."""
+
+
+@dramatiq.actor(queue_name="dca-manual", max_retries=3, min_backoff=60_000, time_limit=600_000)
+def evaluate_dca_on_add(tenant_id: int, user_id: str, symbols: list[str]) -> dict[str, Any]:
+    """Señal DCA de los símbolos recién añadidos a watchlist/cartera (sin esperar
+    al barrido diario). Misma cola y worker que el manual (una descarga a la
+    vez) y mismo lease por tenant que el diario y el manual: si está ocupado,
+    reintenta más tarde con backoff (la marca de «preparando» sigue viva)."""
+    from app.core.config import get_settings
+    from app.services.dca_on_add import run_on_add
+
+    if not get_settings().dca_evaluation_enabled:
+        return {"status": "skipped", "actor": "evaluate_dca_on_add", "reason": "disabled"}
+    lease_name = f"evaluate_dca_signals:{tenant_id}"
+    lease = acquire_job_lease(lease_name, ttl_seconds=600, redis_url=_lease_redis_url())
+    if lease is None:
+        raise DcaOnAddLeaseHeld(lease_name)
+    db = None
+    try:
+        db = _session(tenant_id, user_id)
+        return {"actor": "evaluate_dca_on_add", **run_on_add(db, list(symbols))}
+    except Exception:
+        if db is not None:
+            _rollback(db)
+        raise
+    finally:
+        release_job_lease(lease_name, lease, redis_url=_lease_redis_url())
+        if db is not None:
+            db.close()
+
+
 @dramatiq.actor(queue_name="ibkr-sync", max_retries=2, min_backoff=30_000, time_limit=600_000)
 def sync_tenant_ibkr_connections_dedicated() -> dict[str, Any]:
     """Dedicated dispatcher so default backlog cannot delay tenant Flex imports."""

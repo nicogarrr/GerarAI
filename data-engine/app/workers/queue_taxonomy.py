@@ -96,6 +96,7 @@ ACTOR_CLASS: dict[str, str] = {
     # calculo: pesado sobre datos ya ingeridos
     "consolidate_memory": CALCULO,
     "evaluate_dca_signals": CALCULO,
+    "evaluate_dca_on_add": CALCULO,  # DCA al añadir a watchlist/cartera (cola dca-manual)
     "extract_document_kpis": CALCULO,
     "freeze_propicks_snapshot": CALCULO,
     "propicks_radar_scan": CALCULO,

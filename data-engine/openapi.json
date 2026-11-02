@@ -3635,6 +3635,11 @@
             ],
             "title": "Params Version"
           },
+          "preparing": {
+            "default": false,
+            "title": "Preparing",
+            "type": "boolean"
+          },
           "reason": {
             "anyOf": [
               {

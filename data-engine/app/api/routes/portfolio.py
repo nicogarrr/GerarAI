@@ -1063,6 +1063,9 @@ def create_transaction(
                 enqueue_tracked_analysis(db, company.ticker)
             except Exception:
                 db.rollback()  # Never roll back the already committed purchase record.
+            from app.services.dca_on_add import enqueue_dca_on_add
+
+            enqueue_dca_on_add(db, [company.ticker])  # nunca lanza
             try:
                 from app.services.market_close_sync import enqueue_price_backfills
 
@@ -1313,6 +1316,12 @@ def create_transaction_batch(
                     enqueue_tracked_analysis(db, company.ticker)
             except Exception:
                 db.rollback()
+
+        # Señal DCA de las compras del lote: un mensaje por cada 10 tickers.
+        from app.services.dca_on_add import enqueue_dca_on_add
+
+        enqueue_dca_on_add(db, [c.ticker for _, c in created_transactions
+                                if c.id in company_ids_for_backfill])
         
         # Return summary and transaction details
         return {
