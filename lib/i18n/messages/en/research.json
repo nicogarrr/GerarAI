@@ -1162,7 +1162,19 @@
     "statusApproved": "approved",
     "statusRejected": "rejected",
     "meta": "Lesson #{id} · decision #{decision} · review #{review}",
-    "noLink": "not linked"
+    "noLink": "not linked",
+    "taxonomy": {
+      "overestimatingTam": "Overestimating the TAM",
+      "underestimatingDilution": "Underestimating dilution",
+      "extrapolatingPeakMargin": "Extrapolating peak margins",
+      "ignoringBalanceSheet": "Ignoring the balance sheet",
+      "managementTrustError": "Misplaced trust in management",
+      "valuationAnchoring": "Valuation anchoring",
+      "positionSizingError": "Position sizing error",
+      "sellingTooEarly": "Selling too early",
+      "ignoringCyclicality": "Ignoring cyclicality",
+      "thesisDrift": "Thesis drift"
+    }
   },
   "driverSection": {
     "created": "Assumption version created",
