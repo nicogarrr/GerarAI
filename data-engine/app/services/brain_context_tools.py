@@ -42,6 +42,9 @@ _RISK_METRIC_RE = re.compile(
 )
 _JOURNAL_RE = re.compile(
     r"(?i)\bdiario\b|\b(?:mis|[uú]ltimas|qu[eé])\s+decisiones\b|\bdecisiones\s+(?:que\s+)?(?:he|tom[eé]|registr\w*)"
+    # En inglés («my decision journal», «what decisions have I logged?») iba al modelo general.
+    r"|\b(?:decision|investment|trading)\s+(?:journal|log|diary)\b|\bmy\s+(?:journal|(?:recent\s+|last\s+)?decisions)\b"
+    r"|\bdecisions\s+(?:have\s+)?i\s+(?:made|logged|recorded|taken)\b"
 )
 
 _SEVERITY_ES = {"critical": "crítica", "high": "alta", "medium": "media", "low": "baja", "info": "info"}
@@ -352,6 +355,9 @@ def portfolio_risk_answer(db: Session, tenant: int, *, today: date | None = None
 
 def journal_answer(db: Session, tenant: int, company: Company | None = None) -> ChatResponse:
     """Últimas entradas del diario de decisiones (abiertas primero)."""
+    from app.services.brain_account_tools import _date_en, _english
+
+    english = _english()
     query = (
         select(DecisionJournalEntry, Company)
         .join(Company, Company.id == DecisionJournalEntry.company_id)
@@ -362,28 +368,49 @@ def journal_answer(db: Session, tenant: int, company: Company | None = None) -> 
     rows = db.execute(
         query.order_by(DecisionJournalEntry.decision_date.desc(), DecisionJournalEntry.id.desc()).limit(40)
     ).all()
-    scope = f" de {company.ticker}" if company is not None else ""
+    if english:
+        scope = f" for {company.ticker}" if company is not None else ""
+    else:
+        scope = f" de {company.ticker}" if company is not None else ""
     if not rows:
-        return _response([f"No hay entradas en tu diario de decisiones{scope}."], [], "decision_journal")
+        return _response([f"There are no entries in your decision journal{scope}." if english
+                          else f"No hay entradas en tu diario de decisiones{scope}."], [], "decision_journal")
     open_rows = [row for row in rows if row[0].status == "open"]
-    lines = [f"Diario de decisiones{scope}: {len(open_rows)} abiertas de las últimas {len(rows)} registradas."]
+    opened, total = len(open_rows), len(rows)
+    if english:
+        latest = "the only one recorded" if total == 1 else f"the last {total} recorded"
+        lines = [f"Decision journal{scope}: {opened} open of {latest}."]
+    else:
+        latest = "la única registrada" if total == 1 else f"las últimas {total} registradas"
+        lines = [f"Diario de decisiones{scope}: {opened} abierta{'' if opened == 1 else 's'} de {latest}."]
     sources: list[dict] = []
     for entry, comp in (open_rows + [row for row in rows if row[0].status != "open"])[:6]:
-        decision = _DECISION_ES.get(entry.decision.lower(), entry.decision)
-        price = f" a {float(entry.price):.2f}".replace(".", ",") if entry.price is not None else ""
         rationale = " ".join((entry.rationale or "").split())
         if len(rationale) > 140:
             rationale = rationale[:137].rstrip() + "…"
-        status = "abierta" if entry.status == "open" else entry.status
-        line = f"- {comp.ticker}, {fecha_es(entry.decision_date)}: {decision}{price} ({status})."
-        if rationale:
-            line += f" Motivo: {rationale}"
         must = [item for item in (entry.what_must_be_true or []) if str(item).strip()]
-        if must:
-            line += f" Debe cumplirse: {len(must)} condición(es)."
+        if english:
+            price = f" at {float(entry.price):,.2f}" if entry.price is not None else ""
+            line = (f"- {comp.ticker}, {_date_en(entry.decision_date)}: {entry.decision.lower()}{price} "
+                    f"({entry.status}).")
+            if rationale:
+                line += f" Reason: {rationale}"
+            if must:
+                line += f" Must hold true: {len(must)} condition{'' if len(must) == 1 else 's'}."
+        else:
+            decision = _DECISION_ES.get(entry.decision.lower(), entry.decision)
+            price = f" a {float(entry.price):.2f}".replace(".", ",") if entry.price is not None else ""
+            status = "abierta" if entry.status == "open" else entry.status
+            line = f"- {comp.ticker}, {fecha_es(entry.decision_date)}: {decision}{price} ({status})."
+            if rationale:
+                line += f" Motivo: {rationale}"
+            if must:
+                line += f" Debe cumplirse: {len(must)} condición(es)."
         lines.append(line)
         sources.append(_source(
-            "decision_journal_entry", entry.id, f"Diario {comp.ticker} {fecha_es(entry.decision_date)}",
+            "decision_journal_entry", entry.id,
+            f"{'Journal' if english else 'Diario'} {comp.ticker} "
+            f"{_date_en(entry.decision_date) if english else fecha_es(entry.decision_date)}",
             f"/research/{quote(comp.ticker, safe='')}/decision-lessons",
         ))
     return _response(lines, sources, "decision_journal")
