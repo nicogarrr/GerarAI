@@ -15,7 +15,11 @@
  */
 import type { Locale } from '../locale.ts';
 
-import compactEn from './en.compact.json' with { type: 'json' };
+// El inglés compacto llega por `#i18n-en-compact`: en el servidor (y en
+// tests/scripts) es el JSON estático; en el navegador es un módulo vacío y el
+// diccionario se descarga aparte, solo si el locale es «en» (LocaleProvider).
+// Así quien usa la app en castellano no descarga ni expande ~230 KB de inglés.
+import { bundledCompactEnglish, type CompactEnglish } from '#i18n-en-compact';
 
 import alerts__es from './es/alerts.json' with { type: 'json' };
 import auth__es from './es/auth.json' with { type: 'json' };
@@ -128,11 +132,28 @@ function expandEnglish(reference: unknown, values: (string | null)[]): unknown {
   if (index !== values.length) throw new Error('Invalid compact English dictionary');
   return expanded;
 }
-const en = Object.fromEntries(Object.entries(es).map(([area, reference]) => [
-  area, expandEnglish(reference, compactEn[area as keyof typeof compactEn]),
-])) as Messages;
+let en: Messages | null = null;
 
-export const messages: Record<Locale, Messages> = { es, en };
+/** Registra el inglés compacto (idempotente). */
+export function registerCompactEnglish(compact: CompactEnglish): void {
+  if (en) return;
+  en = Object.fromEntries(Object.entries(es).map(([area, reference]) => [
+    area, expandEnglish(reference, compact[area as keyof typeof compact]),
+  ])) as Messages;
+}
+
+if (bundledCompactEnglish) registerCompactEnglish(bundledCompactEnglish);
+
+/** ¿Está ya el diccionario inglés en memoria? (en el navegador, tras cargarlo). */
+export function hasEnglishMessages(): boolean {
+  return en !== null;
+}
+
+export const messages: Record<Locale, Messages> = {
+  es,
+  // Mientras el inglés no está cargado (solo en el navegador), es = referencia.
+  get en() { return en ?? es; },
+};
 
 export function getMessages(locale: Locale): Messages {
   return messages[locale] ?? messages.es;
