@@ -412,6 +412,7 @@ def _asks_sell_all_tax(text: str, question: str) -> bool:
 def _sell_all_answer(db: Session, tenant: int) -> ChatResponse:
     from app.models import Company, Position
     from app.services.chat_service import _savings_scale_label
+    from app.services.portfolio_ledger_service import trade_price_fallbacks
     from app.services.sale_simulation import simulate_fifo_sale
     from app.services.tax_irpf_filing import calculate_savings_tax
     from app.valuation.currency import canonical_currency_code
@@ -430,7 +431,14 @@ def _sell_all_answer(db: Session, tenant: int) -> ChatResponse:
     items: list[tuple[str, Decimal, Decimal]] = []
     missing: list[str] = []
     average: list[str] = []
+    # Valoradas al precio de su última operación (sin cotización, auditoría A3):
+    # su ganancia no está medida, como en cartera, impuestos y el latente.
+    quote_missing = trade_price_fallbacks(db, [pos for pos, _c in rows], tenant_id=tenant)
+    unquoted: list[str] = []
     for pos, company in rows:
+        if pos.company_id in quote_missing:
+            unquoted.append(company.ticker)
+            continue
         held = Decimal(pos.quantity)
         value = pos.market_value_base if (pos.base_currency or "EUR") == "EUR" else None
         currency = canonical_currency_code(pos.currency or company.currency or "EUR")
@@ -465,10 +473,12 @@ def _sell_all_answer(db: Session, tenant: int) -> ChatResponse:
         return _money(float(amount), "EUR", signed=signed, english=english)
 
     if english:
-        lines = [f"If you sold all {len(items)} positions today (data as of {day}): value {eur(value)}, "
+        what = f"all {len(items)} positions" if len(items) > 1 else "your only measured position"
+        lines = [f"If you sold {what} today (data as of {day}): value {eur(value)}, "
                  f"cost {eur(cost)} (FIFO), net {'gain' if gain >= 0 else 'loss'} {eur(abs(gain))}."]
     else:
-        lines = [f"Si vendieras hoy tus {len(items)} posiciones (datos a {day}): valor {eur(value)}, "
+        what = f"tus {len(items)} posiciones" if len(items) > 1 else "tu única posición medida"
+        lines = [f"Si vendieras hoy {what} (datos a {day}): valor {eur(value)}, "
                  f"coste {eur(cost)} (FIFO), {'ganancia' if gain >= 0 else 'pérdida'} neta de {eur(abs(gain))}."]
     ranked = sorted(items, key=lambda item: item[1] - item[2], reverse=True)
     for ticker, v, c in ranked[:12]:
@@ -503,6 +513,9 @@ def _sell_all_answer(db: Session, tenant: int) -> ChatResponse:
     if average:
         lines.append(("Average cost, no FIFO lots: " if english else "Con coste medio, sin lotes FIFO: ")
                      + ", ".join(average[:10]) + ".")
+    if unquoted:
+        lines.append(("Left out (no real quote): " if english else "Fuera del cálculo (sin cotización real): ")
+                     + ", ".join(unquoted[:10]) + ".")
     if missing:
         lines.append(("Left out (no value or cost in euros): " if english else "Fuera del cálculo (sin valor o coste en euros): ")
                      + ", ".join(missing[:10]) + ".")
