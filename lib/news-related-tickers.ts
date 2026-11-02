@@ -1,5 +1,6 @@
 // Sin imports de alias (@/): el guard lo carga con node --experimental-strip-types.
-const NA = 'N/D';
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { naFor } from './format.ts';
 
 function validCurrency(currency: string | null | undefined): currency is string {
     if (!currency || !/^[A-Z]{3}$/.test(currency)) return false;
@@ -47,20 +48,25 @@ export type RelatedTickerView = {
  * cierre datado, nunca una cotizacion en vivo. Divisa no ISO (GBX, ZAC):
  * se muestra el numero con su divisa tal cual, sin convertir ni sustituir.
  */
-export function relatedTickerView(item: RelatedTicker): RelatedTickerView {
+export function relatedTickerView(item: RelatedTicker, locale: 'es' | 'en' = 'es'): RelatedTickerView {
+    const en = locale === 'en';
+    const intl = en ? 'en-US' : 'es-ES';
+    const NA = naFor(locale);
     if (item.kind === 'etf') {
         const w = typeof item.weight_pct === 'number' && Number.isFinite(item.weight_pct)
-            ? new Intl.NumberFormat('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 2 }).format(item.weight_pct)
+            ? new Intl.NumberFormat(intl, { minimumFractionDigits: 1, maximumFractionDigits: 2 }).format(item.weight_pct)
             : null;
         return {
             ticker: item.ticker,
             href: '',
-            priceText: w ? `${w} % del ETF` : NA,
+            priceText: w ? (en ? `${w}% of the ETF` : `${w} % del ETF`) : NA,
             changeText: '',
             dateText: '',
             tone: 'none',
             isEtf: true,
-            title: `ETF ${item.name ?? item.ticker} · peso del ticker segun holdings oficiales${item.holdings_as_of ? ` al ${item.holdings_as_of}` : ''}`,
+            title: en
+                ? `ETF ${item.name ?? item.ticker} · ticker weight per official holdings${item.holdings_as_of ? ` as of ${item.holdings_as_of}` : ''}`
+                : `ETF ${item.name ?? item.ticker} · peso del ticker segun holdings oficiales${item.holdings_as_of ? ` al ${item.holdings_as_of}` : ''}`,
         };
     }
     const hasPrice = typeof item.price === 'number' && Number.isFinite(item.price);
@@ -68,17 +74,17 @@ export function relatedTickerView(item: RelatedTicker): RelatedTickerView {
     if (hasPrice) {
         const value = item.price as number;
         priceText = validCurrency(item.currency)
-            ? new Intl.NumberFormat('es-ES', { style: 'currency', currency: item.currency, useGrouping: 'always', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
-            : `${new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}${item.currency ? ` ${item.currency}` : ''}`;
+            ? new Intl.NumberFormat(intl, { style: 'currency', currency: item.currency, useGrouping: 'always', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+            : `${new Intl.NumberFormat(intl, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}${item.currency ? ` ${item.currency}` : ''}`;
     }
     const hasChange = typeof item.change_pct === 'number' && Number.isFinite(item.change_pct);
     const changeText = hasChange
-        ? new Intl.NumberFormat('es-ES', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: 'exceptZero' }).format((item.change_pct as number) / 100)
+        ? new Intl.NumberFormat(intl, { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: 'exceptZero' }).format((item.change_pct as number) / 100)
         : NA;
     const tone = !hasChange ? 'none' : item.change_pct! > 0 ? 'up' : item.change_pct! < 0 ? 'down' : 'flat';
     const m = item.date ? /^\d{4}-(\d{2})-(\d{2})/.exec(item.date) : null;
-    const dateText = !hasChange && hasPrice && m ? `${m[2]}/${m[1]}` : '';
-    const day = item.date ? `cierre ${item.date}` : 'sin cierre disponible';
+    const dateText = !hasChange && hasPrice && m ? (en ? `${m[1]}/${m[2]}` : `${m[2]}/${m[1]}`) : '';
+    const day = item.date ? (en ? `close ${item.date}` : `cierre ${item.date}`) : (en ? 'no close available' : 'sin cierre disponible');
     return {
         ticker: item.ticker,
         href: `/research/${encodeURIComponent(item.ticker)}`,

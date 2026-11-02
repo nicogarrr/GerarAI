@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { relatedTickerView, type RelatedTicker } from '@/lib/news-related-tickers';
+import type { Locale } from '@/lib/i18n/locale';
+import { createTranslator } from '@/lib/i18n/translate';
 
 const TONE: Record<string, string> = {
   up: 'text-emerald-300',
@@ -9,12 +11,13 @@ const TONE: Record<string, string> = {
 };
 
 /** Tira «tickers relacionados» de una noticia: ultimo cierre y variacion del dia. */
-export function RelatedTickersStrip({ items }: { items?: RelatedTicker[] | null }) {
+export function RelatedTickersStrip({ items, locale = 'es' }: { items?: RelatedTicker[] | null; locale?: Locale }) {
   if (!items || items.length === 0) return null;
+  const t = createTranslator(locale);
   return (
-    <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label="Tickers relacionados" data-testid="related-tickers">
+    <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label={t('research.relatedTickers.aria')} data-testid="related-tickers">
       {items.map((item) => {
-        const view = relatedTickerView(item);
+        const view = relatedTickerView(item, locale);
         return (
           <li key={item.ticker} title={view.title} className="flex items-center gap-1.5">
             {view.isEtf ? (
@@ -24,7 +27,7 @@ export function RelatedTickersStrip({ items }: { items?: RelatedTicker[] | null 
             )}
             <span className="text-gray-400">{view.priceText}</span>
             <span className={TONE[view.tone]}>{view.changeText}</span>
-            {view.dateText ? <span className="text-gray-500">cierre {view.dateText}</span> : null}
+            {view.dateText ? <span className="text-gray-500">{t('research.relatedTickers.close', { date: view.dateText })}</span> : null}
           </li>
         );
       })}
