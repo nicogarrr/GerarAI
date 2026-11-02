@@ -9,9 +9,16 @@ entre sus tickers:
 - Base ``posiciones_iguales``: sin objetivos por ticker, las posiciones vivas
   (cantidad > 0) a partes iguales.
 
-Cada peso base se multiplica por el nivel DCA del motor (``dca_signal_states``):
-4X pesa 4, 3X 3, 2X 2, 1X 1 y las zonas de recorte (-1/-2) pesan 0: no se
-aporta dinero nuevo a un valor que el motor manda recortar.
+Cada peso base se multiplica por el cuadrado del nivel DCA del motor
+(``dca_signal_states``): 4X pesa 16, 3X 9, 2X 4, 1X 1 y las zonas de recorte
+(-1/-2) pesan 0: no se aporta dinero nuevo a un valor que el motor manda
+recortar. La cuota del mes no cambia: el nivel solo mueve el reparto.
+
+Por que el cuadrado (backtest gerarai-dcaplano, 2-nov-2026, 600 carteras
+aleatorias de 10-20 valores del S&P 500, mismo dinero y fechas que el DCA
+plano): fuera de muestra (2013-2026) nivel² gana al DCA plano por +1,3 puntos
+de TIR en el 82 % de las carteras, frente a +0,6 del peso ×nivel anterior; al
+reves (1996-2012) +1,2, y gana en las 21 ventanas de 10 anos.
 
 Degrada limpio: si la tabla ``dca_signal_states`` no existe (el motor DCA aun
 no esta desplegado) o un ticker no tiene nivel, ese ticker pesa como 1X y la
@@ -35,7 +42,8 @@ from app.models import Company, Position
 from app.services.investment_plan_service import InvestmentPlanService
 
 DCA_TABLE = "dca_signal_states"
-DCA_MULTIPLIER: dict[int, int] = {4: 4, 3: 3, 2: 2, 1: 1, -1: 0, -2: 0}
+# Peso = nivel² (ver docstring); los recortes no reciben aportacion.
+DCA_MULTIPLIER: dict[int, int] = {4: 16, 3: 9, 2: 4, 1: 1, -1: 0, -2: 0}
 DCA_LABELS: dict[int, str] = {
     4: "4X DCA",
     3: "3X DCA",

@@ -2,8 +2,8 @@
 
 «Este mes X EUR a POOL, Y EUR a UBER»: la cuota mensual se reparte entre los
 tickers del plan (objetivos por ticker o, sin ellos, posiciones vivas a partes
-iguales) multiplicando cada peso por el nivel DCA del motor (4X pesa 4, 1X pesa
-1, recorte pesa 0). Degrada limpio: sin tabla dca_signal_states o sin nivel
+iguales) multiplicando cada peso por el cuadrado del nivel DCA del motor (4X pesa 16,
+3X 9, 2X 4, 1X 1, recorte pesa 0). Degrada limpio: sin tabla dca_signal_states o sin nivel
 para un ticker, ese ticker pesa como 1X y se dice.
 """
 
@@ -84,10 +84,45 @@ def _cand(ticker: str, weight: str, level: int | None) -> SplitCandidate:
 
 
 def test_pure_split_weights_by_dca_level():
+    # 3X pesa 9 y 1X pesa 1: 9/10 y 1/10 de los 300.
     result = split_contribution(Decimal("300"), [_cand("POOL", "50", 3), _cand("UBER", "50", 1)])
     amounts = {row["ticker"]: row["amount"] for row in result["allocations"]}
-    assert amounts == {"POOL": 225.0, "UBER": 75.0}
+    assert amounts == {"POOL": 270.0, "UBER": 30.0}
     assert result["unallocated"] == 0.0
+
+
+def test_weight_is_the_square_of_the_dca_level():
+    """Peso nivel² (1X→1, 2X→4, 3X→9, 4X→16): backtest gerarai-dcaplano, +1,3 puntos de TIR fuera de muestra."""
+    result = split_contribution(
+        Decimal("300"), [_cand(t, "1", level) for t, level in (("A", 4), ("B", 3), ("C", 2), ("D", 1))]
+    )
+    rows = {row["ticker"]: row for row in result["allocations"]}
+    assert {t: rows[t]["multiplier"] for t in "ABCD"} == {"A": 16, "B": 9, "C": 4, "D": 1}
+    assert rows["A"]["reason"] == "4X DCA: peso ×16"
+    assert rows["D"]["reason"] == "1X DCA: peso ×1"
+    # 16 : 9 : 4 : 1 sobre 30 partes de 300 -> 160 / 90 / 40 / 10.
+    assert {t: rows[t]["amount"] for t in "ABCD"} == {"A": 160.0, "B": 90.0, "C": 40.0, "D": 10.0}
+
+
+@pytest.mark.parametrize(
+    "levels",
+    [
+        (4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (4, 3, 2, 1, -1, -2, None),
+        (2, 2, 3),
+        (1, 1, 1),
+        (4, -1),
+    ],
+)
+@pytest.mark.parametrize("amount", ["300", "1000", "123.45", "0.07"])
+def test_monthly_budget_is_unchanged_only_the_split_moves(levels, amount):
+    """Mismo dinero total al mes que antes: el cuadrado solo cambia el reparto, nunca la cuota."""
+    candidates = [_cand(f"T{i}", "1", level) for i, level in enumerate(levels)]
+    result = split_contribution(Decimal(amount), candidates)
+    spent = sum(Decimal(str(row["amount"])) for row in result["allocations"])
+    assert spent == Decimal(amount)
+    assert result["unallocated"] == 0.0
+    assert result["status"] == "ok"
 
 
 def test_trim_level_gets_nothing_and_missing_level_is_1x():
@@ -99,9 +134,10 @@ def test_trim_level_gets_nothing_and_missing_level_is_1x():
     assert rows["UBER"]["multiplier"] == 0
     assert rows["MSFT"]["multiplier"] == 1
     assert "sin nivel DCA" in rows["MSFT"]["reason"]
-    # 2 : 0 : 1 -> 66,67 / 0 / 33,33 y la suma cuadra al centimo.
-    assert rows["POOL"]["amount"] == 66.67
-    assert rows["MSFT"]["amount"] == 33.33
+    # 2X pesa 4: 4 : 0 : 1 -> 80 / 0 / 20 y la suma cuadra al centimo.
+    assert rows["POOL"]["multiplier"] == 4
+    assert rows["POOL"]["amount"] == 80.0
+    assert rows["MSFT"]["amount"] == 20.0
     assert sum(row["amount"] for row in result["allocations"]) == 100.0
 
 
@@ -157,11 +193,11 @@ def test_targets_weighted_by_dca_levels(db):
     result = build_contribution_split(db)
     assert result["dca_available"] is True
     rows = {row["ticker"]: row for row in result["allocations"]}
-    assert rows["POOL"]["amount"] == 225.0
+    assert rows["POOL"]["amount"] == 270.0
     assert rows["POOL"]["dca_label"] == "3X DCA"
-    assert rows["UBER"]["amount"] == 75.0
+    assert rows["UBER"]["amount"] == 30.0
     assert result["currency"] == "EUR"
-    assert "225,00 EUR a POOL" in result["summary"]
+    assert "270,00 EUR a POOL" in result["summary"]
 
 
 def test_other_tenant_dca_rows_are_ignored(db):
@@ -187,7 +223,8 @@ def test_without_ticker_targets_uses_live_positions_equally(db):
     result = build_contribution_split(db)
     assert result["basis"] == "posiciones_iguales"
     rows = {row["ticker"]: row["amount"] for row in result["allocations"]}
-    assert rows == {"POOL": 200.0, "UBER": 100.0}
+    # POOL 2X pesa 4 frente al 1 de UBER (sin nivel).
+    assert rows == {"POOL": 240.0, "UBER": 60.0}
 
 
 def test_no_candidates_says_so(db):

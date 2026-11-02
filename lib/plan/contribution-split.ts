@@ -1,5 +1,5 @@
 /**
- * Reparto de la aportación mensual ponderado por nivel DCA
+ * Reparto de la aportación mensual ponderado por nivel DCA al cuadrado
  * (GET /api/plan/contribution-split, data-engine/app/services/plan_contribution_split.py).
  * Funciones puras para la tarjeta del plan; sin Next.
  */
@@ -42,8 +42,8 @@ export function formatSplitAmount(value: number, currency: string | null | undef
 }
 
 export const BASIS_LABELS: Record<string, string> = {
-  objetivos_ticker: 'Pesos objetivo por ticker × nivel DCA',
-  posiciones_iguales: 'Posiciones vivas a partes iguales × nivel DCA',
+  objetivos_ticker: 'Pesos objetivo por ticker × nivel DCA²',
+  posiciones_iguales: 'Posiciones vivas a partes iguales × nivel DCA²',
 };
 
 /** Texto vacío honesto según el estado; null cuando hay reparto que mostrar. */
