@@ -18,6 +18,7 @@ from app.services.connectors.damodaran import (
     latest_implied_erp,
 )
 from app.services.connectors.fred import FREDClient
+from app.services.source_documents import get_or_create_source_document
 
 # Sufijos Yahoo por bolsa (free tier): solo mercados confirmados en prod.
 _YAHOO_SUFFIX_BY_EXCHANGE = {
@@ -313,24 +314,14 @@ class WaccInputService:
         title: str,
         metadata: dict,
     ) -> Document:
-        document = db.scalar(
-            select(Document).where(
-                Document.company_id == company.id,
-                Document.source_type == source_type,
-                Document.title == title,
-            )
+        return get_or_create_source_document(
+            db,
+            company,
+            title=title,
+            source_type=source_type,
+            metadata=metadata,
+            published_at=datetime.now(UTC),
         )
-        if document is None:
-            document = Document(
-                company_id=company.id,
-                title=title,
-                source_type=source_type,
-                published_at=datetime.now(UTC),
-                metadata_=metadata,
-            )
-            db.add(document)
-            db.flush()
-        return document
 
     def _upsert_fact(
         self,

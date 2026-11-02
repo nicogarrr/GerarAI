@@ -28,7 +28,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
@@ -51,6 +50,7 @@ from app.services.fact_deletion import (
 )
 from app.services.financial_ingestion_service import BANK_REVENUE_TICKERS
 from app.services.provenance import Coverage, SourceKind, provenance
+from app.services.source_documents import get_or_create_source_document
 
 SOURCE = "sec_edgar_edgartools"
 PROVIDER = "SEC"
@@ -88,26 +88,14 @@ def _tenant_filter(db: Session, model: Any) -> Any:
 
 
 def _source_document(db: Session, company: Company, ticker: str) -> Document:
-    title = f"SEC XBRL facts (edgartools) - {ticker}"
-    document = db.scalar(
-        select(Document).where(
-            Document.company_id == company.id,
-            Document.source_type == PROVIDER,
-            Document.title == title,
-        )
-    )
-    if document is not None:
-        return document
-    document = Document(
-        company_id=company.id,
-        title=title,
+    return get_or_create_source_document(
+        db,
+        company,
+        title=f"SEC XBRL facts (edgartools) - {ticker}",
         source_type=PROVIDER,
         source_url=f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&ticker={ticker}&type=10-K",
-        metadata_={"provider": PROVIDER, "pipeline": PIPELINE, "normalized": True},
+        metadata={"provider": PROVIDER, "pipeline": PIPELINE, "normalized": True},
     )
-    db.add(document)
-    db.flush()
-    return document
 
 
 def _replace_own_facts(db: Session, company: Company, document: Document) -> None:
