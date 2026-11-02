@@ -115,14 +115,15 @@ def _asks_daily_change(text: str) -> bool:
 
 
 def _daily_change_answer(db: Session, tenant: int) -> ChatResponse:
+    from app.models import Portfolio
+
     english = _english()
-    latest = db.scalar(
-        select(PortfolioDailySnapshot)
-        .where(PortfolioDailySnapshot.tenant_id == tenant)
-        .order_by(PortfolioDailySnapshot.snapshot_date.desc(), PortfolioDailySnapshot.id.desc())
-        .limit(1)
-    )
-    if latest is None:
+    # Cada cartera con su última foto: con varias, antes solo se describía la
+    # de la foto más reciente de cualquiera de ellas, como si fuera toda tu cartera.
+    portfolio_ids = sorted(db.scalars(
+        select(PortfolioDailySnapshot.portfolio_id).where(PortfolioDailySnapshot.tenant_id == tenant).distinct()
+    ).all())
+    if not portfolio_ids:
         text = (
             "There is no daily history of your portfolio yet (a snapshot is saved each day when prices "
             "refresh). Your current value is in Portfolio."
@@ -131,6 +132,31 @@ def _daily_change_answer(db: Session, tenant: int) -> ChatResponse:
             "El valor actual está en Cartera."
         )
         return _response(text, [], "portfolio_daily_change")
+    parts: list[tuple[str, dict]] = []
+    for portfolio_id in portfolio_ids:
+        latest = db.scalar(
+            select(PortfolioDailySnapshot)
+            .where(PortfolioDailySnapshot.tenant_id == tenant, PortfolioDailySnapshot.portfolio_id == portfolio_id)
+            .order_by(PortfolioDailySnapshot.snapshot_date.desc(), PortfolioDailySnapshot.id.desc())
+            .limit(1)
+        )
+        if latest is not None:
+            parts.append(_daily_change_text(db, tenant, latest, english))
+    if len(parts) == 1:
+        text, source = parts[0]
+        return _response(text, [source], "portfolio_daily_change")
+    names = dict(db.execute(
+        select(Portfolio.id, Portfolio.name).where(Portfolio.tenant_id == tenant, Portfolio.id.in_(portfolio_ids))
+    ).all())
+    lines = [f"You have {len(parts)} portfolios with a daily snapshot; each one separately:" if english
+             else f"Tienes {len(parts)} carteras con foto diaria; cada una por separado:"]
+    for (text, source), portfolio_id in zip(parts, portfolio_ids, strict=True):
+        lines.append(f"- «{names.get(portfolio_id) or portfolio_id}»: {text}")
+    return _response("\n".join(lines), [source for _t, source in parts], "portfolio_daily_change")
+
+
+def _daily_change_text(db: Session, tenant: int, latest: PortfolioDailySnapshot, english: bool) -> tuple[str, dict]:
+    """Variación del día de UNA cartera (su última foto frente a la anterior)."""
     previous = db.scalar(
         select(PortfolioDailySnapshot)
         .where(
@@ -146,7 +172,7 @@ def _daily_change_answer(db: Session, tenant: int) -> ChatResponse:
     day = latest.snapshot_date
     is_today = day == local_today()
     when = (_date_en(day) if english else fecha_es(day))
-    sources = [_source("portfolio_snapshot", latest.id, f"Cartera {fecha_es(day)}", "/portfolio")]
+    source = _source("portfolio_snapshot", latest.id, f"Cartera {fecha_es(day)}", "/portfolio")
     ret = latest.daily_return
     if total is None or ret is None or previous is None or not previous.total_value_base:
         if english:
@@ -158,7 +184,7 @@ def _daily_change_answer(db: Session, tenant: int) -> ChatResponse:
             lead = f"Hoy ({when})" if is_today else f"Aún no hay foto de hoy de tu cartera. El último día guardado ({when})"
             text = (f"{lead}: valor {_money(total, currency)}, pero no puedo calcular la variación: no hay un día "
                     "anterior comparable (faltan precios, una aportación en un día sin foto o es el inicio de la serie).")
-        return _response(text, sources, "portfolio_daily_change")
+        return text, source
     fraction = float(ret)
     amount = float(Decimal(ret) * previous.total_value_base)
     prev_when = _date_en(previous.snapshot_date) if english else fecha_es(previous.snapshot_date)
@@ -191,7 +217,7 @@ def _daily_change_answer(db: Session, tenant: int) -> ChatResponse:
     if coverage < 1:
         text += (f" Only {_num_en(coverage * 100, 0)}% of positions had a price." if english
                  else f" Solo el {num_es(coverage * 100, 0)} % de las posiciones tenía precio.")
-    return _response(text, sources, "portfolio_daily_change")
+    return text, source
 
 
 # ------------------------------------------------------ ganado / vendido en el año
