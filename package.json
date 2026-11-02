@@ -2,6 +2,12 @@
     "name": "gerarai",
     "version": "0.5.0",
     "private": true,
+    "imports": {
+        "#i18n-en-compact": {
+            "browser": "./lib/i18n/messages/en-compact.browser.ts",
+            "default": "./lib/i18n/messages/en-compact.ts"
+        }
+    },
     "scripts": {
         "dev": "next dev --turbopack",
         "prebuild": "node scripts/i18n-compact-en.mjs",
