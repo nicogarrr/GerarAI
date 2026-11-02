@@ -506,6 +506,12 @@ def dividend_ticker_without_records(db: Session, question: str) -> str | None:
     return None if has_records is not None else company.ticker
 
 
+_MY_THESES_EN_RE = re.compile(
+    r"(?i)\b(?:my|active|current|open)\s+(?:investment\s+)?theses\b"
+    r"|\b(?:what|which)\s+(?:investment\s+)?theses\s+(?:do\s+i\s+have|have\s+i)\b"
+)
+
+
 def answer_data_question(db: Session, question: str) -> ChatResponse | None:
     """None means this tool does not own the question; never guess user intent."""
     tenant = db.info.get("tenant_id")
@@ -521,6 +527,11 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
         return context_answer
     news = bool(re.search(r"(?i)\bnoticias?\b", question)) and bool(re.search(r"(?i)\bmis\s+(?:empresas|acciones|posiciones)\b|\bmi\s+cartera\b", question))
     theses = bool(re.search(r"(?i)\btesis\b", question)) and bool(re.search(r"(?i)\b(?:tengo|mis|activas|vigentes)\b", question))
+    # «What's the status of my theses?» / «my theses»: antes iban al modelo
+    # general (solo se reconocía «tesis»). Los criterios de invalidación
+    # siguen su ruta propia.
+    english = _english()
+    theses = theses or (english and bool(_MY_THESES_EN_RE.search(question)) and "invalid" not in question.lower())
     comparison = bool(re.search(r"(?i)\bcompara\w*\b", question))
     valuation = bool(re.search(r"(?i)\b(?:precio|PER|cotiza\w*)\b|\ba\s+cu[aá]nto\s+est[aá]n?\b", question)) and not re.search(r"(?i)\b(?:medio|coste|peso|posici[oó]n|tengo|compr[eé]|pagu[eé])\b|\bprecio\s+de\s+compra\b", question)
     plan = bool(re.search(r"(?i)\b(?:mi|el|tu)\s+plan\b|\bplan\s+de\s+(?:inversi[oó]n|aportaci\w+)", question))
@@ -598,12 +609,23 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
                 published.setdefault(company.id, (thesis, company))
         active, drafts, sources = [], [], []
         for thesis, company in published.values():
-            active.append(f"- {company.ticker}: tesis v{thesis.version} (publicada).")
-            sources.append(_source("thesis_version", thesis.id, f"Tesis {company.ticker} v{thesis.version}", _link(company, "thesis")))
+            active.append(f"- {company.ticker}: thesis v{thesis.version} (published)." if english
+                          else f"- {company.ticker}: tesis v{thesis.version} (publicada).")
+            sources.append(_source("thesis_version", thesis.id,
+                                   f"{'Thesis' if english else 'Tesis'} {company.ticker} v{thesis.version}",
+                                   _link(company, "thesis")))
         for thesis, company in latest.values():
             if thesis.status != "published":
-                drafts.append(f"- {company.ticker}: v{thesis.version}, no activa (borrador o pendiente de publicación).")
-                sources.append(_source("thesis_version", thesis.id, f"Última versión {company.ticker} v{thesis.version}", _link(company, "thesis")))
+                drafts.append(f"- {company.ticker}: v{thesis.version}, not active (draft or pending publication)." if english
+                              else f"- {company.ticker}: v{thesis.version}, no activa (borrador o pendiente de publicación).")
+                sources.append(_source("thesis_version", thesis.id,
+                                       f"{'Latest version' if english else 'Última versión'} {company.ticker} v{thesis.version}",
+                                       _link(company, "thesis")))
+        if english:
+            lines = ["Active theses (latest published per company):", *active] if active else ["There are no published theses saved."]
+            if drafts:
+                lines += ["Other latest saved versions (not active):", *drafts]
+            return _response(lines, sources, "portfolio_theses")
         lines = ["Tesis activas (última publicada por empresa):", *active] if active else ["No hay tesis publicadas guardadas."]
         if drafts:
             lines += ["Otras últimas versiones guardadas (no activas):", *drafts]
