@@ -967,29 +967,55 @@ def _asks_history(text: str, question: str) -> bool:
 
 
 def _history_answer(db: Session, tenant: int, text: str) -> ChatResponse:
+    from app.models import Portfolio
+
     english = _english()
-    target, this_period = _history_target(text) or (local_today(), False)
-    when = (lambda day: _date_en(day)) if english else (lambda day: fecha_es(day))
-    base = select(PortfolioDailySnapshot).where(PortfolioDailySnapshot.tenant_id == tenant)
-    latest = db.scalar(base.order_by(PortfolioDailySnapshot.snapshot_date.desc(),
-                                     PortfolioDailySnapshot.id.desc()).limit(1))
-    if latest is None:
+    # Cada cartera con su historia: con varias, antes solo se comparaba la de
+    # la foto más reciente de cualquiera de ellas, como si fuera toda tu cartera.
+    portfolio_ids = sorted(db.scalars(
+        select(PortfolioDailySnapshot.portfolio_id).where(PortfolioDailySnapshot.tenant_id == tenant).distinct()
+    ).all())
+    if not portfolio_ids:
         return _response(
             "There is no daily history of your portfolio yet (a snapshot is saved each day when prices refresh)."
             if english else
             "Aún no hay histórico diario de tu cartera (se guarda una foto cada día al actualizar precios).",
             [], "portfolio_history")
-    same = base.where(PortfolioDailySnapshot.portfolio_id == latest.portfolio_id)
+    parts = [_history_text(db, tenant, portfolio_id, text, english) for portfolio_id in portfolio_ids]
+    if len(parts) == 1:
+        text_out, source = parts[0]
+        return _response(text_out, [source], "portfolio_history")
+    names = dict(db.execute(
+        select(Portfolio.id, Portfolio.name).where(Portfolio.tenant_id == tenant, Portfolio.id.in_(portfolio_ids))
+    ).all())
+    lines = [f"You have {len(parts)} portfolios with daily snapshots; each one separately:" if english
+             else f"Tienes {len(parts)} carteras con fotos diarias; cada una por separado:"]
+    for (text_out, _source_row), portfolio_id in zip(parts, portfolio_ids, strict=True):
+        lines.append(f"- «{names.get(portfolio_id) or portfolio_id}»: " + text_out.replace("\n", " "))
+    return _response("\n".join(lines), [source for _t, source in parts], "portfolio_history")
+
+
+def _history_text(db: Session, tenant: int, portfolio_id: int, text: str, english: bool) -> tuple[str, dict]:
+    """Comparación con el pasado de UNA cartera (sus fotos diarias)."""
+    target, this_period = _history_target(text) or (local_today(), False)
+    when = (lambda day: _date_en(day)) if english else (lambda day: fecha_es(day))
+    same = select(PortfolioDailySnapshot).where(PortfolioDailySnapshot.tenant_id == tenant,
+                                                PortfolioDailySnapshot.portfolio_id == portfolio_id)
+    latest = db.scalar(same.order_by(PortfolioDailySnapshot.snapshot_date.desc(),
+                                     PortfolioDailySnapshot.id.desc()).limit(1))
+    if latest is None:  # no pasa: la cartera sale de sus propias fotos
+        return ("There is no daily history of this portfolio yet." if english
+                else "Aún no hay histórico diario de esta cartera."), _source("portfolio_snapshot", None, "Cartera", "/portfolio")
     past = db.scalar(same.where(PortfolioDailySnapshot.snapshot_date <= target)
                      .order_by(PortfolioDailySnapshot.snapshot_date.desc()).limit(1))
-    sources = [_source("portfolio_snapshot", latest.id, f"Cartera {fecha_es(latest.snapshot_date)}", "/portfolio")]
+    source = _source("portfolio_snapshot", latest.id, f"Cartera {fecha_es(latest.snapshot_date)}", "/portfolio")
     if past is None:
         first = db.scalar(same.order_by(PortfolioDailySnapshot.snapshot_date.asc()).limit(1))
         first_day = when(first.snapshot_date) if first else when(latest.snapshot_date)
         text_out = (f"I have no snapshot of your portfolio on or before {when(target)}: the first one is from {first_day}."
                     if english else
                     f"No tengo foto de tu cartera del {when(target)} ni anterior: la primera es del {first_day}.")
-        return _response(text_out, sources, "portfolio_history")
+        return text_out, source
     if past.id == latest.id or past.snapshot_date >= latest.snapshot_date:
         if this_period:
             text_out = (f"There is no snapshot of your portfolio for this period yet (the latest is from "
@@ -1001,12 +1027,12 @@ def _history_answer(db: Session, tenant: int, text: str) -> ChatResponse:
                         "newer to compare." if english else
                         f"La última foto de tu cartera es del {when(latest.snapshot_date)}; no hay nada más nuevo con "
                         "que comparar.")
-        return _response(text_out, sources, "portfolio_history")
+        return text_out, source
     currency = latest.base_currency
     if latest.total_value_base is None or past.total_value_base is None:
         text_out = ("Portfolio comparison: N/A (a snapshot has an unknown total value)." if english else
                     "Comparación de cartera: N/D (una foto tiene el valor total desconocido).")
-        return _response(text_out, sources, "portfolio_history")
+        return text_out, source
     now_value, then_value = float(latest.total_value_base), float(past.total_value_base)
     flows = db.scalars(same.where(PortfolioDailySnapshot.snapshot_date > past.snapshot_date,
                                   PortfolioDailySnapshot.snapshot_date <= latest.snapshot_date)).all()
@@ -1025,7 +1051,7 @@ def _history_answer(db: Session, tenant: int, text: str) -> ChatResponse:
                      "Aportaciones/retiradas netas: N/D; no se pueden separar los flujos de la rentabilidad.")
         lines.append("Saved daily snapshots, not live prices." if english else
                      "Fotos diarias guardadas, no cotización en directo.")
-        return _response("\n".join(lines), sources, "portfolio_history")
+        return "\n".join(lines), source
     if latest.cumulative_twr is not None and past.cumulative_twr is not None:
         ret = (1 + float(latest.cumulative_twr)) / (1 + float(past.cumulative_twr)) - 1
         label = "TWR"
@@ -1042,7 +1068,7 @@ def _history_answer(db: Session, tenant: int, text: str) -> ChatResponse:
                      else f"Sin aportaciones ni retiradas en ese tiempo{pct}.")
     lines.append("Saved daily snapshots, not live prices." if english
                  else "Fotos diarias guardadas, no cotización en directo.")
-    return _response("\n".join(lines), sources, "portfolio_history")
+    return "\n".join(lines), source
 
 
 _RULES_ASK = re.compile(

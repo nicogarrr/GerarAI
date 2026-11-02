@@ -96,8 +96,9 @@ def test_history_missing_amount_does_not_invent_comparison(monkeypatch, english,
         (latest if missing == "latest" else past).total_value_base = None
     db = Mock()
     db.scalar.side_effect = [latest, past]
-    db.scalars.return_value.all.return_value = [SimpleNamespace(
-        net_external_flow_base=None if missing == "flow" else Decimal("0"))]
+    flows = [SimpleNamespace(net_external_flow_base=None if missing == "flow" else Decimal("0"))]
+    # Primero la única cartera con fotos, luego los flujos entre las dos fotos.
+    db.scalars.side_effect = [Mock(all=Mock(return_value=[1])), Mock(all=Mock(return_value=flows))]
     answer = tools._history_answer(db, 1, "hace un mes").answer
     assert unknown in answer
     assert "0,00 €" not in answer.replace("100,00 €", "").replace("120,00 €", "").replace("+20,00 €", "")
