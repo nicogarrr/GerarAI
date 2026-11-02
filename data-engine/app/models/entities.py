@@ -2928,6 +2928,16 @@ class WorkflowRun(TenantOwnedMixin, Base, TimestampMixin):
             name="uq_workflow_runs_idempotency",
         ),
         Index("ix_workflow_runs_name_status", "workflow_name", "status"),
+        # 0123: tracked_statuses (watchlist/cartera) filtra por tenant + workflow
+        # + ticker dentro del payload JSONB; sin índice de expresión era barrido
+        # de toda la porción del tenant (medido en lab: 40 ms a 178k corridas).
+        # sqlite >= 3.38 entiende ->> igual que PG.
+        Index(
+            "ix_workflow_runs_tracked_ticker",
+            "tenant_id",
+            "workflow_name",
+            text("(input_payload ->> 'ticker')"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
