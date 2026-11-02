@@ -200,6 +200,15 @@ def _sale_question_es(question: str) -> str:
     text = re.sub(r"(?i)\b(?:sell|sold|selling)\b", "vendo", question or "")
     text = re.sub(r"(?i)\bvendo\s+(?:only\s+|just\s+)?(?:my\s+)?half\b", "vendo la mitad", text)
     text = re.sub(r"(?i)\bvendo\s+(?:only|just)\s+", "vendo ", text)
+    # «sell a third / two thirds / a quarter / three quarters (of my …)»: antes la
+    # fracción no se traducía y la simulación vendía TODA la posición.
+    for english, spanish in (
+        (r"(?:a|one)\s+third", "un tercio"), (r"two\s+thirds", "dos tercios"),
+        (r"(?:a|one)\s+quarter", "un cuarto"), (r"three\s+quarters", "tres cuartos"),
+    ):
+        text = re.sub(rf"(?i)\bvendo\s+{english}\b(?:\s+of\s+my\b)?",
+                      lambda m, es=spanish: f"vendo {es}" + (" de mis" if m.group(0).lower().endswith(" my") else ""),
+                      text)
     text = re.sub(r"(?i)\bvendo\s+(?:all\s+(?:of\s+)?)?my\b", "vendo mis", text)
     text = re.sub(r"(?i)\bvendo\s+all\b", "vendo todo", text)
     text = re.sub(r"(?i)\bshares\b", "acciones", text)
