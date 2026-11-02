@@ -870,6 +870,13 @@ _PORTFOLIO_QUERY_RE = re.compile(
     r"qu[eé]\s+posici[oó]n\s+pesa|patrimonio(?:\s+neto)?|"
     r"valor\s+(?:total\s+)?de\s+(?:la|mi)\s+cartera|"
     r"c[oó]mo\s+va\s+(?:la|mi)\s+cartera)\b"
+    # «¿Qué acciones tengo?», «¿en qué empresas estoy invertido?», «what stocks
+    # do I own?»: iban al modelo general aunque es el volcado de posiciones.
+    r"|\bqu[eé]\s+(?:acciones|empresas|valores|compa[nñ][ií]as|t[ií]tulos)\s+(?:tengo|poseo|llevo)\s*(?:[?¿.!]|$|en\s+(?:cartera|mi\s+cartera))"
+    r"|\ben\s+qu[eé]\s+(?:empresas|acciones|valores|compa[nñ][ií]as)\s+(?:estoy\s+invertid[oa]|tengo\s+dinero|invierto)\b"
+    r"|\bqu[eé]\s+tengo\s+en\s+(?:mi\s+)?cartera\b"
+    r"|\b(?:what|which)\s+(?:stocks|shares|companies|positions)\s+do\s+i\s+(?:own|have|hold)\b"
+    r"|\bwhat\s+do\s+i\s+(?:own|hold)\b"
 )
 # Pregunta por la posicion de un ticker concreto ("peso de ASTS",
 # "cuanto tengo en ASTS", "acciones de ASTS que tengo").
