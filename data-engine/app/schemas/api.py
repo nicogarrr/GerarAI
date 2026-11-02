@@ -4,15 +4,20 @@ from typing import Annotated, Any, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
 
+# Caracteres de anchura cero que ``str.strip()`` no quita: un texto hecho solo
+# de ellos se ve vacío en pantalla aunque no lo sea para Python.
+_INVISIBLES = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff\u00ad"))
+
 
 def not_blank(min_length: int = 1) -> AfterValidator:
     """``min_length`` cuenta espacios: «       » pasaba y se guardaba un texto vacío.
 
-    Exige ``min_length`` caracteres que no sean espacios (sin recortar el valor).
+    Exige ``min_length`` caracteres que no sean espacios ni caracteres invisibles
+    de anchura cero (sin recortar el valor).
     """
 
     def check(value: str) -> str:
-        if len(value.strip()) < min_length:
+        if len(value.translate(_INVISIBLES).strip()) < min_length:
             raise ValueError(
                 f"String should have at least {min_length} characters besides spaces"
             )
