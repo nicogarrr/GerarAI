@@ -105,3 +105,21 @@ def test_history_missing_amount_does_not_invent_comparison(monkeypatch, english,
     assert "0.00 €" not in answer.replace("100.00 €", "").replace("120.00 €", "").replace("+20.00 €", "")
     assert "aprox." not in answer and "approx." not in answer
     assert "Sin aportaciones" not in answer and "No deposits" not in answer
+
+
+@pytest.mark.parametrize("english,unknown", [(False, "N/D"), (True, "N/A")])
+@pytest.mark.parametrize("quantity,price", [(None, None), (Decimal(0), Decimal(0)), (Decimal(2), Decimal(3))])
+def test_saved_trades_preserve_unknown_and_explicit_zero(monkeypatch, english, unknown, quantity, price):
+    monkeypatch.setattr(tools, "_english", lambda: english)
+    tx = SimpleNamespace(quantity=quantity, price=price, currency="USD", action="sell", trade_date=date(2026, 11, 1))
+    db = Mock()
+    db.execute.return_value.all.return_value = [(tx, "NFLX", "Main")]
+    db.scalar.return_value = 1
+    answer = tools._trades_answer(db, 1, "mis ultimas ventas").answer
+    assert (unknown in answer) is (quantity is None or price is None)
+    if quantity is None:
+        assert "0 USD" not in answer
+    elif quantity == 0:
+        assert "0 NFLX" in answer and "0 USD" in answer
+    else:
+        assert "2 NFLX" in answer and ("3.00 USD" if english else "3,00 USD") in answer

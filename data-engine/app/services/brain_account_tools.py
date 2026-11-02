@@ -416,7 +416,7 @@ def _sales_answer(db: Session, year: int, only: set[str]) -> ChatResponse:
                 continue
             shown += 1
             qty = _qty(float(sale["quantity"]), english)
-            one = float(sale["quantity"]) == 1
+            one = Decimal(str(sale["quantity"])) == Decimal(1)
             proceeds = sale.get("proceeds_base")
             gain = sale.get("gain_base")
             if english:
@@ -1618,10 +1618,11 @@ def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = Non
         lines = ["Your latest saved buys and sells (most recent first):" if english
                  else "Tus últimas compras y ventas guardadas (la más reciente primero):"]
     for tx, ticker, portfolio_name in rows[:_MAX_TRADES]:
-        qty = _qty(float(tx.quantity or 0), english)
+        qty = _qty(float(tx.quantity), english) if tx.quantity is not None else ("N/A" if english else "N/D")
         # Precio en la divisa guardada de la operación, tal cual (sin .upper(): GBp ≠ GBP).
-        price = (f"{_num_en(float(tx.price or 0))} {tx.currency}" if english
-                 else f"{num_es(float(tx.price or 0))} {tx.currency}")
+        price = ((f"{_num_en(float(tx.price))} {tx.currency}" if english
+                  else f"{num_es(float(tx.price))} {tx.currency}")
+                 if tx.price is not None else ("N/A" if english else "N/D"))
         where = f" ({portfolio_name})" if portfolios > 1 and portfolio_name else ""
         name = ticker or "?"
         if english:
