@@ -14,6 +14,7 @@ from app.services.cnmv_mapping import resolve_issuer
 from app.services.connectors.cnmv_shorts import fetch_positions
 from app.services.connectors.short_interest import fetch_short_interest, fetch_short_volume
 from app.services.data_health_service import utc
+from app.services.number_format import format_number_es
 
 CONNECTOR = "public_shorts"
 
@@ -159,7 +160,7 @@ def emit_shorts_increase(db: Session, company: Company, previous: dict, current:
             after = current.get("public_total_percent")
             if before is not None and after is not None and after > before:
                 message = (f"{company.ticker}: suma de posiciones cortas públicas CNMV "
-                           f"{before:g}% → {after:g}% (fechas de posición {min(observation_dates)} a {max(observation_dates)}). Mismos titulares; solo posiciones públicas >=0,5%, no el total del mercado.")
+                           f"{format_number_es(before, 4)}% → {format_number_es(after, 4)}% (fechas de posición {min(observation_dates)} a {max(observation_dates)}). Mismos titulares; solo posiciones públicas >=0,5%, no el total del mercado.")
                 parts = ["CNMV", *[f"{k}:{v['position_date']}:{v['percent']}" for k, v in sorted(new.items())]]
                 source_url = current.get("source_url")
     interest = current.get("short_interest")
@@ -172,7 +173,7 @@ def emit_shorts_increase(db: Session, company: Company, previous: dict, current:
         before, after = interest.get("previous_short_interest"), interest.get("short_interest")
         if (settled and timedelta(0) <= now.date() - settled <= timedelta(days=35)
                 and before is not None and before > 0 and after is not None and after > before):
-            message = (f"{company.ticker}: posiciones cortas FINRA {before:,} → {after:,} acciones "
+            message = (f"{company.ticker}: posiciones cortas FINRA {format_number_es(before, 0)} → {format_number_es(after, 0)} acciones "
                        f"a {stamp}. No es volumen corto diario ni porcentaje del capital.")
             parts = ["FINRA", str(stamp), str(after), str(before)]
             source_url = interest.get("source_url")
