@@ -13,6 +13,13 @@ from pathlib import PurePosixPath
 from urllib.parse import urlparse
 
 import httpx
+from tenacity import (
+    AsyncRetrying,
+    RetryCallState,
+    retry_if_exception_type,
+    retry_if_result,
+    stop_after_attempt,
+)
 
 from app.core.config import get_settings
 from app.services.connectors import sec_edgar
@@ -263,42 +270,61 @@ class SECClient:
         (con tope). 401/403/404 no se reintentan: un 403 es un bloqueo de IP
         que reintentar solo empeora; lo gestiona el fallback (mirror/EFTS).
         """
-        max_retries = self.max_retries
-        delay = _BACKOFF_BASE_SECONDS
-        for attempt in range(max_retries + 1):
+        # Bucle de reintento con tenacity: mismos intentos (max_retries + 1),
+        # un hueco del reloj compartido antes de cada petición y mismas esperas
+        # que el bucle escrito a mano (Retry-After con tope o backoff que se dobla).
+        async def attempt_once() -> httpx.Response:
             await self._throttle()
-            response: httpx.Response | None = None
-            try:
-                if self.client is not None:
-                    response = await self.client.get(url, headers=self.headers)
-                else:
-                    async with httpx.AsyncClient(
-                        timeout=30,
-                        headers=self.headers,
-                        follow_redirects=True,
-                    ) as client:
-                        response = await client.get(url)
-            except httpx.TransportError as exc:  # incluye timeouts
-                if attempt >= max_retries:
-                    raise
-                logger.warning("SEC red/timeout (%s), reintento %d", type(exc).__name__, attempt + 1)
-                await asyncio.sleep(min(delay, _BACKOFF_CAP_SECONDS))
-                delay *= 2
-                continue
+            if self.client is not None:
+                response = await self.client.get(url, headers=self.headers)
+            else:
+                async with httpx.AsyncClient(
+                    timeout=30,
+                    headers=self.headers,
+                    follow_redirects=True,
+                ) as client:
+                    response = await client.get(url)
             from app.services.connectors.sec_pacing import rate_limited
 
             rate_limited(response)
-            if response.status_code in _RETRYABLE_STATUS and attempt < max_retries:
-                wait = retry_after_seconds(response, cap=_BACKOFF_CAP_SECONDS) or delay
-                logger.warning(
-                    "SEC %s en %s, reintento %d en %.1fs", response.status_code, url, attempt + 1, wait
-                )
-                await asyncio.sleep(min(wait, _BACKOFF_CAP_SECONDS))
-                delay *= 2
-                continue
-            response.raise_for_status()
             return response
-        raise RuntimeError("unreachable")  # pragma: no cover
+
+        def wait_seconds(state: RetryCallState) -> float:
+            attempt = state.attempt_number - 1
+            delay = _BACKOFF_BASE_SECONDS * (2**attempt)
+            outcome = state.outcome
+            assert outcome is not None
+            if outcome.failed:
+                exc = outcome.exception()
+                logger.warning("SEC red/timeout (%s), reintento %d", type(exc).__name__, attempt + 1)
+                return min(delay, _BACKOFF_CAP_SECONDS)
+            response = outcome.result()
+            wait = retry_after_seconds(response, cap=_BACKOFF_CAP_SECONDS) or delay
+            logger.warning(
+                "SEC %s en %s, reintento %d en %.1fs", response.status_code, url, attempt + 1, wait
+            )
+            return min(wait, _BACKOFF_CAP_SECONDS)
+
+        async def sleep(seconds: float) -> None:
+            await asyncio.sleep(seconds)
+
+        def last_outcome(state: RetryCallState) -> httpx.Response:
+            # Sin mas intentos: el error de red se relanza tal cual y la
+            # respuesta 429/5xx sale para raise_for_status de abajo.
+            assert state.outcome is not None
+            return state.outcome.result()
+
+        retrying = AsyncRetrying(
+            stop=stop_after_attempt(self.max_retries + 1),
+            wait=wait_seconds,
+            retry=retry_if_exception_type(httpx.TransportError)  # incluye timeouts
+            | retry_if_result(lambda response: response.status_code in _RETRYABLE_STATUS),
+            sleep=sleep,
+            retry_error_callback=last_outcome,
+        )
+        response = await retrying(attempt_once)
+        response.raise_for_status()
+        return response
 
     async def _get_json(self, url: str) -> dict:
         snapshot = sec_edgar.read_snapshot_for(url)
