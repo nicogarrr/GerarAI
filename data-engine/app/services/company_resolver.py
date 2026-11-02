@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Company
+from app.services.instrument_reference import figi_sibling_tickers, get_by_ticker
 
 
 def _reference_company_candidates(db: Session, normalized: str) -> list[str]:
@@ -30,35 +31,18 @@ def _reference_company_candidates(db: Session, normalized: str) -> list[str]:
     composite) para que un renombre resuelva a la misma Company. Sin fila
     o sin FIGI: lista vacia (el fallback de sufijos sigue exacto igual).
     Degrada a [] si la tabla aun no existe (DB anterior a la migracion).
+
+    Politica "todo o nada": si la expansion por FIGI falla a mitad, no se
+    usa ningun candidato (a diferencia de sibling_tickers, que conserva lo
+    parcial incluyendo el propio ticker; aqui el propio ticker ya fallo el
+    match exacto y no sirve de candidato).
     """
-    try:
-        from app.models.entities import InstrumentReference
-    except Exception:
-        return []
-    try:
-        row = db.scalar(
-            select(InstrumentReference).where(
-                InstrumentReference.ticker_normalized == normalized
-            )
-        )
-    except Exception:
-        return []
+    row = get_by_ticker(db, normalized)
     if row is None:
         return []
     candidates: set[str] = set()
     try:
-        if row.figi:
-            for sib in db.scalars(
-                select(InstrumentReference).where(InstrumentReference.figi == row.figi)
-            ).all():
-                candidates.add(sib.ticker_normalized)
-        if row.composite_figi:
-            for sib in db.scalars(
-                select(InstrumentReference).where(
-                    InstrumentReference.composite_figi == row.composite_figi
-                )
-            ).all():
-                candidates.add(sib.ticker_normalized)
+        candidates.update(figi_sibling_tickers(db, row))
     except Exception:
         return []
     candidates.discard(normalized)

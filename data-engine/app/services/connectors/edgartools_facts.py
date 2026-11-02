@@ -30,7 +30,7 @@ a ``document.metadata_["xbrl_concept_by_metric_period"]`` como la via actual;
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any
 
 from app.services.connectors.edgartools_concepts import (
@@ -45,6 +45,7 @@ from app.services.financial_ingestion_service import (
     SEC_METRIC_MAP,
     is_summed_component,
 )
+from app.services.number_parsing import parse_machine_decimal as _decimal
 
 ANNUAL_FORMS = {"10-K", "10-K/A", "20-F", "20-F/A", "40-F", "40-F/A"}
 QUARTERLY_FORMS = {"10-Q"}
@@ -56,15 +57,6 @@ QUARTERLY_MIN_SPAN = 70
 QUARTERLY_MAX_SPAN = 110
 ANNUAL_CAP = 20
 QUARTERLY_CAP = 12
-
-
-def _decimal(value: Any) -> Decimal | None:
-    if value is None or value == "":
-        return None
-    try:
-        return Decimal(str(value))
-    except (InvalidOperation, ValueError):
-        return None
 
 
 def _normalized_month(end: str) -> str | None:

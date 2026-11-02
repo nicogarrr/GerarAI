@@ -142,6 +142,29 @@ def get_by_figi(db: Session, figi: str) -> list[InstrumentReference]:
         return []
 
 
+def figi_sibling_tickers(db: Session, row: InstrumentReference):
+    """Generador de tickers que comparten figi o composite_figi con ``row``.
+
+    Nucleo compartido de la expansion por identidad FIGI (antes copiada en
+    company_resolver). Es un generador a proposito: si la base falla a mitad,
+    el caller conserva lo ya emitido (politica "parcial" de sibling_tickers)
+    o descarta todo (politica "todo o nada" de company_resolver) sin duplicar
+    las dos consultas.
+    """
+    if row.figi:
+        for sib in db.scalars(
+            select(InstrumentReference).where(InstrumentReference.figi == row.figi)
+        ).all():
+            yield sib.ticker_normalized
+    if row.composite_figi:
+        for sib in db.scalars(
+            select(InstrumentReference).where(
+                InstrumentReference.composite_figi == row.composite_figi
+            )
+        ).all():
+            yield sib.ticker_normalized
+
+
 def sibling_tickers(db: Session, ticker: str) -> list[str]:
     """Tickers candidatos para un pedido via identidad FIGI estable.
 
@@ -150,17 +173,7 @@ def sibling_tickers(db: Session, ticker: str) -> list[str]:
     - Fila con FIGI -> todos los tickers que comparten figi o composite_figi
       (renombre por corporate action: viejo y nuevo apuntan al mismo FIGI).
     """
-    normalized = normalize_ticker(ticker)
-    if not normalized:
-        return []
-    try:
-        row = db.scalar(
-            select(InstrumentReference).where(
-                InstrumentReference.ticker_normalized == normalized
-            )
-        )
-    except Exception:
-        return []
+    row = get_by_ticker(db, ticker)
     if row is None:
         return []
     candidates: set[str] = {row.ticker_normalized}
@@ -168,18 +181,7 @@ def sibling_tickers(db: Session, ticker: str) -> list[str]:
     if not figis:
         return sorted(candidates)
     try:
-        if row.figi:
-            for sib in db.scalars(
-                select(InstrumentReference).where(InstrumentReference.figi == row.figi)
-            ).all():
-                candidates.add(sib.ticker_normalized)
-        if row.composite_figi:
-            for sib in db.scalars(
-                select(InstrumentReference).where(
-                    InstrumentReference.composite_figi == row.composite_figi
-                )
-            ).all():
-                candidates.add(sib.ticker_normalized)
+        candidates.update(figi_sibling_tickers(db, row))
     except Exception:
         return sorted(candidates)
     return sorted(candidates)

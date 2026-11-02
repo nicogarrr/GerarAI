@@ -75,6 +75,23 @@ def _not_a_thousands_group(raw: str, separator: str) -> bool:
     return len(fraction) != 3 or len(integer) > 3
 
 
+def parse_machine_decimal(value: object) -> Decimal | None:
+    """Decimal from a machine-shaped value (JSON/XML numbers from APIs).
+
+    The companion to ``parse_localized_number``: that one reads free text with
+    locale rules; this one reads values that are already numeric (or numeric
+    strings with a machine decimal point) from SEC facts, broker payloads and
+    ingestion rows. ``None`` and empty/invalid input mean "no data" and return
+    ``None`` - never ``0``, which would be a real figure.
+    """
+    if value is None or value == "":
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+
+
 def find_number_tokens(text: object) -> list[str]:
     """Every numeric token in free text, in order of appearance.
 
