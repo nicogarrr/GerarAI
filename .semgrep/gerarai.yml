@@ -88,6 +88,8 @@ rules:
   paths:
     include:
     - /data-engine/app/
+    # edgar_common: moved existing reviewed form4/form13dg transport; callers restrict SEC hosts.
+    # subtel: fixed HTTPS registry and exact official-host/path validation, no redirects, 5MB cap.
     exclude:
     - /data-engine/app/api/routes/companies.py
     - /data-engine/app/core/error_reporting.py
@@ -115,6 +117,7 @@ rules:
     - /data-engine/app/services/connectors/earnings_calendar.py
     - /data-engine/app/services/connectors/ecb.py
     - /data-engine/app/services/connectors/ecb_history.py
+    - /data-engine/app/services/connectors/edgar_common.py
     - /data-engine/app/services/connectors/esef.py
     - /data-engine/app/services/connectors/finnhub.py
     - /data-engine/app/services/connectors/fmp.py
@@ -132,6 +135,7 @@ rules:
     - /data-engine/app/services/connectors/sec_edgar.py
     - /data-engine/app/services/connectors/short_interest.py
     - /data-engine/app/services/connectors/stooq.py
+    - /data-engine/app/services/connectors/subtel.py
     - /data-engine/app/services/connectors/uk_pdmr_tracefour.py
     - /data-engine/app/services/connectors/yahoo.py
     - /data-engine/app/services/corpus_ingestion_service.py
