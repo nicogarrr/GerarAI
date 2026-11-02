@@ -26,6 +26,7 @@ from app.schemas import (
     KPIExtractionAction,
     KPIExtractionCandidateOut,
 )
+from app.schemas.api import not_blank
 from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetExceededError
 from app.services.claim_intelligence_service import ClaimIntelligenceService
@@ -42,11 +43,11 @@ router = APIRouter()
 
 class ManualTranscriptImportRequest(BaseModel):
     ticker: str = Field(min_length=1, max_length=20)
-    title: str = Field(min_length=3, max_length=500)
+    title: Annotated[str, not_blank(3)] = Field(min_length=3, max_length=500)
     # Tope alineado con el presupuesto de 10MB que RawBodyMiddleware da a los
     # cuerpos firmados: el texto se trocea en DocumentChunks y se indexa en
     # RAG, y un cuerpo gigante merece un 422 claro, no un 413 seco.
-    text: str = Field(min_length=20, max_length=10 * 1024 * 1024)
+    text: Annotated[str, not_blank(20)] = Field(min_length=20, max_length=10 * 1024 * 1024)
     # Document.source_url es String(1000) y Transcript.period String(40):
     # sin cota, SQLite los tragaba y el INSERT rompia en Postgres (500, no 422).
     source_url: str | None = Field(default=None, max_length=1000)
@@ -55,9 +56,9 @@ class ManualTranscriptImportRequest(BaseModel):
 
 class UrlIngestRequest(BaseModel):
     ticker: str = Field(min_length=1, max_length=20)
-    title: str = Field(min_length=3, max_length=500)
+    title: Annotated[str, not_blank(3)] = Field(min_length=3, max_length=500)
     url: str = Field(min_length=8, max_length=2000)
-    source_type: str = Field(default="url", min_length=2, max_length=80)
+    source_type: Annotated[str, not_blank(2)] = Field(default="url", min_length=2, max_length=80)
 
 
 @router.post("/documents/index/rebuild")
