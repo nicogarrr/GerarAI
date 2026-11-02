@@ -16,6 +16,7 @@ from app.services.inferred_input_service import InferredInputService, pick_rate_
 from app.valuation.adr_ratios import table_adr_ratio
 from app.valuation.financial_snapshot import FinancialSnapshot, FinancialSnapshotBuilder
 from app.valuation.moat_framework import empty_moat_framework
+from app.valuation.scenario_definitions import ScenarioDefinition
 
 # v2: net_debt is a required DCF input (no longer coerced to zero debt), the
 # FCF-margin clamp no longer flips the sign of a known-negative margin, the
@@ -177,11 +178,13 @@ def insufficient_result(
         "fact_ids": snapshot.fact_ids() if snapshot else {},
         "periods": snapshot.periods() if snapshot else {},
         "snapshot": {
-            "as_of": snapshot.as_of_period if snapshot else None,
-            "income_statement": snapshot.income_statement if snapshot else None,
-            "balance_sheet": snapshot.balance_sheet if snapshot else None,
-            "shares": snapshot.shares_period if snapshot else None,
-            "warnings": snapshot.warnings if snapshot else [],
+            **(snapshot_trace(snapshot) if snapshot else {
+                "as_of": None,
+                "income_statement": None,
+                "balance_sheet": None,
+                "shares": None,
+                "warnings": [],
+            }),
             "excluded_inputs": list(snapshot.excluded_present) if snapshot else [],
         },
     }
@@ -266,6 +269,32 @@ def insufficient_from_context(
         snapshot=context.snapshot,
         extra_trace=extra_trace,
     )
+
+
+def snapshot_trace(snapshot: FinancialSnapshot) -> dict:
+    """Corte del snapshot usado en la valoracion, para la traza del resultado.
+
+    Los cinco motores incluian este sub-dict a mano en su traza; una sola
+    fuente para que el formato del corte no derive entre motores.
+    """
+    return {
+        "as_of": snapshot.as_of_period,
+        "income_statement": snapshot.income_statement,
+        "balance_sheet": snapshot.balance_sheet,
+        "shares": snapshot.shares_period,
+        "warnings": snapshot.warnings,
+    }
+
+
+def scenario_definition_trace(scenario: ScenarioDefinition) -> dict:
+    """La definicion de un escenario tal como viaja en la traza (comun a los DCF)."""
+    return {
+        "name": scenario.name,
+        "probability": scenario.probability,
+        "drivers": scenario.drivers,
+        "description": scenario.description,
+        "assumptions": scenario.assumptions,
+    }
 
 
 class ValuationEngine(ABC):

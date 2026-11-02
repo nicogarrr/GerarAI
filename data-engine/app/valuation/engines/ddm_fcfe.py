@@ -93,6 +93,7 @@ from app.valuation.engines.base import (
     default_wacc,
     is_adr_without_ratio,
     margin_of_safety,
+    snapshot_trace,
 )
 from app.valuation.engines.base import (
     insufficient_from_context as _insufficient,
@@ -455,13 +456,7 @@ class _EquityMethodEngine(ValuationEngine):
                 "evidence_confidence": mean_confidence(used.values()),
                 "evidence_confidence_inputs": sorted(used_metrics & set(rows)),
                 "publication_blockers": publication_blockers,
-                "snapshot": {
-                    "as_of": snapshot.as_of_period,
-                    "income_statement": snapshot.income_statement,
-                    "balance_sheet": snapshot.balance_sheet,
-                    "shares": snapshot.shares_period,
-                    "warnings": snapshot.warnings,
-                },
+                "snapshot": snapshot_trace(snapshot),
                 "scenarios": scenario_traces,
                 "weighted": weighted["trace"],
                 "reverse_ddm": reverse.get("trace") if reverse else None,

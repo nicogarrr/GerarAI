@@ -27,6 +27,8 @@ from app.valuation.engines.base import (
     is_adr_without_ratio,
     margin_of_safety,
     resolve_rates,
+    scenario_definition_trace,
+    snapshot_trace,
 )
 from app.valuation.moat_framework import empty_moat_framework
 from app.valuation.reverse_dcf import ReverseDCFInputs, solve_required_growth
@@ -301,13 +303,7 @@ class StandardDCFEngine(ValuationEngine):
                 )
             )
             scenario_results[scenario.name] = {
-                "definition": {
-                    "name": scenario.name,
-                    "probability": scenario.probability,
-                    "drivers": scenario.drivers,
-                    "description": scenario.description,
-                    "assumptions": scenario.assumptions,
-                },
+                "definition": scenario_definition_trace(scenario),
                 "value_per_share": result.value_per_share,
                 "trace": result.trace,
             }
@@ -481,13 +477,7 @@ class StandardDCFEngine(ValuationEngine):
                 "evidence_confidence_inputs": sorted(MODEL_INPUT_METRICS & set(snapshot.facts)),
                 "fact_ids": snapshot.fact_ids(),
                 "periods": snapshot.periods(),
-                "snapshot": {
-                    "as_of": snapshot.as_of_period,
-                    "income_statement": snapshot.income_statement,
-                    "balance_sheet": snapshot.balance_sheet,
-                    "shares": snapshot.shares_period,
-                    "warnings": snapshot.warnings,
-                },
+                "snapshot": snapshot_trace(snapshot),
                 "scenarios": scenario_results,
                 "weighted": weighted["trace"],
                 "reverse_dcf": reverse.get("trace") if reverse else None,
