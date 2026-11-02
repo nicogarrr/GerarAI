@@ -375,6 +375,61 @@ def _asks_about_selected_review(question: str, ticker: str) -> bool:
     return bool(terms) and not (terms - context_words)
 
 
+def _dca_response(db: Session, company: Company, tenant_id: int, mode: str, review) -> dict:
+    """Read stored DCA or calculate from persisted closes only. No writes/network/LLM."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from app.services.brain_context_tools import _dca_stale_age, dca_answer
+    from app.services.dca_level_reader import read_dca_levels
+    from app.services.dca_signal_engine import current_verdict
+    from app.services.dca_signal_service import _db_history, build_bars, settled_rows
+
+    today = datetime.now(ZoneInfo("America/New_York")).date()
+    readings = read_dca_levels(db, tenant_id, [company.ticker])
+    reading = (readings or {}).get(company.ticker.upper())
+    missing = []
+    if reading is not None:
+        text = dca_answer(db, tenant_id, company, today=today).answer
+        stamp = reading.signal_date
+        if _dca_stale_age(stamp, today) is not None:
+            missing.append("El último nivel guardado está desactualizado; no confirma el nivel de hoy.")
+    else:
+        history = _db_history(db, company)
+        rows = settled_rows(history.rows, datetime.now(ZoneInfo("America/New_York")))
+        if rows and not any(row.adj_close for row in rows):
+            response = _empty(mode, f"{company.ticker}: sin nivel DCA guardado; la serie local no tiene cierres ajustados y no permite descartar splits. No doy un nivel sin verificarlo.")
+            response["review_id"] = review.id if review else None
+            return response
+        bars, _factor = build_bars(rows)
+        verdict = current_verdict(bars, today=today) if bars else None
+        if verdict is None:
+            response = _empty(mode, f"{company.ticker}: sin nivel DCA guardado y cierres locales insuficientes para calcularlo.")
+            response["review_id"] = review.id if review else None
+            return response
+        stamp = verdict.signal_date
+        currency = history.currency or company.currency or "divisa no declarada"
+        close = max(rows, key=lambda row: row.day).close
+        state = "mes en formación, provisional" if verdict.status == "forming" else "mes cerrado"
+        text = (f"{company.ticker}: {verdict.zone['label']} ({verdict.zone['zone']}). "
+                f"Cierre usado {close:.2f} {currency} del {stamp.isoformat()}; {state}. "
+                f"Calculado en solo lectura con {len(bars)} cierres locales desde {min(b.day for b in bars).isoformat()}; "
+                "no es una señal guardada ni una orden de compra.")
+        missing.append("Sin nivel DCA guardado: cálculo limitado al histórico local disponible, sin descargar ni guardar datos.")
+        if _dca_stale_age(stamp, today) is not None:
+            missing.append("Cierres desactualizados: este cálculo no confirma el nivel de hoy.")
+    citation_id = f"market_observation:dca:{company.ticker}"
+    if missing:
+        text += "\n" + "\n".join(missing)
+    return {"mode": mode, "status": "answered", "answer": text,
+            "sections": [{"key": "calculations", "body": text, "citation_ids": [citation_id]}],
+            "citations": [{"id": citation_id, "kind": "market_observation",
+                           "source": f"Fórmula DCA · {company.ticker} · datos locales",
+                           "url": None, "as_of": stamp.isoformat() if stamp else None, "excerpt": text}],
+            "missing_data": missing, "suggested_next_steps": [],
+            "review_id": review.id if review else None, "writeback": False}
+
+
 def answer(db: Session, payload) -> dict:
     tenant_id = _tenant(db)
     if not payload.ticker:
@@ -389,6 +444,10 @@ def answer(db: Session, payload) -> dict:
             return response
         company = target
     review = _review(db, payload.review_id, company.id, tenant_id)
+    from app.services.brain_context_tools import _DCA_RE, _ORDER_RE
+
+    if _DCA_RE.search(payload.question) and not _ORDER_RE.search(_DCA_RE.sub(" ", payload.question)):
+        return _dca_response(db, company, tenant_id, payload.mode, review)
     anchored = review is not None and _asks_about_selected_review(payload.question, company.ticker)
     citations = (_linked_review_news(db, review, company, tenant_id) if anchored
                  else _evidence(db, company, tenant_id, payload.question))

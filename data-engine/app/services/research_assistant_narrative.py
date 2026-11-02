@@ -56,6 +56,10 @@ def _prompt_payload(payload, citations: list[dict]) -> dict:
 async def synthesize(db, payload, baseline: dict, *, provider=None) -> dict:
     if baseline["status"] != "answered" or not baseline["citations"]:
         return baseline
+    # Structured local calculations already contain their answer. Never spend
+    # or rewrite a DCA reading as a generic research quotation.
+    if not any(c["kind"] in {"document_chunk", "financial_fact"} for c in baseline["citations"]):
+        return baseline
     provider = provider or create_chat_llm_provider()
     if provider.name == "disabled":
         return baseline
