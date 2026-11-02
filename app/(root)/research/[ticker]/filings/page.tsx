@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest } from '@/lib/research/client';
+import { filingsYoyText } from '@/lib/research/filings-yoy-text';
 import { metricLabel } from '@/lib/research/metric-labels';
 import { formatDate, type Formatters } from '@/lib/format';
 import { getFormat, getLocale, getT } from '@/lib/i18n/server';
@@ -64,7 +65,7 @@ export default async function FilingsYoyPage({ params, searchParams }: {
         className={`inline-flex min-h-11 min-w-11 items-center justify-center ${f === form ? 'font-semibold text-teal-200' : 'text-gray-400 hover:text-teal-300'}`} href={href(f, 1)}>{f}</Link>)}
     </nav>
     {!data ? <p role="status" className="text-amber-300">{t('research.filingsYoy.loadError')}</p>
-      : data.status !== 'ready' || !data.current || !data.previous ? <p role="status" className="text-gray-400">{data.reason ?? t('research.filingsYoy.noData')}</p>
+      : data.status !== 'ready' || !data.current || !data.previous ? <p role="status" className="text-gray-400">{filingsYoyText(data.reason, locale) ?? t('research.filingsYoy.noData')}</p>
       : <>
         <p className="text-sm text-gray-400">
           {t('research.filingsYoy.periodLine', { form, current: data.current.reported_period ? formatDate(data.current.reported_period, undefined, undefined, locale) : fmt.na, previous: data.previous.reported_period ? formatDate(data.previous.reported_period, undefined, undefined, locale) : fmt.na })}
@@ -75,8 +76,8 @@ export default async function FilingsYoyPage({ params, searchParams }: {
             <thead className="text-left text-xs text-gray-500"><tr><th className="py-1 pr-3">{t('research.filingsYoy.colMetric')}</th><th className="pr-3">{t('research.filingsYoy.colCurrent')}</th><th className="pr-3">{t('research.filingsYoy.colPrevious')}</th><th>{t('research.filingsYoy.colChange')}</th></tr></thead>
             <tbody>{data.figures.map((fig) => <tr className="border-t border-gray-800" key={`${fig.metric}-${fig.unit}`}>
               <td className="py-1.5 pr-3">{metricLabel(fig.metric, locale)}{fig.outflow ? <span className="block text-xs text-gray-500">{t('research.filingsYoy.outflowNote')}</span> : null}</td>
-              <td className="pr-3">{fig.current ? <>{money(fig.current.value, fig.unit, fig.metric, fmt, t, fig.outflow)} {sourceLink(fig.current.source.url)}</> : 'N/D'}</td>
-              <td className="pr-3">{fig.previous ? <>{money(fig.previous.value, fig.unit, fig.metric, fmt, t, fig.outflow)} {sourceLink(fig.previous.source.url)}</> : 'N/D'}</td>
+              <td className="pr-3">{fig.current ? <>{money(fig.current.value, fig.unit, fig.metric, fmt, t, fig.outflow)} {sourceLink(fig.current.source.url)}</> : fmt.na}</td>
+              <td className="pr-3">{fig.previous ? <>{money(fig.previous.value, fig.unit, fig.metric, fmt, t, fig.outflow)} {sourceLink(fig.previous.source.url)}</> : fmt.na}</td>
               <td className={fig.highlight ? 'font-semibold text-amber-300' : 'text-gray-300'}>
                 {fig.change_pct == null ? fmt.na : `${Number(fig.change_pct) > 0 ? '+' : ''}${fmt.formatNumber(Number(fig.change_pct), { maximumFractionDigits: 1 })}${locale === 'en' ? '%' : ' %'}`}
                 {' '}<span className="text-xs text-gray-500">{fig.change_pct == null ? fmt.na : t('research.filingsYoy.calculated')}</span>
@@ -85,10 +86,10 @@ export default async function FilingsYoyPage({ params, searchParams }: {
         </Panel>
         <Panel title={t('research.filingsYoy.textChanges')}>
           {data.text ? <>
-            <p className="my-2 text-xs text-gray-500">{data.text.label}</p>
+            <p className="my-2 text-xs text-gray-500">{filingsYoyText(data.text.label, locale)}</p>
             <div className="space-y-4">{data.text.sections.map((section) => <section key={section.section}>
-              <h3 className="font-medium text-gray-200">{section.label}</h3>
-              {section.status !== 'changed' ? <p className="text-sm text-gray-400">{section.status === 'unchanged' ? t('research.filingsYoy.unchangedText') : section.reason ?? t('research.filingsYoy.noSectionData')}</p>
+              <h3 className="font-medium text-gray-200">{filingsYoyText(section.label, locale)}</h3>
+              {section.status !== 'changed' ? <p className="text-sm text-gray-400">{section.status === 'unchanged' ? t('research.filingsYoy.unchangedText') : filingsYoyText(section.reason, locale) ?? t('research.filingsYoy.noSectionData')}</p>
                 : <details className="mt-1" open={section.changes.length <= 3}><summary className="cursor-pointer text-sm text-gray-400">{t('research.filingsYoy.changesCount', { count: section.change_count ?? section.changes.length })}{section.truncated ? t('research.filingsYoy.truncated') : ''}</summary>
                   <ul className="mt-2 space-y-3">{section.changes.map((change, i) => <li className="rounded border border-gray-800 p-3 text-sm" key={i}>
                     <Badge variant="outline">{t(KIND[change.kind])}</Badge>
@@ -96,7 +97,7 @@ export default async function FilingsYoyPage({ params, searchParams }: {
                     {change.after.length ? <p className="mt-1 text-gray-200">{t('research.filingsYoy.after', { text: change.after.map((e) => e.text).join(' ') })}</p> : null}
                   </li>)}</ul></details>}
             </section>)}</div></>
-            : <p className="text-gray-400">{data.text_reason ?? t('research.filingsYoy.noTextAnalysis')}</p>}
+            : <p className="text-gray-400">{filingsYoyText(data.text_reason, locale) ?? t('research.filingsYoy.noTextAnalysis')}</p>}
         </Panel>
         <nav aria-label={t('research.filingsYoy.pagesAria')} className="flex items-center gap-4 text-sm">
           {page > 1 && <Link className="inline-flex min-h-11 min-w-11 items-center text-teal-300" href={href(form, page - 1)}>{t('research.filingsYoy.newer')}</Link>}
