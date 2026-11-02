@@ -17,6 +17,7 @@ from urllib.parse import quote
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models import (
     AlertRule,
     Company,
@@ -153,7 +154,7 @@ def alerts_answer(
                     if condition.get("value") is not None else rule.name)
             line = f"- {comp.ticker}: {text}"
             if rule.last_triggered_at is not None:
-                fired = rule.last_triggered_at.date()
+                fired = local_today(rule.last_triggered_at)
                 line += (f" (last triggered {_date_en(fired)})" if english
                          else f" (saltó por última vez el {fecha_es(fired)})")
                 sources.append(_source("alert_rule", rule.id, f"{'Rule' if english else 'Regla'}: {rule.name}",

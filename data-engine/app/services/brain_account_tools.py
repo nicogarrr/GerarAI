@@ -1143,7 +1143,7 @@ def _alert_rules_answer(db: Session, tenant: int) -> ChatResponse:
     for rule, ticker, currency in rows[:20]:
         line = f"- {ticker or '?'}: {_rule_text(rule.rule_type or '', rule.condition or {}, currency, english, rule.target)}"
         if rule.last_triggered_at is not None:
-            fired = rule.last_triggered_at.date()
+            fired = local_today(rule.last_triggered_at)
             line += (f" (last triggered {_date_en(fired)})" if english
                      else f" (saltó por última vez el {fecha_es(fired)})")
         lines.append(line)
@@ -1192,13 +1192,13 @@ def _saved_screens_answer(db: Session, tenant: int) -> ChatResponse:
             crit = f"{n} criteri{'a' if n != 1 else 'on'}"
             match = (f"{len(tickers)} compan{'ies' if len(tickers) != 1 else 'y'} match now ({', '.join(tickers[:8])}"
                      f"{', …' if len(tickers) > 8 else ''})" if tickers else "no company matches now")
-            ran = f"; last run {_date_en(screen.last_run_at.date())}" if screen.last_run_at else ""
+            ran = f"; last run {_date_en(local_today(screen.last_run_at))}" if screen.last_run_at else ""
         else:
             crit = f"{n} criterio{'s' if n != 1 else ''}"
             match = (f"la cumple{'n' if len(tickers) != 1 else ''} ahora {len(tickers)} empresa"
                      f"{'s' if len(tickers) != 1 else ''} ({', '.join(tickers[:8])}{', …' if len(tickers) > 8 else ''})"
                      if tickers else "ninguna empresa la cumple ahora")
-            ran = f"; última ejecución el {fecha_es(screen.last_run_at.date())}" if screen.last_run_at else ""
+            ran = f"; última ejecución el {fecha_es(local_today(screen.last_run_at))}" if screen.last_run_at else ""
         lines.append(f"- «{screen.name}»: {crit}; {match}{ran}.")
     if count > 15:
         lines.append(f"And {count - 15} more in Screeners." if english else f"Y {count - 15} más en Screeners.")
