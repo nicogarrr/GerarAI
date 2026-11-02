@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
+from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from operator import mul
+from operator import itemgetter, mul
 from statistics import fmean, mean, pstdev
 from types import SimpleNamespace
 from typing import Any
@@ -312,27 +313,44 @@ class PortfolioIntelligenceService:
             if position.id in base_values
         }
         price_series: dict[int, list[Any]] = {company.id: [] for _, company in rows}
+        held_ids = [company.id for _, company in rows]
+        # Cierres leidos UNA vez por peticion: la reconstruccion diaria pide
+        # sus cierres (empresas con operaciones desde la primera operacion)
+        # y se leen de una vez junto con los de la ventana de las series;
+        # antes eran dos consultas de ~390.000 filas casi iguales.
+        shared: dict[str, Any] = {}
+
+        def _closes(company_ids: list[int], since: date) -> Iterable[tuple[Any, ...]] | None:
+            if not rows:
+                return None
+            wanted = set(company_ids)
+            union = wanted | set(held_ids)
+            lower = min(cutoff, since)
+            shared["rows"] = self._closes_rows(db, union, lower)
+            shared["window"] = [union, lower]
+            # Columnas (company_id, date, close, quote_currency) de cada fila;
+            # se filtra solo si la lectura comun abarca mas de lo pedido.
+            columns = itemgetter(0, 1, 2, 5)
+            if wanted == union and since == lower:
+                return map(columns, shared["rows"])
+            return [columns(row) for row in shared["rows"] if row[0] in wanted and row[1] >= since]
+
+        reconstruction = PortfolioReconstructionService().build(db, start=cutoff, rows=rows, closes=_closes)
         if rows:
             # Lote: 1 query para todas las series (anti N+1 por posición).
             # Solo las columnas que se usan (filas ligeras con .date, .close,
             # .adj_close y .source): ~25.000 entidades ORM completas costaban
             # mas que todo el calculo.
-            all_prices = list(
-                db.execute(
-                    select(
-                        MarketPrice.company_id,
-                        MarketPrice.date,
-                        MarketPrice.close,
-                        MarketPrice.adj_close,
-                        MarketPrice.source,
-                    )
-                    .where(
-                        MarketPrice.company_id.in_([company.id for _, company in rows]),
-                        MarketPrice.date >= cutoff,
-                    )
-                    .order_by(MarketPrice.company_id, MarketPrice.date)
-                ).all()
-            )
+            if "rows" in shared:
+                union, lower = shared["window"]
+                held = set(held_ids)
+                all_prices = (
+                    shared["rows"]
+                    if union == held and lower == cutoff
+                    else [row for row in shared["rows"] if row[0] in held and row[1] >= cutoff]
+                )
+            else:
+                all_prices = self._closes_rows(db, held_ids, cutoff)
             for price in all_prices:
                 price_series.setdefault(price.company_id, []).append(price)
             price_series = {
@@ -350,7 +368,6 @@ class PortfolioIntelligenceService:
             if snapshot.daily_return is not None
         }
         snapshot_exact = self._snapshot_history_is_exact(snapshots)
-        reconstruction = PortfolioReconstructionService().build(db, start=cutoff, rows=rows)
         use_reconstruction = not snapshot_exact and reconstruction.usable
         if snapshot_exact:
             portfolio_returns = snapshot_returns
@@ -546,6 +563,24 @@ class PortfolioIntelligenceService:
                 ),
             },
         }
+
+    @staticmethod
+    def _closes_rows(db: Session, company_ids: Iterable[int], since: date) -> list[Any]:
+        """Cierres de esas empresas desde ``since``, ordenados (empresa, fecha)."""
+        return list(
+            db.execute(
+                select(
+                    MarketPrice.company_id,
+                    MarketPrice.date,
+                    MarketPrice.close,
+                    MarketPrice.adj_close,
+                    MarketPrice.source,
+                    MarketPrice.quote_currency,
+                )
+                .where(MarketPrice.company_id.in_(sorted(company_ids)), MarketPrice.date >= since)
+                .order_by(MarketPrice.company_id, MarketPrice.date)
+            ).all()
+        )
 
     @staticmethod
     def _partial_trading_day(

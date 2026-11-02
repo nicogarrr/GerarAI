@@ -23,6 +23,7 @@ Alcance declarado (se devuelve en `scope` y `method`):
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
@@ -39,6 +40,9 @@ from app.services.price_units import price_unit_factor
 
 METHOD = "ledger_reconstruction"
 SCOPE = "positions_only_no_cash_no_dividends"
+
+# closes(company_ids, desde) -> filas (company_id, date, close, quote_currency) o None.
+ClosesProvider = Callable[[list[int], date], Iterable[tuple[Any, ...]] | None]
 
 
 @dataclass
@@ -78,7 +82,13 @@ class PortfolioReconstructionService:
         *,
         start: date | None = None,
         rows: list[tuple[Position, Company]] | None = None,
+        closes: ClosesProvider | None = None,
     ) -> Reconstruction:
+        """``closes``: opcional, ``closes(company_ids, desde)`` devuelve las
+        filas (company_id, date, close, quote_currency) de esas empresas desde
+        esa fecha (las mismas que la consulta de abajo, en cualquier orden) o
+        None para que se lean aqui. Lo usa /portfolio/intelligence para leer
+        los cierres una sola vez por peticion."""
         fx = PortfolioFXService()
         base = fx.base_currency(db)
         transactions = [
@@ -150,16 +160,17 @@ class PortfolioReconstructionService:
         # La unidad depende de (empresa, unidad del cierre), no del valor: se
         # resuelve una vez por par y no por cada uno de los miles de cierres.
         unit_factors: dict[tuple[int, str | None], tuple[Decimal, Decimal] | None] = {}
-        for price_company_id, price_date, close, quote_currency in db.execute(
-            select(
-                MarketPrice.company_id,
-                MarketPrice.date,
-                MarketPrice.close,
-                MarketPrice.quote_currency,
-            ).where(
-                MarketPrice.company_id.in_(company_ids), MarketPrice.date >= warmup
+        price_rows = closes(company_ids, warmup) if closes is not None else None
+        if price_rows is None:
+            price_rows = db.execute(
+                select(
+                    MarketPrice.company_id,
+                    MarketPrice.date,
+                    MarketPrice.close,
+                    MarketPrice.quote_currency,
+                ).where(MarketPrice.company_id.in_(company_ids), MarketPrice.date >= warmup)
             )
-        ):
+        for price_company_id, price_date, close, quote_currency in price_rows:
             if close and close > 0:
                 company = companies_by_id.get(price_company_id)
                 if company is None:
