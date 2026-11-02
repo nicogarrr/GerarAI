@@ -121,10 +121,10 @@ def _phrase_priority(question: str, terms: list[str]):
     folded = _fold(question)
     phrases = [t for t in terms if " " in t]
     phrases += [es for es, _ in _ES_EN_GLOSSARY if " " in es and es in folded]
-    phrases = [p.replace("%", "").replace("_", "") for p in dict.fromkeys(phrases)]
+    phrases = list(dict.fromkeys(phrases))
     if not phrases:
         return KnowledgeChunk.id * 0
-    return case((or_(*[KnowledgeChunk.content.ilike(f"%{p}%") for p in phrases]), 0), else_=1)
+    return case((or_(*[KnowledgeChunk.content.icontains(p, autoescape=True) for p in phrases]), 0), else_=1)
 
 
 def retrieve(db: Session, question: str, *, scope: str, author: str | None = None,
@@ -161,7 +161,7 @@ def retrieve(db: Session, question: str, *, scope: str, author: str | None = Non
     lexical = []
     if terms:
         lexical = list(db.execute(statement.where(or_(
-            *[KnowledgeChunk.content.ilike(f"%{term.replace('%', '').replace('_', '')}%") for term in terms]
+            *[KnowledgeChunk.content.icontains(term, autoescape=True) for term in terms]
         )).order_by(_phrase_priority(question, terms), KnowledgeChunk.id).limit(120)).all())
         covered = sorted(
             (
