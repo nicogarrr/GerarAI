@@ -15,6 +15,7 @@ import {
     fiscalYearNote,
     formatPositionQuantity,
 } from '@/lib/portfolio-dividends-display';
+import { dividendProjectionText } from '@/lib/portfolio-dividends-text';
 
 /** Lista de tickers enlazados a su ficha: cada cifra de la proyección pertenece
  *  a una posición concreta, así que el ticker lleva a su pantalla. */
@@ -61,10 +62,10 @@ function WithholdingNote({ position, ti = esT, f = esF }: { position: DividendPo
                 <span className="block text-xs text-gray-500">{ti('portfolio.dividends.withholdingCapNote')}</span>
             ) : null}
             {position.source_withholding_rate !== null && position.scenario_conditions ? (
-                <span className="block max-w-xs text-xs text-amber-300/80 max-md:max-w-none">{position.scenario_conditions}</span>
+                <span className="block max-w-xs text-xs text-amber-300/80 max-md:max-w-none">{dividendProjectionText(position.scenario_conditions, f.locale)}</span>
             ) : null}
             {position.source_withholding_rate === null && position.unverified_reason ? (
-                <span className="block max-w-xs text-xs text-amber-300/80 max-md:max-w-none">{position.unverified_reason}</span>
+                <span className="block max-w-xs text-xs text-amber-300/80 max-md:max-w-none">{dividendProjectionText(position.unverified_reason, f.locale)}</span>
             ) : null}
         </>
     );
@@ -73,7 +74,7 @@ function WithholdingNote({ position, ti = esT, f = esF }: { position: DividendPo
 function FiscalYearCard({ year, data, baseCurrency, ti = esT, f = esF }: { year: string; data: PortfolioDividendProjection['fiscal_by_year'][string]; baseCurrency: string; ti?: TFunction; f?: Formatters }) {
     const money = (value: number | null) => f.formatMoney(value, baseCurrency);
     const rows = fiscalCardRows(data, f.locale === 'en' ? 'en' : 'es');
-    const note = fiscalYearNote(data);
+    const note = dividendProjectionText(fiscalYearNote(data), f.locale);
     return (
         <div className="rounded-lg border border-gray-800 p-4">
             <p className="text-xs uppercase tracking-wide text-gray-500">{ti('portfolio.dividends.fiscalScenario', { year })}</p>
@@ -112,7 +113,7 @@ function DeclaredFuturePanel({ items, ti = esT, f = esF }: { items: PortfolioDiv
     // la nota siempre llega a la pantalla (declaredFutureNoteView).
     const view = declaredFutureNoteView(items);
     const description = [
-        view.sharedNote,
+        dividendProjectionText(view.sharedNote, f.locale),
         view.sharedAsOf !== null ? ti('portfolio.dividends.declaredAsOf', { date: f.formatDate(view.sharedAsOf) }) : null,
     ]
         .filter((part): part is string => part !== null)
@@ -131,10 +132,10 @@ function DeclaredFuturePanel({ items, ti = esT, f = esF }: { items: PortfolioDiv
                         {ti('portfolio.dividends.declaredItemLine', { exDate: f.formatDate(item.ex_date), payDate: item.pay_date ? f.formatDate(item.pay_date) : ti('common.na') })}
                         {ti('portfolio.dividends.perShare', { price: f.formatPrice(item.amount_per_share, item.currency) })}
                         <span className="ml-2 rounded border border-gray-700 px-1.5 py-0.5 text-xs text-gray-400">
-                            {item.label} · {item.source}
+                            {dividendProjectionText(item.label, f.locale)} · {item.source}
                         </span>
                         {view.perItemNotes[index] !== null ? (
-                            <span className="block text-xs text-gray-500">{view.perItemNotes[index]}</span>
+                            <span className="block text-xs text-gray-500">{dividendProjectionText(view.perItemNotes[index], f.locale)}</span>
                         ) : null}
                     </li>
                 ))}
@@ -381,7 +382,7 @@ export default function PortfolioDividends({ projection, userId, ti = esT, f = e
                                     <ul className="ml-4 mt-1 list-disc space-y-0.5 text-xs text-amber-100/70">
                                         {entry.tickers.map((ticker) => (
                                             <li key={ticker}>
-                                                {ticker}: {projection.coverage.unverified_reasons?.[ticker] ?? ti('portfolio.dividends.reasonFallback')}
+                                                {ticker}: {dividendProjectionText(projection.coverage.unverified_reasons?.[ticker], f.locale) ?? ti('portfolio.dividends.reasonFallback')}
                                             </li>
                                         ))}
                                     </ul>
@@ -396,7 +397,7 @@ export default function PortfolioDividends({ projection, userId, ti = esT, f = e
                 <summary className="cursor-pointer select-none text-gray-400">{ti('portfolio.dividends.assumptions')}</summary>
                 <ul className="mt-2 list-disc space-y-1 pl-5 leading-5">
                     {projection.fiscal_conditions.map((condition) => (
-                        <li key={condition}>{condition}</li>
+                        <li key={condition}>{dividendProjectionText(condition, f.locale)}</li>
                     ))}
                 </ul>
                 {Object.keys(projection.sources).length > 0 ? (
