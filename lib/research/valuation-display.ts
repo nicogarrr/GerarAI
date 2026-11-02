@@ -4,6 +4,8 @@
  * campo ausente degrada a null (la vista omite la línea), nunca se inventa.
  */
 import { formatPercent } from '@/lib/format';
+import type { Locale } from '@/lib/i18n/locale';
+import { createTranslator } from '@/lib/i18n/translate';
 
 /** Motivos de no publicación en español claro. «traceable_wacc» como blocker
  *  significa que FALTA (el token suelto se leía como «WACC con fuente
@@ -25,15 +27,15 @@ export function blockerLabel(id: string, locale: 'es' | 'en' = 'es'): string {
 }
 
 /** Procedencia del WACC usado por el motor (resolve_rates del backend). */
-const WACC_SOURCE_LABELS: Record<string, string> = {
-  calculated_metric: 'calculado con insumos trazables',
-  inferred_input: 'inferido, con fuentes',
-  tag_default: 'tipo por defecto del modelo, sin fuente trazable',
-};
-
-export function waccSourceLabel(source: string | null | undefined): string | null {
+export function waccSourceLabel(source: string | null | undefined, locale: Locale = 'es'): string | null {
   if (!source) return null;
-  return WACC_SOURCE_LABELS[source] ?? source;
+  const t = createTranslator(locale);
+  switch (source) {
+    case 'calculated_metric': return t('research.valuationText.waccSource.calculated_metric');
+    case 'inferred_input': return t('research.valuationText.waccSource.inferred_input');
+    case 'tag_default': return t('research.valuationText.waccSource.tag_default');
+    default: return source;
+  }
 }
 
 type ReverseDcfLike = {
@@ -46,27 +48,24 @@ type ReverseDcfLike = {
 
 // Dos decimales: un margen FCF del 1,07 % no se puede redondear a «1,1 %»
 // (el contexto de la cifra es justamente ese segundo decimal).
-const pct = (value: number | null | undefined) =>
-  value == null || !Number.isFinite(value) ? null : formatPercent(value, { digits: 2 });
+const pct = (value: number | null | undefined, locale: Locale = 'es') =>
+  value == null || !Number.isFinite(value) ? null : formatPercent(value, { digits: 2 }, undefined, locale);
 
 /** DCF inverso en una frase; null cuando el motor no devolvió nada que contar. */
-export function reverseDcfText(reverse: ReverseDcfLike | null | undefined): string | null {
+export function reverseDcfText(reverse: ReverseDcfLike | null | undefined, locale: Locale = 'es'): string | null {
   if (!reverse || typeof reverse !== 'object') return null;
+  const t = createTranslator(locale);
   const status = reverse.status ?? (reverse.required_revenue_growth != null ? 'ok' : null);
   if (status === 'ok') {
-    const growth = pct(reverse.required_revenue_growth);
+    const growth = pct(reverse.required_revenue_growth, locale);
     if (!growth) return null;
-    const margin = pct(reverse.fcf_margin);
-    const wacc = pct(reverse.wacc);
-    const basis = margin && wacc ? ` (con margen FCF ${margin} y WACC ${wacc})` : '';
-    return `El precio del modelo exige un crecimiento de ingresos del ${growth} anual${basis}; no es una previsión, es lo que el precio ya descuenta.`;
+    const margin = pct(reverse.fcf_margin, locale);
+    const wacc = pct(reverse.wacc, locale);
+    const basis = margin && wacc ? t('research.valuationText.reverseBasis', { margin, wacc }) : '';
+    return t('research.valuationText.reverseOk', { growth, basis });
   }
-  if (status === 'out_of_bounds') {
-    return 'DCF inverso fuera de rango: con los supuestos base no existe un crecimiento de ingresos entre el −25 % y el +75 % anual que haga el modelo valer el precio actual, así que no se publica un «crecimiento exigido».';
-  }
-  if (status === 'not_applicable') {
-    return 'DCF inverso no aplicable: con margen FCF ≤ 0 crecer no aumenta el valor (más ingresos queman más caja), así que no hay crecimiento exigido.';
-  }
+  if (status === 'out_of_bounds') return t('research.valuationText.reverseOutOfBounds');
+  if (status === 'not_applicable') return t('research.valuationText.reverseNotApplicable');
   return null;
 }
 
@@ -84,24 +83,29 @@ function baseAssumptions(trace: TraceLike): { fcf_margin?: unknown; revenue_grow
 
 /** «Supuestos del escenario base: margen FCF 1,07 % (periodo FY2025) ·
  *  crecimiento de ingresos 7 % · WACC 9 % (…)». null si no hay nada que decir. */
-export function baseAssumptionsText(trace: TraceLike | null | undefined): string | null {
+export function baseAssumptionsText(trace: TraceLike | null | undefined, locale: Locale = 'es'): string | null {
   if (!trace || typeof trace !== 'object') return null;
+  const t = createTranslator(locale);
   const assumptions = baseAssumptions(trace);
   const parts: string[] = [];
-  const margin = typeof assumptions.fcf_margin === 'number' ? pct(assumptions.fcf_margin) : null;
+  const margin = typeof assumptions.fcf_margin === 'number' ? pct(assumptions.fcf_margin, locale) : null;
   if (margin) {
     const period = trace.periods?.fcf_margin ?? trace.periods?.free_cash_flow ?? null;
-    parts.push(`margen FCF ${margin}${period ? ` (periodo ${period})` : ''}`);
+    parts.push(period
+      ? t('research.valuationText.marginPeriod', { value: margin, period })
+      : t('research.valuationText.margin', { value: margin }));
   }
-  const growth = typeof assumptions.revenue_growth === 'number' ? pct(assumptions.revenue_growth) : null;
-  if (growth) parts.push(`crecimiento de ingresos ${growth}`);
-  const waccValue = typeof trace.wacc === 'number' ? pct(trace.wacc) : null;
+  const growth = typeof assumptions.revenue_growth === 'number' ? pct(assumptions.revenue_growth, locale) : null;
+  if (growth) parts.push(t('research.valuationText.growth', { value: growth }));
+  const waccValue = typeof trace.wacc === 'number' ? pct(trace.wacc, locale) : null;
   if (waccValue) {
-    const source = waccSourceLabel(typeof trace.wacc_source === 'string' ? trace.wacc_source : null);
-    parts.push(`WACC ${waccValue}${source ? ` (${source})` : ''}`);
+    const source = waccSourceLabel(typeof trace.wacc_source === 'string' ? trace.wacc_source : null, locale);
+    parts.push(source
+      ? t('research.valuationText.waccWithSource', { value: waccValue, source })
+      : t('research.valuationText.wacc', { value: waccValue }));
   }
   if (parts.length === 0) return null;
-  return `Supuestos del escenario base: ${parts.join(' · ')}.`;
+  return t('research.valuationText.assumptions', { parts: parts.join(' · ') });
 }
 
 /** Notas N/D de escenarios (bear/base/bull/expected) en orden estable. */

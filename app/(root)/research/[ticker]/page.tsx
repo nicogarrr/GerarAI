@@ -405,8 +405,8 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
   const engineNotice = typeof valuation.trace?.notice === 'string' ? valuation.trace.notice : null;
   const notPublishable = valuation.status !== 'ok' || valuation.publishable === false;
   const scenarioNotes = scenarioNotesList(valuation.scenario_notes);
-  const reverseText = reverseDcfText(valuation.reverse_dcf);
-  const assumptionsText = baseAssumptionsText(valuation.trace);
+  const reverseText = reverseDcfText(valuation.reverse_dcf, locale);
+  const assumptionsText = baseAssumptionsText(valuation.trace, locale);
   // F348: el precio del modelo es un snapshot persistido; el precio canónico
   // (en vivo) es el de la cabecera. El del modelo se rotula con su fecha,
   // nunca como precio actual.
