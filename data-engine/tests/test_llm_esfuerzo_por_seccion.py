@@ -34,6 +34,7 @@ def settings(monkeypatch):
         "app.core.config",
         "app.services.thesis_deep_narrative",
         "app.services.thesis_news_narrative",
+        "app.services.thesis_narrative_common",
         "app.services.thesis_debate_service",
         "app.services.chat_synthesis_service",
         "app.llm.reasoning_sections",

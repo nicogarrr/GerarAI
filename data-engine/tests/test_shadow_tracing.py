@@ -220,7 +220,7 @@ def test_tracer_funciona_contra_el_sdk_real_de_langfuse():
     )
     tracer._start_root()
     assert type(tracer._root).__name__ == "LangfuseSpan"
-    child = tracer._root.start_observation(name="paso", metadata={"x": "y"})
+    child = tracer._root.start_observation(as_type="span", name="paso", metadata={"x": "y"})
     child.end()
     generation = tracer._root.start_observation(
         as_type="generation", name="gen", model="m", usage_details={"input": 1, "output": 2}
