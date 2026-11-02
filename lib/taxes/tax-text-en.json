@@ -57,7 +57,8 @@
     "compra": "purchase",
     "comision": "fee",
     "supera la divisa conocida": "exceeds the known currency balance",
-    "lote sin valor en EUR": "lot with no EUR value"
+    "lote sin valor en EUR": "lot with no EUR value",
+    "Coste 0 (regalo / spin-off): revisar": "Cost 0 (gift / spin-off): review"
   },
   "templates": [
     [
