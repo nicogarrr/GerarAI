@@ -108,7 +108,7 @@ def test_ticker_sin_posicion_lo_dice_sin_inventar(db):
     resp = asyncio.run(ChatService().answer(db, "¿Qué peso tiene ASTS en mi cartera?", "portfolio", None))
     assert resp.llm_trace["path"] == "portfolio_position"
     assert "No tienes ninguna posición guardada en ASTS" in resp.answer
-    assert "1 posiciones" in resp.answer
+    assert "1 posición abierta en otro ticker" in resp.answer
     assert resp.sources == []
 
 

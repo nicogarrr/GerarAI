@@ -2746,10 +2746,11 @@ class ChatService:
         if not found:
             answer = (
                 f"You have no saved position in {company.ticker}; your saved portfolio has "
-                f"{len(rows)} open position{'' if len(rows) == 1 else 's'} in other tickers."
+                f"{len(rows)} open position{' in another ticker' if len(rows) == 1 else 's in other tickers'}."
                 if english
                 else f"No tienes ninguna posición guardada en {company.ticker}; "
-                f"tu cartera guardada tiene {len(rows)} posiciones abiertas en otros tickers."
+                f"tu cartera guardada tiene {len(rows)} "
+                f"{'posición abierta en otro ticker' if len(rows) == 1 else 'posiciones abiertas en otros tickers'}."
             )
             return ChatResponse(
                 answer=answer,
