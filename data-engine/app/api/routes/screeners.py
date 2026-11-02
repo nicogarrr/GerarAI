@@ -2,7 +2,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import Any, Literal, Protocol
+from typing import Annotated, Any, Literal, Protocol
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -20,6 +20,7 @@ from app.schemas.api import (
     ScreenerMetricCoverageOut,
     ScreenerRealOut,
     ScreenerSavedScreenOut,
+    not_blank,
 )
 from app.services.screener_service import (
     DUPLICATE_SCREEN_NAME,
@@ -32,7 +33,7 @@ router = APIRouter()
 
 class CustomMetricCreate(BaseModel):
     metric_key: str = Field(min_length=2, max_length=160)
-    name: str = Field(min_length=1, max_length=240)
+    name: Annotated[str, not_blank()] = Field(min_length=1, max_length=240)
     formula: str = Field(min_length=1, max_length=1000)
     unit: str = Field(default="decimal", min_length=1, max_length=40)
     description: str = Field(default="", max_length=5000)
