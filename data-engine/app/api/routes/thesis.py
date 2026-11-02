@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
+from app.core.local_date import local_today
 from app.core.ui_errors import ui_error
 from app.models import Claim, ClaimEvidence, ThesisDiff, ThesisSection, ThesisVersion
 from app.schemas import ThesisGenerateRequest, ThesisGraphOut, ThesisOut
@@ -211,7 +212,7 @@ def thesis_epub(ticker: str, db: Session = Depends(get_db)) -> Response:
         version=thesis.version,
         rating="insufficient_data" if reason else thesis.rating or "watch",
         status=thesis.status or "draft",
-        generated_on=thesis.updated_at.date().isoformat() if thesis.updated_at else "",
+        generated_on=local_today(thesis.updated_at).isoformat() if thesis.updated_at else "",
         executive_summary=archived_thesis_notice(thesis, reason) if reason else thesis.executive_summary or "",
         sections=[] if reason else [EpubSection(title=s.title, body=s.body or "") for s in sections],
         citations=[] if reason else _epub_citations(db, list(claims)),

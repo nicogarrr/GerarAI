@@ -25,6 +25,7 @@ from matplotlib.patches import Rectangle
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.local_date import local_today
 from app.models.entities import Claim, Portfolio, Position, ThesisSection, ThesisVersion
 from app.services.company_resolver import resolve_company
 from app.services.thesis_publication_gate import archived_thesis_notice, thesis_withheld_reason
@@ -342,7 +343,7 @@ def export_thesis_pdf_for_ticker(db: Session, ticker: str) -> tuple[bytes, str]:
         version=thesis.version,
         rating="insufficient_data" if reason else thesis.rating or "watch",
         status=thesis.status or "draft",
-        generated_on=thesis.updated_at.date().isoformat() if thesis.updated_at else "",
+        generated_on=local_today(thesis.updated_at).isoformat() if thesis.updated_at else "",
         executive_summary=archived_thesis_notice(thesis, reason) if reason else thesis.executive_summary or "",
         provenance=provenance,
         sections=pdf_sections,
@@ -479,7 +480,8 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
         version=1,
         rating=None,
         status="",
-        generated_on=portfolio.created_at.date().isoformat() if portfolio.created_at else "",
+        # Fecha del informe (hoy en Madrid): las cifras son las de hoy, no las del alta.
+        generated_on=local_today().isoformat(),
         executive_summary=summary,
         provenance="DATOS DE LA CARTERA REGISTRADA",
         holdings=holdings,
