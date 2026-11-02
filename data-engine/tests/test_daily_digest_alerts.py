@@ -89,7 +89,9 @@ def test_emit_requires_tenant(db):
 def test_copy_carries_source_date_basis_and_variations(db):
     digest = make_digest(db)
     alert = emit_digest_alert(db, digest, AS_OF)
-    assert AS_OF.isoformat() in alert.message
+    # Auditoría F1: la fecha legible («9 oct 2026»), nunca ISO crudo.
+    assert "al 9 oct 2026, no el P&L" in alert.message
+    assert AS_OF.isoformat() not in alert.message and AS_OF.isoformat() not in alert.title
     assert "yfinance" in alert.message
     assert "ASTS +2,50 %" in alert.message  # la variacion viaja en el resumen
     assert "Sin datos: NBIS" in alert.message  # lo no cubierto se nombra, nunca 0
@@ -101,7 +103,7 @@ def test_copy_carries_source_date_basis_and_variations(db):
 def test_copy_seals_universe_sampling_time(db):
     digest = make_digest(db)
     alert = emit_digest_alert(db, digest, AS_OF)
-    assert "2026-10-10 07:15 (hora de Madrid)" in alert.message  # cartera medida al generar
+    assert "10 oct 2026, 07:15 (hora de Madrid)" in alert.message  # cartera medida al generar
     assert alert.metadata_["positions_sampled_at"] == "2026-10-10T05:15:00+00:00"
 
 
@@ -256,7 +258,7 @@ def test_aware_non_utc_generated_at_is_converted(db):
     digest = make_digest(db)
     digest.generated_at = datetime(2026, 10, 10, 7, 15, tzinfo=timezone(timedelta(hours=2)))
     alert = emit_digest_alert(db, digest, AS_OF)
-    assert "2026-10-10 07:15 (hora de Madrid)" in alert.message
+    assert "10 oct 2026, 07:15 (hora de Madrid)" in alert.message
     assert alert.metadata_["positions_sampled_at"] == "2026-10-10T05:15:00+00:00"
 
 
@@ -284,7 +286,7 @@ def test_sampling_time_uses_madrid_winter_offset(db):
     digest.generated_at = datetime(2026, 11, 2, 23, 30, tzinfo=UTC)  # CET: 3-nov 00:30
     db.commit()
     alert = emit_digest_alert(db, digest, AS_OF)
-    assert "2026-11-03 00:30 (hora de Madrid)" in alert.message
+    assert "3 nov 2026, 00:30 (hora de Madrid)" in alert.message
     assert " UTC)" not in alert.message
 
 
@@ -298,7 +300,7 @@ def test_session_gap_is_named_with_missing_day_not_as_plain_missing_data(db):
     ]
     alert = emit_digest_alert(db, make_digest(db, items=items), AS_OF)
     assert "Sin datos" not in alert.message
-    assert "SAN.MC (falta el cierre del 2026-10-27)" in alert.message
+    assert "SAN.MC (falta el cierre del 27 oct 2026)" in alert.message
     assert "hueco de sesión, no 0" in alert.message
     assert alert.metadata_["coverage"] == "parcial"
 
@@ -324,12 +326,12 @@ def test_digest_in_english_for_user_with_english_saved(db, english):
         {"ticker": "UBER", "status": "hueco de sesión", "missing_sessions": ["2026-10-08"]},
     ]
     alert = emit_digest_alert(db, make_digest(db, items=items), AS_OF)
-    assert alert.title == "Daily summary of your portfolio as of 2026-10-09"
+    assert alert.title == "Daily summary of your portfolio as of Oct 9, 2026"
     assert alert.message == (
         "1 of 3 positions moved: ASTS +2.50%. No data: NBIS. "
-        "No daily change because of a session gap, not 0: UBER (missing the close of 2026-10-08). "
-        "Price changes from yfinance adjusted closes as of 2026-10-09, not your position's P&L. "
-        "Portfolio measured when the summary was generated (2026-10-10 07:15 (Madrid time)); "
+        "No daily change because of a session gap, not 0: UBER (missing the close of Oct 8, 2026). "
+        "Price changes from yfinance adjusted closes as of Oct 9, 2026, not your position's P&L. "
+        "Portfolio measured when the summary was generated (Oct 10, 2026, 07:15 (Madrid time)); "
         "later moves are not included. Summary coverage: partial."
     )
     assert alert.metadata_["coverage"] == "parcial"
@@ -347,5 +349,5 @@ def test_digest_stays_spanish_without_saved_language(db, monkeypatch):
     get_settings.cache_clear()
     alert = emit_digest_alert(db, make_digest(db), AS_OF)
     get_settings.cache_clear()
-    assert alert.title == "Resumen diario de tu cartera al 2026-10-09"
+    assert alert.title == "Resumen diario de tu cartera al 9 oct 2026"
     assert "Sin datos: NBIS." in alert.message
