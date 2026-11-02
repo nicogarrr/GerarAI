@@ -134,10 +134,14 @@ def export_year(
         position_rows.append(row)
     journal_rows = []
     entries = db.scalars(
-        select(DecisionJournalEntry).where(
+        select(DecisionJournalEntry)
+        .where(
             DecisionJournalEntry.decision_date >= start,
             DecisionJournalEntry.decision_date <= end,
         )
+        # Por fecha de decisión, como las operaciones: sin ORDER BY salían en el
+        # orden que devolviera la base (un asiento apuntado tarde quedaba al final).
+        .order_by(DecisionJournalEntry.decision_date, DecisionJournalEntry.id)
     ).all()
     for entry in entries:
         journal_rows.append(
