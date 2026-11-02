@@ -13,6 +13,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const source = (p: string): string => readFileSync(join(root, p), 'utf8');
 
 describe('formularios de operaciones aceptan decimales', () => {
+    // Los campos viven en el cuerpo compartido de alta/edición; cada diálogo
+    // sigue parseando con parseLocalizedNumber en su submit.
     for (const file of [
         'components/portfolio/EditTransactionDialog.tsx',
         'components/portfolio/AddTransactionDialog.tsx',
@@ -20,14 +22,19 @@ describe('formularios de operaciones aceptan decimales', () => {
         it(`${file} no restringe cantidad/precio a 2 decimales`, () => {
             const text = source(file);
             assert.ok(!text.includes('step="0.01"'));
-            for (const field of ['quantity', 'price']) {
-                const input = text.match(new RegExp(`<Input[^>]*id="${field}"[^>]*>`, 's'))?.[0];
-                assert.ok(input, `${field} input exists`);
-                assert.match(input, /type="text"/, `${field} must avoid browser number rounding`);
-                assert.match(input, /inputMode="decimal"/, `${field} keeps decimal keyboard`);
-                assert.ok(!input.includes('step='), `${field} has no precision restriction`);
-            }
             assert.match(text, /parseLocalizedNumber/);
+            assert.match(text, /TransactionFormFields/, 'usa el cuerpo de campos compartido');
         });
     }
+    it('components/portfolio/TransactionFormFields.tsx mantiene cantidad/precio como texto decimal', () => {
+        const text = source('components/portfolio/TransactionFormFields.tsx');
+        assert.ok(!text.includes('step="0.01"'));
+        for (const field of ['quantity', 'price']) {
+            const input = text.match(new RegExp(`<Input[^>]*id="${field}"[^>]*>`, 's'))?.[0];
+            assert.ok(input, `${field} input exists`);
+            assert.match(input, /type="text"/, `${field} must avoid browser number rounding`);
+            assert.match(input, /inputMode="decimal"/, `${field} keeps decimal keyboard`);
+            assert.ok(!input.includes('step='), `${field} has no precision restriction`);
+        }
+    });
 });

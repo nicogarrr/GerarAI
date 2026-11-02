@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { useLazyDialog } from '@/hooks/useLazyDialog';
 import { useT } from '@/lib/i18n/client';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 
@@ -36,19 +36,16 @@ const TRIGGER_CLASS: Record<Props['variant'], string> = {
 };
 
 export default function WatchlistBuyAction({ userId, symbol, companyName, currency, variant }: Props) {
-  const [open, setOpen] = useState(false);
+  const { open, setOpen, openedOnce, onOpenChange } = useLazyDialog();
   const t = useT();
   // Una vez abierto, el diálogo queda montado (oculto por Radix al cerrar)
   // para conservar lo escrito si se cierra sin enviar.
-  const [openedOnce, setOpenedOnce] = useState(false);
+
 
   return (
     <Dialog
       open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (next) setOpenedOnce(true);
-      }}
+      onOpenChange={onOpenChange}
     >
       <DialogTrigger asChild>
         <button
