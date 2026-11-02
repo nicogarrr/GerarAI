@@ -13,6 +13,7 @@ import { getMarketThemes } from '@/lib/actions/market-themes.actions';
 import { getFlowHoldings, getMoneyFlow, getMoneyFlowThemes } from '@/lib/actions/money-flows.actions';
 import type { MoneyFlow } from '@/lib/market/flows';
 import { themeReasonText } from '@/lib/market/theme-reason-text';
+import { themeMethodText } from '@/lib/market/theme-method-text';
 import { ThemeFlow, ThemeFlowUnavailable } from './_components/ThemeFlow';
 import { ThemeFundamentals } from './_components/ThemeFundamentals';
 import type { Formatters } from '@/lib/format';
@@ -367,8 +368,8 @@ async function TemasBody({ order, requestedPage }: TemasBodyProps) {
       <footer className="border-t border-gray-800 pt-3 text-xs text-gray-500">
         <p>
           {data.as_of
-            ? `${t(data.intraday ? 'themes.page.intraday' : 'themes.page.close', { date: fmt.formatMarketDate(data.as_of) })} · ${data.method}`
-            : `${t('themes.page.noDate')} · ${data.method}`}
+            ? `${t(data.intraday ? 'themes.page.intraday' : 'themes.page.close', { date: fmt.formatMarketDate(data.as_of) })} · ${themeMethodText(data.method, t)}`
+            : `${t('themes.page.noDate')} · ${themeMethodText(data.method, t)}`}
           {data.status === 'parcial' ? t('themes.page.partial') : ''}
           {data.stale ? t('themes.page.stale') : ''}
         </p>
