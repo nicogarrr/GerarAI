@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.i18n import generation_language
+from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.models import Company, NewsEvent, Position, ResearchAlert, WatchItem
 from app.services.notification_service import record_in_app_delivery
@@ -181,7 +182,7 @@ def evaluate(db: Session, *, now: datetime | None = None) -> dict:
         headline = headline.strip()
         # Idioma guardado del usuario (Ajustes); sin preferencia, espanol como siempre.
         language = generation_language(db)
-        title, message = _copy(language, headline, str(event.source), published.date().isoformat(),
+        title, message = _copy(language, headline, str(event.source), local_today(published).isoformat(),
                                date_source == "gdelt_first_seen")
         alert = ResearchAlert(
             tenant_id=tenant_id, company_id=asts.id, severity="high", status="open",

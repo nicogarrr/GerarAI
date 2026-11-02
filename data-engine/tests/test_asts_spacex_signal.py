@@ -168,3 +168,14 @@ def test_alert_in_english_for_a_user_with_english_saved(db, monkeypatch):
     finally:
         monkeypatch.delenv("I18N_GENERATION_ENABLED")
         get_settings.cache_clear()
+
+
+def test_message_date_is_madrid_day_not_utc(db):
+    """Publicada a las 22:30 UTC del 8: en Madrid ya es el 9 (00:30)."""
+    t1, _, a, s = _setup(db)
+    _news(db, t1, s, "SpaceX signs agreement with Verizon for Starlink Mobile", "https://publisher.example/x",
+          published=datetime(2026, 10, 8, 22, 30, tzinfo=UTC))
+    db.info["tenant_id"] = t1.id
+    assert evaluate(db, now=NOW)["created"] == 1
+    alert = db.scalars(select(ResearchAlert)).one()
+    assert "2026-10-09" in alert.message and "2026-10-08" not in alert.message
