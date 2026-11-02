@@ -171,6 +171,17 @@ const KNOWN: ReadonlyArray<readonly [RegExp, string]> = [
   [/^Sin CIK para (\S+): este emisor no reporta a la SEC; usa la fuente de su mercado local \(ESEF para emisores de la UE\)$/, 'No CIK for $1: this issuer does not report to the SEC; use its local market source (ESEF for EU issuers).'],
   [/^Sin snapshot ESEF local para (\S+): por ahora solo hay cobertura de emisores IBEX revisados$/, 'No local ESEF snapshot for $1: for now only reviewed IBEX issuers are covered.'],
   // Sincronización IBKR Flex (Ajustes)
+  // Estado guardado de la conexión IBKR (Ajustes): el dato se guarda en castellano; se traduce al mostrarlo.
+  [/^Conecta una cuenta IBKR mediante Flex, solo lectura\.?$/, 'Connect an IBKR account through Flex, read-only.'],
+  [/^Conexión verificada\. Pulsa Sincronizar para importar posiciones y caja\.?$/, 'Connection verified. Press Sync to import positions and cash.'],
+  [/^Desconectado\. Se han conservado las posiciones y operaciones importadas\.?$/, 'Disconnected. The imported positions and trades have been kept.'],
+  [/^Datos actualizados sin cerrar posiciones ausentes\. Confirma una consulta completa para reconciliar la cartera\.?$/, 'Data updated without closing missing positions. Confirm a complete query to reconcile the portfolio.'],
+  [/^Importación parcial: revisa la consulta antes de dar la cartera por completa\.?$/, 'Partial import: check the query before treating the portfolio as complete.'],
+  [/^Posiciones y caja sincronizadas con el extracto de IBKR\.?$/, 'Positions and cash synced with the IBKR statement.'],
+  [/^No se pudo sincronizar\. Conservamos los datos anteriores; revisa la conexión y vuelve a intentarlo\.?$/, 'Sync failed. We kept the previous data; check the connection and try again.'],
+  [/^No se pudo verificar la conexión\. Revisa token, Query ID y cuenta\. La consulta debe incluir posiciones y caja del mismo cierre, en XML; IBKR puede tardar en prepararla\.?$/, 'Could not verify the connection. Check the token, Query ID and account. The query must include positions and cash from the same close, in XML; IBKR may take a while to prepare it.'],
+  [/^No se pudo sincronizar\. Conservamos los datos anteriores\. Revisa la consulta o vuelve a intentarlo cuando IBKR termine el informe\.?$/, 'Sync failed. We kept the previous data. Check the query or try again when IBKR finishes the report.'],
+  [/^No se pudo desconectar\. Vuelve a intentarlo; la conexión puede seguir activa\.?$/, 'Could not disconnect; the connection may still be active. Please retry.'],
   [/^La sincronización necesita PostgreSQL\.?$/, 'Sync needs PostgreSQL.'],
   [/^El extracto es demasiado grande\. Reduce el período de la consulta Flex\.?$/, 'The statement is too large. Shorten the period of the Flex query.'],
   [/^IBKR aún prepara los costes del extracto\. Reintenta más tarde\.?$/, 'IBKR is still preparing the statement costs. Retry later.'],

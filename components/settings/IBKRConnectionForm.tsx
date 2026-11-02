@@ -4,11 +4,15 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { connectIBKR, disconnectIBKR, syncIBKR, type IBKRConnection, type IBKRResult } from '@/lib/actions/ibkr-settings.actions';
-import { useFormat, useT } from '@/lib/i18n/client';
+import { useFormat, useLocale, useT } from '@/lib/i18n/client';
+import { knownBackendMessageEn } from '@/lib/research/backend-error-en';
 
 export default function IBKRConnectionForm({ initial }: { initial: IBKRConnection }) {
   const t = useT();
+  const locale = useLocale();
   const { formatDate } = useFormat();
+  // El estado guardado (row.message) y los avisos de fallo llegan en castellano; en inglés se traducen al mostrarlos.
+  const serverText = (text: string) => (locale === 'en' ? knownBackendMessageEn(text) ?? text : text);
   const [connection, setConnection] = useState(initial);
   const [token, setToken] = useState('');
   const [query, setQuery] = useState(initial.query_id ?? '');
@@ -21,8 +25,8 @@ export default function IBKRConnectionForm({ initial }: { initial: IBKRConnectio
   function apply(result: IBKRResult) {
     if (result.ok) {
       setConnection(result.connection);
-      setMessage(result.connection.message);
-    } else setMessage(result.message);
+      setMessage(serverText(result.connection.message));
+    } else setMessage(serverText(result.message));
   }
 
   async function connect(event: React.FormEvent) {
@@ -126,7 +130,7 @@ export default function IBKRConnectionForm({ initial }: { initial: IBKRConnectio
           <div className="flex flex-wrap gap-2"><Button disabled={busy} onClick={() => void disconnect()}>{t('settings.ibkr.confirmDisconnect')}</Button><Button variant="outline" disabled={busy} onClick={() => setConfirmDisconnect(false)}>{t('settings.ibkr.cancel')}</Button></div>
         </div>
       ) : null}
-      <p role="status" aria-live="polite" className="text-sm leading-relaxed text-gray-300">{message || (connection.connected || connection.status !== 'not_connected' ? connection.message : '')}</p>
+      <p role="status" aria-live="polite" className="text-sm leading-relaxed text-gray-300">{message || (connection.connected || connection.status !== 'not_connected' ? serverText(connection.message) : '')}</p>
     </div>
   );
 }
