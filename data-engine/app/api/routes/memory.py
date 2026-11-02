@@ -338,6 +338,9 @@ def create_thesis_change(payload: ThesisChangeCreate, db: Session = Depends(get_
                 status_code=422, detail="Thesis version belongs to another company"
             )
         company_id = version.company_id
+    # Igual que las sesiones de investigación: un id inexistente o de otra
+    # empresa salía en «Qué ha cambiado» y tapaba el aviso de contradicción.
+    _require_own_rows(db, Claim, payload.affected_claim_ids, company_id, "Claim")
 
     change = ThesisChange(
         company_id=company_id,
