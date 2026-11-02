@@ -8,7 +8,7 @@ legibles, no depender de que cada consumidor formatee.
 
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation, localcontext
 
 NumericLike = int | float | Decimal | str | None
 
@@ -25,12 +25,23 @@ def _to_decimal(value: NumericLike) -> Decimal | None:
     return parsed
 
 
+def _round_half_up(value: Decimal, digits: int) -> Decimal:
+    """Redondeo como ECMA-402 («halfExpand»): 0,125 → 0,13 y 2,5 → 3.
+
+    El formato de ``Decimal`` redondea al par (0,125 → «0,12»), así que la
+    misma cifra salía distinta aquí que en ``lib/format.ts`` (Intl).
+    """
+    with localcontext() as ctx:
+        ctx.prec = max(28, value.adjusted() + digits + 3)
+        return value.quantize(Decimal(1).scaleb(-digits), rounding=ROUND_HALF_UP)
+
+
 def format_number_es(value: NumericLike, maximum_fraction_digits: int = 2) -> str | None:
     """Número con separadores es-ES (1.234,56). None si no es numérico."""
     parsed = _to_decimal(value)
     if parsed is None:
         return None
-    text = f"{parsed:,.{maximum_fraction_digits}f}"
+    text = f"{_round_half_up(parsed, maximum_fraction_digits):,.{maximum_fraction_digits}f}"
     # en-US (coma de miles, punto decimal) -> es-ES (punto de miles, coma).
     text = text.replace(",", "@").replace(".", ",").replace("@", ".")
     if "," in text:
@@ -75,7 +86,7 @@ def format_percent_es(ratio: NumericLike, fraction_digits: int = 2) -> str | Non
     parsed = _to_decimal(ratio)
     if parsed is None:
         return None
-    text = f"{parsed * 100:.{fraction_digits}f}".replace(".", ",")
+    text = f"{_round_half_up(parsed * 100, fraction_digits):.{fraction_digits}f}".replace(".", ",")
     if text.startswith("-") and not any(ch in "123456789" for ch in text):
         text = text[1:]
     return f"{text} %"
