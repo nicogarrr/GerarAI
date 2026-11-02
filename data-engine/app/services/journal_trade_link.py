@@ -24,6 +24,7 @@ from app.core.tenancy import tenant_filters
 from app.models import (
     Company,
     DecisionJournalEntry,
+    MarketPrice,
     ThesisVersion,
     Transaction,
     ValuationModel,
@@ -287,17 +288,36 @@ def journal_trades(db: Session, company: Company, *, limit: int = 100) -> list[d
 
 
 def _price_compatible(
-    entry: DecisionJournalEntry, trade: Transaction, company_currency: str | None
+    entry: DecisionJournalEntry, trade: Transaction, decision_currency: str | None
 ) -> bool:
-    """False solo si hay dos precios comparables (misma divisa) y difieren demasiado."""
+    """False solo si hay dos precios comparables (misma divisa) y difieren demasiado.
+
+    ``decision_currency`` es la unidad en que esta guardado ``entry.price``.
+    """
     decision_price = _positive(entry.price)
     trade_price = _positive(trade.price)
     if decision_price is None or trade_price is None:
         return True
-    to_company = _unit_factor(trade.currency, company_currency) if company_currency else None
-    if to_company is None:
+    to_decision = _unit_factor(trade.currency, decision_currency) if decision_currency else None
+    if to_decision is None:
         return True
-    return abs(trade_price * to_company / decision_price - 1) <= float(AUTO_LINK_MAX_PRICE_GAP)
+    return abs(trade_price * to_decision / decision_price - 1) <= float(AUTO_LINK_MAX_PRICE_GAP)
+
+
+def _decision_price_currency(db: Session, company: Company) -> str | None:
+    """Unidad del precio de una decision sin operacion.
+
+    Se guarda el ultimo cierre tal cual, en la divisa de la COTIZACION
+    (TSCO.L: peniques «GBp», aunque las cuentas vayan en libras «GBP»). Sin
+    divisa de cotizacion registrada, la de la empresa (comportamiento previo).
+    """
+    quote = db.scalar(
+        select(MarketPrice.quote_currency)
+        .where(MarketPrice.company_id == company.id, MarketPrice.quote_currency.is_not(None))
+        .order_by(desc(MarketPrice.date))
+        .limit(1)
+    )
+    return quote or company.currency
 
 
 def auto_link_journal_trades(
@@ -382,8 +402,8 @@ def auto_link_journal_trades(
         ).all()
     }
     window = AUTO_LINK_WINDOW_DAYS
-    company_currency = {
-        company.id: company.currency
+    decision_currency = {
+        company.id: _decision_price_currency(db, company)
         for company in db.scalars(select(Company).where(Company.id.in_(company_set))).all()
     }
     candidates: dict[int, list[Transaction]] = {}
@@ -400,7 +420,7 @@ def auto_link_journal_trades(
                 and str(trade.action).lower() == wanted
                 and trade.id not in already_linked
                 and 0 <= (trade.trade_date - decided).days <= window
-                and _price_compatible(entry, trade, company_currency.get(entry.company_id))
+                and _price_compatible(entry, trade, decision_currency.get(entry.company_id))
             ]
         )
     entries_by_trade: dict[int, int] = {}
