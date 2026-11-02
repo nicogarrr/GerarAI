@@ -47,9 +47,11 @@ from app.valuation.engines.base import (
     adr_ratio,
     apply_publication_blockers,
     context_split_cutoff,
-    insufficient_result,
     is_adr_without_ratio,
     margin_of_safety,
+)
+from app.valuation.engines.base import (
+    insufficient_from_context as _insufficient,
 )
 from app.valuation.engines.standard_dcf import StandardDCFEngine
 from app.valuation.fact_reference import SourcedFact, latest_facts
@@ -174,27 +176,6 @@ class _PeerBundle:
     price_as_of: str | None
     fundamentals: dict[str, float]
     provider_multiples: dict[str, SourcedFact]
-
-
-def _insufficient(
-    context: ValuationContext, *, missing: list[str], reason: str, extra_trace: dict | None = None
-) -> dict:
-    result = insufficient_result(
-        ticker=context.company.ticker,
-        model_type=context.company.valuation_model,
-        engine_key=context.engine_key,
-        current_price=context.current_price,
-        missing_inputs=missing,
-        reason=reason,
-        snapshot=context.snapshot,
-        extra_trace=extra_trace,
-    )
-    result["moat"] = empty_moat_framework(
-        context.company.company_type,
-        context.company.factor_tags or [],
-        context.company.special_risks or [],
-    )
-    return result
 
 
 def _latest_price(db, company: Company) -> tuple[float | None, str | None]:

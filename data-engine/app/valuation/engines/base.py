@@ -213,6 +213,61 @@ def insufficient_result(
     }
 
 
+NET_DEBT_REQUIRED_REASON = (
+    "net_debt is required for the equity bridge (EV - net debt) and "
+    "must not be assumed to be zero."
+)
+
+
+def insufficient_with_moat(
+    company: Company,
+    *,
+    engine_key: str,
+    current_price: float | None,
+    missing: list[str],
+    reason: str,
+    snapshot: FinancialSnapshot | None = None,
+    extra_trace: dict | None = None,
+) -> dict:
+    """``insufficient_result`` con el marco de moat vacio adjunto.
+
+    Patron compartido por todos los motores: una insuficiencia honesta sigue
+    publicando la ficha de moat (vacia) para que la UI no tenga un caso
+    especial. Antes cada motor repetia el bloque; ahora vive aqui.
+    """
+    result = insufficient_result(
+        ticker=company.ticker,
+        model_type=company.valuation_model,
+        engine_key=engine_key,
+        current_price=current_price,
+        missing_inputs=missing,
+        reason=reason,
+        snapshot=snapshot,
+        extra_trace=extra_trace,
+    )
+    result["moat"] = empty_moat_framework(
+        company.company_type,
+        company.factor_tags or [],
+        company.special_risks or [],
+    )
+    return result
+
+
+def insufficient_from_context(
+    context: ValuationContext, *, missing: list[str], reason: str, extra_trace: dict | None = None
+) -> dict:
+    """Atajo de :func:`insufficient_with_moat` para motores con ``ValuationContext``."""
+    return insufficient_with_moat(
+        context.company,
+        engine_key=context.engine_key,
+        current_price=context.current_price,
+        missing=missing,
+        reason=reason,
+        snapshot=context.snapshot,
+        extra_trace=extra_trace,
+    )
+
+
 class ValuationEngine(ABC):
     key: str = "base"
 

@@ -16,13 +16,14 @@ from __future__ import annotations
 from app.valuation.dcf_fcff import DCFInputs, run_dcf
 from app.valuation.engines.base import (
     MODEL_VERSION,
+    NET_DEBT_REQUIRED_REASON,
     ValuationContext,
     ValuationEngine,
     adr_ratio,
     apply_publication_blockers,
     clamp_fcf_margin,
     default_growth,
-    insufficient_result,
+    insufficient_from_context,
     is_adr_without_ratio,
     margin_of_safety,
     resolve_rates,
@@ -171,19 +172,11 @@ class StandardDCFEngine(ValuationEngine):
         current_price = context.current_price
 
         if not snapshot.coherent:
-            result = insufficient_result(
-                ticker=company.ticker,
-                model_type=company.valuation_model,
-                engine_key=self.key,
-                current_price=current_price,
-                missing_inputs=snapshot.missing_inputs,
+            return insufficient_from_context(
+                context,
+                missing=snapshot.missing_inputs,
                 reason="Coherent financial snapshot required. Bootstrap assumptions are disabled.",
-                snapshot=snapshot,
             )
-            result["moat"] = empty_moat_framework(
-                company.company_type, company.factor_tags or [], company.special_risks or []
-            )
-            return result
 
         revenue = snapshot.value("revenue")
         shares = snapshot.value("shares_diluted")
@@ -193,41 +186,25 @@ class StandardDCFEngine(ValuationEngine):
             # The filing reports ordinary shares and the quote is an ADR price.
             # Without the ratio, value per share is off by a factor of N, so
             # the engine refuses rather than publishing an 8x error.
-            result = insufficient_result(
-                ticker=company.ticker,
-                model_type=company.valuation_model,
-                engine_key=self.key,
-                current_price=current_price,
-                missing_inputs=["adr_ratio"],
+            return insufficient_from_context(
+                context,
+                missing=["adr_ratio"],
                 reason=(
                     f"{company.ticker} is quoted as an ADR but the ordinary-shares-per-ADR "
                     "ratio is unknown, so shares_diluted and the quoted price are not "
                     "on the same basis."
                 ),
-                snapshot=snapshot,
             )
-            result["moat"] = empty_moat_framework(
-                company.company_type, company.factor_tags or [], company.special_risks or []
-            )
-            return result
 
         margin, margin_normalization = _normalized_fcf_margin(context, snapshot)
         if margin is None:
             fcf = snapshot.value("free_cash_flow")
             if fcf is None:
-                result = insufficient_result(
-                    ticker=company.ticker,
-                    model_type=company.valuation_model,
-                    engine_key=self.key,
-                    current_price=current_price,
-                    missing_inputs=["normalized_fcf_or_fcf_margin"],
+                return insufficient_from_context(
+                    context,
+                    missing=["normalized_fcf_or_fcf_margin"],
                     reason="FCF margin cannot be derived from the coherent snapshot.",
-                    snapshot=snapshot,
                 )
-                result["moat"] = empty_moat_framework(
-                    company.company_type, company.factor_tags or [], company.special_risks or []
-                )
-                return result
             margin = fcf / revenue
 
         if margin <= 0:
@@ -235,23 +212,15 @@ class StandardDCFEngine(ValuationEngine):
             # FCFF DCF cannot represent that: clamping the floor to +1% would
             # turn a reported burn into a positive enterprise value. Refuse
             # instead of publishing a sign-flipped valuation.
-            result = insufficient_result(
-                ticker=company.ticker,
-                model_type=company.valuation_model,
-                engine_key=self.key,
-                current_price=current_price,
-                missing_inputs=["non_negative_fcf_margin"],
+            return insufficient_from_context(
+                context,
+                missing=["non_negative_fcf_margin"],
                 reason=(
                     f"Sourced FCF margin is {margin:.4f} (the company burns cash). "
                     "A FCFF DCF cannot value a negative FCF margin without "
                     "misrepresenting it; use a funding-gap / dilution model."
                 ),
-                snapshot=snapshot,
             )
-            result["moat"] = empty_moat_framework(
-                company.company_type, company.factor_tags or [], company.special_risks or []
-            )
-            return result
 
         growth = snapshot.value("revenue_growth")
         if growth is None:
@@ -274,22 +243,11 @@ class StandardDCFEngine(ValuationEngine):
             # Missing net debt is never treated as "debt-free": the equity
             # bridge is EV - net_debt, so 0.0 would invent equity out of thin
             # air and inflate value per share by exactly net_debt / shares.
-            result = insufficient_result(
-                ticker=company.ticker,
-                model_type=company.valuation_model,
-                engine_key=self.key,
-                current_price=current_price,
-                missing_inputs=["net_debt"],
-                reason=(
-                    "net_debt is required for the equity bridge (EV - net debt) and "
-                    "must not be assumed to be zero."
-                ),
-                snapshot=snapshot,
+            return insufficient_from_context(
+                context,
+                missing=["net_debt"],
+                reason=NET_DEBT_REQUIRED_REASON,
             )
-            result["moat"] = empty_moat_framework(
-                company.company_type, company.factor_tags or [], company.special_risks or []
-            )
-            return result
 
         # Puente completo EV -> equity: también restan los intereses
         # minoritarios y las acciones preferentes cuando el emisor los declara
