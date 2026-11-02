@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import BackendOffline from '@/components/system/BackendOffline';
 import type { CatalystCalendar, CatalystEvent } from '@/lib/actions/catalysts.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
+import { catalystActionTitle, catalystDetailText } from '@/lib/calendar/catalyst-text';
 import { getT, getFormat } from '@/lib/i18n/server';
 
 // Extraido de app/(root)/calendar/page.tsx (31-oct-2026): Next solo admite
@@ -88,9 +89,9 @@ export async function CalendarEvents({ calendarPromise }: { calendarPromise: Pro
                                         <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
                                         <span className="font-mono font-semibold text-teal-300">{event.ticker}</span>
                                         <span className="text-gray-100">
-                                            {event.type === 'corporate_action' ? event.title : (TYPE_LABEL[event.type] ?? event.title)}
+                                            {event.type === 'corporate_action' ? catalystActionTitle(event.title, f.locale) : (TYPE_LABEL[event.type] ?? event.title)}
                                         </span>
-                                        {event.detail ? <span className="text-gray-400">{event.detail}</span> : null}
+                                        {event.detail ? <span className="text-gray-400">{catalystDetailText(event, f.locale)}</span> : null}
                                         {event.origin === 'watchlist' ? (
                                             <Badge variant="outline" className="border-gray-700 font-normal text-gray-400">Watchlist</Badge>
                                         ) : null}
