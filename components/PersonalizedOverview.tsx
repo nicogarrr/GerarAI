@@ -551,7 +551,13 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                 <p className="text-xs text-gray-400">{t('home.portfolio.empty')}</p>
                             )}
                             {insight.kind === 'no-cost-basis' && (
-                                <p className="text-xs text-gray-400">{t('home.portfolio.noCostBasis')}</p>
+                                // Si lo que falta es la cotización (el coste sí está), decir eso:
+                                // «no tenemos la base de coste» era falso para esas posiciones.
+                                <p className="text-xs text-gray-400">
+                                    {portfolioSummary.holdings.every((h) => h.quoteMissing && h.cost > 0)
+                                        ? t('home.portfolio.noQuote')
+                                        : t('home.portfolio.noCostBasis')}
+                                </p>
                             )}
                             {insight.kind === 'movement' && insight.partial && (
                                 <p className="text-xs text-gray-400">{t('home.portfolio.partial')}</p>
@@ -785,7 +791,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                             {/* /watchlist tiene su propio «Añadir empresa» (con alta por
                                 símbolo): es el destino directo, sin pasar por /search. */}
                             <Link href="/watchlist" className="mt-2 inline-flex min-h-[44px] items-center justify-center rounded-lg border border-yellow-400/30 px-4 text-sm text-yellow-400 hover:bg-yellow-950/30">
-                                Añadir empresas
+                                {t('home.watchlist.addCompanies')}
                             </Link>
                         </div>
                     )}

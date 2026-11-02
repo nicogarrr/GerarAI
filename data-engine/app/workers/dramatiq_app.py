@@ -1481,6 +1481,32 @@ def refresh_asts_catalog() -> dict[str, Any]:
     }
 
 
+@dramatiq.actor(max_retries=2, min_backoff=60_000)
+@_coalesce_on_success("refresh_subtel_decrees", 23 * 60 * 60)
+def refresh_subtel_decrees() -> dict[str, Any]:
+    """One public request lookup daily, then explicit tenant copies; no alerts."""
+    from app.services.connectors.subtel import fetch_decrees
+    from app.services.subtel_news import persist_decrees
+
+    contexts = tenant_contexts()
+    if not contexts:
+        return {"actor": "refresh_subtel_decrees", "status": "skipped", "reason": "no_tenants"}
+    decrees = _run(fetch_decrees())
+    fetched_at = datetime.now(UTC)
+    created, errors = 0, []
+    for tenant_id, user_id in contexts:
+        db = _session(tenant_id, user_id)
+        try:
+            created += persist_decrees(db, decrees, fetched_at)
+        except Exception as exc:
+            _rollback(db)
+            errors.append({"tenant_id": tenant_id, "type": type(exc).__name__})
+        finally:
+            db.close()
+    return {"actor": "refresh_subtel_decrees", "status": "partial" if errors else "ok",
+            "created": created, "count": len(decrees), "errors": errors}
+
+
 @dramatiq.actor(max_retries=2, min_backoff=30_000)
 @_coalesce_on_success("refresh_bottlenecks", 50 * 60, ("tenant_id",))
 def refresh_bottlenecks(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:

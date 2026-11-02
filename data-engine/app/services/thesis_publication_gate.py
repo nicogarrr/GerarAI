@@ -113,6 +113,10 @@ def thesis_withheld_reason(db: Session, thesis: ThesisVersion) -> str | None:
     return thesis_withheld_reasons(db, [thesis])[thesis.id]
 
 
-def archived_thesis_notice(thesis: ThesisVersion, reason: str) -> str:
+def archived_thesis_notice(thesis: ThesisVersion, reason: str, language: str = "es") -> str:
+    """Aviso de tesis archivada; ``language="en"`` (Ajustes) lo da en inglés."""
+    if language == "en":
+        stamp = thesis.created_at.date().isoformat() if thesis.created_at else "unverified date"
+        return f"Archived thesis v{thesis.version} ({stamp}): {withheld_reason_en(reason)}"
     stamp = thesis.created_at.date().isoformat() if thesis.created_at else "fecha sin verificar"
     return f"Tesis archivada v{thesis.version} ({stamp}): {reason}"

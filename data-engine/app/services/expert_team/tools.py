@@ -15,6 +15,7 @@ from urllib.parse import quote
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models.entities import (
     Company,
     Document,
@@ -204,7 +205,7 @@ def build_tools(db: Session, *, today: date | None = None) -> dict[str, ToolSpec
             return None
         mine = sum(_num(p.market_value_base) or 0.0 for p in positions if p.company_id == company.id)
         return ToolOutput(
-            source={"table": "positions", "date": _day(today or date.today()), "url": "/portfolio"},
+            source={"table": "positions", "date": _day(today or local_today()), "url": "/portfolio"},
             data={"ticker": company.ticker, "weight_pct": round(100 * mine / total, 2),
                   "positions_count": len(positions)},
         )
@@ -213,7 +214,7 @@ def build_tools(db: Session, *, today: date | None = None) -> dict[str, ToolSpec
         company = _company(db, ctx)
         if company is None:
             return []
-        since = (today or date.today()) - timedelta(days=NEWS_DAYS)
+        since = (today or local_today()) - timedelta(days=NEWS_DAYS)
         rows = db.scalars(
             select(NewsEvent)
             .where(NewsEvent.tenant_id == ctx.tenant_id, NewsEvent.company_id == company.id, NewsEvent.date >= since)
@@ -237,18 +238,36 @@ def build_tools(db: Session, *, today: date | None = None) -> dict[str, ToolSpec
         rows = [p for p in _positions(ctx) if p.company_id == company.id and (_num(p.quantity) or 0) > 0]
         if not rows:
             return None
-        p = rows[0]
+
+        def total(attr: str) -> float | None:
+            # Suma de todas las carteras; si a alguna fila le falta el dato, mejor
+            # vacío que una suma parcial que el experto tomaría por la total.
+            values = [_num(getattr(p, attr)) for p in rows]
+            return None if any(v is None for v in values) else round(sum(v for v in values if v is not None), 6)
+
+        quantity = sum(_num(p.quantity) or 0.0 for p in rows)
+        currencies = {p.currency for p in rows}
+        costs = [_num(p.average_cost) for p in rows]
+        same_currency = len(currencies) == 1
+        average_cost = None
+        if same_currency and quantity > 0 and all(c is not None for c in costs):
+            weighted = sum((_num(p.quantity) or 0.0) * (c or 0.0) for p, c in zip(rows, costs, strict=True))
+            average_cost = round(weighted / quantity, 6)
+        source = {"table": "positions", "date": _day(today or local_today())}
+        if len(rows) == 1:
+            source["id"] = str(rows[0].id)
         return ToolOutput(
-            source={"table": "positions", "id": str(p.id), "date": _day(today or date.today())},
-            data={"ticker": company.ticker, "quantity": _num(p.quantity), "average_cost": _num(p.average_cost),
-                  "currency": p.currency, "cost_basis_base": _num(p.cost_basis_base),
-                  "market_value_base": _num(p.market_value_base), "unrealized_pnl_base": _num(p.unrealized_pnl_base)},
+            source=source,
+            data={"ticker": company.ticker, "quantity": round(quantity, 6), "average_cost": average_cost,
+                  "currency": next(iter(currencies)) if same_currency else None,
+                  "cost_basis_base": total("cost_basis_base"), "market_value_base": total("market_value_base"),
+                  "unrealized_pnl_base": total("unrealized_pnl_base"), "positions_count": len(rows)},
         )
 
     def irpf_savings_bands(ctx: RunContext) -> ToolOutput:
         from app.services.tax_irpf_filing import savings_bands
 
-        year = (today or date.today()).year
+        year = (today or local_today()).year
         bands = [
             {"from": _num(low), "to": _num(high), "rate_pct": round(float(rate) * 100, 2)}
             for low, high, rate in savings_bands(year)

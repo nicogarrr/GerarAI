@@ -52,6 +52,7 @@ from app.workers.dramatiq_app import (
     refresh_propicks_prices,
     refresh_rss_feeds,
     refresh_sec_filings,
+    refresh_subtel_decrees,
     refresh_ticker_news,
     refresh_valuation_metrics,
     review_theses,
@@ -270,6 +271,7 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     _register(scheduler, partial(coalesced_send, ibkr_actor), "cron", job_id="tenant_ibkr_flex_sync", hour=6, minute=50)
     # One global GP + SupGP fetch every 2 h, never per tenant or more often.
     _register(scheduler, partial(coalesced_send, refresh_asts_catalog), "interval", job_id="asts_celestrak_refresh", hours=2)
+    _register(scheduler, partial(coalesced_send, refresh_subtel_decrees), "interval", job_id="subtel_decrees_refresh", hours=24)
     _register(
         scheduler,
         partial(enqueue_for_all_tenants, refresh_rss_feeds),

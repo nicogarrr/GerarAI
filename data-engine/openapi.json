@@ -6438,6 +6438,11 @@
             "title": "Is Latest",
             "type": "boolean"
           },
+          "judge_timed_out": {
+            "default": false,
+            "title": "Judge Timed Out",
+            "type": "boolean"
+          },
           "plan": {
             "items": {
               "type": "string"
@@ -6506,6 +6511,11 @@
               }
             ],
             "title": "Finished At"
+          },
+          "judge_timed_out": {
+            "default": false,
+            "title": "Judge Timed Out",
+            "type": "boolean"
           },
           "run_id": {
             "title": "Run Id",

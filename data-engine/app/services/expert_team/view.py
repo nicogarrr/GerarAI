@@ -58,6 +58,8 @@ class ExpertThesisRunOut(BaseModel):
     verdict: str | None = None
     answered: list[str] = Field(default_factory=list)
     timed_out: list[str] = Field(default_factory=list)
+    #: True si hubo que llamar al juez y no llegó a tiempo (verdict.source == "timeout").
+    judge_timed_out: bool = False
 
 
 class ExpertThesisOut(BaseModel):
@@ -69,6 +71,8 @@ class ExpertThesisOut(BaseModel):
     sources: list[ExpertThesisSourceOut] = Field(default_factory=list)
     conflicts: list[str] = Field(default_factory=list)
     verdict: ExpertThesisVerdictOut | None = None
+    #: True si el juez no llegó a tiempo: sin veredicto, quedan las posturas.
+    judge_timed_out: bool = False
     history: list[ExpertThesisRunOut] = Field(default_factory=list)
     #: False cuando se abrió una corrida anterior (``?run=``): la pantalla lo avisa.
     is_latest: bool = True
@@ -153,6 +157,11 @@ def _verdict_label(result: dict[str, Any], t: dict[str, Any]) -> str | None:
     return t["labels"].get(label, label)
 
 
+def _judge_timed_out(result: dict[str, Any]) -> bool:
+    verdict = result.get("verdict")
+    return isinstance(verdict, dict) and verdict.get("source") == "timeout"
+
+
 def run_summary(run: WorkflowRun, result: dict[str, Any], lang: str) -> ExpertThesisRunOut:
     from app.services.expert_team.chat import _LABELS
 
@@ -164,6 +173,7 @@ def run_summary(run: WorkflowRun, result: dict[str, Any], lang: str) -> ExpertTh
         verdict=_verdict_label(result, t),
         answered=[str(r.get("expert") or "") for r in reports if _valid_claims(r)],
         timed_out=[str(r.get("expert") or "") for r in reports if r.get("status") == "timeout"],
+        judge_timed_out=_judge_timed_out(result),
     )
 
 
@@ -238,6 +248,7 @@ def thesis_view(
         ],
         conflicts=conflicts,
         verdict=verdict_out,
+        judge_timed_out=_judge_timed_out(result),
         history=[run_summary(r, res, lang) for r, res in earlier or []],
         is_latest=is_latest,
     )

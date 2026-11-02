@@ -87,6 +87,7 @@
     "weightsNote": "Pesos sobre el valor bruto de las posiciones.",
     "empty": "Todavía no tienes posiciones. Añade tu primera inversión para ver aquí qué ha cambiado desde la compra.",
     "noCostBasis": "Todavía no tenemos la base de coste de tus posiciones. Cuando esté cargada, aquí verás cómo va tu cartera desde la compra.",
+    "noQuote": "Todavía no hay cotización de tus posiciones. Cuando la haya, aquí verás cómo va tu cartera desde la compra.",
     "partial": "Entre las posiciones con base de coste: la ganancia/pérdida no incluye las demás.",
     "reviewMover": "Revisar {symbol} (mayor variación desde la compra)",
     "reviewAll": "Revisar tu cartera"
@@ -113,6 +114,7 @@
     "lastNOfTotal": "Las {n} últimas añadidas de {total}",
     "totalCount": "{total} en total",
     "empty": "Aún no sigues ninguna empresa.",
+    "addCompanies": "Añadir empresas",
     "seeFullList": "ver la lista completa"
   },
   "opportunities": {

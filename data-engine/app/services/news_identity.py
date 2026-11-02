@@ -98,8 +98,15 @@ def equivalent_news_event(db: Session, *, company_id: int | None, url: str | Non
     wanted_url = normalize_url(url)
     if wanted_url:
         host_path = wanted_url
+        # icontains + autoescape: en Postgres LIKE distingue mayúsculas (un host
+        # guardado como «WWW.Site.com» no casaba) y el «%»/«_» de una URL
+        # («%20») hacía de comodín; con limit(50) sin orden la noticia buena
+        # podía quedarse fuera. La comparación exacta sigue siendo la de abajo.
         candidates = db.scalars(
-            select(NewsEvent).where(NewsEvent.url.like(f"%{host_path}%")).limit(50)
+            select(NewsEvent)
+            .where(NewsEvent.url.icontains(host_path, autoescape=True))
+            .order_by(NewsEvent.id.desc())
+            .limit(50)
         ).all()
         for event in candidates:
             if normalize_url(event.url) == wanted_url:
