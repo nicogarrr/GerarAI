@@ -49,7 +49,8 @@ function PaperFeedButton({ t }: { t: TranslateFn }) {
 export function PaperTradingContent({ data, locale = DEFAULT_LOCALE }: { data: PaperState; locale?: Locale }) {
     const t = createTranslator(locale);
     const number = numberFor(t, locale);
-    if (data.error) return <p role="alert" className="text-red-300">{data.error}</p>;
+    // El error de la acción es una frase fija en castellano: se pinta la del idioma elegido.
+    if (data.error) return <p role="alert" className="text-red-300">{t('propicks.paper.loadError')}</p>;
     return <section className="min-w-0 space-y-4" aria-label={t('propicks.paper.sectionLabel')}>
         <h2 className="text-xl font-semibold text-gray-100">{t('propicks.paper.heading')}</h2>
         <p className="text-sm text-gray-400">{t('propicks.paper.intro')} <Link href="/paper-trading" className="text-teal-300 hover:underline">{t('propicks.paper.demoLink')}</Link>.</p>

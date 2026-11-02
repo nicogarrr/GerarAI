@@ -49,7 +49,7 @@ export function CompanyPaperTrades({ ticker, state, locale = DEFAULT_LOCALE }: {
     if (state === null || state.error) {
         return <Panel description={description} id="paper-trading" title={title}>
             <p className="text-sm text-amber-200" role="status">
-                {state?.error ?? t('research.companyPaper.loadError')} {t('research.companyPaper.notMeaningNone')}
+                {t('research.companyPaper.loadError')} {t('research.companyPaper.notMeaningNone')}
             </p>
         </Panel>;
     }
