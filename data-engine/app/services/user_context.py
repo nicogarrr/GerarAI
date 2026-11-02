@@ -54,6 +54,8 @@ from app.models import (
     ThesisVersion,
     WatchItem,
 )
+from app.services.date_format import format_date_en
+from app.services.display_es import fecha_es
 from app.services.portfolio_ledger_service import trade_price_fallbacks
 from app.services.price_units import listing_price
 from app.valuation.currency import normalize_currency
@@ -224,11 +226,20 @@ def _f(value: Any) -> float | None:
 
 
 def _day(value: datetime | date | None) -> str:
+    """«30 oct 2026»: estas líneas salen tal cual en la respuesta sin modelo
+    (antes «2026-10-30»). Un instante se lee en el día de Madrid."""
     if value is None:
         return "sin fecha"
+    return fecha_es(value)
+
+
+def _day_en(value: datetime | date | None) -> str:
+    """«Oct 30, 2026» para las líneas en inglés."""
+    if value is None:
+        return "no date"
     if isinstance(value, datetime):
-        value = value.date()
-    return value.isoformat()
+        value = local_today(value)
+    return format_date_en(value) or "no date"
 
 
 def _short(text: str | None, limit: int = 140) -> str:
@@ -308,7 +319,7 @@ def _dca_text_en(levels: dict[str, Any] | None, symbol: str, today: date | None 
         age = (today - when).days
         if age > int(get_settings().dca_max_data_age_days):
             stale = f" [stale: last close {age} days ago]"
-    return f"DCA level {label}{extra} ({_day(when) if when is not None else 'no date'}){stale}"
+    return f"DCA level {label}{extra} ({_day_en(when)}){stale}"
 
 
 def _num_en(value: float, digits: int = 2) -> str:
@@ -414,7 +425,7 @@ def _portfolio_block(
         header += " Divisas base mezcladas: sin total ni pesos."
     block.lines.append(header)
     header_en = (f"- {len(rows)} position{'s' if len(rows) != 1 else ''}; base currency {base or 'not set'}; "
-                 f"data as of {_day(as_of)}.")
+                 f"data as of {_day_en(as_of)}.")
     if single_base and total > 0:
         header_en += f" Total value {_money_en(total, base)}."
         if total_cost > 0:
@@ -537,7 +548,7 @@ def _watchlist_block(
         if raw_close is not None and listed is not None:
             close = (float(listed[0]), raw_close[1])
             parts.append(f"cierre {num_es(close[0])} {listed[1]} ({_day(close[1])})")
-            parts_en.append(f"close {_num_en(close[0])} {listed[1]} ({_day(close[1])})")
+            parts_en.append(f"close {_num_en(close[0])} {listed[1]} ({_day_en(close[1])})")
             row["price"] = close[0]
         elif raw_close is not None:
             parts.append("precio guardado sin unidad verificable")
@@ -664,10 +675,11 @@ def _alerts_block(db: Session, tenant: int, now: datetime) -> ContextBlock:
     for alert, comp in visible[:MAX_ALERTS]:
         ticker = f"{comp.ticker}: " if comp is not None else ""
         when = _day(alert.last_triggered_at or alert.created_at)
+        when_en = _day_en(alert.last_triggered_at or alert.created_at)
         block.lines.append(
             f"- {ticker}{_short(alert.title, 110)} (gravedad {alert.severity}, {when})."
         )
-        block.lines_en.append(f"- {ticker}{_short(alert.title, 110)} (severity {alert.severity}, {when}).")
+        block.lines_en.append(f"- {ticker}{_short(alert.title, 110)} (severity {alert.severity}, {when_en}).")
         if alert.alert_type in {"portfolio_data_review", "savings_plan_review"}:
             # These notices carry date/currency/weight-basis qualifiers. Titles
             # alone would hide the difference between a dated record and live data.
@@ -719,11 +731,11 @@ def _plan_block(db: Session, tenant: int) -> ContextBlock:
     amount = _f(plan.monthly_contribution) or 0.0
     currency = plan.monthly_contribution_currency or "divisa no registrada"
     block.lines.append(
-        f"- Aportación mensual {num_es(amount)} {currency}; horizonte {plan.horizon_years} años; desde {_day(plan.start_date)}."
+        f"- Aportación mensual {num_es(amount)} {currency}; horizonte {plan.horizon_years} {'año' if plan.horizon_years == 1 else 'años'}; desde {_day(plan.start_date)}."
     )
     block.lines_en.append(
         f"- Monthly contribution {_num_en(amount)} {plan.monthly_contribution_currency or 'currency not recorded'}; "
-        f"horizon {plan.horizon_years} year{'s' if plan.horizon_years != 1 else ''}; since {_day(plan.start_date)}."
+        f"horizon {plan.horizon_years} year{'s' if plan.horizon_years != 1 else ''}; since {_day_en(plan.start_date)}."
     )
     allocations = [a for a in (plan.target_allocations or []) if isinstance(a, dict)]
     if allocations:

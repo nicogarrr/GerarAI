@@ -63,7 +63,7 @@ def test_watchlist_con_margen_y_nivel_dca(db):
     for ticker in WATCHLIST:
         assert f"- {ticker}" in text
     # POOL: (400 − 300) / 400 = +25 %; 4X DCA.
-    assert "POOL (Pool Corporation), cierre 300,00 USD (2026-10-24), valor justo 400,00 USD" in text
+    assert "POOL (Pool Corporation), cierre 300,00 USD (24 oct 2026), valor justo 400,00 USD" in text
     assert "margen de seguridad +25,0 %, nivel DCA 4X DCA" in text
     # KKR: (160 − 120) / 160 = +25 %; AAPL: (200 − 260) / 200 = −30 %, recorte ligero.
     assert "margen de seguridad -30,0 %, nivel DCA RECORTE LIGERO" in text
@@ -118,7 +118,7 @@ def test_tesis_avisos_diario_y_plan(db):
     assert "se invalida si: Las comisiones recurrentes caen por debajo del 60 % de los ingresos" in text
     assert "ONDS: ONDS cae un 12 % en una sesión (gravedad high" in text
     assert "1 avisos abiertos; 1 reglas de aviso activas" in text
-    assert "2026-10-02 BN: compra a 55,00 USD (abierta)" in text
+    assert "2 oct 2026 BN: compra a 55,00 USD (abierta)" in text
     assert "Aportación mensual 300,00 EUR; horizonte 20 años" in text
     assert "Ahorro futuro: simulación solo de aportaciones" in text
     assert "121.741,35 EUR en 20 años" in text
@@ -203,3 +203,25 @@ def test_nivel_dca_desactualizado_se_marca(db):
     fresh = _ctx(db, today=date(2026, 10, 10)).render()
     assert "nivel DCA 4X DCA" in fresh
     assert "desactualizado" not in fresh
+
+
+def test_fechas_legibles_y_plan_a_un_ano(db):
+    """La respuesta sin modelo pinta estas líneas tal cual: antes «2026-10-02»,
+    «(2026-10-24)» y «horizonte 1 años»."""
+    from datetime import UTC, date, datetime
+
+    from app.models import InvestmentPlan
+    from app.services.user_context import _day, _day_en
+
+    assert _day(date(2026, 10, 30)) == "30 oct 2026"
+    # Un instante de las 23:30 UTC del 30 ya es el 31 en Madrid.
+    assert _day(datetime(2026, 10, 30, 23, 30, tzinfo=UTC)) == "31 oct 2026"
+    assert _day_en(datetime(2026, 10, 30, 23, 30, tzinfo=UTC)) == "Oct 31, 2026"
+    assert _day(None) == "sin fecha" and _day_en(None) == "no date"
+
+    plan = db.query(InvestmentPlan).first()
+    plan.horizon_years = 1
+    db.flush()
+    ctx = _ctx(db)
+    assert "horizonte 1 año; desde " in ctx.render()
+    assert "horizon 1 year; since " in "\n".join(ctx.block("plan").lines_en)
