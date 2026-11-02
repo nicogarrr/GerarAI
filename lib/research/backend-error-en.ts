@@ -74,6 +74,8 @@ const KNOWN: ReadonlyArray<readonly [RegExp, string]> = [
   [/^El modo guía requiere un ticker$/, 'Guide mode needs a ticker.'],
   [/^El ticket requiere un ticker$/, 'The ticket needs a ticker.'],
   // Alertas y paper trading
+  [/^Símbolo no reconocido: (.+)\. Comprueba que exista en bolsa\.$/, 'Symbol not recognized: $1. Check that it is listed on an exchange.'],
+  [/^Ya tienes esta alerta configurada\.$/, 'You already have this alert set up.'],
   [/^El umbral de una alerta de precio o de cambio debe ser un número\.?$/, 'The threshold of a price or change alert must be a number.'],
   [/^El precio de la alerta debe ser mayor que 0\.?$/, 'The alert price must be greater than 0.'],
   [/^El precio de la alerta es demasiado alto\.?$/, 'The alert price is too high.'],
