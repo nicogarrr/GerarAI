@@ -12,6 +12,7 @@ import { getBottlenecks } from '@/lib/actions/bottlenecks.actions';
 import { getMarketThemes } from '@/lib/actions/market-themes.actions';
 import { getFlowHoldings, getMoneyFlow, getMoneyFlowThemes } from '@/lib/actions/money-flows.actions';
 import type { MoneyFlow } from '@/lib/market/flows';
+import { themeReasonText } from '@/lib/market/theme-reason-text';
 import { ThemeFlow, ThemeFlowUnavailable } from './_components/ThemeFlow';
 import { ThemeFundamentals } from './_components/ThemeFundamentals';
 import type { Formatters } from '@/lib/format';
@@ -167,7 +168,7 @@ function ThemeCard({
                         </Link>
                         {row.reason ? (
                           <span className="mt-0.5 block max-w-[11rem] text-[11px] font-normal leading-4 text-gray-500">
-                            {row.reason}
+                            {themeReasonText(row.reason, fmt.locale)}
                           </span>
                         ) : null}
                       </th>
