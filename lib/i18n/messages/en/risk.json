@@ -88,5 +88,12 @@
     "weightGross": "Weight (gross value)",
     "weightWithCash": "Weight (with cash)",
     "weightUnknown": "Weight (basis unavailable)"
+  },
+  "alertText": {
+    "over20": "{ticker} is more than 20% of the portfolio",
+    "preFcfOver10": "{ticker} is pre-FCF and more than 10% of the portfolio",
+    "netCashNegative": "The net cash balance, converted to {currency}, is negative",
+    "netCashNegativeIn": "The net cash balance, converted to {currency}, is negative (negative balance in {detail})",
+    "cashNegative": "The {currency} cash balance is negative"
   }
 }
