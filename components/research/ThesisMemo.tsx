@@ -30,6 +30,7 @@ import {
 } from '@/components/research/LazyMemoControls';
 import type { ResearchThesis } from '@/lib/actions/research.actions';
 import type { GlossaryKey } from '@/lib/glossary';
+import { thesisCatalystLabel } from '@/lib/research/catalyst-label';
 
 /** Etiquetas en español para los enums persistidos por el backend (mismo
  *  vocabulario que la ficha y el indice de research). */
@@ -488,7 +489,7 @@ export default function ThesisMemo({
             <ul className="mt-2 space-y-2 text-sm text-gray-300">
               {thesis.catalysts.map((catalyst, index) => (
                 <li key={index} className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="font-medium text-gray-200">{catalyst.label ?? t('research.memo.catalyst')}</span>
+                  <span className="font-medium text-gray-200">{catalyst.label ? thesisCatalystLabel(catalyst.label, locale, t) : t('research.memo.catalyst')}</span>
                   {catalyst.date ? (
                     <span className="text-gray-400">
                       · {catalyst.date}
