@@ -3,6 +3,7 @@ import os
 import re
 import time
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Annotated, Literal
 from urllib.parse import urlparse
 
@@ -38,6 +39,9 @@ _PRICE_DIRECTION: dict[str, frozenset[str]] = {
     "price_above": frozenset({">", ">="}),
     "price_below": frozenset({"<", "<="}),
 }
+
+
+_MAX_ALERT_PRICE = Decimal("99999999999999.999999")
 
 
 class ManualAlertCreate(BaseModel):
@@ -78,6 +82,10 @@ class ManualAlertCreate(BaseModel):
                     )
                 if threshold <= 0:
                     raise ValueError("El precio de la alerta debe ser mayor que 0")
+                # 1e308 pasaba: «por encima de 1e308» no avisa nunca y «por debajo»
+                # avisa siempre. Mismo techo que el precio de una operación (Numeric(20, 6)).
+                if Decimal(str(self.value).strip()) > _MAX_ALERT_PRICE:
+                    raise ValueError("El precio de la alerta es demasiado alto")
         return self
 
 
