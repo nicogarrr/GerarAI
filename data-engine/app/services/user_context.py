@@ -411,7 +411,14 @@ def _portfolio_block(
     # su P&L latente no está medido, ni por posición ni en el total.
     quote_missing = trade_price_fallbacks(db, [pos for pos, _ in rows], tenant_id=tenant)
     total = sum(value_of(pos) for pos, _ in rows)
-    known = [pos for pos, _ in rows if pos.company_id not in quote_missing]
+    # Valoración en blanco (sin cotización: valor y P&L en base a NULL, 0 como
+    # centinela en market_value): ni su valor ni su coste cuentan en el P&L, y
+    # su línea no dice «P&L +0,00» (antes rebajaba el % total y lo mostraba).
+    def unvalued(pos: Position) -> bool:
+        return pos.market_value_base is None and pos.unrealized_pnl_base is None and not _f(pos.market_value)
+
+    blank = [comp.ticker for pos, comp in rows if unvalued(pos)]
+    known = [pos for pos, _ in rows if pos.company_id not in quote_missing and pos.unrealized_pnl_base is not None]
     total_cost = sum(_f(pos.cost_basis_base) or 0.0 for pos in known)
     total_pnl = sum(_f(pos.unrealized_pnl_base) or 0.0 for pos in known)
     ordered = sorted(rows, key=lambda row: value_of(row[0]), reverse=True)
@@ -423,6 +430,8 @@ def _portfolio_block(
             header += f" P&L latente {money_es(total_pnl, base, signed=True)} ({pct_es(total_pnl / total_cost, signed=True)} sobre coste)."
     elif not single_base:
         header += " Divisas base mezcladas: sin total ni pesos."
+    if blank:
+        header += f" Sin valorar (fuera del total): {', '.join(sorted(blank))}."
     block.lines.append(header)
     header_en = (f"- {len(rows)} position{'s' if len(rows) != 1 else ''}; base currency {base or 'not set'}; "
                  f"data as of {_day_en(as_of)}.")
@@ -433,6 +442,8 @@ def _portfolio_block(
                           f"({_pct_en(total_pnl / total_cost, signed=True)} on cost).")
     elif not single_base:
         header_en += " Mixed base currencies: no total or weights."
+    if blank:
+        header_en += f" Not valued (left out of the total): {', '.join(sorted(blank))}."
     block.lines_en.append(header_en)
     for pos, comp in ordered[:MAX_POSITIONS]:
         value = value_of(pos)
@@ -441,17 +452,22 @@ def _portfolio_block(
         pnl = _f(pos.unrealized_pnl_base)
         if pnl is None:
             pnl = _f(pos.unrealized_pnl)
-        if pos.company_id in quote_missing:
+        if pos.company_id in quote_missing or unvalued(pos):
             pnl = None
         pnl_pct = pnl / cost if pnl is not None and cost else None
         dca, level = _dca_text(levels, comp.ticker, today)
         parts = [f"- {comp.ticker} ({_short(comp.name, 40)})"]
         parts_en = list(parts)
+        if unvalued(pos):
+            weight = None
+            parts.append("sin valoración (sin cotización)")
+            parts_en.append("not valued (no quote)")
         if weight is not None:
             parts.append(f"peso {pct_es(weight)}")
             parts_en.append(f"weight {_pct_en(weight)}")
-        parts.append(f"valor {money_es(value, pos.base_currency or base)}")
-        parts_en.append(f"value {_money_en(value, pos.base_currency or base)}")
+        if not unvalued(pos):
+            parts.append(f"valor {money_es(value, pos.base_currency or base)}")
+            parts_en.append(f"value {_money_en(value, pos.base_currency or base)}")
         if pnl is not None:
             pnl_text = f"P&L {money_es(pnl, pos.base_currency or base, signed=True)}"
             pnl_en = f"P&L {_money_en(pnl, pos.base_currency or base, signed=True)}"
