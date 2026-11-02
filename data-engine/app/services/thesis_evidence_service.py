@@ -50,6 +50,7 @@ from app.services.connectors.ir import IRConnector
 from app.services.date_format import format_date_es
 from app.services.fact_deletion import delete_financial_facts
 from app.services.number_parsing import parse_machine_decimal as _decimal
+from app.services.source_documents import get_or_create_source_document
 
 logger = logging.getLogger(__name__)
 
@@ -953,25 +954,14 @@ class ThesisEvidenceService:
     def _get_or_create_document(
         self, db: Session, company: Company, *, title: str, source_type: str, source_url: str
     ) -> Document:
-        existing = db.scalar(
-            select(Document).where(
-                Document.company_id == company.id,
-                Document.source_type == source_type,
-                Document.title == title,
-            )
-        )
-        if existing:
-            return existing
-        document = Document(
-            company_id=company.id,
+        return get_or_create_source_document(
+            db,
+            company,
             title=title,
             source_type=source_type,
             source_url=source_url,
-            metadata_={"provider": source_type, "auto_ingested": True},
+            metadata={"provider": source_type, "auto_ingested": True},
         )
-        db.add(document)
-        db.flush()
-        return document
 
     def _replace_facts(self, db: Session, company: Company, source_type: str) -> None:
         tenant_id = db.info.get("tenant_id")

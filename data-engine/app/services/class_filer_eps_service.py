@@ -37,6 +37,7 @@ from app.services.connectors.sec_xbrl_instance import (
     DimensionedFact,
     parse_instance_dimensioned_facts,
 )
+from app.services.source_documents import get_or_create_source_document
 
 # Clase cuyos hechos representan al ticker cotizado. Nombre LOCAL del miembro
 # (sin prefijo de namespace: cada emisor usa el suyo). Revisada a mano.
@@ -157,26 +158,14 @@ def _latest_10k_instance_url(cik: str, fetch_json: Callable[[str], dict]) -> str
 
 
 def _get_or_create_document(db: Session, company: Company, url: str) -> Document:
-    title = f"SEC XBRL instance (class facts) - {company.ticker}"
-    document = db.scalar(
-        select(Document).where(
-            Document.company_id == company.id,
-            Document.source_type == "SEC",
-            Document.title == title,
-        )
-    )
-    if document:
-        return document
-    document = Document(
-        company_id=company.id,
-        title=title,
+    return get_or_create_source_document(
+        db,
+        company,
+        title=f"SEC XBRL instance (class facts) - {company.ticker}",
         source_type="SEC",
         source_url=url,
-        metadata_={"provider": "SEC", "xbrl_instance": True},
+        metadata={"provider": "SEC", "xbrl_instance": True},
     )
-    db.add(document)
-    db.flush()
-    return document
 
 
 def backfill_class_based_eps(

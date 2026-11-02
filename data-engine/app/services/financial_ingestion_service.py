@@ -10,7 +10,6 @@ from sqlalchemy import delete, or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
-from app.core.source_urls import linkable_source_url
 from app.models import Company, Document, FinancialFact, FinancialStatement, MarketPrice
 from app.services.connectors import esef as esef_connector
 from app.services.connectors import fred as fred_connector
@@ -25,6 +24,7 @@ from app.services.fact_deletion import (
 )
 from app.services.number_parsing import parse_machine_decimal as _decimal
 from app.services.price_units import price_in_currency
+from app.services.source_documents import get_or_create_source_document
 from app.services.ttm_fundamentals import (
     NON_ADDITIVE_FLOWS,
     PeriodValue,
@@ -2214,26 +2214,14 @@ class FinancialIngestionService:
         )
 
     def _source_document(self, db: Session, company: Company) -> Document:
-        title = f"FMP normalized financials - {company.ticker}"
-        document = db.scalar(
-            select(Document).where(
-                Document.company_id == company.id,
-                Document.source_type == "FMP",
-                Document.title == title,
-            )
-        )
-        if document:
-            return document
-        document = Document(
-            company_id=company.id,
-            title=title,
+        return get_or_create_source_document(
+            db,
+            company,
+            title=f"FMP normalized financials - {company.ticker}",
             source_type="FMP",
             source_url=f"https://financialmodelingprep.com/financial-summary/{company.ticker}",
-            metadata_={"provider": "FMP", "normalized": True},
+            metadata={"provider": "FMP", "normalized": True},
         )
-        db.add(document)
-        db.flush()
-        return document
 
     def _replace_fmp_data(self, db: Session, company: Company, document: Document) -> None:
         tenant_id = db.info.get("tenant_id")
@@ -2764,54 +2752,30 @@ class FinancialIngestionService:
         return derived
 
     def _source_document_sec(self, db: Session, company: Company, ticker: str) -> Document:
-        title = f"SEC XBRL facts - {ticker}"
-        document = db.scalar(
-            select(Document).where(
-                Document.company_id == company.id,
-                Document.source_type == "SEC",
-                Document.title == title,
-            )
-        )
-        if document:
-            return document
-        document = Document(
-            company_id=company.id,
-            title=title,
+        return get_or_create_source_document(
+            db,
+            company,
+            title=f"SEC XBRL facts - {ticker}",
             source_type="SEC",
             source_url=f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&ticker={ticker}&type=10-K",
-            metadata_={"provider": "SEC", "normalized": True},
+            metadata={"provider": "SEC", "normalized": True},
         )
-        db.add(document)
-        db.flush()
-        return document
 
     def _source_document_esef(
         self, db: Session, company: Company, ticker: str, snapshot: dict[str, Any]
     ) -> Document:
-        title = f"ESEF XBRL facts - {ticker}"
-        document = db.scalar(
-            select(Document).where(
-                Document.company_id == company.id,
-                Document.source_type == "ESEF",
-                Document.title == title,
-            )
-        )
-        if document:
-            # A normalized snapshot has no verified filing URL. Keep its LEI,
-            # filing id and hash in metadata, never fabricate a clickable URL.
-            if document.source_url and linkable_source_url(document.source_url) is None:
-                document.source_url = None
-            return document
-        document = Document(
-            company_id=company.id,
-            title=title,
+        # A normalized snapshot has no verified filing URL. Keep its LEI,
+        # filing id and hash in metadata, never fabricate a clickable URL
+        # (el helper anula una URL guardada no enlazable al reutilizar).
+        return get_or_create_source_document(
+            db,
+            company,
+            title=f"ESEF XBRL facts - {ticker}",
             source_type="ESEF",
             source_url=None,
-            metadata_={"provider": "ESEF", "normalized": True},
+            metadata={"provider": "ESEF", "normalized": True},
+            scrub_unlinkable_url=True,
         )
-        db.add(document)
-        db.flush()
-        return document
 
     def _replace_esef_data(self, db: Session, company: Company, document: Document) -> None:
         """Delete only the facts THIS document wrote (see ``_replace_sec_data``)."""
