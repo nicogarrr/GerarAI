@@ -1,9 +1,7 @@
 import { withAuthErrors } from '@/lib/auth/route-auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { researchIdentityHeaders } from '@/lib/auth/research-identity';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
-
-const BACKEND_URL = process.env.FMP_BACKEND_URL;
+import { fetchMemoMarkdown } from '@/lib/thesis/fetch-memo';
 
 // Proxy firmado del memo Markdown: el navegador no puede firmar la identidad
 // research, asi que la descarga pasa por este route handler server-side.
@@ -13,33 +11,19 @@ async function getHandler(
 ) {
   await requireAuthenticatedUser();
   const { ticker } = await params;
-  if (!/^[A-Za-z0-9.^=-]{1,15}$/.test(ticker)) {
-    return NextResponse.json({ error: 'Ticker no valido' }, { status: 400 });
-  }
-  if (!BACKEND_URL) {
-    return NextResponse.json({ error: 'Backend no configurado' }, { status: 503 });
-  }
-  const identity = await researchIdentityHeaders({
-    method: 'GET',
-    path: `/api/thesis/${encodeURIComponent(ticker.toUpperCase())}/memo.md`,
-  });
   // published=1: la descarga es siempre la ultima version PUBLICADA. Un
   // borrador no enseña cifras ni margen (regla vigente de la app).
-  const upstream = await fetch(
-    `${BACKEND_URL}/api/thesis/${encodeURIComponent(ticker.toUpperCase())}/memo.md?published=1`,
-    { headers: identity, cache: 'no-store' },
-  );
-  if (!upstream.ok) {
-    return NextResponse.json(
-      { error: upstream.status === 404 ? 'Aún no hay ninguna tesis publicada de este ticker' : 'Memo no disponible' },
-      { status: upstream.status },
-    );
-  }
-  const body = await upstream.text();
+  const memo = await fetchMemoMarkdown({
+    tickerRaw: ticker,
+    query: 'published=1',
+    notFoundError: 'Aún no hay ninguna tesis publicada de este ticker',
+    unavailableError: 'Memo no disponible',
+  });
+  if (!memo.ok) return memo.response;
   const disposition =
-    upstream.headers.get('content-disposition') ??
+    memo.contentDisposition ??
     `attachment; filename="tesis-${ticker.toLowerCase()}.md"`;
-  return new NextResponse(body, {
+  return new NextResponse(memo.markdown, {
     status: 200,
     headers: {
       'Content-Type': 'text/markdown; charset=utf-8',
