@@ -11,6 +11,8 @@ from statistics import fmean, mean, pstdev
 from types import SimpleNamespace
 from typing import Any
 
+import numpy as np
+import pyxirr
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -29,6 +31,105 @@ from app.services.tax_report_service import (
     withholding_cost,
 )
 from app.valuation.currency import normalize_currency
+
+# Intervalo de búsqueda del XIRR (sin cambios desde la bisección original):
+# por debajo de -99,99 % el descuento explota y por encima de +1.000 % anual
+# la cifra no es una rentabilidad útil; fuera de él el estado es no_xirr_root.
+XIRR_LOW = -0.9999
+XIRR_HIGH = 10.0
+# Malla para detectar varias raíces cuando los flujos cambian de signo más de
+# una vez (más densa donde viven las rentabilidades reales).
+_XIRR_SCAN_GRID = np.unique(
+    np.concatenate(
+        [
+            np.linspace(XIRR_LOW, -0.5, 16),
+            np.linspace(-0.5, 1.0, 61),
+            np.linspace(1.0, XIRR_HIGH, 25),
+        ]
+    )
+)
+
+
+def _xirr_npv(cashflows: list[tuple[date, float]], origin: date, rate: float) -> float:
+    return sum(value / ((1 + rate) ** ((day - origin).days / 365.0)) for day, value in cashflows)
+
+
+def _bisection_xirr(cashflows: list[tuple[date, float]]) -> float | None:
+    """Bisección original (referencia y red de seguridad de ``solve_xirr``)."""
+    origin = min(day for day, _ in cashflows)
+    low, high = XIRR_LOW, XIRR_HIGH
+    if _xirr_npv(cashflows, origin, low) * _xirr_npv(cashflows, origin, high) > 0:
+        return None
+    middle = low
+    for _ in range(200):
+        middle = (low + high) / 2
+        if abs(_xirr_npv(cashflows, origin, middle)) < 1e-8:
+            break
+        if _xirr_npv(cashflows, origin, low) * _xirr_npv(cashflows, origin, middle) <= 0:
+            high = middle
+        else:
+            low = middle
+    return middle
+
+
+def _net_sign_changes(cashflows: list[tuple[date, float]]) -> int:
+    by_day: dict[date, float] = defaultdict(float)
+    for day, value in cashflows:
+        by_day[day] += value
+    signs = [value > 0 for _, value in sorted(by_day.items()) if value != 0]
+    return sum(1 for previous, current in zip(signs, signs[1:], strict=False) if previous != current)
+
+
+def _single_root_cell(years: np.ndarray, values: np.ndarray, rate: float) -> bool:
+    """True si la malla ve UN solo cambio de signo del NPV y ``rate`` cae en él."""
+    npv = (1.0 + _XIRR_SCAN_GRID)[:, None] ** (-years[None, :]) @ values
+    signs = np.sign(npv)
+    changes = np.nonzero(signs[:-1] * signs[1:] < 0)[0]
+    if len(changes) != 1 or np.count_nonzero(signs == 0):
+        return False
+    index = int(changes[0])
+    return bool(_XIRR_SCAN_GRID[index] <= rate <= _XIRR_SCAN_GRID[index + 1])
+
+
+def solve_xirr(cashflows: list[tuple[date, float]]) -> tuple[float | None, str]:
+    """Tasa XIRR (ACT/365F) en [XIRR_LOW, XIRR_HIGH] y el método que la dio.
+
+    pyxirr (Rust) resuelve en microsegundos lo que la bisección en Python
+    tardaba cientos de milisegundos con miles de flujos. El resultado es el
+    mismo que el de la bisección original (test de paridad a 1e-6):
+
+    - sin raíz en el intervalo (NPV con el mismo signo en los dos extremos)
+      -> ``(None, "no_root")``, igual que antes;
+    - pyxirr solo se acepta cuando la raíz es ÚNICA: un cambio de signo neto
+      en los flujos (regla de los signos de Descartes), o varios cambios pero
+      la malla ve una sola raíz y pyxirr cae en ella; además su tasa debe
+      quedar dentro del intervalo y anular el NPV;
+    - en cualquier otro caso (varias raíces, sin cambio de signo neto, error
+      de pyxirr) se usa la bisección original, que elige la misma raíz que
+      siempre.
+    """
+    origin = min(day for day, _ in cashflows)
+    if _xirr_npv(cashflows, origin, XIRR_LOW) * _xirr_npv(cashflows, origin, XIRR_HIGH) > 0:
+        return None, "no_root"
+    sign_changes = _net_sign_changes(cashflows)
+    if sign_changes >= 1:
+        try:
+            rate = pyxirr.xirr(
+                [day for day, _ in cashflows],
+                [value for _, value in cashflows],
+                silent=True,
+            )
+        except Exception:  # noqa: BLE001 - cualquier fallo vuelve a la bisección
+            rate = None
+        if rate is not None and math.isfinite(rate) and XIRR_LOW < rate < XIRR_HIGH:
+            years = np.array([(day - origin).days / 365.0 for day, _ in cashflows])
+            values = np.array([value for _, value in cashflows])
+            scale = max(1.0, float(np.abs(values).sum()))
+            residual = abs(float(values @ (1.0 + rate) ** (-years)))
+            if residual <= 1e-9 * scale and (sign_changes == 1 or _single_root_cell(years, values, rate)):
+                return float(rate), "pyxirr"
+    return _bisection_xirr(cashflows), "bisection_xirr"
+
 
 # Exchange -> listing-market country. Best-effort fallback only: the owning
 # fact is issuer domicile, and positions without a known exchange are grouped
@@ -819,13 +920,8 @@ class PortfolioIntelligenceService:
                 "perspective": perspective,
                 "external_flows": len(external),
             }
-        origin = min(day for day, _ in cashflows)
-
-        def npv(rate: float) -> float:
-            return sum(value / ((1 + rate) ** ((day - origin).days / 365.0)) for day, value in cashflows)
-
-        low, high = -0.9999, 10.0
-        if npv(low) * npv(high) > 0:
+        rate, method = solve_xirr(cashflows)
+        if rate is None:
             return None, {
                 "status": "no_xirr_root",
                 "cashflows": len(cashflows),
@@ -833,17 +929,9 @@ class PortfolioIntelligenceService:
                 "perspective": perspective,
                 "external_flows": len(external),
             }
-        for _ in range(200):
-            middle = (low + high) / 2
-            if abs(npv(middle)) < 1e-8:
-                break
-            if npv(low) * npv(middle) <= 0:
-                high = middle
-            else:
-                low = middle
-        return middle, {
+        return rate, {
             "status": "calculated",
-            "method": "bisection_xirr",
+            "method": method,
             "cashflows": len(cashflows),
             "ambiguous_cash_excluded": ambiguous_cash_excluded,
             "perspective": perspective,

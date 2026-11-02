@@ -313,10 +313,20 @@ def _db_history(db: Session, company: Company | None) -> FetchedHistory:
         return FetchedHistory(rows=[])
     from app.valuation.currency import normalize_currency
 
+    # Columnas, no entidades: son años de cierres por ticker y construir un
+    # MarketPrice ORM por fila era casi todo el coste de la evaluacion DCA
+    # (400 tickers x 5 años = ~520.000 objetos). MarketPrice no es de tenant.
     prices = [
         price
-        for price in db.scalars(
-            select(MarketPrice).where(MarketPrice.company_id == company.id).order_by(MarketPrice.date)
+        for price in db.execute(
+            select(
+                MarketPrice.date,
+                MarketPrice.close,
+                MarketPrice.adj_close,
+                MarketPrice.quote_currency,
+            )
+            .where(MarketPrice.company_id == company.id)
+            .order_by(MarketPrice.date)
         )
         if price.close and float(price.close) > 0
     ]
