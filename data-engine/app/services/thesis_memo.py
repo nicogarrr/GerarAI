@@ -9,8 +9,9 @@ financiero.
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -27,13 +28,50 @@ from app.valuation.margin_convention import (
 )
 
 
-def _fecha_hora_utc(value: datetime) -> str:
+def _fecha_hora_utc(value: datetime, *, en: bool = False) -> str:
     """«24 oct 2026, 09:41 UTC»: la fecha en la forma corta que usa la web.
 
     La ficha pinta «generada el 24 oct 2026» (formatGeneratedDate, es-ES);
-    el memo es el mismo documento y no puede fechar en ISO crudo.
+    el memo es el mismo documento y no puede fechar en ISO crudo. En inglés,
+    «Oct 24, 2026, 09:41 UTC» (en-US, como la web en inglés).
     """
-    return f"{fecha_es(value)}, {value:%H:%M} UTC"
+    return f"{_date_en(value) if en else fecha_es(value)}, {value:%H:%M} UTC"
+
+
+_MONTHS_EN = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+_MADRID = ZoneInfo("Europe/Madrid")
+
+
+def _date_en(value) -> str:
+    """Misma fecha que ``fecha_es`` (día de Madrid para instantes) en inglés: «Oct 18, 2026».
+
+    Un texto que no es ISO se devuelve tal cual: nunca se inventa un día.
+    """
+    if value is None:
+        return "n/a"
+    if isinstance(value, str):
+        try:
+            value = date.fromisoformat(value[:10])
+        except ValueError:
+            return value
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        value = value.astimezone(_MADRID).date()
+    return f"{_MONTHS_EN[value.month - 1]} {value.day}, {value.year}"
+
+
+def _money_en(value, currency: str | None) -> str:
+    """Valor por acción en inglés: «$343.46», «€1,234.50»; otra divisa con su código («1,234.50 GBP»)."""
+    if value is None:
+        return "pending"
+    amount = float(value)
+    sign = "-" if amount < 0 else ""
+    if currency in ("USD", "EUR"):
+        return f"{sign}{'$' if currency == 'USD' else '€'}{abs(amount):,.2f}"
+    if currency and len(currency) == 3 and currency.isupper():
+        return f"{amount:,.2f} {currency}"
+    return f"{amount:,.2f}"
 
 
 def _fraction_row_to_percent(line: str) -> str:
@@ -222,7 +260,10 @@ def build_memo_markdown(
         return f"{value * 100:.{decimals}f}%" if en else percent_es(value, decimals=decimals)
 
     def money(value) -> str:
-        return "pending" if en and value is None else _money(value, company.currency)
+        return _money_en(value, company.currency) if en else _money(value, company.currency)
+
+    def day(value) -> str:
+        return _date_en(value) if en else fecha_es(value)
 
     pending = tr("_Pendiente._", "_Pending._")
 
@@ -237,7 +278,8 @@ def build_memo_markdown(
         rating_part = "" if draft else f"rating {_english_label(thesis.rating)} · "
         lines.append(
             f"Version {thesis.version} · status {_english_label(thesis.status)} · {rating_part}"
-            f"generated {_fecha_hora_utc(thesis.created_at)} · updated {_fecha_hora_utc(thesis.updated_at)}"
+            f"generated {_fecha_hora_utc(thesis.created_at, en=True)} · "
+            f"updated {_fecha_hora_utc(thesis.updated_at, en=True)}"
         )
     else:
         rating_part = "" if draft else f"rating {label_es(RATING_ES, thesis.rating)} · "
@@ -247,7 +289,7 @@ def build_memo_markdown(
             f"generada {_fecha_hora_utc(thesis.created_at)} · actualizada {_fecha_hora_utc(thesis.updated_at)}"
         )
     if stale:
-        when = fecha_es(latest_data_at) if latest_data_at else tr("desconocida", "unknown")
+        when = day(latest_data_at) if latest_data_at else tr("desconocida", "unknown")
         lines.append(tr(f"\n> AVISO: tesis potencialmente DESACTUALIZADA: hay datos mas nuevos (hasta {when}).",
                         f"\n> WARNING: thesis possibly OUT OF DATE: there is newer data (up to {when})."))
     lines.append("")
@@ -348,7 +390,7 @@ def build_memo_markdown(
         # cotización solo si quedó persistida (nunca una fecha inventada).
         price_as_of = (thesis.valuation_basis or {}).get("price_as_of")
         price_label = tr("Precio del modelo", "Model price") + (
-            f" {tr('al', 'as of')} {fecha_es(price_as_of)}" if price_as_of else ""
+            f" {tr('al', 'as of')} {day(price_as_of)}" if price_as_of else ""
         )
         lines.append(
             f"\n{price_label}: {money(thesis.current_price)} · {tr('Valor esperado', 'Expected value')}: "
@@ -438,14 +480,14 @@ def build_memo_markdown(
         lines.append(tr(
             f"Generado {_fecha_hora_utc(datetime.now(UTC))} desde una ejecución aislada "
             "(rollback, no persistida; sin fingerprint persistido).",
-            f"Generated {_fecha_hora_utc(datetime.now(UTC))} from an isolated run "
+            f"Generated {_fecha_hora_utc(datetime.now(UTC), en=True)} from an isolated run "
             "(rolled back, not stored; no stored fingerprint).",
         ))
     else:
         lines.append(tr(
             f"Generado {_fecha_hora_utc(datetime.now(UTC))} desde la versión persistida "
             f"{thesis.version} (fingerprint {thesis.input_fingerprint or 'n/a'}).",
-            f"Generated {_fecha_hora_utc(datetime.now(UTC))} from stored version "
+            f"Generated {_fecha_hora_utc(datetime.now(UTC), en=True)} from stored version "
             f"{thesis.version} (fingerprint {thesis.input_fingerprint or 'n/a'}).",
         ))
     lines.append(tr(
