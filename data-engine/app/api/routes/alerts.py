@@ -220,6 +220,12 @@ def _safe_http_url(value: object) -> str | None:
     return None
 
 
+# Estados que escribe ReviewAlertService (y el «open» de alta). Un filtro con
+# otro valor no puede casar nunca: antes devolvía 200 [] y un error de tecleo
+# parecía «no hay alertas».
+_ALERT_STATUSES = frozenset({"open", "acknowledged", "snoozed", "resolved"})
+
+
 @router.get("", response_model=list[ResearchAlertOut])
 def list_alerts(
     ticker: str | None = None,
@@ -259,6 +265,8 @@ def list_alerts(
             raise HTTPException(status_code=404, detail="Company not found")
         statement = statement.where(ResearchAlert.company_id == company.id)
     if status:
+        if status not in _ALERT_STATUSES:
+            raise HTTPException(status_code=422, detail="Invalid alert status")
         statement = statement.where(ResearchAlert.status == status)
     elif not include_snoozed:
         # Solo REAPARECEN las alertas cuyo snooze ya caduco: un snooze sin

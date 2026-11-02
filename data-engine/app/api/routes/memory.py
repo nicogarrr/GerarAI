@@ -428,6 +428,8 @@ def list_research_sessions(
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
 ) -> list[ResearchSession]:
+    if status:
+        _require_enum(status, _RESEARCH_SESSION_STATUSES, "session status")
     statement = select(ResearchSession)
     if ticker:
         company = _company_by_ticker(db, ticker)
