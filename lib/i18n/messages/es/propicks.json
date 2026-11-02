@@ -104,7 +104,9 @@
     "colDiff": "Diferencia (p.p.)",
     "pp": "{value} p.p.",
     "noGroups": "Sin grupos de resultados para comparar.",
-    "base": "Base: {value}"
+    "base": "Base: {value}",
+    "calNoticeInsufficient": "Muestra insuficiente ({closed} cerradas, mínimo {min}): la calibración es orientativa",
+    "binNoticeFew": "menos de {min} cerradas: tasa N/D"
   },
   "tabs": {
     "loadingView": "Cargando vista…",
