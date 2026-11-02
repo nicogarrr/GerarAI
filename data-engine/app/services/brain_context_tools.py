@@ -14,7 +14,7 @@ from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from urllib.parse import quote
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.local_date import local_today
@@ -36,7 +36,7 @@ _ALERT_ACTION_RE = re.compile(
     r"create|add|set\s+(?:up\s+)?an?|alert\s+me|notify|delete|remove|disable|enable|mute|snooze|pause)\b"
 )
 # «my alerts», «show my alerts», «which alerts are set?»: en inglés iban al modelo general.
-_ALERTS_RE = re.compile(r"(?i)\b(?:avisos?|alertas?)\b|\b(?:my|any|open|which|what|show|list)\s+(?:\w+\s+)?alerts\b")
+_ALERTS_RE = re.compile(r"(?i)\b(?:avisos?|alertas?)\b|\b(?:my|any|open|which|what|show|list)\s+(?:\w+\s+)?alerts\b|\bhow\s+many\s+(?:open\s+)?alerts\b")
 _RISK_METRIC_RE = re.compile(
     r"(?i)\b(?:drawdown|ca[ií]da\s+m[aá]xima|volatilidad|twr|panel\s+de\s+riesgo|"
     r"(?:avisos?|alertas?|reglas?|l[ií]mites?)\s+de\s+riesgo)\b"
@@ -45,10 +45,11 @@ _JOURNAL_RE = re.compile(
     r"(?i)\bdiario\b|\b(?:mis|[uú]ltimas|qu[eé])\s+decisiones\b|\bdecisiones\s+(?:que\s+)?(?:he|tom[eé]|registr\w*)"
     # En inglés («my decision journal», «what decisions have I logged?») iba al modelo general.
     r"|\b(?:decision|investment|trading)\s+(?:journal|log|diary)\b|\bmy\s+(?:journal|(?:recent\s+|last\s+)?decisions)\b"
-    r"|\bdecisions\s+(?:have\s+)?i\s+(?:made|logged|recorded|taken)\b"
+    r"|\bdecisions\s+(?:have\s+)?i\s+(?:made|logged|recorded|taken)\b|\bjournal\s+entr(?:y|ies)\b"
 )
 
 _SEVERITY_ES = {"critical": "crítica", "high": "alta", "medium": "media", "low": "baja", "info": "info"}
+_JOURNAL_STATUS_ES = {"open": "abierta", "reviewed": "revisada", "closed": "cerrada"}
 _DECISION_ES = {
     "buy": "comprar", "add": "ampliar", "hold": "mantener", "trim": "recortar",
     "sell": "vender", "watch": "vigilar", "pass": "descartar", "avoid": "evitar",
@@ -400,9 +401,16 @@ def journal_answer(db: Session, tenant: int, company: Company | None = None) -> 
     )
     if company is not None:
         query = query.where(DecisionJournalEntry.company_id == company.id)
-    rows = db.execute(
-        query.order_by(DecisionJournalEntry.decision_date.desc(), DecisionJournalEntry.id.desc()).limit(40)
-    ).all()
+    newest = (DecisionJournalEntry.decision_date.desc(), DecisionJournalEntry.id.desc())
+    rows = db.execute(query.order_by(*newest).limit(40)).all()
+    # Recuentos de todo el diario, no solo de las 40 últimas (antes «de las últimas 40»
+    # con 57 entradas, y una abierta más antigua no contaba ni salía).
+    count_query = select(func.count()).select_from(query.with_only_columns(DecisionJournalEntry.id).subquery())
+    total = db.scalar(count_query) or 0
+    open_query = query.where(DecisionJournalEntry.status == "open")
+    opened = db.scalar(select(func.count()).select_from(
+        open_query.with_only_columns(DecisionJournalEntry.id).subquery())) or 0
+    open_rows = db.execute(open_query.order_by(*newest).limit(6)).all()
     if english:
         scope = f" for {company.ticker}" if company is not None else ""
     else:
@@ -410,13 +418,13 @@ def journal_answer(db: Session, tenant: int, company: Company | None = None) -> 
     if not rows:
         return _response([f"There are no entries in your decision journal{scope}." if english
                           else f"No hay entradas en tu diario de decisiones{scope}."], [], "decision_journal")
-    open_rows = [row for row in rows if row[0].status == "open"]
-    opened, total = len(open_rows), len(rows)
     if english:
-        latest = "the only one recorded" if total == 1 else f"the last {total} recorded"
+        latest = ("the only one recorded" if total == 1 else
+                  f"the last {total} recorded" if total <= len(rows) else f"{total} recorded")
         lines = [f"Decision journal{scope}: {opened} open of {latest}."]
     else:
-        latest = "la única registrada" if total == 1 else f"las últimas {total} registradas"
+        latest = ("la única registrada" if total == 1 else
+                  f"las últimas {total} registradas" if total <= len(rows) else f"{total} registradas")
         lines = [f"Diario de decisiones{scope}: {opened} abierta{'' if opened == 1 else 's'} de {latest}."]
     sources: list[dict] = []
     for entry, comp in (open_rows + [row for row in rows if row[0].status != "open"])[:6]:
@@ -435,12 +443,12 @@ def journal_answer(db: Session, tenant: int, company: Company | None = None) -> 
         else:
             decision = _DECISION_ES.get(entry.decision.lower(), entry.decision)
             price = f" a {float(entry.price):.2f}".replace(".", ",") if entry.price is not None else ""
-            status = "abierta" if entry.status == "open" else entry.status
+            status = _JOURNAL_STATUS_ES.get(entry.status, entry.status)
             line = f"- {comp.ticker}, {fecha_es(entry.decision_date)}: {decision}{price} ({status})."
             if rationale:
                 line += f" Motivo: {rationale}"
             if must:
-                line += f" Debe cumplirse: {len(must)} condición(es)."
+                line += f" Debe cumplirse: {len(must)} {'condición' if len(must) == 1 else 'condiciones'}."
         lines.append(line)
         sources.append(_source(
             "decision_journal_entry", entry.id,

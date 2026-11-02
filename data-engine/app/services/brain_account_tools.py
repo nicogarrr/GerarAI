@@ -1086,7 +1086,9 @@ _RULES_ASK = re.compile(
     r"\b(?:que|cuales|cuantas)\s+(?:alertas|avisos)\s+tengo\s+(?:configurad|puest|activ|cread|programad)\w*"
     r"|\bmis\s+reglas\s+de\s+(?:aviso|alerta)s?\b|\blista\w*\s+(?:de\s+)?(?:mis\s+)?(?:alertas|avisos)\b"
     r"|\bmis\s+(?:alertas|avisos)\s+(?:configurad|puest|activ|cread|programad)\w*"
-    r"|\bmy\s+alert\s+rules\b|\bwhat\s+alerts\s+(?:do\s+)?i\s+have\b|\blist\s+(?:all\s+)?my\s+alerts\b"
+    r"|\bmy\s+alert\s+rules\b|\blist\s+(?:all\s+)?my\s+alerts\b"
+    # «what alerts do I have?» a secas va, como «¿qué alertas tengo?», a avisos abiertos + reglas.
+    r"|\bwhat\s+alerts\s+(?:do\s+)?i\s+have\s+(?:set\s+up|configured|active|created|scheduled)\b"
 )
 
 
@@ -1128,6 +1130,32 @@ def _rule_text(kind: str, condition: dict, currency: str | None, english: bool, 
     return f"{kind} {op} {number}".strip()
 
 
+def _open_alerts_line(db: Session, tenant: int, english: bool) -> str | None:
+    """Avisos abiertos (alertas que ya saltaron, no pospuestos) junto a la lista de reglas."""
+    from datetime import UTC, datetime
+
+    from sqlalchemy import or_
+
+    from app.models import ResearchAlert
+
+    now = datetime.now(UTC)
+    rows = db.scalars(select(ResearchAlert.snoozed_until).where(
+        ResearchAlert.tenant_id == tenant, ResearchAlert.status == "open",
+        or_(ResearchAlert.snoozed_until.is_(None), ResearchAlert.snoozed_until <= now))).all()
+    # SQLite devuelve fechas sin zona: se vuelve a filtrar aquí con la misma regla que alerts_answer.
+    count = sum(1 for until in rows
+                if until is None or (until if until.tzinfo else until.replace(tzinfo=UTC)) <= now)
+    if not count:
+        return None
+    if english:
+        if count == 1:
+            return "You also have 1 open alert (one that already triggered); see it in Alerts."
+        return f"You also have {count} open alerts (ones that already triggered); see them in Alerts."
+    if count == 1:
+        return "Eso sí, tienes 1 aviso abierto (una alerta que ya saltó); lo ves en Alertas."
+    return f"Eso sí, tienes {count} avisos abiertos (alertas que ya saltaron); los ves en Alertas."
+
+
 def _alert_rules_answer(db: Session, tenant: int) -> ChatResponse:
     from app.models import AlertRule, Company
 
@@ -1139,9 +1167,13 @@ def _alert_rules_answer(db: Session, tenant: int) -> ChatResponse:
         .order_by(AlertRule.id)
     ).all()
     sources = [_source("alert_rule", None, "Alertas", "/alerts")]
+    opened = _open_alerts_line(db, tenant, english)
     if not rows:
-        return _response("You have no active alerts. You can create them in Alerts." if english
-                         else "No tienes alertas activas. Puedes crearlas en Alertas.", sources, "account_alert_rules")
+        lines = ["You have no active alerts. You can create them in Alerts." if english
+                 else "No tienes alertas activas. Puedes crearlas en Alertas."]
+        if opened:
+            lines.append(opened)
+        return _response("\n".join(lines), sources, "account_alert_rules")
     count = len(rows)
     lines = [(f"You have {count} active alert{'s' if count != 1 else ''}:" if english
               else f"Tienes {count} alerta{'s' if count != 1 else ''} activa{'s' if count != 1 else ''}:")]
@@ -1154,13 +1186,15 @@ def _alert_rules_answer(db: Session, tenant: int) -> ChatResponse:
         lines.append(line)
     if count > 20:
         lines.append(f"And {count - 20} more in Alerts." if english else f"Y {count - 20} más en Alertas.")
+    if opened:
+        lines.append(opened)
     lines.append("To create, pause or delete alerts, go to Alerts." if english
                  else "Para crear, pausar o borrar alertas, ve a Alertas.")
     return _response("\n".join(lines), sources, "account_alert_rules")
 
 
 _SCREENS = re.compile(
-    r"\b(?:pantallas|screens?|screeners?|filtros)\s+(?:que\s+tengo\s+)?(?:guardad\w*|del\s+screener|en\s+el\s+screener)"
+    r"\b(?:pantallas|screens?|screeners?|filtros)\s+(?:(?:que\s+)?tengo\s+)?(?:guardad\w*|del\s+screener|en\s+el\s+screener)"
     r"|\bmis\s+(?:pantallas|screens?|screeners?)\b|\btengo\s+guardad\w+\s+en\s+el\s+screener\b"
     r"|\bmy\s+(?:saved\s+)?screens?\b|\bsaved\s+screens?\b"
 )
