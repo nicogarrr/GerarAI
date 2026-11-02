@@ -1521,8 +1521,16 @@ _MONTH_NAMES_EN = ("January", "February", "March", "April", "May", "June", "July
 _MAX_TRADES = 10
 
 
+#: «¿cuál fue mi última venta?», «what was my last sale?»: solo ventas (antes, modelo general).
+_LAST_SELLS = re.compile(
+    r"\bmis?\s+ultimas?\s+ventas?\b|\bultimas?\s+ventas?\s+(?:que\s+)?(?:he|hice)\b"
+    r"|\bmy\s+(?:last|latest|most\s+recent|recent)\s+(?:sales?|sells?)\b"
+)
+
+
 def _asks_trades(text: str, question: str) -> bool:
-    return bool((_TRADES_ES.search(text) or _TRADES_EN.search(text)) and not _tickers_in(question)
+    return bool((_TRADES_ES.search(text) or _TRADES_EN.search(text) or _LAST_SELLS.search(text))
+                and not _tickers_in(question)
                 and not re.search(r"\b(?:comision\w*|fees?|commissions?|deberia|should)\b", text))
 
 
@@ -1568,11 +1576,13 @@ def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = Non
 
     english = _english()
     period = None if ticker else _trades_period(text)
+    sells_only = ticker is None and period is None and bool(_LAST_SELLS.search(text))
     sources = [_source("transactions", None, "Operaciones" if not english else "Trades", "/portfolio")]
     query = (select(Transaction, Company.ticker, Portfolio.name)
              .outerjoin(Company, Company.id == Transaction.company_id)
              .outerjoin(Portfolio, Portfolio.id == Transaction.portfolio_id)
-             .where(Transaction.tenant_id == tenant, Transaction.action.in_(("buy", "sell"))))
+             .where(Transaction.tenant_id == tenant,
+                    Transaction.action.in_(("sell",) if sells_only else ("buy", "sell"))))
     if period is not None:
         query = query.where(Transaction.trade_date >= period[0], Transaction.trade_date <= period[1])
     if ticker:
@@ -1587,6 +1597,9 @@ def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = Non
         elif period is not None:
             text_out = (f"There are no saved buys or sells in {period[3]}." if english
                         else f"No hay compras ni ventas guardadas de {period[2]}.")
+        elif sells_only:
+            text_out = ("You have no saved sells. You can import them in Portfolio." if english
+                        else "No tienes ventas guardadas. Puedes importarlas en Cartera.")
         else:
             text_out = ("You have no saved buys or sells. You can import them in Portfolio." if english
                         else "No tienes compras ni ventas guardadas. Puedes importarlas en Cartera.")
@@ -1598,6 +1611,9 @@ def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = Non
     elif period is not None:
         lines = [f"Your saved buys and sells in {period[3]}:" if english
                  else f"Tus compras y ventas guardadas de {period[2]}:"]
+    elif sells_only:
+        lines = ["Your latest saved sells (most recent first):" if english
+                 else "Tus últimas ventas guardadas (la más reciente primero):"]
     else:
         lines = ["Your latest saved buys and sells (most recent first):" if english
                  else "Tus últimas compras y ventas guardadas (la más reciente primero):"]
