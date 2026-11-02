@@ -72,8 +72,8 @@ def test_alerts_question_lists_open_alerts_and_rules_without_llm(db):
     assert "Resuelto antiguo" not in resp.answer
     assert "De otro tenant" not in resp.answer
     assert "Pospuestos ahora mismo: 1" in resp.answer
-    assert "Reglas de aviso activas: 1 (price_below 1)" in resp.answer
-    assert "«AAPL < 200»" in resp.answer
+    assert "Reglas de aviso activas: 1." in resp.answer
+    assert "- AAPL: AAPL < 200 (saltó por última vez el" in resp.answer
     assert all(source["url"] == "/alerts" for source in resp.sources)
 
 

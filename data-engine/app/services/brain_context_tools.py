@@ -31,9 +31,11 @@ _ORDER_RE = re.compile(r"(?i)\b(?:compra|comprar|vende|vender|ejecuta|buy|sell)\
 # Crear o cambiar un aviso es una acción, no una consulta: no se contesta aquí.
 _ALERT_ACTION_RE = re.compile(
     r"(?i)\b(?:crea|crear|creame|cr[eé]ame|pon|ponme|configura\w*|a[nñ]ade|activa\w*|desactiva\w*|"
-    r"borra\w*|elimina\w*|silencia\w*|posp[oó]n\w*)\b"
+    r"borra\w*|elimina\w*|silencia\w*|posp[oó]n\w*|"
+    r"create|add|set\s+(?:up\s+)?an?|alert\s+me|notify|delete|remove|disable|enable|mute|snooze|pause)\b"
 )
-_ALERTS_RE = re.compile(r"(?i)\b(?:avisos?|alertas?)\b")
+# «my alerts», «show my alerts», «which alerts are set?»: en inglés iban al modelo general.
+_ALERTS_RE = re.compile(r"(?i)\b(?:avisos?|alertas?)\b|\b(?:my|any|open|which|what|show|list)\s+(?:\w+\s+)?alerts\b")
 _RISK_METRIC_RE = re.compile(
     r"(?i)\b(?:drawdown|ca[ií]da\s+m[aá]xima|volatilidad|twr|panel\s+de\s+riesgo|"
     r"(?:avisos?|alertas?|reglas?|l[ií]mites?)\s+de\s+riesgo)\b"
@@ -106,36 +108,58 @@ def alerts_answer(
         rule_query = rule_query.where(AlertRule.company_id == company.id)
     rules = db.execute(rule_query).all()
 
-    scope = f" de {company.ticker}" if company is not None else ""
+    from app.services.brain_account_tools import _date_en, _english, _rule_text
+
+    english = _english()
+    if english:
+        scope = f" for {company.ticker}" if company is not None else ""
+    else:
+        scope = f" de {company.ticker}" if company is not None else ""
     lines: list[str] = []
     sources: list[dict] = []
     if visible:
-        lines.append(f"Avisos abiertos{scope}: {len(visible)} (los más recientes primero).")
+        lines.append(f"Open alerts{scope}: {len(visible)} (most recent first)." if english
+                     else f"Avisos abiertos{scope}: {len(visible)} (los más recientes primero).")
         for alert, comp in visible[:8]:
             ticker = f"{comp.ticker}: " if comp is not None else ""
-            when = _day(alert.last_triggered_at or alert.created_at)
-            severity = _SEVERITY_ES.get(alert.severity, alert.severity)
-            lines.append(f"- {ticker}{alert.title} (gravedad {severity}, {when}).")
-            sources.append(_source("research_alert", alert.id, f"Aviso: {alert.title}", "/alerts"))
+            stamp = alert.last_triggered_at or alert.created_at
+            if english:
+                when = _date_en(stamp.date() if isinstance(stamp, datetime) else stamp) if stamp else "no date"
+                lines.append(f"- {ticker}{alert.title} (severity {alert.severity}, {when}).")
+            else:
+                severity = _SEVERITY_ES.get(alert.severity, alert.severity)
+                lines.append(f"- {ticker}{alert.title} (gravedad {severity}, {_day(stamp)}).")
+            sources.append(_source("research_alert", alert.id, f"{'Alert' if english else 'Aviso'}: {alert.title}",
+                                   "/alerts"))
         if len(visible) > 8:
-            lines.append(f"Y {len(visible) - 8} más en la página de avisos.")
+            lines.append(f"And {len(visible) - 8} more on the alerts page." if english
+                         else f"Y {len(visible) - 8} más en la página de avisos.")
     else:
-        lines.append(f"No hay avisos abiertos{scope}.")
+        lines.append(f"No open alerts{scope}." if english else f"No hay avisos abiertos{scope}.")
     if snoozed:
-        lines.append(f"Pospuestos ahora mismo: {snoozed}.")
+        lines.append(f"Snoozed right now: {snoozed}." if english else f"Pospuestos ahora mismo: {snoozed}.")
     if rules:
-        by_type: dict[str, int] = {}
-        for rule, _comp in rules:
-            by_type[rule.rule_type] = by_type.get(rule.rule_type, 0) + 1
-        detail = ", ".join(f"{kind} {count}" for kind, count in sorted(by_type.items()))
-        lines.append(f"Reglas de aviso activas{scope}: {len(rules)} ({detail}).")
-        triggered = [(rule, comp) for rule, comp in rules if rule.last_triggered_at is not None]
-        triggered.sort(key=lambda row: _aware(row[0].last_triggered_at) or now, reverse=True)
-        for rule, comp in triggered[:3]:
-            lines.append(f"- Última vez que saltó «{rule.name}» ({comp.ticker}): {_day(rule.last_triggered_at)}.")
-            sources.append(_source("alert_rule", rule.id, f"Regla: {rule.name}", "/alerts"))
+        # Cada regla en lenguaje normal («MSFT: precio por debajo de 300 USD»);
+        # antes salía el tipo interno y un recuento («price_below 1»).
+        lines.append(f"Active alert rules{scope}: {len(rules)}." if english
+                     else f"Reglas de aviso activas{scope}: {len(rules)}.")
+        rules = sorted(rules, key=lambda row: (_aware(row[0].last_triggered_at) is None, row[0].id))
+        for rule, comp in rules[:8]:
+            condition = rule.condition or {}
+            text = (_rule_text(rule.rule_type or "", condition, comp.currency, english)
+                    if condition.get("value") is not None else rule.name)
+            line = f"- {comp.ticker}: {text}"
+            if rule.last_triggered_at is not None:
+                fired = rule.last_triggered_at.date()
+                line += (f" (last triggered {_date_en(fired)})" if english
+                         else f" (saltó por última vez el {fecha_es(fired)})")
+                sources.append(_source("alert_rule", rule.id, f"{'Rule' if english else 'Regla'}: {rule.name}",
+                                       "/alerts"))
+            lines.append(line)
+        if len(rules) > 8:
+            lines.append(f"And {len(rules) - 8} more in Alerts." if english else f"Y {len(rules) - 8} más en Alertas.")
     else:
-        lines.append(f"No hay reglas de aviso activas{scope}.")
+        lines.append(f"No active alert rules{scope}." if english else f"No hay reglas de aviso activas{scope}.")
     return _response(lines, sources, "alerts")
 
 
