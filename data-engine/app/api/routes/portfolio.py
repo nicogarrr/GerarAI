@@ -1413,7 +1413,13 @@ def update_transaction(
     if "fees" in payload.model_fields_set:
         transaction.fees = payload.fees
     transaction.currency = canonical_currency_code(payload.currency)
-    transaction.raw_payload = {"notes": payload.notes} if payload.notes else {}
+    # Solo «notes» es del usuario: el resto del rastro (tradeID, accountId,
+    # identidad del CSV...) se conserva; sin el, la conciliacion de costes de
+    # IBKR tomaba la compra por no nativa y ocultaba coste y plusvalia.
+    raw_payload = {key: value for key, value in (transaction.raw_payload or {}).items() if key != "notes"}
+    if payload.notes:
+        raw_payload["notes"] = payload.notes
+    transaction.raw_payload = raw_payload
     try:
         # La sesion va con autoflush=False: sin volcar el cambio, la consulta
         # de rebuild_position leeria de la BD el ticker y la fecha ANTIGUOS

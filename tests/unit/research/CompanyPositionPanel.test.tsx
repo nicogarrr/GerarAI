@@ -77,4 +77,9 @@ describe('Company position panel with the same figures as the portfolio', () => 
         expect(screen.getByRole('status')).toHaveTextContent('No se pudo cargar tu posición en esta empresa.');
         expect(screen.getByRole('link', { name: 'Ir a la cartera' })).toHaveAttribute('href', '/portfolio');
     });
+    it('in English the load failure reads in English', () => {
+        render(<CompanyPositionPanel locale="en" context={{ status: 'error', message: 'No se pudo cargar tu posición en esta empresa.' }} />);
+        expect(screen.getByRole('status')).toHaveTextContent('Your position in this company could not be loaded.');
+        expect(screen.getByRole('status')).not.toHaveTextContent('No se pudo');
+    });
 });

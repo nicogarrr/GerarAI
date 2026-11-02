@@ -24,7 +24,7 @@ export function CompanyPositionPanel({ context, locale = DEFAULT_LOCALE }: { con
     const NA = fmt.na;
     if (context.status === 'error') {
         return <Panel density="compact" title={t('research.positionPanel.title')}>
-            <p className="text-sm text-amber-200" role="status">{context.message} {t('research.positionPanel.errorHint')}</p>
+            <p className="text-sm text-amber-200" role="status">{t('research.positionPanel.loadFailed')} {t('research.positionPanel.errorHint')}</p>
             <Link className="mt-2 inline-flex min-h-11 items-center text-sm text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href="/portfolio">{t('research.positionPanel.goToPortfolio')}</Link>
         </Panel>;
     }

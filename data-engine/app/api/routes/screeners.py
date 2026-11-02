@@ -149,7 +149,8 @@ def update_screen(screen_id: int, payload: ScreenCreate, db: Session = Depends(g
     screen.name = name
     screen.description = payload.description.strip()
     screen.criteria = criteria
-    screen.ranking_formula = payload.ranking_formula
+    # Igual que create_screen: recortada, y vacia = sin ranking (None, no "").
+    screen.ranking_formula = payload.ranking_formula.strip() if payload.ranking_formula else None
     screen.ranking_direction = payload.ranking_direction
     screen.alerts_enabled = payload.alerts_enabled
     try:
