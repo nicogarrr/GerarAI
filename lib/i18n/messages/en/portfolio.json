@@ -418,7 +418,9 @@
     "pendingBadQuantityMany": "{n} invalid quantities",
     "pendingUncheckedOne": "{n} row not marked as reviewed",
     "pendingUncheckedMany": "{n} rows not marked as reviewed",
-    "pendingMissing": "Still needed: {items}."
+    "pendingMissing": "Still needed: {items}.",
+    "previewNoRows": "No rows with a quantity header were recognised. Crop the table including the header, or use a file or manual entry.",
+    "previewRows": "Pick each instrument explicitly and review the rows. Prices in the screenshot are not imported."
   },
   "savings": {
     "title": "Your long-term savings",

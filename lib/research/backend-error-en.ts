@@ -65,6 +65,8 @@ const KNOWN: ReadonlyArray<readonly [RegExp, string]> = [
   [/^No se pudo iniciar la lectura local\. Usa un fichero o la entrada manual$/, 'Local reading could not start. Use a file or manual entry.'],
   [/^No se pudo leer la captura\. Prueba con un recorte más nítido o importa un fichero$/, 'The screenshot could not be read. Try a sharper crop or import a file.'],
   [/^La captura contiene demasiado texto\. Recorta solo la tabla de posiciones$/, 'The screenshot has too much text. Crop just the positions table.'],
+  [/^Hay otra captura en lectura\. Vuelve a intentarlo en unos segundos$/, 'Another screenshot is being read. Retry in a few seconds.'],
+  [/^No se puede leer esta imagen; prueba con otra captura$/, 'This image cannot be read; try another screenshot.'],
   // Watchlist, plan, impuestos y asistente
   [/^La etiqueta no puede llevar saltos de línea ni caracteres de control$/, 'The label cannot contain line breaks or control characters.'],
   [/^Los objetivos de tipo (\S+) suman ([\d.,]+) %: no pueden superar el 100 %\.?$/, '$1 targets add up to $2%: they cannot exceed 100%.'],

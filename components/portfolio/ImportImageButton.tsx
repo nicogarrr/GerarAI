@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { confirmPortfolioImage, previewPortfolioImage, reviewPortfolioImage, searchImageInstrument } from '@/lib/actions/portfolio-image.actions';
-import { imageFileError, imageRowsPending, normalizeImageQuantity, unwrapImageResult, type ImageInstrument, type ImagePreview, type ImageReview } from '@/lib/portfolio/image-import';
+import { imageFileError, imagePreviewMessage, imageRowsPending, normalizeImageQuantity, unwrapImageResult, type ImageInstrument, type ImagePreview, type ImageReview } from '@/lib/portfolio/image-import';
 import { toast } from 'sonner';
 import { useT, useFormat } from '@/lib/i18n/client';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
@@ -96,7 +96,7 @@ export default function ImportImageButton() {
             </button> : !review && <div className="mb-4 flex items-center justify-between gap-3"><p className="text-sm text-gray-400">{drafts.length} {drafts.length === 1 ? ti('portfolio.importImage.rowOne') : ti('portfolio.importImage.rowMany')}</p><Button variant="ghost" size="sm" disabled={busy} onClick={() => fileInput.current?.click()}>{ti('portfolio.importImage.changeImage')}</Button></div>}
             {busy && <p role="status" className="flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" />{ti('portfolio.importImage.busy')}</p>}
             {error && <p role="alert" className="rounded border border-red-700 p-3 text-sm text-red-200">{error}</p>}
-            {preview && drafts.length === 0 && !review && <p className="my-3 text-sm text-amber-200">{preview.message}</p>}
+            {preview && drafts.length === 0 && !review && <p className="my-3 text-sm text-amber-200">{imagePreviewMessage(preview.message, ti)}</p>}
             {!review && drafts.map((row, index) => <section key={index} className="mb-3 grid gap-3 rounded-xl border border-gray-700 bg-gray-800/30 p-4" aria-label={ti('portfolio.importImage.rowAria', { n: index + 1 })}>
                 <div className="flex items-center justify-between gap-2"><span className="text-xs font-medium uppercase tracking-wide text-gray-400">{ti('portfolio.importImage.positionLabel', { n: index + 1 })}</span><span className={`text-xs ${row.checked ? 'text-emerald-300' : 'text-amber-200'}`}>{row.checked ? ti('portfolio.importImage.reviewed') : ti('portfolio.importImage.toReview')}</span></div>
                 <details className="text-xs text-gray-500"><summary className="cursor-pointer">{ti('portfolio.importImage.rawText')}</summary><p className="mt-2 break-words text-gray-400">{ti('portfolio.importImage.rawRead', { raw: preview?.rows[index]?.raw ?? ti('portfolio.importImage.rawManual') })}</p></details>
