@@ -311,6 +311,10 @@ export function formatMoneyCompact(
   const parsed = toFinite(value);
   if (parsed === null) return fallback ?? naFor(locale);
   if (locale === 'en') {
+    // Peniques: Intl leía «GBp» como libras («£1.20B», x100); cifra y «p».
+    if (isPence(currency)) {
+      return `${formatCompact(parsed, { maximumFractionDigits: 2, ...options }, fallback, locale)}\u00a0p`;
+    }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency,
@@ -343,26 +347,15 @@ export function formatMarketCapUsd(value: NumericInput, fallback?: string, local
 export function formatMarketCap(value: NumericInput, currency: string | null, fallback?: string, locale: Locale = DEFAULT_LOCALE): string {
   const parsed = toFinite(value);
   if (parsed === null) return fallback ?? naFor(locale);
-  // Sin divisa real no se asume USD: numero compacto pelado, sin simbolo.
-  if (!currency) {
-    return new Intl.NumberFormat(intlLocale(locale), {
-      notation: 'compact',
-      maximumFractionDigits: 2,
-    }).format(parsed);
+  // Sin divisa real no se asume USD: numero compacto pelado, sin simbolo, con
+  // la escala es-ES fija (Intl compacto daba «9447 M», B18).
+  if (!currency) return formatCompact(parsed, { maximumFractionDigits: 2 }, fallback, locale);
+  // Todas las divisas con la escala es-ES fija de formatMoneyCompact: en EUR
+  // salía «9447 M €» (Intl compacto, B18) y los peniques (GBp) como «GBP».
+  if (isPence(currency) || isValidCurrencyCode(currency.toUpperCase())) {
+    return formatMoneyCompact(parsed, isPence(currency) ? currency : currency.toUpperCase(), {}, fallback, locale);
   }
-  // USD con la misma escala es-ES fija que formatMarketCapUsd («4,87 mil M US$»).
-  if (currency.toUpperCase() === 'USD') return formatMoneyCompact(parsed, 'USD', {}, fallback, locale);
-  try {
-    return new Intl.NumberFormat(intlLocale(locale), {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: 0,
-      notation: 'compact',
-      maximumFractionDigits: 2,
-    }).format(parsed);
-  } catch {
-    return formatNumber(parsed, {}, fallback, locale);
-  }
+  return formatCompact(parsed, { maximumFractionDigits: 2 }, fallback, locale);
 }
 
 export function formatPercent(
