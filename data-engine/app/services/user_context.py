@@ -168,6 +168,9 @@ class ContextBlock:
     lines: list[str] = field(default_factory=list)
     rows: list[dict] = field(default_factory=list)
     sources: list[dict] = field(default_factory=list)
+    # Las mismas líneas en inglés, solo para la respuesta determinista en
+    # inglés; nunca van al contexto del modelo (``render`` usa ``lines``).
+    lines_en: list[str] = field(default_factory=list)
 
     @property
     def title(self) -> str:
@@ -281,6 +284,44 @@ def _dca_text(
             # Mismo límite que la watchlist («desactualizado»): no es el nivel de hoy.
             stale = f" [desactualizado: último cierre de hace {age} días]"
     return f"nivel DCA {label}{extra} ({_day(when)}){stale}", level
+
+
+_DCA_LABELS_EN = {"RECORTE LIGERO": "LIGHT TRIM", "RECORTE FUERTE": "STRONG TRIM"}
+
+
+def _dca_text_en(levels: dict[str, Any] | None, symbol: str, today: date | None = None) -> str:
+    """``_dca_text`` en inglés, para la respuesta determinista (no para el modelo)."""
+    if levels is None:
+        return "DCA level not available (the DCA engine hasn't evaluated it yet)"
+    reading = levels.get(symbol.upper())
+    if reading is None:
+        return "no DCA level evaluated"
+    level = int(getattr(reading, "level", 0) or 0)
+    label = getattr(reading, "label", None) or _DCA_LABELS.get(level, f"{level}X DCA")
+    label = _DCA_LABELS_EN.get(label, label)
+    extra = " (forming)" if (getattr(reading, "status", "") or "") == "forming" else ""
+    when = getattr(reading, "signal_date", None)
+    stale = ""
+    if today is not None and isinstance(when, date):
+        from app.core.config import get_settings
+
+        age = (today - when).days
+        if age > int(get_settings().dca_max_data_age_days):
+            stale = f" [stale: last close {age} days ago]"
+    return f"DCA level {label}{extra} ({_day(when) if when is not None else 'no date'}){stale}"
+
+
+def _num_en(value: float, digits: int = 2) -> str:
+    return f"{value:,.{digits}f}"
+
+
+def _fair_label_en(reading: dict) -> str:
+    source = reading.get("source")
+    if source == "tesis":
+        return f"published thesis v{reading.get('thesis_version')}" + (" (old)" if reading.get("stale") else "")
+    if source == "motor":
+        return "valuation engine"
+    return "valuation engine (indicative)"
 
 
 # ------------------------------------------------------------------ bloques
@@ -417,6 +458,7 @@ def _watchlist_block(
     ).all()
     if not items:
         block.lines.append("- Watchlist vacía.")
+        block.lines_en.append("- Your watchlist is empty.")
         return block
     symbols = [str(item.symbol).upper() for item in items]
     companies = {
@@ -429,16 +471,23 @@ def _watchlist_block(
         f"- {len(items)} valores. Margen de seguridad = (valor justo − precio) / valor justo; "
         "positivo = cotiza por debajo del valor justo."
     )
+    block.lines_en.append(
+        f"- {len(items)} stock{'s' if len(items) != 1 else ''}. Margin of safety = (fair value − price) / fair value; "
+        "positive = trading below fair value."
+    )
     for item in items[:MAX_WATCH]:
         symbol = str(item.symbol).upper()
         comp = companies.get(symbol)
         dca, level = _dca_text(levels, symbol, today)
+        dca_en = _dca_text_en(levels, symbol, today)
         row: dict[str, Any] = {"ticker": symbol, "dca_level": level, "mos": None, "fair_value": None, "price": None}
         if comp is None:
             block.lines.append(f"- {symbol}: aún sin ficha en GerarAI (sin precio ni valor justo); {dca}.")
+            block.lines_en.append(f"- {symbol}: no GerarAI page yet (no price or fair value); {dca_en}.")
             block.rows.append(row)
             continue
         parts = [f"- {symbol} ({_short(comp.name, 40)})"]
+        parts_en = list(parts)
         reading = fair.get(int(comp.id)) or {}
         value = _f(reading.get("value"))
         raw_close = closes.get(int(comp.id))
@@ -455,11 +504,14 @@ def _watchlist_block(
         if raw_close is not None and listed is not None:
             close = (float(listed[0]), raw_close[1])
             parts.append(f"cierre {num_es(close[0])} {listed[1]} ({_day(close[1])})")
+            parts_en.append(f"close {_num_en(close[0])} {listed[1]} ({_day(close[1])})")
             row["price"] = close[0]
         elif raw_close is not None:
             parts.append("precio guardado sin unidad verificable")
+            parts_en.append("saved price without a verifiable unit")
         else:
             parts.append("sin precio guardado")
+            parts_en.append("no saved price")
         fair_major = normalize_currency(currency)[0]
         if close is not None and listed is not None and (fair_major is None or listed[1] != fair_major):
             close_for_mos = None
@@ -468,23 +520,30 @@ def _watchlist_block(
         if value is not None:
             label = reading.get("label") or "valor justo"
             parts.append(f"valor justo {num_es(value)} {normalize_currency(currency)[0] or currency} ({label})")
+            parts_en.append(f"fair value {_num_en(value)} {normalize_currency(currency)[0] or currency} ({_fair_label_en(reading)})")
             row["fair_value"] = value
         else:
             parts.append("sin valor justo (ni tesis publicada ni motor)")
+            parts_en.append("no fair value (neither a published thesis nor the engine)")
         mos = margin_of_safety(value, close_for_mos[0] if close_for_mos else None)
         if mos is not None and value is not None and close_for_mos is not None:
             ratio = value / close_for_mos[0]
             if ratio > _MOS_SANE_RATIO or ratio < 1 / _MOS_SANE_RATIO:
                 parts.append("margen no calculado: posible desajuste de unidades o divisa entre precio y valor")
+                parts_en.append("margin not calculated: possible unit or currency mismatch between price and value")
             else:
                 parts.append(f"margen de seguridad {pct_es(mos, signed=True)}")
+                parts_en.append(f"margin of safety {'+' if mos > 0 else ''}{_num_en(mos * 100, 1)}%")
                 row["mos"] = mos
         parts.append(dca)
+        parts_en.append(dca_en)
         block.lines.append(", ".join(parts) + ".")
+        block.lines_en.append(", ".join(parts_en) + ".")
         block.rows.append(row)
         block.sources.append(_source("watch_item", item.id, f"Watchlist {symbol}", "/watchlist"))
     if len(items) > MAX_WATCH:
         block.lines.append(f"- Y {len(items) - MAX_WATCH} valores más en /watchlist.")
+        block.lines_en.append(f"- And {len(items) - MAX_WATCH} more in /watchlist.")
     return block
 
 

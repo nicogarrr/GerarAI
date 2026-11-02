@@ -354,6 +354,12 @@ def deterministic_lines(intent: PersonalIntent, ctx: UserContext, db: Session) -
                 "las posiciones y te digo cómo va, con peso, P&L y nivel DCA de cada una."
             ]
         return ["Tu cartera (/portfolio):", *lines]
+    if intent.kind == "watchlist" and _english():
+        # En inglés, la respuesta sin modelo sale en inglés («Tus datos de
+        # watchlist…» salía en castellano); el contexto del modelo no cambia.
+        block = ctx.block("watchlist")
+        lines_en = list(block.lines_en) if block else []
+        return ["Your watchlist in GerarAI:", *(lines_en or _block_lines(ctx, "watchlist"))]
     key = {"watchlist": "watchlist", "plan": "plan", "tesis": "tesis", "fiscal": "fiscal"}.get(intent.kind)
     if key:
         return [f"Tus datos de {key} en GerarAI:", *_block_lines(ctx, key)]
