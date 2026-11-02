@@ -1615,6 +1615,63 @@ def _trade_count_answer(db: Session, tenant: int, text: str) -> ChatResponse:
     lines.append("Counting buys and sells only; not dividends or cash movements." if english
                  else "Cuento compras y ventas; no dividendos ni movimientos de efectivo.")
     return _response("\n".join(lines), sources, "account_trade_count")
+# ------------------------------------------------------------------ carteras
+
+_PORTFOLIOS = re.compile(
+    r"\b(?:que|cuales|cuant[ao]s)\s+carteras\s+(?:tengo|hay)\b|\bmis\s+carteras\b|^\W*cuant[ao]s\s+carteras\b"
+    r"|\bhow\s+many\s+portfolios\b|\bmy\s+portfolios\b|\b(?:what|which)\s+portfolios\s+(?:do\s+i\s+have|have\s+i)\b"
+)
+
+
+def _asks_portfolios(text: str, question: str) -> bool:
+    return bool(_PORTFOLIOS.search(text) and not _tickers_in(question))
+
+
+def _portfolios_answer(db: Session, tenant: int) -> ChatResponse:
+    """Carteras guardadas con sus posiciones abiertas y su valor (solo lectura, solo del tenant)."""
+    from app.models import Portfolio, Position
+
+    english = _english()
+    portfolios = list(db.scalars(select(Portfolio).where(Portfolio.tenant_id == tenant)
+                                 .order_by(Portfolio.is_default.desc(), Portfolio.id)))
+    sources = [_source("portfolio", None, "Portfolio" if english else "Cartera", "/portfolio")]
+    if not portfolios:
+        return _response("You have no saved portfolios. You can create or import them in Portfolio." if english
+                         else "No tienes carteras guardadas. Puedes crearlas o importarlas en Cartera.",
+                         sources, "account_portfolios")
+    stats: dict[int, list] = {p.id: [0, Decimal("0"), True] for p in portfolios}
+    for portfolio_id, value in db.execute(
+        select(Position.portfolio_id, Position.market_value_base)
+        .where(Position.tenant_id == tenant, Position.quantity > 0)
+    ).all():
+        row = stats.get(portfolio_id)
+        if row is None:
+            continue
+        row[0] += 1
+        if value is None:
+            row[2] = False
+        else:
+            row[1] += Decimal(value)
+    count = len(portfolios)
+    if english:
+        lines = [f"You have {count} saved portfolio{'' if count == 1 else 's'}:"]
+    else:
+        lines = [f"Tienes {count} cartera{'' if count == 1 else 's'} guardada{'' if count == 1 else 's'}:"]
+    for portfolio in portfolios:
+        n, total, priced = stats[portfolio.id]
+        default = (" (default)" if english else " (predeterminada)") if portfolio.is_default and count > 1 else ""
+        if not n:
+            detail = "no open positions" if english else "sin posiciones abiertas"
+        else:
+            detail = (f"{n} open position{'' if n == 1 else 's'}" if english
+                      else f"{n} posici{'ón' if n == 1 else 'ones'} abierta{'' if n == 1 else 's'}")
+            if priced:
+                detail += (", value " if english else ", valor ") + _money(float(total), portfolio.base_currency,
+                                                                           english=english)
+        lines.append(f"- {portfolio.name}{default}: {detail}.")
+    lines.append("Position values in each portfolio's base currency, with the latest saved prices." if english
+                 else "Valor de las posiciones en la divisa base de cada cartera, con los últimos precios guardados.")
+    return _response("\n".join(lines), sources, "account_portfolios")
 
 
 def answer_account_question(db: Session, question: str) -> ChatResponse | None:
@@ -1629,6 +1686,8 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
         return _history_answer(db, tenant, text)
     if _asks_sell_all_tax(text, question):
         return _sell_all_answer(db, tenant)
+    if _asks_portfolios(text, question):
+        return _portfolios_answer(db, tenant)
     if _asks_documents(text, question):
         return _documents_answer(db, tenant)
     if _asks_saved_screens(text, question):
