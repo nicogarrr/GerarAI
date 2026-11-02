@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
+import { AuthFormFooterLink, AuthFormNotice, AuthFormResult } from '@/components/auth/form-bits';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,18 +25,15 @@ export default function ForgotPasswordForm({
 
     if (!emailConfigured) {
         return (
-            <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-100">
-                <p className="font-medium">{t('auth.forgotPassword.unavailableTitle')}</p>
-                <p className="mt-1">
-                    {t('auth.forgotPassword.unavailableBody')}{' '}
-                    <Link className="underline" href="/security">{t('auth.forgotPassword.securityLink')}</Link>.
-                    {supportEmail ? (
-                        <> {t('auth.forgotPassword.unavailableContactPrefix')} <a className="underline" href={`mailto:${supportEmail}`}>{supportEmail}</a>.</>
-                    ) : (
-                        <> {t('auth.forgotPassword.unavailableHelpPrefix')} <Link className="underline" href="/help">{t('auth.forgotPassword.helpLink')}</Link> {t('auth.forgotPassword.unavailableHelpSuffix')}</>
-                    )}
-                </p>
-            </div>
+            <AuthFormNotice title={t('auth.forgotPassword.unavailableTitle')}>
+                {t('auth.forgotPassword.unavailableBody')}{' '}
+                <Link className="underline" href="/security">{t('auth.forgotPassword.securityLink')}</Link>.
+                {supportEmail ? (
+                    <> {t('auth.forgotPassword.unavailableContactPrefix')} <a className="underline" href={`mailto:${supportEmail}`}>{supportEmail}</a>.</>
+                ) : (
+                    <> {t('auth.forgotPassword.unavailableHelpPrefix')} <Link className="underline" href="/help">{t('auth.forgotPassword.helpLink')}</Link> {t('auth.forgotPassword.unavailableHelpSuffix')}</>
+                )}
+            </AuthFormNotice>
         );
     }
 
@@ -71,17 +69,8 @@ export default function ForgotPasswordForm({
             <Button disabled={busy} type="submit">
                 {busy ? t('auth.forgotPassword.submitting') : t('auth.forgotPassword.submit')}
             </Button>
-            {message ? (
-                <p
-                    className={`text-sm ${isError ? 'text-red-300' : 'text-teal-200'}`}
-                    role={isError ? 'alert' : 'status'}
-                >
-                    {message}
-                </p>
-            ) : null}
-            <p className="text-sm text-gray-500">
-                <Link className="underline hover:text-teal-300" href="/sign-in">{t('auth.forgotPassword.backToSignIn')}</Link>
-            </p>
+            <AuthFormResult message={message} isError={isError} />
+            <AuthFormFooterLink href="/sign-in">{t('auth.forgotPassword.backToSignIn')}</AuthFormFooterLink>
         </form>
     );
 }

@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import type { Currency, OptionContract } from '@/lib/paper-trading/types';
 import { expirationState, isRealDate } from '@/lib/paper-trading/options';
 import { clientOrderIdAfter, parseEsNumber } from './submit';
+import { invalidMessage, TicketFeedbackMessages, useExecutedAtLocal, type FieldInvalid } from './ticket-feedback';
 import type { FillSubmit, SubmitFill } from './submit';
 
 type Kind = 'accion' | 'opcion';
@@ -64,16 +65,8 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     const [strike, setStrike] = useState('');
     const [expiry, setExpiry] = useState('');
 
-    const [executedAtLocal, setExecutedAtLocal] = useState(() => {
-        const now = new Date();
-        now.setSeconds(0, 0);
-        // datetime-local espera hora local sin zona
-        return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-    });
-    // Error de validación local ligado a los valores con los que se calculó:
-    // en cuanto el usuario edita cualquier campo la clave cambia y deja de
-    // mostrarse, sin efectos ni renders en cascada.
-    const [invalid, setInvalid] = useState<{ key: string; message: string } | null>(null);
+    const [executedAtLocal, setExecutedAtLocal] = useExecutedAtLocal();
+    const [invalid, setInvalid] = useState<FieldInvalid>(null);
     // Feedback del envío (rechazo/fallo de la acción): persiste hasta el próximo envío.
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
@@ -102,7 +95,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     }
 
     const fieldKey = JSON.stringify([kind, symbol, name, side, quantity, price, currency, callPut, strike, expiry, executedAtLocal]);
-    const validationError = invalid !== null && invalid.key === fieldKey ? invalid.message : null;
+    const validationError = invalidMessage(invalid, fieldKey);
 
     const parsedQuantity = parseEsNumber(quantity);
     const parsedPrice = parseEsNumber(price);
@@ -446,21 +439,12 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                 </div>
             ) : null}
 
-            {validationError || submitError ? (
-                <p role="alert" className="text-sm text-red-400">
-                    {validationError ?? submitError}
-                </p>
-            ) : null}
-            {notice ? (
-                <p role="status" className="text-sm text-teal-300">
-                    {notice}
-                </p>
-            ) : null}
-            {duplicate ? (
-                <p role="status" className="text-sm text-warn">
-                    {duplicate}
-                </p>
-            ) : null}
+            <TicketFeedbackMessages
+                validationError={validationError}
+                submitError={submitError}
+                notice={notice}
+                duplicate={duplicate}
+            />
 
             <Button type="submit" disabled={disabled || pending}>
                 {pending ? ti('paperTrading.ticket.submitPending') : ti('paperTrading.ticket.submit', { side: submitSideLabel })}
