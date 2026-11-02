@@ -225,3 +225,21 @@ def test_fechas_legibles_y_plan_a_un_ano(db):
     ctx = _ctx(db)
     assert "horizonte 1 año; desde " in ctx.render()
     assert "horizon 1 year; since " in "\n".join(ctx.block("plan").lines_en)
+
+
+def test_posicion_sin_valorar_no_cuenta_en_el_pnl(db):
+    """Valoración en blanco (sin cotización): antes su coste rebajaba el P&L total
+    (+8,3 % en vez de +12,1 %) y su línea decía «valor 0,00 EUR, P&L +0,00 EUR»."""
+    from sqlalchemy import select
+
+    from app.models.entities import Company, Position
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+
+    asts = db.scalar(select(Position).join(Company, Company.id == Position.company_id).where(Company.ticker == "ASTS"))
+    PortfolioLedgerService._blank_valuation(asts)
+    db.commit()
+    text = _ctx(db).render()
+    assert "P&L latente +650,00 EUR (+12,1 % sobre coste). Sin valorar (fuera del total): ASTS." in text
+    line = next(item for item in text.splitlines() if item.startswith("- ASTS"))
+    assert "sin valoración (sin cotización)" in line
+    assert "P&L" not in line and "valor 0,00" not in line and "peso" not in line
