@@ -16,7 +16,7 @@ vi.mock('@/lib/cache/requestCache', () => ({ requestCache: { invalidate: request
 vi.mock('next/cache', () => ({ revalidatePath }));
 vi.mock('@/lib/actions/watchlist.actions', () => ({ getWatchlist }));
 
-import { AppError } from '@/lib/types/errors';
+import { AppError, ExternalAPIError } from '@/lib/types/errors';
 import { feedPaperProposalsNow, getPaperTrading } from '@/lib/actions/paper-trading.actions';
 import { getHistoricalStress } from '@/lib/actions/historical-stress.actions';
 import { getCorporateActions, applyCorporateAction, getCorporateActionsSyncStatus } from '@/lib/actions/corporate-actions.actions';
@@ -59,12 +59,13 @@ describe('paper-trading', () => {
 
 describe('historical-stress', () => {
     it('no-ok -> AppError con status; red caída -> ExternalAPIError; ticker en query', async () => {
-        fetchMock.mockResolvedValue({ ok: true, json: async () => ({ status: 'ok' }) } as Response);
+        // Usa el cliente común del motor (researchRequest): sus errores llegan tal cual.
+        researchRequest.mockResolvedValue({ status: 'ok' });
         await getHistoricalStress('AAPL');
-        expect(String(fetchMock.mock.calls[0][0])).toContain('/api/risk/historical-stress?ticker=AAPL');
-        fetchMock.mockResolvedValue({ ok: false, status: 503 } as Response);
+        expect(String(researchRequest.mock.calls[0][0])).toContain('/api/risk/historical-stress?ticker=AAPL');
+        researchRequest.mockRejectedValue(new AppError('503', 'RESEARCH_API_ERROR', 503));
         await expect(getHistoricalStress()).rejects.toMatchObject({ code: 'RESEARCH_API_ERROR', statusCode: 503 });
-        fetchMock.mockRejectedValue(new Error('red'));
+        researchRequest.mockRejectedValue(new ExternalAPIError('red', 'research'));
         await expect(getHistoricalStress()).rejects.toMatchObject({ code: 'EXTERNAL_API_ERROR' });
     });
 });

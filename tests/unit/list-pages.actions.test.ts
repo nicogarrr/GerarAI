@@ -6,17 +6,18 @@ vi.mock('@/lib/research/client', () => ({ RESEARCH_TIMEOUTS: { GLOBAL_MS: 1000 }
 vi.mock('@/lib/auth/require-user', () => ({ requireAuthenticatedUser: user }));
 import { getKnowledgeLibrary, getKnowledgeDocument } from '@/lib/actions/research-tools.actions';
 import { getPortfolioTransactionPage } from '@/lib/actions/portfolio.actions';
+import { AppError } from '@/lib/types/errors';
 
 describe('bounded page actions', () => {
  beforeEach(() => { vi.clearAllMocks(); user.mockResolvedValue({ id: 'tenant-one' }); identity.mockResolvedValue({}); });
  it('requests a bounded offset page and server-side principle status, preserving totals', async () => {
   const urls: string[] = [];
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+  // La biblioteca usa el cliente común del motor (researchRequest), no un fetch propio.
+  request.mockImplementation(async (url: string) => {
    urls.push(String(url));
-   const payload = url.includes('/documents/page') ? { items: [{ id: 1 }], total: 351, collection_counts: { 3: 351 } }
+   return url.includes('/documents/page') ? { items: [{ id: 1 }], total: 351, collection_counts: { 3: 351 } }
     : url.includes('/principles/page') ? { items: [{ id: 8, status: 'approved' }], total: 1, proposed_total: 350 } : [];
-   return new Response(JSON.stringify(payload));
-  }));
+  });
   const result = await getKnowledgeLibrary({ documentOffset: 200, principleOffset: 0, status: 'approved' });
   expect(urls.some(url => url.endsWith('/documents/page?limit=50&offset=200'))).toBe(true);
   expect(urls.some(url => url.endsWith('/principles/page?limit=50&offset=0&status=approved'))).toBe(true);
@@ -25,13 +26,12 @@ describe('bounded page actions', () => {
  });
  it('searches the library in the backend (tenant-scoped endpoint) and keeps library totals', async () => {
   const urls: string[] = [];
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+  request.mockImplementation(async (url: string) => {
    urls.push(String(url));
-   const payload = url.includes('/documents/search') ? { items: [{ id: 7 }], total: 61, query: 'buffett carta' }
+   return url.includes('/documents/search') ? { items: [{ id: 7 }], total: 61, query: 'buffett carta' }
     : url.includes('/documents/page') ? { items: [{ id: 1 }], total: 351, collection_counts: { 3: 351 } }
     : url.includes('/principles/page') ? { items: [], total: 0, proposed_total: 0 } : [];
-   return new Response(JSON.stringify(payload));
-  }));
+  });
   const result = await getKnowledgeLibrary({ documentOffset: 50, q: '  buffett carta ' });
   expect(urls.some(url => url.endsWith('/documents/search?q=buffett%20carta&limit=50&offset=50'))).toBe(true);
   expect(result.documents).toEqual([{ id: 7 }]);
@@ -42,12 +42,13 @@ describe('bounded page actions', () => {
   expect(urls.some(url => url.includes('/documents/search'))).toBe(false);
  });
  it('resolves a document outside the visible page and keeps missing links harmless', async () => {
-  const fetch = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ id: 1, title: 'Old document' })))
-   .mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'Not found' }), { status: 404 }));
-  vi.stubGlobal('fetch', fetch);
+  request.mockResolvedValueOnce({ id: 1, title: 'Old document' })
+   .mockRejectedValueOnce(new AppError('Not found', 'RESEARCH_API_ERROR', 404));
   expect((await getKnowledgeDocument(1))?.title).toBe('Old document');
   expect(await getKnowledgeDocument(999)).toBeNull();
-  expect(String(fetch.mock.calls[0][0])).toContain('/documents/1');
+  expect(String(request.mock.calls[0][0])).toContain('/documents/1');
+  request.mockRejectedValueOnce(new AppError('Boom', 'RESEARCH_API_ERROR', 500));
+  await expect(getKnowledgeDocument(2)).rejects.toThrow('Boom');
  });
  it('maps the 201st transaction with its currency and does not cache stale pages', async () => {
   request.mockResolvedValue({ items: [{ id: 201, ticker: 'OLD', action: 'buy', quantity: 1, price: 10, fees: 2.5, trade_date: '2020-01-01', currency: 'EUR' }], total: 201 });
