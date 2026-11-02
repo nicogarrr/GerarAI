@@ -43,7 +43,7 @@ _CURRENCY_MAP = {
 }
 _LOT_RE = re.compile(
     rf"(?i)(?<![\d.,])(?P<qty>{_NUM})\s*(?:acciones|t[ií]tulos|participaciones)?"
-    rf"(?:\s+(?:de\s+|en\s+)?[A-Za-z][\w.]*)?\s+(?:a|por|@)\s+(?:(?P<pre>{_CUR})\s*)?"
+    rf"(?:\s+(?:de\s+|en\s+)?[A-Za-z][\w.]*)?\s+(?:a|por|@)\s+(?P<total>un\s+total\s+de\s+)?(?:(?P<pre>{_CUR})\s*)?"
     rf"(?P<price>{_NUM})\s*(?P<cur>{_CUR})?"
 )
 _SALE_PRICE_RE = re.compile(
@@ -65,6 +65,7 @@ _SALE_PRICE_RE = re.compile(
     rf"|\bprecio\s+de\s+venta\s+(?:de\s+|es\s+|ser[ií]a\s+)?(?:(?P<pre2>{_CUR})\s*)?"
     rf"(?P<price2>{_NUM})\s*(?P<cur2>{_CUR})?"
 )
+_LOT_TOTAL_AFTER_RE = re.compile(r"(?i)\s*(?:en\s+total|en\s+conjunto)\b")
 # «… que compré a 150 $» sin cantidad: el lote es lo que se vende.
 _BOUGHT_AT_RE = re.compile(
     rf"(?i)\bcompr\w*\s+(?:(?:las|los|todas|todo|todos)\s+)?"
@@ -235,6 +236,10 @@ def parse_purchase_lots(text: str) -> list[HypoLot]:
         price = parse_number(m.group("price"))
         if qty is None or price is None or qty <= 0 or price <= 0:
             continue
+        # «7 acciones por 1.050 € en total» / «por un total de 1.050 €»: el importe
+        # es el del lote entero; antes se tomaba como precio por acción (coste x7).
+        if m.group("total") or _LOT_TOTAL_AFTER_RE.match(text, m.end()):
+            price = price / qty
         # La fecha va detrás del lote (hasta el siguiente) o justo delante.
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         after = text[m.end():min(end, m.end() + 60)]
