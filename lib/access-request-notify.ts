@@ -1,5 +1,5 @@
-import nodemailer from 'nodemailer';
 import { buildNotification, notifyTarget, smtpConfig, type AccessRequestInput } from '@/lib/access-request';
+import { createSmtpTransport } from '@/lib/smtp-transport';
 
 /**
  * Avisa por correo de una solicitud nueva. Devuelve true solo si el correo SALIO.
@@ -14,15 +14,7 @@ export async function notifyAccessRequest(req: AccessRequestInput, total: number
     if (!to || !smtp) return false;
     const { subject, text } = buildNotification(req, total);
     try {
-        const transport = nodemailer.createTransport({
-            host: smtp.host,
-            port: smtp.port,
-            secure: smtp.port === 465,
-            auth: { user: smtp.user, pass: smtp.pass },
-            connectionTimeout: 8000,
-            greetingTimeout: 8000,
-            socketTimeout: 10000,
-        });
+        const transport = createSmtpTransport(smtp);
         await transport.sendMail({ from: smtp.from, to, replyTo: req.email, subject, text });
         return true;
     } catch (error) {

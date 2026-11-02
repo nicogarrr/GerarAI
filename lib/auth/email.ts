@@ -1,6 +1,6 @@
-import nodemailer from 'nodemailer';
 
 import { smtpConfig } from '@/lib/access-request';
+import { createSmtpTransport } from '@/lib/smtp-transport';
 import { getT } from '@/lib/i18n/server';
 
 /**
@@ -27,15 +27,7 @@ export async function sendPasswordResetEmail(args: {
     const greeting = args.name?.trim()
         ? t('emails.passwordReset.greetingNamed', { name: args.name.trim() })
         : t('emails.passwordReset.greeting');
-    const transport = nodemailer.createTransport({
-        host: smtp.host,
-        port: smtp.port,
-        secure: smtp.port === 465,
-        auth: { user: smtp.user, pass: smtp.pass },
-        connectionTimeout: 8000,
-        greetingTimeout: 8000,
-        socketTimeout: 10000,
-    });
+    const transport = createSmtpTransport(smtp);
     await transport.sendMail({
         from: smtp.from,
         to: args.to,
