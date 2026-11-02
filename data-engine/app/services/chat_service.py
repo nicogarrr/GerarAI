@@ -879,6 +879,11 @@ _PORTFOLIO_QUERY_RE = re.compile(
     r"|\bwhat\s+do\s+i\s+(?:own|hold)\b"
     # «How many positions do I have?» iba al modelo general (en castellano ya iba aquí).
     r"|\bhow\s+many\s+(?:positions|stocks|holdings|companies)\s+(?:do\s+i\s+(?:have|own|hold)|am\s+i\s+holding)\b"
+    # «¿Cuántas acciones tengo?» / «how many shares do I have?» SIN ticker: el volcado
+    # ya da las acciones de cada posición (antes iba al modelo general). Con ticker
+    # («… de UBER», «… of UBER») sigue la ruta de la posición.
+    r"|\bcu[aá]ntas\s+acciones\s+tengo\s*(?:[?¿.!]|$|en\s+(?:total|cartera|mi\s+cartera))"
+    r"|\bhow\s+many\s+shares\s+do\s+i\s+(?:have|own|hold)\s*(?:[?.!]|$|in\s+(?:total|my\s+portfolio))"
 )
 # «¿Qué diversificación tengo?», «¿en qué sectores estoy?», «which sectors am I
 # in?»: hablan de tu cartera sin decir «mi cartera» y caían al modelo general.
