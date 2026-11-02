@@ -1,4 +1,5 @@
 import { getT } from '@/lib/i18n/server';
+import { LoadingShell } from '@/components/ui/loading-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 
@@ -10,9 +11,7 @@ import { Card } from '@/components/ui/card';
 export default async function Loading() {
   const ti = await getT();
   return (
-    <main id="content" tabIndex={-1} aria-busy="true" className="mx-auto flex max-w-7xl flex-col gap-6">
-      <span className="sr-only" role="status">{ti('common.states.loading')}</span>
-      <div aria-hidden="true" className="space-y-6">
+    <LoadingShell label={ti('common.states.loading')} className="mx-auto flex max-w-7xl flex-col gap-6" contentClassName="space-y-6">
         <div className="space-y-2">
           <Skeleton className="h-3 w-24" />
           <Skeleton className="h-9 w-64" />
@@ -27,7 +26,6 @@ export default async function Loading() {
             </Card>
           ))}
         </div>
-      </div>
-    </main>
+     </LoadingShell>
   );
 }
