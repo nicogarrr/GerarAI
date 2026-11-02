@@ -196,7 +196,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.12.5"
           enable-cache: true
@@ -232,7 +232,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.12.5"
           enable-cache: true
@@ -373,7 +373,7 @@ jobs:
       # El venv entra en PATH para que los pasos
       # siguientes (`python scripts/run_*.py`, precarga del modelo) lo usen
       # sin tocar sus comandos.
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         if: ${{ steps.discover.outputs.present != '' }}
         with:
           version: "0.12.5"
@@ -751,7 +751,7 @@ jobs:
       # El venv entra en PATH:
       # `python -m alembic` y el webServer de playwright.config.ts
       # (PYTHON_BIN ?? "python") usan el venv sin tocar sus comandos.
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.12.5"
           enable-cache: true
@@ -811,7 +811,7 @@ jobs:
       # dep-parity compara dependencias directas, no versiones transitivas.
       # Medicion local reportada: pip caliente 7s / uv 0.85s; no promete
       # ese ahorro en CI, donde cache y disco son distintos.
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.12.5"
           enable-cache: true
