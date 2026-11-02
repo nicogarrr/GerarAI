@@ -61,6 +61,20 @@
     }
   },
   "dca": {
+    "engine": {
+      "lightTrim": "RECORTE LIGERO",
+      "strongTrim": "RECORTE FUERTE",
+      "all2x4x": "Todos 2X–4X",
+      "zoneExtreme": "Zona de compra extrema",
+      "zoneStrong": "Zona de compra fuerte",
+      "zoneBuy": "Zona de compra",
+      "zoneNormal": "Zona de aportacion normal",
+      "zoneLightTrim": "Zona de recorte ligero",
+      "zoneStrongTrim": "Zona de recorte fuerte",
+      "planPlain": "DCA plano",
+      "planLevels": "DCA por niveles (aporta extra)",
+      "planFixed": "Niveles con presupuesto fijo"
+    },
     "run": {
       "startFailed": "No se pudo iniciar la evaluación",
       "accepted": "Tanda aceptada. Puedes salir: continúa en segundo plano.",

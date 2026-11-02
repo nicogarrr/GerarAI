@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import type { DcaHitRates } from '@/lib/dca/types';
 import { dcaPercent } from '@/lib/dca/format';
 import { dcaReasonText } from '@/lib/dca/reason-text';
+import { dcaEngineText } from '@/lib/dca/engine-text';
 import { intlLocale, type Locale } from '@/lib/i18n/locale';
 import { t, type TranslationKey, type TranslationVars } from '@/lib/i18n/t';
 
@@ -93,7 +94,7 @@ export default function DcaHitRatesCard({ data, compact = false, scope = 'full',
                                 className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
                                 style={{ backgroundColor: row.color ?? '#374151', color: contrast(row.color) }}
                             >
-                                {row.label}
+                                {dcaEngineText(row.label, ti)}
                             </span>
                             <span className="text-[11px] text-gray-500">{ti('watchlist.hitRates.signalMonths', { count: INT.format(row.signal_months) })}</span>
                         </div>
