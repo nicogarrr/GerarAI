@@ -70,9 +70,11 @@ def export_year(
     start = date(year, 1, 1)
     end = date(year, 12, 31)
 
+    # LEFT JOIN: intereses, depositos, retiradas y comisiones de cuenta se
+    # guardan sin empresa (company_id NULL) y tambien son parte del año.
     transactions = db.execute(
         select(Transaction, Company)
-        .join(Company, Transaction.company_id == Company.id)
+        .outerjoin(Company, Transaction.company_id == Company.id)
         .where(Transaction.trade_date >= start, Transaction.trade_date <= end)
         # Desempate determinista: trade_date solo empata a diario.
         .order_by(Transaction.trade_date, Transaction.created_at, Transaction.id)
@@ -81,7 +83,7 @@ def export_year(
     tx_rows = [
         {
             "date": t.trade_date.isoformat(),
-            "ticker": company.ticker,
+            "ticker": company.ticker if company is not None else None,
             "action": t.action,
             "quantity": float(t.quantity),
             "price": float(t.price),
