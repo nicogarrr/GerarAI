@@ -4,11 +4,18 @@ from __future__ import annotations
 
 import re
 
-from app.services.expert_team.coordinator import fold, is_broad_question
+from app.services.expert_team.coordinator import fold, is_broad_question, keyword_hit
 from app.services.expert_team.experts import ExpertSpec
 from app.services.expert_team.models import RunContext
 
-_TAX_KEYWORDS = ("irpf", "impuesto", "hacienda", "fiscal", "tributa", "plusvalia", "tax")
+#: «tax » solo como palabra entera («taxonomy» no es fiscal); «taxes», «taxation»… por prefijo.
+_TAX_KEYWORDS = ("irpf", "impuesto", "hacienda", "fiscal", "tributa", "plusvalia", "tax ", "taxes", "taxed",
+                 "taxation", "taxable")
+#: «año fiscal», «fiscal 2024», «FY»: el periodo contable de la empresa, no tus impuestos.
+_FISCAL_PERIOD_RE = re.compile(
+    r"\b(?:ano|anos|ejercicio|ejercicios|periodo|trimestre|cierre)\s+fiscal(?:es)?\b"
+    r"|\bfiscal\s+(?:year|years|quarter|quarters|period|q[1-4]|\d{2,4})\b"
+)
 #: «¿merece la pena mantener/vender X?»: decidir sobre una posición que ya tienes.
 _HOLD_SELL_RE = re.compile(
     r"\b(?:mantener|mantenerla|mantenerlas|vender|venderla|venderlas|quedarme|salir|seguir\s+con"
@@ -22,11 +29,12 @@ def _tax_applies(ctx: RunContext) -> bool:
     if ctx.mode != "chat":
         return ctx.holds_position
     question = fold(ctx.question or "")
-    if any(re.search(rf"\b{re.escape(k)}", question) for k in _TAX_KEYWORDS):
+    if any(keyword_hit(_FISCAL_PERIOD_RE.sub(" ", question), k) for k in _TAX_KEYWORDS):
         return True
     if is_broad_question(question):
         return ctx.holds_position and bool(_HOLD_SELL_RE.search(question))
-    return True
+    # Sin palabra fiscal (o solo «año fiscal» de la empresa): el fiscal no entra.
+    return False
 
 
 def default_experts() -> list[ExpertSpec]:
@@ -45,7 +53,7 @@ def default_experts() -> list[ExpertSpec]:
             prompt_name="expert_valuation",
             tools=("valuation_engine",),
             keywords=("valoracion", "valorar", "dcf", "multiplo", "precio objetivo", "valor razonable",
-                      "margen de seguridad", "cara", "barata", "valuation", "fair value", "cheap", "expensive",
+                      "margen de seguridad", "cara ", "caras ", "caro ", "caros ", "barat", "valuation", "fair value", "cheap", "expensive",
                       "sobrevalor", "infravalor", "overvalu", "undervalu"),
         ),
         ExpertSpec(

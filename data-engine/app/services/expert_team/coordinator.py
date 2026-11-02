@@ -53,6 +53,15 @@ def fold(text: str) -> str:
     return _fold(text)
 
 
+def keyword_hit(question: str, keyword: str) -> bool:
+    """Palabra clave del plan sobre el texto ya plegado: por defecto vale como
+    prefijo («valor» → «valoración»); con espacio final, solo la palabra entera
+    («cara » no salta con «características»)."""
+    word = keyword.rstrip()
+    tail = r"\b" if keyword != word else ""
+    return re.search(rf"\b{re.escape(word)}{tail}", question) is not None
+
+
 def is_broad_question(question: str) -> bool:
     return bool(_BROAD_RE.search(_fold(question)))
 
@@ -115,7 +124,7 @@ class ExpertTeam:
             if (
                 ctx.mode == "chat"
                 and not (broad and spec.broad)
-                and not any(re.search(rf"\b{re.escape(k)}", question) for k in spec.keywords)
+                and not any(keyword_hit(question, k) for k in spec.keywords)
             ):
                 continue
             chosen.append(spec.name)
