@@ -288,7 +288,10 @@ class CompanyEnsureRequest(BaseModel):
 class DecisionJournalCreate(BaseModel):
     decision: Literal["buy", "hold", "trim", "sell", "watch", "avoid"]
     rationale: Annotated[str, not_blank(5)] = Field(min_length=5, max_length=5000)
-    what_must_be_true: list[str] = Field(default_factory=list, max_length=30)
+    # Cada condicion es una frase corta; sin tope por item se guardaban 100k caracteres.
+    what_must_be_true: list[Annotated[str, Field(max_length=1000)]] = Field(
+        default_factory=list, max_length=30
+    )
     # Operacion real (compra/venta de IBKR o manual) que ejecuto la decision.
     transaction_id: int | None = Field(default=None, ge=1)
 
