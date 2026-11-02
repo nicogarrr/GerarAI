@@ -42,14 +42,18 @@ def _fingerprint(tenant_id: int, as_of: date) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _fmt_pct(value: object) -> str | None:
+def _fmt_pct(value: object, en: bool = False) -> str | None:
+    """Variación con signo: «+2.50%» en inglés, «+2,50 %» en castellano."""
     try:
         pct = float(value)
     except (TypeError, ValueError):
         return None
     if not math.isfinite(pct):
         return None
-    return f"{pct:+.2f}%"
+    if en:
+        return f"{pct:+.2f}%"
+    text = f"{pct:+,.2f}".replace(",", "@").replace(".", ",").replace("@", ".")
+    return f"{text} %"
 
 
 _COVERAGE_EN = {"parcial": "partial", "completa": "complete", "complete": "complete", "partial": "partial"}
@@ -113,8 +117,10 @@ def emit_digest_alert(db: Session, digest: PortfolioMoveDigest, as_of: date) -> 
     # anterior; no hay variacion de UN dia que mostrar. Se nombra aparte, con
     # la sesion que falta, en vez de mezclarlo con "Sin datos" sin motivo.
     huecos: dict[str, list[str]] = {}
+    # Idioma guardado del usuario (Ajustes); sin preferencia, espanol como siempre.
+    en = generation_language(db) == "en"
     for item in items:
-        pct = _fmt_pct(item.get("price_change_pct"))
+        pct = _fmt_pct(item.get("price_change_pct"), en)
         if item.get("status") == "disponible" and pct is not None:
             disponibles.append((abs(float(item["price_change_pct"])),
                                 f"{item['ticker']} {pct}"))
@@ -129,25 +135,23 @@ def emit_digest_alert(db: Session, digest: PortfolioMoveDigest, as_of: date) -> 
     sin_datos_all = sorted(sin_datos)
     sin_datos_shown = sin_datos_all[:_MAX_LINEAS]
     omitidas_sd = len(sin_datos_all) - len(sin_datos_shown)
-    # Idioma guardado del usuario (Ajustes); sin preferencia, espanol como siempre.
-    en = generation_language(db) == "en"
     if en:
         resumen = _summary_en(items, disponibles, lineas, total_var, omitidas,
                               sin_datos_shown, omitidas_sd, huecos, as_of)
     elif not items:
-        resumen = "No habia posiciones abiertas que resumir."
+        resumen = "No había posiciones abiertas que resumir."
     elif not disponibles:
         resumen = (f"{len(items)} posici{'ones seguidas' if len(items) != 1 else 'ón seguida'}, sin datos de cierre para el "
                    f"{as_of.isoformat()} (sin datos, no 0).")
     else:
-        resumen = (f"{total_var} de {len(items)} posici{'ones' if len(items) != 1 else 'ón'} con variacion: "
+        resumen = (f"{total_var} de {len(items)} posici{'ones' if len(items) != 1 else 'ón'} con variación: "
                    + ", ".join(lineas) + ".")
         if omitidas:
             resumen += (f" Mostradas {len(lineas)} de {total_var} posiciones con "
-                        f"variacion; {omitidas} omitidas.")
+                        f"variación; {omitidas} omitida{'s' if omitidas != 1 else ''}.")
     if not en and items and sin_datos_shown:
         resumen += f" Sin datos: {', '.join(sin_datos_shown)}"
-        resumen += f" y {omitidas_sd} mas." if omitidas_sd else "."
+        resumen += f" y {omitidas_sd} más." if omitidas_sd else "."
     if not en and huecos:
         partes = []
         for ticker in sorted(huecos)[:_MAX_LINEAS]:
