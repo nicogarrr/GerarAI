@@ -431,6 +431,18 @@ _EN_NUMBER_RE = re.compile(r"\d[\d.,]*")
 _EN_SCALE_WORD_RE = re.compile(r"(?i)(?:thousand|million|billion|trillion)")
 
 
+_LIST_MARKER_RE = re.compile(r"(?m)^[ \t]*\d{1,2}[.)][ \t]+")
+
+
+def _without_list_markers(text: str) -> str:
+    """Quita el número de cada punto de una lista numerada («1. », «2) »).
+
+    Ese número ordena la lista, no es una cifra: antes «1. Distingue…» hacía
+    que una respuesta general sin ninguna cifra se tirase como inventada.
+    """
+    return _LIST_MARKER_RE.sub("", text)
+
+
 def _inferred_general_text_valid_en(
     text: str, *, allow_placeholders: bool = False, quantitative: bool = True,
     allow_named_attribution: bool = False,
@@ -492,7 +504,7 @@ def _inferred_general_text_valid_en(
         return False
     if not quantitative:
         return True
-    clauses = re.split(r"[;!?\n]|(?<!\d)[.](?!\d)|\b(?:and|but)\b", text)
+    clauses = re.split(r"[;!?\n]|(?<!\d)[.](?!\d)|\b(?:and|but)\b", _without_list_markers(text))
     for clause in clauses:
         if allow_named_attribution and not _MAGNITUDE_MARKER_RE.search(clause):
             continue
@@ -615,12 +627,15 @@ def _inferred_general_text_valid(
         return True
     # Cada clausula con cantidad requiere su propio aproximador. Una frase
     # previa o una cantidad marcada no legitima otra cantidad exacta.
-    clauses = re.split(r"[;!?\n]|(?<!\d)[.](?!\d)|\b(?:y(?!\s*(?:el\s+)?\d)|pero|and|but)\b", text)
+    clauses = re.split(
+        r"[;!?\n]|(?<!\d)[.](?!\d)|\b(?:y(?!\s*(?:el\s+)?\d)|pero|and|but)\b", _without_list_markers(text)
+    )
     number = re.compile(r"\d[\d.,]*|" + _NUMBER_WORD_RE.pattern.replace("(?i)", ""), re.I)
     approximate = re.compile(
         r"(?i)(?:unos?|unas?|aproximadamente|aproximad\w*|estimad\w*|"
-        r"estimaci[oó]n|alrededor de|en torno a|cerca de(?:l)?|del orden de|"
-        r"en el orden de|algo m[aá]s de|m[aá]s de|menos de|por encima de|por debajo de|"
+        r"estimaci[oó]n|alrededor de(?:l)?|en torno al?|cerca de(?:l)?|del orden de(?:l)?|"
+        r"en el orden de(?:l)?|algo m[aá]s de(?:l)?|m[aá]s de(?:l)?|menos de(?:l)?|"
+        r"por encima de(?:l)?|por debajo de(?:l)?|"
         r"superan?(?: holgadamente| con holgura)?|rondar[ií]a|"
         r"rondar[ií]an|ronda|rondan|rondaba|rondaban|cercan[oa]s? a|decenas de|cientos de|miles de|entre)\s+(?:(?:el|la|los|las|de|del)\s+){0,3}$"
     )
