@@ -74,6 +74,7 @@ const KNOWN: ReadonlyArray<readonly [RegExp, string]> = [
   // Alertas y paper trading
   [/^El umbral de una alerta de precio o de cambio debe ser un número\.?$/, 'The threshold of a price or change alert must be a number.'],
   [/^El precio de la alerta debe ser mayor que 0\.?$/, 'The alert price must be greater than 0.'],
+  [/^El precio de la alerta es demasiado alto\.?$/, 'The alert price is too high.'],
   [/^El número debe ser finito\.?$/, 'The number must be finite.'],
   [/^El número excede la precisión persistida\.?$/, 'The number exceeds the stored precision.'],
   [/^Número fuera de la precisión persistida\.?$/, 'Number outside the stored precision.'],
