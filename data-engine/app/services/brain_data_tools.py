@@ -152,12 +152,16 @@ def _dividend_line(company: Company, record: DividendRecord) -> str:
             f"ex-dividendo {_fecha_es(record.ex_date)}{pay} ({_source_label(record.source)}).")
 
 
-_YEAR_IN_QUESTION_RE = re.compile(r"\b(20\d{2})\b")
+_YEAR_IN_QUESTION_RE = re.compile(r"\b(20\d{2})\b(?!\s*(?:acci[oó]n(?:es)?|t[ií]tulos?|participaciones|euros?|eur|€"
+                                  r"|d[oó]lar(?:es)?|usd|shares?|stocks?|dollars?)(?!\w))", re.IGNORECASE)
 _LAST_YEAR_IN_QUESTION_RE = re.compile(r"(?i)\b(?:a[nñ]o|ejercicio)\s+pasado\b")
 
 
 def _year_in_question(question: str, today: date) -> int:
-    """Año que pide la pregunta («2025», «el año pasado»); si no, el actual."""
+    """Año que pide la pregunta («2025», «el año pasado»); si no, el actual.
+
+    «con mis 2000 acciones» o «2025 euros» son cantidades, no el año.
+    """
     explicit = _YEAR_IN_QUESTION_RE.search(question or "")
     if explicit:
         return int(explicit.group(1))
