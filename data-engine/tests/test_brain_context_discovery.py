@@ -92,6 +92,7 @@ def test_radar_question_lists_clear_signals_from_saved_snapshots(db):
     comp = _company(db, "XYZW")
     from app.services.propicks_radar_store import save_snapshot
 
+    now = datetime.now(UTC)
     save_snapshot(
         db,
         comp.id,
@@ -99,7 +100,7 @@ def test_radar_question_lists_clear_signals_from_saved_snapshots(db):
             "status": "ok",
             "formula_version": "nico-v2",
             "price_verified": True,
-            "price_date": "2026-10-30",
+            "price_date": now.date().isoformat(),
             "source": "test",
             "current": {"level": 4},
             "confirmed": [{"level": 4}],
@@ -107,7 +108,7 @@ def test_radar_question_lists_clear_signals_from_saved_snapshots(db):
             "daily_close_drawdown": 0.35,
             "drawdown_basis": "close",
         },
-        now=datetime(2026, 10, 30, 15, 0, tzinfo=UTC),
+        now=now,
     )
     db.commit()
     from app.services.brain_data_tools import answer_data_question
