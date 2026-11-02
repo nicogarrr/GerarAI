@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { RecordList } from '@/components/data/RecordViews';
 import TmePreviewForm from '@/components/taxes/TmePreviewForm';
-import { useT, useFormat } from '@/lib/i18n/client';
+import { useLocale, useT, useFormat } from '@/lib/i18n/client';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import type { Formatters } from '@/lib/format';
 import { Landmark, FileDown, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { humanizeTaxText } from '@/lib/taxes/humanize-text';
+import { taxText } from '@/lib/taxes/tax-text';
 import { filingSectionKey } from '@/lib/taxes/section-keys';
 
 /**
@@ -146,13 +146,14 @@ function DoubleTaxationByCountry({ countries }: { countries: DataRecord[] }) {
 }
 
 function WarningList({ items }: { items: string[] }) {
+    const locale = useLocale();
     if (items.length === 0) return null;
     return (
         <ul className="mt-3 space-y-1 text-xs leading-5 text-amber-200/80">
             {items.map((item) => (
                 <li key={item} className="flex gap-2">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    <span>{humanizeTaxText(item)}</span>
+                    <span>{taxText(item, locale)}</span>
                 </li>
             ))}
         </ul>
@@ -166,6 +167,7 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
     onReset: () => void;
 }) {
     const t = useT();
+    const locale = useLocale();
     const f = useFormat();
     if (!filing) return (
         <Section title={t('taxes.filing.title')} description={t('taxes.filing.descHelp')}
@@ -185,7 +187,7 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
                     disponible»: dice qué se necesita para que se pueda calcular. */}
                 <p className="text-sm text-gray-400">
                     {typeof filing.reason === 'string' && filing.reason
-                        ? humanizeTaxText(filing.reason)
+                        ? taxText(filing.reason, locale)
                         : t('taxes.filing.fallbackReason')}
                 </p>
             </Section>
@@ -201,7 +203,7 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
             >
                 <p className="text-sm text-gray-400">
                     {typeof casillas.unavailable_reason === 'string' && casillas.unavailable_reason
-                        ? humanizeTaxText(casillas.unavailable_reason)
+                        ? taxText(casillas.unavailable_reason, locale)
                         : t('taxes.filing.fallbackBoxes')}
                 </p>
             </Section>
@@ -226,7 +228,7 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
         ? dividendos.special_payment_tickers as string[]
         : [];
     const warnings: string[] = [
-        ...manualReview.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: ${humanizeTaxText(String(item.reason ?? ''))}`),
+        ...manualReview.map((item) => `${taxText(String(item.ticker ?? ''), locale)}: ${taxText(String(item.reason ?? ''), locale)}`),
         ...(specialTickers.length > 0
             ? [t('taxes.filing.specialPayments', { tickers: specialTickers.join(', ') })]
             : []),
@@ -325,6 +327,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
     unavailable?: boolean;
 }) {
     const t = useT();
+    const locale = useLocale();
     const f = useFormat();
     if (!thresholds) {
         if (!unavailable) return null;
@@ -354,11 +357,11 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
     const file720Name = `modelo720-${typeof fiscalYear === 'number' ? String(fiscalYear) : 'ejercicio'}.720`;
     const warnings: string[] = [
         ...(missingIsin.length > 0 ? [t('taxes.modelo720.missingIsin', { tickers: missingIsin.join(', ') })] : []),
-        ...foreignUnverified.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: ${humanizeTaxText(String(item.reason ?? ''))}`),
-        ...shortPositions.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: ${t('taxes.modelo720.shortPosition')}`),
-        ...unvalued.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: ${humanizeTaxText(String(item.reason ?? ''))}`),
+        ...foreignUnverified.map((item) => `${taxText(String(item.ticker ?? ''), locale)}: ${taxText(String(item.reason ?? ''), locale)}`),
+        ...shortPositions.map((item) => `${taxText(String(item.ticker ?? ''), locale)}: ${t('taxes.modelo720.shortPosition')}`),
+        ...unvalued.map((item) => `${taxText(String(item.ticker ?? ''), locale)}: ${taxText(String(item.reason ?? ''), locale)}`),
         // A17: una cuenta a 0 a 31/12 que no entra en el total se nombra con su motivo.
-        ...zeroBalance.map((item) => `${String(item.account ?? item.ticker ?? '')}: ${humanizeTaxText(String(item.reason ?? ''))}`),
+        ...zeroBalance.map((item) => `${taxText(String(item.account ?? item.ticker ?? ''), locale)}: ${taxText(String(item.reason ?? ''), locale)}`),
     ];
     return (
         <Section
@@ -382,7 +385,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                             {Array.isArray(category.reasons) && (category.reasons as string[]).length > 0 && (
                                 <ul className="mt-1 space-y-0.5 text-xs leading-5 text-gray-500">
                                     {(category.reasons as string[]).map((reason) => (
-                                        <li key={reason}>{humanizeTaxText(reason)}</li>
+                                        <li key={reason}>{taxText(reason, locale)}</li>
                                     ))}
                                 </ul>
                             )}
@@ -423,7 +426,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                                     <p className="text-xs font-semibold uppercase text-gray-500">{t('taxes.modelo720.reviewTitle')}</p>
                                     <ul className="mt-1 space-y-1 text-xs leading-5 text-gray-400">
                                         {(file720.notas as string[]).map((nota, i) => (
-                                            <li key={`nota-${i}`}>{humanizeTaxText(nota)}</li>
+                                            <li key={`nota-${i}`}>{taxText(nota, locale)}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -434,7 +437,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                                     <ul className="mt-1 space-y-1 text-xs leading-5 text-amber-200/80">
                                         {(file720.excluded as DataRecord[]).map((item, i) => (
                                             <li key={`${String(item.ticker ?? 'item')}-${i}`}>
-                                                {humanizeTaxText(String(item.ticker ?? ''))}: {humanizeTaxText(String(item.reason ?? ''))}
+                                                {taxText(String(item.ticker ?? ''), locale)}: {taxText(String(item.reason ?? ''), locale)}
                                             </li>
                                         ))}
                                     </ul>
@@ -446,7 +449,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                                     <ul className="mt-1 space-y-1 text-xs leading-5 text-amber-200/80">
                                         {(file720.manual_review as DataRecord[]).map((item, i) => (
                                             <li key={`${String(item.ticker ?? 'item')}-${i}`}>
-                                                {humanizeTaxText(String(item.ticker ?? ''))}: {humanizeTaxText(String(item.reason ?? ''))}
+                                                {taxText(String(item.ticker ?? ''), locale)}: {taxText(String(item.reason ?? ''), locale)}
                                             </li>
                                         ))}
                                     </ul>
@@ -456,7 +459,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                     ) : (
                         <p className="text-sm text-gray-400">
                             {typeof file720.reason === 'string' && file720.reason
-                                ? humanizeTaxText(file720.reason)
+                                ? taxText(file720.reason, locale)
                                 : t('taxes.modelo720.noFileReason')}
                             {' '}
                             <Link className="inline-flex min-h-[44px] items-center text-teal-300 underline underline-offset-2 sm:min-h-0" href="/settings">
