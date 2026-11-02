@@ -102,3 +102,6 @@ pyxirr>=0.10.8,<0.11
 
 # Anadidas por sync_requirements.py (estaban en pyproject, no aqui):
 exchange-calendars>=4.13.2,<5
+
+# Anadidas por sync_requirements.py (estaban en pyproject, no aqui):
+tenacity>=9.1.4,<10
