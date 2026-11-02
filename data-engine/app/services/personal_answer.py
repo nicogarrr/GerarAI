@@ -32,7 +32,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.schemas import ChatResponse
-from app.services.user_context import UserContext, build_user_context, pct_es
+from app.services.user_context import UserContext, _pct_en, build_user_context, pct_es
 
 PROMPT_VERSION = "personal-context-v1"
 MAX_ANSWER_CHARS = 1600
@@ -275,6 +275,115 @@ def _cheap_answer(ctx: UserContext) -> list[str]:
     return lines
 
 
+def _block_lines_en(ctx: UserContext, key: str, limit: int = 40) -> list[str]:
+    """Líneas en inglés del bloque (solo respuesta determinista); si no hay, las de siempre."""
+    block = ctx.block(key)
+    if block is None:
+        return []
+    return list((block.lines_en or block.lines)[:limit])
+
+
+def _dca_word_en(level: int | None) -> str:
+    if level is None:
+        return ""
+    if level < 0:
+        return " (trim zone)" if level == -1 else " (strong trim)"
+    return f" ({level}X DCA)"
+
+
+def _cheap_answer_en(ctx: UserContext) -> list[str]:
+    """``_cheap_answer`` en inglés: mismas filas y mismo orden."""
+    watch = ctx.block("watchlist")
+    rows = watch.rows if watch else []
+    held = ctx.block("cartera")
+    held_rows = held.rows if held else []
+    cheap = sorted((r for r in rows if r.get("mos") is not None and r["mos"] > 0), key=lambda r: r["mos"], reverse=True)
+    pricey = sorted((r for r in rows if r.get("mos") is not None and r["mos"] <= 0), key=lambda r: r["mos"])
+    dca_buy = [r for r in [*rows, *held_rows] if (r.get("dca_level") or 0) >= 3 and r.get("mos") is None]
+    lines = []
+    if cheap:
+        lines.append("Cheapest on your watchlist by margin of safety (V − P) / V (watchlist):")
+        lines += [f"- {r['ticker']}: {_pct_en(r['mos'], signed=True)}{_dca_word_en(r.get('dca_level'))}." for r in cheap[:6]]
+    else:
+        lines.append("No positive margin can be calculated from the saved data; without a price or a fair value "
+                     "I can't classify that stock.")
+    if dca_buy:
+        lines.append(
+            "In a strong DCA buy zone but with no fair value to measure the margin: "
+            + ", ".join(f"{r['ticker']}{_dca_word_en(r.get('dca_level'))}" for r in dca_buy[:6]) + "."
+        )
+    if pricey:
+        lines.append(
+            "Above their fair value: "
+            + ", ".join(f"{r['ticker']} {_pct_en(r['mos'], signed=True)}{_dca_word_en(r.get('dca_level'))}"
+                        for r in pricey[:4])
+            + "."
+        )
+    missing = [r["ticker"] for r in rows if r.get("fair_value") is None]
+    if missing:
+        lines.append(
+            "No fair value (neither a published thesis nor the engine), so I can't say whether they're cheap: "
+            f"{', '.join(missing[:12])}."
+        )
+    trims = [r for r in held_rows if (r.get("dca_level") or 0) < 0]
+    if trims:
+        lines.append("In your portfolio, in a trim zone (they get no new money): " + ", ".join(
+            f"{r['ticker']}{_dca_word_en(r.get('dca_level'))}" for r in trims) + ".")
+    return lines
+
+
+def _risk_answer_en(ctx: UserContext, db: Session) -> list[str]:
+    """``_risk_answer`` en inglés: mismos datos, misma estructura."""
+    lines: list[str] = []
+    held = ctx.block("cartera")
+    rows = held.rows if held else []
+    weighted = [r for r in rows if r.get("weight") is not None]
+    if not rows:
+        lines.append("You have no saved positions in your portfolio, so there's no portfolio risk to measure.")
+    elif weighted:
+        top = weighted[0]
+        top3 = sum(r["weight"] for r in weighted[:3])
+        lines.append(
+            f"Concentration (portfolio): {top['ticker']} weighs {_pct_en(top['weight'])} "
+            f"and the top 3 add up to {_pct_en(top3)}."
+        )
+        sector_line = next(
+            (line for line in held.lines_en if line.startswith("- Weight by sector")), None
+        ) if held else None
+        if sector_line:
+            lines.append(sector_line.removeprefix("- "))
+        losers = [r for r in rows if r.get("pnl_pct") is not None and r["pnl_pct"] < 0]
+        if losers:
+            losers.sort(key=lambda r: r["pnl_pct"])
+            lines.append("With unrealized losses: " + ", ".join(
+                f"{r['ticker']} {_pct_en(r['pnl_pct'], signed=True)}" for r in losers[:5]) + ".")
+        trims = [r for r in rows if (r.get("dca_level") or 0) < 0]
+        if trims:
+            lines.append("In a DCA trim zone: " + ", ".join(
+                f"{r['ticker']}{_dca_word_en(r.get('dca_level'))}" for r in trims) + ".")
+    else:
+        lines.append("Your positions have mixed base currencies: I don't calculate weights or concentration.")
+    theses = ctx.block("tesis")
+    held_tickers = {r["ticker"] for r in rows}
+    criteria = [r for r in (theses.rows if theses else []) if r["ticker"] in held_tickers and r.get("criteria")]
+    for row in criteria[:4]:
+        lines.append(f"Your {row['ticker']} thesis is invalidated if: {row['criteria'][0]}")
+    alerts = _block_lines_en(ctx, "avisos", 4)
+    if alerts:
+        lines.append("Alerts: " + alerts[0].removeprefix("- "))
+        lines += alerts[1:4]
+    # nosemgrep: gerarai-broad-except-pass -- pieza opcional; sin ella la respuesta sigue (comentario en linea)
+    try:
+        from importlib import import_module
+
+        tools = import_module("app.services.brain_context_tools")
+        risk_lines, _ = tools.portfolio_risk_lines(db, ctx.tenant_id, english=True)
+        lines += [line if line.startswith("- ") else f"- {line}" for line in risk_lines[:4]]
+    except Exception:  # noqa: BLE001 - pieza opcional; sin ella sigue la respuesta
+        pass
+    return lines
+
+
 def _risk_answer(ctx: UserContext, db: Session) -> list[str]:
     lines: list[str] = []
     held = ctx.block("cartera")
@@ -325,6 +434,28 @@ def _risk_answer(ctx: UserContext, db: Session) -> list[str]:
 
 
 def deterministic_lines(intent: PersonalIntent, ctx: UserContext, db: Session) -> list[str]:
+    if intent.kind == "barato" and _english():
+        # En inglés, sin modelo, «what's cheap on my watchlist?» salía en
+        # castellano entero; el contexto del modelo no cambia.
+        lines = ["Saved readings, not live quotes or buy orders."]
+        for section, maximum in (("plan", 2), ("avisos", 2)):
+            lines.extend(_block_lines_en(ctx, section, maximum))
+        seen_en: set[str] = set()
+        for block in (ctx.block("cartera"), ctx.block("watchlist")):
+            if block:
+                for row in block.rows:
+                    symbol = row["ticker"]
+                    if symbol in seen_en or (row.get("dca_level") or 0) < 3:
+                        continue
+                    dated = next((line for line in block.lines_en
+                                  if line.startswith(f"- {symbol} (") and "DCA level" in line), None)
+                    if dated:
+                        seen_en.add(symbol)
+                        lines.append(dated)
+        lines.extend(_cheap_answer_en(ctx))
+        return lines
+    if intent.kind == "riesgo" and _english():
+        return _risk_answer_en(ctx, db)
     if intent.kind == "barato":
         lines = ["Lecturas guardadas, no cotizaciones en directo ni órdenes de compra."]
         # Keep the plan and risk notices ahead of the bounded candidates, so

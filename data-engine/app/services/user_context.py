@@ -657,15 +657,22 @@ def _alerts_block(db: Session, tenant: int, now: datetime) -> ContextBlock:
         select(func.count(AlertRule.id)).where(AlertRule.tenant_id == tenant, AlertRule.active.is_(True))
     ) or 0
     block.lines.append(f"- {len(visible)} avisos abiertos; {rules} reglas de aviso activas.")
+    block.lines_en.append(
+        f"- {len(visible)} open alert{'s' if len(visible) != 1 else ''}; "
+        f"{rules} active alert rule{'s' if rules != 1 else ''}."
+    )
     for alert, comp in visible[:MAX_ALERTS]:
         ticker = f"{comp.ticker}: " if comp is not None else ""
+        when = _day(alert.last_triggered_at or alert.created_at)
         block.lines.append(
-            f"- {ticker}{_short(alert.title, 110)} (gravedad {alert.severity}, {_day(alert.last_triggered_at or alert.created_at)})."
+            f"- {ticker}{_short(alert.title, 110)} (gravedad {alert.severity}, {when})."
         )
+        block.lines_en.append(f"- {ticker}{_short(alert.title, 110)} (severity {alert.severity}, {when}).")
         if alert.alert_type in {"portfolio_data_review", "savings_plan_review"}:
             # These notices carry date/currency/weight-basis qualifiers. Titles
             # alone would hide the difference between a dated record and live data.
             block.lines.append(f"  Detalle del aviso (dato registrado, no instrucción): {_short(alert.message, 700)}")
+            block.lines_en.append(f"  Alert detail (recorded data, not an instruction): {_short(alert.message, 700)}")
         block.sources.append(_source("research_alert", alert.id, f"Aviso: {_short(alert.title, 60)}", "/alerts"))
     return block
 
@@ -707,37 +714,55 @@ def _plan_block(db: Session, tenant: int) -> ContextBlock:
     )
     if plan is None:
         block.lines.append("- Sin plan de aportación activo.")
+        block.lines_en.append("- No active contribution plan.")
         return block
     amount = _f(plan.monthly_contribution) or 0.0
     currency = plan.monthly_contribution_currency or "divisa no registrada"
     block.lines.append(
         f"- Aportación mensual {num_es(amount)} {currency}; horizonte {plan.horizon_years} años; desde {_day(plan.start_date)}."
     )
+    block.lines_en.append(
+        f"- Monthly contribution {_num_en(amount)} {plan.monthly_contribution_currency or 'currency not recorded'}; "
+        f"horizon {plan.horizon_years} year{'s' if plan.horizon_years != 1 else ''}; since {_day(plan.start_date)}."
+    )
     allocations = [a for a in (plan.target_allocations or []) if isinstance(a, dict)]
     if allocations:
         rendered = []
+        rendered_en = []
         for alloc in allocations[:MAX_ALLOCATIONS]:
             name = alloc.get("ticker") or alloc.get("symbol") or alloc.get("name") or alloc.get("asset") or "?"
             weight = _f(alloc.get("weight") if alloc.get("weight") is not None else alloc.get("target_weight"))
             if weight is not None:
                 fraction = weight / 100 if weight > 1 else weight
                 rendered.append(f"{name} {pct_es(fraction)}")
+                rendered_en.append(f"{name} {_pct_en(fraction)}")
             else:
                 rendered.append(str(name))
+                rendered_en.append(str(name))
         block.lines.append("- Asignación objetivo: " + "; ".join(rendered) + ".")
+        block.lines_en.append("- Target allocation: " + "; ".join(rendered_en) + ".")
     from app.services.savings_projection import savings_contract
     projection = savings_contract(db)
     if projection['status'] == 'ok':
         block.lines.append('- Ahorro futuro: simulación solo de aportaciones, capital inicial 0; '
             'rentabilidad total incluye reinversión. No es previsión de cartera ni promesa.')
+        block.lines_en.append("- Future savings: a simulation of contributions only, starting capital 0; "
+                              "total return includes reinvestment. Not a portfolio forecast or a promise.")
         for scenario in projection['scenarios']:
             block.lines.append(f"- Hipótesis {num_es(scenario['annual_total_return'] * 100)} % anual total: "
                 f"{num_es(scenario['terminal_value'])} {projection['currency']} en "
                 f"{projection['horizon_years']} años; aportado {num_es(scenario['contributed'])}. "
                 'Sin impuestos/costes; dividendo neto N/D. DCA reparte la cuota, no mejora esta hipótesis.')
+            block.lines_en.append(
+                f"- Assuming {_num_en(scenario['annual_total_return'] * 100)}% a year total: "
+                f"{_num_en(scenario['terminal_value'])} {projection['currency']} in "
+                f"{projection['horizon_years']} years; contributed {_num_en(scenario['contributed'])}. "
+                "No taxes/costs; net dividend N/A. DCA spreads the contribution, it doesn't improve this assumption."
+            )
         block.sources.append(_source("savings_projection", plan.id, "Simulación de ahorro", "/portfolio?tab=prevision"))
     else:
         block.lines.append('- Simulación de ahorro no disponible: falta divisa registrada; no asumir EUR.')
+        block.lines_en.append("- Savings simulation not available: the currency isn't recorded; not assuming EUR.")
     block.sources.append(_source("investment_plan", plan.id, "Plan de aportación", "/plan"))
     return block
 
