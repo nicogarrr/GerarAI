@@ -275,6 +275,20 @@ def is_preparing(db: Session, symbol: str, *, client: Any = None) -> bool:
             client.close()
 
 
+def clear_marks(tenant_id: Any, symbols: Iterable[str], *, client: Any = None) -> None:
+    """Quita el «preparando» de estos símbolos (el job ya no va a evaluarlos). Nunca lanza."""
+    own_client = client is None
+    try:
+        client = client or redis_client()
+        for symbol in symbols:
+            client.delete(mark_key(tenant_id, str(symbol)))
+    except Exception:  # noqa: BLE001 - la marca caduca sola
+        logger.warning("dca on-add: no se pudieron borrar las marcas", exc_info=True)
+    finally:
+        if own_client and client is not None:
+            client.close()
+
+
 def run_on_add(db: Session, symbols: list[str], *, client: Any = None) -> dict[str, Any]:
     """Cuerpo del actor (con el lease ya tomado): evalúa solo lo que siga debido."""
     from app.services.dca_signal_service import evaluate_watchlist
