@@ -184,7 +184,8 @@
     "errorDateMissing": "Indica la fecha de la aportación.",
     "errorDateFuture": "La fecha no puede ser futura: registra la aportación cuando la hagas.",
     "errorAmountMin": "El importe debe ser mayor que 0 (mínimo 0,01).",
-    "errorAmountMax": "El importe no puede superar 10.000.000."
+    "errorAmountMax": "El importe no puede superar 10.000.000.",
+    "saveFailed": "No se pudo registrar la aportación. Revisa la fecha, el importe y la divisa."
   },
   "deleteContribution": {
     "deleting": "Eliminando…",

@@ -184,7 +184,8 @@
     "errorDateMissing": "Enter the contribution date.",
     "errorDateFuture": "The date cannot be in the future: record the contribution when you make it.",
     "errorAmountMin": "The amount must be greater than 0 (minimum 0.01).",
-    "errorAmountMax": "The amount cannot exceed 10,000,000."
+    "errorAmountMax": "The amount cannot exceed 10,000,000.",
+    "saveFailed": "The contribution could not be saved. Check the date, amount and currency."
   },
   "deleteContribution": {
     "deleting": "Deleting…",

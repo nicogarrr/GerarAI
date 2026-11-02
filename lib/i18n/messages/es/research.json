@@ -1513,7 +1513,8 @@
     "costUnknown": "Coste de adquisición desconocido. No se puede calcular la plusvalía.",
     "noBaseCost": "Sin coste en {currency}: falta el tipo de cambio de alguna compra. No se puede calcular la plusvalía en {currency}.",
     "recordTrade": "Registrar compra o venta",
-    "viewInPortfolio": "Ver en la cartera"
+    "viewInPortfolio": "Ver en la cartera",
+    "loadFailed": "No se pudo cargar tu posición en esta empresa."
   },
   "publicShorts": {
     "metaTitle": "Cortos públicos",
