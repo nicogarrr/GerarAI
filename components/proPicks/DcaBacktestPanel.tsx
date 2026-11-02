@@ -238,7 +238,7 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
                         </div>
                     )}
                     <DcaHitRatesCard data={result.hit_rates} scope="range" ti={t} locale={locale} />
-                    <p className="text-[11px] text-gray-500">{result.disclaimer}</p>
+                    <p className="text-[11px] text-gray-500">{dcaReasonText(result.disclaimer, locale)}</p>
                 </div>
             )}
         </Card>

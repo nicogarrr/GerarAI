@@ -69,7 +69,7 @@
   "lib/calendar/eight-k-text.ts": 10,
   "lib/chat/citations.ts": 3,
   "lib/config/product.ts": 2,
-  "lib/dca/reason-text.ts": 8,
+  "lib/dca/reason-text.ts": 9,
   "lib/env.ts": 9,
   "lib/format.ts": 3,
   "lib/glossary.ts": 43,
