@@ -1,6 +1,6 @@
-import nodemailer from 'nodemailer';
 
 import { notifyTarget, smtpConfig } from '@/lib/access-request';
+import { createSmtpTransport } from '@/lib/smtp-transport';
 import {
     adminListTokenTtlMs,
     approvalTokenTtlMs,
@@ -63,15 +63,7 @@ export async function notifyPendingAccount(args: {
     // Una sola línea: un nombre con saltos colaba un «Aprobar:» falso en este correo.
     const displayName = singleLineName(args.name) || '(sin nombre)';
     try {
-        const transport = nodemailer.createTransport({
-            host: smtp.host,
-            port: smtp.port,
-            secure: smtp.port === 465,
-            auth: { user: smtp.user, pass: smtp.pass },
-            connectionTimeout: 8000,
-            greetingTimeout: 8000,
-            socketTimeout: 10000,
-        });
+        const transport = createSmtpTransport(smtp);
         await transport.sendMail({
             from: smtp.from,
             to,
@@ -112,15 +104,7 @@ export async function notifyAccountApproved(args: {
     const name = singleLineName(args.name);
     const greeting = name ? `Hola, ${name}:` : 'Hola:';
     try {
-        const transport = nodemailer.createTransport({
-            host: smtp.host,
-            port: smtp.port,
-            secure: smtp.port === 465,
-            auth: { user: smtp.user, pass: smtp.pass },
-            connectionTimeout: 8000,
-            greetingTimeout: 8000,
-            socketTimeout: 10000,
-        });
+        const transport = createSmtpTransport(smtp);
         await transport.sendMail({
             from: smtp.from,
             to: args.email,
