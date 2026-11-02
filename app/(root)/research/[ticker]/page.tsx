@@ -142,6 +142,7 @@ import QuickAlertButton from '@/components/research/QuickAlertButton';
 import ThesisMemo from '@/components/research/ThesisMemo';
 import { valuationScenarioDisplay } from '@/lib/research/listed-share-values';
 import { baseAssumptionsText, blockerLabel, reverseDcfText, scenarioNotesList } from '@/lib/research/valuation-display';
+import { scenarioNoteText } from '@/lib/research/scenario-notes-text';
 import ThesisExportMenu from '@/components/research/ThesisExportMenu';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
 import { ImpactBadge, NewsEventsFlow } from '@/components/research/NewsEventsFlow';
@@ -446,7 +447,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
         </div>
         {scenarioNotes.length ? (
           <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-amber-300/80">
-            {scenarioNotes.map((note) => <li key={note}>{note}</li>)}
+            {scenarioNotes.map((note) => <li key={note}>{scenarioNoteText(note, locale)}</li>)}
           </ul>
         ) : null}
         {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
@@ -469,7 +470,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
       </div>
       {scenarioNotes.length ? (
         <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-amber-300/80">
-          {scenarioNotes.map((note) => <li key={note}>{note}</li>)}
+          {scenarioNotes.map((note) => <li key={note}>{scenarioNoteText(note, locale)}</li>)}
         </ul>
       ) : null}
       {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
