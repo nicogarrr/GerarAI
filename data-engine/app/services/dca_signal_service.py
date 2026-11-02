@@ -317,8 +317,8 @@ def _db_history(db: Session, company: Company | None) -> FetchedHistory:
     # MarketPrice ORM por fila era casi todo el coste de la evaluacion DCA
     # (400 tickers x 5 años = ~520.000 objetos). MarketPrice no es de tenant.
     prices = [
-        price
-        for price in db.execute(
+        (day, close, adj_close, quote_currency)
+        for day, close, adj_close, quote_currency in db.execute(
             select(
                 MarketPrice.date,
                 MarketPrice.close,
@@ -328,22 +328,29 @@ def _db_history(db: Session, company: Company | None) -> FetchedHistory:
             .where(MarketPrice.company_id == company.id)
             .order_by(MarketPrice.date)
         )
-        if price.close and float(price.close) > 0
+        if close and float(close) > 0
     ]
-    declared = [price.quote_currency for price in prices if price.quote_currency]
+    declared = [quote for _day, _close, _adj, quote in prices if quote]
     unit = declared[-1] if declared else company.currency
     unit_major, unit_divisor = normalize_currency(unit)
+    # Escala por unidad de fila: hay una o dos unidades por ticker, no una por
+    # cierre. None = otra moneda (o unidad desconocida frente a una declarada).
+    scales: dict[str | None, float | None] = {}
     rows: list[PriceRow] = []
-    for price in prices:
-        major, divisor = normalize_currency(price.quote_currency or company.currency)
-        if major != unit_major:
+    for day, close, adj_close, quote in prices:
+        if quote in scales:
+            scale = scales[quote]
+        else:
+            major, divisor = normalize_currency(quote or company.currency)
+            scale = unit_divisor / divisor if major == unit_major else None
+            scales[quote] = scale
+        if scale is None:
             continue  # otra moneda (o unidad desconocida frente a una declarada): nunca a la par
-        scale = unit_divisor / divisor
         rows.append(
             PriceRow(
-                day=price.date,
-                close=float(price.close) * scale,
-                adj_close=float(price.adj_close) * scale if price.adj_close else None,
+                day=day,
+                close=float(close) * scale,
+                adj_close=float(adj_close) * scale if adj_close else None,
             )
         )
     return FetchedHistory(rows=rows, currency=unit)
