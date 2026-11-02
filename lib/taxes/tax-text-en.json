@@ -36,7 +36,28 @@
     "Fichero conforme al diseño de registro oficial AEAT (500 bytes, ISO-8859-1): AYUDA DE CÓMPUTO — revisar antes de presentar por TGVI Online.": "File following the official AEAT record layout (500 bytes, ISO-8859-1): a CALCULATION AID — review it before filing through TGVI Online.",
     "Origen siempre 'A': si la categoría ya se declaró y el incremento conjunto supera 20.000 € corresponde 'M' (ver 'manual_review').": "Origin is always “A”: if the category was already declared and the combined increase exceeds €20,000, “M” applies (see manual review).",
     "Un ISIN comprado en lotes con fechas distintas exige un registro por lote: aquí se genera uno con la fecha aportada; si hubo varias fechas, revisar manualmente.": "An ISIN bought in lots on different dates needs one record per lot: here one is generated with the date provided; if there were several dates, review it by hand.",
-    "Cuentas (clave C) y bajas no se generan: requieren datos que no tenemos (ver 'manual_review').": "Accounts (key C) and disposals are not generated: they need data we don't have (see manual review)."
+    "Cuentas (clave C) y bajas no se generan: requieren datos que no tenemos (ver 'manual_review').": "Accounts (key C) and disposals are not generated: they need data we don't have (see manual review).",
+    "Irlanda va a revisión manual a propósito, no por falta de datos: el convenio España-Irlanda (BOE-A-1994-28597, art. 10.1) no fija un tipo único para particulares. El 15 % del art. 10.1.b solo se aplica si tienes derecho al crédito fiscal irlandés del dividendo; si no, el art. 10.1.c deja el dividendo exento en Irlanda y la retención irlandesa no se deduce en la casilla 0588, sino que se reclama a Irlanda. Cuál de los dos casos aplica depende de la ley irlandesa, así que GerarAI no calcula esta deducción: revisa la retención en el certificado de tu bróker con un asesor antes de incluirla.": "Ireland goes to manual review on purpose, not for lack of data: the Spain–Ireland treaty (BOE-A-1994-28597, art. 10.1) sets no single rate for individuals. The 15% of art. 10.1.b only applies if you are entitled to the Irish tax credit on the dividend; otherwise art. 10.1.c makes the dividend exempt in Ireland and the Irish withholding is not deducted in box 0588 but reclaimed from Ireland. Which case applies depends on Irish law, so GerarAI does not compute this deduction: check the withholding on your broker's certificate with an adviser before including it.",
+    "Sin tipo de cambio para convertir el dividendo o la retención; no entra en la deducción.": "No exchange rate to convert the dividend or the withholding; it is not part of the deduction.",
+    "Fila de caja ambigua (quantity fuera de {0, 1}) sin resolver; el bloque no entra en la deducción hasta revisarla.": "Ambiguous cash row (quantity outside {0, 1}) not resolved; the block is not part of the deduction until it is reviewed.",
+    "Reversion o ajuste de retencion con varios dividendos en el ejercicio: no se puede atribuir por fecha al dividendo que la origino; imputa la reversion a su dividendo y recalcula la deduccion a mano.": "Withholding reversal or adjustment with several dividends in the year: it cannot be matched by date to the dividend it came from; assign the reversal to its dividend and recompute the deduction by hand.",
+    "País de retención desconocido (sin domicilio del emisor); no se calcula deducción para este bloque.": "Withholding country unknown (no issuer domicile); no deduction is computed for this block.",
+    "Hay dividendos de emisor español o de país desconocido sin tipo de cambio, retención o revisión: el total de retenciones españolas no es verificable.": "There are dividends from Spanish or unknown-country issuers with no exchange rate, withholding or review: the total Spanish withholding cannot be verified.",
+    "Ejercicio con conversión de divisa incompleta: saldo no aprovechable en este informe.": "Year with incomplete currency conversion: the balance cannot be used in this report.",
+    "Saldos derivados SOLO del libro: no reflejan compensaciones ya aplicadas en declaraciones presentadas ni orígenes fuera del libro. NO trasladable a casillas. Introduce los saldos del anexo C.3 de tu última declaración en la metadata del tenant (clave 'tax_prior_losses_pending') para publicar casillas.": "Balances derived ONLY from the ledger: they do not reflect offsets already applied in filed returns or sources outside the ledger. NOT transferable to boxes. Enter the annex C.3 balances of your last return in your tax details (pending prior losses) to publish boxes.",
+    "Interés sin importe en EUR (falta el tipo de cambio de su fecha o la fila es ambigua): revisar a mano.": "Interest with no EUR amount (the exchange rate for its date is missing or the row is ambiguous): review it by hand.",
+    "Los intereses pagados por el margen no son gasto deducible en el IRPF de una persona física: para intereses de cuentas no se admite ningún gasto y para dividendos solo los de administración y depósito (art. 26.1.a LIRPF; Manual de ayuda Renta 2025, apdo. 7.2.3.1). No los restes en la declaración.": "Margin interest paid is not a deductible expense in an individual's IRPF (Spanish income tax): no expense is allowed for account interest, and for dividends only administration and custody fees are (art. 26.1.a LIRPF; Renta 2025 help manual, section 7.2.3.1). Don't subtract it in the return.",
+    "Informe orientativo, no apto para declarar sin la validación de un asesor fiscal: wash-sale según procedimiento del Manual AEAT 2025 (art. 33.5.f LIRPF, proporcionalidad y FIFO); sin ISIN/cotización ni cobertura multibróker verificadas.": "Indicative report, not fit for filing without a tax adviser's validation: wash sales follow the AEAT 2025 Manual procedure (art. 33.5.f LIRPF, proportionality and FIFO); ISIN/listing and multi-broker coverage are not verified.",
+    "La cartera no usa EUR como divisa base: las casillas del Modelo 100 y la deducción 0588 son importes en euros y no se publican cifras en otra divisa. Cambia la divisa base de la cartera a EUR para obtener la capa de declaración.": "The portfolio does not use EUR as base currency: the Modelo 100 boxes and deduction 0588 are amounts in euros, and figures in another currency are not published. Change the portfolio's base currency to EUR to get the filing layer.",
+    "criterio por analogía, sin consulta": "criterion by analogy, without a ruling",
+    "sin conversiones reales de divisa como entrada": "no real currency conversions as input",
+    "falta valor en EUR de un lote consumido": "EUR value missing for a consumed lot",
+    "lote readquirido sin valor en EUR": "repurchased lot with no EUR value",
+    "no se garantiza el saldo de divisa anterior al ejercicio": "the currency balance before the year is not guaranteed",
+    "compra": "purchase",
+    "comision": "fee",
+    "supera la divisa conocida": "exceeds the known currency balance",
+    "lote sin valor en EUR": "lot with no EUR value"
   },
   "templates": [
     [
@@ -110,6 +131,50 @@
     [
       "La fecha de primera adquisición de {ticker} ('{date}') no es YYYYMMDD: corrígela en tax_declarant.first_acquisition_dates.",
       "The first acquisition date of {ticker} (“{date}”) is not YYYYMMDD: fix it in the first acquisition dates of your declarant data."
+    ],
+    [
+      "Mapeo de casillas verificado solo para la Renta 2025 ({basis}); el ejercicio {year} usa otra orden ministerial y no se muestran números sin verificar.",
+      "Box mapping verified only for the 2025 IRPF (Spanish income tax) return ({basis}); tax year {year} uses a different ministerial order and unverified figures are not shown."
+    ],
+    [
+      "Tipo de pago especial ({list}): no es un dividendo ordinario y su tratamiento fiscal difiere; no entra en la deducción automática.",
+      "Special payment type ({list}): not an ordinary dividend and its tax treatment differs; it is not part of the automatic deduction."
+    ],
+    [
+      "Sin tipo de convenio verificado para {country}: la retención se revisa a mano contra el convenio aplicable (un tipo genérico podría acreditar de más o de menos).",
+      "No verified treaty rate for {country}: the withholding is checked by hand against the applicable treaty (a generic rate could credit too much or too little)."
+    ],
+    [
+      "{n} movimientos en {currency} sin modelar (dividendos, intereses, retenciones u otros; activar fx_income_by_analogy para tratarlos por analogia)",
+      "{n} {currency} movements not modelled (dividends, interest, withholdings or others; turn on income by analogy to treat them by analogy)"
+    ],
+    [
+      "{n} operaciones con fondos/ETF en {currency} (V0775-21, diferencia imputada al reembolsar): fuera de alcance",
+      "{n} fund/ETF trades in {currency} (V0775-21, difference assigned on redemption): out of scope"
+    ],
+    [
+      "cambios a otra divisa distinta de EUR no soportados: {list}",
+      "conversions to a currency other than EUR not supported: {list}"
+    ],
+    [
+      "falta cambio BCE del {day}",
+      "ECB rate missing for {day}"
+    ],
+    [
+      "conversion del {day} supera la divisa conocida en {amount}",
+      "conversion on {day} exceeds the known currency balance by {amount}"
+    ],
+    [
+      "perdida del {day}: ventana de 1 año aun abierta, una recompra posterior la bloquearia",
+      "loss on {day}: 1-year window still open, a later repurchase would block it"
+    ],
+    [
+      "dividendos/intereses como entradas: {label}",
+      "dividends/interest as inflows: {label}"
+    ],
+    [
+      "{kind} del {day} ({ref}): {what}",
+      "{kind} on {day} ({ref}): {what}"
     ]
   ]
 }

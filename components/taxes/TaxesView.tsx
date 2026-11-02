@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Download, FileText, Receipt, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { taxText } from '@/lib/taxes/tax-text';
 import {
     RecordDetail,
     RecordList,
@@ -151,6 +152,11 @@ function formatInconsistentCashRows(value: unknown, i18n: TaxI18n): string {
 /** Convierte el resumen fiscal a filas etiquetadas con valores formateados
  *  (importes con divisa, listas de tickers, fechas). Nunca inventa: los null
  *  quedan como `NA` («N/D») y las claves raras se humanizan. */
+/** Frases del backend en el resumen: en inglés se traducen; en castellano, tal cual. */
+function summaryText(value: string, i18n: TaxI18n): string {
+    return i18n.f.locale === 'en' ? taxText(value, 'en') : value;
+}
+
 function humanizeTaxReport(summary: DataRecord, i18n: TaxI18n): DataRecord {
     const tFn = i18n.t;
     const currency = typeof summary.base_currency === 'string' && summary.base_currency
@@ -227,7 +233,9 @@ function humanizeTaxReport(summary: DataRecord, i18n: TaxI18n): DataRecord {
             const parts = Object.entries(byCurrency).map(([cur, v]) => `${cur}: ${v.gain_base === null || v.gain_base === undefined ? tFn('taxes.ledger.notComputed') : formatMoney(v.gain_base, 'EUR')} (${names[String(v.status)] ?? String(v.status)}${v.unconverted === null || v.unconverted === undefined ? '' : `, ${tFn('taxes.ledger.unconverted', { amount: formatNumber(v.unconverted, { maximumFractionDigits: 2 }), currency: cur })}`})`);
             display[label] = parts.length > 0 ? parts.join(' · ') : tFn('taxes.ledger.noConversions');
         } else if (key === 'currency_ledger_reason') {
-            display[label] = value ?? tFn('taxes.values.noneM');
+            display[label] = typeof value === 'string' && value ? summaryText(value, i18n) : tFn('taxes.values.noneM');
+        } else if ((key === 'fiscal_disclaimer' || key === 'currency_ledger_note') && typeof value === 'string') {
+            display[label] = summaryText(value, i18n);
         } else if (key === 'method') {
             display[label] = ({ fifo: tFn('taxes.values.methodFifo') } as Record<string, string>)[String(value).toLowerCase()] ?? String(value);
         } else if (key === 'generated_at') {
