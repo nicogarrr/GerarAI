@@ -200,8 +200,16 @@ docker compose -p cavaai -f docker-compose.prod.yml config \
 ```bash
 docker compose -p cavaai -f docker-compose.prod.yml up -d --no-deps \
   backend worker worker-thesis worker-kpis worker-knowledge \
-  worker-alerts worker-gdelt scheduler
+  worker-alerts worker-gdelt scheduler worker-official-closes \
+  worker-prices worker-externa worker-finnhub worker-yahoo \
+  worker-dca-manual
 ```
+
+La lista es la misma de la parada del paso 2, con los seis workers de colas
+de datos incluidos: llevan parados desde la ventana y no vuelven solos; sin
+ellos la ingesta de precios, cierres oficiales y noticias queda detenida
+(backup.sh para y rearranca esos mismos 14 servicios en cada backup:
+scripts/backup.sh).
 
 Verificar `/health/ready` (sonda `minio` = ok; el nombre de la sonda es
 historico, el backend habla S3 contra Garage).
@@ -229,7 +237,9 @@ solo en Garage.
 ```bash
 docker compose -p cavaai -f docker-compose.prod.yml stop \
   backend worker worker-thesis worker-kpis worker-knowledge \
-  worker-alerts worker-gdelt scheduler
+  worker-alerts worker-gdelt scheduler worker-official-closes \
+  worker-prices worker-externa worker-finnhub worker-yahoo \
+  worker-dca-manual
 ```
 
 2. **Copia inversa verificada**: lo escrito en Garage desde el corte se copia
