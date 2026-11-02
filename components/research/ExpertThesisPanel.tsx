@@ -121,6 +121,10 @@ export function ExpertThesisPanel({
                     <span className="font-semibold">{t('brain.expertTeam.thesis.verdict')}</span>
                     {`: ${thesis.verdict.label}. ${thesis.verdict.rationale ?? ''}`.trimEnd()}
                 </p>
+            ) : thesis.judge_timed_out ? (
+                <p className="mt-4 text-sm leading-6 text-gray-400" data-testid="expert-thesis-judge-timeout">
+                    {t('brain.expertTeam.thesis.judgeTimeout')}
+                </p>
             ) : null}
             {thesis.history?.length ? (
                 <div className="mt-6" data-testid="expert-thesis-history">
@@ -141,7 +145,9 @@ export function ExpertThesisPanel({
                                 {' · '}
                                 {run.verdict
                                     ? t('brain.expertTeam.thesis.historyVerdict', { label: run.verdict })
-                                    : t('brain.expertTeam.thesis.historyNoVerdict')}
+                                    : run.judge_timed_out
+                                      ? t('brain.expertTeam.thesis.historyJudgeTimeout')
+                                      : t('brain.expertTeam.thesis.historyNoVerdict')}
                                 {run.answered?.length
                                     ? ` · ${t('brain.expertTeam.thesis.historyAnswered', { experts: expertNames(run.answered, t) })}`
                                     : null}

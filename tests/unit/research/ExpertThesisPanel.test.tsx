@@ -22,6 +22,7 @@ const thesis: ExpertThesis = {
     conflicts: ['Fundamental lo ven a favor y Riesgo en contra'],
     verdict: { label: 'a favor', rationale: 'Pesa más el crecimiento.' },
     is_latest: true,
+    judge_timed_out: false,
 };
 
 describe('tesis guardada del equipo de expertos', () => {
@@ -82,8 +83,8 @@ describe('tesis guardada del equipo de expertos', () => {
         const withHistory: ExpertThesis = {
             ...thesis,
             history: [
-                { run_id: 5, finished_at: '2026-10-31T09:00:00Z', verdict: 'neutral', answered: ['fundamental', 'valuation'], timed_out: ['risk'] },
-                { run_id: 3, finished_at: '2026-10-20T09:00:00Z', verdict: null, answered: ['fundamental'], timed_out: [] },
+                { run_id: 5, finished_at: '2026-10-31T09:00:00Z', verdict: 'neutral', answered: ['fundamental', 'valuation'], timed_out: ['risk'], judge_timed_out: false },
+                { run_id: 3, finished_at: '2026-10-20T09:00:00Z', verdict: null, answered: ['fundamental'], timed_out: [], judge_timed_out: false },
             ],
         };
         render(<ExpertThesisPanel thesis={withHistory} t={createTranslator('es')} formatDate={(iso) => iso.slice(0, 10)} />);
@@ -102,7 +103,7 @@ describe('tesis guardada del equipo de expertos', () => {
     it('historial en inglés y oculto si no hay corridas anteriores', () => {
         const withHistory: ExpertThesis = {
             ...thesis,
-            history: [{ run_id: 5, finished_at: '2026-10-31T09:00:00Z', verdict: 'positive', answered: ['news'], timed_out: ['tax'] }],
+            history: [{ run_id: 5, finished_at: '2026-10-31T09:00:00Z', verdict: 'positive', answered: ['news'], timed_out: ['tax'], judge_timed_out: false }],
         };
         const { unmount } = render(<ExpertThesisPanel thesis={withHistory} t={createTranslator('en')} />);
         const history = screen.getByTestId('expert-thesis-history');
@@ -119,7 +120,7 @@ describe('tesis guardada del equipo de expertos', () => {
     it('cada corrida anterior se abre entera con ?expertRun= (solo con basePath)', () => {
         const withHistory: ExpertThesis = {
             ...thesis,
-            history: [{ run_id: 5, finished_at: '2026-10-31T09:00:00Z', verdict: 'neutral', answered: ['fundamental'], timed_out: [] }],
+            history: [{ run_id: 5, finished_at: '2026-10-31T09:00:00Z', verdict: 'neutral', answered: ['fundamental'], timed_out: [], judge_timed_out: false }],
         };
         const { unmount } = render(
             <ExpertThesisPanel thesis={withHistory} t={createTranslator('es')} basePath="/research/MSFT/tesis" formatDate={(iso) => iso.slice(0, 10)} />,
@@ -144,6 +145,35 @@ describe('tesis guardada del equipo de expertos', () => {
         render(<ExpertThesisPanel thesis={older} t={createTranslator('en')} basePath="/research/MSFT/tesis" />);
         expect(screen.getByTestId('expert-thesis-older')).toHaveTextContent('You are viewing an earlier run');
         expect(screen.getByRole('link', { name: 'See the latest' })).toBeInTheDocument();
+    });
+
+    it('si el juez no llegó a tiempo lo dice, en la tesis y en el historial', () => {
+        const slowJudge: ExpertThesis = {
+            ...thesis,
+            verdict: null,
+            judge_timed_out: true,
+            history: [
+                { run_id: 5, finished_at: '2026-10-31T09:00:00Z', verdict: null, answered: ['fundamental'], timed_out: [], judge_timed_out: true },
+                { run_id: 3, finished_at: '2026-10-20T09:00:00Z', verdict: null, answered: ['fundamental'], timed_out: [], judge_timed_out: false },
+            ],
+        };
+        const { unmount } = render(<ExpertThesisPanel thesis={slowJudge} t={createTranslator('es')} formatDate={(iso) => iso.slice(0, 10)} />);
+        expect(screen.queryByTestId('expert-thesis-verdict')).toBeNull();
+        expect(screen.getByTestId('expert-thesis-judge-timeout')).toHaveTextContent(
+            'El juez no llegó a tiempo: sin veredicto, quedan las posturas de cada experto.',
+        );
+        expect(screen.getByTestId('expert-thesis-run-5')).toHaveTextContent('El juez no llegó a tiempo');
+        expect(screen.getByTestId('expert-thesis-run-5')).not.toHaveTextContent('Sin veredicto');
+        expect(screen.getByTestId('expert-thesis-run-3')).toHaveTextContent('Sin veredicto');
+        unmount();
+        render(<ExpertThesisPanel thesis={slowJudge} t={createTranslator('en')} formatDate={(iso) => iso.slice(0, 10)} />);
+        expect(screen.getByTestId('expert-thesis-judge-timeout')).toHaveTextContent('The judge did not answer in time');
+        expect(screen.getByTestId('expert-thesis-run-5')).toHaveTextContent('Judge out of time');
+    });
+
+    it('con veredicto o sin choque no sale el aviso del juez', () => {
+        render(<ExpertThesisPanel thesis={thesis} t={createTranslator('es')} />);
+        expect(screen.queryByTestId('expert-thesis-judge-timeout')).toBeNull();
     });
 
     it('sin tesis (flag apagado o ninguna guardada) no pinta nada', () => {
