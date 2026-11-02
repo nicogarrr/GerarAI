@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { GerarAIWordmark } from '@/components/GerarAIWordmark';
 import { useT } from '@/lib/i18n/client';
+import { useNavDrawer } from '@/hooks/useNavDrawer';
 
 export interface PublicNavLinkItem {
     href: string;
@@ -33,65 +34,9 @@ export default function PublicMobileNav({ links, cta }: { links: PublicNavLinkIt
     const closeButtonRef = useRef<HTMLButtonElement>(null);
     const dialogRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        if (!open) return;
-        const trigger = triggerRef.current;
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                setOpen(false);
-                return;
-            }
-            if (e.key !== 'Tab') return;
-            const dialog = dialogRef.current;
-            if (!dialog) return;
-            // El backdrop lleva tabIndex=-1 a proposito (cierra por fondo, no es
-            // un control del ciclo) y la CTA del drawer puede estar display:none
-            // por breakpoint: un focusable invisible o sin tab stop rompe el
-            // ciclo (Shift+Tab escapaba al backdrop - auditor #1076).
-            const focusable = Array.from(
-                dialog.querySelectorAll<HTMLElement>(
-                    'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-                ),
-            ).filter((el) => el.tabIndex >= 0 && el.getClientRects().length > 0);
-            if (focusable.length === 0) {
-                e.preventDefault();
-                dialog.focus();
-                return;
-            }
-            const first = focusable[0];
-            const last = focusable[focusable.length - 1];
-            if (e.shiftKey && document.activeElement === first) {
-                e.preventDefault();
-                last.focus();
-            } else if (!e.shiftKey && document.activeElement === last) {
-                e.preventDefault();
-                first.focus();
-            }
-        };
-        // Cruzar a md+ con el drawer abierto lo oculta (md:hidden) sin
-        // cerrarlo: el body quedaria con overflow:hidden y el listener Tab
-        // activo contra un menu invisible. Se cierra al cambiar el breakpoint.
-        const mq = window.matchMedia('(min-width: 768px)');
-        const onBreakpoint = () => {
-            if (mq.matches) setOpen(false);
-        };
-        mq.addEventListener('change', onBreakpoint);
-        document.addEventListener('keydown', onKey);
-        closeButtonRef.current?.focus();
-        const prevOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        return () => {
-            mq.removeEventListener('change', onBreakpoint);
-            document.removeEventListener('keydown', onKey);
-            document.body.style.overflow = prevOverflow;
-            // Al cerrar por breakpoint (resize a md+) el trigger esta oculto:
-            // enfocarlo seria mandar el foco a un elemento invisible; se suelta
-            // al documento en su lugar (auditor #1076).
-            if (trigger && trigger.getClientRects().length > 0) trigger.focus();
-            else (document.activeElement as HTMLElement | null)?.blur?.();
-        };
-    }, [open]);
+    // Escape, ciclo de Tab, bloqueo de scroll, cierre al cruzar a md+ y
+    // foco: comportamiento compartido con MobileNavDrawer (hooks/useNavDrawer).
+    useNavDrawer({ active: open, onClose: () => setOpen(false), dialogRef, closeButtonRef, triggerRef });
 
     const close = () => setOpen(false);
 

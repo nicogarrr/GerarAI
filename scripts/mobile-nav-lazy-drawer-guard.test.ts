@@ -11,6 +11,9 @@ import { readFileSync } from 'node:fs';
 
 const nav = readFileSync('components/MobileNav.tsx', 'utf8');
 const drawer = readFileSync('components/MobileNavDrawer.tsx', 'utf8');
+// El comportamiento del drawer (Escape, Tab, scroll, foco) vive en el hook
+// compartido con PublicMobileNav desde la consolidación de los dos drawers.
+const drawerBehavior = drawer + readFileSync('hooks/useNavDrawer.ts', 'utf8');
 
 describe('navegación móvil: drawer diferido', () => {
     it('el drawer carga con dynamic() desde el gatillo', () => {
@@ -24,9 +27,9 @@ describe('navegación móvil: drawer diferido', () => {
     });
 
     it('el drawer conserva la gestión de foco, scroll y Escape', () => {
-        assert.ok(drawer.includes("document.body.style.overflow = 'hidden'"), 'bloquea el scroll del body al abrir');
-        assert.ok(drawer.includes("e.key === 'Escape'"), 'Escape cierra');
-        assert.ok(drawer.includes('closeButtonRef.current?.focus()'), 'el foco entra por el botón de cerrar');
+        assert.ok(drawerBehavior.includes("document.body.style.overflow = 'hidden'"), 'bloquea el scroll del body al abrir');
+        assert.ok(drawerBehavior.includes("e.key === 'Escape'"), 'Escape cierra');
+        assert.ok(drawerBehavior.includes('closeButtonRef.current?.focus()'), 'el foco entra por el botón de cerrar');
         assert.ok(drawer.includes('createPortal'), 'sigue en portal a document.body');
     });
 });

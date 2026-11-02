@@ -1,9 +1,9 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
 import { useT } from '@/lib/i18n/client';
 import { useOpenFromQuery } from '@/hooks/useOpenFromQuery';
+import { useLazyDialog } from '@/hooks/useLazyDialog';
 import { Plus } from 'lucide-react';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -22,24 +22,17 @@ const WatchlistAddDialog = dynamic(loadWatchlistAddDialog, { loading: () => null
  * canónico del master en el servidor (SAN.MC -> SAN) antes de guardar.
  */
 export default function WatchlistAddButton({ followedSymbols }: { followedSymbols: string[] }) {
-    const [open, setOpen] = useState(false);
+    const { open, openedOnce, onOpenChange, openDialog } = useLazyDialog();
     const t = useT();
-    // Una vez abierto por primera vez, el diálogo se queda montado (oculto
-    // por Radix al cerrar) para conservar lo escrito si se cierra sin añadir.
-    const [openedOnce, setOpenedOnce] = useState(false);
     // Enlace directo «…?anadir=1» (Primeros pasos de Inicio): abre el alta al llegar.
     useOpenFromQuery(() => {
-      setOpenedOnce(true);
-      setOpen(true);
+      openDialog();
     });
 
     return (
         <Dialog
             open={open}
-            onOpenChange={(next) => {
-                setOpen(next);
-                if (next) setOpenedOnce(true);
-            }}
+            onOpenChange={onOpenChange}
         >
             <DialogTrigger asChild>
                 <Button

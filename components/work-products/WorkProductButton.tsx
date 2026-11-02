@@ -1,11 +1,11 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
 import { FileOutput } from 'lucide-react';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useT } from '@/lib/i18n/client';
+import { useLazyDialog } from '@/hooks/useLazyDialog';
 
 // El diálogo de generación (buscador de ticker, selects, la acción y el
 // visor markdown del resultado) solo hace falta al abrirlo: importado
@@ -16,18 +16,12 @@ const WorkProductDialog = dynamic(loadWorkProductDialog, { loading: () => null }
 
 export default function WorkProductButton() {
     const t = useT();
-    const [open, setOpen] = useState(false);
-    // Una vez abierto por primera vez, el diálogo se queda montado (oculto
-    // por Radix al cerrar) para conservar lo elegido si se cierra sin generar.
-    const [openedOnce, setOpenedOnce] = useState(false);
+    const { open, openedOnce, onOpenChange } = useLazyDialog();
 
     return (
         <Dialog
             open={open}
-            onOpenChange={(next) => {
-                setOpen(next);
-                if (next) setOpenedOnce(true);
-            }}
+            onOpenChange={onOpenChange}
         >
             <DialogTrigger asChild>
                 <Button
