@@ -875,6 +875,9 @@ _PORTFOLIO_QUERY_RE = re.compile(
     r"|\bqu[eé]\s+(?:acciones|empresas|valores|compa[nñ][ií]as|t[ií]tulos)\s+(?:tengo|poseo|llevo)\s*(?:[?¿.!]|$|en\s+(?:cartera|mi\s+cartera))"
     r"|\ben\s+qu[eé]\s+(?:empresas|acciones|valores|compa[nñ][ií]as)\s+(?:estoy\s+invertid[oa]|tengo\s+dinero|invierto)\b"
     r"|\bqu[eé]\s+tengo\s+en\s+(?:mi\s+)?cartera\b"
+    # «¿Cuántas empresas tengo?»: el recuento de posiciones (antes, modelo general;
+    # «¿cuántas posiciones tengo?» y «how many companies do I have?» ya iban aquí).
+    r"|\bcu[aá]nt[oa]s\s+(?:empresas|valores|compa[nñ][ií]as)\s+tengo\s*(?:[?¿.!]|$|en\s+(?:cartera|mi\s+cartera))"
     r"|\b(?:what|which)\s+(?:stocks|shares|companies|positions)\s+do\s+i\s+(?:own|have|hold)\b"
     r"|\bwhat\s+do\s+i\s+(?:own|hold)\b"
     # «How many positions do I have?» iba al modelo general (en castellano ya iba aquí).
