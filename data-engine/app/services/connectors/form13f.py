@@ -24,38 +24,29 @@ import httpx
 # XML externo (SEC EDGAR): defusedxml solo para PARSEAR.
 from defusedxml import ElementTree as DefusedET
 
-# Unica definicion de la URL de submissions (la de form4) y UN unico estado de
-# throttle, el de connectors/base.py.
+# Transporte EDGAR compartido (edgar_common): URLs, cabeceras y registro de
+# salud son los mismos objetos que usan form4 y form13dg (espejo por
+# construccion). El throttle sigue siendo UNO, el de connectors/base.py.
+from app.services.connectors import edgar_common
 from app.services.connectors.base import SEC_MIN_INTERVAL_SECONDS, sec_throttle
-from app.services.connectors.form4 import SUBMISSIONS_URL, default_headers, filing_index_url
 from app.services.data_source_health import get_data_source_registry
 
+SUBMISSIONS_URL = edgar_common.SUBMISSIONS_URL
+ARCHIVES_URL = edgar_common.ARCHIVES_URL
 MIN_INTERVAL_SECONDS = SEC_MIN_INTERVAL_SECONDS
+default_headers = edgar_common.default_headers
+filing_index_url = edgar_common.filing_index_url
 FORMS = {"13F-HR", "13F-HR/A"}
 
 # Alias directo al throttle compartido (ver form4._throttle).
 _throttle = sec_throttle
 
-
-# Clave compartida con el resto de conectores SEC (sec.py, sec_edgar.py):
-# mismo proveedor, mismo circuito. 400/404 (CIK o documento inexistente) son
-# dato por emisor y NO degradan; 403/429/5xx/red/no-JSON SI.
-_REGISTRY_KEY = "sec_edgar"
-
-
-def _record_sec_outcome(registry, started: float) -> None:
-    registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
-
-
-def _record_sec_http_failure(registry, exc) -> None:
-    from app.services.connectors.sec_pacing import rate_limited
-
-    rate_limited(exc.response)
-    registry.record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
-
-
-def _record_sec_transport_failure(registry, exc: Exception) -> None:
-    registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+# Registro de salud de la fuente: mismo circuito "sec_edgar" que el resto de
+# conectores SEC, mismas funciones que form4/form13dg (alias, no copias).
+_REGISTRY_KEY = edgar_common._REGISTRY_KEY
+_record_sec_outcome = edgar_common._record_sec_outcome
+_record_sec_http_failure = edgar_common._record_sec_http_failure
+_record_sec_transport_failure = edgar_common._record_sec_transport_failure
 
 
 def _get(url: str, client: httpx.Client | None) -> httpx.Response:
