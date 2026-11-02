@@ -1,6 +1,8 @@
 import { ExternalLink } from 'lucide-react';
 import { t, type TranslationKey, type TranslationVars } from '@/lib/i18n/t';
 import type { MacroEvent } from '@/lib/actions/macro-calendar.actions';
+import { macroEventText } from '@/lib/calendar/macro-text';
+import type { Locale } from '@/lib/i18n/locale';
 
 type TiFn = (key: TranslationKey, vars?: TranslationVars) => string;
 /** Fallback español sin RequestScope (tests y render directo): el acceso es de main (lib/i18n/t). */
@@ -13,13 +15,13 @@ export function SourceBadge({ children }: { children: React.ReactNode }) {
 
 /** Fila de evento macro. El enlace del documento lleva icono y aria genérico:
     el nombre de la fuente queda en la API y no se pinta (patrón de #3527). */
-export function MacroEventRow({ event, dateLabel, ti = esT }: { event: MacroEvent; dateLabel: string; ti?: TiFn }) {
+export function MacroEventRow({ event, dateLabel, ti = esT, locale = 'es' }: { event: MacroEvent; dateLabel: string; ti?: TiFn; locale?: Locale }) {
     return (
         <li className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
             <span className="w-28 text-sm font-medium text-gray-100">{dateLabel}</span>
             <span className="flex-1 text-sm text-gray-200">
-                {event.title}
-                {event.detail ? <span className="text-gray-500"> · {event.detail}</span> : null}
+                {macroEventText(event.title, locale)}
+                {event.detail ? <span className="text-gray-500"> · {macroEventText(event.detail, locale)}</span> : null}
             </span>
             {event.time_et && <span className="text-xs text-gray-500">{event.time_et} ET</span>}
             <SourceBadge>{ti('calendar.macro.official')}</SourceBadge>

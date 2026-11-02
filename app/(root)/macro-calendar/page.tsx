@@ -11,6 +11,7 @@ import {
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getT, getFormat } from '@/lib/i18n/server';
 import { eightKItemTitle, eightKReason } from '@/lib/calendar/eight-k-text';
+import { macroSourceName } from '@/lib/calendar/macro-text';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 
 export const dynamic = 'force-dynamic';
@@ -80,12 +81,12 @@ export default async function MacroCalendarPage({ searchParams }: PageProps) {
                 <h2 id="macro-title" className="text-xl font-semibold text-gray-100">{ti('calendar.macro.macroTitle')}</h2>
                 {down.length > 0 && (
                     <p role="status" className="mt-3 rounded-lg border border-amber-900/60 bg-amber-950/40 px-3 py-2 text-sm text-amber-300">
-                        {ti('calendar.macro.sourcesDown', { names: down.map((s) => s.name).join(', ') })}
+                        {ti('calendar.macro.sourcesDown', { names: down.map((s) => macroSourceName(s.name, f.locale)).join(', ') })}
                     </p>
                 )}
                 {short.length > 0 && (
                     <p role="status" className="mt-3 rounded-lg border border-amber-900/60 bg-amber-950/40 px-3 py-2 text-sm text-amber-300">
-                        {ti('calendar.macro.sourcesPartial', { names: short.map((s) => s.name).join(', ') })}
+                        {ti('calendar.macro.sourcesPartial', { names: short.map((s) => macroSourceName(s.name, f.locale)).join(', ') })}
                     </p>
                 )}
                 {macro.events.length === 0 ? (
@@ -95,7 +96,7 @@ export default async function MacroCalendarPage({ searchParams }: PageProps) {
                 ) : (
                     <ul className="mt-4 divide-y divide-gray-800 rounded-xl border border-gray-800">
                         {macro.events.map((event) => (
-                            <MacroEventRow key={`${event.kind}-${event.date}`} event={event} dateLabel={f.formatMarketDate(event.date)} ti={ti} />
+                            <MacroEventRow key={`${event.kind}-${event.date}`} event={event} dateLabel={f.formatMarketDate(event.date)} ti={ti} locale={f.locale} />
                         ))}
                     </ul>
                 )}
