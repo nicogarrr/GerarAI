@@ -3,7 +3,8 @@
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useT, useFormat } from '@/lib/i18n/client';
+import { useLocale, useT, useFormat } from '@/lib/i18n/client';
+import { paperTradingMessage } from '@/lib/paper-trading/messages-en';
 import type { HistoryRow } from './submit';
 
 /**
@@ -16,6 +17,7 @@ import type { HistoryRow } from './submit';
 export function LedgerTable({ entries }: { entries: HistoryRow[] }) {
     const ti = useT();
     const f = useFormat();
+    const locale = useLocale();
     if (entries.length === 0) {
         return (
             <EmptyState
@@ -54,7 +56,7 @@ export function LedgerTable({ entries }: { entries: HistoryRow[] }) {
                                         : `${row.side === 'buy' ? ti('paperTrading.ledger.sideBuy') : ti('paperTrading.ledger.sideSell')}${
                                               row.kind === 'opcion' ? ` ${ti(row.openClose === 'open' ? 'paperTrading.ledger.open' : 'paperTrading.ledger.close')}` : ''
                                           }${!rejected && row.fee > 0 ? ti('paperTrading.ledger.feePart', { fee: f.formatMoney(row.fee, row.currency) }) : ''}`}
-                                    {rejected && row.rejectReason ? ` · ${row.rejectReason}` : ''}
+                                    {rejected && row.rejectReason ? ` · ${paperTradingMessage(row.rejectReason, locale)}` : ''}
                                 </span>
                             </TableCell>
                             <TableCell className="text-right">
