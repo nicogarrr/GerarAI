@@ -1762,5 +1762,22 @@
   "relatedTickers": {
     "aria": "Tickers relacionados",
     "close": "cierre {date}"
+  },
+  "valuationText": {
+    "reverseOk": "El precio del modelo exige un crecimiento de ingresos del {growth} anual{basis}; no es una previsión, es lo que el precio ya descuenta.",
+    "reverseBasis": " (con margen FCF {margin} y WACC {wacc})",
+    "reverseOutOfBounds": "DCF inverso fuera de rango: con los supuestos base no existe un crecimiento de ingresos entre el −25 % y el +75 % anual que haga el modelo valer el precio actual, así que no se publica un «crecimiento exigido».",
+    "reverseNotApplicable": "DCF inverso no aplicable: con margen FCF ≤ 0 crecer no aumenta el valor (más ingresos queman más caja), así que no hay crecimiento exigido.",
+    "assumptions": "Supuestos del escenario base: {parts}.",
+    "margin": "margen FCF {value}",
+    "marginPeriod": "margen FCF {value} (periodo {period})",
+    "growth": "crecimiento de ingresos {value}",
+    "wacc": "WACC {value}",
+    "waccWithSource": "WACC {value} ({source})",
+    "waccSource": {
+      "calculated_metric": "calculado con insumos trazables",
+      "inferred_input": "inferido, con fuentes",
+      "tag_default": "tipo por defecto del modelo, sin fuente trazable"
+    }
   }
 }
