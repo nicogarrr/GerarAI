@@ -300,7 +300,7 @@
     "worstUnrealized": "Peor pérdida latente",
     "cashLeft": "Caja sin invertir al final",
     "levelsNote": "Niveles aportando extra: TIR {irr} vs plano; con el mismo dinero total compra {shares} acciones.",
-    "fixedNote": "Presupuesto fijo (mismo dinero que el plano; en 1X invierte la mitad y guarda caja): valor final {value} vs plano. En el histórico amplio esta variante suele quedar POR DEBAJO del DCA plano.",
+    "fixedNote": "Presupuesto fijo (mismo dinero que el plano; en 1X invierte la mitad y guarda caja): valor final {value} vs plano. Guardar caja con un solo valor suele quedar POR DEBAJO del DCA plano (2013–2026: −1,7 puntos de TIR en 491 valores del S&P 500). Con el mismo dinero, lo que gana es repartir la aportación entre varios valores (reparto del plan).",
     "levelMonths": "{label}: {months} meses"
   },
   "gems": {
