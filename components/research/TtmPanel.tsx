@@ -12,6 +12,7 @@ import {
   ttmProvenanceLabel,
   ttmQuartersText,
 } from '@/lib/research/ttm-display';
+import { ttmFormulaText, ttmNoteText } from '@/lib/research/ttm-note-text';
 
 /**
  * Fundamentales actuales en TTM (últimos 4 trimestres) con respaldo FY.
@@ -42,12 +43,12 @@ export function TtmPanel({ ttm, locale = DEFAULT_LOCALE }: { ttm: ResearchTtm | 
               </div>
               <div className="mt-2 text-xs text-gray-500">{ttmPeriodText(metric, locale)}</div>
               {quarters ? <div className="mt-1 text-xs leading-5 text-gray-500">{t('research.ttm.sumOf', { quarters })}</div> : null}
-              {metric.note ? <div className="mt-1 text-xs leading-5 text-amber-300/80">{metric.note}</div> : null}
+              {metric.note ? <div className="mt-1 text-xs leading-5 text-amber-300/80">{ttmNoteText(metric.note, locale)}</div> : null}
             </div>
           );
         })}
       </div>
-      <p className="mt-3 text-xs leading-5 text-gray-500">{ttm?.formula}</p>
+      <p className="mt-3 text-xs leading-5 text-gray-500">{ttmFormulaText(ttm?.formula, locale)}</p>
     </div>
   );
 }
