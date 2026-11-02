@@ -1,5 +1,6 @@
 {
   "title": "Plan de inversión",
+  "offlineFeature": "Tu plan",
   "empty": "No hay plan de inversión configurado todavía.",
   "addTicker": "Añadir ticker",
   "meta": {
