@@ -1162,7 +1162,19 @@
     "statusApproved": "aprobada",
     "statusRejected": "rechazada",
     "meta": "Lección #{id} · decisión #{decision} · revisión #{review}",
-    "noLink": "sin vínculo"
+    "noLink": "sin vínculo",
+    "taxonomy": {
+      "overestimatingTam": "Sobrestimar el mercado potencial (TAM)",
+      "underestimatingDilution": "Infravalorar la dilución",
+      "extrapolatingPeakMargin": "Extrapolar márgenes de pico",
+      "ignoringBalanceSheet": "Ignorar el balance",
+      "managementTrustError": "Confiar de más en la directiva",
+      "valuationAnchoring": "Anclarse en una valoración",
+      "positionSizingError": "Error de tamaño de posición",
+      "sellingTooEarly": "Vender demasiado pronto",
+      "ignoringCyclicality": "Ignorar la ciclicidad",
+      "thesisDrift": "Deriva de la tesis"
+    }
   },
   "driverSection": {
     "created": "Versión de supuestos creada",
