@@ -300,7 +300,7 @@
     "worstUnrealized": "Worst unrealized loss",
     "cashLeft": "Uninvested cash at the end",
     "levelsNote": "Tiers contributing extra: IRR {irr} vs flat; with the same total money it buys {shares} shares.",
-    "fixedNote": "Fixed budget (same money as flat; at 1X it invests half and keeps cash): final value {value} vs flat. Over the long history this variant usually ends up BELOW flat DCA.",
+    "fixedNote": "Fixed budget (same money as flat; at 1X it invests half and keeps cash): final value {value} vs flat. Holding cash on a single stock usually ends up BELOW flat DCA (2013–2026: −1.7 IRR points across 491 S&P 500 stocks). With the same money, what wins is splitting the contribution across several stocks (the plan split).",
     "levelMonths": "{label}: {months} months"
   },
   "gems": {
