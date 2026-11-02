@@ -15,7 +15,7 @@ import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Pencil } from 'lucide-react';
-import { updateTransaction } from '@/lib/actions/portfolio.actions';
+import { updateTransaction, type PortfolioTransaction } from '@/lib/actions/portfolio.actions';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
@@ -25,24 +25,13 @@ import { parseLocalizedNumber } from '@/lib/i18n/parse-number';
 import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 import type { Formatters } from '@/lib/format';
 
-type Transaction = {
-    _id: string;
-    symbol: string;
-    type: 'buy' | 'sell';
-    quantity: number;
-    price: number;
-    fees?: number;
-    date: string;
-    notes?: string;
-    currency?: string;
-};
 
 type Props = {
-    transaction: Transaction;
+    transaction: PortfolioTransaction;
     userId: string;
 };
 
-function initialForm(transaction: Transaction, f: Formatters) {
+function initialForm(transaction: PortfolioTransaction, f: Formatters) {
     return {
         symbol: transaction.symbol,
         type: transaction.type,

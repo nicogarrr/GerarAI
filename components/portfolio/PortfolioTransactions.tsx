@@ -15,6 +15,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
 import { deleteTransaction } from '@/lib/actions/portfolio.actions';
+import type { PortfolioTransaction } from '@/lib/actions/portfolio.actions';
 import { useRouter } from 'next/navigation';
 import EditTransactionDialog from './EditTransactionDialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -24,20 +25,9 @@ import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { hasTransactionFilters, transactionsHref, type TransactionFilters } from '@/lib/portfolio/transaction-filters';
 
-type Transaction = {
-  _id: string;
-  symbol: string;
-  type: 'buy' | 'sell';
-  quantity: number;
-  price: number;
-  fees?: number;
-  date: string;
-  notes?: string;
-  currency?: string;
-};
 
 type Props = {
-  transactions: Transaction[];
+  transactions: PortfolioTransaction[];
   page?: { total: number; offset: number; filters?: TransactionFilters };
   userId: string;
 };
@@ -60,7 +50,7 @@ export const ZERO_COST_REVIEW_LABEL = 'Coste 0 (regalo / spin-off): revisar';
  * misma regla que `is_zero_cost_buy` del backend. Se acepta, pero su base de
  * coste 0 cambia la ganancia fiscal de la venta, así que se marca para revisar.
  */
-export function isZeroCostBuy(tx: Pick<Transaction, 'type' | 'quantity' | 'price'>): boolean {
+export function isZeroCostBuy(tx: Pick<PortfolioTransaction, 'type' | 'quantity' | 'price'>): boolean {
   return tx.type === 'buy' && Number.isFinite(tx.quantity) && tx.quantity > 0 && tx.price === 0;
 }
 
@@ -69,7 +59,7 @@ export function isZeroCostBuy(tx: Pick<Transaction, 'type' | 'quantity' | 'price
  * ticker, fecha y precio) para que no se borre uno parecido por error, y avisa
  * de que no se puede deshacer.
  */
-export function describeDeletion(tx: Transaction | undefined, ti: TFunction = esT, f: Formatters = esF): string {
+export function describeDeletion(tx: PortfolioTransaction | undefined, ti: TFunction = esT, f: Formatters = esF): string {
   const tail = ti('portfolio.transactions.deleteTail');
   if (!tx) return ti('portfolio.transactions.deleteGeneric', { tail });
   const currency = transactionCurrency(tx.currency);

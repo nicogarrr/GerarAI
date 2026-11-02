@@ -6,6 +6,7 @@ import { jsonBody, researchRequest } from '@/lib/research/client';
 import { formatNumber } from '@/lib/format';
 import { fetchDatedChanges } from '@/lib/market/dated-change';
 import type { components } from '@/lib/research/openapi.generated';
+import type { EngineScreenResult, ScreenCriterion } from '@/lib/screener-types';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
@@ -355,33 +356,11 @@ export const getFairValueReading = cache(
 // analisis de cobertura.
 // ============================================================================
 
-export type EngineCriterion = {
-  left: string;
-  operator: '>' | '>=' | '<' | '<=' | '==' | '!=';
-  right: string;
-};
-
-export type EngineScreenRow = {
-  company_id: number;
-  ticker: string;
-  name: string;
-  matched: boolean;
-  rank_value: string | null;
-  coverage_percent: number;
-  confidence: string;
-  latest_data_at: string | null;
-  missing_fields: string[];
-};
-
-export type EngineScreenResult = {
-  criteria: EngineCriterion[];
-  ranking_formula: string | null;
-  ranking_direction: string;
-  company_count: number;
-  match_count: number;
-  new_match_company_ids?: number[];
-  results: EngineScreenRow[];
-};
+// El contrato del motor vive en lib/screener-types.ts (compartido con
+// research-tools.actions); EngineCriterion es el mismo criterio con su
+// nombre histórico aquí.
+export type EngineCriterion = ScreenCriterion;
+export type { EngineScreenRow, EngineScreenResult } from '@/lib/screener-types';
 
 /** POST /api/screeners/run — filtro ad-hoc contra el motor (trazable). */
 export async function runScreenerEngine(
