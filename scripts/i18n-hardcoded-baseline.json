@@ -94,6 +94,7 @@
   "lib/news-language.ts": 3,
   "lib/news-related-tickers.ts": 4,
   "lib/newsRelevance.ts": 2,
+  "lib/ownership/overlap-text.ts": 14,
   "lib/paginate-all.ts": 1,
   "lib/paginated-backend.ts": 4,
   "lib/paper-trading/accounting.ts": 4,

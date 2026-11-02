@@ -4,6 +4,7 @@ import BackendOffline from '@/components/system/BackendOffline';
 import { getPortfolioOverlap } from '@/lib/actions/investors.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getLocale, getT } from '@/lib/i18n/server';
+import { overlapText } from '@/lib/ownership/overlap-text';
 
 import { periodLabel } from '../../inversores/_components/format';
 import { Pagination, paginate } from '../../inversores/_components/Pagination';
@@ -25,11 +26,11 @@ export async function Overlap({ pagina, compras }: { pagina?: string; compras?: 
   return <>
     <p className="text-xs text-gray-400">{t('ownership.overlap.summary', { withData: data.managers_with_data, withoutData: data.managers_without_data, partial: data.managers_partial })}</p>
     <p className="text-sm text-gray-400">{t('ownership.overlap.note')}</p>
-    {data.message && <p className="text-sm text-gray-400">{data.message}</p>}
+    {data.message && <p className="text-sm text-gray-400">{overlapText(data.message, locale)}</p>}
     <ul className="flex flex-col gap-3">
       {paged.items.map(position => <li key={position.ticker} className="rounded-xl border border-gray-800 p-4">
         <Link href={`/research/${encodeURIComponent(position.ticker)}`} className="font-medium text-teal-300">{position.ticker} · {position.name}</Link>
-        <p className="mt-1 text-xs text-gray-500">{position.identity_source ?? t('ownership.overlap.noCusip')}</p>
+        <p className="mt-1 text-xs text-gray-500">{overlapText(position.identity_source, locale) ?? t('ownership.overlap.noCusip')}</p>
         {position.status === 'sin_coincidencias' && <p className="mt-2 text-sm text-gray-400">{t('ownership.overlap.noMatches')}</p>}
         <ul className="mt-2 flex flex-col gap-2">
           {position.holders.map(holder => <li key={holder.slug} className="text-sm">
