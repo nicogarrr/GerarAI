@@ -327,7 +327,7 @@ def _company_news_answer(db: Session, company: Company, tenant: int) -> ChatResp
         if key in seen:
             continue
         seen.add(key)
-        lines.append(f"- '{title}' ({_fecha_es(event.date.date())}, {_source_label(event.source)}).")
+        lines.append(f"- '{title}' ({_fecha_es(local_today(event.date))}, {_source_label(event.source)}).")
         sources.append(_source("news_event", event.id, f"{company.ticker}: {title}", event.url or _link(company, "news")))
         if len(lines) == 6:
             break
@@ -593,7 +593,7 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
                 continue
             seen.add(key)
             kept_signatures.append((signature, event.date))
-            lines.append(f"- {company.ticker}: '{title}' ({_fecha_es(event.date.date())}, {_source_label(event.source)}).")
+            lines.append(f"- {company.ticker}: '{title}' ({_fecha_es(local_today(event.date))}, {_source_label(event.source)}).")
             sources.append(_source("news_event", event.id, f"{company.ticker}: {title}", event.url or _link(company, "news")))
             if len(lines) == 6:
                 break
