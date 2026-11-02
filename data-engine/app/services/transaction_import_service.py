@@ -72,6 +72,8 @@ class TransactionImportPreviewResponse(BaseModel):
 # POST/PUT /transactions (#2606).
 _MAX_NUMERIC_20_6 = Decimal("99999999999999.999999")
 _MAX_NUMERIC_20_2 = Decimal("999999999999999999.99")
+# Numeric(20, 6): por debajo de medio millonésimo se guarda como 0.
+_MIN_STORED_QUANTITY = Decimal("0.0000005")
 
 
 _ISIN_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
@@ -104,6 +106,11 @@ class TransactionImportCommitRequest(BaseModel):
                         f"Fila {tx.row_number}: {field} fuera de rango ({value}); "
                         "revisa el archivo y vuelve a generar la vista previa"
                     )
+            if tx.action in ("buy", "sell") and 0 < tx.quantity < float(_MIN_STORED_QUANTITY):
+                raise ValueError(
+                    f"Fila {tx.row_number}: cantidad demasiado pequeña ({tx.quantity}); "
+                    "revisa el archivo y vuelve a generar la vista previa"
+                )
             # Ni las reglas de fecha de la vista previa: «1800-01-01» entraba
             # como compra de hace dos siglos.
             try:
@@ -641,6 +648,16 @@ class TransactionImportService:
             elif parsed_qty <= 0 and parsed_action in ("buy", "sell"):
                 errors.append(RowValidationError(row_number=row_idx, field="quantity", message="La cantidad debe ser mayor que cero", raw_value=qty_raw))
                 row_has_error = True
+            elif abs(parsed_qty) > _MAX_NUMERIC_20_6:
+                # Mismo tope que el commit: sin él la vista previa daba la fila
+                # por buena y el commit rechazaba el lote entero después.
+                errors.append(RowValidationError(row_number=row_idx, field="quantity", message="Cantidad fuera de rango", raw_value=qty_raw))
+                row_has_error = True
+            elif parsed_action in ("buy", "sell") and parsed_qty < _MIN_STORED_QUANTITY:
+                # La columna guarda 6 decimales: «0,0000001» quedaba como una
+                # compra de 0 acciones.
+                errors.append(RowValidationError(row_number=row_idx, field="quantity", message="La cantidad es demasiado pequeña (mínimo 0,000001)", raw_value=qty_raw))
+                row_has_error = True
             else:
                 qty_num = float(parsed_qty)
 
@@ -653,6 +670,9 @@ class TransactionImportService:
                 row_has_error = True
             elif parsed_price < 0:
                 errors.append(RowValidationError(row_number=row_idx, field="price", message="El precio no puede ser negativo", raw_value=price_raw))
+                row_has_error = True
+            elif parsed_price > _MAX_NUMERIC_20_6:
+                errors.append(RowValidationError(row_number=row_idx, field="price", message="Precio fuera de rango", raw_value=price_raw))
                 row_has_error = True
             elif parsed_price == 0 and parsed_action == "buy":
                 # Una compra a 0 dejaría la posición con coste 0 y toda la
@@ -671,6 +691,9 @@ class TransactionImportService:
                     # Una comisión ilegible no puede pasar a 0 en silencio: el
                     # coste de adquisición quedaría por debajo del real.
                     errors.append(RowValidationError(row_number=row_idx, field="fees", message="Comisión no numérica", raw_value=fees_raw))
+                    row_has_error = True
+                elif abs(pf) > _MAX_NUMERIC_20_2:
+                    errors.append(RowValidationError(row_number=row_idx, field="fees", message="Comisión fuera de rango", raw_value=fees_raw))
                     row_has_error = True
                 else:
                     # Los brokers (p. ej. DEGIRO) exportan los costes en negativo
