@@ -16,7 +16,11 @@ test.describe("hardening frontend estático", () => {
     // dueña de su landmark, y el skip-link apunta al id que estas declaran.
     expect(layout).not.toContain("<main");
     expect(layout).toContain('href="#content"');
-    expect(layout).toContain("Saltar al contenido");
+    expect(layout).toContain("t('landing.shell.skipLink')");
+    const es = JSON.parse(source("lib", "i18n", "messages", "es", "landing.json"));
+    const en = JSON.parse(source("lib", "i18n", "messages", "en", "landing.json"));
+    expect(es.shell.skipLink).toBe("Saltar al contenido");
+    expect(en.shell.skipLink).toBe("Skip to content");
     // La geometria del shell sale de variables CSS, no de 4rem/100vh sueltos.
     expect(layout).toContain("min-h-dvh");
   });
@@ -29,7 +33,12 @@ test.describe("hardening frontend estático", () => {
     expect(sidebar).toContain("md:flex");
     expect(mobileNav).toContain("md:hidden");
     // La trampa de foco del drawer vive en un solo sitio.
-    expect(mobileNav).toContain("querySelectorAll<HTMLElement>");
+    expect(mobileNav).toContain("useNavDrawer({ active: true, onClose, dialogRef, closeButtonRef, triggerRef })");
+    const drawerHook = source("hooks", "useNavDrawer.ts");
+    expect(drawerHook).toContain("querySelectorAll<HTMLElement>");
+    expect(drawerHook).toContain("el.tabIndex >= 0 && el.getClientRects().length > 0");
+    expect(drawerHook).toContain("e.key === 'Escape'");
+    expect(drawerHook).toContain("e.key !== 'Tab'");
     expect(mobileNav).not.toContain("onDrawerKeyDown");
   });
 
@@ -74,7 +83,12 @@ test.describe("hardening frontend estático", () => {
     expect(mobileNav).toContain("aria-label={t('shell.nav.closeBackdrop')}");
     const shellMessages = JSON.parse(source("lib", "i18n", "messages", "es", "shell.json")) as { nav: { closeBackdrop: string } };
     expect(shellMessages.nav.closeBackdrop).toBe("Cerrar menú por fondo");
-    expect(mobileNav).toContain("querySelectorAll<HTMLElement>");
+    expect(mobileNav).toContain("useNavDrawer({ active: true, onClose, dialogRef, closeButtonRef, triggerRef })");
+    const drawerHook = source("hooks", "useNavDrawer.ts");
+    expect(drawerHook).toContain("querySelectorAll<HTMLElement>");
+    expect(drawerHook).toContain("el.tabIndex >= 0 && el.getClientRects().length > 0");
+    expect(drawerHook).toContain("e.key === 'Escape'");
+    expect(drawerHook).toContain("e.key !== 'Tab'");
     expect(searchCommand).toContain("searchError");
     expect(searchCommand).toContain("t('ui.command.error')");
     const uiMessages = JSON.parse(source("lib", "i18n", "messages", "es", "ui.json")) as { command: { error: string } };
