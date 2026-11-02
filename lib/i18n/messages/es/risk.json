@@ -88,5 +88,12 @@
     "weightGross": "Peso (valor bruto)",
     "weightWithCash": "Peso (con caja)",
     "weightUnknown": "Peso (base no disponible)"
+  },
+  "alertText": {
+    "over20": "{ticker} supera el 20 % de peso en la cartera",
+    "preFcfOver10": "{ticker} es pre-FCF y supera el 10 % de peso en la cartera",
+    "netCashNegative": "El saldo neto de caja, convertido a {currency}, es negativo",
+    "netCashNegativeIn": "El saldo neto de caja, convertido a {currency}, es negativo (saldo negativo en {detail})",
+    "cashNegative": "El saldo de caja en {currency} es negativo"
   }
 }

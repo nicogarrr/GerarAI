@@ -11,6 +11,7 @@ import type { Locale } from '@/lib/i18n/locale';
 import { etiquetaFactor, etiquetaSector, etiquetaSeveridad } from '@/lib/labels';
 import { useT, useFormat } from '@/lib/i18n/client';
 import { valuationHoldReason } from '@/lib/portfolio/forecast-excluded-reason';
+import { riskAlertText } from '@/lib/risk/alert-text';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import type { Formatters } from '@/lib/format';
 import { getRiskDashboard } from '@/lib/actions/risk.actions';
@@ -341,7 +342,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                                 <div className="rounded-md border border-gray-700/60 bg-black/20 p-3" key={alertKey(alert)}>
                                     <div className="flex flex-wrap items-center gap-2">
                                         <Badge variant="outline">{etiquetaSeveridad(formatRecordValue(alert.severity), f.locale)}</Badge>
-                                        <span className="text-sm text-gray-200">{formatRecordValue(alert.message)}</span>
+                                        <span className="text-sm text-gray-200">{riskAlertText(formatRecordValue(alert.message), f.locale, t)}</span>
                                     </div>
                                     <p className="mt-2 text-xs leading-5 text-gray-400">{thresholdExplanation(t, alert)}</p>
                                 </div>
