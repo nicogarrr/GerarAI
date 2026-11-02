@@ -1539,6 +1539,27 @@ def _asks_trades(text: str, question: str) -> bool:
                 and not re.search(r"\b(?:comision\w*|fees?|commissions?|deberia|should)\b", text))
 
 
+_MONTH_WORDS = {
+    **{name: i + 1 for i, name in enumerate(_MONTH_NAMES_ES)},
+    **{name.lower(): i + 1 for i, name in enumerate(_MONTH_NAMES_EN)},
+    "setiembre": 9,
+}
+#: «en octubre», «en marzo de 2026», «in March 2026»: un mes con nombre. Antes no
+#: se leía y el recuento contaba TODAS las ventas bajo la pregunta de un mes.
+_NAMED_MONTH = re.compile(
+    rf"\b(?:en|de|durante|in|during)\s+({'|'.join(sorted(_MONTH_WORDS, key=len, reverse=True))})\b"
+    r"(?:\s+(?:de\s+|del\s+|of\s+)?((?:19|20)\d\d)\b)?"
+)
+_LAST_YEAR = re.compile(r"\b(?:el\s+)?ano\s+pasado\b|\blast\s+year\b")
+_QUARTER = re.compile(r"\b(?:este|el)\s+trimestre(?:\s+(pasado|anterior))?\b|\b(this|last)\s+quarter\b")
+
+
+def _month_period(year: int, month: int) -> tuple[date, date, str, str]:
+    first = date(year, month, 1)
+    last = (first.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    return (first, last, f"{_MONTH_NAMES_ES[month - 1]} de {year}", f"{_MONTH_NAMES_EN[month - 1]} {year}")
+
+
 def _trades_period(text: str) -> tuple[date, date, str, str] | None:
     """(desde, hasta, rótulo es, rótulo en) del periodo pedido, o None para «las últimas»."""
     today = local_today()
@@ -1546,9 +1567,31 @@ def _trades_period(text: str) -> tuple[date, date, str, str] | None:
         first = today.replace(day=1)
         if _LAST_MONTH.search(text):
             first = (first - timedelta(days=1)).replace(day=1)
-        last = (first.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-        return (first, last, f"{_MONTH_NAMES_ES[first.month - 1]} de {first.year}",
-                f"{_MONTH_NAMES_EN[first.month - 1]} {first.year}")
+        return _month_period(first.year, first.month)
+    quarter = _QUARTER.search(text)
+    if quarter:
+        index = (today.month - 1) // 3
+        year = today.year
+        if quarter.group(1) or quarter.group(2) == "last":
+            index -= 1
+            if index < 0:
+                index, year = 3, year - 1
+        first = date(year, index * 3 + 1, 1)
+        last = _month_period(year, index * 3 + 3)[1]
+        return (first, last, f"{_MONTH_NAMES_ES[index * 3]}–{_MONTH_NAMES_ES[index * 3 + 2]} de {year}",
+                f"{_MONTH_NAMES_EN[index * 3]}–{_MONTH_NAMES_EN[index * 3 + 2]} {year}")
+    named = _NAMED_MONTH.search(text)
+    if named:
+        month = _MONTH_WORDS[named.group(1)]
+        if named.group(2):
+            year = int(named.group(2))
+        else:
+            # «en diciembre» dicho en noviembre: el último diciembre ya pasado.
+            year = today.year if month <= today.month else today.year - 1
+        return _month_period(year, month)
+    if _LAST_YEAR.search(text):
+        year = today.year - 1
+        return date(year, 1, 1), date(year, 12, 31), str(year), str(year)
     year = _asked_year(text)
     if year is not None:
         return date(year, 1, 1), date(year, 12, 31), str(year), str(year)
@@ -1581,7 +1624,9 @@ def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = Non
 
     english = _english()
     period = None if ticker else _trades_period(text)
-    sells_only = ticker is None and period is None and bool(_LAST_SELLS.search(text))
+    # «¿cuál fue mi última venta este año?»: solo ventas también con periodo
+    # (antes el periodo hacía listar las compras).
+    sells_only = ticker is None and bool(_LAST_SELLS.search(text))
     sources = [_source("transactions", None, "Operaciones" if not english else "Trades", "/portfolio")]
     query = (select(Transaction, Company.ticker, Portfolio.name)
              .outerjoin(Company, Company.id == Transaction.company_id)
@@ -1599,6 +1644,9 @@ def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = Non
         if ticker:
             text_out = (f"You have no saved buys or sells of {ticker}." if english
                         else f"No tienes compras ni ventas guardadas de {ticker}.")
+        elif period is not None and sells_only:
+            text_out = (f"There are no saved sells in {period[3]}." if english
+                        else f"No hay ventas guardadas de {period[2]}.")
         elif period is not None:
             text_out = (f"There are no saved buys or sells in {period[3]}." if english
                         else f"No hay compras ni ventas guardadas de {period[2]}.")
@@ -1613,6 +1661,9 @@ def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = Non
     if ticker:
         lines = [f"Your saved buys and sells of {ticker} (most recent first):" if english
                  else f"Tus compras y ventas guardadas de {ticker} (la más reciente primero):"]
+    elif period is not None and sells_only:
+        lines = [f"Your saved sells in {period[3]}:" if english
+                 else f"Tus ventas guardadas de {period[2]}:"]
     elif period is not None:
         lines = [f"Your saved buys and sells in {period[3]}:" if english
                  else f"Tus compras y ventas guardadas de {period[2]}:"]
