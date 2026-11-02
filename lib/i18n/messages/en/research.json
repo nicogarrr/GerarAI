@@ -1758,5 +1758,9 @@
   "assistantRedirect": {
     "moved": "The research guide now lives in the Brain.",
     "continue": "Continue"
+  },
+  "relatedTickers": {
+    "aria": "Related tickers",
+    "close": "close {date}"
   }
 }

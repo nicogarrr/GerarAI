@@ -1758,5 +1758,9 @@
   "assistantRedirect": {
     "moved": "La guía de investigación ahora vive en el Cerebro.",
     "continue": "Continuar"
+  },
+  "relatedTickers": {
+    "aria": "Tickers relacionados",
+    "close": "cierre {date}"
   }
 }
