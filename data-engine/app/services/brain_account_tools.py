@@ -210,8 +210,16 @@ _TICKER_TOKEN = re.compile(r"\b[A-Z][A-Z0-9.]{0,5}\b")
 _NOT_TICKERS = {"IRPF", "EUR", "USD", "DCA", "ETF", "YTD", "I", "A", "Y", "O"}
 
 
+#: «con mis 2000 acciones», «2025 euros»: una cantidad, no el año pedido.
+_QUANTITY_NUMBER = re.compile(
+    r"\b\d+(?:[.,]\d+)*\s*(?:acciones|accion|titulos?|participaciones|euros?|eur|€|dolares|dolar|usd"
+    r"|shares?|stocks?|dollars?)(?!\w)"
+)
+
+
 def _asked_year(text: str) -> int | None:
     """Año pedido: «en 2025» o «este año» (Madrid). None si la frase no habla de un año."""
+    text = _QUANTITY_NUMBER.sub(" ", text)
     if not re.search(_YEAR_EXPR, text):
         return None
     explicit = re.search(r"\b((?:19|20)\d\d)\b", text)
