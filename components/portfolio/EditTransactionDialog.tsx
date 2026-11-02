@@ -19,6 +19,7 @@ import { updateTransaction, type PortfolioTransaction } from '@/lib/actions/port
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
+import { isNextRedirectError } from '@/lib/types/errors';
 import { currencyOptions } from './transactionCurrencies';
 import { hasTransactionErrors, validateTransactionForm, type TransactionFormErrors } from './transactionValidation';
 import { parseLocalizedNumber } from '@/lib/i18n/parse-number';
@@ -70,14 +71,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const errors = validateTransactionForm({
-            symbol: formData.symbol,
-            type: formData.type,
-            quantity: formData.quantity,
-            price: formData.price,
-            fees: formData.fees,
-            date: formData.date,
-        }, new Date(), { ti, locale });
+        const errors = validateTransactionForm(formData, new Date(), { ti, locale });
         setFieldErrors(errors);
         if (hasTransactionErrors(errors)) return;
         setLoading(true);
@@ -107,8 +101,8 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
             toast.success(ti('portfolio.editTransaction.toastSuccess'));
             router.refresh();
         } catch (error) {
-            const digest = (error as { digest?: unknown })?.digest;
-            if (typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')) throw error;
+            // Nunca tragar un redirect de Next (p. ej. sesión caducada): debe navegar.
+            if (isNextRedirectError(error)) throw error;
             showErrorToast(error);
         } finally {
             setLoading(false);

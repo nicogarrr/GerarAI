@@ -74,3 +74,22 @@ describe('parseLocalizedNumber (wrapper): null ante vacío, inválido o ambiguo'
         expect(parseLocalizedNumber(input)).toBeNull();
     });
 });
+
+describe('vía @/lib/format con locale en: la regla de honestidad es la de lib/i18n/parse-number', () => {
+    // Antes format.ts llevaba su propia gramática en-US, más laxa: aceptaba
+    // «1.567» como decimal cuando también puede leerse como miles es-ES
+    // (1234 en es-ES se escribe «1.234»). Tras la consolidación, el parser
+    // compartido la rechaza por ambigua, igual que «1,234» en es-ES.
+    it.each(['1.567', '10.000', '1234.567'])('rechaza %s por ambigua en locale en', (input) => {
+        expect(parseLocalizedNumberDetailed(input, 'en')).toEqual({ ok: false, error: 'ambiguous' });
+        expect(parseLocalizedNumber(input, 'en')).toBeNull();
+    });
+    it.each([
+        ['32.5', 32.5],
+        ['1,234.56', 1234.56],
+        ['1,234', 1234],
+        ['0.001', 0.001],
+    ])('acepta %s = %d en locale en', (input, expected) => {
+        expect(parseLocalizedNumber(input, 'en')).toBe(expected);
+    });
+});
