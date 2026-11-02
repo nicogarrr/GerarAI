@@ -25,7 +25,7 @@ export default function GemsView() {
         setLoading(true);
         setError(null);
         const result = await getGems();
-        if ('error' in result) setError(result.error);
+        if ('error' in result) setError(t('propicks.gems.loadError'));
         else setGems(result);
         setLoading(false);
     };

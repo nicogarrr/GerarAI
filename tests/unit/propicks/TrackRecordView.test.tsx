@@ -15,9 +15,9 @@ describe('ProPicks track record display',()=>{
   expect(await screen.findByText('Aún no hay histórico')).toBeVisible();expect(screen.queryByRole('table')).not.toBeInTheDocument();expect(screen.getByRole('button')).toBeEnabled();
  });
  it('shows action error and recovers on explicit refresh',async()=>{
-  mocks.load.mockResolvedValueOnce({error:'No disponible'}).mockResolvedValueOnce(data([],{snapshots_count:0}));render(<TrackRecordView/>);
-  expect(await screen.findByText('No disponible')).toBeVisible();fireEvent.click(screen.getByRole('button',{name:'Actualizar'}));
-  expect(await screen.findByText('Aún no hay histórico')).toBeVisible();expect(screen.queryByText('No disponible')).not.toBeInTheDocument();
+  mocks.load.mockResolvedValueOnce({error:'No se pudo cargar el histórico de selecciones.'}).mockResolvedValueOnce(data([],{snapshots_count:0}));render(<TrackRecordView/>);
+  expect(await screen.findByText('No se pudo cargar el histórico de selecciones.')).toBeVisible();fireEvent.click(screen.getByRole('button',{name:'Actualizar'}));
+  expect(await screen.findByText('Aún no hay histórico')).toBeVisible();expect(screen.queryByText('No se pudo cargar el histórico de selecciones.')).not.toBeInTheDocument();
  });
  it('shows active, exited and stale records with same-window SPY and missing values',async()=>{
   mocks.load.mockResolvedValue(data([

@@ -56,7 +56,7 @@ export default function DeepValueView() {
         setLoading(true);
         setError(null);
         const result = await getDeepValue(pbMax, yieldMin);
-        if ('error' in result) setError(result.error);
+        if ('error' in result) setError(t('propicks.deepValue.loadError'));
         else setData(result);
         setLoading(false);
     }, [pbMax, yieldMin]);
