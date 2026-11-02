@@ -2,6 +2,7 @@ import type { PaperCalibration } from '@/lib/actions/paper-trading.actions';
 import { naFor } from '@/lib/format';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locale';
 import { createTranslator } from '@/lib/i18n/translate';
+import { paperCalibrationNotice } from '@/lib/propicks/paper-calibration-text';
 
 const metricFor = (locale: Locale) => (value: number | null | undefined, ratio = false) =>
     typeof value === 'number' && Number.isFinite(value)
@@ -25,7 +26,7 @@ export function PaperCalibrationView({ data, locale = DEFAULT_LOCALE }: { data?:
         {!data ? <p>{t('propicks.paper.calUnavailable')}</p> : <>
             <p>{t('propicks.paper.calClosed', { closed: data.cerradas_con_resultado, total: data.propuestas_llm })}</p>
             {data.muestra_insuficiente && <p role="status" className="text-amber-200">{t('propicks.paper.calInsufficient', { closed: data.cerradas_con_resultado, min: data.minimo_cerradas })}</p>}
-            {data.aviso && <p className="text-gray-400">{data.aviso}</p>}
+            {data.aviso && <p className="text-gray-400">{paperCalibrationNotice(data.aviso, locale)}</p>}
             <dl className="grid grid-cols-2 gap-2">
                 <dt>{t('propicks.paper.brier')}</dt><dd>{metric(data.brier)}</dd>
                 <dt>{t('propicks.paper.brierRef')}</dt><dd>{metric(data.brier_referencia_sin_informacion)}</dd>
@@ -40,7 +41,7 @@ export function PaperCalibrationView({ data, locale = DEFAULT_LOCALE }: { data?:
                             <dt>{t('propicks.paper.wins')}</dt><dd>{metric(bin.tasa_acierto, true)}</dd>
                             <dt>{t('propicks.paper.difference')}</dt><dd>{gap(bin.hueco)}</dd>
                         </dl>
-                        {bin.aviso && <p className="mt-2 text-xs text-gray-400">{bin.aviso}</p>}
+                        {bin.aviso && <p className="mt-2 text-xs text-gray-400">{paperCalibrationNotice(bin.aviso, locale)}</p>}
                     </article>)}
                 </div>
                 <div className="hidden max-w-full overflow-x-auto sm:block">
@@ -48,7 +49,7 @@ export function PaperCalibrationView({ data, locale = DEFAULT_LOCALE }: { data?:
                     <caption className="pb-2 text-left text-gray-400">{t('propicks.paper.caption')}</caption>
                     <thead><tr>{[t('propicks.paper.colRange'), t('propicks.paper.colClosed'), t('propicks.paper.avgConviction'), t('propicks.paper.wins'), t('propicks.paper.colDiff')].map(label => <th className="px-2 py-2 first:pl-0" key={label} scope="col">{label}</th>)}</tr></thead>
                     <tbody>{data.bins.map(bin => <tr key={bin.rango} className="border-t border-gray-800">
-                        <th scope="row" className="px-2 py-2 first:pl-0 font-normal">{rangeLabel(bin.rango)}{bin.aviso ? <p className="mt-1 text-gray-400">{bin.aviso}</p> : null}</th>
+                        <th scope="row" className="px-2 py-2 first:pl-0 font-normal">{rangeLabel(bin.rango)}{bin.aviso ? <p className="mt-1 text-gray-400">{paperCalibrationNotice(bin.aviso, locale)}</p> : null}</th>
                         <td className="px-2 py-2">{bin.cerradas}</td>
                         <td className="px-2 py-2">{metric(bin.conviction_media, true)}</td>
                         <td className="px-2 py-2">{metric(bin.tasa_acierto, true)}</td>

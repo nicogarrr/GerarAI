@@ -104,7 +104,9 @@
     "colDiff": "Difference (pp)",
     "pp": "{value} pp",
     "noGroups": "No result groups to compare.",
-    "base": "Basis: {value}"
+    "base": "Basis: {value}",
+    "calNoticeInsufficient": "Insufficient sample ({closed} closed, minimum {min}): the calibration is indicative",
+    "binNoticeFew": "fewer than {min} closed: rate N/A"
   },
   "tabs": {
     "loadingView": "Loading view…",
