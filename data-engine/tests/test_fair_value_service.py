@@ -298,6 +298,16 @@ def test_choose_orientative_engine_older_than_180_days_is_not_served():
     assert out["missing_inputs"] == []
 
 
+def test_choose_stale_draft_reason_has_accents_and_readable_engine_block_date():
+    """«de hace 200 dias» sin tilde y «del 2026-10-20» en ISO: texto visible."""
+    engine = Candidate(value=42.5, as_of=TODAY - timedelta(days=200), publishable=False)
+    assert "de hace 200 días (> 180)" in choose(None, engine, today=TODAY)["reason"]
+
+    model = ValuationModel(company_id=1, status="insufficient_data", calculation_trace={"reason": "x"})
+    model.created_at = datetime(2026, 10, 20, 9, 0)
+    assert fvs._engine_block(model).reason == "La última valoración del motor del 20 oct 2026 no dio cifra: x."
+
+
 def test_choose_orientative_engine_without_date_is_not_served():
     engine = Candidate(value=42.5, as_of=None, publishable=False)
     out = choose(None, engine, today=TODAY)

@@ -724,8 +724,8 @@ def test_multiple_is_capped_at_current_market_multiple(db, monkeypatch):
     base = payload["escenarios"]["base"]["precio_objetivo_5y"]
     fcf5_ps = 100.0 * 1.25**5 * 0.20 / 10.0
     assert base["valor"] == pytest.approx(fcf5_ps * 50.0)
-    assert "acotado al multiplo de mercado actual (50.0x" in base["base"]
-    assert "2026-10-08" in base["base"]
+    assert "acotado al múltiplo de mercado actual (50,0x" in base["base"]
+    assert "precio del 8 oct 2026), sin expansión de múltiplo" in base["base"]
     assert base["etiqueta"] == "INFERIDO"
 
 

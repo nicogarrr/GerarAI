@@ -384,7 +384,9 @@ export function formatPercent(
  * «5 posiciones». El número lleva separador de miles es-ES.
  */
 export function formatCountEs(value: number, singular: string, pluralForm: string, locale: Locale = DEFAULT_LOCALE): string {
-  return `${formatNumber(value, { maximumFractionDigits: 0 }, undefined, locale)} ${value === 1 ? singular : pluralForm}`;
+  // La concordancia sigue a la cifra que se pinta (0,6 se pinta «1»): «1 día», nunca «1 días».
+  const shown = Number.isFinite(value) ? Math.abs(Math.round(value)) : value;
+  return `${formatNumber(value, { maximumFractionDigits: 0 }, undefined, locale)} ${shown === 1 ? singular : pluralForm}`;
 }
 
 /**
