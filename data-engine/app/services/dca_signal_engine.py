@@ -133,10 +133,22 @@ NICO_V0_PARAMS = DcaParams(
 )
 
 
-def _trailing_vol(closes: Sequence[float], i: int, params: DcaParams) -> float | None:
-    """Vol anualizada de rentabilidades log mensuales de los meses ANTERIORES a i."""
+def _trailing_vol(
+    closes: Sequence[float],
+    i: int,
+    params: DcaParams,
+    log_returns: Sequence[float] | None = None,
+) -> float | None:
+    """Vol anualizada de rentabilidades log mensuales de los meses ANTERIORES a i.
+
+    ``log_returns[j]`` = log(closes[j] / closes[j - 1]) ya calculado (mismo
+    valor): evita recalcular los mismos logaritmos en cada mes de la serie.
+    """
     start = max(1, i - params.vol_lookback_months)
-    rets = [math.log(closes[j] / closes[j - 1]) for j in range(start, i)]
+    if log_returns is not None:
+        rets = list(log_returns[start:i])
+    else:
+        rets = [math.log(closes[j] / closes[j - 1]) for j in range(start, i)]
     if len(rets) < max(2, params.vol_min_months):
         return None
     mean = sum(rets) / len(rets)
@@ -171,10 +183,18 @@ class MonthlyVerdict:
 def monthly_closes(bars: Iterable[DailyBar]) -> list[tuple[str, date, float, float]]:
     """Agrupa barras diarias en meses: (YYYY-MM, fecha ultimo cierre, cierre, minimo)."""
     months: dict[str, list[DailyBar]] = {}
+    # La clave del mes se formatea solo al cambiar de mes (no una vez por
+    # cierre diario): mismas claves, mismos grupos, mismo orden.
+    current: tuple[int, int] | None = None
+    bucket: list[DailyBar] = []
     for bar in sorted(bars, key=lambda b: b.day):
         if bar.close is None or not math.isfinite(bar.close) or bar.close <= 0:
             continue
-        months.setdefault(f"{bar.day.year:04d}-{bar.day.month:02d}", []).append(bar)
+        year_month = (bar.day.year, bar.day.month)
+        if year_month != current:
+            current = year_month
+            bucket = months.setdefault(f"{year_month[0]:04d}-{year_month[1]:02d}", [])
+        bucket.append(bar)
     out = []
     for key in sorted(months):
         items = months[key]
@@ -230,6 +250,9 @@ def evaluate_series(
         return []
     closes = [m[2] for m in months]
     rsi = _rsi_series(closes, params.rsi_period)
+    # Rentabilidades log mensuales una vez por serie (antes, de nuevo en cada
+    # mes para su ventana de volatilidad). Los cierres mensuales son > 0.
+    log_returns = [0.0] + [math.log(closes[j] / closes[j - 1]) for j in range(1, len(closes))]
     verdicts: list[MonthlyVerdict] = []
     last_index = len(months) - 1
     if month_complete is None:
@@ -249,7 +272,7 @@ def evaluate_series(
         n_sma = min(params.sma_months, i + 1)
         long_sma = _sma(closes, i, n_sma) if n_sma >= min_sma else None
         long_gap = (1.0 - close / long_sma) if long_sma else None
-        vol = _trailing_vol(closes, i, params) if params.vol_beta else None
+        vol = _trailing_vol(closes, i, params, log_returns) if params.vol_beta else None
         vol_ratio = 1.0
         if vol is not None:
             if vol >= params.vol_min_reliable:
