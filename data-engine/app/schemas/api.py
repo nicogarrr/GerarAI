@@ -1,8 +1,24 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+def not_blank(min_length: int = 1) -> AfterValidator:
+    """``min_length`` cuenta espacios: «       » pasaba y se guardaba un texto vacío.
+
+    Exige ``min_length`` caracteres que no sean espacios (sin recortar el valor).
+    """
+
+    def check(value: str) -> str:
+        if len(value.strip()) < min_length:
+            raise ValueError(
+                f"String should have at least {min_length} characters besides spaces"
+            )
+        return value
+
+    return AfterValidator(check)
 
 
 class CompanyOut(BaseModel):
@@ -417,14 +433,15 @@ class ThesisOut(BaseModel):
 
 
 class ClaimEvidenceCreate(BaseModel):
-    document_id: int | None = None
-    document_chunk_id: int | None = None
+    # Ids >= 1: con ``if payload.x_id:`` un 0 se saltaba la comprobación de existencia.
+    document_id: int | None = Field(default=None, ge=1)
+    document_chunk_id: int | None = Field(default=None, ge=1)
     source_url: str | None = Field(default=None, max_length=1000)
     evidence_type: str = Field(
         default="supports",
         pattern="^(supports|contradicts|supersedes|context|uncertain)$",
     )
-    summary: str = Field(min_length=3)
+    summary: Annotated[str, not_blank(3)] = Field(min_length=3)
     quote: str | None = None
     # Confianza 0..1: 1.5 o -3 se guardaban tal cual (Numeric(5, 4) los admite).
     confidence: Decimal = Field(default=Decimal("0.70"), ge=0, le=1)
@@ -449,9 +466,9 @@ class ClaimEvidenceOut(BaseModel):
 
 class ClaimCreate(BaseModel):
     ticker: str | None = Field(default=None, max_length=20)
-    company_id: int | None = None
-    thesis_version_id: int | None = None
-    statement: str = Field(min_length=5)
+    company_id: int | None = Field(default=None, ge=1)
+    thesis_version_id: int | None = Field(default=None, ge=1)
+    statement: Annotated[str, not_blank(5)] = Field(min_length=5)
     # Cotas = ancho de columna: SQLite acepta cualquier largo en String(N),
     # pero Postgres rompe con DataError; el 422 por campo sale del schema.
     claim_type: str = Field(default="thesis", max_length=80)
@@ -481,8 +498,8 @@ class ClaimOut(BaseModel):
 
 
 class ThesisSectionCreate(BaseModel):
-    section_key: str = Field(min_length=1, max_length=80)
-    title: str = Field(min_length=1, max_length=200)
+    section_key: Annotated[str, not_blank()] = Field(min_length=1, max_length=80)
+    title: Annotated[str, not_blank()] = Field(min_length=1, max_length=200)
     body: str = ""
     status: str = Field(default="draft", max_length=40)
     order_index: int = 0
@@ -507,14 +524,14 @@ class ThesisSectionOut(BaseModel):
 
 class ThesisChangeCreate(BaseModel):
     ticker: str | None = Field(default=None, max_length=20)
-    company_id: int | None = None
-    from_version_id: int | None = None
-    to_version_id: int | None = None
+    company_id: int | None = Field(default=None, ge=1)
+    from_version_id: int | None = Field(default=None, ge=1)
+    to_version_id: int | None = Field(default=None, ge=1)
     change_type: str = Field(default="manual", max_length=80)
     impact_direction: str = Field(default="neutral", pattern="^(positive|negative|neutral|mixed)$")
     materiality_score: int = Field(default=5, ge=0, le=10)
-    summary: str = Field(min_length=5)
-    affected_claim_ids: list[int] = Field(default_factory=list)
+    summary: Annotated[str, not_blank(5)] = Field(min_length=5)
+    affected_claim_ids: list[Annotated[int, Field(ge=1)]] = Field(default_factory=list)
     affected_metrics: list[str] = Field(default_factory=list)
     requires_review: bool = False
 
@@ -566,15 +583,15 @@ class ResearchSessionOut(BaseModel):
 
 class MemoryItemCreate(BaseModel):
     ticker: str | None = Field(default=None, max_length=20)
-    company_id: int | None = None
-    research_session_id: int | None = None
+    company_id: int | None = Field(default=None, ge=1)
+    research_session_id: int | None = Field(default=None, ge=1)
     scope: str = "portfolio"
     memory_type: str = "note"
     importance: int = Field(default=5, ge=0, le=10)
-    content: str = Field(min_length=3)
+    content: Annotated[str, not_blank(3)] = Field(min_length=3)
     status: str = "active"
     source_type: str = "user"
-    source_id: int | None = None
+    source_id: int | None = Field(default=None, ge=1)
 
 
 class MemoryItemOut(BaseModel):
@@ -595,7 +612,7 @@ class MemoryItemOut(BaseModel):
 
 
 class ManualNewsRequest(BaseModel):
-    text: str = Field(min_length=10)
+    text: Annotated[str, not_blank(10)] = Field(min_length=10)
     url: str | None = None
     source: str = "manual"
 

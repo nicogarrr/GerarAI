@@ -41,6 +41,7 @@ from app.schemas import (
     FinancialRefreshResponse,
     ThesisTickersOut,
 )
+from app.schemas.api import not_blank
 from app.schemas.ttm import CompanyTtmOut
 from app.services import market_change
 from app.services.analyst_targets_service import AnalystTargets, analyst_targets_service
@@ -286,7 +287,7 @@ class CompanyEnsureRequest(BaseModel):
 
 class DecisionJournalCreate(BaseModel):
     decision: Literal["buy", "hold", "trim", "sell", "watch", "avoid"]
-    rationale: str = Field(min_length=5, max_length=5000)
+    rationale: Annotated[str, not_blank(5)] = Field(min_length=5, max_length=5000)
     what_must_be_true: list[str] = Field(default_factory=list, max_length=30)
     # Operacion real (compra/venta de IBKR o manual) que ejecuto la decision.
     transaction_id: int | None = Field(default=None, ge=1)
