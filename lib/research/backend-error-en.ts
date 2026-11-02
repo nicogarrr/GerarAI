@@ -78,6 +78,7 @@ const KNOWN: ReadonlyArray<readonly [RegExp, string]> = [
   [/^El número debe ser finito\.?$/, 'The number must be finite.'],
   [/^El número excede la precisión persistida\.?$/, 'The number exceeds the stored precision.'],
   [/^Número fuera de la precisión persistida\.?$/, 'Number outside the stored precision.'],
+  [/^El valor debe ser un número\.?$/, 'The value must be a number.'],
   [/^Long: stop < entrada propuesta < objetivo$/, 'Long: stop < proposed entry < target'],
   [/^Short: objetivo < entrada propuesta < stop$/, 'Short: target < proposed entry < stop'],
   // Importación: errores por fila, límites e identidad (IBKR, ISIN)
