@@ -450,6 +450,22 @@ def observe(db: Session, rule: AlertRule) -> tuple[Decimal | None, dict[str, Any
     return None, {**base, "status": "unsupported_target"}
 
 
+def alert_title(company: Company, rule: AlertRule, language: str = "es") -> str:
+    """Titulo del aviso. En castellano, el nombre guardado de la regla (igual que
+    siempre); en ingles se compone al vuelo sin tocar el nombre guardado, que es
+    la clave de la regla en ``sync_thesis_rules``."""
+    if language != "en":
+        return rule.name
+    target = rule.target or {}
+    condition = rule.condition or {}
+    item = {
+        "metric": target.get("metric"),
+        "operator": condition.get("operator"),
+        "threshold": condition.get("value"),
+    }
+    return f"{company.ticker}: thesis invalidation · {_describe_rule_en(item)}"[:300]
+
+
 def alert_message(company: Company, rule: AlertRule, observed: Any, language: str = "es") -> str:
     target = rule.target or {}
     condition = rule.condition or {}
