@@ -43,7 +43,11 @@ async function getHandler(
   const pdf = await buildMemoPdf(markdown);
   // «Versión N» (castellano) o «Version N» (memo en inglés, Ajustes).
   const version = markdown.match(/^Versi[oó]n (\d+)/m)?.[1];
-  const filename = `tesis-${ticker.toLowerCase()}${version ? `-v${version}` : ''}${draft ? '-borrador' : ''}.pdf`;
+  // Memo en inglés (Ajustes): el nombre del fichero también («thesis-…-draft»).
+  const english = markdown.startsWith('# Thesis memo');
+  const prefix = english ? 'thesis' : 'tesis';
+  const draftSuffix = draft ? (english ? '-draft' : '-borrador') : '';
+  const filename = `${prefix}-${ticker.toLowerCase()}${version ? `-v${version}` : ''}${draftSuffix}.pdf`;
   return new NextResponse(new Uint8Array(pdf), {
     status: 200,
     headers: {

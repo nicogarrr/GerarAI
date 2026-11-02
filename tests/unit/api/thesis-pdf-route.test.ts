@@ -68,6 +68,27 @@ describe('GET /api/thesis/[ticker]/pdf', () => {
 
         expect(response.status).toBe(200);
         expect(buildMemoPdf).toHaveBeenCalledWith(english);
-        expect(response.headers.get('Content-Disposition')).toBe('attachment; filename="tesis-pdft-v3.pdf"');
+        expect(response.headers.get('Content-Disposition')).toBe('attachment; filename="thesis-pdft-v3.pdf"');
+    });
+
+    it('names an English draft or archived memo «thesis-…-draft.pdf»', async () => {
+        const english = '# Thesis memo — PDFT (Pdft)\n\nVersion 2 · status draft · generated Oct 20, 2026, 14:03 UTC\n';
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(english, { status: 200 })));
+        const { GET } = await import('@/app/api/thesis/[ticker]/pdf/route');
+
+        const draft = await GET(
+            new NextRequest('http://localhost/api/thesis/pdft/pdf?draft=1'),
+            { params: Promise.resolve({ ticker: 'pdft' }) },
+        );
+        expect(draft.headers.get('Content-Disposition')).toBe('attachment; filename="thesis-pdft-v2-draft.pdf"');
+
+        // Memo archivado en inglés: sin línea de versión, prefijo inglés igualmente.
+        const archived = '# Thesis memo - PDFT\n\nArchived thesis v4 (2026-09-01): The model is not publishable.\n';
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(archived, { status: 200 })));
+        const response = await GET(
+            new NextRequest('http://localhost/api/thesis/pdft/pdf'),
+            { params: Promise.resolve({ ticker: 'pdft' }) },
+        );
+        expect(response.headers.get('Content-Disposition')).toBe('attachment; filename="thesis-pdft.pdf"');
     });
 });
