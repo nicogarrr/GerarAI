@@ -1,3 +1,4 @@
+import DcaPreparingRefresh from '@/components/research/DcaPreparingRefresh';
 import DcaHitRatesCard from '@/components/watchlist/DcaHitRatesCard';
 import { getDcaHitRatesState } from '@/lib/actions/dca-signals.actions';
 import { getLocale, getT } from '@/lib/i18n/server';
@@ -12,6 +13,14 @@ export async function DcaHitRatesSection({ ticker }: { ticker: string }) {
         return (
             <p role="status" data-testid="dca-hit-rates-not-evaluated" className={EMPTY_CLASS}>
                 {t('watchlist.hitRates.section.notEvaluated')}
+            </p>
+        );
+    }
+    if (state.status === 'preparing') {
+        return (
+            <p role="status" aria-live="polite" data-testid="dca-hit-rates-preparing" className={EMPTY_CLASS}>
+                {t('watchlist.hitRates.section.preparing')}
+                <DcaPreparingRefresh />
             </p>
         );
     }
