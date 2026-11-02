@@ -704,7 +704,26 @@ def _asks_return_ranking(text: str, question: str) -> bool:
     return bool(_RANK_RETURN.search(text)) and not _tickers_in(question)
 
 
-def _ranking_answer(db: Session, tenant: int, text: str) -> ChatResponse:
+_HOLDINGS = r"\b(?:posiciones|acciones|valores|empresas|inversiones|positions|stocks|holdings|investments)\b"
+_LOSERS = re.compile(_HOLDINGS + r".*\b(?:en\s+(?:perdidas|negativo|rojo)|pierden|losing|in\s+the\s+red|at\s+a\s+loss)\b")
+_WINNERS = re.compile(_HOLDINGS + r".*\b(?:en\s+(?:ganancias|positivo|verde|beneficios?)|winning|in\s+the\s+green"
+                      r"|at\s+a\s+(?:gain|profit)|making\s+money)\b")
+#: «posiciones»/«positions» ya son las del usuario; «acciones»/«stocks» necesitan «mis/my».
+_HOLDINGS_MINE = re.compile(r"\b(?:tengo|mis|mi\s+cartera|my|i\s+(?:have|own|hold)|posiciones|positions|holdings)\b")
+
+
+def _asks_losers_winners(text: str, question: str) -> str | None:
+    """«loss» / «gain» si pregunta qué posiciones suyas pierden o ganan; si no, None."""
+    if _tickers_in(question) or not _HOLDINGS_MINE.search(text) or re.search(r"\b(?:si|if)\b", text):
+        return None
+    if _LOSERS.search(text):
+        return "loss"
+    if _WINNERS.search(text):
+        return "gain"
+    return None
+
+
+def _ranking_answer(db: Session, tenant: int, text: str, side: str | None = None) -> ChatResponse:
     from app.models import Company, Position
 
     english = _english()
@@ -738,13 +757,29 @@ def _ranking_answer(db: Session, tenant: int, text: str) -> ChatResponse:
     lead = ranked[-1] if worst_first else ranked[0]
     as_of = max(k[4] for k in known)
     day = _date_en(as_of) if english else fecha_es(as_of)
-    if english:
+    if side is not None:
+        # «¿Qué posiciones tengo en pérdidas/ganancias?»: solo las de ese lado.
+        losing = side == "loss"
+        order = [k for k in (reversed(ranked) if losing else ranked) if (k[1] < k[2]) == losing and k[1] != k[2]]
+        n = len(order)
+        if english:
+            what = "at a loss" if losing else "at a gain"
+            lines = ([f"None of your positions is {what} on its purchase cost (data as of {day})."] if not n else
+                     [f"You have {n} position{'' if n == 1 else 's'} {what} on {'its' if n == 1 else 'their'} "
+                      f"purchase cost (data as of {day}), {'worst' if losing else 'best'} first:"])
+        else:
+            what = "en pérdidas" if losing else "en ganancias"
+            lines = ([f"Ninguna de tus posiciones está {what} sobre su coste de compra (datos a {day})."] if not n else
+                     [f"Tienes {n} posici{'ón' if n == 1 else 'ones'} {what} sobre su coste de compra "
+                      f"(datos a {day}), la {'peor' if losing else 'mejor'} primero:"])
+    elif english:
         head = f"{'Worst' if worst_first else 'Best'} return on cost: {line(lead)}."
         lines = [head, f"All your positions by return on purchase cost (data as of {day}):"]
     else:
         head = f"La que {'peor' if worst_first else 'mejor'} va sobre su coste: {line(lead)}."
         lines = [head, f"Todas tus posiciones por rentabilidad sobre el coste de compra (datos a {day}):"]
-    order = list(reversed(ranked)) if worst_first else ranked
+    if side is None:
+        order = list(reversed(ranked)) if worst_first else ranked
     lines += [f"{i}. {line(item)}" for i, item in enumerate(order[:15], 1)]
     if len(order) > 15:
         lines.append(f"… and {len(order) - 15} more" if english else f"… y {len(order) - 15} más")
@@ -1731,6 +1766,9 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
         return _upcoming_dividends_answer(db, tenant)
     if _asks_plan(text, question):
         return _plan_answer(db, tenant, text)
+    side = _asks_losers_winners(text, question)
+    if side is not None:
+        return _ranking_answer(db, tenant, text, side)
     if _asks_return_ranking(text, question):
         return _ranking_answer(db, tenant, text)
     year = _asked_year(text)
