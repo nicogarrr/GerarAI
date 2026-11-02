@@ -12,7 +12,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.services.number_format import format_compact_es, format_number_es
+from app.services.number_format import format_compact_es, format_number_es, format_percent_es
 
 
 def test_999_999_999_es_1_mil_millones_no_1000_millones():
@@ -50,3 +50,20 @@ def test_la_escala_nunca_muestra_1000_de_la_escala_inferior(seed):
     assert text is not None
     assert not text.startswith("1.000 M")
     assert not text.startswith("1.000.000")
+
+
+def test_redondeo_como_intl_half_expand_no_al_par():
+    """ECMA-402 redondea «halfExpand»: Intl pinta 0,125 como «0,13» y 2,5 como «3».
+
+    El formato de Decimal redondeaba al par y la misma cifra salía «0,12» en
+    el backend y «0,13» en la ficha.
+    """
+    assert format_number_es(Decimal("0.125")) == "0,13"
+    assert format_number_es(0.125) == "0,13"
+    assert format_number_es(Decimal("2.5"), 0) == "3"
+    assert format_number_es(Decimal("-0.125")) == "-0,13"
+    assert format_number_es(Decimal("1234.565")) == "1.234,57"
+    assert format_percent_es(Decimal("0.12345")) == "12,35 %"
+    assert format_compact_es(Decimal("12345000")) == "12,35 M"
+    # Cifras enormes no rompen la precisión del contexto.
+    assert format_number_es(Decimal("1e30")) == "1." + ".".join(["000"] * 10)
