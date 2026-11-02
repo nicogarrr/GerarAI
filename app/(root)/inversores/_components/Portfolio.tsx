@@ -2,7 +2,7 @@ import type {
   InvestorDatum,
   InvestorPortfolio,
 } from "@/lib/actions/investors.actions";
-import { ownershipLimitations } from "@/lib/research/ownership-display";
+import { ownershipLimitations, ownershipNote } from "@/lib/research/ownership-display";
 import { createFormatters } from "@/lib/format";
 import type { Locale } from "@/lib/i18n/locale";
 import { getLocale, getT } from "@/lib/i18n/server";
@@ -183,7 +183,7 @@ export async function Portfolio({
                 </div>
               </div>
               {row.note ? (
-                <p className="text-xs text-gray-500">{row.note}</p>
+                <p className="text-xs text-gray-500">{ownershipNote(row.note, locale)}</p>
               ) : null}
             </li>
           ))}
@@ -243,7 +243,7 @@ export async function Portfolio({
                 </div>
               ) : null}
               {row.note ? (
-                <p className="text-xs text-gray-500">{row.note}</p>
+                <p className="text-xs text-gray-500">{ownershipNote(row.note, locale)}</p>
               ) : null}
             </li>
             );
