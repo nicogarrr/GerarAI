@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import logging
+import math
 import operator
 import re
 import threading
@@ -76,6 +77,7 @@ class SafeFormula:
             raise ValueError("La fórmula supera los 1000 caracteres")
         self.expression = expression
         self.names: set[str] = set()
+        self.out_of_range = False
         # Un anidamiento profundo dentro de los 1000 caracteres («------1»,
         # «-(-(-(…)))») agota la pila al parsear o validar: RecursionError no es
         # ValueError y los llamadores solo capturan ValueError, asi que crear la
@@ -96,6 +98,13 @@ class SafeFormula:
         elif isinstance(node, ast.Constant):
             if not isinstance(node.value, (int, float)) or isinstance(node.value, bool):
                 raise ValueError("Solo se admiten constantes numéricas")
+            # «1e999» es float('inf') para ast y «1e-400» es 0.0. Se anota (no se
+            # lanza aquí: una fórmula ya guardada debe seguir cargando) y
+            # ``reject_out_of_range`` lo rechaza al guardar o ejecutar una nueva.
+            if isinstance(node.value, float) and (
+                not math.isfinite(node.value) or (node.value == 0 and self._literal_is_nonzero(node))
+            ):
+                self.out_of_range = True
         elif isinstance(node, ast.Name):
             if not KEY_RE.fullmatch(node.id):
                 raise ValueError(f"Nombre de métrica no válido: {node.id}")
@@ -125,6 +134,25 @@ class SafeFormula:
                 self._validate(argument)
         else:
             raise ValueError(f"Elemento de fórmula {type(node).__name__} no permitido")
+
+    @classmethod
+    def reject_out_of_range(cls, *expressions: str | None) -> None:
+        """Rechaza fórmulas nuevas con un número que float no representa.
+
+        Un filtro «pe_ratio < 1e999» se guardaba y ninguna empresa podía
+        evaluarse después (resultado no finito), sin aviso; «1e-400» comparaba
+        contra un 0 que nadie escribió.
+        """
+        for expression in expressions:
+            if expression and cls(expression).out_of_range:
+                raise ValueError("La fórmula tiene un número fuera de rango")
+
+    def _literal_is_nonzero(self, node: ast.Constant) -> bool:
+        segment = ast.get_source_segment(self.expression.strip(), node) or "0"
+        try:
+            return Decimal(segment.replace("_", "")) != 0
+        except DecimalException:
+            return False
 
     def evaluate(self, values: dict[str, Decimal]) -> Decimal:
         missing = self.names - values.keys()
@@ -189,6 +217,7 @@ class CustomMetricService:
         if not KEY_RE.fullmatch(metric_key):
             raise ValueError("metric_key must be lower-case snake_case")
         parsed = SafeFormula(formula)
+        SafeFormula.reject_out_of_range(formula)
         if metric_key in parsed.names:
             raise ValueError("Una métrica personalizada no puede referirse a sí misma")
         previous = db.scalar(
@@ -298,6 +327,9 @@ class ScreenerService:
         if not criteria:
             raise ValueError("El filtro necesita al menos un criterio")
         normalized = [self._criterion(item) for item in criteria]
+        SafeFormula.reject_out_of_range(
+            ranking_formula, *(side for item in normalized for side in (item["left"], item["right"]))
+        )
         clean_name = self.claim_screen_name(db, name)
         if ranking_formula:
             SafeFormula(ranking_formula)
