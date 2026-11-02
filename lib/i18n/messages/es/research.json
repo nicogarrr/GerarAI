@@ -1754,5 +1754,9 @@
   "listingStale": {
     "withClose": "Ticker sin cotización vigente (último cierre {date})",
     "noClose": "Ticker sin cotización vigente (sin cierre conocido)"
+  },
+  "assistantRedirect": {
+    "moved": "La guía de investigación ahora vive en el Cerebro.",
+    "continue": "Continuar"
   }
 }

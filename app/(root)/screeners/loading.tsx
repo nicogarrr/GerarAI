@@ -1,11 +1,13 @@
+import { getT } from '@/lib/i18n/server';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 
 /** Esqueleto de /screeners mientras el servidor ejecuta el screener y carga los guardados. */
-export default function Loading() {
+export default async function Loading() {
+  const ti = await getT();
   return (
     <main id="content" tabIndex={-1} aria-busy="true" className="mx-auto flex max-w-7xl flex-col gap-6 pb-28">
-      <span className="sr-only" role="status">Cargando…</span>
+      <span className="sr-only" role="status">{ti('common.states.loading')}</span>
       <div aria-hidden="true" className="flex flex-col gap-6">
         <div className="flex flex-col gap-2 border-b border-gray-800 pb-5">
           <Skeleton className="h-3 w-40" />

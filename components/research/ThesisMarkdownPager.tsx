@@ -67,8 +67,8 @@ export default function ThesisMarkdownPager({ pages }: { pages: MemoPage[] }) {
         <ThesisMarkdown content={page.body} />
       </div>
       <div className="mt-3 flex justify-between">
-        <Button disabled={safeIndex === 0} onClick={() => go(safeIndex - 1)} type="button" variant="outline">Anterior</Button>
-        <Button disabled={safeIndex === pages.length - 1} onClick={() => go(safeIndex + 1)} type="button" variant="outline">Siguiente</Button>
+        <Button disabled={safeIndex === 0} onClick={() => go(safeIndex - 1)} type="button" variant="outline">{t('research.previous')}</Button>
+        <Button disabled={safeIndex === pages.length - 1} onClick={() => go(safeIndex + 1)} type="button" variant="outline">{t('research.next')}</Button>
       </div>
     </div>
   );

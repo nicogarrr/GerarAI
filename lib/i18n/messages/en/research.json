@@ -1754,5 +1754,9 @@
   "listingStale": {
     "withClose": "Ticker with no current quote (last close {date})",
     "noClose": "Ticker with no current quote (no known close)"
+  },
+  "assistantRedirect": {
+    "moved": "The research guide now lives in the Brain.",
+    "continue": "Continue"
   }
 }

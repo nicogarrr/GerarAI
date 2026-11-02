@@ -168,5 +168,8 @@
     "notFound": "Inversor no encontrado",
     "photo": "Foto:",
     "via": "vía"
+  },
+  "selector": {
+    "choose": "Seleccionar inversor"
   }
 }

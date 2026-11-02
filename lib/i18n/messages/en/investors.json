@@ -168,5 +168,8 @@
     "notFound": "Investor not found",
     "photo": "Photo:",
     "via": "via"
+  },
+  "selector": {
+    "choose": "Choose an investor"
   }
 }

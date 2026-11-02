@@ -287,7 +287,7 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                                         usd(f, tx.value, 0, txCurrency(tx))
                                                     )}
                                                     {tx.currency == null && (tx.price != null || tx.value != null) ? (
-                                                        <span className="block text-xs font-normal text-gray-500">Divisa no informada</span>
+                                                        <span className="block text-xs font-normal text-gray-500">{t('insider.feed.currencyMissing')}</span>
                                                     ) : null}
                                                 </td>
                                             </tr>

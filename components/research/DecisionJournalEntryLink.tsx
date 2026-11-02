@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 
+import { useT } from '@/lib/i18n/client';
 import { scrollToHashAnchor } from '@/lib/search/scroll-to-hash';
 
 export const DECISION_JOURNAL_ANCHOR = 'diario-decisiones';
@@ -18,6 +19,7 @@ export const DECISION_JOURNAL_ANCHOR = 'diario-decisiones';
  * es del llamador, igual que en la paleta (scroll-to-hash).
  */
 export function DecisionJournalEntryLink({ ticker, className }: { ticker: string; className?: string }) {
+  const t = useT();
   return <Link
     className={className}
     data-testid="decision-journal-entry"
@@ -26,5 +28,5 @@ export function DecisionJournalEntryLink({ ticker, className }: { ticker: string
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
       scrollToHashAnchor(DECISION_JOURNAL_ANCHOR);
     }}
-  >Diario de decisiones <span aria-hidden="true">→</span></Link>;
+  >{t('research.journal.title')} <span aria-hidden="true">→</span></Link>;
 }

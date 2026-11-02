@@ -12,6 +12,7 @@ import { requireAuthenticatedUser } from "@/lib/auth/require-user";
 import { cookies } from "next/headers";
 import { redirectToSignIn } from "@/lib/auth/sign-in-redirect";
 import React from "react";
+import { getT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -34,7 +35,7 @@ async function getLayoutUser(): Promise<User> {
 }
 
 const Layout = async ({ children }: { children: React.ReactNode }) => {
-    const user = await getLayoutUser();
+    const [user, t] = await Promise.all([getLayoutUser(), getT()]);
     // Las populares del buscador NO se esperan aqui: resolverlas antes del
     // primer byte retrasaba el TTFB de CADA pagina autenticada (llamada
     // Finnhub/DB) aunque el usuario nunca abriese el buscador. SearchCommand
@@ -48,7 +49,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
 
     return (
         <div className="flex min-h-dvh flex-col text-gray-300">
-            <a href="#content" className="skip-link">Saltar al contenido</a>
+            <a href="#content" className="skip-link">{t('landing.shell.skipLink')}</a>
 
             {/* Banner y header comparten un unico contenedor pegajoso: asi el
                 aviso de "sin conexion" no desaparece al hacer scroll, y el

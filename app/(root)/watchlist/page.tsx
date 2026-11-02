@@ -427,7 +427,7 @@ export default async function WatchlistPage({
                                 </div>
                                 <dl className="mt-2 grid grid-cols-2 gap-2 rounded-lg bg-gray-800/50 px-2 py-2 text-center">
                                     <div className="col-span-2 min-w-0">
-                                        <dt className="text-[11px] text-gray-500">Precio</dt>
+                                        <dt className="text-[11px] text-gray-500">{t('watchlist.page.sort.price')}</dt>
                                         <dd className="truncate font-mono text-sm font-medium text-gray-200">{formatPriceCell(stock.price, stock.currency)}</dd>
                                         {stock.priceKind === 'close' ? (
                                             <dd className="break-words text-[10px] leading-relaxed text-gray-500">{stock.priceAsOf ? t('watchlist.page.closeOn', { date: formatMarketDate(stock.priceAsOf) }) : t('watchlist.page.closeUndated')}</dd>
