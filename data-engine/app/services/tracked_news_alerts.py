@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.i18n import generation_language
+from app.core.local_date import local_today
 from app.models import Company, NewsEvent, Position, ResearchAlert, WatchItem
 from app.services.notification_service import NotificationService
 from app.services.ticker_news_lane import _NAME_NOISE, VERIFIED_ALIASES
@@ -198,7 +199,7 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
             headline = provenance["source_headline"].strip()
             source_label = "detectada por GDELT" if date_source == "gdelt_first_seen" else "fechada por la fuente"
             title, message = _copy(language, company.ticker, headline, str(event.source),
-                                   published.date().isoformat(), date_source == "gdelt_first_seen")
+                                   local_today(published).isoformat(), date_source == "gdelt_first_seen")
             alert = ResearchAlert(
                 tenant_id=tenant_id, company_id=company.id, severity="medium", status="open",
                 alert_type="tracked_news", title=title,
