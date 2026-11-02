@@ -2212,6 +2212,11 @@ class IBKRImportService:
             )
         except Exception:  # noqa: BLE001 - cola caida: la importacion ya es valida
             db.rollback()
+        # Señal DCA en segundo plano de lo que la importación estrena (solo lo
+        # nunca evaluado: la sincronización diaria no repite la cartera entera).
+        from app.services.dca_on_add import enqueue_dca_for_new_tracked
+
+        enqueue_dca_for_new_tracked(db)
         return {
             "status": "imported",
             "price_backfills_enqueued": price_backfills_enqueued,

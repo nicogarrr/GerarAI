@@ -44,8 +44,14 @@ def redis_client():
     )
 
 
-def due_symbols(db: Session, symbols: Iterable[str], *, now: datetime | None = None) -> list[str]:
-    """Símbolos seguidos por el tenant de la sesión cuya señal falta o está vieja."""
+def due_symbols(
+    db: Session, symbols: Iterable[str], *, now: datetime | None = None, only_new: bool = False
+) -> list[str]:
+    """Símbolos seguidos por el tenant de la sesión cuya señal falta o está vieja.
+
+    ``only_new``: solo los que nunca se han evaluado (importaciones y
+    sincronizaciones: lo ya evaluado lo refresca el barrido diario).
+    """
     from app.services.dca_signal_engine import DEFAULT_PARAMS
     from app.services.dca_signal_service import tracked_symbols
 
@@ -71,6 +77,10 @@ def due_symbols(db: Session, symbols: Iterable[str], *, now: datetime | None = N
         evaluated = state.evaluated_at if state is not None else None
         if evaluated is not None and evaluated.tzinfo is None:
             evaluated = evaluated.replace(tzinfo=UTC)
+        if only_new:
+            if state is None:
+                due.append(symbol)
+            continue
         if (
             state is None
             or evaluated is None
@@ -93,24 +103,25 @@ def enqueue_dca_on_add(
     *,
     client: Any = None,
     sender: Callable[[int, str, list[str]], None] | None = None,
+    only_new: bool = False,
 ) -> int:
     """Encola la evaluación DCA de los símbolos recién seguidos. Nunca lanza.
 
     Devuelve cuántos mensajes se encolaron (lotes de ``BATCH_SIZE``).
     """
     try:
-        return _enqueue(db, list(symbols), client=client, sender=sender or _default_sender)
+        return _enqueue(db, list(symbols), client=client, sender=sender or _default_sender, only_new=only_new)
     except Exception:  # noqa: BLE001 - el alta de watchlist/cartera manda
         logger.warning("dca on-add: no se pudo encolar %s", list(symbols)[:BATCH_SIZE], exc_info=True)
         return 0
 
 
-def _enqueue(db: Session, symbols: list[str], *, client: Any, sender: Callable) -> int:
+def _enqueue(db: Session, symbols: list[str], *, client: Any, sender: Callable, only_new: bool = False) -> int:
     tenant_id = db.info.get("tenant_id")
     user_id = db.info.get("user_id")
     if tenant_id is None or not user_id or not get_settings().dca_evaluation_enabled:
         return 0
-    due = due_symbols(db, symbols)
+    due = due_symbols(db, symbols, only_new=only_new)
     if not due:
         return 0
     own_client = client is None
@@ -131,6 +142,20 @@ def _enqueue(db: Session, symbols: list[str], *, client: Any, sender: Callable) 
         if own_client:
             client.close()
     return sent
+
+
+def enqueue_dca_for_new_tracked(db: Session) -> int:
+    """Tras una importación o sincronización: encola la señal de lo que el
+    usuario sigue y nunca se ha evaluado (lo ya evaluado no se repite). Nunca lanza."""
+    try:
+        from app.services.dca_signal_service import tracked_symbols
+
+        symbols = list(tracked_symbols(db))
+    except Exception:  # noqa: BLE001 - la importación ya está confirmada
+        logger.warning("dca on-add: no se pudieron leer los símbolos seguidos", exc_info=True)
+        db.rollback()
+        return 0
+    return enqueue_dca_on_add(db, symbols, only_new=True)
 
 
 def is_preparing(db: Session, symbol: str, *, client: Any = None) -> bool:

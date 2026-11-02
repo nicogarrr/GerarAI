@@ -174,3 +174,21 @@ def test_actor_reutiliza_la_cola_dca_manual_y_reintenta_si_el_lease_esta_ocupado
     monkeypatch.setattr(dramatiq_app, "acquire_job_lease", lambda *a, **k: None)
     with pytest.raises(dramatiq_app.DcaOnAddLeaseHeld):
         actor.fn(1, "u1", ["AAA"])
+
+
+def test_importacion_solo_encola_lo_nunca_evaluado(db):
+    _watch(db, 1, "NUEVO", "VIEJO")
+    _state(db, 1, "VIEJO", age=timedelta(hours=30))  # lo refresca el diario, no la importación
+    redis, (sent, sender) = FakeRedis(), _capture()
+    dca_on_add.enqueue_dca_on_add(db, ["NUEVO", "VIEJO"], client=redis, sender=sender, only_new=True)
+    assert sent == [(1, "u1", ["NUEVO"])]
+
+
+def test_tras_importar_encola_lo_seguido_sin_senal(db, monkeypatch):
+    _watch(db, 1, "NUEVO", "FRESH")
+    _state(db, 1, "FRESH", age=timedelta(hours=30))
+    _watch(db, 2, "AJENO")
+    calls = []
+    monkeypatch.setattr(dca_on_add, "enqueue_dca_on_add", lambda session, symbols, **kw: calls.append((sorted(symbols), kw)) or 1)
+    assert dca_on_add.enqueue_dca_for_new_tracked(db) == 1
+    assert calls == [(["FRESH", "NUEVO"], {"only_new": True})]
