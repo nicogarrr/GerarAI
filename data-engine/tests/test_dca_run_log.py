@@ -142,7 +142,7 @@ def test_actor_records_scheduler_run_and_error(monkeypatch):
         dca_run_log, "finish_run",
         lambda db, row, summary=None, error=None: events.append(("finish", row, bool(error))),
     )
-    monkeypatch.setattr("app.services.dca_signal_service.evaluate_watchlist", lambda db: {"evaluated": 1})
+    monkeypatch.setattr("app.services.dca_signal_service.evaluate_watchlist", lambda db, **kw: {"evaluated": 1})
     dramatiq_app.evaluate_dca_signals.fn(7, "u-1")
     assert events == [("start", "scheduler"), ("finish", "row", False)]
 
