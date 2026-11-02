@@ -23,6 +23,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.i18n import generation_language
+from app.core.local_date import local_today
 from app.models import ResearchAlert
 from app.services.date_format import readable_date
 
@@ -84,8 +85,9 @@ def _when_text(event: dict[str, Any], window: str, now: datetime, language: str 
     en = language == "en"
     start, has_time = _start(event)  # type: ignore[misc]
     if not has_time:
-        today = now.astimezone(ET).date()
-        if start.astimezone(ET).date() == today:
+        # «hoy»/«mañana» en el día del usuario (Madrid), no en el de Nueva York:
+        # pasada la medianoche en Madrid, el evento de hoy decía «mañana».
+        if start.astimezone(ET).date() <= local_today(now):
             return "today" if en else "hoy"
         return "tomorrow" if en else "mañana"
     minutes = max(1, int((start - now).total_seconds() // 60))
