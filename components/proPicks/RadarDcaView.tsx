@@ -5,6 +5,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useT } from '@/lib/i18n/client';
+import { dcaEngineText } from '@/lib/dca/engine-text';
 import {
     getRadarDcaOpportunities,
     type RadarDcaOpportunity,
@@ -33,7 +34,7 @@ function LevelBadge({ item }: { item: RadarDcaOpportunity }) {
     // (-1/-2) el label es "RECORTE LIGERO/FUERTE" y el prefijo "-1X" era un
     // artefacto. Sin label del backend: fallback derivado del nivel.
     const label =
-        item.level_label ?? (item.level > 0 ? `${item.level}X DCA` : t('propicks.radarDca.cutFallback'));
+        (item.level_label ? dcaEngineText(item.level_label, t) : null) ?? (item.level > 0 ? `${item.level}X DCA` : t('propicks.radarDca.cutFallback'));
     return (
         <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${style}`}>
             {label}

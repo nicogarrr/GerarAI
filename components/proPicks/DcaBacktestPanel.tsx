@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useLocale, useT } from '@/lib/i18n/client';
+import { dcaEngineText } from '@/lib/dca/engine-text';
 import { Loader2, Play, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -199,7 +200,7 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
                                     <th scope="col" className="pb-2 text-left font-medium">{t('propicks.dcaBacktest.metric')}</th>
                                     {plans.map((p) => (
                                         <th key={p.key} scope="col" className="pb-2 pr-3 text-right font-medium">
-                                            {p.label}
+                                            {dcaEngineText(p.label, t)}
                                         </th>
                                     ))}
                                 </tr>
@@ -232,7 +233,7 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
                             {result.levels.map((l) => (
                                 <span key={l.level} className="rounded border border-gray-700 px-2 py-1 text-gray-300">
                                     <span aria-hidden="true" className="mr-1 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: l.color }} />
-                                    {t('propicks.dcaBacktest.levelMonths', { label: l.label, months: l.months })}
+                                    {t('propicks.dcaBacktest.levelMonths', { label: dcaEngineText(l.label, t), months: l.months })}
                                 </span>
                             ))}
                         </div>

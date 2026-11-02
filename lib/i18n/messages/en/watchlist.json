@@ -61,6 +61,20 @@
     }
   },
   "dca": {
+    "engine": {
+      "lightTrim": "LIGHT TRIM",
+      "strongTrim": "STRONG TRIM",
+      "all2x4x": "All 2X–4X",
+      "zoneExtreme": "Extreme buy zone",
+      "zoneStrong": "Strong buy zone",
+      "zoneBuy": "Buy zone",
+      "zoneNormal": "Normal contribution zone",
+      "zoneLightTrim": "Light trim zone",
+      "zoneStrongTrim": "Strong trim zone",
+      "planPlain": "Plain DCA",
+      "planLevels": "Level-based DCA (adds extra)",
+      "planFixed": "Levels with fixed budget"
+    },
     "run": {
       "startFailed": "Couldn't start the evaluation",
       "accepted": "Batch accepted. You can leave: it keeps running in the background.",
