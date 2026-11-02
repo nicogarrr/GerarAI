@@ -788,6 +788,8 @@ def _withholding_years(db: Session, tenant: int, only: set[str]) -> list[int]:
 
 
 def _withholding_answer(db: Session, tenant: int, year: int | None, only: set[str]) -> ChatResponse:
+    from app.valuation.currency import normalize_currency
+
     english = _english()
     years = [year] if year is not None else _withholding_years(db, tenant, only)
     # (año o ticker, divisa) -> [retenido, bruto]
@@ -798,12 +800,16 @@ def _withholding_answer(db: Session, tenant: int, year: int | None, only: set[st
             ticker = item.get("ticker") or "?"
             if only and ticker not in only:
                 continue
-            key = (ticker if year is not None else str(current), (item.get("currency") or "EUR").upper())
+            # «GBp».upper() era «GBP» con el importe en peniques (x100): divisa
+            # principal y su divisor, como el informe fiscal (_minor_divisor).
+            currency, divisor = normalize_currency(item.get("currency") or "EUR")
+            key = (ticker if year is not None else str(current), currency)
             bucket = rows.setdefault(key, [Decimal("0"), Decimal("0")])
             for index, field in enumerate(("withholding_native", "dividends_native")):
                 value = item.get(field)
                 known = bucket[index]
-                bucket[index] = None if known is None or value is None else known + Decimal(str(value))
+                bucket[index] = (None if known is None or value is None
+                                 else known + Decimal(str(value)) / Decimal(divisor))
     sources = [_source("tax_report", None, "Impuestos", "/taxes")]
 
     names = ", ".join(sorted(only))
