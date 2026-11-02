@@ -93,18 +93,18 @@ _DAILY_CHANGE_ES = re.compile(
     r"(?:\s+\w+){0,3}\s+hoy"
     r"|(?:he|hemos)\s+(?:ganado|perdido)\s+hoy"
     r"|hoy\s+(?:\w+\s+){0,2}(?:he|hemos)\s+(?:ganado|perdido)"
-    r"|(?:gano|pierdo|ganado|perdido)\s+hoy"
+    r"|(?:gano|pierdo|gane|perdi|ganado|perdido)\s+hoy"
     r"|variacion\s+(?:diaria|de hoy|del dia)"
     r"|cambio\s+(?:diario|de hoy|del dia))\b"
 )
 _DAILY_CHANGE_EN = re.compile(
     r"\b(?:(?:up|down)\s+today|today'?s\s+(?:change|move|return|performance)"
     r"|daily\s+(?:change|move|return|performance)|(?:do|doing|did)\s+today"
-    r"|(?:gain|gained|lose|lost|made)\s+today"
+    r"|(?:gain|gained|lose|lost|make|made|earn|earned)\s+(?:money\s+)?today"
     r"|(?:change|changed|move|moved|perform|performed|go|went)\s+today)\b"
 )
 _PORTFOLIO_WORD = re.compile(r"\b(?:cartera|portfolio|patrimonio|inversiones|he ganado|he perdido|gane|perdi|"
-                             r"i (?:gain|gained|lose|lost|made))\b")
+                             r"i (?:gain|gained|lose|lost|make|made|earn|earned))\b")
 
 
 def _asks_daily_change(text: str) -> bool:
