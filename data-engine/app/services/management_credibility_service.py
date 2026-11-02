@@ -194,6 +194,13 @@ class ManagementCredibilityService:
                     distance = abs(actual.value - promise.target_value)
                     tolerance = abs(promise.target_value) * Decimal("0.05")
                     promise.status = "partial" if distance <= tolerance else "missed"
+            # Conciliar otra vez con el mismo dato no es evidencia nueva: antes
+            # cada pulsación de «Conciliar» repetía la entrada.
+            if any(
+                isinstance(item, dict) and item.get("financial_fact_id") == actual.id
+                for item in (promise.evidence or [])
+            ):
+                continue
             promise.evidence = [
                 *(promise.evidence or []),
                 {
