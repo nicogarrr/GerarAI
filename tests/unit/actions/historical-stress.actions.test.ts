@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const request = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/research/client', () => ({ researchRequest: request }));
 import { getHistoricalStress } from '@/lib/actions/historical-stress.actions';
-beforeEach(() => request.mockReset());
+beforeEach(() => { request.mockReset(); });
 it('uses the shared bounded request and URL encodes ticker', async () => {
     const report = { scenarios: [] };
     request.mockResolvedValue(report);
