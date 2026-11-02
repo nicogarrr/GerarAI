@@ -10,7 +10,7 @@ from decimal import Decimal
 from sqlalchemy import create_engine
 
 from app.core.database import Base
-from app.models import Company, Transaction
+from app.models import Company, MarketPrice, Transaction
 from app.services.fundamental_review_service import DecisionJournalService
 from app.services.ibkr_import_service import IBKRImportService
 from app.services.journal_trade_link import (
@@ -530,3 +530,33 @@ def test_recalculation_after_link_does_not_touch_other_company_metadata():
     db.refresh(unrelated)
     assert unrelated.metadata_["auto_link"]["candidate_transaction_id"] == 999999
     assert unrelated.transaction_id is None
+
+
+def test_london_decision_price_in_pence_is_compared_in_pence():
+    """TSCO.L: cuentas en libras («GBP»), cotiza en peniques («GBp»).
+
+    La decision guarda el ultimo cierre tal cual (2.640 peniques). Antes se
+    comparaba con la compra pasada a la divisa de las cuentas (26,50 libras):
+    2.640 contra 26,5 salia «precio incompatible» y la compra nunca se sugeria.
+    """
+    db = _db()
+    c = _company(db, "TSCO.L")
+    c.currency = "GBP"
+    db.add(MarketPrice(company_id=c.id, date=date(2026, 3, 9), close=Decimal("2640"), quote_currency="GBp"))
+    db.commit()
+    entry = _entry(db, c)
+    assert entry.price == Decimal("2640")
+    tx = _trade(db, c, date(2026, 3, 10))
+    tx.price, tx.currency = Decimal("2650"), "GBp"
+    db.commit()
+    assert auto_link_journal_trades(db)["suggested"] == 1
+    db.commit()
+    assert entry.metadata_["auto_link"]["candidate_transaction_id"] == tx.id
+    # La misma compra contada en libras tambien es compatible...
+    tx.price, tx.currency = Decimal("26.50"), "GBP"
+    db.commit()
+    assert auto_link_journal_trades(db)["suggested"] == 1
+    # ...y una a un precio muy distinto sigue vetada.
+    tx.price = Decimal("50")
+    db.commit()
+    assert auto_link_journal_trades(db)["suggested"] == 0
