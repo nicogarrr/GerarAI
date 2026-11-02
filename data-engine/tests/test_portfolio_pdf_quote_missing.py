@@ -56,7 +56,7 @@ def test_pdf_marca_posicion_valorada_con_su_ultima_operacion(monkeypatch):
     assert position["quote_missing"] is True
 
     text = _pdf_text(client, tenant, user)
-    assert "12.50 EUR *" in text
+    assert "12,50 EUR *" in text
     assert "sin cotización" in text
 
 
@@ -78,6 +78,6 @@ def test_pdf_no_marca_posicion_con_cotizacion(monkeypatch):
     assert response.status_code == 200, response.text
 
     text = _pdf_text(client, tenant, user)
-    assert "20.00 EUR" in text
-    assert "20.00 EUR *" not in text
+    assert "20,00 EUR" in text
+    assert "20,00 EUR *" not in text
     assert "sin cotización" not in text.lower()
