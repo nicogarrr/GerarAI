@@ -566,9 +566,16 @@ class PortfolioIntelligenceService:
 
     @staticmethod
     def _closes_rows(db: Session, company_ids: Iterable[int], since: date) -> list[Any]:
-        """Cierres de esas empresas desde ``since``, ordenados (empresa, fecha)."""
+        """Cierres de esas empresas desde ``since``, ordenados (empresa, fecha).
+
+        Por Core (``db.connection()``), no por la capa de resultados ORM: son
+        cientos de miles de filas (300 posiciones x 5 años) y MarketPrice no es
+        de tenant, asi que no hay criteria que perder. Mismas filas, mismos
+        valores (Decimal), mismos nombres de columna.
+        """
         return list(
-            db.execute(
+            db.connection()
+            .execute(
                 select(
                     MarketPrice.company_id,
                     MarketPrice.date,
@@ -579,7 +586,8 @@ class PortfolioIntelligenceService:
                 )
                 .where(MarketPrice.company_id.in_(sorted(company_ids)), MarketPrice.date >= since)
                 .order_by(MarketPrice.company_id, MarketPrice.date)
-            ).all()
+            )
+            .all()
         )
 
     @staticmethod
