@@ -171,6 +171,21 @@ const KNOWN: ReadonlyArray<readonly [RegExp, string]> = [
   [/^Sin CIK para (\S+): este emisor no reporta a la SEC; usa la fuente de su mercado local \(ESEF para emisores de la UE\)$/, 'No CIK for $1: this issuer does not report to the SEC; use its local market source (ESEF for EU issuers).'],
   [/^Sin snapshot ESEF local para (\S+): por ahora solo hay cobertura de emisores IBEX revisados$/, 'No local ESEF snapshot for $1: for now only reviewed IBEX issuers are covered.'],
   // Sincronización IBKR Flex (Ajustes)
+  // Privacidad (Ajustes › Seguridad): avisos del borrado de cuenta y de la exportación
+  [/^La sesión no tiene email; no se puede confirmar el borrado\.?$/, 'The session lacks an email address, so the deletion cannot be confirmed.'],
+  [/^Escribe exactamente el email de tu cuenta para confirmar\.?$/, 'Type your account email exactly to confirm.'],
+  [/^Introduce tu contraseña para reautenticarte\.?$/, 'Enter your password to re-authenticate.'],
+  [/^Demasiados intentos\. Espera un momento antes de volver a intentarlo\.?$/, 'Too many attempts. Wait a moment before retrying.'],
+  [/^Contraseña incorrecta\. No se ha borrado nada\.?$/, 'Wrong password. Nothing has been deleted.'],
+  [/^No se pudo verificar la sesión\. No se ha borrado nada; inténtalo de nuevo\.?$/, 'The session could not be verified. Nothing has been deleted; please retry.'],
+  [/^El servicio de datos no responde; no se ha borrado nada\. Inténtalo de nuevo en unos minutos\.?$/, 'The data service is not responding; nothing has been deleted. Please retry in a few minutes.'],
+  [/^No se pudo limpiar todo el almacenamiento; no se ha confirmado el borrado\. Reinténtalo\.?$/, 'Not all storage could be cleaned; the deletion has not been confirmed. Please retry.'],
+  [/^No se pudo borrar la cuenta\. No se ha eliminado nada\. Inténtalo de nuevo\.?$/, 'The account could not be deleted. Nothing has been removed. Please retry.'],
+  [/^Los datos de investigación se han borrado, pero no se pudieron limpiar los datos auxiliares\. Vuelve a intentarlo para terminar de cerrar la cuenta\.?$/, 'Your research data has been deleted, but the auxiliary data could not be cleaned. Retry to finish closing the account.'],
+  [/^Tus datos de investigación se han borrado, pero la cuenta de acceso sigue activa\. Vuelve a intentarlo para cerrarla definitivamente\.?$/, 'Your research data has been deleted, but your sign-in account is still active. Retry to close it for good.'],
+  [/^La cuenta de acceso se ha cerrado, pero no se pudieron borrar todos los datos de doble factor\. Contacta con soporte para completar la limpieza\.?$/, 'Your sign-in account has been closed, but not all two-factor data could be deleted. Contact support to finish the cleanup.'],
+  [/^Cuenta y datos eliminados\. Se han cerrado todas las sesiones\.?$/, 'Account and data deleted. All sessions have been signed out.'],
+  [/^El servicio de datos no responde\. Inténtalo de nuevo en unos minutos\.?$/, 'The data service is not responding. Please retry in a few minutes.'],
   // Estado guardado de la conexión IBKR (Ajustes): el dato se guarda en castellano; se traduce al mostrarlo.
   [/^Conecta una cuenta IBKR mediante Flex, solo lectura\.?$/, 'Connect an IBKR account through Flex, read-only.'],
   [/^Conexión verificada\. Pulsa Sincronizar para importar posiciones y caja\.?$/, 'Connection verified. Press Sync to import positions and cash.'],

@@ -10,10 +10,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { deleteAccount, exportAccountData } from '@/lib/actions/privacy.actions';
-import { useT } from '@/lib/i18n/client';
+import { useLocale, useT } from '@/lib/i18n/client';
+import { knownBackendMessageEn } from '@/lib/research/backend-error-en';
 
 export default function PrivacySettings({ email }: { email: string }) {
     const t = useT();
+    const locale = useLocale();
+    // Los avisos de la acción de servidor llegan en castellano; en inglés se traducen al mostrarlos.
+    const shown = (text: string) => (locale === 'en' ? knownBackendMessageEn(text) ?? text : text);
     const router = useRouter();
     const [exporting, setExporting] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -30,7 +34,7 @@ export default function PrivacySettings({ email }: { email: string }) {
             toast.success(t('security.privacy.exported'));
         } catch (error) {
             toast.error(t('security.privacy.exportFailed'), {
-                description: error instanceof Error ? error.message : t('security.privacy.tryAgain'),
+                description: error instanceof Error ? shown(error.message) : t('security.privacy.tryAgain'),
             });
         } finally {
             setExporting(false);
@@ -47,10 +51,10 @@ export default function PrivacySettings({ email }: { email: string }) {
         try {
             const result = await deleteAccount({ confirmation, password });
             if (!result.success) {
-                toast.error(t('security.privacy.deleteFailed'), { description: result.message });
+                toast.error(t('security.privacy.deleteFailed'), { description: shown(result.message) });
                 return;
             }
-            toast.success(t('security.privacy.deleted'), { description: result.message });
+            toast.success(t('security.privacy.deleted'), { description: shown(result.message) });
             router.push('/sign-in');
             router.refresh();
         } catch {
