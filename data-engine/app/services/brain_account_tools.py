@@ -630,10 +630,17 @@ def _ranking_answer(db: Session, tenant: int, text: str) -> ChatResponse:
         select(Position, Company.ticker).join(Company, Company.id == Position.company_id)
         .where(Position.tenant_id == tenant, Position.quantity > 0)
     ).all())
+    # Sin cotización real (valorada al precio de su última operación, A3): su
+    # rentabilidad (~0 %) no está medida; fuera, como en cartera e impuestos.
+    from app.services.portfolio_ledger_service import trade_price_fallbacks
+
+    quote_missing = trade_price_fallbacks(db, [p for p, _ in rows], tenant_id=tenant)
+    unquoted = sorted(t for p, t in rows if p.company_id in quote_missing)
     known = [(t, float(p.market_value_base), float(p.cost_basis_base), p.base_currency or "EUR", p.as_of)
              for p, t in rows
-             if p.market_value_base is not None and p.cost_basis_base is not None and p.cost_basis_base > 0]
-    unknown = sorted(t for p, t in rows if not any(k[0] == t for k in known))
+             if p.market_value_base is not None and p.cost_basis_base is not None and p.cost_basis_base > 0
+             and p.company_id not in quote_missing]
+    unknown = sorted(t for p, t in rows if t not in unquoted and not any(k[0] == t for k in known))
     if not known:
         text_out = ("You have no open positions with a saved value and cost, so I can't rank them." if english
                     else "No tienes posiciones abiertas con valor y coste guardados: no puedo ordenarlas.")
@@ -662,6 +669,10 @@ def _ranking_answer(db: Session, tenant: int, text: str) -> ChatResponse:
     if unknown:
         lines.append(("No saved cost or value, left out: " if english else "Sin coste o valor guardado, fuera: ")
                      + ", ".join(unknown[:10]) + ".")
+    if unquoted:
+        lines.append(("No real quote (valued at their last trade price), left out: " if english
+                      else "Sin cotización real (valoradas al precio de su última operación), fuera: ")
+                     + ", ".join(unquoted[:10]) + ".")
     lines.append("Simple return since purchase, without dividends." if english
                  else "Rentabilidad simple desde la compra, sin dividendos.")
     return _response("\n".join(lines), [_source("position", None, "Posiciones abiertas", "/portfolio")],
