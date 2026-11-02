@@ -1507,6 +1507,82 @@ def _trades_answer(db: Session, tenant: int, text: str) -> ChatResponse:
     return _response("\n".join(lines), sources, "account_trades")
 
 
+# ------------------------------------------------------- cuántas operaciones
+
+_TRADE_COUNT = re.compile(
+    r"\bcuant[ao]s\s+(?:operaciones|compras|compraventas|compras\s+y\s+ventas)\b"
+    r"|\bhow\s+many\s+(?:trades|transactions|purchases|buys|buys\s+and\s+sells)\b"
+)
+
+
+def _asks_trade_count(text: str, question: str) -> bool:
+    return bool(_TRADE_COUNT.search(text) and not _tickers_in(question)
+                and not re.search(r"\b(?:comision\w*|fees?|commissions?|deberia|should|acciones|shares)\b", text))
+
+
+def _count_words(buys: int, sells: int, english: bool) -> str:
+    parts = []
+    if buys:
+        parts.append(f"{buys} {'buy' if buys == 1 else 'buys'}" if english
+                     else f"{buys} {'compra' if buys == 1 else 'compras'}")
+    if sells:
+        parts.append(f"{sells} {'sell' if sells == 1 else 'sells'}" if english
+                     else f"{sells} {'venta' if sells == 1 else 'ventas'}")
+    return (" and " if english else " y ").join(parts)
+
+
+def _trade_count_answer(db: Session, tenant: int, text: str) -> ChatResponse:
+    """Recuento de compras y ventas guardadas, por año y por cartera (solo lectura, solo del tenant)."""
+    from app.models import Portfolio, Transaction
+
+    english = _english()
+    period = _trades_period(text)
+    sources = [_source("transactions", None, "Operaciones" if not english else "Trades", "/portfolio")]
+    query = (select(Transaction.trade_date, Transaction.action, Portfolio.name)
+             .outerjoin(Portfolio, Portfolio.id == Transaction.portfolio_id)
+             .where(Transaction.tenant_id == tenant, Transaction.action.in_(("buy", "sell"))))
+    if period is not None:
+        query = query.where(Transaction.trade_date >= period[0], Transaction.trade_date <= period[1])
+    rows = db.execute(query).all()
+    if not rows:
+        if period is not None:
+            text_out = (f"There are no saved buys or sells in {period[3]}." if english
+                        else f"No hay compras ni ventas guardadas de {period[2]}.")
+        else:
+            text_out = ("You have no saved buys or sells. You can import them in Portfolio." if english
+                        else "No tienes compras ni ventas guardadas. Puedes importarlas en Cartera.")
+        return _response(text_out, sources, "account_trade_count")
+    by_year: dict[int, list[int]] = {}
+    by_portfolio: dict[str, int] = {}
+    for day, action, portfolio_name in rows:
+        counts = by_year.setdefault(day.year, [0, 0])
+        counts[0 if action == "buy" else 1] += 1
+        if portfolio_name:
+            by_portfolio[portfolio_name] = by_portfolio.get(portfolio_name, 0) + 1
+    buys = sum(c[0] for c in by_year.values())
+    sells = sum(c[1] for c in by_year.values())
+    total = buys + sells
+    split = _count_words(buys, sells, english)
+    if english:
+        noun = "saved buy or sell" if total == 1 else "saved buys and sells"
+        head = f"You have {total} {noun}: {split}." if period is None else f"In {period[3]} you have {total} {noun}: {split}."
+    else:
+        noun = "operación de compraventa guardada" if total == 1 else "operaciones de compraventa guardadas"
+        head = f"Tienes {total} {noun}: {split}." if period is None else f"En {period[2]} tienes {total} {noun}: {split}."
+    lines = [head]
+    if len(by_year) > 1:
+        for year in sorted(by_year, reverse=True):
+            year_buys, year_sells = by_year[year]
+            lines.append(f"- {year}: {year_buys + year_sells} ({_count_words(year_buys, year_sells, english)})")
+    if len(by_portfolio) > 1:
+        ordered = sorted(by_portfolio.items(), key=lambda kv: (-kv[1], kv[0]))
+        lines.append(("By portfolio: " if english else "Por cartera: ")
+                     + ", ".join(f"{name} {count}" for name, count in ordered) + ".")
+    lines.append("Counting buys and sells only; not dividends or cash movements." if english
+                 else "Cuento compras y ventas; no dividendos ni movimientos de efectivo.")
+    return _response("\n".join(lines), sources, "account_trade_count")
+
+
 def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     """Respuesta de datos de la cuenta, o None si la pregunta no es de este módulo."""
     tenant = _tenant(db)
@@ -1534,6 +1610,8 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     if _asks_return_ranking(text, question):
         return _ranking_answer(db, tenant, text)
     year = _asked_year(text)
+    if _asks_trade_count(text, question):
+        return _trade_count_answer(db, tenant, text)
     if _asks_withholding(text) and _tickers_in(question):
         return _withholding_answer(db, tenant, year, _tickers_in(question))
     if _asks_fees(text):
