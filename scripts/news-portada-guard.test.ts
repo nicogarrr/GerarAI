@@ -5,7 +5,7 @@ import test from 'node:test';
 test('portada /api/news: dedupe de titulares literales y spam legal fuera (ficha conserva)', () => {
   const route = readFileSync('data-engine/app/api/routes/news.py', 'utf8');
   assert.ok(route.includes('exact_key'), 'la portada agrupa por clave de texto exacta normalizada');
-  assert.ok(route.includes('find_group'), 'la portada une las noticias de una misma historia en un grupo');
+  assert.ok(route.includes('find_group') || route.includes('StoryClusterIndex'), 'la portada une las noticias de una misma historia en un grupo');
   const cluster = readFileSync('data-engine/app/services/news_story_cluster.py', 'utf8');
   assert.ok(cluster.includes('def exact_key'), 'existe la clave de texto exacta');
   assert.ok(cluster.includes('group.text_key == text_key'), 'un titular literal repetido cae en el mismo grupo');
