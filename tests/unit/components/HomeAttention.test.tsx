@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const get = vi.fn();
 vi.mock('@/lib/actions/home-attention.actions', () => ({ getHomeAttention: () => get() }));
@@ -6,6 +6,26 @@ import HomeAttention from '@/components/HomeAttention';
 const empty = { thesis: { unavailable: false, items: [] }, dca: { unavailable: false, items: [] } };
 beforeEach(() => { get.mockReset(); });
 describe('HomeAttention', () => {
+    it('defers its action until the next task so sibling effects can enqueue first', async () => {
+        vi.useFakeTimers();
+        try {
+            get.mockResolvedValue(empty);
+            render(<HomeAttention />);
+            expect(get).not.toHaveBeenCalled();
+            await act(async () => { await vi.runAllTimersAsync(); });
+            expect(get).toHaveBeenCalledTimes(1);
+        } finally { vi.useRealTimers(); }
+    });
+    it('cancels the deferred action when unmounted before the next task', async () => {
+        vi.useFakeTimers();
+        try {
+            get.mockResolvedValue(empty);
+            const view = render(<HomeAttention />);
+            view.unmount();
+            await act(async () => { await vi.runAllTimersAsync(); });
+            expect(get).not.toHaveBeenCalled();
+        } finally { vi.useRealTimers(); }
+    });
     it('honest empty, no invented signals', async () => {
         get.mockResolvedValue(empty); render(<HomeAttention />);
         expect(await screen.findByText(/Sin cambios de tesis pendientes/)).toBeInTheDocument();
