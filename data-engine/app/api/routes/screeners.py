@@ -25,6 +25,7 @@ from app.schemas.api import (
 from app.services.screener_service import (
     DUPLICATE_SCREEN_NAME,
     CustomMetricService,
+    SafeFormula,
     ScreenerService,
 )
 
@@ -139,8 +140,10 @@ def update_screen(screen_id: int, payload: ScreenCreate, db: Session = Depends(g
     service = ScreenerService()
     try:
         criteria = [service._criterion(item.model_dump()) for item in payload.criteria]
+        SafeFormula.reject_out_of_range(
+            payload.ranking_formula, *(side for item in criteria for side in (item["left"], item["right"]))
+        )
         if payload.ranking_formula:
-            from app.services.screener_service import SafeFormula
             SafeFormula(payload.ranking_formula)
         name = service.claim_screen_name(db, payload.name, exclude_id=screen.id)
     except ValueError as exc:
@@ -195,6 +198,9 @@ def metric_coverage(db: Session = Depends(get_db)) -> dict:
 @router.post("/run")
 def run_ad_hoc_screen(payload: AdHocScreen, db: Session = Depends(get_db)) -> dict:
     try:
+        SafeFormula.reject_out_of_range(
+            payload.ranking_formula, *(side for item in payload.criteria for side in (item.left, item.right))
+        )
         return ScreenerService().run(
             db,
             criteria=[item.model_dump() for item in payload.criteria],
