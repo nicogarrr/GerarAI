@@ -53,10 +53,17 @@ def update_review(
     review = db.get(ResearchReview, review_id)
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
+    # Un PATCH solo con el estado no borra las notas: solo cambian si vienen
+    # en el cuerpo (``null`` explicito las borra).
+    notes = (
+        payload.resolution_notes
+        if "resolution_notes" in payload.model_fields_set
+        else review.resolution_notes
+    )
     ReviewAlertService().transition_review(
         review,
         status=payload.status,
-        resolution_notes=payload.resolution_notes,
+        resolution_notes=notes,
     )
     db.commit()
     db.refresh(review)
