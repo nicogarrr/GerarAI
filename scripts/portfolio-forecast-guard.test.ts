@@ -87,12 +87,15 @@ async function renderForecast(payload: PortfolioForecast): Promise<string> {
 export default function Link({ href, children, ...rest }) { return createElement('a', { href, ...rest }, children); }
 `,
         );
+        // Motivos de exclusión en el idioma de la interfaz (solo imports de tipos).
+        writeFileSync(`${dir}/forecast-excluded-reason.mjs`, compile('lib/portfolio/forecast-excluded-reason.ts'));
         writeFileSync(
             `${dir}/forecast.mjs`,
             compile('components/portfolio/PortfolioForecast.tsx').replaceAll(
                 '@/components/ui/panel',
                 './panel.mjs',
             ).replaceAll("'next/link'", "'./next-link.mjs'").replaceAll('@/lib/format', './format.mjs')
+                .replaceAll('@/lib/portfolio/forecast-excluded-reason', './forecast-excluded-reason.mjs')
                 .replaceAll('@/lib/i18n/t', './i18n/t.mjs')
                 .replaceAll('@/lib/i18n/locale', './i18n/locale.mjs'),
         );

@@ -8,6 +8,7 @@ import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import { createFormatters, type Formatters } from '@/lib/format';
 import { intlLocale } from '@/lib/i18n/locale';
 import { t } from '@/lib/i18n/t';
+import { forecastExcludedReason } from '@/lib/portfolio/forecast-excluded-reason';
 
 const esT: TFunction = t;
 const esF = createFormatters('es');
@@ -60,7 +61,7 @@ function ExcludedList({ items, ti = esT, f = esF }: { items: PortfolioForecastEx
             {item.weight === null
               ? ti('portfolio.forecast.weightNa')
               : ti('portfolio.forecast.weightPct', { pct: pct(item.weight, 1, ti, f) })}
-            . {item.reason}
+            . {forecastExcludedReason(item, f.locale, ti)}
           </li>
         ))}
       </ul>

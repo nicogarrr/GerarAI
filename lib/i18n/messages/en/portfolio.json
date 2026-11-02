@@ -283,7 +283,17 @@
     "basisPrefix": "Price {source} · ",
     "basisSuffix": " · {date} · thesis v{thesisVersion} ({thesisStatus})",
     "modelSuffix": " · model v{version}",
-    "assumptionsTitle": "Assumptions"
+    "assumptionsTitle": "Assumptions",
+    "excludedReason": {
+      "noThesis": "No current published thesis: excluded from the forecast.",
+      "noThesisDraft": "No current published thesis (there is an unpublished draft): excluded from the forecast.",
+      "adrWithoutListedValues": "ADR without values per listed share: comparison with the price not verified (N/A).",
+      "currencyMismatch": "Position currency differs from the company’s trading currency: comparison without a verified conversion (N/A).",
+      "basisUnverified": "Unverified valuation basis (thesis without the engine’s value_per_share_basis): comparison with the price N/A, never assumed.",
+      "noComputableIntrinsic": "Thesis without computable intrinsic values.",
+      "noBaseValue": "No value in the base currency (conversion N/A): not added to the portfolio.",
+      "valuationHold": "Valuation pending: {reason}."
+    }
   },
   "importIbk": {
     "nounPositionOne": "{n} position",

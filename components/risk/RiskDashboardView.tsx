@@ -10,6 +10,7 @@ import { RecordDetail, formatRecordValue, type DataRecord } from '@/components/d
 import type { Locale } from '@/lib/i18n/locale';
 import { etiquetaFactor, etiquetaSector, etiquetaSeveridad } from '@/lib/labels';
 import { useT, useFormat } from '@/lib/i18n/client';
+import { valuationHoldReason } from '@/lib/portfolio/forecast-excluded-reason';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import type { Formatters } from '@/lib/format';
 import { getRiskDashboard } from '@/lib/actions/risk.actions';
@@ -179,7 +180,7 @@ function humanizeRiskDashboard(t: TFunction, f: Formatters, dashboard: DataRecor
             display[label] = value
                 .map((item) => {
                     if (!isRecord(item)) return String(item);
-                    const reason = typeof item.reason === 'string' && item.reason ? `: ${item.reason}` : '';
+                    const reason = typeof item.reason === 'string' && item.reason ? `: ${valuationHoldReason(item.reason, f.locale)}` : '';
                     const since = typeof item.effective_date === 'string' && item.effective_date ? ` · ${f.formatDate(item.effective_date)}` : '';
                     return `${String(item.ticker ?? '?')}${reason}${since}`;
                 })

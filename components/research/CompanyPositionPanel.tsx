@@ -5,6 +5,7 @@ import type { CompanyHoldingContext } from '@/lib/actions/portfolio.actions';
 import { addTransactionHref } from '@/lib/portfolio/add-dialog-link';
 import { createFormatters, isValidCurrencyCode, type Formatters } from '@/lib/format';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locale';
+import { valuationHoldReason } from '@/lib/portfolio/forecast-excluded-reason';
 import { createTranslator } from '@/lib/i18n/translate';
 
 const money = (fmt: Formatters, value: number | null, currency: string) =>
@@ -55,7 +56,7 @@ export function CompanyPositionPanel({ context, locale = DEFAULT_LOCALE }: { con
                 {weightPercent !== null ? <dd className="text-xs text-gray-400">{t('research.positionPanel.weightNote')}</dd> : null}</div>
             {holding.firstBuyDate ? <div><dt className="text-gray-500">{t('research.positionPanel.firstBuy')}</dt><dd className="font-semibold text-gray-100">{formatDate(holding.firstBuyDate)}</dd></div> : null}
         </dl>
-        {holding.valuationHold ? <p className="mt-3 text-xs text-amber-200" role="status">{t('research.positionPanel.valuationHold', { reason: holding.valuationHold.reason })}</p> : null}
+        {holding.valuationHold ? <p className="mt-3 text-xs text-amber-200" role="status">{t('research.positionPanel.valuationHold', { reason: valuationHoldReason(holding.valuationHold.reason, locale) })}</p> : null}
         {holding.quoteMissing && !holding.valuationHold ? <p className="mt-3 text-xs text-amber-200" role="status">{t('research.positionPanel.noQuote')}</p> : null}
         {!holding.valuationHold && holding.valueMissing ? <p className="mt-3 text-xs text-amber-200" role="status">{t('research.positionPanel.noValue', { currency: base })}</p> : null}
         {!nativeCostKnown && !holding.costReviewMessage ? <p className="mt-3 text-xs text-amber-200" role="status">{t('research.positionPanel.costUnknown')}</p> : null}
