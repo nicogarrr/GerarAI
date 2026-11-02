@@ -10,7 +10,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any
 
 from app.llm import run_guard
-from app.services.expert_team.citations import citation_validator
+from app.services.expert_team.citations import citation_validator, figures_supported
 from app.services.expert_team.experts import ExpertSpec, Reasoner, Validator, run_expert
 from app.services.expert_team.ledger import EvidenceLedger
 from app.services.expert_team.models import ExpertReport, RunContext, TeamResult, ToolSpec
@@ -240,8 +240,9 @@ class ExpertTeam:
         match = re.search(r"(bullish|bearish|neutral)\s*\|?\s*(.*)", text or "", re.IGNORECASE | re.DOTALL)
         if not match:
             return {"label": "neutral", "rationale": "", "source": "unresolved"}
-        return {
-            "label": _JUDGE_LABELS[match.group(1).lower()],
-            "rationale": match.group(2).strip()[:600],
-            "source": "judge",
-        }
+        rationale = match.group(2).strip()[:600]
+        # El juez solo vio afirmaciones validadas: una cifra que no está en ellas
+        # sería inventada, así que su frase no se enseña (el veredicto sí).
+        if not figures_supported(rationale, user):
+            rationale = ""
+        return {"label": _JUDGE_LABELS[match.group(1).lower()], "rationale": rationale, "source": "judge"}

@@ -85,6 +85,18 @@ def _is_trivial(token: str) -> bool:
     return token.isdigit() and int(token) <= 10
 
 
+def figures_supported(text: str, source: Any, rel_tol: float = 0.005) -> bool:
+    """Cada cifra escrita en ``text`` (salvo enteros 0–10 e ids ev-N) aparece en
+    ``source`` (texto o datos), con la misma tolerancia y escalas que una afirmación."""
+    known = list(_numbers_in(source))
+    for token in _NUMBER.findall(_EVIDENCE_ID.sub(" ", text)):
+        if _is_trivial(token):
+            continue
+        if not any(_close(r, k, rel_tol) for r in _readings(token) for k in known):
+            return False
+    return True
+
+
 def citation_validator(*, mode: Literal["drop", "mark"] = "drop", rel_tol: float = 0.005) -> Validator:
     def validate(claim: Claim, ledger: EvidenceLedger, spec: ExpertSpec) -> str:
         reason = basic_citation_check(claim, ledger, spec)
