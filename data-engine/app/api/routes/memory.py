@@ -492,6 +492,15 @@ def create_memory_item(payload: MemoryItemCreate, db: Session = Depends(get_db))
     session = db.get(ResearchSession, payload.research_session_id) if payload.research_session_id else None
     if payload.research_session_id and not session:
         raise HTTPException(status_code=404, detail="Research session not found")
+    # Una nota de una empresa no puede colgarse de la sesión de otra (aparecía
+    # en ella). Igual que _require_own_rows: la sesión sin empresa vale para todo.
+    if (
+        session is not None
+        and company_id is not None
+        and session.company_id is not None
+        and session.company_id != company_id
+    ):
+        raise HTTPException(status_code=404, detail="Research session not found")
 
     item = MemoryItem(
         company_id=company_id,
