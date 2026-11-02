@@ -346,6 +346,16 @@ def deterministic_lines(intent: PersonalIntent, ctx: UserContext, db: Session) -
         return lines
     if intent.kind == "riesgo":
         return _risk_answer(ctx, db)
+    if intent.kind == "cartera" and _english():
+        # En inglés, sin modelo, la cartera sale en inglés (antes en castellano).
+        block = ctx.block("cartera")
+        lines_en = list(block.lines_en[:12]) if block else []
+        if lines_en == ["- No saved positions."]:
+            return [
+                "You have no saved positions in your portfolio (/portfolio). Import the IBKR CSV or add your "
+                "positions and I'll tell you how it's doing, with each one's weight, P&L and DCA level."
+            ]
+        return ["Your portfolio (/portfolio):", *(lines_en or _block_lines(ctx, "cartera", 12))]
     if intent.kind == "cartera":
         lines = _block_lines(ctx, "cartera", 12)
         if lines == ["- Sin posiciones guardadas."]:
