@@ -964,9 +964,18 @@ def _asks_alert_rules(text: str, question: str) -> bool:
     return bool(_RULES_ASK.search(text) and not _tickers_in(question))
 
 
-def _rule_text(kind: str, condition: dict, currency: str | None, english: bool) -> str:
+def _rule_text(kind: str, condition: dict, currency: str | None, english: bool, target: dict | None = None) -> str:
     op = str((condition or {}).get("operator") or "")
     raw = (condition or {}).get("value")
+    if kind == "thesis_invalidation":
+        # Criterio de la tesis: misma lectura que el resto de la app (métrica,
+        # operador y umbral con sus decimales), no el código interno con el
+        # umbral redondeado a 2 decimales («thesis_invalidation < 0,07»).
+        from app.services.thesis_invalidation_rules import _describe_rule_en, describe_rule
+
+        item = {"metric": str((target or {}).get("metric") or ""), "operator": op, "threshold": raw}
+        return (f"thesis invalidation: {_describe_rule_en(item)}" if english
+                else f"invalidación de tesis: {describe_rule(item)}")
     try:
         value = float(str(raw))
         number = _num_en(value, 2).rstrip("0").rstrip(".") if english else num_es(value, 2).rstrip("0").rstrip(",")
@@ -1007,7 +1016,7 @@ def _alert_rules_answer(db: Session, tenant: int) -> ChatResponse:
     lines = [(f"You have {count} active alert{'s' if count != 1 else ''}:" if english
               else f"Tienes {count} alerta{'s' if count != 1 else ''} activa{'s' if count != 1 else ''}:")]
     for rule, ticker, currency in rows[:20]:
-        line = f"- {ticker or '?'}: {_rule_text(rule.rule_type or '', rule.condition or {}, currency, english)}"
+        line = f"- {ticker or '?'}: {_rule_text(rule.rule_type or '', rule.condition or {}, currency, english, rule.target)}"
         if rule.last_triggered_at is not None:
             fired = rule.last_triggered_at.date()
             line += (f" (last triggered {_date_en(fired)})" if english
