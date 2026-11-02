@@ -102,8 +102,12 @@ def _parse_threshold(value: Any) -> Decimal | None:
         return None
     if not parsed.is_finite():
         return None
-    # Se guarda como float: «1e400» es un Decimal finito pero un float infinito.
-    return parsed if math.isfinite(float(parsed)) else None
+    # Se guarda como float: «1e400» es un Decimal finito pero un float infinito,
+    # y «1e-400» no es cero pero el float lo redondea a 0.
+    as_float = float(parsed)
+    if not math.isfinite(as_float) or (as_float == 0 and not parsed.is_zero()):
+        return None
+    return parsed
 
 
 def _valid_metric(metric: str) -> bool:
