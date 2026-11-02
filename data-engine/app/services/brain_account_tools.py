@@ -17,7 +17,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from urllib.parse import quote
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.local_date import local_today
@@ -1415,6 +1415,98 @@ def _upcoming_dividends_answer(db: Session, tenant: int) -> ChatResponse:
     return _response("\n".join(lines), sources, "account_upcoming_dividends")
 
 
+# ------------------------------------------------------- últimas operaciones
+
+_TRADES_ES = re.compile(
+    r"\bmis\s+(?:ultimas?\s+)?(?:operaciones|compras|compraventas)\b"
+    r"|\bmi\s+ultima\s+(?:operacion|compra)\b|\bultimas?\s+(?:operaciones|compras)\s+(?:que\s+)?(?:he|hice)\b"
+    r"|\bque\s+operaciones\s+(?:he\s+hecho|hice)\b|\bque\s+he\s+comprado\b|^\W*que\s+compre\b"
+)
+_TRADES_EN = re.compile(
+    r"\bwhat\s+(?:did\s+i\s+buy|have\s+i\s+bought)\b"
+    r"|\bmy\s+(?:(?:last|latest|recent)\s+)?(?:trades|transactions|purchases|buys)\b"
+    r"|\bmy\s+(?:last|latest)\s+(?:trade|transaction|purchase)\b"
+)
+_LAST_MONTH = re.compile(r"\b(?:el\s+)?mes\s+pasado\b|\blast\s+month\b")
+_THIS_MONTH = re.compile(r"\beste\s+mes\b|\bthis\s+month\b")
+_MONTH_NAMES_ES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre",
+                   "octubre", "noviembre", "diciembre")
+_MONTH_NAMES_EN = ("January", "February", "March", "April", "May", "June", "July", "August", "September",
+                   "October", "November", "December")
+_MAX_TRADES = 10
+
+
+def _asks_trades(text: str, question: str) -> bool:
+    return bool((_TRADES_ES.search(text) or _TRADES_EN.search(text)) and not _tickers_in(question)
+                and not re.search(r"\b(?:comision\w*|fees?|commissions?|deberia|should)\b", text))
+
+
+def _trades_period(text: str) -> tuple[date, date, str, str] | None:
+    """(desde, hasta, rótulo es, rótulo en) del periodo pedido, o None para «las últimas»."""
+    today = local_today()
+    if _LAST_MONTH.search(text) or _THIS_MONTH.search(text):
+        first = today.replace(day=1)
+        if _LAST_MONTH.search(text):
+            first = (first - timedelta(days=1)).replace(day=1)
+        last = (first.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+        return (first, last, f"{_MONTH_NAMES_ES[first.month - 1]} de {first.year}",
+                f"{_MONTH_NAMES_EN[first.month - 1]} {first.year}")
+    year = _asked_year(text)
+    if year is not None:
+        return date(year, 1, 1), date(year, 12, 31), str(year), str(year)
+    return None
+
+
+def _trades_answer(db: Session, tenant: int, text: str) -> ChatResponse:
+    """Compras y ventas guardadas, la más reciente primero (solo lectura, solo del tenant)."""
+    from app.models import Company, Portfolio, Transaction
+
+    english = _english()
+    period = _trades_period(text)
+    sources = [_source("transactions", None, "Operaciones" if not english else "Trades", "/portfolio")]
+    query = (select(Transaction, Company.ticker, Portfolio.name)
+             .outerjoin(Company, Company.id == Transaction.company_id)
+             .outerjoin(Portfolio, Portfolio.id == Transaction.portfolio_id)
+             .where(Transaction.tenant_id == tenant, Transaction.action.in_(("buy", "sell"))))
+    if period is not None:
+        query = query.where(Transaction.trade_date >= period[0], Transaction.trade_date <= period[1])
+    rows = db.execute(
+        query.order_by(Transaction.trade_date.desc(), Transaction.id.desc()).limit(_MAX_TRADES + 1)
+    ).all()
+    if not rows:
+        if period is not None:
+            text_out = (f"There are no saved buys or sells in {period[3]}." if english
+                        else f"No hay compras ni ventas guardadas de {period[2]}.")
+        else:
+            text_out = ("You have no saved buys or sells. You can import them in Portfolio." if english
+                        else "No tienes compras ni ventas guardadas. Puedes importarlas en Cartera.")
+        return _response(text_out, sources, "account_trades")
+    portfolios = db.scalar(select(func.count(Portfolio.id)).where(Portfolio.tenant_id == tenant)) or 0
+    if period is not None:
+        lines = [f"Your saved buys and sells in {period[3]}:" if english
+                 else f"Tus compras y ventas guardadas de {period[2]}:"]
+    else:
+        lines = ["Your latest saved buys and sells (most recent first):" if english
+                 else "Tus últimas compras y ventas guardadas (la más reciente primero):"]
+    for tx, ticker, portfolio_name in rows[:_MAX_TRADES]:
+        qty = _qty(float(tx.quantity or 0), english)
+        # Precio en la divisa guardada de la operación, tal cual (sin .upper(): GBp ≠ GBP).
+        price = (f"{_num_en(float(tx.price or 0))} {tx.currency}" if english
+                 else f"{num_es(float(tx.price or 0))} {tx.currency}")
+        where = f" ({portfolio_name})" if portfolios > 1 and portfolio_name else ""
+        name = ticker or "?"
+        if english:
+            verb = "bought" if tx.action == "buy" else "sold"
+            lines.append(f"- {_date_en(tx.trade_date)}: {verb} {qty} {name} at {price}{where}.")
+        else:
+            verb = "compra" if tx.action == "buy" else "venta"
+            lines.append(f"- {fecha_es(tx.trade_date)}: {verb} de {qty} {name} a {price}{where}.")
+    if len(rows) > _MAX_TRADES:
+        lines.append(f"Showing the last {_MAX_TRADES}; the rest are in Portfolio." if english
+                     else f"Te enseño las {_MAX_TRADES} últimas; el resto está en Cartera.")
+    return _response("\n".join(lines), sources, "account_trades")
+
+
 def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     """Respuesta de datos de la cuenta, o None si la pregunta no es de este módulo."""
     tenant = _tenant(db)
@@ -1448,6 +1540,8 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
         return _fees_answer(db, tenant, year, _tickers_in(question))
     if _asks_cash(text, question):
         return _cash_answer(db, tenant)
+    if _asks_trades(text, question):
+        return _trades_answer(db, tenant, text)
     if year is not None and _SALES.search(text):
         return _sales_answer(db, year, _tickers_in(question))
     # Solo el año en curso: un ejercicio pasado ya lo responde el bloque fiscal (#3952).
