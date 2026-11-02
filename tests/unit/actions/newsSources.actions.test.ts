@@ -19,9 +19,9 @@ const stubFetch = (routes: Array<[string, object]>) => {
         const u = String(url);
         calls.push(u);
         for (const [match, payload] of routes) {
-            if (u.includes(match)) return { ok: true, json: async () => payload } as Response;
+            if (u.includes(match)) return { ok: true, json: async () => payload, headers: { get: () => 'application/json' } } as unknown as Response;
         }
-        return { ok: false, status: 404, json: async () => ({}) } as Response;
+        return { ok: false, status: 404, json: async () => ({}), headers: { get: () => 'application/json' } } as unknown as Response;
     }));
     return calls;
 };

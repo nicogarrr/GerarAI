@@ -181,7 +181,7 @@ const DYNAMIC_KNOWN: Record<string, number> = {
     'components/export/ObsidianVaultCard.tsx': 1,
     'lib/actions/export.actions.ts': 1,
     'lib/actions/live-quotes.actions.ts': 1,
-    'lib/actions/newsSources.actions.ts': 5,
+    'lib/actions/newsSources.actions.ts': 3,
     'lib/actions/privacy.actions.ts': 2,
     'lib/actions/screener.actions.ts': 1,
     'lib/upstream/finnhub.ts': 1,

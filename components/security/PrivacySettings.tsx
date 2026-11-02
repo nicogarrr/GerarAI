@@ -1,5 +1,6 @@
 'use client';
 
+import { downloadBlob } from '@/lib/download-blob';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -29,14 +30,7 @@ export default function PrivacySettings({ email }: { email: string }) {
         try {
             const result = await exportAccountData();
             const blob = new Blob([result.content], { type: result.contentType });
-            const url = URL.createObjectURL(blob);
-            const anchor = document.createElement('a');
-            anchor.href = url;
-            anchor.download = result.filename;
-            document.body.appendChild(anchor);
-            anchor.click();
-            anchor.remove();
-            URL.revokeObjectURL(url);
+            downloadBlob(result.filename, blob);
             toast.success(t('security.privacy.exported'));
         } catch (error) {
             toast.error(t('security.privacy.exportFailed'), {

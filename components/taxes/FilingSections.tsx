@@ -1,5 +1,6 @@
 'use client';
 
+import { downloadBlob } from '@/lib/download-blob';
 import Link from 'next/link';
 import { useState } from 'react';
 import { RecordList } from '@/components/data/RecordViews';
@@ -42,14 +43,7 @@ function downloadFile720(content: string, fileName: string) {
     for (let index = 0; index < content.length; index += 1) {
         bytes[index] = content.charCodeAt(index) & 0xff;
     }
-    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = fileName;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
+    downloadBlob(fileName, new Blob([bytes], { type: 'application/octet-stream' }));
 }
 
 function Section({ title, description, icon, children }: {

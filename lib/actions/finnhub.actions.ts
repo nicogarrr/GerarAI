@@ -3,10 +3,9 @@
 import { mergeSpanishListings, searchSpanishListings } from '@/lib/market/spanish-search';
 import { classifyFichaCoverage, EXCHANGE_LABEL_BY_SUFFIX } from '@/lib/market/search-coverage';
 import { withFetchDeadline } from '@/lib/upstream/fetch-deadline';
-import { isFinanciallyRelevant } from '@/lib/newsRelevance';
 
 import { exactSymbolFirst, marketPriority, onePerIssuer } from '@/lib/market/search-results';
-import { getDateRange, validateArticle, formatArticle } from '@/lib/utils';
+import { getFinnhubOnlyNews } from '@/lib/news/finnhub-only-news';
 import { POPULAR_STOCK_SYMBOLS } from '@/lib/constants';
 import type { PopularStocksResult } from '@/lib/popular-stocks-loader';
 import { foldSearchQuery } from '@/lib/search-query';
@@ -121,89 +120,9 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
             return news;
         }
 
-        // Fallback to original Finnhub-only implementation
-        const range = getDateRange(5);
-        const token = env.FINNHUB_API_KEY;
-        if (!token) {
-            // Sin fuente de noticias configurada no es un fallo: es «no hay
-            // noticias». Antes se lanzaba, Inicio pintaba el aviso ámbar «No se
-            // pudieron cargar las noticias» con un «Reintentar» que no podía
-            // arreglar nada, y el error salía en la consola del navegador.
-            return [];
-        }
-        const cleanSymbols = (symbols || [])
-            .map((s) => s?.trim().toUpperCase())
-            .filter((s): s is string => Boolean(s));
-
-        const maxArticles = 6;
-
-        // If we have symbols, try to fetch company news per symbol and round-robin select
-        // Limitar a máximo 3 símbolos para evitar rate limiting
-        if (cleanSymbols.length > 0) {
-            const limitedSymbols = cleanSymbols.slice(0, 3); // Limitar a 3 símbolos
-
-            // Requests en paralelo: cada símbolo es independiente y fetchJSON
-            // ya cachea 60s, así que el coste pasa de suma a máximo de RTTs.
-            const perSymbolResults = await Promise.all(
-                limitedSymbols.map(async (sym) => {
-                    try {
-                        const url = `${FINNHUB_BASE_URL}/company-news?symbol=${encodeURIComponent(sym)}&from=${range.from}&to=${range.to}&token=${token}`;
-                        // Noticias siempre frescas - máximo 60 segundos de cache
-                        const articles = await fetchJSON<RawNewsArticle[]>(url, 60);
-                        return { sym, articles: (articles || []).filter(validateArticle) };
-                    } catch {
-                        // Silenciar errores 429 (rate limit): ese símbolo aporta []
-                        // y el resto continúa; el fallback a generales sigue abajo.
-                        return { sym, articles: [] as RawNewsArticle[] };
-                    }
-                }),
-            );
-            const perSymbolArticles: Record<string, RawNewsArticle[]> = {};
-            for (const { sym, articles } of perSymbolResults) {
-                perSymbolArticles[sym] = articles;
-            }
-
-            const collected: MarketNewsArticle[] = [];
-            // Round-robin up to 6 picks
-            for (let round = 0; round < maxArticles; round++) {
-                for (let i = 0; i < cleanSymbols.length; i++) {
-                    const sym = cleanSymbols[i];
-                    const list = perSymbolArticles[sym] || [];
-                    if (list.length === 0) continue;
-                    const article = list.shift();
-                    if (!article || !validateArticle(article)) continue;
-                    collected.push(formatArticle(article, true, sym, round));
-                    if (collected.length >= maxArticles) break;
-                }
-                if (collected.length >= maxArticles) break;
-            }
-
-            if (collected.length > 0) {
-                // Sort by datetime desc
-                collected.sort((a, b) => (b.datetime || 0) - (a.datetime || 0));
-                return collected.slice(0, maxArticles);
-            }
-            // If none collected, fall through to general news
-        }
-
-        // General market news fallback or when no symbols provided
-        // Noticias siempre frescas - máximo 60 segundos de cache
-        const generalUrl = `${FINNHUB_BASE_URL}/news?category=general&token=${token}`;
-        const general = await fetchJSON<RawNewsArticle[]>(generalUrl, 60);
-
-        const seen = new Set<string>();
-        const unique: RawNewsArticle[] = [];
-        for (const art of general || []) {
-            if (!validateArticle(art) || !isFinanciallyRelevant(art)) continue;
-            const key = `${art.id}-${art.url}-${art.headline}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            unique.push(art);
-            if (unique.length >= 20) break; // cap early before final slicing
-        }
-
-        const formatted = unique.slice(0, maxArticles).map((a, idx) => formatArticle(a, false, undefined, idx));
-        return formatted;
+        // Fallback a Finnhub directo: la misma lógica que la fuente Finnhub
+        // del agregador multi-fuente (lib/news/finnhub-only-news).
+        return await getFinnhubOnlyNews(symbols, 6);
     } catch (err) {
         console.error('getNews error:', err);
         throw new Error('Failed to fetch news');

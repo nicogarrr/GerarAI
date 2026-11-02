@@ -5,7 +5,7 @@
 
 'use server';
 
-import { validateArticle, formatArticle, getDateRange } from '@/lib/utils';
+import { getFinnhubOnlyNews } from '@/lib/news/finnhub-only-news';
 import { isFinanciallyRelevant } from '@/lib/newsRelevance';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { NewsSource } from '@/lib/types/vendorSources';
@@ -44,104 +44,15 @@ interface MarketauxArticle {
 
 export type { NewsSource };
 
-const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
-
 /**
- * Fetch news from Finnhub
+ * Fetch news from Finnhub: misma lógica que el fallback de getNews,
+ * compartida en lib/news/finnhub-only-news. El filtro de relevancia de las
+ * generales vive ahora en la fuente (el agregador lo seguía aplicando al
+ * final, así que el resultado es el mismo).
  */
 async function getNewsFinnhub(symbols?: string[], maxArticles = 6): Promise<MarketNewsArticle[]> {
     try {
-        const token = process.env.FINNHUB_API_KEY;
-        if (!token) return [];
-
-        const range = getDateRange(5);
-        const cleanSymbols = (symbols || [])
-            .map((s) => s?.trim().toUpperCase())
-            .filter((s): s is string => Boolean(s));
-
-        // If we have symbols, try company news
-        if (cleanSymbols.length > 0) {
-            const limitedSymbols = cleanSymbols.slice(0, 3);
-
-            // Requests en paralelo: cada símbolo es independiente (fetch con
-            // revalidate 60s). Mismo round-robin posterior, sin sleeps.
-            const perSymbolResults = await Promise.all(
-                limitedSymbols.map(async (sym) => {
-                    try {
-                        const url = `${FINNHUB_BASE_URL}/company-news?symbol=${encodeURIComponent(sym)}&from=${range.from}&to=${range.to}&token=${token}`;
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-                        const response = await fetch(url, {
-                            next: { revalidate: 60 },
-                            signal: controller.signal,
-                        });
-
-                        clearTimeout(timeoutId);
-
-                        if (response.ok) {
-                            const articles = await response.json();
-                            return { sym, articles: (articles || []).filter(validateArticle) as RawNewsArticle[] };
-                        }
-                        return { sym, articles: [] as RawNewsArticle[] };
-                    } catch {
-                        return { sym, articles: [] as RawNewsArticle[] };
-                    }
-                }),
-            );
-            const perSymbolArticles: Record<string, RawNewsArticle[]> = {};
-            for (const { sym, articles } of perSymbolResults) {
-                perSymbolArticles[sym] = articles;
-            }
-
-            const collected: MarketNewsArticle[] = [];
-            for (let round = 0; round < maxArticles; round++) {
-                for (let i = 0; i < cleanSymbols.length; i++) {
-                    const sym = cleanSymbols[i];
-                    const list = perSymbolArticles[sym] || [];
-                    if (list.length === 0) continue;
-                    const article = list.shift();
-                    if (!article || !validateArticle(article)) continue;
-                    collected.push(formatArticle(article, true, sym, round));
-                    if (collected.length >= maxArticles) break;
-                }
-                if (collected.length >= maxArticles) break;
-            }
-
-            if (collected.length > 0) {
-                collected.sort((a, b) => (b.datetime || 0) - (a.datetime || 0));
-                return collected.slice(0, maxArticles);
-            }
-        }
-
-        // General market news fallback
-        const generalUrl = `${FINNHUB_BASE_URL}/news?category=general&token=${token}`;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-        const response = await fetch(generalUrl, {
-            next: { revalidate: 60 },
-            signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) return [];
-
-        const general = await response.json();
-
-        const seen = new Set<string>();
-        const unique: RawNewsArticle[] = [];
-        for (const art of general || []) {
-            if (!validateArticle(art)) continue;
-            const key = `${art.id}-${art.url}-${art.headline}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            unique.push(art);
-            if (unique.length >= 20) break;
-        }
-
-        return unique.slice(0, maxArticles).map((a, idx) => formatArticle(a, false, '', idx));
+        return await getFinnhubOnlyNews(symbols, maxArticles);
     } catch (err) {
         console.error('Finnhub news error:', err);
         return [];

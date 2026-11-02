@@ -17,6 +17,7 @@
  * cuando cambia algo de verdad (seleccion, aislamiento, busqueda).
  */
 
+import { downloadBlob } from '@/lib/download-blob';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import Link from 'next/link';
@@ -74,15 +75,7 @@ const MAX_SUGGESTIONS = 8;
 const EMPTY_SIZE: Size = { width: 0, height: 0 };
 
 function download(filename: string, content: string, mime: string) {
-    const blob = new Blob([content], { type: `${mime};charset=utf-8` });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
+    downloadBlob(filename, new Blob([content], { type: `${mime};charset=utf-8` }));
 }
 
 export default function KnowledgeGraphCanvas({ graph }: Props) {
