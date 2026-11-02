@@ -343,23 +343,30 @@ def _sales_answer(db: Session, year: int, only: set[str]) -> ChatResponse:
         return _response(text, sources, "account_sales")
     lines = [f"In {year} you sold:" if english else f"En {year} vendiste:"]
     shown = 0
+    hidden = 0
     for bucket in realized:
         for sale in bucket.get("sales") or []:
             if shown >= 20:
-                break
+                # La lista se corta en 20, pero el total es de todas: se dice cuántas faltan.
+                hidden += 1
+                continue
             shown += 1
             qty = _qty(float(sale["quantity"]), english)
+            one = float(sale["quantity"]) == 1
             proceeds = sale.get("proceeds_base")
             gain = sale.get("gain_base")
             if english:
-                line = f"- {bucket['ticker']}: {qty} shares on {_fdate(sale['date'], True)}"
+                line = f"- {bucket['ticker']}: {qty} {'share' if one else 'shares'} on {_fdate(sale['date'], True)}"
                 line += f", for {_money(proceeds, 'EUR', english=True)}" if proceeds is not None else ""
                 line += f"; gain {_money(gain, 'EUR', signed=True, english=True)}" if gain is not None else "; gain: no reliable figure"
             else:
-                line = f"- {bucket['ticker']}: {qty} acciones el {_fdate(sale['date'], False)}"
+                line = f"- {bucket['ticker']}: {qty} {'acción' if one else 'acciones'} el {_fdate(sale['date'], False)}"
                 line += f", por {_money(proceeds, 'EUR')}" if proceeds is not None else ""
                 line += f"; ganancia {_money(gain, 'EUR', signed=True)}" if gain is not None else "; ganancia: sin dato fiable"
             lines.append(line + ".")
+    if hidden:
+        lines.append(f"… and {hidden} more sale{'s' if hidden != 1 else ''} (in Taxes)." if english
+                     else f"… y {hidden} venta{'s' if hidden != 1 else ''} más (en Impuestos).")
     total = sum(float(b["gain_base"]) for b in realized if b.get("gain_base") is not None)
     reliable = all(b.get("gain_base") is not None for b in realized)
     if reliable:
