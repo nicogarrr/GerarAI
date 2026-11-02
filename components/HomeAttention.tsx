@@ -22,10 +22,18 @@ export default function HomeAttention() {
     const [page, setPage] = useState(0);
     useEffect(() => {
         let active = true;
-        getHomeAttention().then(value => { if (active) setData(value); }).catch(() => {
-            if (active) setData({ thesis: { unavailable: true, items: [] }, dca: { unavailable: true, items: [] } });
-        });
-        return () => { active = false; };
+        // Esta tarjeta es secundaria y queda bajo el pliegue: diferimos su
+        // lectura un macrotask para que getHomeOverviewBundle (tarjeta
+        // Cartera, elemento LCP de /inicio) se encole antes. Next serializa
+        // las server actions de un cliente y este efecto, al ser de un hijo,
+        // corria antes que los de PersonalizedOverview: le ganaba la cola al
+        // bundle y retrasaba el LCP ~0,3 s (medido 31-oct en la VM).
+        const timer = setTimeout(() => {
+            getHomeAttention().then(value => { if (active) setData(value); }).catch(() => {
+                if (active) setData({ thesis: { unavailable: true, items: [] }, dca: { unavailable: true, items: [] } });
+            });
+        }, 0);
+        return () => { active = false; clearTimeout(timer); };
     }, [retry]);
     const items = [
         ...(data?.thesis.items ?? []).map(item => ({ key: `thesis-${item.id}`, symbol: item.symbol,
