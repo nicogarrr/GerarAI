@@ -317,7 +317,8 @@
     "kept": "Mantenida por la IA",
     "confidence": "Confianza {value}",
     "invalidation": "La invalidaría: {text}",
-    "notReviewed": "Sin revisión IA"
+    "notReviewed": "Sin revisión IA",
+    "loadError": "No se pudieron cargar las joyas."
   },
   "deepValue": {
     "na": "N/D",
@@ -332,7 +333,8 @@
     "points": "{value} ptos",
     "bookFy": "(libros FY{year})",
     "priceAsOf": "precio al {date}",
-    "dividendTtm": "Dividendo TTM"
+    "dividendTtm": "Dividendo TTM",
+    "loadError": "No se pudo cargar el cribado deep value."
   },
   "radar": {
     "regionGlobal": "Global",
@@ -397,7 +399,8 @@
     "colSinceEntry": "Desde entrada",
     "colHorizon": "A {days} días",
     "spyThrough": "SPY ({source}) con datos hasta {date}.",
-    "spyMissing": "Serie de SPY sin datos todavía: las columnas vs SPY saldrán cuando se ingiera."
+    "spyMissing": "Serie de SPY sin datos todavía: las columnas vs SPY saldrán cuando se ingiera.",
+    "loadError": "No se pudo cargar el histórico de selecciones."
   },
   "rebalance": {
     "emptyGroup": "Ningún valor en este grupo.",

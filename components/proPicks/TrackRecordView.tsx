@@ -96,7 +96,7 @@ export default function TrackRecordView() {
         setLoading(true);
         setError(null);
         const result = await getTrackRecord();
-        if ('error' in result) setError(result.error);
+        if ('error' in result) setError(t('propicks.trackRecord.loadError'));
         else setData(result);
         setLoading(false);
     };

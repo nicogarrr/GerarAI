@@ -317,7 +317,8 @@
     "kept": "Kept by the AI",
     "confidence": "Confidence {value}",
     "invalidation": "What would invalidate it: {text}",
-    "notReviewed": "No AI review"
+    "notReviewed": "No AI review",
+    "loadError": "Couldn't load the hidden gems."
   },
   "deepValue": {
     "na": "n/a",
@@ -332,7 +333,8 @@
     "points": "{value} pts",
     "bookFy": "(book FY{year})",
     "priceAsOf": "price as of {date}",
-    "dividendTtm": "Dividend TTM"
+    "dividendTtm": "Dividend TTM",
+    "loadError": "Couldn't load the deep value screen."
   },
   "radar": {
     "regionGlobal": "Global",
@@ -397,7 +399,8 @@
     "colSinceEntry": "Since entry",
     "colHorizon": "At {days} days",
     "spyThrough": "SPY ({source}) with data through {date}.",
-    "spyMissing": "The SPY series has no data yet: the vs-SPY columns will appear once it's ingested."
+    "spyMissing": "The SPY series has no data yet: the vs-SPY columns will appear once it's ingested.",
+    "loadError": "Couldn't load the picks track record."
   },
   "rebalance": {
     "emptyGroup": "There are zero stocks in this group.",
