@@ -173,7 +173,7 @@ def test_journal_lists_open_decisions_first_with_link(db):
     resp = asyncio.run(ChatService().answer(db, "¿Qué hay en mi diario de decisiones?", "portfolio", None))
     assert resp.llm_trace["provider_calls"] == 0
     assert resp.llm_trace["path"] == "decision_journal"
-    assert "1 abiertas de las últimas 2" in resp.answer
+    assert "1 abierta de las últimas 2" in resp.answer
     assert resp.answer.index("AAPL") < resp.answer.index("UBER")
     assert "comprar a 210,50 (abierta)" in resp.answer
     assert "Debe cumplirse: 1 condición(es)" in resp.answer
