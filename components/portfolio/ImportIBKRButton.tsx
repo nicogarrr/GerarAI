@@ -20,6 +20,7 @@ function noun(n: number, one: TranslationKey, many: TranslationKey, ti: TFunctio
     return ti(n === 1 ? one : many, { n: f.formatNumber(n, { maximumFractionDigits: 0 }) });
 }
 import { showErrorToast } from '@/lib/toast';
+import { identityWarningText } from '@/lib/portfolio/import-identity-warning';
 
 interface ImportIBKRButtonProps {
     userId: string;
@@ -117,7 +118,7 @@ export function notifyImportResult(result: ImportOutcome, ti: TFunction = esT, f
         return false;
     }
     toast.success(describeResult(result, ti, f));
-    if (result.identity_warning) toast.warning(result.identity_warning);
+    if (result.identity_warning) toast.warning(identityWarningText(result.identity_warning, ti));
     if (result.row_errors?.length) {
         toast.warning(
             ti('portfolio.importIbk.rowWarnings', {

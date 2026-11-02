@@ -322,6 +322,7 @@
     "fileTooBig": "The file is {size} and the maximum is {max}. Export a shorter period or split it into several files.",
     "importFailed": "The import did not complete. Check the file or the IBKR connection and try again.",
     "rowWarnings": "{rows}. First: {first}",
+    "identityWarning": "CSV without a trade identifier: rows are matched by symbol, action, quantity, price, date, fee and currency, keeping repeated rows from the file. Two partial files with identical trades cannot be told apart; use tradeID to import them without ambiguity.",
     "importing": "Importing IBKR...",
     "importCta": "Import IBKR",
     "importTitle": "Import portfolio from Interactive Brokers (Flex statement)",
