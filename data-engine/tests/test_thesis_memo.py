@@ -517,3 +517,44 @@ def test_memo_dates_use_web_short_spanish_format_not_iso(db):
     # La fecha del catalizador se conserva tal cual está persistida: la ficha
     # la muestra igual y el memo no reescribe datos.
     assert "- Próximos resultados (2026-11-05)" in memo
+
+
+def test_full_thesis_memo_in_english_keeps_stored_content(db):
+    company = _company(db)
+    thesis = _full_thesis(db, company.id)
+    memo = build_memo_markdown(db, company, thesis, language="en")
+
+    assert memo.startswith("# Thesis memo — AAPL (Apple)")
+    assert "Version 2 · status published · rating buy" in memo
+    assert "## Hypothesis" in memo and "## Executive summary" in memo
+    # El contenido persistido no se traduce: sale como se genero.
+    assert "La base instalada monetiza servicios a doble digito." in memo
+    assert "| Scenario | Value | Probability |" in memo
+    assert "| Bear | $150.00 | 20% |" in memo
+    assert "| Bull | $300.00 | 25% |" in memo
+    assert "Model price: $200.00 · Expected value: $235.00 · Margin of safety: 15.0%" in memo
+    assert "## Catalysts" in memo and "- Próximos resultados (2026-11-05)" in memo
+    assert "## Invalidation criteria" in memo
+    assert "Data confidence 82/100 · source coverage 74/100 · red-team 61/100 · valuation risk 35/100" in memo
+    assert "## Sections" in memo and "### Foso competitivo" in memo
+    assert "## Sources" in memo
+    assert "from stored version 2 (fingerprint fp-abc123)." in memo
+    assert memo.rstrip().endswith(
+        "Informational research document. It is NOT financial advice or a recommendation to buy or sell."
+    )
+    for spanish in ("Memo de tesis", "Versión", "Escenario", "Catalizadores", "Generado", "asesoramiento"):
+        assert spanish not in memo
+
+
+def test_sparse_thesis_memo_in_english_says_pending():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        company = _company(session)
+        thesis = ThesisVersion(company_id=company.id, version=1, status="draft", thesis_markdown="# t", executive_summary="")
+        session.add(thesis)
+        session.commit()
+        memo = build_memo_markdown(session, company, thesis, language="en", draft=True)
+    assert "status draft" in memo
+    assert "> Unpublished DRAFT." in memo
+    assert "_Pending._" in memo and "_Pendiente._" not in memo
