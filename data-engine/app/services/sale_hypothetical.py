@@ -41,9 +41,27 @@ _CURRENCY_MAP = {
     "$": "USD", "us$": "USD", "dolares": "USD", "dólares": "USD", "usd": "USD",
     "£": "GBP", "libras": "GBP", "gbp": "GBP",
 }
+_MONTHS = {
+    "enero": 1, "ene": 1, "febrero": 2, "feb": 2, "marzo": 3, "mar": 3, "abril": 4, "abr": 4,
+    "mayo": 5, "may": 5, "junio": 6, "jun": 6, "julio": 7, "jul": 7, "agosto": 8, "ago": 8,
+    "septiembre": 9, "setiembre": 9, "sep": 9, "sept": 9, "octubre": 10, "oct": 10,
+    "noviembre": 11, "nov": 11, "diciembre": 12, "dic": 12,
+}
+_MONTH = "|".join(sorted(_MONTHS, key=len, reverse=True))
+# «compré 5 acciones el 10 de marzo (de 2024) a 150 $»: la fecha puede ir entre
+# la cantidad y el precio. Antes no se leía el lote, o se tomaba el DÍA (10)
+# como cantidad.
+_LOT_WHEN = (
+    rf"(?:el\s+)?\d{{1,2}}\s+de\s+(?:{_MONTH})\.?(?:\s+(?:de|del)\s+\d{{4}})?"
+    rf"|(?:el\s+)?\d{{1,2}}[/-]\d{{1,2}}[/-]\d{{4}}|(?:el\s+)?\d{{4}}-\d{{2}}-\d{{2}}"
+    rf"|en\s+(?:{_MONTH})\.?(?:\s+(?:de|del)\s+\d{{4}})?"
+)
 _LOT_RE = re.compile(
     rf"(?i)(?<![\d.,])(?P<qty>{_NUM})\s*(?:acciones|t[ií]tulos|participaciones)?"
-    rf"(?:\s+(?:de\s+|en\s+)?[A-Za-z][\w.]*)?\s+(?:a|por|@)\s+(?P<total>un\s+total\s+de\s+)?(?:(?P<pre>{_CUR})\s*)?"
+    # «de Apple», «de Apple Inc»: hasta dos palabras de nombre (la 2.ª con mayúscula).
+    rf"(?:\s+(?:de\s+|en\s+)?[A-Za-z][\w.]*(?:\s+(?-i:[A-Z])[\w.]*)?)?"
+    rf"(?:\s+(?P<when>{_LOT_WHEN}))?"
+    rf"\s+(?:a|por|@)\s+(?P<total>un\s+total\s+de\s+)?(?:(?P<pre>{_CUR})\s*)?"
     rf"(?P<price>{_NUM})\s*(?P<cur>{_CUR})?"
 )
 _SALE_PRICE_RE = re.compile(
@@ -100,13 +118,6 @@ _SALE_SLASH_RE = re.compile(
 )
 _SALE_HALF_RE = re.compile(r"(?i)\bvend\w*\s+(?:la\s+)?mitad\b")
 
-_MONTHS = {
-    "enero": 1, "ene": 1, "febrero": 2, "feb": 2, "marzo": 3, "mar": 3, "abril": 4, "abr": 4,
-    "mayo": 5, "may": 5, "junio": 6, "jun": 6, "julio": 7, "jul": 7, "agosto": 8, "ago": 8,
-    "septiembre": 9, "setiembre": 9, "sep": 9, "sept": 9, "octubre": 10, "oct": 10,
-    "noviembre": 11, "nov": 11, "diciembre": 12, "dic": 12,
-}
-_MONTH = "|".join(sorted(_MONTHS, key=len, reverse=True))
 _DATE_DMY_WORDS = re.compile(rf"(?i)\b(\d{{1,2}})\s+de\s+({_MONTH})\.?\s+(?:de|del)\s+(\d{{4}})\b")
 _DATE_MY_WORDS = re.compile(rf"(?i)\b({_MONTH})\.?\s+(?:de|del)\s+(\d{{4}})\b")
 _DATE_NUMERIC = re.compile(r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b")
@@ -224,12 +235,23 @@ def _is_date_year(text: str, match: re.Match[str]) -> bool:
     )
 
 
+_DAY_OF_MONTH_RE = re.compile(rf"(?i)\s+de\s+(?:{_MONTH})\b")
+
+
+def _is_date_day(text: str, match: re.Match[str]) -> bool:
+    """«el 10 de marzo a 150 $»: el día de una fecha no es un lote de 10 acciones."""
+    return (
+        re.search(r"(?i)acciones|t[ií]tulos|participaciones", match.group(0)) is None
+        and _DAY_OF_MONTH_RE.match(text, match.end("qty")) is not None
+    )
+
+
 def parse_purchase_lots(text: str) -> list[HypoLot]:
     """Lotes de compra escritos en la pregunta («10 acciones a 150 $ el 3 de marzo de 2024»)."""
     lots: list[HypoLot] = []
     matches = [
         m for m in _LOT_RE.finditer(text or "")
-        if not _is_sale_clause(text, m.start()) and not _is_date_year(text, m)
+        if not _is_sale_clause(text, m.start()) and not _is_date_year(text, m) and not _is_date_day(text, m)
     ]
     for i, m in enumerate(matches):
         qty = parse_number(m.group("qty"))
@@ -240,10 +262,13 @@ def parse_purchase_lots(text: str) -> list[HypoLot]:
         # es el del lote entero; antes se tomaba como precio por acción (coste x7).
         if m.group("total") or _LOT_TOTAL_AFTER_RE.match(text, m.end()):
             price = price / qty
-        # La fecha va detrás del lote (hasta el siguiente) o justo delante.
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        after = text[m.end():min(end, m.end() + 60)]
-        trade_date, approx = _find_date(after)
+        # La fecha va entre cantidad y precio, detrás del lote (hasta el
+        # siguiente) o justo delante.
+        trade_date, approx = _find_date(m.group("when")) if m.group("when") else (None, False)
+        if trade_date is None:
+            end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+            after = text[m.end():min(end, m.end() + 60)]
+            trade_date, approx = _find_date(after)
         if trade_date is None:
             prev_end = matches[i - 1].end() if i > 0 else 0
             trade_date, approx = _find_date(text[max(prev_end, m.start() - 45):m.start()])
