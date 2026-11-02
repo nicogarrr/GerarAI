@@ -90,6 +90,8 @@
     "position": "Posición"
   },
   "values": {
+    "belowTarget": "{label} está {points} puntos por debajo del objetivo",
+    "aboveTarget": "{label} está {points} puntos por encima del objetivo",
     "yes": "Sí",
     "no": "No",
     "statusOk": "Completo",

@@ -188,6 +188,9 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
             buy: t('plan.values.buy'),
             sell: t('plan.values.sell'),
         };
+        // Detalle de la sugerencia (investment_plan_service): el backend lo manda en castellano.
+        const drift = locale === 'en' ? /^([\s\S]+) está (\S+) puntos por (debajo|encima) del objetivo$/.exec(cleanText) : null;
+        if (drift) return t(drift[3] === 'debajo' ? 'plan.values.belowTarget' : 'plan.values.aboveTarget', { label: drift[1], points: drift[2] });
         return statusLabels[text] ?? sector(cleanText.replace(/^ticker:/, tickerPrefix).replace(/^asset_class:Cash$/, cashKey));
     }
     const planMoney = (value: unknown, record: DataRecord) =>
