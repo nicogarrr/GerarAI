@@ -17,6 +17,7 @@ from app.models import (
     PositionDailySnapshot,
     ResearchAlert,
 )
+from app.services.number_format import format_number_es
 from app.services.review_alert_service import ReviewAlertService
 
 
@@ -31,6 +32,11 @@ def _emit(db, *, kind, key, title, message, metadata):
         channels=['in_app'], metadata={'source': '/portfolio', 'reason': kind,
             'orders_enabled': False, **metadata})
     return 1
+
+
+def _money_es(value: Decimal) -> str:
+    """Importe con dos decimales en formato español: -1234.5 -> «-1.234,50»."""
+    return f"{value:,.2f}".replace(",", "@").replace(".", ",").replace("@", ".")
 
 
 def review_portfolio_data(db) -> dict:
@@ -51,7 +57,7 @@ def review_portfolio_data(db) -> dict:
         key = f'{currency}:{cash.balance}'
         emitted += _emit(db, kind='negative_cash_record', key=key,
             title=f'Revisa la caja registrada en {currency}',
-            message=f'Hay un saldo de {cash.balance} {currency} fechado {cash.as_of.isoformat()} '
+            message=f'Hay un saldo de {_money_es(cash.balance)} {currency} fechado {cash.as_of.isoformat()} '
                 f'(fuente {cash.source}). Puede ser margen, un apunte pendiente o un dato antiguo: '
                 'no confirma deuda ni caja disponible hoy. Concílialo con tu broker antes de interpretar compras o el plan.',
             metadata={'currency': currency, 'recorded_balance': str(cash.balance),
@@ -96,9 +102,10 @@ def review_portfolio_data(db) -> dict:
         key = hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
         emitted += _emit(db, kind='above_saved_ticker_band', key=key,
             title=f'{ticker} supera la banda que guardaste en el plan',
-            message=f'En la foto del {snapshot.snapshot_date.isoformat()}, {ticker} pesa {current:.2f}% '
-                f'sobre patrimonio neto con caja ({snapshot.base_currency}). Tu objetivo guardado es '
-                f'{target_pct}% con banda de {band} puntos. Revisa el reparto y los datos; '
+            message=f'En la foto del {snapshot.snapshot_date.isoformat()}, {ticker} pesa '
+                f'{format_number_es(current)} % sobre patrimonio neto con caja ({snapshot.base_currency}). '
+                f'Tu objetivo guardado es {format_number_es(target_pct)} % con banda de '
+                f"{format_number_es(band)} punto{'' if band == 1 else 's'}. Revisa el reparto y los datos; "
                 'no es una orden de venta ni un límite de inversión recomendado.',
             metadata={**config, 'snapshot_id': snapshot.id, 'as_of': snapshot.snapshot_date.isoformat(),
                 'weight_pct': str(current), 'weight_basis': 'nav_with_cash',
