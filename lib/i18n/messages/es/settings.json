@@ -142,6 +142,15 @@
     "providerCustom": "Otro compatible con OpenAI",
     "saved": "Ajustes de IA guardados",
     "testFailed": "No se pudo comprobar tu clave. Revisa proveedor y clave API; si sigue fallando, vuelve a intentarlo más tarde.",
+    "testMessage": {
+      "timeout": "El proveedor no respondió en 5 segundos.",
+      "unreachable": "No se pudo conectar con el proveedor.",
+      "nonPublic": "La URL del proveedor apunta a una dirección no pública.",
+      "http": "El proveedor respondió HTTP {code}.",
+      "noModelList": "El proveedor respondió, pero sin una lista de modelos legible: no se pudo verificar el modelo.",
+      "modelMissing": "El modelo '{model}' no existe en este proveedor. Revisa el nombre exacto en su lista de modelos.",
+      "ok": "Conexión correcta."
+    },
     "formAria": "Configuración del modelo de IA",
     "billingTenant": "La clave y el coste son tuyos",
     "billingPlatform": "Coste de GerarAI",
