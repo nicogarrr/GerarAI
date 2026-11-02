@@ -15,6 +15,7 @@ import re
 import unicodedata
 from datetime import date, timedelta
 from decimal import Decimal
+from urllib.parse import quote
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -1227,6 +1228,94 @@ def _upcoming_earnings_answer(db: Session, tenant: int) -> ChatResponse:
     return _response("\n".join(lines), sources, "account_upcoming_earnings")
 
 
+# ------------------------------------------------- dividendos por cobrar
+
+_UPDIV_ES = re.compile(
+    r"\bproxim[oa]s?\s+dividendos?\b|\bdividendos?\s+(?:pendientes|por\s+cobrar)\b"
+    r"|\b(?:voy\s+a|me\s+van\s+a|vaya\s+a)\s+(?:cobrar|pagar|recibir|ingresar)\b"
+    r"|\bcuando\s+(?:cobro|me\s+pagan|recibo|me\s+ingresan)\b"
+)
+_UPDIV_EN = re.compile(
+    r"\b(?:upcoming|next)\s+dividends?\b"
+    r"|\b(?:will|am)\s+i\s+(?:get|receive|collect|be\s+paid)\b|\bam\s+i\s+going\s+to\s+(?:get|receive|collect)\b"
+    r"|\bwhen\s+(?:do|will)\s+i\s+(?:get|receive|collect)\b"
+)
+
+
+def _asks_upcoming_dividends(text: str, question: str) -> bool:
+    return bool((_UPDIV_ES.search(text) or _UPDIV_EN.search(text))
+                and re.search(r"\bdividend", text) and not _tickers_in(question))
+
+
+def _upcoming_dividends_answer(db: Session, tenant: int) -> ChatResponse:
+    """Dividendos declarados y aún sin pagar de tus posiciones abiertas (tabla guardada, sin proveedores)."""
+    from app.models import Company, DividendRecord, Position
+    from app.services.dividend_records import records_in_position_currency, resolve_yahoo_events
+
+    english = _english()
+    today = local_today()
+    sources: list[dict] = []
+    rows = db.execute(
+        select(Position, Company).join(Company, Company.id == Position.company_id)
+        .where(Position.tenant_id == tenant, Position.quantity > 0)
+    ).all()
+    if not rows:
+        return _response("You have no open positions, so there are no dividends to collect." if english
+                         else "No tienes posiciones abiertas, así que no hay dividendos por cobrar.",
+                         sources, "account_upcoming_dividends")
+    ids = sorted({company.id for _, company in rows})
+    records_by_company: dict[int, list] = {cid: [] for cid in ids}
+    for record in db.scalars(select(DividendRecord).where(
+        DividendRecord.tenant_id == tenant, DividendRecord.company_id.in_(ids),
+        # Sin pagar aún: pago futuro, o sin fecha de pago y ex-dividendo futuro.
+        ((DividendRecord.pay_date >= today) | (DividendRecord.pay_date.is_(None) & (DividendRecord.ex_date >= today))),
+    ).order_by(DividendRecord.ex_date)).all():
+        records_by_company[record.company_id].append(record)
+    payments, totals, without = [], {}, []
+    for position, company in sorted(rows, key=lambda row: row[1].ticker):
+        kept, _uncertain = resolve_yahoo_events(records_by_company[company.id])
+        records = records_in_position_currency(kept, position.currency)
+        if not records:
+            without.append(company.ticker)
+            continue
+        quantity = Decimal(str(position.quantity))
+        for record in records:
+            amount = Decimal(str(record.amount)) * quantity
+            totals[position.currency] = totals.get(position.currency, Decimal("0")) + amount
+            payments.append((record.pay_date or record.ex_date, company, record, quantity, amount))
+    if not payments:
+        return _response("None of your holdings has a declared dividend pending payment in the saved data. "
+                         "I haven't checked the provider live." if english else
+                         "Ninguna de tus posiciones tiene un dividendo declarado pendiente de pago en los datos "
+                         "guardados. No he consultado el proveedor en directo.",
+                         sources, "account_upcoming_dividends")
+    payments.sort(key=lambda item: (item[0], item[1].ticker))
+    lines = ["Declared dividends you still have to collect (gross, with the shares you hold today):" if english
+             else "Dividendos declarados que te quedan por cobrar (brutos, con las acciones que tienes hoy):"]
+    for _day, company, record, quantity, amount in payments:
+        shares = _qty(float(quantity), english)
+        per_share = _num_en(float(record.amount), 4).rstrip("0").rstrip(".") if english \
+            else num_es(float(record.amount), 4).rstrip("0").rstrip(",")
+        if english:
+            pay = f", paid {_date_en(record.pay_date)}" if record.pay_date else ", payment date not saved"
+            lines.append(f"- {company.ticker}: {_money(float(amount), record.currency, english=True)} "
+                         f"({per_share} {_symbol(record.currency)} × {shares}); ex-dividend {_date_en(record.ex_date)}{pay}")
+        else:
+            pay = f", pago el {fecha_es(record.pay_date)}" if record.pay_date else ", sin fecha de pago guardada"
+            lines.append(f"- {company.ticker}: {_money(float(amount), record.currency)} "
+                         f"({per_share} {_symbol(record.currency)} × {shares}); ex-dividendo el {fecha_es(record.ex_date)}{pay}")
+        sources.append(_source("dividend_record", record.id, f"{'Dividend' if english else 'Dividendo'} "
+                               f"{company.ticker} · {record.ex_date}", f"/research/{quote(company.ticker, safe='')}"))
+    total = " · ".join(_money(float(value), currency, english=english) for currency, value in sorted(totals.items()))
+    lines.append(f"Total: {total}.")
+    if without:
+        lines.append(f"No declared dividend pending: {', '.join(without)}." if english
+                     else f"Sin dividendo declarado pendiente: {', '.join(without)}.")
+    lines.append("You only collect it if you hold the shares before the ex-dividend date; withholding not deducted." if english
+                 else "Solo lo cobras si tienes las acciones antes de la fecha ex-dividendo; sin descontar retenciones.")
+    return _response("\n".join(lines), sources, "account_upcoming_dividends")
+
+
 def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     """Respuesta de datos de la cuenta, o None si la pregunta no es de este módulo."""
     tenant = _tenant(db)
@@ -1247,6 +1336,8 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
         return _alert_rules_answer(db, tenant)
     if _asks_upcoming_earnings(text, question):
         return _upcoming_earnings_answer(db, tenant)
+    if _asks_upcoming_dividends(text, question):
+        return _upcoming_dividends_answer(db, tenant)
     if _asks_plan(text, question):
         return _plan_answer(db, tenant, text)
     if _asks_return_ranking(text, question):

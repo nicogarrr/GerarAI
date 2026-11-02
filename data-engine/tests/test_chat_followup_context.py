@@ -298,5 +298,6 @@ def test_dividendos_cobro_es_pregunta_de_cartera(db):
     resp = asyncio.run(
         ChatService().answer(db, "¿cuándo cobro dividendos?", "portfolio", None, use_jev=False)
     )
-    assert resp.prompt_version == "brain-data-v1"
-    assert "dividendos guardados de tus posiciones" in resp.answer
+    # «¿Cuándo cobro…?» pregunta por lo pendiente de cobro de tus posiciones.
+    assert resp.llm_trace["path"] == "account_upcoming_dividends"
+    assert "dividendo declarado pendiente de pago" in resp.answer
