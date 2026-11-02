@@ -6,7 +6,13 @@ BlackRock sobre ASTS del 27-oct-2026). Hasta aqui la ingesta SEC de noticias
 filtraba 10-K/10-Q/8-K/20-F/6-K y el carril insider solo Form 4/4-A: estos
 filings eran invisibles para la app.
 
-Diseno propio, espejo de ``form4.py`` (cero dependencias nuevas, stdlib+httpx):
+Diseno propio, mismo transporte EDGAR que ``form4.py`` (cero dependencias
+nuevas, stdlib+httpx). Este conector nacio como "espejo" de form4.py con la
+logica copiada a mano; el transporte compartido vive ahora en
+``connectors/edgar_common.py`` (submissions JSON, cabeceras, backoff
+403/429/5xx, registro de salud) y el espejo es por construccion: mismo
+codigo importado, imposible de desalinear. Lo especifico de 13D/13G queda
+aqui:
 - submissions JSON de data.sec.gov para listar SC 13D/13G y enmiendas (/A) por
   CIK. EDGAR nombra el formulario de dos maneras segun la epoca: familia
   antigua ``SC 13D``/``SC 13G`` y familia nueva ``SCHEDULE 13D``/``SCHEDULE 13G``;
@@ -36,41 +42,25 @@ import httpx
 from defusedxml import ElementTree as DefusedET
 
 from app.core.errors import redact_secrets
-
-# Mismo throttle compartido de proceso que form4/form13f (ver base.py y la
-# nota de form4.py): un reloj propio permitiria disparar dos peticiones SEC a
-# la vez y la SEC devolveria 403 a todos los conectores.
-from app.services.connectors.base import SEC_MIN_INTERVAL_SECONDS, sec_throttle
-from app.services.connectors.form4 import default_headers
+from app.services.connectors import edgar_common
 from app.services.data_source_health import get_data_source_registry
 
-# Clave compartida con el resto de conectores SEC (sec.py, sec_edgar.py):
-# mismo proveedor, mismo circuito. 400/404 (CIK o documento inexistente) son
-# dato por emisor y NO degradan; 403/429/5xx/red/no-JSON SI.
-_REGISTRY_KEY = "sec_edgar"
+# Transporte EDGAR compartido (ver la docstring de cabecera): alias directos,
+# NO wrappers, para que la identidad sea la de edgar_common.
+SUBMISSIONS_URL = edgar_common.SUBMISSIONS_URL
+ARCHIVES_URL = edgar_common.ARCHIVES_URL
+MIN_INTERVAL_SECONDS = edgar_common.MIN_INTERVAL_SECONDS
+_throttle = edgar_common._throttle  # == base.sec_throttle
+default_headers = edgar_common.default_headers
+filing_index_url = edgar_common.filing_index_url
+RETRY_STATUSES = edgar_common.RETRY_STATUSES
+RETRY_BACKOFF_SECONDS = edgar_common.RETRY_BACKOFF_SECONDS
+_record_sec_outcome = edgar_common._record_sec_outcome
+_record_sec_http_failure = edgar_common._record_sec_http_failure
+_record_sec_transport_failure = edgar_common._record_sec_transport_failure
+_looks_like_xml = edgar_common._looks_like_xml
+resolve_user_agent = edgar_common.resolve_user_agent
 
-
-def _record_sec_outcome(registry, started: float) -> None:
-    registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
-
-
-def _record_sec_http_failure(registry, exc) -> None:
-    from app.services.connectors.sec_pacing import rate_limited
-
-    rate_limited(exc.response)
-    registry.record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
-
-
-def _record_sec_transport_failure(registry, exc: Exception) -> None:
-    registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
-
-
-SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
-ARCHIVES_URL = "https://www.sec.gov/Archives/edgar/data"
-
-MIN_INTERVAL_SECONDS = SEC_MIN_INTERVAL_SECONDS
-
-_throttle = sec_throttle
 
 # Formularios aceptados: las dos familias de EDGAR y sus enmiendas (/A).
 # Una enmienda corrige un filing previo; excluirla dejaba correcciones
@@ -89,16 +79,6 @@ FORMS_13DG: frozenset[str] = frozenset(
 )
 
 
-def _pad_cik(cik: str | int) -> str:
-    return str(cik).strip().zfill(10)
-
-
-def filing_index_url(cik: str | int, accession_number: str) -> str:
-    cik_number = str(int(str(cik).strip()))
-    accession = str(accession_number).replace("-", "")
-    return f"{ARCHIVES_URL}/{cik_number}/{accession}/"
-
-
 def recent_form13dg_filings(
     cik: str | int,
     *,
@@ -106,63 +86,14 @@ def recent_form13dg_filings(
     client: httpx.Client | None = None,
 ) -> list[dict]:
     """Filings SC 13D/13G (y /A) recientes desde el submissions JSON (sincrono)."""
-    url = SUBMISSIONS_URL.format(cik=_pad_cik(cik))
-    # Cabeceras ANTES del throttle (ver form4.py: preparar despues se comia
-    # parte del hueco entre peticiones, que es lo que la SEC mide).
-    headers = default_headers()
-    registry = get_data_source_registry()
-    started = time.perf_counter()
-    _throttle()
-    try:
-        if client is not None:
-            response = client.get(url, headers=headers)
-        else:
-            with httpx.Client(timeout=30, headers=headers) as owned:
-                response = owned.get(url)
-        response.raise_for_status()
-        payload = response.json()
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code in (400, 404):
-            raise  # CIK sin datos: dato por emisor, no fuente caida
-        _record_sec_http_failure(registry, exc)
-        raise
-    except httpx.TransportError as exc:
-        _record_sec_transport_failure(registry, exc)
-        raise
-    except ValueError:
-        registry.record_failure(_REGISTRY_KEY, "respuesta no JSON")
-        raise
-    _record_sec_outcome(registry, started)
-    recent = (payload.get("filings") or {}).get("recent") or {}
-    accessions = recent.get("accessionNumber", []) or []
-    cik_number = str(int(str(cik).strip()))
-    items: list[dict] = []
-
-    def _col(name: str, index: int):
-        values = recent.get(name, []) or []
-        return values[index] if index < len(values) else None
-
-    for index, accession in enumerate(accessions):
-        form = str(_col("form", index) or "").strip().upper()
-        if form not in FORMS_13DG:
-            continue
-        primary = _col("primaryDocument", index)
-        accession_nodash = str(accession).replace("-", "")
-        index_url = f"{ARCHIVES_URL}/{cik_number}/{accession_nodash}/"
-        items.append(
-            {
-                "form": form,
-                "accession_number": accession,
-                "filing_date": _col("filingDate", index),
-                "report_date": _col("reportDate", index),
-                "primary_document": primary,
-                "index_url": index_url,
-                "document_url": f"{index_url}{primary}" if primary else index_url,
-            }
-        )
-        if len(items) >= limit:
-            break
-    return items
+    return edgar_common.recent_filings(
+        cik,
+        forms=FORMS_13DG,
+        limit=limit,
+        client=client,
+        headers=default_headers(),
+        throttle=_throttle,
+    )
 
 
 _RENDERED_XSL_RE = re.compile(r"/xslschedule_13[dg]_x\d+/", re.IGNORECASE)
@@ -197,52 +128,9 @@ def _is_13dg_xml(text: str) -> bool:
     return root.tag.rsplit("}", 1)[-1] == "edgarSubmission"
 
 
-def _looks_like_xml(text: str) -> bool:
-    """XML con o sin declaracion `<?xml`; la version renderizada XSLT es HTML
-    (<!DOCTYPE html> / <html) y eso es lo unico que hay que descartar."""
-    head = text.lstrip()[:200].lower()
-    if head.startswith("<!doctype") or head.startswith("<html"):
-        return False
-    return head.startswith("<")
-
-
-RETRY_STATUSES = {403, 429, 500, 502, 503, 504}
-RETRY_BACKOFF_SECONDS = (2.0, 6.0)
-
-
 def _get_text(url: str, client: httpx.Client | None) -> str:
     """GET con backoff ante 403/429/5xx de la SEC (limite por IP): hasta 3 intentos."""
-    headers = default_headers()
-    attempt = 0
-    while True:
-        _throttle()
-        try:
-            if client is not None:
-                response = client.get(url, headers=headers)
-            else:
-                with httpx.Client(timeout=30, headers=headers) as owned:
-                    response = owned.get(url)
-        except httpx.TransportError as exc:
-            _record_sec_transport_failure(get_data_source_registry(), exc)
-            raise
-        from app.services.connectors.sec_pacing import rate_limited
-
-        rate_limited(response)
-        if getattr(response, "status_code", 200) in RETRY_STATUSES and attempt < len(RETRY_BACKOFF_SECONDS):
-            time.sleep(RETRY_BACKOFF_SECONDS[attempt])
-            attempt += 1
-            continue
-        registry = get_data_source_registry()
-        try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code in (400, 404):
-                raise  # documento inexistente: dato por emisor
-            _record_sec_http_failure(registry, exc)
-            raise
-        # Sin éxito aquí: un 200 no basta (puede ser un challenge HTML). El
-        # éxito lo registra el consumidor tras validar el formato.
-        return response.text
+    return edgar_common.get_text(url, client, headers=default_headers(), throttle=_throttle, sleep=time.sleep)
 
 
 def fetch_filing_document(
@@ -275,7 +163,9 @@ def fetch_filing_document(
             and _SGML_TYPE_RE.search(text) is None
             and _LEGACY_DOC_RE.search(text) is None
         ):
-            registry.record_failure(_REGISTRY_KEY, "200 sin documento 13D/G válido (parse failed)")
+            registry.record_failure(
+                edgar_common._REGISTRY_KEY, "200 sin documento 13D/G válido (parse failed)"
+            )
             raise ValueError("SC 13D/13G document is neither XML nor a recognizable 13D/G text")
         _record_sec_outcome(registry, started)
         return text
@@ -288,7 +178,7 @@ def fetch_filing_document(
         and _SGML_TYPE_RE.search(raw_text) is None
         and _LEGACY_DOC_RE.search(raw_text) is None
     ):
-        registry.record_failure(_REGISTRY_KEY, "200 sin documento 13D/G válido (parse failed)")
+        registry.record_failure(edgar_common._REGISTRY_KEY, "200 sin documento 13D/G válido (parse failed)")
         raise ValueError("SC 13D/13G raw document is rendered HTML too")
     _record_sec_outcome(registry, started)
     return raw_text

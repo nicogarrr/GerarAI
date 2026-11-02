@@ -17,6 +17,16 @@ Diseno propio para GerarAI (cero dependencias nuevas, solo stdlib + httpx):
   SEC limita por IP/proceso, y con un reloj por modulo los dos conectores se
   creerian libres a la vez.
 
+El transporte EDGAR (submissions JSON, cabeceras, backoff 403/429/5xx,
+registro de salud) vive en ``connectors/edgar_common.py``, compartido con
+``form13dg`` y ``form13f``: antes form13dg se documentaba como "espejo" de
+este modulo copiando la misma logica a mano; ahora el espejo es por
+construccion (mismo codigo importado) y no puede desalinearse. Los nombres
+publicos se reexportan aqui (alias) para no romper a los consumidores, y los
+wrappers inyectan los globales de ESTE modulo (``_throttle``, ``_sleep``,
+``default_headers``) en edgar_common para que los monkeypatch de los tests
+sigan actuando sobre form4.
+
 No se anade ninguna dependencia: NO tocar requirements.txt por esto.
 """
 
@@ -33,87 +43,35 @@ import httpx
 # XML externo (SEC EDGAR): defusedxml solo para PARSEAR.
 from defusedxml import ElementTree as DefusedET
 
-from app.core.config import get_settings
-
-# El ritmo de la SEC es un estado UNICO de proceso (ver connectors/base.py):
-# data.sec.gov limita por IP, no por modulo, asi que un reloj propio aqui
-# permitiria que un fetch 13F y un Form 4 disparasen juntos y la SEC devolviese
-# 403 a los dos. ``form13f`` comparte este mismo throttle.
-from app.services.connectors.base import SEC_MIN_INTERVAL_SECONDS, sec_throttle
+from app.services.connectors import edgar_common
 from app.services.data_source_health import get_data_source_registry
 
-# Clave compartida con el resto de conectores SEC (sec.py, sec_edgar.py):
-# mismo proveedor, mismo circuito. 400/404 (CIK o documento inexistente) son
-# dato por emisor y NO degradan; 403/429/5xx/red/no-JSON SI.
-_REGISTRY_KEY = "sec_edgar"
+# Transporte EDGAR compartido (ver la docstring de cabecera): alias directos,
+# NO wrappers, para que la identidad sea la de edgar_common y los imports
+# existentes (form13f, form13dg, tests) sigan funcionando sin cambios.
+SUBMISSIONS_URL = edgar_common.SUBMISSIONS_URL
+ARCHIVES_URL = edgar_common.ARCHIVES_URL
+MIN_INTERVAL_SECONDS = edgar_common.MIN_INTERVAL_SECONDS
+_throttle = edgar_common._throttle  # == base.sec_throttle (test_sec_throttle_shared)
+resolve_user_agent = edgar_common.resolve_user_agent
+default_headers = edgar_common.default_headers
+filing_index_url = edgar_common.filing_index_url
+RETRY_STATUSES = edgar_common.RETRY_STATUSES
+RETRY_BACKOFF_SECONDS = edgar_common.RETRY_BACKOFF_SECONDS
+_record_sec_outcome = edgar_common._record_sec_outcome
+_record_sec_http_failure = edgar_common._record_sec_http_failure
+_record_sec_transport_failure = edgar_common._record_sec_transport_failure
 
 
-def _record_sec_outcome(registry, started: float) -> None:
-    registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+def _sleep(seconds: float) -> None:
+    import time
+
+    time.sleep(seconds)
 
 
-def _record_sec_http_failure(registry, exc) -> None:
-    from app.services.connectors.sec_pacing import rate_limited
-
-    rate_limited(exc.response)
-    registry.record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
-
-
-def _record_sec_transport_failure(registry, exc: Exception) -> None:
-    registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
-
-
-SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
-ARCHIVES_URL = "https://www.sec.gov/Archives/edgar/data"
-
-# SEC fair-use: maximo 10 peticiones/segundo.
-MIN_INTERVAL_SECONDS = SEC_MIN_INTERVAL_SECONDS
-
-# Alias directo (no un wrapper) para que ``form4._throttle`` y
-# ``form13f._throttle`` sean el MISMO objeto y compartan estado por construccion.
-_throttle = sec_throttle
-
-
-BROWSER_USER_AGENT = "Mozilla/5.0 (compatible; GerarAI/0.1; +mailto:{contact}) GerarAI Research"
-DEFAULT_CONTACT = "contact@example.com"
-_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
-
-
-def resolve_user_agent() -> str:
-    """User-Agent tipo navegador con contacto.
-
-    La SEC bloquea con 403 los User-Agent de producto aunque lleven contacto
-    (verificado en prod: ``<producto>/0.1 <email>`` -> 403; UA tipo navegador ->
-    200). Misma politica que ``connectors/sec_edgar.py``: se envuelve el
-    contacto en un UA tipo navegador, salvo que el operador ya configure uno.
-    """
-    candidate = (get_settings().sec_user_agent or "").strip()
-    if candidate.startswith("Mozilla/"):
-        return candidate
-    match = _EMAIL_RE.search(candidate)
-    contact = match.group(0) if match else DEFAULT_CONTACT
-    # Env historico sin espacio ("<producto>/0.1email@..."): la version queda
-    # pegada al local-part del email; se retira un prefijo de version.
-    contact = re.sub(r"^\d+(\.\d+)+(?=\D)", "", contact)
-    return BROWSER_USER_AGENT.format(contact=contact)
-
-
-def default_headers() -> dict[str, str]:
-    return {
-        "User-Agent": resolve_user_agent(),
-        "Accept": "application/json, text/xml, */*",
-        "Accept-Encoding": "gzip, deflate",
-    }
-
-
-def _pad_cik(cik: str | int) -> str:
-    return str(cik).strip().zfill(10)
-
-
-def filing_index_url(cik: str | int, accession_number: str) -> str:
-    cik_number = str(int(str(cik).strip()))
-    accession = str(accession_number).replace("-", "")
-    return f"{ARCHIVES_URL}/{cik_number}/{accession}/"
+def _get_text(url: str, client: httpx.Client | None) -> str:
+    """GET con backoff ante 403/429/5xx de la SEC (limite por IP): hasta 3 intentos."""
+    return edgar_common.get_text(url, client, headers=default_headers(), throttle=_throttle, sleep=_sleep)
 
 
 def recent_form4_filings(
@@ -123,67 +81,16 @@ def recent_form4_filings(
     client: httpx.Client | None = None,
 ) -> list[dict]:
     """Filings Form 4 recientes desde el submissions JSON (sincrono)."""
-    url = SUBMISSIONS_URL.format(cik=_pad_cik(cik))
-    # Cabeceras ANTES del throttle: el sello del intervalo se fija justo antes de
-    # salir a la red. Preparar despues (el primer ``get_settings()`` cuesta
-    # ~15 ms) se comia parte del hueco y acortaba la separacion real entre
-    # peticiones, que es justo lo que la SEC mide.
-    headers = default_headers()
-    registry = get_data_source_registry()
-    started = time.perf_counter()
-    _throttle()
-    try:
-        if client is not None:
-            response = client.get(url, headers=headers)
-        else:
-            with httpx.Client(timeout=30, headers=headers) as owned:
-                response = owned.get(url)
-        response.raise_for_status()
-        payload = response.json()
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code in (400, 404):
-            raise  # CIK sin datos: dato por emisor, no fuente caida
-        _record_sec_http_failure(registry, exc)
-        raise
-    except httpx.TransportError as exc:
-        _record_sec_transport_failure(registry, exc)
-        raise
-    except ValueError:
-        registry.record_failure(_REGISTRY_KEY, "respuesta no JSON")
-        raise
-    _record_sec_outcome(registry, started)
-    recent = (payload.get("filings") or {}).get("recent") or {}
-    accessions = recent.get("accessionNumber", []) or []
-    cik_number = str(int(str(cik).strip()))
-    items: list[dict] = []
-
-    def _col(name: str, index: int):
-        values = recent.get(name, []) or []
-        return values[index] if index < len(values) else None
-
-    for index, accession in enumerate(accessions):
-        form = str(_col("form", index) or "").strip().upper()
-        # Form 4 y sus enmiendas (4/A). Las enmiendas corrigen un filing
-        # previo; excluirlas dejaba correcciones invisibles.
-        if form not in {"4", "4/A"}:
-            continue
-        primary = _col("primaryDocument", index)
-        accession_nodash = str(accession).replace("-", "")
-        index_url = f"{ARCHIVES_URL}/{cik_number}/{accession_nodash}/"
-        items.append(
-            {
-                "form": form,
-                "accession_number": accession,
-                "filing_date": _col("filingDate", index),
-                "report_date": _col("reportDate", index),
-                "primary_document": primary,
-                "index_url": index_url,
-                "document_url": f"{index_url}{primary}" if primary else index_url,
-            }
-        )
-        if len(items) >= limit:
-            break
-    return items
+    # Form 4 y sus enmiendas (4/A). Las enmiendas corrigen un filing previo;
+    # excluirlas dejaba correcciones invisibles.
+    return edgar_common.recent_filings(
+        cik,
+        forms={"4", "4/A"},
+        limit=limit,
+        client=client,
+        headers=default_headers(),
+        throttle=_throttle,
+    )
 
 
 _RENDERED_XSL_RE = re.compile(r"/xslF345X\d+/", re.IGNORECASE)
@@ -208,15 +115,6 @@ def raw_document_url(document_url: str) -> str:
     return urlunparse(parsed._replace(path=raw_path))
 
 
-def _looks_like_xml(text: str) -> bool:
-    """XML con o sin declaracion `<?xml`; la version renderizada XSLT es HTML
-    (<!DOCTYPE html> / <html) y eso es lo unico que hay que descartar."""
-    head = text.lstrip()[:200].lower()
-    if head.startswith("<!doctype") or head.startswith("<html"):
-        return False
-    return head.startswith("<")
-
-
 def _is_form4_xml(text: str) -> bool:
     """Parseo real: solo vale XML bien formado con raíz <ownershipDocument>
     (esquema F345). `<div>AccessDenied</div>` o `<?xml><broken` no pasan."""
@@ -225,51 +123,6 @@ def _is_form4_xml(text: str) -> bool:
     except ET.ParseError:
         return False
     return root.tag.rsplit("}", 1)[-1] == "ownershipDocument"
-
-
-RETRY_STATUSES = {403, 429, 500, 502, 503, 504}
-RETRY_BACKOFF_SECONDS = (2.0, 6.0)
-
-
-def _sleep(seconds: float) -> None:
-    import time
-
-    time.sleep(seconds)
-
-
-def _get_text(url: str, client: httpx.Client | None) -> str:
-    """GET con backoff ante 403/429/5xx de la SEC (limite por IP): hasta 3 intentos."""
-    headers = default_headers()
-    attempt = 0
-    while True:
-        _throttle()
-        try:
-            if client is not None:
-                response = client.get(url, headers=headers)
-            else:
-                with httpx.Client(timeout=30, headers=headers) as owned:
-                    response = owned.get(url)
-        except httpx.TransportError as exc:
-            _record_sec_transport_failure(get_data_source_registry(), exc)
-            raise
-        from app.services.connectors.sec_pacing import rate_limited
-
-        rate_limited(response)
-        if getattr(response, "status_code", 200) in RETRY_STATUSES and attempt < len(RETRY_BACKOFF_SECONDS):
-            _sleep(RETRY_BACKOFF_SECONDS[attempt])
-            attempt += 1
-            continue
-        registry = get_data_source_registry()
-        try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code in (400, 404):
-                raise  # documento inexistente: dato por emisor
-            _record_sec_http_failure(registry, exc)
-            raise
-        # Sin éxito aquí: un 200 no basta (puede ser un challenge HTML). El
-        # éxito lo registra el consumidor tras validar que el cuerpo es XML.
-        return response.text
 
 
 def fetch_filing_xml(
@@ -295,11 +148,11 @@ def fetch_filing_xml(
         return text
     raw_url = raw_document_url(document_url)
     if raw_url == document_url:
-        registry.record_failure(_REGISTRY_KEY, "200 sin XML válido (parse failed)")
+        registry.record_failure(edgar_common._REGISTRY_KEY, "200 sin XML válido (parse failed)")
         raise ValueError("Form 4 document is not XML and has no raw variant")
     raw_text = _get_text(raw_url, client)
     if not _is_form4_xml(raw_text):
-        registry.record_failure(_REGISTRY_KEY, "200 sin XML válido (parse failed)")
+        registry.record_failure(edgar_common._REGISTRY_KEY, "200 sin XML válido (parse failed)")
         raise ValueError("Form 4 raw document is not XML either")
     _record_sec_outcome(registry, started)
     return raw_text
