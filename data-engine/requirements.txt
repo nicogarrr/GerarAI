@@ -96,3 +96,6 @@ pywebpush>=2.0.0,<3
 
 # Anadidas por sync_requirements.py (estaban en pyproject, no aqui):
 defusedxml>=0.7.1,<0.9
+
+# Anadidas por sync_requirements.py (estaban en pyproject, no aqui):
+pyxirr>=0.10.8,<0.11
