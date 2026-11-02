@@ -15,7 +15,9 @@ import {
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { BOTTLENECK_TO_THEMES, basketName, bottleneckThemeName } from '@/lib/market/theme-bottleneck-map';
 import { NA, type Formatters } from '@/lib/format';
-import { getFormat, getT } from '@/lib/i18n/server';
+import { getFormat, getLocale, getT } from '@/lib/i18n/server';
+import type { Locale } from '@/lib/i18n/locale';
+import { bottleneckReasoningText, bottleneckText } from '@/lib/research/bottleneck-text';
 import type { TranslateFn } from '@/lib/i18n/translate';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -88,7 +90,7 @@ function SignalCard({ signal, minSources, t, fmt }: { signal: Awaited<ReturnType
   );
 }
 
-function DiscoveryCard({ item, t, fmt }: { item: DiscoveryView; t: TranslateFn; fmt: Formatters }) {
+function DiscoveryCard({ item, t, fmt, locale }: { item: DiscoveryView; t: TranslateFn; fmt: Formatters; locale: Locale }) {
   const known = item.ticker !== NA;
   return (
     <li className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
@@ -103,9 +105,9 @@ function DiscoveryCard({ item, t, fmt }: { item: DiscoveryView; t: TranslateFn; 
         ) : (
           <span className="text-base font-semibold text-gray-300">{t('bottlenecks.page.unidentified')}</span>
         )}
-        <span className="text-xs text-gray-500">{item.theme}</span>
+        <span className="text-xs text-gray-500">{bottleneckThemeName(item.theme, t)}</span>
         <Badge className="border-amber-500/50 text-amber-300" variant="outline">
-          {item.label}
+          {bottleneckText(item.label, locale)}
         </Badge>
         {!item.theme_detected ? (
           <Badge className="border-gray-600 text-gray-400" variant="outline">
@@ -128,7 +130,7 @@ function DiscoveryCard({ item, t, fmt }: { item: DiscoveryView; t: TranslateFn; 
           </Badge>
         ) : null}
       </div>
-      <p className="mt-2 text-sm leading-relaxed text-gray-300">{item.reasoning}</p>
+      <p className="mt-2 text-sm leading-relaxed text-gray-300">{bottleneckReasoningText(item.reasoning, locale)}</p>
       {item.evidence.length > 0 ? (
         <ul className="mt-3 space-y-1 border-t border-gray-800 pt-2">
           {item.evidence.map((evidence) => (
@@ -162,7 +164,7 @@ function DiscoveryCard({ item, t, fmt }: { item: DiscoveryView; t: TranslateFn; 
 
 export default async function CuellosPage({ searchParams }: PageProps) {
   const page = parsePage((await searchParams).pagina);
-  const [t, fmt] = await Promise.all([getT(), getFormat()]);
+  const [t, fmt, locale] = await Promise.all([getT(), getFormat(), getLocale()]);
   let bottlenecks: Awaited<ReturnType<typeof getBottlenecks>>;
   let discoveries: Awaited<ReturnType<typeof getBottleneckDiscoveries>>;
   try {
@@ -242,7 +244,7 @@ export default async function CuellosPage({ searchParams }: PageProps) {
           <>
             <ul className="grid gap-3 sm:grid-cols-2">
               {discoveries.items.map((item) => (
-                <DiscoveryCard item={item} key={item.id} t={t} fmt={fmt} />
+                <DiscoveryCard item={item} key={item.id} t={t} fmt={fmt} locale={locale} />
               ))}
             </ul>
             <nav aria-label={t('bottlenecks.page.pagerAria')} className="mt-4 flex items-center gap-2 text-sm">
@@ -269,8 +271,8 @@ export default async function CuellosPage({ searchParams }: PageProps) {
       </section>
 
       <footer className="border-t border-gray-800 pt-3 text-xs text-gray-500">
-        <p>{bottlenecks.method} · {bottlenecks.limitation}</p>
-        <p className="mt-1">{discoveries.note}</p>
+        <p>{bottleneckText(bottlenecks.method, locale)} · {bottleneckText(bottlenecks.limitation, locale)}</p>
+        <p className="mt-1">{bottleneckText(discoveries.note, locale)}</p>
       </footer>
     </main>
   );
