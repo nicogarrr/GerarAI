@@ -68,7 +68,18 @@
     "trigger": "Disparador: {trigger}",
     "mentalModels": "Modelos mentales",
     "whatIDontKnow": "Lo que no sé",
-    "textOnlyNote": "Búsqueda por texto. Prueba también términos del idioma original."
+    "textOnlyNote": "Búsqueda por texto. Prueba también términos del idioma original.",
+    "probabilityNote": "Estimación del modelo, no un dato.",
+    "disclaimer": "No es consejo financiero. Doctrina de la biblioteca, no datos actuales de empresas.",
+    "messages": {
+      "analysisUnavailable": "El análisis estructurado no está disponible ahora mismo. Estos son los fragmentos más relacionados de la biblioteca.",
+      "synthesisUnavailable": "Fragmentos encontrados. Síntesis no disponible.",
+      "notAnswered": "Los fragmentos encontrados no responden a esta pregunta.",
+      "modelNotApproved": "Fragmentos encontrados. Sintesis no disponible: el modelo configurado para la biblioteca no es un modelo aprobado (free verificado o suscripcion Go).",
+      "citationsRejected": "Fragmentos encontrados. El modelo respondio pero sus respuestas no superaron la verificacion de citas. Los fragmentos citados son literales y siguen siendo validos.",
+      "providerDown": "Fragmentos encontrados. Sintesis no disponible ahora mismo: el proveedor del modelo no respondio. Los fragmentos citados son literales y siguen siendo validos.",
+      "noFragments": "No hay fragmentos de la biblioteca para esta pregunta."
+    }
   },
   "panel": {
     "title": "Cerebro GerarAI",

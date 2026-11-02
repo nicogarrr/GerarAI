@@ -8,6 +8,7 @@ import { markdownComponents } from '@/components/research/ThesisMarkdown';
 import { type LibraryAnswer } from '@/lib/actions/knowledge-chat.actions';
 import { type CitedPoint } from '@/lib/knowledge/analysis';
 import { useT } from '@/lib/i18n/client';
+import { libraryText } from '@/lib/knowledge/library-text';
 
 type Citation = LibraryAnswer['answers'][number]['citation'];
 
@@ -45,19 +46,19 @@ function Analysis({ result }: { result: LibraryAnswer }) {
     <section><h3 className="text-sm font-semibold text-teal-300">{t('brain.library.whatWouldProveMeWrong')}</h3><div className="mt-2"><Cited point={a.error} /></div></section>
     <section><h3 className="text-sm font-semibold text-teal-300">{t('brain.library.scenarios')}</h3>
       <ul className="mt-2 flex flex-col gap-2">{a.escenarios.map((s, i) => <li key={i} className="text-sm"><strong>{s.nombre}</strong> · {s.probabilidad} %<span className="block text-gray-400">{t('brain.library.trigger', { trigger: s.disparador })}</span></li>)}</ul>
-      <p className="mt-1 text-xs text-gray-500">{a.probabilidades}</p></section>
+      <p className="mt-1 text-xs text-gray-500">{libraryText(a.probabilidades, t)}</p></section>
     <section><h3 className="text-sm font-semibold text-teal-300">{t('brain.library.mentalModels')}</h3>
       <ul className="mt-2 flex flex-col gap-3">{a.modelos.map((p, i) => <li key={i}><Cited point={p} /></li>)}</ul></section>
     <section><h3 className="text-sm font-semibold text-teal-300">{t('brain.library.whatIDontKnow')}</h3>
       <ul className="mt-2 list-disc pl-5 text-sm text-gray-300">{a.no_se.map((t, i) => <li key={i}>{t}</li>)}</ul></section>
-    <p className="text-xs text-amber-300">{a.aviso}</p>
+    <p className="text-xs text-amber-300">{libraryText(a.aviso, t)}</p>
   </div>;
 }
 
 export function BrainLibraryAnswer({ result }: { result: LibraryAnswer }) {
   const t = useT();
   return <div className="flex flex-col gap-4">
-    {result.message && <p className="text-sm text-gray-400">{result.message}</p>}
+    {result.message && <p className="text-sm text-gray-400">{libraryText(result.message, t)}</p>}
     {result.retrieval === 'solo_texto' && <p className="text-xs text-gray-500">{t('brain.library.textOnlyNote')}</p>}
     <Analysis result={result} />
     {result.answers.map((answer, index) => <article key={`${answer.citation.chunk_id}-${index}`} className="min-w-0 border-t border-gray-800 pt-3">
