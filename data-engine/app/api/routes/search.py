@@ -42,10 +42,11 @@ def universal_search(
             date_from=payload.date_from,
             date_to=payload.date_to,
             limit=payload.page_size,
+            offset=(payload.page - 1) * payload.page_size,
             include_vector=payload.include_vector,
         )
-        # Wrap in paginated response: search doesn't do SQL pagination,
-        # it returns top N results after ranking
+        # Paginación sobre la lista ya clasificada: el servicio devuelve la
+        # página pedida y el total de resultados clasificados.
         paginated = PaginatedResponse.create(
             items=result["results"],
             total=result["total"],

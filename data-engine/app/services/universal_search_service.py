@@ -108,6 +108,7 @@ class UniversalSearchService:
         date_from: date | None = None,
         date_to: date | None = None,
         limit: int = 20,
+        offset: int = 0,
         include_vector: bool = True,
     ) -> dict[str, Any]:
         tenant_id = db.info.get("tenant_id")
@@ -214,8 +215,13 @@ class UniversalSearchService:
             reverse=True,
         )
 
+        # `total` cuenta todo lo clasificado y `offset` salta las páginas ya
+        # vistas: antes la página 2 devolvía otra vez la 1 y el total era el
+        # tamaño de la página, así que nunca había «siguiente».
+        start = max(0, offset)
+        page_rows = ranked[start : start + max(1, min(limit, 100))]
         results = []
-        for rerank_score, item in ranked[: max(1, min(limit, 100))]:
+        for rerank_score, item in page_rows:
             tier = classify_source(item.source_type, item.source_url)
             results.append(
                 {
@@ -268,7 +274,7 @@ class UniversalSearchService:
                 "rrf_k": RRF_K,
                 "reranker": "financial_source_hierarchy_v1",
             },
-            "total": len(results),
+            "total": len(ranked),
             "results": results,
         }
 
