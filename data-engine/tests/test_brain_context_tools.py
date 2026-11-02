@@ -176,7 +176,7 @@ def test_journal_lists_open_decisions_first_with_link(db):
     assert "1 abierta de las últimas 2" in resp.answer
     assert resp.answer.index("AAPL") < resp.answer.index("UBER")
     assert "comprar a 210,50 (abierta)" in resp.answer
-    assert "Debe cumplirse: 1 condición(es)" in resp.answer
+    assert "Debe cumplirse: 1 condición." in resp.answer
     assert "recortar" in resp.answer
     assert "SECRETO" not in resp.answer
     assert resp.sources[0]["url"] == "/research/AAPL/decision-lessons"
