@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.core.i18n import generation_language
 from app.models import ResearchAlert
+from app.services.date_format import readable_date
 
 VERSION = "macro-event-v1"
 ET = ZoneInfo("America/New_York")
@@ -103,7 +104,7 @@ def _message(event: dict[str, Any], window: str, now: datetime, language: str = 
         # evento desconocido conserva su titulo tal cual (nunca se inventa).
         name = _TITLES_EN.get(str(event.get("kind")), event["title"])
         hour = f"{stamp} (New York time)" if stamp else "time not published by the source"
-        lines = [f"{name} on {event['date']}, {hour}."]
+        lines = [f"{name} on {readable_date(str(event['date']), 'en')}, {hour}."]
         if event.get("detail"):
             lines.append(f"{_DETAILS_EN.get(event['detail'], event['detail'])}.")
         source = event.get("source") or "unknown"
@@ -113,7 +114,7 @@ def _message(event: dict[str, Any], window: str, now: datetime, language: str = 
         return f"{name}: {when}"[:300], " ".join(lines)
     hora = f"{stamp} (hora de Nueva York)" if stamp else "hora no publicada por la fuente"
     title = f"{event['title']}: {when}"
-    lines = [f"{event['title']} el {event['date']}, {hora}."]
+    lines = [f"{event['title']} el {readable_date(str(event['date']), 'es')}, {hora}."]
     if event.get("detail"):
         lines.append(f"{event['detail']}.")
     lines.append(f"Fuente: {event.get('source', 'desconocida')} ({event.get('label', 'sin etiqueta')}). "

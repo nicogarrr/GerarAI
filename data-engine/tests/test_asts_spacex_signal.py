@@ -155,14 +155,14 @@ def test_alert_in_english_for_a_user_with_english_saved(db, monkeypatch):
         spanish = db.scalars(select(ResearchAlert).where(ResearchAlert.id != english.id)).one()
         assert english.title == "ASTS signal: SpaceX signs agreement with Verizon"
         assert english.message == (
-            "Article from publisher.example, detected by GDELT on 2026-10-09: SpaceX signs agreement with Verizon. "
+            "Article from publisher.example, detected by GDELT on Oct 9, 2026: SpaceX signs agreement with Verizon. "
             "Watch signal: if SpaceX closes deals with large carriers, the argument that AST's moat is its "
             "carrier agreements weakens. Check the source; the headline alone does not confirm the facts."
         )
         assert english.metadata_["language"] == "en"
         assert english.metadata_["date_label"] == "detected by GDELT"
         assert spanish.title == "Señal ASTS: SpaceX signs agreement with Verizon"
-        assert spanish.message.startswith("Artículo de publisher.example, fechado el 2026-10-09 por la fuente")
+        assert spanish.message.startswith("Artículo de publisher.example, fechado el 9 oct 2026 por la fuente")
         assert spanish.metadata_["date_label"] == "fechada por la fuente"
         assert "language" not in spanish.metadata_
     finally:
@@ -178,4 +178,4 @@ def test_message_date_is_madrid_day_not_utc(db):
     db.info["tenant_id"] = t1.id
     assert evaluate(db, now=NOW)["created"] == 1
     alert = db.scalars(select(ResearchAlert)).one()
-    assert "2026-10-09" in alert.message and "2026-10-08" not in alert.message
+    assert "9 oct 2026" in alert.message and "8 oct 2026" not in alert.message

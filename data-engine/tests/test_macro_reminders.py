@@ -190,12 +190,12 @@ def test_reminder_in_english_for_a_user_with_english_saved(db, monkeypatch):
         cpi, fomc = sorted(db.scalars(select(ResearchAlert)), key=lambda row: row.id)
         assert cpi.title == "US CPI (inflation): in about 20 h"
         assert cpi.message == (
-            "US CPI (inflation) on 2026-11-10, 08:30 (New York time). "
+            "US CPI (inflation) on Nov 10, 2026, 08:30 (New York time). "
             "Source: BLS (OFFICIAL). https://www.bls.gov/schedule/news_release/"
         )
         assert fomc.title == "FOMC meeting (rate decision): tomorrow"
         assert fomc.message.startswith(
-            "FOMC meeting (rate decision) on 2026-12-09, time not published by the source. "
+            "FOMC meeting (rate decision) on Dec 9, 2026, time not published by the source. "
             "With economic projections. Source: Federal Reserve (OFFICIAL)."
         )
         assert cpi.metadata_["language"] == "en"
@@ -219,3 +219,17 @@ def test_unknown_event_keeps_its_own_title_in_english(db, monkeypatch):
     finally:
         monkeypatch.delenv("I18N_GENERATION_ENABLED")
         get_settings.cache_clear()
+
+
+def test_message_date_is_readable_not_iso():
+    """Auditoría F1: una fecha ISO cruda en un texto visible es un bug de contenido.
+
+    El aviso decía «Reunión del FOMC el 2026-11-03, …» (y «on 2026-11-03» en inglés).
+    """
+    event = {"kind": "fomc", "date": "2026-11-03", "title": "Reunión del FOMC",
+             "source": "Reserva Federal", "label": "OFICIAL"}
+    now = datetime(2026, 11, 2, 12, tzinfo=UTC)
+    _title, body = mr._message(event, "day", now)
+    assert "el 3 nov 2026," in body and "2026-11-03" not in body
+    _title, body_en = mr._message(event, "day", now, "en")
+    assert "on Nov 3, 2026," in body_en and "2026-11-03" not in body_en

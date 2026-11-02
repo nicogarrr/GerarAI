@@ -7,6 +7,15 @@ describe('clean persisted news wrappers', () => {
     expect(copy.note).toContain('no es la fecha de publicación');
     expect(copy.note).toContain('el titular no confirma');
   });
+  // El backend escribe ahora la fecha legible (auditoría F1): «27 sept 2026», «Sep 27, 2026».
+  it.each([
+    'Artículo de Yahoo Finance, fechada el 27 sept 2026 por Yahoo Finance',
+    'Artículo de Reuters, detectado por GDELT el 9 oct 2026',
+    'Article from Yahoo Finance, dated Sep 27, 2026 by Yahoo Finance',
+    'Article from Reuters, detected by GDELT on Oct 9, 2026',
+  ])('strips the attribution with a readable date: %s', (prefix) => {
+    expect(changeHeadlineCopy(`${prefix}: Apple releases results.`).text).toBe('Apple releases results.');
+  });
   it('removes review boilerplate but preserves hypothesis and publisher headline dates', () => {
     expect(changeHeadlineCopy('Noticia material que requiere revisión de la tesis: ASTS Could Grow in 2027').text).toBe('ASTS Could Grow in 2027');
     expect(changeHeadlineCopy('Apple: 2026-10-29 outlook may change')).toEqual({text:'Apple: 2026-10-29 outlook may change',note:null});

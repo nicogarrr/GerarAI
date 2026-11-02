@@ -20,6 +20,7 @@ from app.core.i18n import generation_language
 from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.models import Company, NewsEvent, Position, ResearchAlert, WatchItem
+from app.services.date_format import readable_date
 from app.services.notification_service import record_in_app_delivery
 from app.services.tracked_news_alerts import _valid_source_url
 
@@ -104,6 +105,8 @@ def _date_label(language: str, gdelt: bool) -> str:
 
 def _copy(language: str, headline: str, source: str, day: str, gdelt: bool) -> tuple[str, str]:
     """Titulo y mensaje del aviso en el idioma guardado; el titular de la fuente no se traduce."""
+    # Fecha legible («3 nov 2026» / «Nov 3, 2026»): ISO crudo en un aviso es un bug (auditoría F1).
+    day = readable_date(day, language)
     if language == "en":
         date_phrase = f"detected by GDELT on {day}" if gdelt else f"dated {day} by the source"
         return (f"ASTS signal: {headline}"[:300],

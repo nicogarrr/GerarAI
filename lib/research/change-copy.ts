@@ -128,8 +128,10 @@ function localizedNewsNotes(text: string, locale: 'es' | 'en'): string {
 export function changeHeadlineCopy(summary: string, locale: 'es' | 'en' = 'es'): { text: string; note: string | null } {
     let text = localizedNewsNotes((summary ?? '').trim(), locale);
     text = text.replace(/^Noticia material que requiere revisión de la tesis:\s*/i, '');
-    text = text.replace(/^Artículo de [\s\S]*?,\s*(?:fechad[ao] el \d{4}-\d{2}-\d{2} por [^:]+|detectad[ao] por GDELT el \d{4}-\d{2}-\d{2}):\s*/i, '');
-    text = text.replace(/^Article from [\s\S]*?,\s*(?:dated \d{4}-\d{2}-\d{2} by [^:]+|detected by GDELT on \d{4}-\d{2}-\d{2}):\s*/i, '');
+    // La fecha llega en ISO (avisos antiguos) o legible: «27 sept 2026» / «Sep 27, 2026».
+    const day = String.raw`(?:\d{4}-\d{2}-\d{2}|\d{1,2} [a-z]{3,4}\.? \d{4}|[A-Z][a-z]{2} \d{1,2}, \d{4})`;
+    text = text.replace(new RegExp(String.raw`^Artículo de [\s\S]*?,\s*(?:fechad[ao] el ${day} por [^:]+|detectad[ao] por GDELT el ${day}):\s*`, 'i'), '');
+    text = text.replace(new RegExp(String.raw`^Article from [\s\S]*?,\s*(?:dated ${day} by [^:]+|detected by GDELT on ${day}):\s*`, 'i'), '');
     const warning = text.search(/(?:Revisa la fuente;\s*(?:la fecha de GDELT|el titular no confirma)|Check the source;\s*the (?:GDELT date|headline alone))/i);
     const note = warning >= 0 ? text.slice(warning).trim() : null;
     if (warning >= 0) text = text.slice(0, warning).trim();
