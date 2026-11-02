@@ -9,7 +9,7 @@ import { Modelo720Section } from '@/components/taxes/FilingSections';
 
 // El backend parte las frases en literales seguidos ("…" "…"): se juntan para
 // buscar cada frase traducida tal cual está en el código.
-const backend = ['tax_modelo720_service.py', 'tax_modelo720_file.py']
+const backend = ['tax_modelo720_service.py', 'tax_modelo720_file.py', 'tax_irpf_filing.py', 'tax_report_service.py', 'currency_ledger.py']
   .map((file) => readFileSync(`data-engine/app/services/${file}`, 'utf8'))
   .join('\n')
   .replace(/"\s*\n\s*f?"/g, '')
@@ -19,7 +19,7 @@ const SPANISH = /[áéíóúñ¿¡«»]|\b(?:de|del|los|las|por|una|para|sin|con
 describe('Modelo 720 en inglés: motivos, notas y avisos del motor fiscal', () => {
   it('cada frase traducida sigue existiendo en el backend (si cambia allí, este test avisa)', () => {
     const exact = Object.keys(data.exact);
-    expect(exact.length).toBeGreaterThan(30);
+    expect(exact.length).toBeGreaterThan(50);
     expect(exact.filter((es) => !backend.includes(es))).toEqual([]);
     const parts = (data.templates as [string, string][])
       .flatMap(([es]) => es.split(/\{\w+\}/))
@@ -47,6 +47,23 @@ describe('Modelo 720 en inglés: motivos, notas y avisos del motor fiscal', () =
       .toBe('The first acquisition date (mandatory, positions 415-422) is missing for: US0378331005, US5949181045. Provide the first acquisition dates (ISIN → date YYYYMMDD) in your declarant data.');
     expect(taxText('cash-USD', 'en')).toBe('USD cash');
     expect(taxText('Motivo nuevo con tax_declarant.custody', 'en')).toBe('Motivo nuevo con your declarant data');
+  });
+
+  it('IRPF y resumen del informe: motivos y notas con sus datos', () => {
+    expect(taxText('Mapeo de casillas verificado solo para la Renta 2025 (Orden HAC/277/2026 (Renta 2025)); el ejercicio 2026 usa otra orden ministerial y no se muestran números sin verificar.', 'en'))
+      .toBe('Box mapping verified only for the 2025 IRPF (Spanish income tax) return (Orden HAC/277/2026 (Renta 2025)); tax year 2026 uses a different ministerial order and unverified figures are not shown.');
+    expect(taxText('Tipo de pago especial (in lieu, return of capital): no es un dividendo ordinario y su tratamiento fiscal difiere; no entra en la deducción automática.', 'en'))
+      .toBe('Special payment type (in lieu, return of capital): not an ordinary dividend and its tax treatment differs; it is not part of the automatic deduction.');
+    expect(taxText('sin conversiones reales de divisa como entrada', 'en')).toBe('no real currency conversions as input');
+    expect(taxText('compra del 2025-03-04 (buy#12): supera la divisa conocida; falta cambio BCE del 2025-03-05; 3 movimientos en USD sin modelar (dividendos, intereses, retenciones u otros; activar fx_income_by_analogy para tratarlos por analogia)', 'en'))
+      .toBe('purchase on 2025-03-04 (buy#12): exceeds the known currency balance; ECB rate missing for 2025-03-05; 3 USD movements not modelled (dividends, interest, withholdings or others; turn on income by analogy to treat them by analogy)');
+    expect(taxText('dividendos/intereses como entradas: criterio por analogía, sin consulta', 'en')).toBe('dividends/interest as inflows: criterion by analogy, without a ruling');
+  });
+
+  it('el resumen del informe pasa por la traducción solo en inglés', () => {
+    const view = readFileSync('components/taxes/TaxesView.tsx', 'utf8');
+    expect(view).toContain("i18n.f.locale === 'en' ? taxText(value, 'en') : value");
+    expect(view).toMatch(/key === 'fiscal_disclaimer' \|\| key === 'currency_ledger_note'/);
   });
 
   it('en castellano no cambia nada', () => {
