@@ -26,13 +26,16 @@ from app.valuation.dcf_fcff import (
 )
 from app.valuation.engines.base import (
     MODEL_VERSION,
+    NET_DEBT_REQUIRED_REASON,
     ValuationContext,
     ValuationEngine,
     adr_ratio,
     apply_publication_blockers,
     default_growth,
     expected_value_or_nd,
+    insufficient_from_context,
     insufficient_result,
+    insufficient_with_moat,
     is_adr_without_ratio,
     margin_of_safety,
     normalize_scenario_display,
@@ -290,12 +293,9 @@ class PreRevenueScenarioEngine(ValuationEngine):
                 return self._indicative_partial(
                     company, snapshot, current_price, context.db, context.as_of
                 )
-            result = insufficient_result(
-                ticker=company.ticker,
-                model_type=company.valuation_model,
-                engine_key=self.key,
-                current_price=current_price,
-                missing_inputs=snapshot.missing_inputs
+            return insufficient_from_context(
+                context,
+                missing=snapshot.missing_inputs
                 + [
                     "deployment_curve_or_capacity_plan",
                     "funding_plan",
@@ -305,7 +305,6 @@ class PreRevenueScenarioEngine(ValuationEngine):
                     "Pre-revenue/speculative valuation requires a coherent financial snapshot "
                     "plus operational drivers. Generic bootstrap DCF is disabled."
                 ),
-                snapshot=snapshot,
                 extra_trace={
                     "required_operational_inputs": [
                         "satellites_or_capacity_deployed",
@@ -315,10 +314,6 @@ class PreRevenueScenarioEngine(ValuationEngine):
                     ]
                 },
             )
-            result["moat"] = empty_moat_framework(
-                company.company_type, company.factor_tags or [], company.special_risks or []
-            )
-            return result
 
         revenue = snapshot.value("revenue")
         shares = snapshot.value("shares_diluted")
@@ -340,19 +335,11 @@ class PreRevenueScenarioEngine(ValuationEngine):
             if margin is not None:
                 pass
             elif fcf is None or revenue <= 0:
-                result = insufficient_result(
-                    ticker=company.ticker,
-                    model_type=company.valuation_model,
-                    engine_key=self.key,
-                    current_price=current_price,
-                    missing_inputs=["normalized_fcf_or_fcf_margin"],
+                return insufficient_from_context(
+                    context,
+                    missing=["normalized_fcf_or_fcf_margin"],
                     reason="Cannot derive FCF margin for speculative scenario DCF.",
-                    snapshot=snapshot,
                 )
-                result["moat"] = empty_moat_framework(
-                    company.company_type, company.factor_tags or [], company.special_risks or []
-                )
-                return result
             else:
                 margin = fcf / revenue
 
@@ -374,24 +361,16 @@ class PreRevenueScenarioEngine(ValuationEngine):
             )
             if convergence is not None:
                 return convergence
-            result = insufficient_result(
-                ticker=company.ticker,
-                model_type=company.valuation_model,
-                engine_key=self.key,
-                current_price=current_price,
-                missing_inputs=["non_negative_fcf_margin"],
+            return insufficient_from_context(
+                context,
+                missing=["non_negative_fcf_margin"],
                 reason=(
                     f"El margen FCF reportado es {margin:.4f} (quema de caja): "
                     "un DCF FCFF daria un valor por acción negativo. No se "
                     "publica rango por acción sin un margen normalizado con "
                     "fuente."
                 ),
-                snapshot=snapshot,
             )
-            result["moat"] = empty_moat_framework(
-                company.company_type, company.factor_tags or [], company.special_risks or []
-            )
-            return result
 
         # Near-zero revenue speculative names: still allow but flag low confidence.
         growth = snapshot.value("revenue_growth")
@@ -411,22 +390,11 @@ class PreRevenueScenarioEngine(ValuationEngine):
             # Una biotech con EV 400M y 150M de caja no ingerida pasaria de
             # 2,00 a 1,25 EUR/accion sobre 200M de acciones (+60% de sobrevalor)
             # sin un solo fact detras. Mismo criterio que standard_dcf.
-            result = insufficient_result(
-                ticker=company.ticker,
-                model_type=company.valuation_model,
-                engine_key=self.key,
-                current_price=current_price,
-                missing_inputs=["net_debt"],
-                reason=(
-                    "net_debt is required for the equity bridge (EV - net debt) and "
-                    "must not be assumed to be zero."
-                ),
-                snapshot=snapshot,
+            return insufficient_from_context(
+                context,
+                missing=["net_debt"],
+                reason=NET_DEBT_REQUIRED_REASON,
             )
-            result["moat"] = empty_moat_framework(
-                company.company_type, company.factor_tags or [], company.special_risks or []
-            )
-            return result
 
         # Preliminary base for funding-gap dilution estimate.
         base_preview = run_dcf(
@@ -660,12 +628,11 @@ class PreRevenueScenarioEngine(ValuationEngine):
         }
         if not rejected:
             return None
-        result = insufficient_result(
-            ticker=company.ticker,
-            model_type=company.valuation_model,
+        return insufficient_with_moat(
+            company,
             engine_key=self.key,
             current_price=current_price,
-            missing_inputs=list(snapshot.missing_inputs) + ["non_negative_fcf_margin"],
+            missing=list(snapshot.missing_inputs) + ["non_negative_fcf_margin"],
             reason=(
                 "El FCF o margen FCF reportado es cero o negativo; un margen "
                 "inferido no puede sustituir ese dato. Sin valor por acción "
@@ -681,10 +648,6 @@ class PreRevenueScenarioEngine(ValuationEngine):
                 },
             },
         )
-        result["moat"] = empty_moat_framework(
-            company.company_type, company.factor_tags or [], company.special_risks or []
-        )
-        return result
 
     def _indicative_partial(self, company, snapshot, current_price: float, db=None, as_of=None) -> dict:
         """Rango indicativo cuando hay precio + acciones sin snapshot coherente.
@@ -726,12 +689,11 @@ class PreRevenueScenarioEngine(ValuationEngine):
             else None
         )
         if needs_inference and (inferred is None or float(inferred.value) <= 0):
-            result = insufficient_result(
-                ticker=company.ticker,
-                model_type=company.valuation_model,
+            return insufficient_with_moat(
+                company,
                 engine_key=self.key,
                 current_price=current_price,
-                missing_inputs=list(snapshot.missing_inputs)
+                missing=list(snapshot.missing_inputs)
                 + ["normalized_fcf_or_fcf_margin"],
                 reason=(
                     (
@@ -756,10 +718,6 @@ class PreRevenueScenarioEngine(ValuationEngine):
                     ],
                 },
             )
-            result["moat"] = empty_moat_framework(
-                company.company_type, company.factor_tags or [], company.special_risks or []
-            )
-            return result
 
         revenue = snapshot.value("revenue")
         revenue_assumed = revenue is None or revenue <= 0

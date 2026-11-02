@@ -91,9 +91,11 @@ from app.valuation.engines.base import (
     context_split_cutoff,
     default_terminal_growth,
     default_wacc,
-    insufficient_result,
     is_adr_without_ratio,
     margin_of_safety,
+)
+from app.valuation.engines.base import (
+    insufficient_from_context as _insufficient,
 )
 from app.valuation.fact_reference import (
     SourcedFact,
@@ -357,27 +359,6 @@ def _resolve_delta(
     if now is not None and before is not None:
         return now.value - before.value, "derived_from_two_instants"
     return None, "unavailable"
-
-
-def _insufficient(
-    context: ValuationContext, *, missing: list[str], reason: str, extra_trace: dict | None = None
-) -> dict:
-    result = insufficient_result(
-        ticker=context.company.ticker,
-        model_type=context.company.valuation_model,
-        engine_key=context.engine_key,
-        current_price=context.current_price,
-        missing_inputs=missing,
-        reason=reason,
-        snapshot=context.snapshot,
-        extra_trace=extra_trace,
-    )
-    result["moat"] = empty_moat_framework(
-        context.company.company_type,
-        context.company.factor_tags or [],
-        context.company.special_risks or [],
-    )
-    return result
 
 
 def _insufficient_from_error(context: ValuationContext, err: DdmInputError) -> dict:
