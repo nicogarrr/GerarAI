@@ -283,7 +283,17 @@
     "basisPrefix": "Precio {source} · ",
     "basisSuffix": " · {date} · tesis v{thesisVersion} ({thesisStatus})",
     "modelSuffix": " · modelo v{version}",
-    "assumptionsTitle": "Supuestos"
+    "assumptionsTitle": "Supuestos",
+    "excludedReason": {
+      "noThesis": "Sin tesis publicada vigente: excluida de la previsión.",
+      "noThesisDraft": "Sin tesis publicada vigente (hay borrador sin publicar): excluida de la previsión.",
+      "adrWithoutListedValues": "ADR sin valores por acción cotizada: comparación con el precio no verificada (N/D).",
+      "currencyMismatch": "Moneda de la posición distinta de la moneda de cotización de la compañía: comparación sin conversión verificada (N/D).",
+      "basisUnverified": "Base de valoración no verificada (tesis sin value_per_share_basis del motor): comparación con el precio N/D, nunca asumida.",
+      "noComputableIntrinsic": "Tesis sin valores intrínsecos computables.",
+      "noBaseValue": "Sin valor en moneda base (conversión N/D): no se suma a la cartera.",
+      "valuationHold": "Valoración pendiente: {reason}."
+    }
   },
   "importIbk": {
     "nounPositionOne": "{n} posición",
