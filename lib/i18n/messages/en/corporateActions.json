@@ -32,7 +32,8 @@
   "dividend": {
     "base": "Dividend of {amount} per share",
     "payDate": " · payment {date}",
-    "adjusted": " · amount adjusted for splits"
+    "adjusted": " · amount adjusted for splits",
+    "uncertain": "Uncertain amount: {amounts} {currency} on the same ex-date"
   },
   "toast": {
     "invalidId": "The corporate action does not have a valid identifier",
