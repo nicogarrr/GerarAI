@@ -168,3 +168,15 @@ def test_sell_a_third_sells_a_third_not_everything(en):
     resp = _ask(en, "How much tax would I pay if I sell a third of my UBER?")
     assert resp.llm_trace["path"] == "portfolio_sale_tax"
     assert resp.answer.startswith("If you sold 10 of your 30 UBER shares today")
+def test_sell_some_of_my_shares_at_a_price_in_english():
+    """«sell 10 of my 20 shares at $30»: el precio dado se perdía y se usaba la cotización."""
+    assert _sale_question_es("if I sell 10 of my 30 shares at $30") == "if I vendo 10 de mis 30 acciones a $30"
+
+
+def test_sell_some_of_my_shares_uses_the_given_price(en):
+    resp = _ask(en, "How much tax would I pay if I sell 10 of my 30 UBER shares at 90 €?")
+    assert resp.llm_trace["path"] == "portfolio_sale_tax"
+    assert resp.answer.startswith(
+        "If you sold 10 of your 30 UBER shares today (data as of Oct 30, 2026): value 900.00 €, cost 500.00 € "
+        "(sale price given: 90.00 €)"
+    )
