@@ -322,6 +322,7 @@
     "fileTooBig": "El fichero pesa {size} y el máximo es {max}. Exporta un periodo más corto o divídelo en varios ficheros.",
     "importFailed": "La importación no se completó. Revisa el fichero o la conexión con IBKR e inténtalo de nuevo.",
     "rowWarnings": "{rows}. Primera: {first}",
+    "identityWarning": "CSV sin identificador de operación: se comparan símbolo, acción, cantidad, precio, fecha, comisión y divisa, conservando las repeticiones del archivo. Dos archivos parciales con operaciones idénticas no se pueden distinguir; usa tradeID para importarlos sin ambigüedad.",
     "importing": "Importando IBKR...",
     "importCta": "Importar IBKR",
     "importTitle": "Importar cartera desde Interactive Brokers (Flex statement)",
