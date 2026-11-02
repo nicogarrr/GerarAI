@@ -81,6 +81,16 @@ def _read_dates(raw) -> dict[str, str]:
     return out
 
 
+def _shown(key: object, limit: int = 40) -> str:
+    """Clave tal como se repite en un error: recortada si es desmesurada.
+
+    Un ISIN o una partida pegados mal (100k caracteres) volvían enteros en el
+    mensaje de error, que se pinta en pantalla.
+    """
+    text = str(key)
+    return text if len(text) <= limit else text[:limit] + "…"
+
+
 def _partida(key: str) -> str:
     key = str(key).strip()
     return "cash:" + key[5:].upper() if key.lower().startswith("cash:") else key.upper()
@@ -158,7 +168,7 @@ def write(db: Session, payload: dict) -> dict:
             for key, country in raw.items():
                 partida = _partida(key)
                 if not _PARTIDA.match(partida) or partida not in known:
-                    errors.append(f"Partida desconocida: {key}")
+                    errors.append(f"Partida desconocida: {_shown(key)}")
                     continue
                 value = str(country or "").strip().upper()
                 if not value:
@@ -184,7 +194,7 @@ def write(db: Session, payload: dict) -> dict:
             for key, entity in raw.items():
                 partida = _partida(key)
                 if partida not in known:
-                    errors.append(f"Partida desconocida: {key}")
+                    errors.append(f"Partida desconocida: {_shown(key)}")
                 elif not entity or not any(str(v or "").strip() for v in entity.values()):
                     merged_entities.pop(partida, None)
                 else:
@@ -215,7 +225,7 @@ def write(db: Session, payload: dict) -> dict:
                 isin = _partida(key)
                 text = str(value or "").strip()
                 if isin not in known or not _ISIN.match(isin):
-                    errors.append(f"ISIN desconocido: {key}")
+                    errors.append(f"ISIN desconocido: {_shown(key)}")
                 elif not text:
                     merged_dates.pop(isin, None)
                 else:
