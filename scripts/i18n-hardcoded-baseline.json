@@ -135,6 +135,7 @@
   "lib/research/thesis-text.ts": 5,
   "lib/research/ticker-commands.ts": 2,
   "lib/research/valuation-display.ts": 8,
+  "lib/research/valuation-summary.ts": 14,
   "lib/research/zip-proxy.ts": 2,
   "lib/screener-metrics.ts": 4,
   "lib/taxes/humanize-text.ts": 24,
