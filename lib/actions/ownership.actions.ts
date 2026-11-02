@@ -2,11 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { normalizeResearchBody, researchIdentityHeaders } from '@/lib/auth/research-identity';
-import { RESEARCH_TIMEOUTS, requestSignal } from '@/lib/research/client';
-import { ExternalAPIError } from '@/lib/types/errors';
-
-const BACKEND_URL = process.env.FMP_BACKEND_URL ?? 'http://localhost:8000';
+import { researchRequest } from '@/lib/research/client';
 
 export type OwnershipManager = {
   cik: string;
@@ -58,42 +54,12 @@ export type ManagerHoldings = {
   provenance?: OwnershipProvenance | null;
 };
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  try {
-    const normalized = await normalizeResearchBody(init?.body ?? null);
-    const identity = await researchIdentityHeaders({
-      method: init?.method ?? 'GET',
-      path,
-      body: normalized.body ?? null,
-    });
-    const response = await fetch(`${BACKEND_URL}${path}`, {
-      ...init,
-      body: normalized.body ?? undefined,
-      cache: 'no-store',
-      // Sin timeout una lectura lenta del engine dejaba la página colgada en
-      // silencio; respeta la señal del caller si la hay (mismo patrón que
-      // lib/research/client.ts).
-      signal: requestSignal(init?.signal, RESEARCH_TIMEOUTS.GLOBAL_MS),
-      headers: {
-        ...identity,
-        ...(normalized.contentType ? { 'Content-Type': normalized.contentType } : {}),
-        ...init?.headers,
-      },
-    });
-    if (!response.ok) throw new ExternalAPIError(`Research API ${response.status}: ${path}`, 'research-api');
-    return (await response.json()) as T;
-  } catch (error) {
-    if (error instanceof ExternalAPIError) throw error;
-    throw new ExternalAPIError(`Research API request failed: ${path}`, 'research-api', error);
-  }
-}
-
 export async function getOwnershipManagers(): Promise<{ managers: OwnershipManager[]; limitations: string[] }> {
-  return requestJson<{ managers: OwnershipManager[]; limitations: string[] }>('/api/ownership/managers');
+  return researchRequest<{ managers: OwnershipManager[]; limitations: string[] }>('/api/ownership/managers');
 }
 
 export async function getManagerHoldings(cik: string): Promise<ManagerHoldings> {
-  return requestJson<ManagerHoldings>(`/api/ownership/managers/${encodeURIComponent(cik)}/holdings`);
+  return researchRequest<ManagerHoldings>(`/api/ownership/managers/${encodeURIComponent(cik)}/holdings`);
 }
 
 export type ManagerChangeRow = {
@@ -122,7 +88,7 @@ export type ManagerChanges = {
 };
 
 export async function getManagerChanges(cik: string): Promise<ManagerChanges> {
-  return requestJson<ManagerChanges>(`/api/ownership/managers/${encodeURIComponent(cik)}/changes`);
+  return researchRequest<ManagerChanges>(`/api/ownership/managers/${encodeURIComponent(cik)}/changes`);
 }
 
 export interface OwnershipSyncResult {
@@ -130,7 +96,7 @@ export interface OwnershipSyncResult {
 }
 
 export async function syncOwnershipManagers(): Promise<OwnershipSyncResult> {
-    const result = await requestJson<OwnershipSyncResult>('/api/ownership/managers/sync', { method: 'POST' });
+    const result = await researchRequest<OwnershipSyncResult>('/api/ownership/managers/sync', { method: 'POST' });
     revalidatePath('/ownership');
     return result;
 }

@@ -16,10 +16,6 @@ const { fetchMock, normalizeResearchBody, researchIdentityHeaders, revalidatePat
 }));
 vi.stubGlobal('fetch', fetchMock);
 vi.mock('@/lib/auth/research-identity', () => ({ normalizeResearchBody, researchIdentityHeaders }));
-vi.mock('@/lib/research/client', () => ({
-    RESEARCH_TIMEOUTS: { GLOBAL_MS: 15000 },
-    requestSignal: (s: unknown) => s ?? undefined,
-}));
 vi.mock('next/cache', () => ({ revalidatePath }));
 
 import {
