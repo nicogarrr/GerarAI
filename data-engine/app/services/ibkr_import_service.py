@@ -1367,6 +1367,12 @@ _FALLBACK_ID_FIELDS = {
         "accountId", "conid", "symbol", "type", "amount", "netCash",
         "dateTime", "date", "settleDate", "currency", "description",
     ),
+    # Dividendo que llega como acción corporativa (DIV/PD/PI): sin id, cada
+    # reimportación lo volvía a apuntar.
+    "CorporateAction": (
+        "accountId", "conid", "symbol", "type", "amount", "proceeds", "netCash",
+        "dateTime", "date", "reportDate", "currency", "description",
+    ),
 }
 
 
@@ -2053,6 +2059,12 @@ class IBKRImportService:
                         "CorporateAction", _attr(element, "symbol", "underlyingSymbol"), element, raw_date,
                     ))
                     continue
+                if not external_id:
+                    external_id = _fallback_external_id(element, fallback_counts)
+                    if _fallback_already_imported(
+                        db, element, external_id, _date(raw_date), fallback_adopted
+                    ):
+                        continue
                 symbol = _attr(element, "symbol", "underlyingSymbol")
                 company_id = None
                 if symbol:
