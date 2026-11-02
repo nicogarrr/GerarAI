@@ -31,9 +31,9 @@ describe('Paper trading read-only loading and local mocked feed', () => {
         expect(screen.queryByRole('button')).not.toBeInTheDocument();
     });
     it('respects an explicit action error and does not interpret it as an empty portfolio', async () => {
-        mocks.load.mockResolvedValue({ ...empty(), error: 'Sin acceso' });
+        mocks.load.mockResolvedValue({ ...empty(), error: 'No se pudo cargar la cartera simulada.' });
         render(<PaperTradingView />);
-        expect(await screen.findByRole('alert')).toHaveTextContent('Sin acceso');
+        expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar la cartera simulada.');
         expect(screen.queryByText(/Sin propuestas del modelo/)).not.toBeInTheDocument();
     });
     it.each([false, true])('ignores late response after unmount, rejected=%s', async rejected => {
