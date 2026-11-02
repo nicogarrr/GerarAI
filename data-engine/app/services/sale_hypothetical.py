@@ -99,6 +99,14 @@ _SALE_QTY_RE = re.compile(
     # «vendo 15 %», «2 tercios», «1/3»: parte de la posición, no acciones.
     r"(?![\d.,]*\s*(?:%|por\s*ciento|/\s*\d|tercios\b|cuartos\b))"
 )
+# «vendo a 30 € 10 acciones»: la cantidad DESPUÉS del precio (antes no se leía
+# y se vendía toda la posición). Solo con «acciones/títulos/participaciones», no
+# seguida de su propio precio (eso es un lote) y antes de cualquier «compré».
+_SALE_QTY_AFTER_RE = re.compile(
+    rf"(?i)(?<![\d.,])(?P<qty>{_NUM})\s+(?:acciones|t[ií]tulos|participaciones)\b"
+    r"(?!\s+(?:a|por|@)\s*[\d$€])"
+)
+_SALE_CLAUSE_END_RE = re.compile(r"(?i)\b(?:compr\w*|adquir\w*)\b")
 # «vendo el 50 %», «un 20 por ciento»: parte de la posición, no una cantidad.
 _SALE_PCT_RE = re.compile(
     rf"(?i)\bvend\w*\s+(?:(?:solo|s[oó]lo|el|un|hoy|ahora)\s+)*(?P<pct>{_NUM})\s*(?:%|por\s*ciento)"
@@ -353,6 +361,15 @@ def _sale_quantity(text: str, held: Decimal) -> Decimal:
         asked = parse_number(m.group("qty"))
         if asked is not None:
             return asked
+    verb = re.search(r"(?i)\bvend\w*", text)
+    if verb:
+        clause = text[verb.end():]
+        end = _SALE_CLAUSE_END_RE.search(clause)
+        after = _SALE_QTY_AFTER_RE.search(clause[: end.start()] if end else clause)
+        if after:
+            asked = parse_number(after.group("qty"))
+            if asked is not None:
+                return asked
     return held
 
 
