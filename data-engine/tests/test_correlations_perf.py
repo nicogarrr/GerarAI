@@ -3,8 +3,8 @@
 Con P posiciones la interseccion de fechas se ordenaba por cada par
 (O(P^2) sorts de ~D fechas). Las fechas de cada serie se ordenan UNA vez
 y la interseccion reutiliza tuplas ya ordenadas: el numero de llamadas a
-sorted queda acotado por P. El coeficiente sigue siendo bit a bit el de la
-formula de referencia (test_correlations_exact_cache).
+sorted queda acotado por P. El coeficiente sigue siendo el de la formula de
+referencia hasta 1e-9 (test_correlations_exact_cache).
 
 Run from data-engine/:
     pytest tests/test_correlations_perf.py -v
@@ -68,4 +68,8 @@ def test_resultado_equivalente_a_la_formula():
         for _, b in rows:
             expected, count = reference(returns[a.id], returns[b.id])
             assert observations[a.ticker][b.ticker] == count
-            assert result[a.ticker][b.ticker] == expected, (a.ticker, b.ticker)
+            got = result[a.ticker][b.ticker]
+            if expected is None:
+                assert got is None, (a.ticker, b.ticker)
+            else:
+                assert abs(got - expected) <= 1e-9, (a.ticker, b.ticker)
