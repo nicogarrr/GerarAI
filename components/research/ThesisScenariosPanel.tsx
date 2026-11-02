@@ -3,6 +3,7 @@ import { naFor } from '@/lib/format';
 import type { Locale } from '@/lib/i18n/locale';
 import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 import { formatScenarioMoney, scenarioCurrency } from '@/lib/research/scenario-format';
+import { scenarioCoherenceText, scenarioNameText } from '@/lib/research/thesis-scenarios-text';
 import type { ScenarioKey, ScenarioMetric, ThesisScenarios } from '@/lib/actions/thesis-scenarios.actions';
 
 const KEYS: ScenarioKey[] = ['bear', 'base', 'bull'];
@@ -42,7 +43,7 @@ export function ThesisScenariosPanel({
                 <tr>
                   <th className="border-b border-gray-800 py-1" scope="col">{t('research.scenarios.year')}</th>
                   {KEYS.map((key) => (
-                    <th className="border-b border-gray-800 px-3 py-1 text-right" key={key} scope="col">{data.escenarios[key].nombre}</th>
+                    <th className="border-b border-gray-800 px-3 py-1 text-right" key={key} scope="col">{scenarioNameText(data.escenarios[key].nombre, locale)}</th>
                   ))}
                 </tr>
               </thead>
@@ -68,7 +69,7 @@ export function ThesisScenariosPanel({
           </div>
         ))}
       </div>
-      {data.aviso_coherencia ? <p className="mt-3 text-xs text-amber-300">{data.aviso_coherencia}</p> : null}
+      {data.aviso_coherencia ? <p className="mt-3 text-xs text-amber-300">{scenarioCoherenceText(data.aviso_coherencia, locale)}</p> : null}
       <p className="mt-3 text-xs text-gray-500">
         {t('research.scenarios.source', { model: data.fuente.modelo ?? NA, version: data.fuente.version ?? NA, date: data.fuente.fecha ?? NA })}
       </p>
