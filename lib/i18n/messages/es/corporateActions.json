@@ -32,7 +32,8 @@
   "dividend": {
     "base": "Dividendo de {amount} por acción",
     "payDate": " · pago {date}",
-    "adjusted": " · importe ajustado por splits"
+    "adjusted": " · importe ajustado por splits",
+    "uncertain": "Importe incierto: {amounts} {currency} en la misma fecha ex"
   },
   "toast": {
     "invalidId": "La acción corporativa no tiene un identificador válido",

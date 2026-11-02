@@ -52,6 +52,9 @@ function dividendDescription(ti: TFunction, f: Formatters, record: DataRecord, f
             + (record.pay_date ? ti('corporateActions.dividend.payDate', { date: f.formatMarketDate(record.pay_date as string) }) : '')
             + (record.source === 'yahoo_finance' ? ti('corporateActions.dividend.adjusted') : '');
     }
+    // Dos importes de Yahoo en la misma fecha ex (corporate_actions.py): el backend lo dice en castellano.
+    const uncertain = f.locale === 'en' && typeof fallback === 'string' ? /^Importe incierto: (.+) (\S+) en la misma fecha ex$/.exec(fallback) : null;
+    if (uncertain) return ti('corporateActions.dividend.uncertain', { amounts: uncertain[1], currency: uncertain[2] });
     return String(fallback ?? ti('common.na'));
 }
 
