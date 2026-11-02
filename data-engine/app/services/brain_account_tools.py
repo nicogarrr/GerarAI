@@ -1412,9 +1412,20 @@ _UPDIV_EN = re.compile(
 )
 
 
+#: «¿qué tengo pendiente de cobrar?», «what's pending to collect?»: sin la palabra
+#: dividendo, pero es lo que hay por cobrar (antes: el modelo general en inglés y
+#: los dividendos ya cobrados del año en castellano).
+_PENDING_COLLECT = re.compile(
+    r"\b(?:que|cuanto)\s+(?:tengo\s+pendiente\s+de|tengo\s+por|me\s+queda\s+por|queda\s+por)\s+cobrar\b"
+    r"|\bwhat(?:'s|\u2019s|\s+is)\s+(?:still\s+)?(?:pending|left|due)\s+to\s+(?:collect|be\s+paid)\b"
+    r"|\bwhat(?:'s|\u2019s|\s+is)\s+still\s+to\s+collect\b"
+    r"|\bwhat\s+do\s+i\s+(?:still\s+)?have\s+(?:left\s+|pending\s+)?to\s+collect\b"
+)
+
+
 def _asks_upcoming_dividends(text: str, question: str) -> bool:
-    return bool((_UPDIV_ES.search(text) or _UPDIV_EN.search(text))
-                and re.search(r"\bdividend", text) and not _tickers_in(question))
+    return bool(((_UPDIV_ES.search(text) or _UPDIV_EN.search(text)) and re.search(r"\bdividend", text)
+                 or _PENDING_COLLECT.search(text)) and not _tickers_in(question))
 
 
 def _upcoming_dividends_answer(db: Session, tenant: int) -> ChatResponse:
