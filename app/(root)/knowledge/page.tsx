@@ -260,6 +260,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
           ))}
         </TabsList>
 
+        {activeTab === TABS.biblioteca ? (
         <TabsContent className="mt-2 space-y-6" value={TABS.biblioteca}>
       {/*
         Lectura primero: al abrir un documento («Fragmentos» o su título) el
@@ -410,7 +411,9 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
         ) : <p className="text-sm text-gray-500">{t('knowledge.noCollections')}</p>}
       </section>
         </TabsContent>
+        ) : null}
 
+        {activeTab === TABS.subir ? (
         <TabsContent className="mt-2" value={TABS.subir}>
           <MutationForm id="upload-knowledge" action={uploadKnowledgeDocumentResult} className="rounded-xl border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage={t('knowledge.uploadSuccess')}>
             <div className="mb-4 flex items-center gap-2"><UploadCloud aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">{t('knowledge.upload')}</h2></div>
@@ -508,7 +511,9 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
             </div>
           </section>
         </TabsContent>
+        ) : null}
 
+        {activeTab === TABS.principios ? (
         <TabsContent className="mt-2" value={TABS.principios}>
       <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5">
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center"><div className="flex items-center gap-2"><Sparkles aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="text-lg font-semibold text-gray-100">{t('knowledge.principlesTitle')}</h2></div><div className="flex flex-wrap gap-2 md:ml-auto">{['', 'proposed', 'approved', 'rejected', 'merged', 'superseded'].map((status) => <Button asChild className="min-h-[44px]" key={status || 'all'} size="sm" variant={(query.status ?? '') === status ? 'default' : 'outline'}><Link href={status ? `/knowledge?tab=principios&status=${status}` : '/knowledge?tab=principios'} scroll={false}>{Object.hasOwn(PRINCIPLE_STATUS_LABELS, status) ? t(PRINCIPLE_STATUS_LABELS[status]) : status}</Link></Button>)}</div></div>
@@ -552,6 +557,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
         <PageNavigation offset={principleOffset} count={principles.length} total={library.principleTotal} parameter="principleOffset" tab="principios" status={query.status} t={t} />
       </section>
         </TabsContent>
+        ) : null}
       </Tabs>
     </main>
   );
