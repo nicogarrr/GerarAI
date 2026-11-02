@@ -52,6 +52,7 @@ def test_no_sells():
     assert resp.answer == "No tienes ventas guardadas. Puedes importarlas en Cartera."
 
 
-def test_last_buy_unchanged():
+def test_last_buy_lists_buys():
+    # La compra tiene su lista propia (test_chat_ultima_compra.py).
     resp = _ask(_db(), "¿cuál fue mi última compra?")
-    assert resp.answer.splitlines()[0] == "Tus últimas compras y ventas guardadas (la más reciente primero):"
+    assert resp.answer.splitlines()[0] == "Tus últimas compras guardadas (la más reciente primero):"

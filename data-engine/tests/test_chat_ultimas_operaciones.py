@@ -92,7 +92,7 @@ def test_recent_trades(question):
 def test_last_month():
     resp = _ask(_db(), "¿Qué compré el mes pasado?")
     assert resp.llm_trace["path"] == "account_trades"
-    assert resp.answer.splitlines() == ["Tus compras y ventas guardadas de octubre de 2026:",
+    assert resp.answer.splitlines() == ["Tus compras guardadas de octubre de 2026:",
                                         "- 5 oct 2026: compra de 10 KO a 60,50 USD."]
 
 
@@ -106,7 +106,7 @@ def test_this_year():
 def test_empty_period():
     resp = _ask(_db(), "¿Qué he comprado este mes?")
     assert resp.llm_trace["path"] == "account_trades"
-    assert resp.answer == "No hay compras ni ventas guardadas de noviembre de 2026."
+    assert resp.answer == "No hay compras guardadas de noviembre de 2026."
 
 
 def test_two_portfolios_name_each():
@@ -126,7 +126,7 @@ def test_english(monkeypatch):
     finally:
         get_settings.cache_clear()
     assert resp.llm_trace["path"] == "account_trades"
-    assert resp.answer.splitlines() == ["Your saved buys and sells in October 2026:",
+    assert resp.answer.splitlines() == ["Your saved buys in October 2026:",
                                         "- Oct 5, 2026: bought 10 KO at 60.50 USD."]
     assert recent.answer.splitlines()[0] == "Your latest saved buys and sells (most recent first):"
     assert "- Jun 1, 2025: sold 2 KO at 58.00 USD." in recent.answer
