@@ -233,3 +233,13 @@ def test_message_date_is_readable_not_iso():
     assert "el 3 nov 2026," in body and "2026-11-03" not in body
     _title, body_en = mr._message(event, "day", now, "en")
     assert "on Nov 3, 2026," in body_en and "2026-11-03" not in body_en
+
+
+def test_date_only_event_says_today_in_madrid_after_midnight():
+    """Pasada la medianoche en Madrid (aún la vispera en Nueva York), un evento de hoy decía «mañana»."""
+    event = {**FOMC, "date": "2026-12-10"}
+    madrid_0030 = datetime(2026, 12, 10, 0, 30, tzinfo=ZoneInfo("Europe/Madrid")).astimezone(UTC)
+    assert mr._when_text(event, "24h", madrid_0030) == "hoy"
+    assert mr._when_text(event, "24h", madrid_0030, "en") == "today"
+    vispera = datetime(2026, 12, 9, 21, 0, tzinfo=ZoneInfo("Europe/Madrid")).astimezone(UTC)
+    assert mr._when_text(event, "24h", vispera) == "mañana"
