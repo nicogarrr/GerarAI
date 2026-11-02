@@ -272,6 +272,12 @@ def _external_flow(transaction: Any) -> float:
 MIN_ANNUALIZATION_SESSIONS = 60
 
 
+# Columnas de PortfolioIntelligenceService._closes_rows, en este orden.
+CLOSES_COLUMNS = ("company_id", "date", "close", "adj_close", "source", "quote_currency")
+# (fecha, adj_close) de una fila de _closes_rows, por posicion.
+_CLOSE_DATE_ADJ = itemgetter(CLOSES_COLUMNS.index("date"), CLOSES_COLUMNS.index("adj_close"))
+
+
 class PortfolioIntelligenceService:
     def build(self, db: Session, *, years: int = 5) -> dict[str, Any]:
         years = max(1, min(years, 20))
@@ -351,12 +357,28 @@ class PortfolioIntelligenceService:
                 )
             else:
                 all_prices = self._closes_rows(db, held_ids, cutoff)
+            # Filas de _closes_rows: por posicion (company_id = 0), no por
+            # nombre; en una Row el acceso por nombre cuesta ~8x mas y son
+            # ~390.000 filas por peticion.
             for price in all_prices:
-                price_series.setdefault(price.company_id, []).append(price)
+                price_series.setdefault(price[0], []).append(price)
+            raw_series = price_series
             price_series = {
                 company_id: self._fill_trailing_spot(series) for company_id, series in price_series.items()
             }
-        returns = {company_id: self._returns(series) for company_id, series in price_series.items()}
+        else:
+            raw_series = {}
+        # Una serie sin relleno de cola son filas de _closes_rows tal cual:
+        # (fecha, adj_close) por posicion. Con relleno (filas spot al final,
+        # raro) se lee por nombre como antes. Mismos valores, misma division.
+        returns = {
+            company_id: (
+                self._returns_from_pairs(map(_CLOSE_DATE_ADJ, series))
+                if series is raw_series.get(company_id)
+                else self._returns(series)
+            )
+            for company_id, series in price_series.items()
+        }
         indicative_returns = self._portfolio_returns(returns, weights)
         # Ventana COMPLETA (5 anos por defecto): con la paginacion del
         # endpoint llegaban solo las 20 sesiones mas antiguas y el TWR de la
@@ -566,20 +588,24 @@ class PortfolioIntelligenceService:
 
     @staticmethod
     def _closes_rows(db: Session, company_ids: Iterable[int], since: date) -> list[Any]:
-        """Cierres de esas empresas desde ``since``, ordenados (empresa, fecha)."""
+        """Cierres de esas empresas desde ``since``, ordenados (empresa, fecha).
+
+        Orden de columnas FIJO (``CLOSES_COLUMNS``): build lee estas filas por
+        posicion (``row[0]``, ``_CLOSE_DATE_ADJ``).
+
+        Por Core (``db.connection()``), no por la capa de resultados ORM: son
+        cientos de miles de filas (300 posiciones x 5 años) y MarketPrice no es
+        de tenant, asi que no hay criteria que perder. Mismas filas, mismos
+        valores (Decimal), mismos nombres de columna.
+        """
         return list(
-            db.execute(
-                select(
-                    MarketPrice.company_id,
-                    MarketPrice.date,
-                    MarketPrice.close,
-                    MarketPrice.adj_close,
-                    MarketPrice.source,
-                    MarketPrice.quote_currency,
-                )
+            db.connection()
+            .execute(
+                select(*(getattr(MarketPrice, name) for name in CLOSES_COLUMNS))
                 .where(MarketPrice.company_id.in_(sorted(company_ids)), MarketPrice.date >= since)
                 .order_by(MarketPrice.company_id, MarketPrice.date)
-            ).all()
+            )
+            .all()
         )
 
     @staticmethod
@@ -693,15 +719,19 @@ class PortfolioIntelligenceService:
         sin sentido. Ahora se exige que AMBOS lados sean validos, y el par se
         descarta en lugar de fabricar un retorno.
         """
+        return PortfolioIntelligenceService._returns_from_pairs((row.date, row.adj_close) for row in series)
+
+    @staticmethod
+    def _returns_from_pairs(pairs: Iterable[tuple[date, Any]]) -> dict[date, float]:
+        """Lo mismo que :meth:`_returns` sobre pares (fecha, adj_close)."""
         # Una pasada: cada cierre se lee y valida una vez (antes dos, como
         # «anterior» y como «actual»). Misma division Decimal, mismo float.
         result = {}
         previous_valid = None
-        for row in series:
-            close = row.adj_close
+        for day, close in pairs:
             if close and close > 0:
                 if previous_valid is not None:
-                    result[row.date] = float(close / previous_valid - 1)
+                    result[day] = float(close / previous_valid - 1)
                 previous_valid = close
             else:
                 previous_valid = None

@@ -4518,6 +4518,7 @@
           },
           "what_must_be_true": {
             "items": {
+              "maxLength": 1000,
               "type": "string"
             },
             "maxItems": 30,

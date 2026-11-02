@@ -35,8 +35,14 @@ class PaperProposal(BaseModel):
     @field_validator("conviction", "proposed_entry", "stop", "target", "quantity", mode="before")
     @classmethod
     def persisted_precision(cls, value, info):
+        # Un texto que no es un número («abc») no es un problema de precisión.
+        if isinstance(value, bool):
+            raise ValueError("El valor debe ser un número")
         try:
-            decimal = Decimal(str(value))
+            decimal = Decimal(str(value).strip())
+        except (InvalidOperation, TypeError, ValueError) as exc:
+            raise ValueError("El valor debe ser un número") from exc
+        try:
             if not decimal.is_finite():
                 raise ValueError("El número debe ser finito")
             quantum = Decimal("0.0001") if info.field_name == "conviction" else Decimal("0.000001")

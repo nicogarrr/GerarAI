@@ -1,3 +1,5 @@
+from typing import get_args
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
@@ -19,6 +21,10 @@ from app.services.review_alert_service import ReviewAlertService
 
 router = APIRouter()
 
+# Los mismos estados que acepta el PATCH: filtrar por otro («pendiente», «Open»)
+# devolvía [] como si no hubiera nada que revisar.
+_REVIEW_STATUSES = frozenset(get_args(ResearchReviewUpdate.model_fields["status"].annotation))
+
 
 @router.get("", response_model=list[ResearchReviewOut])
 def list_reviews(
@@ -27,6 +33,8 @@ def list_reviews(
     limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
 ) -> list[ResearchReview]:
+    if status and status not in _REVIEW_STATUSES:
+        raise HTTPException(status_code=400, detail="Invalid review status")
     statement = select(ResearchReview)
     if ticker:
         company = resolve_company(db, ticker)

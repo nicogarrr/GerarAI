@@ -286,9 +286,21 @@ def test_refresh_race_newer_mark_is_not_overwritten(tmp_path):
     engine.dispose()
 
 
-def test_non_numeric_decimal_rejected_by_precision_normalizer():
+def test_non_numeric_decimal_rejected_as_not_a_number():
+    # «abc» no es un problema de precisión: el mensaje antes decía «fuera de la
+    # precisión persistida» y despistaba.
+    for value in ("not-a-number", "abc", "", True):
+        with pytest.raises(ValidationError, match="El valor debe ser un número"):
+            PaperProposal(**body(conviction=value))
+    with pytest.raises(ValidationError, match="El valor debe ser un número"):
+        PaperProposal(**body(quantity="diez"))
+
+
+def test_number_too_precise_still_rejected_by_precision_normalizer():
     with pytest.raises(ValidationError, match="Número fuera de la precisión persistida"):
-        PaperProposal(**body(conviction="not-a-number"))
+        PaperProposal(**body(conviction="1e30"))
+    # Un número válido con espacios alrededor se sigue aceptando.
+    assert PaperProposal(**body(conviction=" 0.5 ")).conviction == Decimal("0.5000")
 
 
 def test_short_target_at_entry_rejected_by_level_validator():

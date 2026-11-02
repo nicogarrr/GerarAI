@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import DcaHitRatesCard from '@/components/watchlist/DcaHitRatesCard';
 import { getDcaBacktest } from '@/lib/actions/dca-signals.actions';
+import { dcaReasonText } from '@/lib/dca/reason-text';
 import { formatMarketDate, parseLocalizedNumberDetailed } from '@/lib/format';
 import type { DcaBacktest, DcaBacktestPlan } from '@/lib/dca/types';
 import type { Locale } from '@/lib/i18n/locale';
@@ -182,7 +183,7 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
             </form>
 
             {error && <p className="text-sm text-red-400" role="alert">{t('propicks.dcaBacktest.error', { error })}</p>}
-            {result && !result.available && <p className="text-sm text-gray-400">{result.reason ?? t('propicks.dcaBacktest.notEnoughData')}</p>}
+            {result && !result.available && <p className="text-sm text-gray-400">{dcaReasonText(result.reason, locale) ?? t('propicks.dcaBacktest.notEnoughData')}</p>}
 
             {result?.available && (
                 <div className="space-y-5">
@@ -237,7 +238,7 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
                         </div>
                     )}
                     <DcaHitRatesCard data={result.hit_rates} scope="range" ti={t} locale={locale} />
-                    <p className="text-[11px] text-gray-500">{result.disclaimer}</p>
+                    <p className="text-[11px] text-gray-500">{dcaReasonText(result.disclaimer, locale)}</p>
                 </div>
             )}
         </Card>

@@ -245,12 +245,22 @@ def _qty(value: float, english: bool) -> str:
     return f"{value:,.4f}".rstrip("0").rstrip(".") if english else num_es(value, 4).rstrip("0").rstrip(",")
 
 
-def _unrealized(db: Session, tenant: int) -> tuple[float, float, str, object] | None:
-    """(ganancia latente, coste, divisa, fecha) de las posiciones abiertas, en su divisa base."""
-    from app.models import Position
+def _unrealized(db: Session, tenant: int) -> tuple[float, float, str, object, list[str]] | None:
+    """(ganancia latente, coste, divisa, fecha, fuera) de las posiciones abiertas, en su divisa base.
 
-    rows = list(db.scalars(select(Position).where(Position.tenant_id == tenant, Position.quantity > 0)))
-    known = [p for p in rows if p.market_value_base is not None and p.cost_basis_base is not None]
+    Solo cuentan las cotizadas: una posición valorada al precio de su última
+    operación (sin cotización, auditoría A3) no tiene plusvalía medida, como en
+    cartera e impuestos. ``fuera`` nombra las que quedan fuera (A3 o sin valor).
+    """
+    from app.models import Company, Position
+    from app.services.portfolio_ledger_service import trade_price_fallbacks
+
+    rows = list(db.execute(select(Position, Company.ticker).join(Company, Company.id == Position.company_id)
+                           .where(Position.tenant_id == tenant, Position.quantity > 0)).all())
+    quote_missing = trade_price_fallbacks(db, [p for p, _ in rows], tenant_id=tenant)
+    known = [p for p, _ in rows if p.market_value_base is not None and p.cost_basis_base is not None
+             and p.company_id not in quote_missing]
+    left_out = sorted({t for p, t in rows if p not in known})
     currencies = {p.base_currency or "EUR" for p in known}
     if not known or len(currencies) != 1:
         return None
@@ -258,7 +268,7 @@ def _unrealized(db: Session, tenant: int) -> tuple[float, float, str, object] | 
     value = sum(float(p.market_value_base) for p in known)
     if cost <= 0:
         return None
-    return value - cost, cost, currencies.pop(), max(p.as_of for p in known)
+    return value - cost, cost, currencies.pop(), max(p.as_of for p in known), left_out
 
 
 def _year_gains_answer(db: Session, tenant: int, year: int) -> ChatResponse:
@@ -309,7 +319,7 @@ def _year_gains_answer(db: Session, tenant: int, year: int) -> ChatResponse:
     if year == today.year:
         latent = _unrealized(db, tenant)
         if latent is not None:
-            amount, cost, currency, as_of = latent
+            amount, cost, currency, as_of, left_out = latent
             day = _date_en(as_of) if english else fecha_es(as_of)
             lines.append(
                 f"- Unrealized (still open, not sold): {_money(amount, currency, signed=True, english=True)} "
@@ -318,6 +328,10 @@ def _year_gains_answer(db: Session, tenant: int, year: int) -> ChatResponse:
                 f"- Latente (lo que sigue abierto, no vendido): {_money(amount, currency, signed=True)} "
                 f"({_pct(amount / cost, signed=True)}) sobre un coste de {_money(cost, currency)}, "
                 f"con datos a {day}; es desde la compra, no solo de este año.")
+            if left_out:
+                lines.append(("Left out of the unrealized figure (no real quote or no saved value): " if english
+                              else "Fuera del latente (sin cotización real o sin valor guardado): ")
+                             + ", ".join(left_out[:10]) + ".")
             sources.append(_source("position", None, "Posiciones abiertas", "/portfolio"))
             lines.append("They are not added up: the unrealized part isn't a gain until you sell." if english
                          else "No se suman: lo latente no es ganancia hasta que vendes.")
@@ -343,23 +357,30 @@ def _sales_answer(db: Session, year: int, only: set[str]) -> ChatResponse:
         return _response(text, sources, "account_sales")
     lines = [f"In {year} you sold:" if english else f"En {year} vendiste:"]
     shown = 0
+    hidden = 0
     for bucket in realized:
         for sale in bucket.get("sales") or []:
             if shown >= 20:
-                break
+                # La lista se corta en 20, pero el total es de todas: se dice cuántas faltan.
+                hidden += 1
+                continue
             shown += 1
             qty = _qty(float(sale["quantity"]), english)
+            one = float(sale["quantity"]) == 1
             proceeds = sale.get("proceeds_base")
             gain = sale.get("gain_base")
             if english:
-                line = f"- {bucket['ticker']}: {qty} shares on {_fdate(sale['date'], True)}"
+                line = f"- {bucket['ticker']}: {qty} {'share' if one else 'shares'} on {_fdate(sale['date'], True)}"
                 line += f", for {_money(proceeds, 'EUR', english=True)}" if proceeds is not None else ""
                 line += f"; gain {_money(gain, 'EUR', signed=True, english=True)}" if gain is not None else "; gain: no reliable figure"
             else:
-                line = f"- {bucket['ticker']}: {qty} acciones el {_fdate(sale['date'], False)}"
+                line = f"- {bucket['ticker']}: {qty} {'acción' if one else 'acciones'} el {_fdate(sale['date'], False)}"
                 line += f", por {_money(proceeds, 'EUR')}" if proceeds is not None else ""
                 line += f"; ganancia {_money(gain, 'EUR', signed=True)}" if gain is not None else "; ganancia: sin dato fiable"
             lines.append(line + ".")
+    if hidden:
+        lines.append(f"… and {hidden} more sale{'s' if hidden != 1 else ''} (in Taxes)." if english
+                     else f"… y {hidden} venta{'s' if hidden != 1 else ''} más (en Impuestos).")
     total = sum(float(b["gain_base"]) for b in realized if b.get("gain_base") is not None)
     reliable = all(b.get("gain_base") is not None for b in realized)
     if reliable:
@@ -522,6 +543,7 @@ def _fees_answer(db: Session, tenant: int, year: int | None, only: set[str]) -> 
     from datetime import date
 
     from app.models import Company, Transaction
+    from app.valuation.currency import normalize_currency
 
     english = _english()
     query = (select(Transaction, Company.ticker).outerjoin(Company, Company.id == Transaction.company_id)
@@ -536,9 +558,13 @@ def _fees_answer(db: Session, tenant: int, year: int | None, only: set[str]) -> 
         if only and (ticker or "") not in only:
             continue
         action = (tx.action or "").lower()
-        currency = (tx.currency or "EUR").upper()
+        # Divisa principal y su divisor, como el libro de divisas del informe
+        # fiscal: en «GBp» la comisión va en peniques (``.upper()`` la dejaba
+        # en «GBP» sin dividir: 500 peniques salían 500 libras).
+        major, divisor = normalize_currency(tx.currency or "EUR")
+        currency = major or "EUR"
         if action in {"buy", "sell"} and tx.fees:
-            amount = abs(Decimal(tx.fees))
+            amount = abs(Decimal(tx.fees)) / divisor
             trade[currency] = trade.get(currency, Decimal("0")) + amount
             key = f"{ticker or '?'}|{currency}"
             by_ticker[key] = by_ticker.get(key, Decimal("0")) + amount
@@ -546,7 +572,7 @@ def _fees_answer(db: Session, tenant: int, year: int | None, only: set[str]) -> 
         elif action == "fee":
             from app.services.tax_report_service import cash_amount
 
-            other[currency] = other.get(currency, Decimal("0")) + abs(cash_amount(tx))
+            other[currency] = other.get(currency, Decimal("0")) + abs(cash_amount(tx)) / divisor
 
     def amounts(totals: dict[str, Decimal]) -> str:
         return " + ".join(_money(float(v), c, english=english) for c, v in sorted(totals.items()))
@@ -625,10 +651,17 @@ def _ranking_answer(db: Session, tenant: int, text: str) -> ChatResponse:
         select(Position, Company.ticker).join(Company, Company.id == Position.company_id)
         .where(Position.tenant_id == tenant, Position.quantity > 0)
     ).all())
+    # Sin cotización real (valorada al precio de su última operación, A3): su
+    # rentabilidad (~0 %) no está medida; fuera, como en cartera e impuestos.
+    from app.services.portfolio_ledger_service import trade_price_fallbacks
+
+    quote_missing = trade_price_fallbacks(db, [p for p, _ in rows], tenant_id=tenant)
+    unquoted = sorted(t for p, t in rows if p.company_id in quote_missing)
     known = [(t, float(p.market_value_base), float(p.cost_basis_base), p.base_currency or "EUR", p.as_of)
              for p, t in rows
-             if p.market_value_base is not None and p.cost_basis_base is not None and p.cost_basis_base > 0]
-    unknown = sorted(t for p, t in rows if not any(k[0] == t for k in known))
+             if p.market_value_base is not None and p.cost_basis_base is not None and p.cost_basis_base > 0
+             and p.company_id not in quote_missing]
+    unknown = sorted(t for p, t in rows if t not in unquoted and not any(k[0] == t for k in known))
     if not known:
         text_out = ("You have no open positions with a saved value and cost, so I can't rank them." if english
                     else "No tienes posiciones abiertas con valor y coste guardados: no puedo ordenarlas.")
@@ -657,6 +690,10 @@ def _ranking_answer(db: Session, tenant: int, text: str) -> ChatResponse:
     if unknown:
         lines.append(("No saved cost or value, left out: " if english else "Sin coste o valor guardado, fuera: ")
                      + ", ".join(unknown[:10]) + ".")
+    if unquoted:
+        lines.append(("No real quote (valued at their last trade price), left out: " if english
+                      else "Sin cotización real (valoradas al precio de su última operación), fuera: ")
+                     + ", ".join(unquoted[:10]) + ".")
     lines.append("Simple return since purchase, without dividends." if english
                  else "Rentabilidad simple desde la compra, sin dividendos.")
     return _response("\n".join(lines), [_source("position", None, "Posiciones abiertas", "/portfolio")],
@@ -804,7 +841,8 @@ def _plan_answer(db: Session, tenant: int, text: str) -> ChatResponse:
     if targets:
         parts = ", ".join(
             f"{t['label']} {float(t.get('target_pct') or 0):g}%" if english
-            else f"{t['label']} {float(t.get('target_pct') or 0):g} %".replace(".", ",") for t in targets)
+            # Coma decimal solo en el número: la etiqueta va tal cual («EE.UU.», «BRK.B»).
+            else f"{t['label']} {format(float(t.get('target_pct') or 0), 'g').replace('.', ',')} %" for t in targets)
         lines.append(f"Target split: {parts}." if english else f"Reparto objetivo: {parts}.")
     if re.search(r"\bdca\b", text):
         from app.services.brain_context_tools import dca_answer
@@ -958,9 +996,18 @@ def _asks_alert_rules(text: str, question: str) -> bool:
     return bool(_RULES_ASK.search(text) and not _tickers_in(question))
 
 
-def _rule_text(kind: str, condition: dict, currency: str | None, english: bool) -> str:
+def _rule_text(kind: str, condition: dict, currency: str | None, english: bool, target: dict | None = None) -> str:
     op = str((condition or {}).get("operator") or "")
     raw = (condition or {}).get("value")
+    if kind == "thesis_invalidation":
+        # Criterio de la tesis: misma lectura que el resto de la app (métrica,
+        # operador y umbral con sus decimales), no el código interno con el
+        # umbral redondeado a 2 decimales («thesis_invalidation < 0,07»).
+        from app.services.thesis_invalidation_rules import _describe_rule_en, describe_rule
+
+        item = {"metric": str((target or {}).get("metric") or ""), "operator": op, "threshold": raw}
+        return (f"thesis invalidation: {_describe_rule_en(item)}" if english
+                else f"invalidación de tesis: {describe_rule(item)}")
     try:
         value = float(str(raw))
         number = _num_en(value, 2).rstrip("0").rstrip(".") if english else num_es(value, 2).rstrip("0").rstrip(",")
@@ -1001,7 +1048,7 @@ def _alert_rules_answer(db: Session, tenant: int) -> ChatResponse:
     lines = [(f"You have {count} active alert{'s' if count != 1 else ''}:" if english
               else f"Tienes {count} alerta{'s' if count != 1 else ''} activa{'s' if count != 1 else ''}:")]
     for rule, ticker, currency in rows[:20]:
-        line = f"- {ticker or '?'}: {_rule_text(rule.rule_type or '', rule.condition or {}, currency, english)}"
+        line = f"- {ticker or '?'}: {_rule_text(rule.rule_type or '', rule.condition or {}, currency, english, rule.target)}"
         if rule.last_triggered_at is not None:
             fired = rule.last_triggered_at.date()
             line += (f" (last triggered {_date_en(fired)})" if english
