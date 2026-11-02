@@ -110,3 +110,36 @@ def test_english(monkeypatch):
 def test_other_questions_unchanged(question):
     resp = _ask(_db(), question)
     assert (resp.llm_trace or {}).get("path") != "account_plan"
+
+
+def _one_year_plan(start):
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    db = Session(engine)
+    db.info["tenant_id"] = 1
+    db.add(Portfolio(tenant_id=1, name="Principal", base_currency="EUR"))
+    db.flush()
+    db.add(InvestmentPlan(tenant_id=1, monthly_contribution=Decimal("100"), monthly_contribution_currency="EUR",
+                          start_date=start, horizon_years=1, target_allocations=[]))
+    db.commit()
+    return db
+
+
+def test_singular_one_year_and_one_month():
+    """«a 1 años» y «(1 meses)»: con un plan a un año y un mes cumplido, en singular."""
+    resp = _ask(_one_year_plan(date(2026, 10, 1)), "¿Cuál es mi plan de aportación?")
+    assert resp.answer.startswith("Tu plan de aportación: 100,00 € al mes desde el 1 oct 2026, a 1 año.")
+    assert "(1 mes);" in resp.answer and "meses" not in resp.answer
+
+
+def test_singular_in_english(monkeypatch):
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
+    get_settings.cache_clear()
+    try:
+        db = _one_year_plan(date(2026, 10, 1))
+        db.info["language"] = "en"
+        resp = _ask(db, "What is my investment plan?")
+        assert resp.answer.startswith("Your contribution plan: 100.00 € a month since Oct 1, 2026, over 1 year.")
+        assert "(1 month);" in resp.answer and "months" not in resp.answer
+    finally:
+        get_settings.cache_clear()

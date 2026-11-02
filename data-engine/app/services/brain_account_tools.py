@@ -928,10 +928,13 @@ def _plan_answer(db: Session, tenant: int, text: str) -> ChatResponse:
                      english=english)
     start = date.fromisoformat(metrics["start_date"])
     years = metrics.get("horizon_years")
+    # «a 1 años» / «(1 meses)»: singular con un plan a un año o un mes cumplido.
     if english:
-        lines = [f"Your contribution plan: {monthly} a month since {_date_en(start)}, over {years} years."]
+        lines = [f"Your contribution plan: {monthly} a month since {_date_en(start)}, "
+                 f"over {years} {'year' if years == 1 else 'years'}."]
     else:
-        lines = [f"Tu plan de aportación: {monthly} al mes desde el {fecha_es(start)}, a {years} años."]
+        lines = [f"Tu plan de aportación: {monthly} al mes desde el {fecha_es(start)}, "
+                 f"a {years} {'año' if years == 1 else 'años'}."]
     actual, expected = metrics.get("actual_contributions_base"), metrics.get("expected_contributions_base")
     months = metrics.get("months_elapsed") or 0
     if actual is not None and expected is not None:
@@ -941,11 +944,13 @@ def _plan_answer(db: Session, tenant: int, text: str) -> ChatResponse:
         if english:
             state = (f"{_money(gap, base, english=True)} behind" if gap > 0 else
                      f"{_money(-gap, base, english=True)} ahead" if gap < 0 else "on track")
-            lines.append(f"Contributed: {done} of {due} expected so far ({months} months); {state}.")
+            lines.append(f"Contributed: {done} of {due} expected so far "
+                         f"({months} {'month' if months == 1 else 'months'}); {state}.")
         else:
             state = (f"vas {_money(gap, base)} por detrás" if gap > 0 else
                      f"vas {_money(-gap, base)} por delante" if gap < 0 else "vas al día")
-            lines.append(f"Aportado: {done} de {due} previstos hasta hoy ({months} meses); {state}.")
+            lines.append(f"Aportado: {done} de {due} previstos hasta hoy "
+                         f"({months} {'mes' if months == 1 else 'meses'}); {state}.")
     else:
         lines.append("Contributed vs expected: unknown (missing currency or FX), see Plan." if english
                      else "Aportado frente a previsto: sin dato (falta divisa o tipo de cambio), míralo en Plan.")
