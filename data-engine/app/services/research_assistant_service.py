@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models import (
     Company,
     Document,
@@ -305,7 +306,8 @@ def _thesis_citations(db: Session, company: Company, tenant_id: int) -> list[dic
     published = next((v for v in versions if v.status == "published"), None)
 
     def stamp(thesis: ThesisVersion) -> str:
-        return thesis.created_at.date().isoformat() if thesis.created_at else "fecha sin datos"
+        # Día de Madrid (no el día UTC: de 0 a 2 h salía el anterior).
+        return local_today(thesis.created_at).isoformat() if thesis.created_at else "fecha sin datos"
 
     def record(thesis: ThesisVersion, excerpt: str) -> dict:
         return {"id": f"thesis_record:{thesis.id}", "kind": "thesis_record",
