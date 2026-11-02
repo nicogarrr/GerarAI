@@ -890,12 +890,14 @@ _PLAN = re.compile(
     r"\bplan(?:es)?\s+(?:de\s+)?(?:aportacion\w*|inversion\w*|dca)\b|\bmis?\s+aportaciones\b"
     r"|\bcuanto\s+(?:he\s+)?aportado\b|\bvoy\s+al\s+dia\s+con\s+mi\s+plan\b|\b(?:cual|como)\s+(?:es|va)\s+mi\s+plan\b"
     r"|\b(?:investment|contribution|dca)\s+plans?\b|\bhow\s+much\s+have\s+i\s+contributed\b|\bmy\s+plan\b"
+    # «¿cuánto aporto al mes?» / «how much do I contribute a month?»: la aportación del plan.
+    r"|\bcuanto\s+aporto\b|\bhow\s+much\s+do\s+i\s+contribute\b"
 )
 _PLAN_NOT = re.compile(r"\bpensiones\b|\bque\s+compro\b|\bsegun\s+mi\s+plan\b|\bwhat\s+(?:should\s+i|to)\s+buy\b")
 
 
 # «¿Cuánto he aportado?» ya habla de lo tuyo sin «mi»: antes caía al modelo general.
-_PLAN_SELF = re.compile(r"\bhe\s+aportado\b|\bhave\s+i\s+contributed\b")
+_PLAN_SELF = re.compile(r"\bhe\s+aportado\b|\bhave\s+i\s+contributed\b|\baporto\b|\bdo\s+i\s+contribute\b")
 
 
 def _asks_plan(text: str, question: str) -> bool:
