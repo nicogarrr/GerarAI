@@ -60,10 +60,11 @@ def _summary_en(items, disponibles, lineas, total_var, omitidas, sin_datos_shown
     if not items:
         text = "There were no open positions to summarise."
     elif not disponibles:
-        text = (f"{len(items)} positions tracked, no closing data for "
+        text = (f"{len(items)} position{'s' if len(items) != 1 else ''} tracked, no closing data for "
                 f"{as_of.isoformat()} (no data, not 0).")
     else:
-        text = f"{total_var} of {len(items)} positions moved: " + ", ".join(lineas) + "."
+        noun = "positions" if len(items) != 1 else "position"
+        text = f"{total_var} of {len(items)} {noun} moved: " + ", ".join(lineas) + "."
         if omitidas:
             text += f" Showing {len(lineas)} of {total_var} positions that moved; {omitidas} left out."
     if items and sin_datos_shown:
@@ -136,10 +137,10 @@ def emit_digest_alert(db: Session, digest: PortfolioMoveDigest, as_of: date) -> 
     elif not items:
         resumen = "No habia posiciones abiertas que resumir."
     elif not disponibles:
-        resumen = (f"{len(items)} posiciones seguidas, sin datos de cierre para el "
+        resumen = (f"{len(items)} posici{'ones seguidas' if len(items) != 1 else 'ón seguida'}, sin datos de cierre para el "
                    f"{as_of.isoformat()} (sin datos, no 0).")
     else:
-        resumen = (f"{total_var} de {len(items)} posiciones con variacion: "
+        resumen = (f"{total_var} de {len(items)} posici{'ones' if len(items) != 1 else 'ón'} con variacion: "
                    + ", ".join(lineas) + ".")
         if omitidas:
             resumen += (f" Mostradas {len(lineas)} de {total_var} posiciones con "
