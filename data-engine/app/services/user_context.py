@@ -315,6 +315,14 @@ def _num_en(value: float, digits: int = 2) -> str:
     return f"{value:,.{digits}f}"
 
 
+def _pct_en(fraction: float, digits: int = 1, *, signed: bool = False) -> str:
+    return f"{'+' if signed and fraction > 0 else ''}{_num_en(fraction * 100, digits)}%"
+
+
+def _money_en(value: float, currency: str | None, *, signed: bool = False) -> str:
+    return f"{'+' if signed and value > 0 else ''}{_num_en(value)} {currency or '(currency?)'}"
+
+
 def _fair_label_en(reading: dict) -> str:
     source = reading.get("source")
     if source == "tesis":
@@ -376,6 +384,7 @@ def _portfolio_block(
     )
     if not rows:
         block.lines.append("- Sin posiciones guardadas.")
+        block.lines_en.append("- No saved positions.")
         return block
 
     def value_of(pos: Position) -> float:
@@ -404,6 +413,16 @@ def _portfolio_block(
     elif not single_base:
         header += " Divisas base mezcladas: sin total ni pesos."
     block.lines.append(header)
+    header_en = (f"- {len(rows)} position{'s' if len(rows) != 1 else ''}; base currency {base or 'not set'}; "
+                 f"data as of {_day(as_of)}.")
+    if single_base and total > 0:
+        header_en += f" Total value {_money_en(total, base)}."
+        if total_cost > 0:
+            header_en += (f" Unrealized P&L {_money_en(total_pnl, base, signed=True)} "
+                          f"({_pct_en(total_pnl / total_cost, signed=True)} on cost).")
+    elif not single_base:
+        header_en += " Mixed base currencies: no total or weights."
+    block.lines_en.append(header_en)
     for pos, comp in ordered[:MAX_POSITIONS]:
         value = value_of(pos)
         weight = value / total if single_base and total > 0 else None
@@ -416,23 +435,34 @@ def _portfolio_block(
         pnl_pct = pnl / cost if pnl is not None and cost else None
         dca, level = _dca_text(levels, comp.ticker, today)
         parts = [f"- {comp.ticker} ({_short(comp.name, 40)})"]
+        parts_en = list(parts)
         if weight is not None:
             parts.append(f"peso {pct_es(weight)}")
+            parts_en.append(f"weight {_pct_en(weight)}")
         parts.append(f"valor {money_es(value, pos.base_currency or base)}")
+        parts_en.append(f"value {_money_en(value, pos.base_currency or base)}")
         if pnl is not None:
             pnl_text = f"P&L {money_es(pnl, pos.base_currency or base, signed=True)}"
+            pnl_en = f"P&L {_money_en(pnl, pos.base_currency or base, signed=True)}"
             if pnl_pct is not None:
                 pnl_text += f" ({pct_es(pnl_pct, signed=True)})"
+                pnl_en += f" ({_pct_en(pnl_pct, signed=True)})"
             parts.append(pnl_text)
+            parts_en.append(pnl_en)
         price = _f(pos.market_price)
         if price:
             parts.append(f"precio {num_es(price)} {pos.currency}")
+            parts_en.append(f"price {_num_en(price)} {pos.currency}")
         if pos.company_id in quote_missing:
             parts.append("sin cotización real (precio de su última operación)")
+            parts_en.append("no real quote (price of its last trade)")
         if pos.valuation_hold_reason:
             parts.append("valoración en suspenso")
+            parts_en.append("valuation on hold")
         parts.append(dca)
+        parts_en.append(_dca_text_en(levels, comp.ticker, today))
         block.lines.append(", ".join(parts) + ".")
+        block.lines_en.append(", ".join(parts_en) + ".")
         block.rows.append({
             "ticker": comp.ticker, "weight": weight, "value": value, "currency": pos.base_currency or base,
             "pnl": pnl, "pnl_pct": pnl_pct, "dca_level": level, "sector": comp.sector,
@@ -440,12 +470,15 @@ def _portfolio_block(
         block.sources.append(_source("position", pos.id, f"Posición {comp.ticker}", "/portfolio"))
     if len(ordered) > MAX_POSITIONS:
         block.lines.append(f"- Y {len(ordered) - MAX_POSITIONS} posiciones pequeñas más en /portfolio.")
+        block.lines_en.append(f"- And {len(ordered) - MAX_POSITIONS} more small positions in /portfolio.")
     if single_base and total > 0:
         sectors: dict[str, float] = {}
         for pos, comp in rows:
             sectors[comp.sector or "Sin sector"] = sectors.get(comp.sector or "Sin sector", 0.0) + value_of(pos)
         top = sorted(sectors.items(), key=lambda kv: kv[1], reverse=True)[:4]
         block.lines.append("- Peso por sector: " + "; ".join(f"{name} {pct_es(v / total)}" for name, v in top) + ".")
+        block.lines_en.append("- Weight by sector: " + "; ".join(
+            f"{'No sector' if name == 'Sin sector' else name} {_pct_en(v / total)}" for name, v in top) + ".")
     return block
 
 
@@ -533,7 +566,7 @@ def _watchlist_block(
                 parts_en.append("margin not calculated: possible unit or currency mismatch between price and value")
             else:
                 parts.append(f"margen de seguridad {pct_es(mos, signed=True)}")
-                parts_en.append(f"margin of safety {'+' if mos > 0 else ''}{_num_en(mos * 100, 1)}%")
+                parts_en.append(f"margin of safety {_pct_en(mos, signed=True)}")
                 row["mos"] = mos
         parts.append(dca)
         parts_en.append(dca_en)
