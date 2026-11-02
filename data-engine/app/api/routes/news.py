@@ -26,11 +26,11 @@ from app.services.news_service import (
     position_change_cluster_title,
 )
 from app.services.news_story_cluster import (
+    StoryClusterIndex,
     StoryGroup,
     absorb,
     event_signature,
     exact_key,
-    find_group,
 )
 from app.services.public_headline_translation import translate_external_headline
 from app.services.second_order_news_service import analyze_second_order
@@ -148,7 +148,7 @@ def news_events(
         # una fila visible por empresa y día con recuento, representada por el
         # primer evento del grupo. En la ficha de empresa se muestran sin agrupar.
         clusters: dict[tuple, dict] = {}
-        story_groups: list[StoryGroup] = []
+        story_index = StoryClusterIndex()
         while len(rows) < limit and scanned < _SCAN_LIMIT:
             chunk = db.execute(ordered_stmt.limit(_SCAN_CHUNK).offset(scanned)).all()
             if not chunk:
@@ -199,19 +199,18 @@ def news_events(
                         # («N fuentes») en vez de repetirse en portada. La dedup
                         # literal queda absorbida por la firma (Jaccard 1.0).
                         sig = event_signature(event, company)
-                        group = find_group(story_groups, event, company, sig)
+                        group = story_index.find(event, company, sig)
                         if group is not None:
                             absorb(group, event)
                             continue
-                        story_groups.append(
+                        item = ("story", story_index.add(
                             StoryGroup(
                                 event=event,
                                 company=company,
                                 signature=sig,
                                 text_key=exact_key(original_headline(event)),
                             )
-                        )
-                        item = ("story", len(story_groups) - 1)
+                        ))
                 else:
                     item = (event, company)
                 if item is None:
@@ -222,7 +221,7 @@ def news_events(
                     rows.append(item)
             if len(chunk) < _SCAN_CHUNK:
                 break
-        return rows, clusters, story_groups
+        return rows, clusters, story_index.groups
 
     # Frescura (solo carril macro): el carril se refresca cada hora
     # (macro_news_refresh); un titular macro de más de 72 h ya no es contexto

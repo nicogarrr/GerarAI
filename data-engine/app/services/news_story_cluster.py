@@ -197,3 +197,57 @@ def event_signature(event: NewsEvent, company: Company | None) -> set[str]:
     if cached and isinstance(cached.get("text"), str) and cached["text"].strip():
         sig |= signature(cached["text"], company_tokens)
     return sig
+
+
+class StoryClusterIndex:
+    """Índice de grupos para el escaneo de portada: las mismas decisiones que
+    ``find_group`` sobre la lista plana, pero sin recorrer todos los grupos por
+    evento (medido en lab 2026-11-02: 2000 titulares distintos en un escaneo
+    profundo = 1.175,7 ms, O(n²); con índice por token el mismo barrido queda
+    ~lineal).
+
+    Por qué es exacto y no aproximado:
+    - ``same_story`` devuelve siempre False cuando las firmas no comparten
+      ningún token (las tres salidas True exigen intersección no vacía), así
+      que el índice token -> grupos solo descarta pares que ya fallaban.
+    - El camino de titular literal (``text_key``) se conserva con un mapa
+      (key, text_key) -> primer grupo; gana el primer grupo insertado igual
+      que en el recorrido lineal.
+    - Los candidatos se examinan en orden de inserción: el primer grupo que
+      casa es el mismo que devolvía ``find_group``.
+    """
+
+    def __init__(self) -> None:
+        self.groups: list[StoryGroup] = []
+        self._by_token: dict[str, set[int]] = {}
+        self._literal: dict[tuple, dict[str, int]] = {}
+
+    def add(self, group: StoryGroup) -> int:
+        """Inserta y devuelve la posición del grupo (la usa ``("story", i)``)."""
+        idx = len(self.groups)
+        self.groups.append(group)
+        for token in group.signature:
+            self._by_token.setdefault(token, set()).add(idx)
+        if group.text_key:
+            self._literal.setdefault(group.key, {}).setdefault(group.text_key, idx)
+        return idx
+
+    def find(self, event: NewsEvent, company: Company | None, sig: set[str]) -> StoryGroup | None:
+        lane = (event.metadata_ or {}).get("news_lane")
+        key = (company.id if company else None, "macro" if lane == "macro" else "empresa")
+        text_key = exact_key(original_headline(event))
+        candidates: set[int] = set()
+        for token in sig:
+            candidates.update(self._by_token.get(token, ()))
+        literal_idx = self._literal.get(key, {}).get(text_key) if text_key else None
+        if literal_idx is not None:
+            candidates.add(literal_idx)
+        for idx in sorted(candidates):
+            group = self.groups[idx]
+            if group.key != key:
+                continue
+            if text_key and group.text_key == text_key:
+                return group
+            if same_story(group.signature, sig, group.event.date, event.date):
+                return group
+        return None
