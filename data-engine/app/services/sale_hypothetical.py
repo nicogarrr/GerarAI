@@ -53,7 +53,13 @@ _SALE_PRICE_RE = re.compile(
     # «si vendo SHEL.L a 30 £» / «vendo mis acciones de AAPL a 200 $»: el ticker
     # sin cantidad delante tambien vale (antes solo tras un numero o «la mitad»,
     # y sin el se usaba EN SILENCIO la cotizacion en lugar del precio dado).
-    rf"(?:(?:{_NUM}|(?:la\s+)?mitad)\s*)?(?:(?:acciones|t[ií]tulos|participaciones)\s*)?(?:de\s+)?"
+    # «vendo el 50 % a 30 €», «1/3 a 30 €», «dos tercios de mis acciones a 30 €»: una
+    # parte de la posición también lleva su precio (antes se usaba la cotización).
+    rf"(?:(?:el|un|solo|s[oó]lo)\s+)?"
+    rf"(?:(?:[1-9]\s*/\s*[2-9]|(?:un|dos|2|tres|3)\s+(?:tercios?|cuartos?)|{_NUM}\s*(?:%|por\s*ciento)?"
+    rf"|(?:la\s+)?mitad)\s*)?"
+    # «vendo 10 de mis 20 acciones a 30 €»: la posición entera puede ir citada.
+    rf"(?:de\s+(?:(?:mis|las|los|tus)\s+)?(?:{_NUM}\s+)?)?(?:(?:acciones|t[ií]tulos|participaciones)\s*)?(?:de\s+)?"
     rf"(?:[A-Za-z][\w.]*\s+){{0,2}}(?:a|por)\s+"
     rf"(?:(?P<pre>{_CUR})\s*)?(?P<price>{_NUM})\s*(?P<cur>{_CUR})?"
     rf"|\bprecio\s+de\s+venta\s+(?:de\s+|es\s+|ser[ií]a\s+)?(?:(?P<pre2>{_CUR})\s*)?"

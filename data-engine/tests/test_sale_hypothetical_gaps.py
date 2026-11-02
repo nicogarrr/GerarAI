@@ -347,3 +347,30 @@ def test_compre_con_fecha_antes_del_precio():
     assert [(lot.quantity, lot.price, lot.currency, lot.trade_date) for lot in lots] == [
         (D("10"), D("100"), "EUR", date(2024, 1, 1))
     ]
+
+
+@pytest.mark.parametrize("question", [
+    "si vendo 50 % a 30 €",
+    "si vendo el 50% de mis AAPL a 30 €",
+    "si vendo un 20 por ciento a 30 €",
+    "si vendo 1/3 a 30 €",
+    "si vendo dos tercios de mis acciones a 30 €",
+    "si vendo 3/4 de mis TEST a 30 €",
+    "si vendo 10 de mis 20 acciones a 30 €",
+])
+def test_vender_una_parte_a_un_precio_respeta_el_precio(question):
+    """«vendo el 50 % a 30 €» o «1/3 a 30 €»: antes el precio no se leía y la
+    venta se calculaba EN SILENCIO a la cotización del día."""
+    assert parse_sale_price(question) == (D("30"), "EUR")
+
+
+def test_el_50_por_ciento_a_un_precio_no_se_sustituye_por_la_cotizacion(db):
+    company = _company(db)
+    db.add(MarketPrice(company_id=company.id, date=date(2026, 10, 10), close=D("120"), source="test"))
+    db.flush()
+    lots = [HypoLot(quantity=D("10"), price=D("100"), currency="EUR", trade_date=date(2024, 1, 2))]
+    sale = simulate_hypothetical_sale(db, lots=lots, question="¿y si vendo el 50 % a 150 €?", company=company, today=TODAY)
+    assert sale.sale_price_source == "usuario"
+    assert sale.sale_price == D("150")
+    assert sale.quantity == D("5")
+    assert sale.gain_eur == D("250")
