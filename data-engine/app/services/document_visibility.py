@@ -37,7 +37,7 @@ def _archive_url_predicate():
     )
 
 
-def without_archive_duplicates(statement):
+def without_archive_duplicates(statement, *, company_ids: list[int] | None = None):
     """Excluye las re-ingestas del mismo filing de archivo inmutable.
 
     Devuelve el statement con un join al ranking por (tenant, empresa, URL):
@@ -45,6 +45,11 @@ def without_archive_duplicates(statement):
     desempate mayor id). Las filas sin URL o con URL no-archivo pasan
     siempre: ante la duda no se oculta contenido.
     """
+    # Filtering on the partition key does not change the winner within any
+    # requested company, and avoids ranking unrelated companies' documents.
+    scope = () if company_ids is None else (Document.company_id.in_(company_ids),)
+    if company_ids is not None:
+        statement = statement.where(Document.company_id.in_(company_ids))
     ranked = (
         select(
             Document.id.label("id"),
@@ -62,6 +67,7 @@ def without_archive_duplicates(statement):
             )
             .label("archive_rank"),
         )
+        .where(*scope)
         .where(Document.source_url.isnot(None))
         .where(_archive_url_predicate())
         .subquery()

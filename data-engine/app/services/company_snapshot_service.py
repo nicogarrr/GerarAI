@@ -327,7 +327,8 @@ class CompanySnapshotService:
         documents_stmt = without_archive_duplicates(
             select(Document.company_id, func.count())
             .where(Document.company_id.in_(company_ids))
-            .group_by(Document.company_id)
+            .group_by(Document.company_id),
+            company_ids=company_ids,
         )
         # El filtro explícito es segunda capa sobre with_loader_criteria
         # (que medido en SQLAlchemy 2.1.6 SI alcanza a los agregados):
@@ -513,7 +514,8 @@ class CompanySnapshotService:
         # agregados func.count().select_from(...) — ver _counts_many.
         tenant_id = db.info.get("tenant_id")
         documents_subquery = without_archive_duplicates(
-            select(func.count()).select_from(Document).where(Document.company_id == company_id)
+            select(func.count()).select_from(Document).where(Document.company_id == company_id),
+            company_ids=[company_id],
         )
         if tenant_id is not None:
             documents_subquery = documents_subquery.where(Document.tenant_id == tenant_id)

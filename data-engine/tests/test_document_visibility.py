@@ -112,3 +112,48 @@ def test_el_mismo_filing_en_dos_empresas_no_se_colapsa(db):
     _doc(db, aapl, "copia AAPL", ARCHIVE, when)
     _doc(db, msft, "copia MSFT", ARCHIVE, when)
     assert _visible_titles(db) == ["copia AAPL", "copia MSFT"]
+
+
+@pytest.mark.parametrize("scope_size", [0, 1, 2])
+def test_company_scope_preserves_archive_winners_and_live_rows(db, scope_size):
+    companies = [_company(db, ticker) for ticker in ["AAPL", "MSFT", "KO"]]
+    when = datetime(2025, 10, 31, tzinfo=UTC)
+    for company in companies:
+        _doc(db, company, f"{company.ticker} old", ARCHIVE, None)
+        _doc(db, company, f"{company.ticker} winner", ARCHIVE, when)
+        _doc(db, company, f"{company.ticker} live1", "https://example.com/ir", when)
+        _doc(db, company, f"{company.ticker} live2", "https://example.com/ir", when)
+        _doc(db, company, f"{company.ticker} no url", None, None)
+    ids = [company.id for company in companies[:scope_size]]
+    original = without_archive_duplicates(
+        select(Document.id).where(Document.company_id.in_(ids))
+    )
+    scoped = without_archive_duplicates(select(Document.id), company_ids=ids)
+    assert sorted(db.scalars(scoped)) == sorted(db.scalars(original))
+    assert len(db.scalars(scoped).all()) == 4 * scope_size
+
+
+def test_company_scope_filters_ranking_before_window():
+    from sqlalchemy.dialects import postgresql
+
+    stmt = without_archive_duplicates(select(Document.id), company_ids=[7, 8])
+    sql = str(stmt.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
+    assert sql.count("documents.company_id IN (7, 8)") == 2
+
+
+def test_company_scope_keeps_tenant_partition_independent(db):
+    company = _company(db, "AAPL")
+    when = datetime(2025, 10, 31, tzinfo=UTC)
+    own = _doc(db, company, "own", ARCHIVE, when)
+    other = Tenant(external_id="other", name="other")
+    db.add(other)
+    db.flush()
+    own_tenant_id = db.info["tenant_id"]
+    db.info["tenant_id"] = other.id
+    db.add(Document(company_id=company.id, tenant_id=other.id,
+                    title="other tenant", source_type="sec_filing",
+                    source_url=ARCHIVE, published_at=when))
+    db.flush()
+    db.info["tenant_id"] = own_tenant_id
+    statement = select(Document.id).where(Document.tenant_id == own_tenant_id)
+    assert db.scalars(without_archive_duplicates(statement, company_ids=[company.id])).all() == [own.id]
