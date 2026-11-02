@@ -9,7 +9,8 @@ const OVERVIEW = readFileSync('components/PersonalizedOverview.tsx', 'utf8');
 
 test('la página pasa el calendario como afterAlerts y no lo pinta al final', () => {
     assert.ok(PAGE.includes('afterAlerts='));
-    assert.ok(PAGE.indexOf('<EarningsDayStrip />') < PAGE.indexOf('<NewsSection'));
+    // Las noticias (<PortfolioNews>, que pinta <NewsSection>) van al final.
+    assert.ok(PAGE.indexOf('<EarningsDayStrip />') < PAGE.indexOf('<PortfolioNews'));
     assert.ok(!/\/>\s*<Suspense fallback=\{null\}>\s*<EarningsDayStrip/.test(PAGE));
 });
 
