@@ -19,7 +19,7 @@ by the user because it depends on deal terms.
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -29,6 +29,8 @@ from app.models import Company, CorporateAction, Position, Transaction
 from app.services.company_resolver import resolve_company
 
 SPLIT_TYPES = {"split", "reverse_split"}
+# Precisión de corporate_actions.ratio (Numeric(24, 10)).
+_RATIO_STEP = Decimal("0.0000000001")
 
 
 def _today() -> date:
@@ -148,7 +150,10 @@ class CorporateActionService:
         company = resolve_company(db, ticker)
         if company is None:
             raise ValueError(f"Company {ticker} does not exist; import transactions or create it first")
-        if ratio <= 0:
+        # La columna es Numeric(24, 10): un ratio > 0 por debajo de 1e-10 se
+        # guardaba como 0 y, al aplicarlo, dividir el precio por él daba
+        # decimal.InvalidOperation (500). Se comprueba ya redondeado.
+        if ratio <= 0 or ratio.quantize(_RATIO_STEP, rounding=ROUND_HALF_UP) <= 0:
             raise ValueError("Ratio must be positive")
         action = CorporateAction(
             company_id=company.id,
