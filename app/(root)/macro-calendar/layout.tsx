@@ -1,13 +1,10 @@
 import type { ReactNode } from "react";
-import { CalendarTabs } from "@/components/calendar/CalendarTabs";
+
+import { CalendariosLayout } from "@/components/calendar/CalendariosLayout";
 
 // Calendarios: catalizadores de cartera, macro y 8-K, y acciones corporativas
-// se enlazan entre sí sin mover rutas.
-export default function CalendariosLayout({ children }: { children: ReactNode }) {
-  return (
-    <>
-      <CalendarTabs />
-      {children}
-    </>
-  );
+// se enlazan entre sí sin mover rutas. El JSX compartido vive en
+// components/calendar/CalendariosLayout.tsx.
+export default function Layout({ children }: { children: ReactNode }) {
+  return <CalendariosLayout>{children}</CalendariosLayout>;
 }
