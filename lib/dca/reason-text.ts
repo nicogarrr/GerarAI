@@ -13,6 +13,8 @@ const DCA_REASON_EN: Record<string, string> = {
   'Historia insuficiente en ese rango: hacen falta al menos 2 meses con veredicto confirmado y compra.':
     'Not enough history in that range: at least 2 months with a confirmed verdict and a purchase are needed.',
   'sin meses confirmados': 'no confirmed months',
+  // Salvedad de aciertos y backtest (watchlist.py, valor por defecto del modelo)
+  'Histórico, hipotético. No es asesoramiento.': 'Historical, hypothetical. Not advice.',
 };
 
 export function dcaReasonText<T extends string | null | undefined>(text: T, locale: Locale): T | string {

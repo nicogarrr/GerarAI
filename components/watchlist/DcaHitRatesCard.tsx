@@ -118,7 +118,7 @@ export default function DcaHitRatesCard({ data, compact = false, scope = 'full',
                 ))}
             </div>
             <p className="text-[11px] text-gray-500">
-                {data.disclaimer} {ti('watchlist.hitRates.footer')}
+                {dcaReasonText(data.disclaimer, locale)} {ti('watchlist.hitRates.footer')}
             </p>
         </div>
     );
