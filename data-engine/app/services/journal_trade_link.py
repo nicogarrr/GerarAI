@@ -225,7 +225,11 @@ def fair_value_on(
             "divisa distinta, no se calcula el margen."
         )
     else:
-        margin = reading["value"] / (trade_price * to_company) - 1
+        # El valor justo va en la divisa PRINCIPAL (libras), también con la
+        # ficha en subunidad («GBX»): el precio se pasa a libras, no a la
+        # unidad de la ficha (2.650 GBp contra 30 £ salía −98,9 %).
+        to_major = to_company / normalize_currency(company.currency)[1]
+        margin = reading["value"] / (trade_price * to_major) - 1
     reading["margin_vs_trade_price"] = margin
     reading["note"] = note
     return reading
