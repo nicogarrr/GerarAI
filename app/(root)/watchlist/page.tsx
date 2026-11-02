@@ -44,24 +44,10 @@ export async function generateMetadata(): Promise<Metadata> {
     return { title: 'Watchlist', description: t('watchlist.page.metaDescription') };
 }
 
-interface WatchlistStock {
+// Los 16 campos de cotización/métricas son los de WatchlistEntryData (la
+// acción que los resuelve): la fila los hereda y solo añade lo de vista.
+interface WatchlistStock extends WatchlistEntryData {
     analysis?: AnalysisStatus | null;
-    symbol: string;
-    name: string;
-    currency: string | null;
-    price: number | null;
-    change: number | null;
-    changePercent: number | null;
-    marketCap: number | null;
-    marketCapDerived: boolean;
-    peRatio: number | null;
-    peKind: 'ttm' | 'fy' | null;
-    peSource: string | null;
-    peSourceLabel: string | null;
-    priceKind: 'live' | 'close' | null;
-    priceAsOf: string | null;
-    metricsNotApplicable: boolean;
-    quoteSymbol: string | null;
     monitor: WatchlistMonitorItem | null;
     /** true = la cadena de cotización agotó su presupuesto (3 s): las celdas
         sin dato lo dicen como espera, nunca como fallo de la fuente. */
@@ -236,6 +222,7 @@ export default async function WatchlistPage({
                 return {
                     symbol: data.symbol,
                     name: data.name,
+                    exchange: data.exchange,
                     price: data.price,
                     change: data.change,
                     changePercent: data.changePercent,
@@ -261,6 +248,7 @@ export default async function WatchlistPage({
                 return {
                     symbol: item.symbol,
                     name: item.symbol,
+                    exchange: null,
                     price: null,
                     change: null,
                     changePercent: null,

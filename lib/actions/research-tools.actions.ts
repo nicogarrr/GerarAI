@@ -11,6 +11,7 @@ import { assertPositiveInt } from '@/lib/validation/pathParams';
 import { knowledgeTickerFormValue, libraryReadingsPath } from '@/lib/knowledge/document-ticker';
 import { backendMessageForRequest } from '@/lib/research/backend-error-locale';
 import type { components } from '@/lib/research/openapi.generated';
+import type { ScreenCriterion, ScreenResult } from '@/lib/screener-types';
 
 const BACKEND_URL = process.env.FMP_BACKEND_URL ?? 'http://localhost:8000';
 
@@ -117,40 +118,11 @@ export type UniversalSearchResponse = {
 
 export type CustomMetric = components['schemas']['ScreenerCustomMetricOut'];
 
-export type ScreenCriterion = {
-  left: string;
-  operator: '>' | '>=' | '<' | '<=' | '==' | '!=';
-  right: string;
-};
-
 export type SavedScreen = components['schemas']['ScreenerSavedScreenOut'];
 
-export type ScreenResult = {
-  criteria: ScreenCriterion[];
-  ranking_formula: string | null;
-  ranking_direction: string;
-  company_count: number;
-  match_count: number;
-  metrics_without_data?: string[];
-  new_match_company_ids?: number[];
-  results: Array<{
-    company_id: number;
-    ticker: string;
-    name: string;
-    matched: boolean;
-    rank_value: string | null;
-    coverage_percent: number;
-    confidence: string;
-    latest_data_at: string | null;
-    missing_fields: string[];
-    criteria: Array<ScreenCriterion & {
-      left_value?: string;
-      right_value?: string;
-      passed: boolean;
-      missing_fields?: string[];
-    }>;
-  }>;
-};
+// El contrato del motor de screeners vive en lib/screener-types.ts
+// (compartido con screener.actions); se reexporta para sus consumidores.
+export type { ScreenCriterion, ScreenResult } from '@/lib/screener-types';
 
 export type FinancialTerminal = {
   ticker: string;

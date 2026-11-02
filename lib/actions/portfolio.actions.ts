@@ -130,6 +130,22 @@ export type PortfolioFxRate = components['schemas']['PortfolioFxRateOut'];
 
 type ResearchPortfolioTransaction = components['schemas']['PortfolioTransactionOut'];
 
+/** Operación de la cartera tal cual la sirven getPortfolioTransactions y
+ *  getPortfolioTransactionPage (mapeada del contrato del backend). Las tres
+ *  vistas de movimientos (pestaña, tabla y diálogo de edición) la comparten:
+ *  antes cada una declaraba su copia local del mismo tipo. */
+export type PortfolioTransaction = {
+    _id: string;
+    symbol: string;
+    type: 'buy' | 'sell';
+    quantity: number;
+    price: number;
+    fees?: number;
+    date: string;
+    notes?: string;
+    currency?: string;
+};
+
 type ResearchPortfolioPosition = components['schemas']['PortfolioPositionItemOut'];
 
 type ResearchPortfolioSummaryResponse = components['schemas']['PortfolioSummaryOut'];

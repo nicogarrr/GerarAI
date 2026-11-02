@@ -50,21 +50,13 @@ const PortfolioDividends = dynamic(() => import('@/components/portfolio/Portfoli
 
 import { Wallet, LayoutDashboard, Briefcase, TrendingUp, TrendingDown, History, Brain, Gauge, Activity, Coins } from 'lucide-react';
 import type { PortfolioForecast as PortfolioForecastType, PortfolioPerformanceHistory, PortfolioSummary as PortfolioSummaryType, PortfolioTearsheet as PortfolioTearsheetType, PortfolioDividendProjection } from '@/lib/actions/portfolio.actions';
+import type { PortfolioTransaction } from '@/lib/actions/portfolio.actions';
 import type { TransactionFilters } from '@/lib/portfolio/transaction-filters';
 
-type Transaction = {
-    _id: string;
-    symbol: string;
-    type: 'buy' | 'sell';
-    quantity: number;
-    price: number;
-    date: string;
-    notes?: string;
-};
 
 type Props = {
     summary: PortfolioSummaryType;
-    transactions: Transaction[];
+    transactions: PortfolioTransaction[];
     transactionPage?: { total: number; offset: number; filters?: TransactionFilters };
     scores: { quality: number | null; growth: number | null; value: number | null; dividend: number | null; cagr3y: number | null; history?: PortfolioPerformanceHistory };
     tearsheet: PortfolioTearsheetType | null;

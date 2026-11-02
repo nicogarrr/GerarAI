@@ -17,7 +17,12 @@ import { PortfolioValueBreakdown } from '@/components/portfolio/PortfolioValueBr
 import { DcaLevelChip, useHoldingSignals } from '@/components/portfolio/HoldingSignals';
 import { fairValueGapPercent } from '@/lib/portfolio/holding-signals';
 import { getPortfolioSummary, type PortfolioHolding, type PortfolioSummary } from '@/lib/actions/portfolio.actions';
-import { getHomeWatchlistPreview, getHomeOpportunities } from '@/lib/actions/home-overview.actions';
+import {
+    getHomeWatchlistPreview,
+    getHomeOpportunities,
+    type HomeOpportunity,
+    type HomeWatchlistItem,
+} from '@/lib/actions/home-overview.actions';
 import { getHomeOverviewBundle, type HomeOverviewBundle } from '@/lib/actions/home-bundle.actions';
 import { sectionErrorKey } from '@/lib/section-error';
 import {
@@ -42,33 +47,10 @@ interface PersonalizedOverviewProps {
     afterAlerts?: ReactNode;
 }
 
-interface WatchlistItem {
-    symbol: string;
-    name: string;
-    // null = sin cotización disponible: nunca se fabrica un 0.
-    price: number | null;
-    currency: string | null;
-    changePercent: number | null;
-    // F358: frescura del precio; un cierre se etiqueta con su fecha si la fuente la da.
-    priceKind: 'live' | 'close' | null;
-    priceAsOf: string | null;
-}
-
-interface UndervaluedStock {
-    symbol: string;
-    name: string;
-    price: number;
-    /** Divisa del LISTADO real (master), no del ticker desnudo: null = N/D. */
-    currency: string | null;
-    fairValue: number;
-    upside: number;
-    /** true = el DCF no es publicable (inputs sin trazabilidad datada):
-     *  la ficha lo muestra como orientacion del motor, no como valoracion final. */
-    orientation?: boolean;
-    /** Procedencia del valor justo único (misma cifra que la watchlist). */
-    fairValueLabel?: string;
-    fairValueAsOf?: string | null;
-}
+// Los tipos viven en la acción que los sirve (espejo antes copiado aquí);
+// el import de tipos desde un 'use server' se borra al compilar.
+type WatchlistItem = HomeWatchlistItem;
+type UndervaluedStock = HomeOpportunity;
 
 /** Valor justo único de una posición en el inicio: margen frente al precio y su fuente. */
 function HomeFairValueHint({ holding, signals }: { holding: PortfolioHolding; signals: ReturnType<typeof useHoldingSignals> }) {
