@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { DcaHitRates } from '@/lib/dca/types';
 import { dcaPercent } from '@/lib/dca/format';
+import { dcaReasonText } from '@/lib/dca/reason-text';
 import { intlLocale, type Locale } from '@/lib/i18n/locale';
 import { t, type TranslationKey, type TranslationVars } from '@/lib/i18n/t';
 
@@ -55,7 +56,7 @@ export default function DcaHitRatesCard({ data, compact = false, scope = 'full',
         return <p className="text-xs text-gray-500">{ti('watchlist.hitRates.unavailable')}</p>;
     }
     if (!data.available) {
-        return <p className="text-xs text-gray-500">{data.reason ?? ti('watchlist.hitRates.noHistory')}</p>;
+        return <p className="text-xs text-gray-500">{dcaReasonText(data.reason, locale) ?? ti('watchlist.hitRates.noHistory')}</p>;
     }
     return (
         <div className="space-y-2" data-testid="dca-hit-rates">
