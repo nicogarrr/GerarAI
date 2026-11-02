@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -1156,6 +1157,76 @@ def _documents_answer(db: Session, tenant: int) -> ChatResponse:
     return _response("\n".join(lines), sources, "account_documents")
 
 
+# ---------------------------------------------------- próximos resultados
+
+_EARN_WHEN_ES = re.compile(
+    r"\bproxim[oa]s?\s+(?:presentaciones?\s+de\s+)?resultados\b|\bcalendario\s+de\s+resultados\b"
+    r"|\b(?:cuando|que\s+dia|en\s+que\s+fecha|fechas?)\s+(?:\w+\s+){0,3}?(?:presenta\w*|publica\w*|salen|dan|"
+    r"anuncia\w*)\s+(?:\w+\s+){0,2}?resultados\b"
+)
+_EARN_WHEN_EN = re.compile(
+    r"\b(?:upcoming|next)\s+earnings\b|\bearnings\s+(?:calendar|dates?|schedule)\b"
+    r"|\bwhen\s+(?:\w+\s+){0,4}?report\w*\b|\breport\s+earnings\b"
+)
+_EARN_MINE = re.compile(
+    r"\b(?:mis|mi\s+cartera|tengo|my|i\s+(?:hold|own))\b"
+)
+_SESSION = {"pre_market": ("antes de la apertura", "before the open"),
+            "after_market": ("tras el cierre", "after the close")}
+_EARNINGS_DAYS = 90
+
+
+def _asks_upcoming_earnings(text: str, question: str) -> bool:
+    english_earnings = _EARN_WHEN_EN.search(text) and re.search(r"\bearnings\b", text)
+    return bool((_EARN_WHEN_ES.search(text) or english_earnings)
+                and _EARN_MINE.search(text) and not _tickers_in(question))
+
+
+def _upcoming_earnings_answer(db: Session, tenant: int) -> ChatResponse:
+    """Próxima fecha de resultados de cada posición abierta (calendario guardado, sin proveedores)."""
+    from app.services.earnings_dates_service import followed_calendar, followed_companies
+
+    english = _english()
+    today = local_today()
+    until = today + timedelta(days=_EARNINGS_DAYS)
+    sources = [_source("earnings_date", None, "Calendar" if english else "Calendario", "/calendar")]
+    # followed_companies mezcla watchlist y cartera (filtrado por tenant): aquí solo la cartera.
+    holdings = {ticker for ticker, info in followed_companies(db).items() if info["origin"] == "cartera"}
+    if not holdings:
+        return _response("You have no open positions, so there are no earnings dates to show." if english
+                         else "No tienes posiciones abiertas, así que no hay fechas de resultados que enseñar.",
+                         sources, "account_upcoming_earnings")
+    calendar = followed_calendar(db, today, until)
+    events = [event for day in calendar["days"] for event in day["events"]
+              if event["ticker"] in holdings and event["date"] >= today.isoformat()]
+    without = sorted(holdings - {event["ticker"] for event in events})
+    end = _date_en(until) if english else fecha_es(until)
+    if not events:
+        lines = [f"None of your holdings has a saved earnings date through {end}." if english
+                 else f"Ninguna de tus posiciones tiene fecha de resultados guardada hasta el {end}."]
+    else:
+        lines = [f"Upcoming earnings for your holdings (through {end}):" if english
+                 else f"Próximos resultados de tus posiciones (hasta el {end}):"]
+    for event in events:
+        day = date.fromisoformat(event["date"])
+        line = f"- {event['ticker']}: {_date_en(day) if english else fecha_es(day)}"
+        session = _SESSION.get(event.get("session") or "")
+        if session:
+            line += f", {session[1] if english else session[0]}"
+        confirmed = event.get("confirmed") is True
+        if english:
+            line += " (confirmed date)" if confirmed else " (estimated date)"
+        else:
+            line += " (fecha confirmada)" if confirmed else " (fecha estimada)"
+        lines.append(line)
+    if without and events:
+        lines.append(f"No date in that window: {', '.join(without)}." if english
+                     else f"Sin fecha en ese plazo: {', '.join(without)}.")
+    lines.append("Dates from the saved calendar; I haven't checked the provider live." if english
+                 else "Fechas del calendario guardado; no he consultado el proveedor en directo.")
+    return _response("\n".join(lines), sources, "account_upcoming_earnings")
+
+
 def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     """Respuesta de datos de la cuenta, o None si la pregunta no es de este módulo."""
     tenant = _tenant(db)
@@ -1174,6 +1245,8 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
         return _saved_screens_answer(db, tenant)
     if _asks_alert_rules(text, question):
         return _alert_rules_answer(db, tenant)
+    if _asks_upcoming_earnings(text, question):
+        return _upcoming_earnings_answer(db, tenant)
     if _asks_plan(text, question):
         return _plan_answer(db, tenant, text)
     if _asks_return_ranking(text, question):
