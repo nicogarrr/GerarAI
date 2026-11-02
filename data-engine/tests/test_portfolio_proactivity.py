@@ -114,3 +114,19 @@ def test_cross_tenant_snapshot_not_used(db):
 def test_future_snapshot_not_used(db):
     setup_snapshot(db,targets=[{'kind':'ticker','label':'ASTS','target_pct':20,'band_pct':5}],dated=local_today()+timedelta(days=1))
     assert review_portfolio_data(db)['new_in_app_alerts'] == 0
+
+
+def test_band_alert_reads_in_spanish_number_format(db):
+    """«pesa 52.38%» y «banda de 1 puntos»: cifras en formato español y singular."""
+    setup_snapshot(db, targets=[{'kind': 'ticker', 'label': 'ASTS', 'target_pct': 40.5, 'band_pct': 1}], cash='909')
+    assert review_portfolio_data(db)['new_in_app_alerts'] == 1
+    message = alerts(db)[0].message
+    assert 'pesa 52,38 % sobre' in message
+    assert 'objetivo guardado es 40,5 % con banda de 1 punto.' in message
+
+
+def test_negative_cash_amount_in_spanish_number_format(db):
+    db.add(CashBalance(tenant_id=1, currency='EUR', balance=Decimal('-1234.50'), source='ibkr', as_of=date(2026, 1, 1)))
+    db.commit()
+    assert review_portfolio_data(db)['new_in_app_alerts'] == 1
+    assert 'saldo de -1.234,50 EUR fechado' in alerts(db)[0].message
