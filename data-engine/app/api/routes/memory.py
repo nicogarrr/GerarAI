@@ -55,6 +55,9 @@ _MEMORY_TYPES = {"note", "chat_memory", "watch_item", "embedding"}
 _MEMORY_STATUSES = {"active", "archived", "consolidated"}
 _MEMORY_SOURCE_TYPES = {"user", "chat"}
 _RESEARCH_SESSION_STATUSES = {"open", "active", "closed", "archived"}
+# Estados que el resto de la app entiende (chat, red team, revisiones,
+# CLAIM_STATUS_LABELS). Cualquier otro salía «con estado desconocido».
+_CLAIM_STATUSES = {"unverified", "supported", "contradicted", "superseded", "stale", "uncertain"}
 
 
 def _require_enum(value: str, allowed: set[str], field: str) -> str:
@@ -124,6 +127,8 @@ def list_claims(
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
 ) -> list[Claim]:
+    if status:
+        _require_enum(status, _CLAIM_STATUSES, "claim status")
     statement = select(Claim).options(selectinload(Claim.evidence))
     if ticker:
         company = _company_by_ticker(db, ticker)
@@ -141,6 +146,7 @@ def list_claims(
 
 @router.post("/claims", response_model=ClaimOut)
 def create_claim(payload: ClaimCreate, db: Session = Depends(get_db)) -> Claim:
+    _require_enum(payload.status, _CLAIM_STATUSES, "claim status")
     company_id = _resolve_company_id(db, payload.ticker, payload.company_id)
     thesis = db.get(ThesisVersion, payload.thesis_version_id) if payload.thesis_version_id else None
     if payload.thesis_version_id and thesis is None:
