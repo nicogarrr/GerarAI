@@ -22,6 +22,14 @@ const DIRECTION_KEY: Record<ChangeDirection, TranslationKey> = {
   mixed: 'research.changesFeed.directionMixed',
   none: 'research.changesFeed.directionNone',
 };
+/** Severidad de la alerta del backend (critical/high/medium/low/info) -> texto (es/en); otra pasa tal cual. */
+const SEVERITY_KEY: Record<string, TranslationKey> = {
+  critical: 'home.severity.critical',
+  high: 'home.severity.high',
+  medium: 'home.severity.medium',
+  low: 'home.severity.low',
+  info: 'home.severity.info',
+};
 const DIRECTION_CLASS: Record<ChangeDirection, string> = {
   improves: 'bg-emerald-500/10 text-emerald-300',
   worsens: 'bg-red-500/10 text-red-300',
@@ -77,7 +85,7 @@ function EventCard({ event, ticker, open, onToggle }: { event: ChangeEvent; tick
               <p className="rounded border border-gray-800 p-2 text-xs" key={`r${g.ids[0]}`}><span className="text-gray-500">{t('research.changesFeed.review')}{g.count > 1 ? ` ×${g.count}` : ''}{g.latest ? ` · ${dateTime(g.latest)}` : ''}</span><br />{g.title}</p>
             ))}
             {event.alerts.map((a) => (
-              <p className="rounded border border-gray-800 p-2 text-xs" key={`a${a.id}`}><span className="text-gray-500">{t('research.changesFeed.alertMeta', { severity: a.severity, date: dateTime(a.created_at) })}</span><br />{a.message}</p>
+              <p className="rounded border border-gray-800 p-2 text-xs" key={`a${a.id}`}><span className="text-gray-500">{t('research.changesFeed.alertMeta', { severity: Object.hasOwn(SEVERITY_KEY, a.severity) ? t(SEVERITY_KEY[a.severity]) : a.severity, date: dateTime(a.created_at) })}</span><br />{a.message}</p>
             ))}
           </div>
         </details>
