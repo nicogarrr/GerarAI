@@ -350,3 +350,70 @@ def test_selected_news_review_is_anchor_for_explain_without_unrelated_sources(db
     db.flush()
     response = answer(db, AssistantRequest(mode="guide", ticker="ASTS", review_id=review.id, question="explica la noticia"))
     assert response["status"] == "insufficient_data"
+
+
+def test_guide_dca_reads_saved_level_without_writes_or_narrative(db):
+    import asyncio
+    from datetime import date
+
+    from app.models import DcaSignalState
+    from app.services.research_assistant_narrative import synthesize
+
+    tenant, other, company = setup(db)
+    db.add(DcaSignalState(tenant_id=tenant.id, symbol='ASTS', company_id=company.id,
+                         level=3, status='forming', period='2026-11', signal_date=date(2026, 11, 2),
+                         close=Decimal(42), currency='USD', params_version='v1', data_source='market_prices'))
+    db.commit()
+    payload = AssistantRequest(mode='guide', question='Nivel dca ASTS', ticker='ASTS')
+    result = AssistantResponse.model_validate(answer(db, payload))
+    assert result.status == 'answered' and '3X DCA' in result.answer
+    assert result.writeback is False and result.citations[0].kind == 'market_observation'
+    assert not db.new and not db.dirty and not db.deleted
+    class NoProvider:
+        @property
+        def name(self):
+            raise AssertionError('DCA must not invoke provider')
+    assert asyncio.run(synthesize(db, payload, result.model_dump(), provider=NoProvider()))['answer'] == result.answer
+    db.info['tenant_id'] = other.id
+    assert '3X DCA' not in answer(db, payload)['answer']
+
+
+def test_guide_dca_calculates_local_history_read_only(db):
+    from datetime import date, timedelta
+
+    from app.models import MarketPrice
+
+    _tenant, _, company = setup(db)
+    for i in range(510):
+        db.add(MarketPrice(company_id=company.id, date=date(2024, 1, 1) + timedelta(days=i),
+                           close=Decimal(42), adj_close=Decimal(42), quote_currency='USD', source='test'))
+    db.commit()
+    before = db.query(MarketPrice).count()
+    response = AssistantResponse.model_validate(answer(db, AssistantRequest(
+        mode='guide', question='Nivel dca ASTS', ticker='ASTS')))
+    assert response.status == 'answered' and 'DCA' in response.answer
+    assert 'cierres locales' in response.answer and 'desactualizados' in response.answer
+    assert response.missing_data and response.writeback is False
+    assert db.query(MarketPrice).count() == before
+    assert not db.new and not db.dirty and not db.deleted
+
+
+def test_guide_dca_missing_history_has_specific_reason(db):
+    setup(db)
+    response = answer(db, AssistantRequest(mode='guide', question='Nivel dca ASTS', ticker='ASTS'))
+    assert response['status'] == 'insufficient_data'
+    assert 'cierres locales insuficientes' in response['answer']
+
+
+def test_guide_dca_rejects_raw_split_unverified_history(db):
+    from datetime import date
+
+    from app.models import MarketPrice
+
+    _, _, company = setup(db)
+    db.add(MarketPrice(company_id=company.id, date=date(2026, 10, 30),
+                       close=Decimal(42), quote_currency='USD', source='test'))
+    db.commit()
+    response = answer(db, AssistantRequest(mode='guide', question='Nivel dca ASTS', ticker='ASTS'))
+    assert response['status'] == 'insufficient_data'
+    assert 'splits' in response['answer']
