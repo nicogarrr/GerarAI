@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 test('biblioteca: borrado de documentos expuesto con confirmación, nunca silencioso', () => {
-  const button = readFileSync('components/knowledge/DeleteDocumentButton.tsx', 'utf8') + '\n' + Object.values(JSON.parse(readFileSync('lib/i18n/messages/es/knowledge.json', 'utf8')).delete).join('\n');
+  // Documento: wrapper (identidad + claves i18n) + impl compartida (confirmacion y mutacion).
+  const button = readFileSync('components/knowledge/DeleteDocumentButton.tsx', 'utf8') + '\n' + readFileSync('components/knowledge/DeleteKnowledgeButton.tsx', 'utf8') + '\n' + Object.values(JSON.parse(readFileSync('lib/i18n/messages/es/knowledge.json', 'utf8')).delete).join('\n');
   assert.ok(button.includes('<ConfirmDialog'), 'el borrado pide confirmación explícita con el diálogo compartido');
   assert.ok(button.includes('onConfirm={handleDelete}'), 'la mutación solo se ejecuta al confirmar');
   assert.ok(!button.includes('onClick={handleDelete}'), 'ningún click borra sin confirmar');
@@ -22,7 +23,8 @@ test('biblioteca: borrado de documentos expuesto con confirmación, nunca silenc
 });
 
 test('biblioteca: las colecciones vacías también se borran con confirmación, nunca en silencio', () => {
-  const button = readFileSync('components/knowledge/DeleteCollectionButton.tsx', 'utf8') + '\n' + Object.values(JSON.parse(readFileSync('lib/i18n/messages/es/knowledge.json', 'utf8')).delete).join('\n');
+  // Coleccion: wrapper (identidad + claves i18n) + impl compartida (confirmacion y mutacion).
+  const button = readFileSync('components/knowledge/DeleteCollectionButton.tsx', 'utf8') + '\n' + readFileSync('components/knowledge/DeleteKnowledgeButton.tsx', 'utf8') + '\n' + Object.values(JSON.parse(readFileSync('lib/i18n/messages/es/knowledge.json', 'utf8')).delete).join('\n');
   assert.ok(button.includes('<ConfirmDialog'), 'el borrado pide confirmación explícita con el diálogo compartido');
   assert.ok(button.includes('onConfirm={handleDelete}'), 'la mutación solo se ejecuta al confirmar');
   assert.ok(!button.includes('onClick={handleDelete}'), 'ningún click borra sin confirmar');
@@ -38,4 +40,15 @@ test('biblioteca: las colecciones vacías también se borran con confirmación, 
 
   const route = readFileSync('data-engine/app/api/routes/knowledge.py', 'utf8');
   assert.ok(route.includes('Knowledge collection is not empty'), 'el backend rechaza colecciones con documentos (409)');
+});
+
+test('biblioteca: la lógica de borrado vive UNA vez en DeleteKnowledgeButton', () => {
+  const impl = readFileSync('components/knowledge/DeleteKnowledgeButton.tsx', 'utf8');
+  const doc = readFileSync('components/knowledge/DeleteDocumentButton.tsx', 'utf8');
+  const col = readFileSync('components/knowledge/DeleteCollectionButton.tsx', 'utf8');
+  assert.ok(doc.includes('<DeleteKnowledgeButton'), 'el botón de documento usa la impl compartida');
+  assert.ok(col.includes('<DeleteKnowledgeButton'), 'el botón de colección usa la impl compartida');
+  assert.ok(!doc.includes('useState') && !col.includes('useState'), 'ningún wrapper repite la máquina de estados');
+  assert.ok(impl.includes('onConfirm={handleDelete}'), 'la mutación solo se ejecuta al confirmar');
+  assert.ok(!impl.includes('onClick={handleDelete}'), 'ningún click borra sin confirmar');
 });

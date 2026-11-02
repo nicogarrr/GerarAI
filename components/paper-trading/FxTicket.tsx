@@ -10,6 +10,7 @@ import { paperTradingMessage } from '@/lib/paper-trading/messages-en';
 import { useRouter } from 'next/navigation';
 import type { Currency } from '@/lib/paper-trading/types';
 import { clientOrderIdAfter, parseEsNumber, type SubmitFx } from './submit';
+import { invalidMessage, TicketFeedbackMessages, useExecutedAtLocal, type FieldInvalid } from './ticket-feedback';
 
 function newClientOrderId(): string {
     return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -32,15 +33,8 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
     const [from, setFrom] = useState<Currency>('EUR');
     const [amount, setAmount] = useState('');
     const [rate, setRate] = useState('');
-    const [executedAtLocal, setExecutedAtLocal] = useState(() => {
-        const now = new Date();
-        now.setSeconds(0, 0);
-        return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-    });
-    // Error de validación local ligado a los valores con los que se calculó:
-    // en cuanto el usuario edita cualquier campo la clave cambia y deja de
-    // mostrarse, sin efectos ni renders en cascada.
-    const [invalid, setInvalid] = useState<{ key: string; message: string } | null>(null);
+    const [executedAtLocal, setExecutedAtLocal] = useExecutedAtLocal();
+    const [invalid, setInvalid] = useState<FieldInvalid>(null);
     // Feedback del envío (rechazo/fallo de la acción): persiste hasta el próximo envío.
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
@@ -48,7 +42,7 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
     const [pending, setPending] = useState(false);
 
     const fieldKey = JSON.stringify([from, amount, rate, executedAtLocal]);
-    const validationError = invalid !== null && invalid.key === fieldKey ? invalid.message : null;
+    const validationError = invalidMessage(invalid, fieldKey);
 
     const to: Currency = from === 'EUR' ? 'USD' : 'EUR';
     const numInputHint = ti('paperTrading.numInputHint');
@@ -196,21 +190,12 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                 ) : null}
             </p>
 
-            {validationError || submitError ? (
-                <p role="alert" className="text-sm text-red-400">
-                    {validationError ?? submitError}
-                </p>
-            ) : null}
-            {notice ? (
-                <p role="status" className="text-sm text-teal-300">
-                    {notice}
-                </p>
-            ) : null}
-            {duplicate ? (
-                <p role="status" className="text-sm text-warn">
-                    {duplicate}
-                </p>
-            ) : null}
+            <TicketFeedbackMessages
+                validationError={validationError}
+                submitError={submitError}
+                notice={notice}
+                duplicate={duplicate}
+            />
 
             <Button type="submit" variant="outline" disabled={disabled || pending}>
                 {pending ? ti('paperTrading.fx.submitPending') : ti('paperTrading.fx.submit')}
