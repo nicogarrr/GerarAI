@@ -245,12 +245,22 @@ def _qty(value: float, english: bool) -> str:
     return f"{value:,.4f}".rstrip("0").rstrip(".") if english else num_es(value, 4).rstrip("0").rstrip(",")
 
 
-def _unrealized(db: Session, tenant: int) -> tuple[float, float, str, object] | None:
-    """(ganancia latente, coste, divisa, fecha) de las posiciones abiertas, en su divisa base."""
-    from app.models import Position
+def _unrealized(db: Session, tenant: int) -> tuple[float, float, str, object, list[str]] | None:
+    """(ganancia latente, coste, divisa, fecha, fuera) de las posiciones abiertas, en su divisa base.
 
-    rows = list(db.scalars(select(Position).where(Position.tenant_id == tenant, Position.quantity > 0)))
-    known = [p for p in rows if p.market_value_base is not None and p.cost_basis_base is not None]
+    Solo cuentan las cotizadas: una posición valorada al precio de su última
+    operación (sin cotización, auditoría A3) no tiene plusvalía medida, como en
+    cartera e impuestos. ``fuera`` nombra las que quedan fuera (A3 o sin valor).
+    """
+    from app.models import Company, Position
+    from app.services.portfolio_ledger_service import trade_price_fallbacks
+
+    rows = list(db.execute(select(Position, Company.ticker).join(Company, Company.id == Position.company_id)
+                           .where(Position.tenant_id == tenant, Position.quantity > 0)).all())
+    quote_missing = trade_price_fallbacks(db, [p for p, _ in rows], tenant_id=tenant)
+    known = [p for p, _ in rows if p.market_value_base is not None and p.cost_basis_base is not None
+             and p.company_id not in quote_missing]
+    left_out = sorted({t for p, t in rows if p not in known})
     currencies = {p.base_currency or "EUR" for p in known}
     if not known or len(currencies) != 1:
         return None
@@ -258,7 +268,7 @@ def _unrealized(db: Session, tenant: int) -> tuple[float, float, str, object] | 
     value = sum(float(p.market_value_base) for p in known)
     if cost <= 0:
         return None
-    return value - cost, cost, currencies.pop(), max(p.as_of for p in known)
+    return value - cost, cost, currencies.pop(), max(p.as_of for p in known), left_out
 
 
 def _year_gains_answer(db: Session, tenant: int, year: int) -> ChatResponse:
@@ -309,7 +319,7 @@ def _year_gains_answer(db: Session, tenant: int, year: int) -> ChatResponse:
     if year == today.year:
         latent = _unrealized(db, tenant)
         if latent is not None:
-            amount, cost, currency, as_of = latent
+            amount, cost, currency, as_of, left_out = latent
             day = _date_en(as_of) if english else fecha_es(as_of)
             lines.append(
                 f"- Unrealized (still open, not sold): {_money(amount, currency, signed=True, english=True)} "
@@ -318,6 +328,10 @@ def _year_gains_answer(db: Session, tenant: int, year: int) -> ChatResponse:
                 f"- Latente (lo que sigue abierto, no vendido): {_money(amount, currency, signed=True)} "
                 f"({_pct(amount / cost, signed=True)}) sobre un coste de {_money(cost, currency)}, "
                 f"con datos a {day}; es desde la compra, no solo de este año.")
+            if left_out:
+                lines.append(("Left out of the unrealized figure (no real quote or no saved value): " if english
+                              else "Fuera del latente (sin cotización real o sin valor guardado): ")
+                             + ", ".join(left_out[:10]) + ".")
             sources.append(_source("position", None, "Posiciones abiertas", "/portfolio"))
             lines.append("They are not added up: the unrealized part isn't a gain until you sell." if english
                          else "No se suman: lo latente no es ganancia hasta que vendes.")
