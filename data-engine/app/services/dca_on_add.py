@@ -158,6 +158,45 @@ def enqueue_dca_for_new_tracked(db: Session) -> int:
     return enqueue_dca_on_add(db, symbols, only_new=True)
 
 
+def _send_ticker_news(tenant_id: int, user_id: str, ticker: str) -> None:
+    from app.workers.dramatiq_app import coalesced_send, refresh_ticker_news
+
+    # Una copia en vuelo por (tenant, ticker): el carril de noticias pone el
+    # ritmo (frenos de Yahoo/Google y pausa entre peticiones).
+    coalesced_send(refresh_ticker_news, tenant_id=tenant_id, user_id=user_id, ticker=ticker, scope="tracked")
+
+
+def enqueue_market_data_on_add(
+    db: Session,
+    symbol: str,
+    *,
+    backfill: Callable[..., int] | None = None,
+    news_sender: Callable[[int, str, str], None] | None = None,
+) -> None:
+    """Al añadir a la watchlist: historial de precios (si la empresa existe y le
+    falta pasado) y noticias del ticker, sin esperar a los barridos. Nunca lanza."""
+    from app.models import Company
+
+    tenant_id = db.info.get("tenant_id")
+    user_id = db.info.get("user_id")
+    if tenant_id is None or not user_id:
+        return
+    ticker = symbol.strip().upper()
+    try:
+        company = db.scalar(select(Company).where(Company.ticker == ticker))
+        if company is not None:
+            if backfill is None:
+                from app.services.market_close_sync import enqueue_price_backfills as backfill
+            backfill(db, [company.id], tenant_id=int(tenant_id), user_id=str(user_id))
+    except Exception:  # noqa: BLE001 - el alta manda
+        logger.warning("on-add: no se pudo encolar el historial de %s", ticker, exc_info=True)
+        db.rollback()
+    try:
+        (news_sender or _send_ticker_news)(int(tenant_id), str(user_id), ticker)
+    except Exception:  # noqa: BLE001 - el alta manda
+        logger.warning("on-add: no se pudieron encolar las noticias de %s", ticker, exc_info=True)
+
+
 def is_preparing(db: Session, symbol: str, *, client: Any = None) -> bool:
     """¿Hay una evaluación al añadir en cola o en curso para este símbolo?"""
     tenant_id = db.info.get("tenant_id")

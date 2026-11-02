@@ -7,7 +7,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from app.models import DcaSignalState, WatchItem
@@ -192,3 +192,41 @@ def test_tras_importar_encola_lo_seguido_sin_senal(db, monkeypatch):
     monkeypatch.setattr(dca_on_add, "enqueue_dca_on_add", lambda session, symbols, **kw: calls.append((sorted(symbols), kw)) or 1)
     assert dca_on_add.enqueue_dca_for_new_tracked(db) == 1
     assert calls == [(["FRESH", "NUEVO"], {"only_new": True})]
+
+
+def test_alta_encola_historial_y_noticias_sin_romper(db):
+    from app.models import Company
+
+    db.add(Company(ticker="HIST", name="Hist Inc", exchange="NASDAQ", company_type="operating", valuation_model="dcf"))
+    db.commit()
+    company_id = db.scalar(select(Company.id).where(Company.ticker == "HIST"))
+    backfills, news = [], []
+
+    def backfill(session, ids, *, tenant_id, user_id):
+        backfills.append((list(ids), tenant_id, user_id))
+        return 1
+
+    dca_on_add.enqueue_market_data_on_add(db, "hist", backfill=backfill,
+                                          news_sender=lambda t, u, s: news.append((t, u, s)))
+    assert backfills == [([company_id], 1, "u1")] and news == [(1, "u1", "HIST")]
+    # Sin ficha de empresa todavía: solo noticias (el historial llega con la compra o el ensure).
+    dca_on_add.enqueue_market_data_on_add(db, "NOCO", backfill=backfill,
+                                          news_sender=lambda t, u, s: news.append((t, u, s)))
+    assert len(backfills) == 1 and news[-1] == (1, "u1", "NOCO")
+
+    def broken(*_a, **_k):
+        raise ConnectionError("cola caída")
+
+    dca_on_add.enqueue_market_data_on_add(db, "HIST", backfill=broken, news_sender=broken)  # no lanza
+    db.info["user_id"] = None
+    dca_on_add.enqueue_market_data_on_add(db, "HIST", backfill=backfill, news_sender=broken)
+    assert len(backfills) == 1
+
+
+def test_noticias_al_anadir_usan_el_envio_con_una_copia_en_vuelo(monkeypatch):
+    from app.workers import dramatiq_app
+
+    calls = []
+    monkeypatch.setattr(dramatiq_app, "coalesced_send", lambda actor, **kw: calls.append((actor.actor_name, kw)))
+    dca_on_add._send_ticker_news(1, "u1", "AAA")
+    assert calls == [("refresh_ticker_news", {"tenant_id": 1, "user_id": "u1", "ticker": "AAA", "scope": "tracked"})]

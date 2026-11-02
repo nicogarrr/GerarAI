@@ -39,6 +39,8 @@ def enqueued(monkeypatch):
         return 1
 
     monkeypatch.setattr("app.api.routes.watchlist.enqueue_dca_on_add", fake)
+    monkeypatch.setattr("app.api.routes.watchlist.enqueue_market_data_on_add",
+                        lambda db, symbol: calls.append((db.info.get("tenant_id"), ["data:" + symbol])))
     monkeypatch.setattr("app.services.dca_on_add.enqueue_dca_on_add", fake)
     return calls
 
@@ -46,10 +48,10 @@ def enqueued(monkeypatch):
 def test_alta_en_watchlist_encola_la_senal_dca_una_vez(call, enqueued):
     symbol = f"OA{uuid4().hex[:4].upper()}"
     assert call("POST", "/api/watchlist", {"symbol": symbol}).status_code == 201
-    assert len(enqueued) == 1 and enqueued[0][1] == [symbol] and enqueued[0][0] is not None
+    assert [s for _, s in enqueued] == [[symbol], ["data:" + symbol]] and enqueued[0][0] is not None
     # Cambiar la etiqueta no es un alta: no se vuelve a encolar.
     assert call("POST", "/api/watchlist", {"symbol": symbol, "company": "Otra"}).status_code == 201
-    assert len(enqueued) == 1
+    assert len(enqueued) == 2
 
 
 def test_el_alta_responde_aunque_falle_el_encolado(call, monkeypatch):
