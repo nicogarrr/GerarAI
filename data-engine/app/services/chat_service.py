@@ -9,6 +9,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.i18n import current_language_is_english as _english
 from app.core.local_date import local_today
 from app.llm.base import LLMProvider
 from app.llm.chat_provider import create_chat_llm_provider
@@ -234,13 +235,6 @@ _MONTHS_EN = (
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 )
-
-
-def _english() -> bool:
-    """True si la petición pide inglés (Ajustes → Idioma, con la generación multidioma activa)."""
-    from app.core.i18n import current_language
-
-    return current_language() == "en"
 
 
 # Respuesta general sin ticker (texto y panel plegado), en español o inglés.

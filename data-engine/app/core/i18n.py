@@ -149,3 +149,8 @@ async def bind_request_language(request: Request) -> AsyncIterator[None]:
         yield
     finally:
         _request_language.reset(token)
+
+
+def current_language_is_english() -> bool:
+    """True si la peticion pide ingles (Ajustes -> Idioma, con la generacion multidioma activa)."""
+    return current_language() == "en"

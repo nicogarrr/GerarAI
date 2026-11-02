@@ -25,3 +25,12 @@ def local_today(now: datetime | None = None) -> date:
     if instant.tzinfo is None:
         instant = instant.replace(tzinfo=UTC)
     return instant.astimezone(USER_TIMEZONE).date()
+
+
+def as_date(value: object) -> date | None:
+    """Coerce datetime/date a date; cualquier otra cosa es «sin fecha» (None)."""
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return None

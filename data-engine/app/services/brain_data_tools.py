@@ -13,6 +13,7 @@ from urllib.parse import quote
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.i18n import current_language_is_english as _english
 from app.core.local_date import local_today
 from app.models import (
     Company,
@@ -107,13 +108,6 @@ def _company_in_question(db: Session, question: str) -> Company | None:
 
 
 _MONTHS_EN = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-
-
-def _english() -> bool:
-    """True si la petición pide inglés (Ajustes → Idioma, con la generación multidioma activa)."""
-    from app.core.i18n import current_language
-
-    return current_language() == "en"
 
 
 def _date_en(value) -> str:

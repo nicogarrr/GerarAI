@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.local_date import local_today
+from app.core.tenancy import session_tenant_id as _tenant
 from app.models import PortfolioDailySnapshot
 from app.schemas import ChatResponse
 from app.services.display_es import fecha_es
@@ -31,13 +32,6 @@ def _english() -> bool:
     from app.core.i18n import current_language
 
     return current_language() == "en"
-
-
-def _tenant(db: Session) -> int | None:
-    tenant = db.info.get("tenant_id")
-    if type(tenant) is not int or tenant <= 0:
-        return None
-    return tenant
 
 
 def _fold(text: str) -> str:

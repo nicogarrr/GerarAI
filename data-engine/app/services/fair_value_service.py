@@ -37,11 +37,12 @@ import logging
 import math
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import as_date as _as_date
 from app.core.tenancy import tenant_filters
 from app.models import Company, ThesisVersion, ValuationModel, ValuationOutput
 from app.services.thesis_publication_gate import thesis_withheld_reasons
@@ -76,14 +77,6 @@ class EngineBlock:
     reason: str
     missing_inputs: tuple[str, ...] = ()
     as_of: date | None = None
-
-
-def _as_date(value: object) -> date | None:
-    if isinstance(value, datetime):
-        return value.date()
-    if isinstance(value, date):
-        return value
-    return None
 
 
 def _positive(raw: object) -> float | None:
