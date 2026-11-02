@@ -68,7 +68,18 @@
     "trigger": "Trigger: {trigger}",
     "mentalModels": "Mental models",
     "whatIDontKnow": "What I don't know",
-    "textOnlyNote": "Text search. Try terms in the original language too."
+    "textOnlyNote": "Text search. Try terms in the original language too.",
+    "probabilityNote": "Model estimate, not a data point.",
+    "disclaimer": "Not financial advice. Library doctrine, not current company data.",
+    "messages": {
+      "analysisUnavailable": "Structured analysis is not available right now. These are the most related passages from the library.",
+      "synthesisUnavailable": "Passages found. Synthesis not available.",
+      "notAnswered": "The passages found do not answer this question.",
+      "modelNotApproved": "Passages found. Synthesis not available: the model configured for the library is not an approved model (verified free or Go subscription).",
+      "citationsRejected": "Passages found. The model answered, but its answers did not pass the citation check. The cited passages are verbatim and still valid.",
+      "providerDown": "Passages found. Synthesis not available right now: the model provider did not respond. The cited passages are verbatim and still valid.",
+      "noFragments": "There are no library passages for this question."
+    }
   },
   "panel": {
     "title": "GerarAI Brain",
