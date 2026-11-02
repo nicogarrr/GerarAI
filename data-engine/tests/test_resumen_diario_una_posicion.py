@@ -46,7 +46,7 @@ def test_one_position_moved_is_singular(db):
 
 def test_one_position_without_close_is_singular(db):
     alert = _emit(db, [{"ticker": "ASTS", "status": "sin datos"}])
-    assert alert.message.startswith("1 posición seguida, sin datos de cierre para el 2026-10-09")
+    assert alert.message.startswith("1 posición seguida, sin datos de cierre para el 9 oct 2026")
 
 
 def test_two_positions_stay_plural(db):
@@ -68,4 +68,4 @@ def test_english_singular(db, english):
 
 def test_english_singular_without_close(db, english):
     alert = _emit(db, [{"ticker": "ASTS", "status": "sin datos"}])
-    assert alert.message.startswith("1 position tracked, no closing data for 2026-10-09")
+    assert alert.message.startswith("1 position tracked, no closing data for Oct 9, 2026")

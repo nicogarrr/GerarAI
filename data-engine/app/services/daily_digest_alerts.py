@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.i18n import generation_language
 from app.core.local_date import USER_TIMEZONE
 from app.models import PortfolioMoveDigest, ResearchAlert
+from app.services.date_format import readable_date
 
 VERSION = "daily-digest-alert-v1"
 
@@ -65,7 +66,7 @@ def _summary_en(items, disponibles, lineas, total_var, omitidas, sin_datos_shown
         text = "There were no open positions to summarise."
     elif not disponibles:
         text = (f"{len(items)} position{'s' if len(items) != 1 else ''} tracked, no closing data for "
-                f"{as_of.isoformat()} (no data, not 0).")
+                f"{readable_date(as_of, 'en')} (no data, not 0).")
     else:
         noun = "positions" if len(items) != 1 else "position"
         text = f"{total_var} of {len(items)} {noun} moved: " + ", ".join(lineas) + "."
@@ -79,7 +80,7 @@ def _summary_en(items, disponibles, lineas, total_var, omitidas, sin_datos_shown
         for ticker in sorted(huecos)[:_MAX_LINEAS]:
             days = huecos[ticker]
             if days:
-                missing = ", ".join(days)
+                missing = "; ".join(readable_date(day, "en") for day in days)
                 parts.append(f"{ticker} (missing the close of {missing})" if len(days) == 1
                              else f"{ticker} (missing the closes of {missing})")
             else:
@@ -142,7 +143,7 @@ def emit_digest_alert(db: Session, digest: PortfolioMoveDigest, as_of: date) -> 
         resumen = "No había posiciones abiertas que resumir."
     elif not disponibles:
         resumen = (f"{len(items)} posici{'ones seguidas' if len(items) != 1 else 'ón seguida'}, sin datos de cierre para el "
-                   f"{as_of.isoformat()} (sin datos, no 0).")
+                   f"{readable_date(as_of)} (sin datos, no 0).")
     else:
         resumen = (f"{total_var} de {len(items)} posici{'ones' if len(items) != 1 else 'ón'} con variación: "
                    + ", ".join(lineas) + ".")
@@ -157,7 +158,7 @@ def emit_digest_alert(db: Session, digest: PortfolioMoveDigest, as_of: date) -> 
         for ticker in sorted(huecos)[:_MAX_LINEAS]:
             dias = huecos[ticker]
             if dias:
-                faltan = ", ".join(dias)
+                faltan = ", ".join(readable_date(dia) for dia in dias)
                 partes.append(f"{ticker} (falta el cierre del {faltan})" if len(dias) == 1
                               else f"{ticker} (faltan los cierres del {faltan})")
             else:
@@ -176,22 +177,25 @@ def emit_digest_alert(db: Session, digest: PortfolioMoveDigest, as_of: date) -> 
         sampled = sampled.replace(tzinfo=UTC)
     sampled = sampled.astimezone(UTC)  # metadatos máquina: siempre UTC
     # La hora que lee el usuario va en Europe/Madrid, no en la del servidor (UTC).
-    sampled_txt = sampled.astimezone(USER_TIMEZONE).strftime("%Y-%m-%d %H:%M") + " (hora de Madrid)"
-    sampled_txt_en = sampled.astimezone(USER_TIMEZONE).strftime("%Y-%m-%d %H:%M") + " (Madrid time)"
+    # Fechas legibles («9 oct 2026», «Oct 9, 2026»): ISO crudo en un aviso es un bug (auditoría F1).
+    sampled_local = sampled.astimezone(USER_TIMEZONE)
+    sampled_txt = f"{readable_date(sampled_local)}, {sampled_local:%H:%M} (hora de Madrid)"
+    sampled_txt_en = f"{readable_date(sampled_local, 'en')}, {sampled_local:%H:%M} (Madrid time)"
+    day_es, day_en = readable_date(as_of), readable_date(as_of, "en")
     alert = ResearchAlert(
         tenant_id=tenant_id, company_id=None, severity="low", status="open",
         alert_type="daily_digest",
-        title=(f"Daily summary of your portfolio as of {as_of.isoformat()}" if en
-               else f"Resumen diario de tu cartera al {as_of.isoformat()}"),
+        title=(f"Daily summary of your portfolio as of {day_en}" if en
+               else f"Resumen diario de tu cartera al {day_es}"),
         message=(
             (resumen + " Price changes from yfinance adjusted closes as of "
-             f"{as_of.isoformat()}, not your position's P&L. "
+             f"{day_en}, not your position's P&L. "
              f"Portfolio measured when the summary was generated ({sampled_txt_en}); "
              "later moves are not included. "
              f"Summary coverage: {_COVERAGE_EN.get(str(cobertura_resumen), cobertura_resumen)}.")
             if en
             else (resumen + " Variaciones del valor con cierres ajustados de yfinance al "
-                  f"{as_of.isoformat()}, no el P&L de tu posición. "
+                  f"{day_es}, no el P&L de tu posición. "
                   f"Cartera medida al generar el resumen ({sampled_txt}); "
                   "movimientos posteriores no están incluidos. "
                   f"Cobertura del resumen: {cobertura_resumen}.")
