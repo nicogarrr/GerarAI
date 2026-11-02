@@ -150,3 +150,21 @@ def test_sale_question_parsing():
     assert _sale_question_es("if I sell half my UBER") == "if I vendo la mitad my UBER"
     assert _sale_question_es("if I sold all my UBER") == "if I vendo mis UBER"
     assert _sale_question_es("if I sell 50 percent of UBER") == "if I vendo 50 % of UBER"
+
+
+@pytest.mark.parametrize("question, expected", [
+    ("if I sell a third at $30", "if I vendo un tercio a $30"),
+    ("if I sell one third of my UBER", "if I vendo un tercio de mis UBER"),
+    ("if I sell two thirds", "if I vendo dos tercios"),
+    ("if I sell a quarter of my shares", "if I vendo un cuarto de mis acciones"),
+    ("if I sell three quarters at $30", "if I vendo tres cuartos a $30"),
+])
+def test_sale_fractions_in_english(question, expected):
+    """«sell a third» vendía TODA la posición: la fracción no se traducía."""
+    assert _sale_question_es(question) == expected
+
+
+def test_sell_a_third_sells_a_third_not_everything(en):
+    resp = _ask(en, "How much tax would I pay if I sell a third of my UBER?")
+    assert resp.llm_trace["path"] == "portfolio_sale_tax"
+    assert resp.answer.startswith("If you sold 10 of your 30 UBER shares today")
