@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.local_date import local_today
 from app.models import (
     Claim,
     ClaimEvidence,
@@ -123,7 +124,9 @@ def _load_thesis_notes_by_company(
             Note(
                 title=f"Tesis {company.ticker} v{v.version}",
                 version=v.version,
-                date=v.updated_at.date().isoformat() if v.updated_at else "",
+                # Día de Madrid de la última edición (no el día UTC: de 0 a 2 h
+                # salía el anterior), como el PDF/EPUB de la tesis.
+                date=local_today(v.updated_at).isoformat() if v.updated_at else "",
                 status=v.status or "",
                 body=(archived_thesis_notice(v, reasons[v.id]) if reasons[v.id] else
                 v.thesis_markdown or "\n\n".join(
