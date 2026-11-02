@@ -12,8 +12,16 @@ const LEVEL_LABELS_EN: Record<number, string> = {
   4: '4X DCA', 3: '3X DCA', 2: '2X DCA', 1: '1X DCA', [-1]: 'LIGHT TRIM', [-2]: 'HEAVY TRIM',
 };
 
+const pct1 = (value: number | null | undefined): string => (typeof value === 'number' ? value.toFixed(1) : '—');
+
 export function splitReasonText(row: ContributionAllocation, locale: Locale): string {
   if (locale !== 'en') return row.reason;
+  if (row.concentration_capped) {
+    const capLabel = row.dca_level === null || row.dca_level === undefined
+      ? (row.dca_stale ? 'stale DCA level' : 'no DCA level')
+      : (LEVEL_LABELS_EN[row.dca_level] ?? `level ${row.dca_level}`);
+    return `${capLabel}: already ${pct1(row.market_share_pct)}% of the plan, over twice its target weight (${pct1(row.base_share_pct)}%); no contribution this month`;
+  }
   if (row.dca_stale) return `stale DCA level (month ${row.dca_period || 'n/a'}): normal weight (1X) until re-evaluated`;
   if (row.dca_level === null || row.dca_level === undefined) return 'no DCA level: normal weight (1X)';
   const label = LEVEL_LABELS_EN[row.dca_level] ?? `level ${row.dca_level}`;
@@ -31,12 +39,15 @@ const NOTES_EN: Record<string, string> = {
 };
 
 const STALE_NOTE = /^Nivel DCA de hace más de un mes en (.+): pesa como 1X hasta que se vuelva a evaluar\.$/;
+const CAP_NOTE = /^Sin aportación nueva este mes a (.+): ya pesan? más del doble de su peso objetivo en el plan\.$/;
 
 export function splitNoteText(note: string, locale: Locale): string {
   if (locale !== 'en') return note;
   if (Object.hasOwn(NOTES_EN, note)) return NOTES_EN[note];
   const stale = STALE_NOTE.exec(note);
-  return stale ? `DCA level older than a month for ${stale[1]}: weighted as 1X until re-evaluated.` : note;
+  if (stale) return `DCA level older than a month for ${stale[1]}: weighted as 1X until re-evaluated.`;
+  const capped = CAP_NOTE.exec(note);
+  return capped ? `No new money this month for ${capped[1]}: already over twice the target weight in the plan.` : note;
 }
 
 /** Resumen «Este mes X a POOL, …»; `money` formatea importe + divisa en el idioma activo. */

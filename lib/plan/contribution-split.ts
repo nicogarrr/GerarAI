@@ -16,6 +16,11 @@ export type ContributionAllocation = {
   /** Nivel de hace más de un mes: no se usa (pesa 1X). */
   dca_stale?: boolean;
   multiplier: number;
+  /** Ya pesa más del doble de su peso base en el plan: este mes no recibe aportación. */
+  concentration_capped?: boolean;
+  /** Peso actual en la cartera del plan y peso base, en %; null si no hay valores fiables. */
+  market_share_pct?: number | null;
+  base_share_pct?: number | null;
   reason: string;
 };
 
