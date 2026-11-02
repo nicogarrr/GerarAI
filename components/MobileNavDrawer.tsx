@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, type RefObject } from 'react';
+import { useRef, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { GerarAIWordmark } from '@/components/GerarAIWordmark';
@@ -8,6 +8,7 @@ import NavItems from '@/components/NavItems';
 import SearchCommand from '@/components/SearchCommand';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
 import { useT } from '@/lib/i18n/client';
+import { useNavDrawer } from '@/hooks/useNavDrawer';
 
 type Props = {
     onClose: () => void;
@@ -25,70 +26,9 @@ export default function MobileNavDrawer({ onClose, triggerRef, initialStocks }: 
     const drawerRef = useRef<HTMLDivElement>(null);
     const closeButtonRef = useRef<HTMLButtonElement>(null);
     const dialogRef = useRef<HTMLDivElement>(null);
-    // Escape cierra, Tab circula dentro del drawer y el scroll del body se
-    // bloquea mientras esta abierto. El foco entra por el boton de cerrar y
-    // vuelve al disparador al cerrar.
-    useEffect(() => {
-        const trigger = triggerRef.current;
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                onClose();
-                return;
-            }
-            if (e.key !== 'Tab') return;
-            const dialog = dialogRef.current;
-            if (!dialog) return;
-            // El backdrop lleva tabIndex=-1 a proposito (cierra por fondo, no es
-            // un control del ciclo) y la CTA del drawer puede estar display:none
-            // por breakpoint: un focusable invisible o sin tab stop rompe el
-            // ciclo (Shift+Tab escapaba al backdrop - auditor #1076).
-            const focusable = Array.from(
-                dialog.querySelectorAll<HTMLElement>(
-                    'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-                ),
-            ).filter((el) => el.tabIndex >= 0 && el.getClientRects().length > 0);
-            if (focusable.length === 0) {
-                e.preventDefault();
-                dialog.focus();
-                return;
-            }
-            const first = focusable[0];
-            const last = focusable[focusable.length - 1];
-            if (e.shiftKey && document.activeElement === first) {
-                e.preventDefault();
-                last.focus();
-            } else if (!e.shiftKey && document.activeElement === last) {
-                e.preventDefault();
-                first.focus();
-            }
-        };
-        // Cruzar a md+ con el drawer abierto lo oculta (md:hidden) sin
-        // cerrarlo: el body quedaria con overflow:hidden y el listener Tab
-        // activo contra un menu invisible. Se cierra al cambiar el breakpoint.
-        const mq = window.matchMedia('(min-width: 768px)');
-        const onBreakpoint = () => {
-            if (mq.matches) onClose();
-        };
-        mq.addEventListener('change', onBreakpoint);
-        document.addEventListener('keydown', onKey);
-        closeButtonRef.current?.focus();
-        const prevOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        return () => {
-            mq.removeEventListener('change', onBreakpoint);
-            document.removeEventListener('keydown', onKey);
-            document.body.style.overflow = prevOverflow;
-            // Al cerrar por breakpoint (resize a md+) el trigger esta oculto:
-            // enfocarlo seria mandar el foco a un elemento invisible; se suelta
-            // al documento en su lugar (auditor #1076).
-            if (trigger && trigger.getClientRects().length > 0) trigger.focus();
-            else (document.activeElement as HTMLElement | null)?.blur?.();
-        };
-        // onClose y triggerRef son estables para la vida del drawer (el padre
-        // lo desmonta al cerrar): el efecto corre una vez por apertura.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    // Escape, ciclo de Tab, bloqueo de scroll, cierre al cruzar a md+ y
+    // foco: comportamiento compartido con PublicMobileNav (hooks/useNavDrawer).
+    useNavDrawer({ active: true, onClose, dialogRef, closeButtonRef, triggerRef });
 
     return createPortal(
         <div
