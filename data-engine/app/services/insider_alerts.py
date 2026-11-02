@@ -289,7 +289,7 @@ def _build_alerts(
                     )
                     if en
                     else (
-                        f"${total:,.0f} como minimo: {missing_value} de "
+                        f"${total:,.0f} como mínimo: {missing_value} de "
                         f"{len(window)} compras sin cifra en el XML"
                     )
                 )
@@ -309,8 +309,8 @@ def _build_alerts(
                             if en
                             else (
                                 f"{len(insiders)} insiders distintos compraron {ticker} "
-                                f"en {CLUSTER_WINDOW_DAYS} dias ({total_phrase}). "
-                                "Codigo P: mercado abierto o privado."
+                                f"en {CLUSTER_WINDOW_DAYS} días ({total_phrase}). "
+                                "Código P: mercado abierto o privado."
                             )
                         ),
                         "metadata": {
