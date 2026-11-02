@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -60,6 +60,15 @@ class PlanUpsertInput(BaseModel):
     target_allocations: list[PlanTarget] = Field(default_factory=list)
 
     _currency_is_iso = field_validator("monthly_contribution_currency")(_iso_currency)
+
+    @field_validator("monthly_contribution")
+    @classmethod
+    def _at_least_one_cent(cls, value: float) -> float:
+        # La columna guarda céntimos (Numeric(14, 2)): 0,001 pasaba el «> 0» y el
+        # plan quedaba con una cuota de 0,00. Mismo criterio que las aportaciones.
+        if Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) <= 0:
+            raise ValueError("La aportación mensual debe ser positiva con precisión de céntimos.")
+        return value
 
     @model_validator(mode="after")
     def _targets_fit_in_each_dimension(self) -> PlanUpsertInput:
