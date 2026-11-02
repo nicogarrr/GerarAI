@@ -230,7 +230,9 @@ _YEAR_GAINS = re.compile(
 _SALES = re.compile(
     r"\b(?:que\s+(?:he\s+|hemos\s+)?(?:vendido|vendi|vendimos)|mis\s+ventas|ventas\s+(?:de|del)\s+(?:este|mi)"
     r"|plusvalias?\s+(?:he\s+)?realizadas?|(?:he|hemos)\s+realizado|ganancias?\s+realizadas?"
-    r"|what\s+(?:did\s+i\s+sell|have\s+i\s+sold)|my\s+sales|realized\s+gains?)\b"
+    r"|what\s+(?:did\s+i\s+sell|have\s+i\s+sold)|my\s+sales|realized\s+gains?"
+    # «¿cuánto he vendido este año?», «how much did I sell this year?» (antes, modelo general).
+    r"|cuanto\s+(?:he\s+|hemos\s+)?(?:vendido|vendi|vendimos)|how\s+much\s+(?:did\s+i\s+sell|have\s+i\s+sold))\b"
 )
 _TICKER_TOKEN = re.compile(r"\b[A-Z][A-Z0-9.]{0,5}\b")
 _NOT_TICKERS = {"IRPF", "EUR", "USD", "DCA", "ETF", "YTD", "I", "A", "Y", "O"}
