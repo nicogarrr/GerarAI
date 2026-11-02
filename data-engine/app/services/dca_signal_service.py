@@ -317,8 +317,9 @@ def _db_history(db: Session, company: Company | None) -> FetchedHistory:
     # Columnas, no entidades: son años de cierres por ticker y construir un
     # MarketPrice ORM por fila era casi todo el coste de la evaluacion DCA
     # (400 tickers x 5 años = ~520.000 objetos). MarketPrice no es de tenant.
+    # El cierre se pasa a float una vez (antes dos: al filtrar y al escalar).
     prices = [
-        (day, close, adj_close, quote_currency)
+        (day, close_float, adj_close, quote_currency)
         for day, close, adj_close, quote_currency in db.execute(
             select(
                 MarketPrice.date,
@@ -329,7 +330,7 @@ def _db_history(db: Session, company: Company | None) -> FetchedHistory:
             .where(MarketPrice.company_id == company.id)
             .order_by(MarketPrice.date)
         )
-        if close and float(close) > 0
+        if close and (close_float := float(close)) > 0
     ]
     declared = [quote for _day, _close, _adj, quote in prices if quote]
     unit = declared[-1] if declared else company.currency
@@ -350,7 +351,7 @@ def _db_history(db: Session, company: Company | None) -> FetchedHistory:
         rows.append(
             PriceRow(
                 day=day,
-                close=float(close) * scale,
+                close=close * scale,
                 adj_close=float(adj_close) * scale if adj_close else None,
             )
         )
