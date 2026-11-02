@@ -116,15 +116,15 @@
   "split": {
     "title": "Aportación de este mes",
     "fallbackDescription": "Reparto de la cuota mensual por nivel DCA",
-    "basisObjetivosTicker": "Pesos objetivo por ticker × nivel DCA",
-    "basisPosicionesIguales": "Posiciones vivas a partes iguales × nivel DCA",
+    "basisObjetivosTicker": "Pesos objetivo por ticker × nivel DCA²",
+    "basisPosicionesIguales": "Posiciones vivas a partes iguales × nivel DCA²",
     "emptyNoPlan": "Configura el plan para ver el reparto de la aportación.",
     "emptyNoCandidates": "El plan no tiene objetivos por ticker ni posiciones vivas: no hay a qué repartir la aportación.",
     "amountColumn": "Importe",
     "weightColumn": "Peso",
     "levelColumn": "Nivel DCA",
     "unallocated": "Sin asignar (liquidez): {amount}",
-    "weightNote": "4X pesa 4, 3X 3, 2X 2, 1X 1; las zonas de recorte no reciben dinero nuevo y sin nivel DCA se pesa como 1X.",
+    "weightNote": "4X pesa 16, 3X 9, 2X 4, 1X 1 (el nivel al cuadrado); las zonas de recorte no reciben dinero nuevo y sin nivel DCA se pesa como 1X.",
     "periodTitle": "Mes {period} ({status})",
     "noData": "s/d"
   },

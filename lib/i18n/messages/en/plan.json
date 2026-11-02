@@ -116,15 +116,15 @@
   "split": {
     "title": "This month's contribution",
     "fallbackDescription": "Monthly contribution split by DCA level",
-    "basisObjetivosTicker": "Target weights per ticker × DCA level",
-    "basisPosicionesIguales": "Live positions in equal parts × DCA level",
+    "basisObjetivosTicker": "Target weights per ticker × DCA level²",
+    "basisPosicionesIguales": "Live positions in equal parts × DCA level²",
     "emptyNoPlan": "Set up the plan to see the contribution split.",
     "emptyNoCandidates": "The plan has no per-ticker targets or live positions: there is nothing to split the contribution across.",
     "amountColumn": "Amount",
     "weightColumn": "Weight",
     "levelColumn": "DCA level",
     "unallocated": "Unallocated (cash): {amount}",
-    "weightNote": "4X weighs 4, 3X 3, 2X 2, 1X 1; trim zones get no new money and no DCA level weighs as 1X.",
+    "weightNote": "4X weighs 16, 3X 9, 2X 4, 1X 1 (the level squared); trim zones get no new money and no DCA level weighs as 1X.",
     "periodTitle": "Month {period} ({status})",
     "noData": "n/a"
   },
