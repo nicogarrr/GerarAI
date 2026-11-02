@@ -22,6 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.i18n import generation_language
 from app.models import ResearchAlert
 
 VERSION = "macro-event-v1"
@@ -65,20 +66,51 @@ def due_windows(event: dict[str, Any], now: datetime) -> list[str]:
     return []
 
 
-def _when_text(event: dict[str, Any], window: str, now: datetime) -> str:
+_TITLES_EN = {
+    "fomc": "FOMC meeting (rate decision)",
+    "cpi": "US CPI (inflation)",
+    "employment": "US jobs report",
+    "ppi": "US PPI (producer prices)",
+    "jolts": "JOLTS: job openings",
+    "eci": "Employment Cost Index",
+}
+_DETAILS_EN = {"Con proyecciones económicas": "With economic projections"}
+_SOURCES_EN = {"Reserva Federal": "Federal Reserve"}
+_LABELS_EN = {"OFICIAL": "OFFICIAL"}
+
+
+def _when_text(event: dict[str, Any], window: str, now: datetime, language: str = "es") -> str:
+    en = language == "en"
     start, has_time = _start(event)  # type: ignore[misc]
     if not has_time:
         today = now.astimezone(ET).date()
-        return "hoy" if start.astimezone(ET).date() == today else "mañana"
+        if start.astimezone(ET).date() == today:
+            return "today" if en else "hoy"
+        return "tomorrow" if en else "mañana"
     minutes = max(1, int((start - now).total_seconds() // 60))
     if window == "1h":
-        return f"en {minutes} min" if minutes < 60 else "en 1 h"
-    return f"en unas {round(minutes / 60)} h"
+        if minutes < 60:
+            return f"in {minutes} min" if en else f"en {minutes} min"
+        return "in 1 h" if en else "en 1 h"
+    return f"in about {round(minutes / 60)} h" if en else f"en unas {round(minutes / 60)} h"
 
 
-def _message(event: dict[str, Any], window: str, now: datetime) -> tuple[str, str]:
-    when = _when_text(event, window, now)
+def _message(event: dict[str, Any], window: str, now: datetime, language: str = "es") -> tuple[str, str]:
+    when = _when_text(event, window, now, language)
     stamp = event.get("time_et")
+    if language == "en":
+        # Lo que viene del calendario en castellano se traduce por clave; un
+        # evento desconocido conserva su titulo tal cual (nunca se inventa).
+        name = _TITLES_EN.get(str(event.get("kind")), event["title"])
+        hour = f"{stamp} (New York time)" if stamp else "time not published by the source"
+        lines = [f"{name} on {event['date']}, {hour}."]
+        if event.get("detail"):
+            lines.append(f"{_DETAILS_EN.get(event['detail'], event['detail'])}.")
+        source = event.get("source") or "unknown"
+        label = event.get("label") or "no label"
+        lines.append(f"Source: {_SOURCES_EN.get(source, source)} ({_LABELS_EN.get(label, label)}). "
+                     f"{event.get('source_url', '')}".strip())
+        return f"{name}: {when}"[:300], " ".join(lines)
     hora = f"{stamp} (hora de Nueva York)" if stamp else "hora no publicada por la fuente"
     title = f"{event['title']}: {when}"
     lines = [f"{event['title']} el {event['date']}, {hora}."]
@@ -97,6 +129,8 @@ def emit_macro_reminders(db: Session, events: list[dict[str, Any]], now: datetim
     now = (now or datetime.now(UTC)).astimezone(UTC)
     created: list[int] = []
     existing = 0
+    # Idioma guardado del usuario (Ajustes); sin preferencia, espanol como siempre.
+    language = generation_language(db)
     for event in events:
         if not event.get("kind") or not event.get("date"):
             continue
@@ -107,7 +141,7 @@ def emit_macro_reminders(db: Session, events: list[dict[str, Any]], now: datetim
             )) is not None:
                 existing += 1
                 continue
-            title, message = _message(event, window, now)
+            title, message = _message(event, window, now, language)
             alert = ResearchAlert(
                 tenant_id=tenant_id, company_id=None, severity="medium", status="open",
                 alert_type=ALERT_TYPE, title=title, message=message, fingerprint=fingerprint,
@@ -115,7 +149,8 @@ def emit_macro_reminders(db: Session, events: list[dict[str, Any]], now: datetim
                 metadata_={"rule_version": VERSION, "macro_kind": event["kind"],
                            "event_date": event["date"], "time_et": event.get("time_et"),
                            "window": window, "source": event.get("source"),
-                           "source_url": event.get("source_url"), "label": event.get("label")},
+                           "source_url": event.get("source_url"), "label": event.get("label"),
+                           **({"language": language} if language != "es" else {})},
             )
             try:
                 with db.begin_nested():
