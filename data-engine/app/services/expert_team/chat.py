@@ -40,7 +40,10 @@ _LABELS = {
         "judge_timeout": "El juez no llegó a tiempo: sin veredicto, quedan las posturas de cada experto",
         "stance": "{pos} lo ven a favor y {neg} en contra",
         "metric": "{metric}: cifras distintas según el experto",
-        "labels": {"bullish": "a favor", "bearish": "en contra", "neutral": "neutral"},
+        # El juez guarda «positive»/«negative» (como la postura de los expertos);
+        # «bullish»/«bearish» se mantienen por si llegan en crudo.
+        "labels": {"positive": "a favor", "negative": "en contra", "bullish": "a favor", "bearish": "en contra",
+                   "neutral": "neutral"},
     },
     "en": {
         "fundamental": "Fundamentals", "valuation": "Valuation", "risk": "Risk",
@@ -50,7 +53,8 @@ _LABELS = {
         "judge_timeout": "The judge did not answer in time: no verdict, each expert's view stands above",
         "stance": "{pos} lean positive and {neg} negative",
         "metric": "{metric}: different figures depending on the expert",
-        "labels": {"bullish": "positive", "bearish": "negative", "neutral": "neutral"},
+        "labels": {"positive": "positive", "negative": "negative", "bullish": "positive", "bearish": "negative",
+                   "neutral": "neutral"},
     },
 }
 
