@@ -70,6 +70,7 @@ from app.services.dca_signal_engine import (
     DcaParams,
     MonthlyVerdict,
     current_verdict,
+    evaluate_series,
     hit_rates,
     zone_visits,
 )
@@ -581,7 +582,11 @@ def evaluate_watchlist(
                 )
                 continue
         bars, factor = build_bars(rows)
-        verdict = current_verdict(bars, params=params, today=today) if bars else None
+        # Una sola evaluacion de la serie por ticker: veredicto, tabla de
+        # aciertos y visitas salen de la MISMA salida (antes se recalculaba 3
+        # veces con las mismas barras, parametros y fecha).
+        verdicts = evaluate_series(bars, params=params, today=today) if bars else []
+        verdict = current_verdict(bars, params=params, today=today, verdicts=verdicts) if bars else None
         if verdict is None:
             reason = "sin_datos" if not bars else "historia_insuficiente"
             if not yahoo and not bars:
@@ -615,11 +620,11 @@ def evaluate_watchlist(
         state.sources = list(item.sources)
         # Tabla "¿cuantas veces estaba mas arriba?" con la misma serie y los
         # mismos parametros (solo meses confirmados, sin look-ahead).
-        hr_payload = hit_rates(bars, params=params, today=today)
+        hr_payload = hit_rates(bars, params=params, today=today, verdicts=verdicts)
         # Mismo corte temporal que hit_rates: la duración de visitas sale de la
         # misma serie y parámetros; los estados viejos sin la clave se declaran
         # no disponibles hasta la próxima evaluación, nunca se rellenan.
-        hr_payload["zone_visits"] = zone_visits(bars, params=params, today=today)
+        hr_payload["zone_visits"] = zone_visits(bars, params=params, today=today, verdicts=verdicts)
         state.hit_rates = hr_payload
         state.params_version = params.version
         state.evaluated_at = now
