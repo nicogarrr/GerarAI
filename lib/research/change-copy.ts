@@ -105,12 +105,32 @@ export function changeSummaryText(summary: string, locale: 'es' | 'en' = 'es'): 
     });
 }
 
+/** Avisos fijos que el backend añade a las noticias seguidas, en los dos idiomas en que los guarda. */
+const NEWS_NOTES: Array<{ es: string; en: string }> = [
+    {
+        es: 'Revisa la fuente; la fecha de GDELT no es la fecha de publicación y el titular no confirma por sí solo los hechos.',
+        en: 'Check the source; the GDELT date is not the publication date and the headline alone does not confirm the facts.',
+    },
+    { es: 'Revisa la fuente; el titular no confirma por sí solo los hechos.', en: 'Check the source; the headline alone does not confirm the facts.' },
+    {
+        es: 'Señal de vigilancia: si SpaceX cierra acuerdos con operadoras grandes, el argumento de que el foso de AST son sus acuerdos con operadoras se debilita.',
+        en: "Watch signal: if SpaceX closes deals with large carriers, the argument that AST's moat is its carrier agreements weakens.",
+    },
+];
+
+function localizedNewsNotes(text: string, locale: 'es' | 'en'): string {
+    let out = text;
+    for (const note of NEWS_NOTES) out = out.split(locale === 'en' ? note.es : note.en).join(locale === 'en' ? note.en : note.es);
+    return out;
+}
+
 /** Render old persisted wrappers without changing the original evidence. */
 export function changeHeadlineCopy(summary: string, locale: 'es' | 'en' = 'es'): { text: string; note: string | null } {
-    let text = (summary ?? '').trim();
+    let text = localizedNewsNotes((summary ?? '').trim(), locale);
     text = text.replace(/^Noticia material que requiere revisión de la tesis:\s*/i, '');
     text = text.replace(/^Artículo de [\s\S]*?,\s*(?:fechad[ao] el \d{4}-\d{2}-\d{2} por [^:]+|detectad[ao] por GDELT el \d{4}-\d{2}-\d{2}):\s*/i, '');
-    const warning = text.search(/Revisa la fuente;\s*(?:la fecha de GDELT|el titular no confirma)/i);
+    text = text.replace(/^Article from [\s\S]*?,\s*(?:dated \d{4}-\d{2}-\d{2} by [^:]+|detected by GDELT on \d{4}-\d{2}-\d{2}):\s*/i, '');
+    const warning = text.search(/(?:Revisa la fuente;\s*(?:la fecha de GDELT|el titular no confirma)|Check the source;\s*the (?:GDELT date|headline alone))/i);
     const note = warning >= 0 ? text.slice(warning).trim() : null;
     if (warning >= 0) text = text.slice(0, warning).trim();
     return { text: changeSummaryText(text, locale), note };
