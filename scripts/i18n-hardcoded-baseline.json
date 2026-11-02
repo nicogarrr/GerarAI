@@ -70,6 +70,7 @@
   "lib/better-auth/auth.ts": 9,
   "lib/brain/conversation.ts": 4,
   "lib/brain/page-context.ts": 2,
+  "lib/calendar/eight-k-text.ts": 10,
   "lib/chat/citations.ts": 3,
   "lib/config/product.ts": 2,
   "lib/env.ts": 9,
