@@ -68,6 +68,7 @@
   "lib/brain/page-context.ts": 2,
   "lib/calendar/catalyst-text.ts": 9,
   "lib/calendar/eight-k-text.ts": 10,
+  "lib/calendar/macro-text.ts": 7,
   "lib/chat/citations.ts": 3,
   "lib/config/product.ts": 2,
   "lib/dca/reason-text.ts": 9,
