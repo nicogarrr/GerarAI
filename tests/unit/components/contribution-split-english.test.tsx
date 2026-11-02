@@ -23,6 +23,16 @@ describe('contribution split in English', () => {
     expect(splitReasonText(row({}), 'es')).toBe('2X DCA: peso ×2');
   });
 
+  it('concentration cap reason', () => {
+    const capped = row({
+      dca_level: 4, dca_label: '4X DCA', multiplier: 16, amount: 0, concentration_capped: true, market_share_pct: 80, base_share_pct: 33.3,
+      reason: '4X DCA: ya pesa el 80,0 % del plan, más del doble de su peso objetivo (33,3 %); este mes no recibe aportación',
+    });
+    expect(splitReasonText(capped, 'en')).toBe('4X DCA: already 80.0% of the plan, over twice its target weight (33.3%); no contribution this month');
+    expect(splitReasonText({ ...capped, dca_level: null, dca_label: null }, 'en')).toMatch(/^no DCA level: already 80\.0%/);
+    expect(splitReasonText(capped, 'es')).toBe(capped.reason);
+  });
+
   it('notes', () => {
     const notes: Array<[string, string]> = [
       ['El plan no tiene objetivos por ticker: se reparte a partes iguales entre las posiciones vivas.', 'The plan has no per-ticker targets: the contribution is split equally across open positions.'],
@@ -30,6 +40,8 @@ describe('contribution split in English', () => {
       ['Nivel DCA de hace más de un mes en POOL, UBER: pesa como 1X hasta que se vuelva a evaluar.', 'DCA level older than a month for POOL, UBER: weighted as 1X until re-evaluated.'],
       ['Ningún ticker del plan tiene nivel DCA calculado: todos pesan como 1X.', 'No ticker in the plan has a computed DCA level: all weigh as 1X.'],
       ['La divisa de la aportación no está registrada en el plan.', 'The contribution currency is not recorded in the plan.'],
+      ['Sin aportación nueva este mes a POOL: ya pesa más del doble de su peso objetivo en el plan.', 'No new money this month for POOL: already over twice the target weight in the plan.'],
+      ['Sin aportación nueva este mes a POOL, UBER: ya pesan más del doble de su peso objetivo en el plan.', 'No new money this month for POOL, UBER: already over twice the target weight in the plan.'],
     ];
     for (const [es, en] of notes) {
       expect(splitNoteText(es, 'en')).toBe(en);

@@ -124,7 +124,7 @@
     "weightColumn": "Peso",
     "levelColumn": "Nivel DCA",
     "unallocated": "Sin asignar (liquidez): {amount}",
-    "weightNote": "4X pesa 16, 3X 9, 2X 4, 1X 1 (el nivel al cuadrado); las zonas de recorte no reciben dinero nuevo y sin nivel DCA se pesa como 1X.",
+    "weightNote": "4X pesa 16, 3X 9, 2X 4, 1X 1 (el nivel al cuadrado); las zonas de recorte y lo que ya pesa más del doble de su objetivo no reciben dinero nuevo; sin nivel DCA se pesa como 1X.",
     "periodTitle": "Mes {period} ({status})",
     "noData": "s/d"
   },

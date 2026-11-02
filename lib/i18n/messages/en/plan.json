@@ -124,7 +124,7 @@
     "weightColumn": "Weight",
     "levelColumn": "DCA level",
     "unallocated": "Unallocated (cash): {amount}",
-    "weightNote": "4X weighs 16, 3X 9, 2X 4, 1X 1 (the level squared); trim zones get no new money and no DCA level weighs as 1X.",
+    "weightNote": "4X weighs 16, 3X 9, 2X 4, 1X 1 (the level squared); trim zones and anything already over twice its target get no new money; no DCA level weighs as 1X.",
     "periodTitle": "Month {period} ({status})",
     "noData": "n/a"
   },
