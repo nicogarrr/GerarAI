@@ -2,6 +2,7 @@ import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
 import { flowSupplierKey, formatFlowAmount, type FlowSource, type MoneyFlow } from '@/lib/market/flows';
+import { localizeFlow } from '@/lib/market/flow-text';
 import { naFor } from '@/lib/format';
 import { getLocale, getT } from '@/lib/i18n/server';
 
@@ -52,8 +53,9 @@ export async function ThemeFlowUnavailable() {
   );
 }
 
-export async function ThemeFlow({ flow, holdings }: ThemeFlowProps) {
+export async function ThemeFlow({ flow: rawFlow, holdings }: ThemeFlowProps) {
   const [t, locale] = await Promise.all([getT(), getLocale()]);
+  const flow = localizeFlow(rawFlow, locale);
   const NA = naFor(locale);
   const maxDestination = Math.max(
     ...flow.destinations.map((item) => item.amount ?? 0),
