@@ -1513,7 +1513,8 @@
     "costUnknown": "Purchase cost unknown. The gain can’t be calculated.",
     "noBaseCost": "No cost in {currency}: a purchase is missing its exchange rate. The gain in {currency} can’t be calculated.",
     "recordTrade": "Record a buy or sell",
-    "viewInPortfolio": "View in portfolio"
+    "viewInPortfolio": "View in portfolio",
+    "loadFailed": "Your position in this company could not be loaded."
   },
   "publicShorts": {
     "metaTitle": "Public short positions",

@@ -95,7 +95,8 @@ export default function PlanContributionDialog({
         try {
             const result = await addPlanContribution({ date, amount: parsed as number, currency, note: note.trim() });
             if (!result.ok) {
-                setError(result.message);
+                // El aviso de la acción de servidor llega en castellano; se muestra en el idioma de la interfaz.
+                setError(t('plan.contribution.saveFailed'));
                 return;
             }
             toast.success(t('plan.contribution.savedToast'));
