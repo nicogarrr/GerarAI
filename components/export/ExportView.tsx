@@ -1,5 +1,6 @@
 'use client';
 
+import { downloadBlob } from '@/lib/download-blob';
 import { useState, useSyncExternalStore } from 'react';
 import { Download, FileDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -46,14 +47,7 @@ export default function ExportView() {
         try {
             const result = await exportJournal(selectedYear, format);
             const blob = new Blob([result.content], { type: result.contentType });
-            const url = URL.createObjectURL(blob);
-            const anchor = document.createElement('a');
-            anchor.href = url;
-            anchor.download = result.filename;
-            document.body.appendChild(anchor);
-            anchor.click();
-            anchor.remove();
-            URL.revokeObjectURL(url);
+            downloadBlob(result.filename, blob);
 
             setPreview(result.content.slice(0, 2000));
             toast.success(t('export.journal.success', { filename: result.filename }));

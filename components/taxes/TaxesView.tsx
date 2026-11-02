@@ -1,5 +1,6 @@
 'use client';
 
+import { downloadBlob } from '@/lib/download-blob';
 import { useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -306,14 +307,7 @@ function downloadTaxSummary(holdings: DataRecord[], report: DataRecord | null, y
         }
     }
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `resumen-fiscal-${year}.csv`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
+    downloadBlob(`resumen-fiscal-${year}.csv`, blob);
 }
 
 /** Ejercicio sin actividad: informe con listas vacías (no ausentes) y sin posiciones. */
