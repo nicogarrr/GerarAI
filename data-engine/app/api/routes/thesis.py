@@ -19,6 +19,7 @@ from app.schemas.api import (
     ThesisHistoryOut,
     ThesisJobStatusOut,
     ThesisLatestJobOut,
+    not_blank,
 )
 from app.services import thesis_audio_service
 from app.services.company_resolver import resolve_company
@@ -94,13 +95,13 @@ def generate_thesis(payload: ThesisGenerateRequest, db: Session = Depends(get_db
 class ThesisHumanInput(BaseModel):
     """Explicit human assumptions, never promoted to sourced financial facts."""
 
-    driver_key: str = Field(min_length=1, max_length=160)
+    driver_key: Annotated[str, not_blank()] = Field(min_length=1, max_length=160)
     fiscal_year: int = Field(ge=1900, le=2200)
     scenario: Literal["bear", "base", "bull"] = "base"
     value: Decimal = Field(allow_inf_nan=False)
-    source: str = Field(min_length=1, max_length=240)
+    source: Annotated[str, not_blank()] = Field(min_length=1, max_length=240)
     confidence: Decimal = Field(default=Decimal("1"), ge=0, le=1)
-    rationale: str = Field(min_length=1, max_length=5000)
+    rationale: Annotated[str, not_blank()] = Field(min_length=1, max_length=5000)
 
 
 class ThesisInputsRequest(BaseModel):
