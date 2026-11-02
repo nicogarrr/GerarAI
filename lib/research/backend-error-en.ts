@@ -200,6 +200,11 @@ const KNOWN: ReadonlyArray<readonly [RegExp, string]> = [
   [/^scope debe ser uno de (\[.*\])$/, 'scope must be one of $1.'],
   [/^ninguna empresa pasa el embudo: no se congela un mes vacío$/, 'No company passes the funnel: an empty month is not frozen.'],
   [/^N\/D: sin extractos ingeridos con URL https para esta empresa$/, 'Unavailable: there are no ingested excerpts with an https URL for this company.'],
+  // Tesis archivada (p. ej. al debatir) y publicación rechazada
+  [/^Tesis archivada v(\d+) \((\d{4}-\d{2}-\d{2})\): El modelo no es publicable; el texto y las cifras archivados no son análisis actual\.?$/, 'Archived thesis v$1 ($2): The model is not publishable; the archived text and figures are not current analysis.'],
+  [/^Tesis archivada v(\d+) \((\d{4}-\d{2}-\d{2})\): No hay un modelo publicable verificado; el texto y las cifras archivados no son análisis actual\.?$/, 'Archived thesis v$1 ($2): There is no verified publishable model; the archived text and figures are not current analysis.'],
+  [/^Tesis archivada v(\d+) \((\d{4}-\d{2}-\d{2})\): Valoración no disponible: faltan ingresos modelados con fuente\. El modelo solo se podía calcular con un supuesto no verificado, así que no se publica ningún valor por acción\.?$/, 'Archived thesis v$1 ($2): Valuation not available: sourced modelled revenue is missing. The model could only be calculated with an unverified assumption, so no per-share value is published.'],
+  [/^thesis v(\d+) usa inputs inferidos: valoración no disponible, no se puede publicar$/, 'thesis v$1 uses inferred inputs: valuation not available, it cannot be published.'],
 ];
 
 /** Traducción inglesa de un mensaje fijo del motor; `null` si no es uno conocido. */

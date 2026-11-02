@@ -106,7 +106,7 @@
   "lib/portfolio/holding-signals.ts": 8,
   "lib/research/analyst-rating-es.ts": 19,
   "lib/research/assistant-client.ts": 6,
-  "lib/research/backend-error-en.ts": 17,
+  "lib/research/backend-error-en.ts": 19,
   "lib/research/backend-error-es.ts": 58,
   "lib/research/change-copy.ts": 20,
   "lib/research/chat-intents.ts": 3,
