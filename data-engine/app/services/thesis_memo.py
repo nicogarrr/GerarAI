@@ -176,6 +176,14 @@ def build_memo_markdown(
     secciones ni fuentes: pueden llevar cifras o veredicto que la ficha oculta.
     """
     reason = thesis_withheld_reason(db, thesis)
+    if reason and language == "en":
+        return (
+            f"# Thesis memo - {company.ticker}\n\n"
+            f"{archived_thesis_notice(thesis, reason, language)}\n\n"
+            "The stored original is kept; this document does not publish its archived analysis.\n\n"
+            "Informational research document. It is NOT financial advice "
+            "or a recommendation to buy or sell.\n"
+        )
     if reason:
         return (
             f"# Memo de tesis - {company.ticker}\n\n"

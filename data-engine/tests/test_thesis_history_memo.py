@@ -167,8 +167,9 @@ def test_memo_markdown_in_english_with_english_selected(monkeypatch):
     get_settings.cache_clear()
     try:
         client = TestClient(main.app)
-        english = client.get(f"/api/thesis/{TICKER}/memo.md", headers={"x-gerarai-language": "en"}).text
-        spanish = client.get(f"/api/thesis/{TICKER}/memo.md", headers={"x-gerarai-language": "es"}).text
+        english_response = client.get(f"/api/thesis/{TICKER}/memo.md", headers={"x-gerarai-language": "en"})
+        spanish_response = client.get(f"/api/thesis/{TICKER}/memo.md", headers={"x-gerarai-language": "es"})
+        english, spanish = english_response.text, spanish_response.text
     finally:
         monkeypatch.delenv("I18N_GENERATION_ENABLED")
         get_settings.cache_clear()
@@ -178,3 +179,6 @@ def test_memo_markdown_in_english_with_english_selected(monkeypatch):
     assert "La red directa a celular se monetiza" in english
     assert "NOT financial advice" in english
     assert f"Memo de tesis — {TICKER}" in spanish and "| Bajista | $10.00 | 20 % |" in spanish
+    # Nombre del fichero: «thesis-» en inglés, «tesis-» en castellano (sin cambios).
+    assert f'filename="thesis-{TICKER.lower()}-v1.md"' in english_response.headers["content-disposition"]
+    assert f'filename="tesis-{TICKER.lower()}-v1.md"' in spanish_response.headers["content-disposition"]
