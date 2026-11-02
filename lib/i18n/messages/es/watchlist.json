@@ -213,6 +213,7 @@
       "avgOther": "Tiempo medio en 2X-4X: {months} meses · {count} visitas completadas{open}{excluded}"
     },
     "section": {
+      "preparing": "Preparando la señal DCA: se está evaluando en segundo plano y aparecerá aquí en unos minutos.",
       "notEvaluated": "Este ticker aún no tiene señal DCA evaluada. El histórico aparece cuando está en tu watchlist o cartera y se ha evaluado.",
       "unavailable": "Histórico no disponible ahora mismo: no se pudo consultar el servicio. Vuelve a intentarlo más tarde.",
       "label": "Histórico de señales DCA"

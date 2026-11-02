@@ -7,6 +7,7 @@ vi.mock('@/lib/actions/dca-signals.actions', () => ({ getDcaHitRatesState: (s: s
 // Server component traducido con getT(): sin cookie el locale es «es».
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('@/components/watchlist/DcaHitRatesCard', () => ({ default: () => <div data-testid="card" /> }));
+vi.mock('@/components/research/DcaPreparingRefresh', () => ({ default: () => <span data-testid="refresh" /> }));
 import { DcaHitRatesSection } from '@/components/research/DcaHitRatesSection';
 
 describe('DcaHitRatesSection', () => {
@@ -22,6 +23,15 @@ describe('DcaHitRatesSection', () => {
     const el = screen.getByTestId('dca-hit-rates-unavailable');
     expect(el).toHaveTextContent('Histórico no disponible');
     expect(el).not.toHaveTextContent('aún no tiene');
+  });
+  it('recién añadido: dice «preparando» y se refresca solo, sin el aviso de «sin señal»', async () => {
+    getState.mockResolvedValue({ status: 'preparing' });
+    render(await DcaHitRatesSection({ ticker: 'AAPL' }));
+    const el = screen.getByTestId('dca-hit-rates-preparing');
+    expect(el).toHaveTextContent('Preparando la señal DCA');
+    expect(el).not.toHaveTextContent('aún no tiene');
+    expect(screen.getByTestId('refresh')).toBeInTheDocument();
+    expect(screen.queryByTestId('card')).not.toBeInTheDocument();
   });
   it('con dato renderiza la tarjeta', async () => {
     getState.mockResolvedValue({ status: 'ok', data: { available: true } });

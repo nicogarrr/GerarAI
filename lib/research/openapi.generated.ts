@@ -7925,6 +7925,11 @@ export interface components {
             months_completed: number;
             /** Params Version */
             params_version?: string | null;
+            /**
+             * Preparing
+             * @default false
+             */
+            preparing: boolean;
             /** Reason */
             reason?: string | null;
             /** Rows */
