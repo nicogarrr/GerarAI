@@ -52,6 +52,25 @@ export function statusLabel(settings: LlmSettings, t: TranslateFn = esT): string
     return t('settings.llm.status.disabled');
 }
 
+/** Frase de estado en el idioma de la interfaz. El servidor la manda solo en
+ *  castellano; se deriva de origen/estado y, si no se reconoce, se usa la suya. */
+export function statusMessage(settings: LlmSettings, t: TranslateFn = esT): string {
+    if (settings.source === 'platform') {
+        if (settings.status === 'platform') return t('settings.llm.statusMessage.platformOn');
+        if (settings.status === 'disabled') return t('settings.llm.statusMessage.platformOff');
+    } else if (settings.source === 'tenant') {
+        if (settings.status === 'tenant') return t('settings.llm.statusMessage.tenant');
+        if (settings.status === 'missing_key') return t('settings.llm.statusMessage.missingKey');
+        if (settings.status === 'disabled') return t('settings.llm.statusMessage.disabled');
+    }
+    return settings.message;
+}
+
+/** Nombre del proveedor: el «otro compatible» viene del servidor en castellano. */
+export function providerLabel(entry: { id: string; label: string }, t: TranslateFn = esT): string {
+    return entry.id === 'custom' ? t('settings.llm.providerCustom') : entry.label;
+}
+
 export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
     const t = useT();
     const providerIds = useMemo(
@@ -163,7 +182,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                         {status.billing_scope === 'tenant' ? t('settings.llm.billingTenant') : t('settings.llm.billingPlatform')}
                     </span>
                 </div>
-                <p className="mt-1 text-gray-400">{status.message}</p>
+                <p className="mt-1 text-gray-400">{statusMessage(status, t)}</p>
                 {status.source !== 'tenant' ? (
                     <p className="mt-2 rounded-lg border border-teal-800/50 bg-teal-950/30 p-3 text-gray-300">
                         {t('settings.llm.byokPitch')}
@@ -186,7 +205,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                         <SelectContent>
                             {status.providers.map((entry) => (
                                 <SelectItem key={entry.id} value={entry.id}>
-                                    {entry.label}
+                                    {providerLabel(entry, t)}
                                 </SelectItem>
                             ))}
                         </SelectContent>

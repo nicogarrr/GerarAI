@@ -132,6 +132,14 @@
       "missingKey": "Your API key is missing",
       "disabled": "Settings turned off"
     },
+    "statusMessage": {
+      "platformOn": "You're using GerarAI's provider.",
+      "platformOff": "GerarAI's provider isn't set up.",
+      "tenant": "Set up with your key. Usage is billed by your provider.",
+      "missingKey": "The provider key is missing: AI is turned off.",
+      "disabled": "Your own AI is turned off or its settings are not valid."
+    },
+    "providerCustom": "Other OpenAI-compatible",
     "saved": "AI settings saved",
     "testFailed": "Couldn't check your key. Check the provider and API key; if it keeps failing, try again later.",
     "formAria": "AI model settings",
