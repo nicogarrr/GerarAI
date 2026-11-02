@@ -374,3 +374,15 @@ def test_el_50_por_ciento_a_un_precio_no_se_sustituye_por_la_cotizacion(db):
     assert sale.sale_price == D("150")
     assert sale.quantity == D("5")
     assert sale.gain_eur == D("250")
+
+
+@pytest.mark.parametrize("text", [
+    "compré 7 acciones por 1.050 € en total",
+    "compré 7 acciones a 1.050 € en total el 3 de marzo de 2024",
+    "compré 7 acciones por un total de 1.050 €",
+])
+def test_importe_en_total_se_reparte_entre_las_acciones(text):
+    """«7 acciones por 1.050 € en total» son 150 € por acción; antes el lote
+    salía a 1.050 € cada una (coste x7 y la ganancia o la pérdida inventadas)."""
+    lots = parse_purchase_lots(text)
+    assert [(lot.quantity, lot.price, lot.currency) for lot in lots] == [(D("7"), D("150"), "EUR")]
