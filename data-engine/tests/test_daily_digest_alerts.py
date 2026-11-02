@@ -91,7 +91,7 @@ def test_copy_carries_source_date_basis_and_variations(db):
     alert = emit_digest_alert(db, digest, AS_OF)
     assert AS_OF.isoformat() in alert.message
     assert "yfinance" in alert.message
-    assert "ASTS +2.50%" in alert.message  # la variacion viaja en el resumen
+    assert "ASTS +2,50 %" in alert.message  # la variacion viaja en el resumen
     assert "Sin datos: NBIS" in alert.message  # lo no cubierto se nombra, nunca 0
     assert "no el P&L" in alert.message
     assert alert.metadata_["price_source"] == "yfinance"
@@ -128,7 +128,7 @@ def test_zero_positions_still_emits_honest_copy(db):
     digest = make_digest(db, items=[], coverage="sin_posiciones")
     alert = emit_digest_alert(db, digest, AS_OF)
     assert alert is not None
-    assert "No habia posiciones" in alert.message
+    assert "No había posiciones" in alert.message
 
 
 def test_all_missing_data_is_not_zero(db):
@@ -245,8 +245,8 @@ def test_nan_and_missing_pct_go_to_sin_datos(db):
     ])
     alert = emit_digest_alert(db, digest, AS_OF)
     assert "+nan" not in alert.message and "+inf" not in alert.message
-    assert "OK1 +1.50%" in alert.message
-    assert "1 de 4 posiciones con variacion" in alert.message
+    assert "OK1 +1,50 %" in alert.message
+    assert "1 de 4 posiciones con variación" in alert.message
     for bad in ("NAN1", "INF1", "NOPCT"):
         assert bad in alert.message.split("Sin datos:")[1]
 
@@ -266,9 +266,9 @@ def test_truncation_is_explicit(db):
     items += [{"ticker": f"S{i:02d}", "status": "sin datos"} for i in range(20)]
     digest = make_digest(db, items=items)
     alert = emit_digest_alert(db, digest, AS_OF)
-    assert "Mostradas 16 de 20 posiciones con variacion; 4 omitidas." in alert.message
-    assert "20 de 40 posiciones con variacion" in alert.message
-    assert "y 4 mas." in alert.message  # sin_datos tambien acotado
+    assert "Mostradas 16 de 20 posiciones con variación; 4 omitidas." in alert.message
+    assert "20 de 40 posiciones con variación" in alert.message
+    assert "y 4 más." in alert.message  # sin_datos tambien acotado
 
 
 def test_last_session_date_skips_weekends():

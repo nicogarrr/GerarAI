@@ -41,7 +41,7 @@ def _emit(db, items):
 
 def test_one_position_moved_is_singular(db):
     alert = _emit(db, [{"ticker": "ASTS", "status": "disponible", "price_change_pct": 2.5}])
-    assert alert.message.startswith("1 de 1 posición con variacion: ASTS +2.50%.")
+    assert alert.message.startswith("1 de 1 posición con variación: ASTS +2,50 %.")
 
 
 def test_one_position_without_close_is_singular(db):
