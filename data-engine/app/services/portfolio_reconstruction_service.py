@@ -35,7 +35,7 @@ from sqlalchemy.orm import Session
 from app.models import Company, MarketPrice, Position, Transaction
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.portfolio_ledger_service import BUY_ACTIONS, SELL_ACTIONS
-from app.services.price_units import price_in_currency
+from app.services.price_units import price_unit_factor
 
 METHOD = "ledger_reconstruction"
 SCOPE = "positions_only_no_cash_no_dividends"
@@ -147,6 +147,9 @@ class PortfolioReconstructionService:
         # Columnas, no entidades: son años de cierres por valor (decenas de
         # miles de filas) y construir un MarketPrice ORM por fila era el mayor
         # coste de la reconstruccion. MarketPrice no es de tenant.
+        # La unidad depende de (empresa, unidad del cierre), no del valor: se
+        # resuelve una vez por par y no por cada uno de los miles de cierres.
+        unit_factors: dict[tuple[int, str | None], tuple[Decimal, Decimal] | None] = {}
         for price_company_id, price_date, close, quote_currency in db.execute(
             select(
                 MarketPrice.company_id,
@@ -161,12 +164,24 @@ class PortfolioReconstructionService:
                 company = companies_by_id.get(price_company_id)
                 if company is None:
                     continue
-                converted = price_in_currency(
-                    close, quote_currency=quote_currency,
-                    target_currency=currency[price_company_id], company=company,
-                )
-                if converted is not None:
-                    prices[(price_company_id, price_date)] = converted
+                factor_key = (price_company_id, quote_currency)
+                if factor_key in unit_factors:
+                    factor = unit_factors[factor_key]
+                else:
+                    raw_factor = price_unit_factor(
+                        quote_currency=quote_currency,
+                        target_currency=currency[price_company_id],
+                        company=company,
+                    )
+                    factor = (
+                        None
+                        if raw_factor is None
+                        else (Decimal(raw_factor[0]), Decimal(raw_factor[1]))
+                    )
+                    unit_factors[factor_key] = factor
+                if factor is not None:
+                    # Mismas operaciones que price_in_currency (x destino / origen).
+                    prices[(price_company_id, price_date)] = close * factor[0] / factor[1]
         # Splits APLICADOS (corporate_actions_service reescribe las patas a
         # terminos post-split: cantidad*ratio, precio/ratio): los cierres
         # crudos anteriores a la fecha efectiva hay que dividirlos por el
