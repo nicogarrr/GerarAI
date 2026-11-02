@@ -360,7 +360,19 @@ def _sales_answer(db: Session, year: int, only: set[str]) -> ChatResponse:
         return _response(text, sources, "account_sales")
     realized = [b for b in data.get("realized") or [] if b.get("sale_count")]
     if only:
-        realized = [b for b in realized if b["ticker"] in only] or realized
+        mine = [b for b in realized if b["ticker"] in only]
+        if not mine:
+            # Antes caía a TODAS las ventas del año como si fueran del ticker pedido.
+            # Una palabra en mayúsculas que no es ninguna empresa («OK») no filtra.
+            from app.models import Company
+
+            known = sorted(db.scalars(select(Company.ticker).where(Company.ticker.in_(sorted(only)))).all())
+            if known:
+                names = ", ".join(known)
+                text = (f"In {year} there are no sales of {names} in your saved trades." if english
+                        else f"En {year} no hay ventas de {names} en tus operaciones guardadas.")
+                return _response(text, sources, "account_sales")
+        realized = mine or realized
     if not realized:
         text = (f"In {year} there are no sales in your saved trades." if english
                 else f"En {year} no hay ventas en tus operaciones guardadas.")
