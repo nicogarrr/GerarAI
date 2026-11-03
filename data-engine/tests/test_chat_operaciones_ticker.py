@@ -84,10 +84,7 @@ def _ask(db, question):
     return asyncio.run(ChatService(provider=_NoLLM()).answer(db, question, "global", None))
 
 
-@pytest.mark.parametrize(
-    "question",
-    ["¿Cuándo compré KO?", "mis operaciones de KO", "¿Qué operaciones he hecho con KO?", "¿cuándo vendí KO?"],
-)
+@pytest.mark.parametrize("question", ["mis operaciones de KO", "¿Qué operaciones he hecho con KO?"])
 def test_ticker_trades(question):
     resp = _ask(_db(), question)
     assert (resp.llm_trace or {}).get("path") == "account_trades"
@@ -99,8 +96,34 @@ def test_ticker_trades(question):
     ]
 
 
+@pytest.mark.parametrize("question", ["¿Cuándo compré KO?", "¿cuándo he comprado KO?", "mis compras de KO"])
+def test_ticker_buys_only(question):
+    """«¿cuándo compré KO?» lista solo las compras (antes mezclaba la venta de 2025)."""
+    resp = _ask(_db(), question)
+    assert (resp.llm_trace or {}).get("path") == "account_trades"
+    assert resp.answer.splitlines() == [
+        "Tus compras guardadas de KO (la más reciente primero):",
+        "- 5 oct 2026: compra de 10 KO a 60,50 USD.",
+    ]
+
+
+@pytest.mark.parametrize("question", ["¿cuándo vendí KO?", "mis ventas de KO"])
+def test_ticker_sells_only(question):
+    resp = _ask(_db(), question)
+    assert (resp.llm_trace or {}).get("path") == "account_trades"
+    assert resp.answer.splitlines() == [
+        "Tus ventas guardadas de KO (la más reciente primero):",
+        "- 1 jun 2025: venta de 2 KO a 58,00 USD.",
+    ]
+
+
+def test_ticker_buys_only_without_sells_or_buys():
+    assert _ask(_db(), "¿cuándo vendí ITX?").answer == "No tienes ventas guardadas de ITX."
+    assert _ask(_db(), "¿Cuándo compré MSFT?").answer == "No tienes compras guardadas de MSFT."
+
+
 def test_ticker_without_trades():
-    resp = _ask(_db(), "¿Cuándo compré MSFT?")
+    resp = _ask(_db(), "mis operaciones de MSFT")
     assert (resp.llm_trace or {}).get("path") == "account_trades"
     assert resp.answer == "No tienes compras ni ventas guardadas de MSFT."
 
@@ -113,8 +136,19 @@ def test_user_b_never_sees_user_a():
     assert "60,50" not in resp.answer
 
 
-@pytest.mark.parametrize("question", ["When did I buy KO?", "my KO trades"])
-def test_english(monkeypatch, question):
+@pytest.mark.parametrize(
+    ("question", "expected"),
+    [
+        ("my KO trades", [
+            "Your saved buys and sells of KO (most recent first):",
+            "- Oct 5, 2026: bought 10 KO at 60.50 USD.",
+            "- Jun 1, 2025: sold 2 KO at 58.00 USD.",
+        ]),
+        ("When did I buy KO?", ["Your saved buys of KO (most recent first):", "- Oct 5, 2026: bought 10 KO at 60.50 USD."]),
+        ("When did I sell KO?", ["Your saved sells of KO (most recent first):", "- Jun 1, 2025: sold 2 KO at 58.00 USD."]),
+    ],
+)
+def test_english(monkeypatch, question, expected):
     monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
     get_settings.cache_clear()
     db = _db()
@@ -124,11 +158,7 @@ def test_english(monkeypatch, question):
     finally:
         get_settings.cache_clear()
     assert (resp.llm_trace or {}).get("path") == "account_trades"
-    assert resp.answer.splitlines() == [
-        "Your saved buys and sells of KO (most recent first):",
-        "- Oct 5, 2026: bought 10 KO at 60.50 USD.",
-        "- Jun 1, 2025: sold 2 KO at 58.00 USD.",
-    ]
+    assert resp.answer.splitlines() == expected
 
 
 @pytest.mark.parametrize(

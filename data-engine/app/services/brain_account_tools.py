@@ -1720,6 +1720,17 @@ _TICKER_TRADES = re.compile(
 )
 
 
+#: Verbo de compra o de venta en la pregunta de un ticker (ver _TICKER_TRADES).
+_TICKER_BUYS = re.compile(
+    r"\bcuando\s+(?:compre|he\s+comprado)\b|\bmis\s+compras\s+(?:de|en|con)\b"
+    r"|\bwhen\s+(?:did\s+i\s+buy|have\s+i\s+bought)\b|\bmy\s+purchases\s+(?:of|in|on|for)\b"
+)
+_TICKER_SELLS = re.compile(
+    r"\bcuando\s+(?:vendi|he\s+vendido)\b|\bmis\s+ventas\s+(?:de|en|con)\b"
+    r"|\bwhen\s+(?:did\s+i\s+sell|have\s+i\s+sold)\b"
+)
+
+
 def _ticker_trades(text: str, question: str) -> str | None:
     """Ticker por el que se pregunta en «¿cuándo compré KO?», o None."""
     if (not _TICKER_TRADES.search(text) or _TAX_WORD.search(text)
@@ -1739,6 +1750,11 @@ def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = Non
     # (antes el periodo hacía listar las compras).
     sells_only = ticker is None and bool(_LAST_SELLS.search(text))
     buys_only = ticker is None and not sells_only and bool(_LAST_BUYS.search(text))
+    if ticker:
+        # «¿cuándo compré UBER?» solo compras y «¿cuándo vendí UBER?» solo ventas
+        # (antes listaba ambas); «mis operaciones de UBER» sigue con las dos.
+        sells_only = bool(_TICKER_SELLS.search(text))
+        buys_only = not sells_only and bool(_TICKER_BUYS.search(text))
     sources = [_source("transactions", None, "Operaciones" if not english else "Trades", "/portfolio")]
     query = (select(Transaction, Company.ticker, Portfolio.name)
              .outerjoin(Company, Company.id == Transaction.company_id)
@@ -1753,7 +1769,13 @@ def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = Non
         query.order_by(Transaction.trade_date.desc(), Transaction.id.desc()).limit(_MAX_TRADES + 1)
     ).all()
     if not rows:
-        if ticker:
+        if ticker and sells_only:
+            text_out = (f"You have no saved sells of {ticker}." if english
+                        else f"No tienes ventas guardadas de {ticker}.")
+        elif ticker and buys_only:
+            text_out = (f"You have no saved buys of {ticker}." if english
+                        else f"No tienes compras guardadas de {ticker}.")
+        elif ticker:
             text_out = (f"You have no saved buys or sells of {ticker}." if english
                         else f"No tienes compras ni ventas guardadas de {ticker}.")
         elif period is not None and sells_only:
@@ -1776,7 +1798,13 @@ def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = Non
                         else "No tienes compras ni ventas guardadas. Puedes importarlas en Cartera.")
         return _response(text_out, sources, "account_trades")
     portfolios = db.scalar(select(func.count(Portfolio.id)).where(Portfolio.tenant_id == tenant)) or 0
-    if ticker:
+    if ticker and sells_only:
+        lines = [f"Your saved sells of {ticker} (most recent first):" if english
+                 else f"Tus ventas guardadas de {ticker} (la más reciente primero):"]
+    elif ticker and buys_only:
+        lines = [f"Your saved buys of {ticker} (most recent first):" if english
+                 else f"Tus compras guardadas de {ticker} (la más reciente primero):"]
+    elif ticker:
         lines = [f"Your saved buys and sells of {ticker} (most recent first):" if english
                  else f"Tus compras y ventas guardadas de {ticker} (la más reciente primero):"]
     elif period is not None and sells_only:
