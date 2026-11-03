@@ -24,3 +24,20 @@ describe('Access wording matches the server signup mode', () => {
         expect(screen.getByRole('link', { name: 'Iniciar sesión' })).toHaveAttribute('href', '/sign-in');
     });
 });
+
+describe('Recuperación y cambio de contraseña: mismo agujero de submit nativo', () => {
+    it('recuperación: form con method="post" y botón deshabilitado en el HTML inicial', async () => {
+        const { renderToString } = await import('react-dom/server');
+        const { default: ForgotPasswordForm } = await import('@/components/auth/ForgotPasswordForm');
+        const html = renderToString(<ForgotPasswordForm emailConfigured supportEmail="soporte@gerarai.com" />);
+        expect(html).toContain('method="post"');
+        expect(html).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled)[^>]*>/);
+    });
+    it('nueva contraseña: form con method="post" y botón deshabilitado en el HTML inicial', async () => {
+        const { renderToString } = await import('react-dom/server');
+        const { default: ResetPasswordForm } = await import('@/components/auth/ResetPasswordForm');
+        const html = renderToString(<ResetPasswordForm token="token-de-prueba" linkError={false} />);
+        expect(html).toContain('method="post"');
+        expect(html).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled)[^>]*>/);
+    });
+});
