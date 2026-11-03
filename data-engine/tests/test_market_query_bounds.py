@@ -187,19 +187,79 @@ def test_refresh_latest_price_query_returns_one_row_per_company(db: Session):
             ).refresh(db, as_of=AS_OF)
         )
 
-    latest = [
-        s
-        for s in captured
-        if "latest_market_price" in s or ("row_number()" in s and "market_prices" in s)
-    ]
-    assert latest, "el ultimo precio por compañía debe acotarse con row_number() = 1"
+    latest = [s for s in captured if "latest_market_price" in s]
+    assert latest, "el ultimo precio por compañía debe acotarse en SQL"
     sql = " ".join(latest).lower()
-    assert "row_number() over (partition by market_prices.company_id" in sql
-    assert "rn = ?" in sql, "solo se materializa UNA fila por compañía"
+    # MAX(date) correlacionado por compañía (una bajada del índice único
+    # company_id+date); nunca una ventana que ordena toda la historia.
+    assert "max(market_prices_1.date)" in sql
+    assert "row_number()" not in sql
     # Sin cambio de resultado: la revaloración usa el cierre más reciente.
     assert result["stages"][2]["updated"] == 1
     position = db.scalar(select(Position))
     assert position.market_price == Decimal("250")
+
+
+def test_refresh_revalues_each_position_with_its_own_latest_close_in_batch(db: Session):
+    """Varias compañías con historias de distinta longitud y último cierre en
+    fechas distintas: cada posición toma SU cierre más reciente (la misma fila
+    que el antiguo row_number() = 1) y los UPDATE de la revaloración salen
+    agrupados en el commit, no uno por posición."""
+    db.add(Portfolio(name="Main", base_currency="EUR", is_default=True))
+    closes = {"AAA": (30, Decimal("101")), "BBB": (3, Decimal("202")), "CCC": (400, Decimal("303"))}
+    for ticker, (days, last_close) in closes.items():
+        company = _company(ticker)
+        db.add(company)
+        db.flush()
+        db.add(
+            Position(
+                company_id=company.id, quantity=Decimal("2"), currency="USD",
+                average_cost=Decimal("50"), market_price=Decimal("1"), market_value=Decimal("2"),
+            )
+        )
+        end = AS_OF - timedelta(days={"AAA": 1, "BBB": 2, "CCC": 3}[ticker])
+        _seed_multi_year_prices(db, company, days=days, end=end - timedelta(days=1))
+        db.add(
+            MarketPrice(
+                company_id=company.id, date=end, close=last_close,
+                adj_close=last_close, volume=1, source="yfinance",
+            )
+        )
+    db.commit()
+
+    executemany_updates: list[int] = []
+    single_updates: list[str] = []
+
+    def listener(conn, cursor, statement, parameters, context, executemany):  # noqa: ARG001
+        if statement.startswith("UPDATE positions"):
+            if executemany:
+                executemany_updates.append(len(parameters))
+            else:
+                single_updates.append(statement)
+
+    event.listen(db.get_bind(), "before_cursor_execute", listener)
+    try:
+        result = asyncio.run(
+            MarketRefreshService(
+                price_provider=_FakePriceProvider(), fx_provider=_FakeFXProvider()
+            ).refresh(db, as_of=AS_OF)
+        )
+    finally:
+        event.remove(db.get_bind(), "before_cursor_execute", listener)
+
+    assert result["stages"][2]["updated"] == 3
+    by_ticker = {
+        company.ticker: position
+        for position, company in db.execute(
+            select(Position, Company).join(Company, Company.id == Position.company_id)
+        ).all()
+    }
+    for ticker, (_days, last_close) in closes.items():
+        assert by_ticker[ticker].market_price == last_close
+        assert by_ticker[ticker].market_value == Decimal("2") * last_close
+    assert by_ticker["AAA"].as_of == AS_OF - timedelta(days=1)
+    assert by_ticker["CCC"].as_of == AS_OF - timedelta(days=3)
+    assert sum(executemany_updates) == 3 and not single_updates
 
 
 # --- 3. screener: financial_facts filtrado y acotado ---

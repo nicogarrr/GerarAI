@@ -568,6 +568,7 @@ class PortfolioLedgerService:
         as_of: date | None = None,
         position: Position | None = None,
         fx_rate: Decimal | None | object = _UNSET,
+        flush: bool = True,
     ) -> Position:
         if position is None:
             position = db.scalar(select(Position).where(Position.company_id == company_id))
@@ -614,7 +615,11 @@ class PortfolioLedgerService:
             and has_cost
             else None
         )
-        db.flush()
+        # ``flush=False``: el llamador revaloriza muchas posiciones seguidas y
+        # hace un unico flush/commit al final (un UPDATE por fila y viaje a la
+        # BD en cada vuelta si no).
+        if flush:
+            db.flush()
         return position
 
 
