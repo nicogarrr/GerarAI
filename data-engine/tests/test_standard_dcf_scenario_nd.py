@@ -33,28 +33,23 @@ def _value(db, ticker, facts=FACTS, tags=(), price=2.7):
     return ValuationService().value_company(db, company)
 
 
-def test_implausible_value_vs_market_is_insufficient_data_not_a_number():
-    """Caso real (AMZN, 03-nov-2026): el motor publicaba «valor justo 26,32 US$»
-    con el precio ~9,5x por encima (margen de seguridad -854,8 %). Un FCFF DCF
-    sobre el margen FCF actual de una megacap en ciclo de inversión no encaja
-    con la empresa: fuera de la banda [0,2x, 5x] del precio la corrida queda
-    insufficient_data con el motivo y el bruto en la traza, NUNCA una cifra
-    insostenible (regla de Nico: N/D antes que un valor absurdo).
-    """
+def test_far_value_vs_market_is_published_with_warning_and_trace():
+    """Nico #4483: distance from market is a warning, not a value veto."""
     init_db()
     db = SessionLocal()
     try:
         result = _value(db, "NDG", price=20.0)
-        assert result["status"] == "insufficient_data"
-        assert result["publishable"] is False
-        assert result["expected_value"] is None
-        assert result["margin_of_safety"] is None
-        guard = result["trace"]["plausibility_guard"]
-        assert guard["expected_value"] > 0
-        assert guard["comparable_price"] == 20.0
-        assert guard["ratio_to_price"] < 0.2
-        assert guard["band"] == [0.2, 5.0]
-        assert "no encaja" in result["trace"]["reason"]
+        assert result["status"] == "ok"
+        assert result["publishable"] is True
+        assert result["expected_value"] is not None and result["expected_value"] > 0
+        assert result["margin_of_safety"] is not None
+        warning = result["plausibility_warning"]
+        assert warning["code"] == "fair_value_far_from_price"
+        assert warning["ratio_to_price"] == pytest.approx(result["expected_value"] / 20.0)
+        assert warning["ratio_to_price"] < 0.2
+        assert warning["band"] == [0.2, 5.0]
+        assert result["trace"]["comparable_price"] == 20.0
+        assert result["trace"]["plausibility_warning"] == warning
     finally:
         _cleanup(db, ["NDG"])
         db.close()

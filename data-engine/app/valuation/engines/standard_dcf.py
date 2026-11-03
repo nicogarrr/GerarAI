@@ -515,40 +515,8 @@ class StandardDCFEngine(ValuationEngine):
         # Terminal value share guard: a DCF where >80% of the EV is the terminal
         # value is not a 5-year forecast, it is a perpetuity assumption.
 
-        # Guardia de plausibilidad frente al mercado (Nico, 2026-11-03: AMZN
-        # publicaba «valor justo 26,32 US$» con el precio ~9,5x por encima, un
-        # margen de seguridad de -854,8 %; RKLB ya salio -94 % el 30/10). Un
-        # FCFF DCF sobre el margen FCF actual/normalizado no encaja con toda
-        # empresa: una megacap en pleno ciclo de inversión (capex de IA)
-        # deprime el FCF y el modelo escupe una cifra absurda que NO se
-        # publica. Fuera de la banda [0,2x, 5x] del precio comparable la
-        # corrida queda insufficient_data con el motivo (N/D honesto), nunca
-        # una cifra insostenible ni un margen de seguridad ridículo.
-        if expected is not None and comparable_price is not None and comparable_price > 0:
-            ratio_to_price = expected / comparable_price
-            if not (0.2 <= ratio_to_price <= 5.0):
-                return insufficient_from_context(
-                    context,
-                    missing=[],
-                    reason=(
-                        "El DCF FCFF sobre el margen FCF actual/normalizado no encaja "
-                        "con esta empresa: valor esperado "
-                        f"{_num_es(expected)} frente a un precio de {_num_es(comparable_price)} "
-                        f"({ratio_to_price:.2f}x), fuera de la banda plausible "
-                        "[0,2x, 5x]. Se muestra N/D en lugar de una cifra que no "
-                        "se sostiene; hace falta un método acorde al tipo de empresa."
-                    ),
-                    extra_trace={
-                        "plausibility_guard": {
-                            "expected_value": expected,
-                            "comparable_price": comparable_price,
-                            "ratio_to_price": ratio_to_price,
-                            "band": [0.2, 5.0],
-                            "fcf_margin_used": margin,
-                            "margin_normalization": margin_normalization,
-                        }
-                    },
-                )
+        # The market-distance band is an attached warning, never a value veto.
+        # Nico's normalized multistage model keeps its independently calculated value.
         base_trace = scenario_results["base"]["trace"]
         pv_explicit = base_trace.get("pv_explicit_fcf")
         pv_terminal = base_trace.get("pv_terminal_value")
