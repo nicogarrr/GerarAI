@@ -10,8 +10,9 @@ import asyncio
 import json
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
+from typing import cast
 
 import httpx
 
@@ -97,6 +98,17 @@ def is_quota_exhausted(exc: BaseException) -> bool:
     return isinstance(exc, ProviderHTTPError) and exc.status_code == 429
 
 
+async def _evict_rejected(provider, response: LLMResponse) -> None:
+    """Retira de la cache una respuesta rechazada (nunca rompe la llamada)."""
+    evict = getattr(provider, "evict_cached", None)
+    if not callable(evict) or not getattr(response, "cache_key", None):
+        return
+    try:
+        await cast(Callable[[LLMResponse], Awaitable[object]], evict)(response)
+    except Exception:  # noqa: BLE001 - la cache nunca rompe el chat
+        logger.debug("chat: no se pudo retirar de la cache una respuesta rechazada", exc_info=True)
+
+
 class _LanguageRejected(ProviderResponseError):
     def __init__(self, response):
         super().__init__("Candidate language rejected")
@@ -137,6 +149,7 @@ class ChatFallbackProvider(LLMProvider):
             from app.core.i18n import current_language
             from app.services.llm_output_guard import inspect_response_text
             if inspect_response_text(response.text, expected_language=current_language()):
+                await _evict_rejected(provider, response)
                 raise _LanguageRejected(response)
         try:
             if response.degraded or response.finish_reason == "length":
@@ -144,6 +157,10 @@ class ChatFallbackProvider(LLMProvider):
             if self.validator is not None:
                 self.validator(response)
         except Exception as exc:
+            # Rechazada: fuera de la cache de respuestas. Si no, repetir la
+            # misma pregunta servia la misma respuesta rechazada (prueba real
+            # 2026-11-02: «¿Deberia vender Santander?» fallaba igual 15 min).
+            await _evict_rejected(provider, response)
             raise ProviderResponseError(f"Candidate rejected: {exc}") from exc
         return response
 
