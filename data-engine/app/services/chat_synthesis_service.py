@@ -403,8 +403,57 @@ def _reject_untrusted_output(payload: dict, baseline: Any, question: str) -> Non
         raise ValueError("External link or HTML in section body")
     context = [question or "", *_flatten_text([s.model_dump() for s in baseline.sections]),
                *_flatten_text(baseline.sources)]
-    if grounded_numbers_in([answer]) - grounded_numbers_in(context):
+    if _ungrounded_figures(answer, context):
         raise ValueError("Ungrounded number in model answer")
+
+
+def _figure_readings(token: str) -> list[tuple[float, int]]:
+    """Lecturas (valor, decimales escritos) de una cifra en formato ES o EN."""
+    token = token.strip(".,")
+    candidates = {token.replace(",", ""), token.replace(".", "").replace(",", ".")}
+    if token.count(",") == 1 and "." not in token:
+        candidates.add(token.replace(",", "."))
+    out = []
+    for cand in candidates:
+        try:
+            value = float(cand)
+        except ValueError:
+            continue
+        out.append((value, len(cand.split(".", 1)[1]) if "." in cand else 0))
+    return out
+
+
+def _ungrounded_figures(answer: str, context: list[str]) -> list[str]:
+    """Cifras de la prosa que no están en el contexto ni tal cual ni reescaladas.
+
+    El modelo escribe «51.200 millones de dólares» donde el dato guardado es
+    51200000000 y la respuesta de datos dice «51,2 mil millones»: es la misma
+    cifra. Prueba real 2026-11-03: comparar solo el texto tiraba todas las
+    respuestas sobre empresas. Vale el mismo número en miles, millones o miles
+    de millones (o ratio ↔ %), redondeado a los decimales que se escriben
+    (o con un 0,5 % de margen, como el validador del equipo de expertos).
+    """
+    known = grounded_numbers_in(context)
+    values = [
+        abs(value)
+        for text in context
+        for match in re.finditer(r"\d[\d.,]*\d|\d", text or "")
+        for value, _ in _figure_readings(match.group())
+    ]
+    missing = []
+    for match in re.finditer(r"\d[\d.,]*\d|\d", answer or ""):
+        token = match.group()
+        key = _number_key(token)
+        if len(key.replace(".", "")) < 2 or key in known:
+            continue
+        if not any(
+            abs(written - data * scale) <= max(0.5 * 10 ** -decimals + 1e-9, 0.005 * data * scale)
+            for written, decimals in _figure_readings(token)
+            for data in values
+            for scale in ((1, 1e3, 1e6, 1e9, 1e-3, 1e-6, 1e-9, 100) if data <= 1.5 else (1, 1e3, 1e6, 1e9, 1e-3, 1e-6, 1e-9))
+        ):
+            missing.append(token)
+    return missing
 
 
 # --- Validacion EN (i18n B) ------------------------------------------------
