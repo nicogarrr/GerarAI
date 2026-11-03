@@ -123,7 +123,7 @@ FILING_FORMS = (*ANNUAL_REPORT_FILING_FORMS, *INTERIM_FILING_FORMS, "8-K")
 FILING_LOOKUP_LIMIT = 80
 MAX_FILING_DOCUMENTS = 8
 MAX_IR_DOCUMENTS = 10
-MAX_NEWS_ITEMS = 5
+MAX_NEWS_ITEMS = 15
 EARNINGS_LOOKAHEAD_DAYS = 14
 FETCH_TIMEOUT_S = 20.0
 
@@ -349,6 +349,9 @@ class ThesisEvidenceService:
         bundle["sources"]["earnings"] = self._collect_earnings(db, company)
         bundle["sources"]["transcript"] = self._collect_transcript(db, company)
         bundle["sources"]["ir"] = self._ingest_ir(db, company)
+        bundle["sources"]["recent_events"] = self._collect_recent_events(
+            db, company, bundle["sources"]["ir"]
+        )
         bundle["sources"]["external_theses"] = self._collect_external_theses(db, company)
         bundle["sources"].update(self._collect_ownership(db, company))
         db.flush()
@@ -365,6 +368,7 @@ class ThesisEvidenceService:
             "ticker": company.ticker.upper(),
             "sources": {
                 "news": self._collect_news(db, company),
+                "recent_events": self._collect_recent_events(db, company, None),
                 "transcript": self._collect_transcript(db, company),
                 "external_theses": self._collect_external_theses(db, company),
                 **self._collect_ownership(db, company),
@@ -860,33 +864,54 @@ class ThesisEvidenceService:
 
     # -- 4. noticias (solo lectura del pipeline news) --------------------------
     def _collect_news(self, db: Session, company: Company) -> dict[str, Any]:
-        # Se leen más filas de las necesarias: una misma noticia publicada por
-        # varias agencias (PR Newswire, GlobeNewswire, Morningstar) ocupaba 3 de
-        # los 5 huecos de «noticias materiales» y contaba como 3 eventos.
+        # Antes: las 40 de mayor «materialidad» de todo el histórico, y de ahí
+        # 5. Medido en prod (ASTS, 3-nov-2026): la materialidad da 10 a
+        # titulares de opinión y la tesis se quedó con noticias del 8 al 20 de
+        # octubre, sin Brasil (26-oct), el handoff (2-nov) ni Chile (3-nov),
+        # que ya estaban en el pipeline. Ahora manda la fecha: las de los
+        # últimos días, agrupadas por historia, con hueco para comunicados y
+        # 8-K (recent_material_events). Sin nada en la ventana se vuelve al
+        # criterio anterior para no dejar la sección vacía.
+        # Una misma noticia publicada por varias agencias cuenta una vez.
         # Captacion de demandantes de despachos de abogados y paginas de datos
         # de precios no son noticias de la empresa: no entran en la tesis.
+        from app.services.recent_material_events import WINDOW_DAYS, pick_recent_news_rows
         from app.services.ticker_news_lane import is_data_page_headline, is_law_firm_solicitation
 
-        candidates = [
-            row
-            for row in db.scalars(
-                select(NewsEvent)
-                .where(NewsEvent.company_id == company.id)
-                .order_by(desc(NewsEvent.materiality_score), desc(NewsEvent.date))
-                .limit(MAX_NEWS_ITEMS * 8)
-            ).all()
-            if not (
-                is_law_firm_solicitation(
-                    (row.metadata_ or {}).get("source_headline") or row.title, None
-                )
-                or is_data_page_headline((row.metadata_ or {}).get("source_headline") or row.title)
+        now = datetime.now(UTC)
+        recent = db.scalars(
+            select(NewsEvent)
+            .where(
+                NewsEvent.company_id == company.id,
+                NewsEvent.date >= now - timedelta(days=WINDOW_DAYS),
             )
-        ]
-        rows = _dedupe_news_rows(
-            candidates,
-            MAX_NEWS_ITEMS,
-            company.ticker,
+            .order_by(desc(NewsEvent.date))
+            .limit(400)
+        ).all()
+        rows = pick_recent_news_rows(
+            list(recent), now=now, ticker=company.ticker, company_name=company.name, limit=MAX_NEWS_ITEMS
         )
+        if not rows:
+            candidates = [
+                row
+                for row in db.scalars(
+                    select(NewsEvent)
+                    .where(NewsEvent.company_id == company.id)
+                    .order_by(desc(NewsEvent.materiality_score), desc(NewsEvent.date))
+                    .limit(MAX_NEWS_ITEMS * 8)
+                ).all()
+                if not (
+                    is_law_firm_solicitation(
+                        (row.metadata_ or {}).get("source_headline") or row.title, None
+                    )
+                    or is_data_page_headline((row.metadata_ or {}).get("source_headline") or row.title)
+                )
+            ]
+            rows = _dedupe_news_rows(
+                candidates,
+                MAX_NEWS_ITEMS,
+                company.ticker,
+            )
         if not rows:
             return _pending(
                 "news pipeline (NewsEvent)",
@@ -916,6 +941,21 @@ class ThesisEvidenceService:
                 for r in rows
             ],
         }
+
+    # -- 4b. hechos recientes (SEC 8-K/6-K, comunicados, IR, noticias) ---------
+    def _collect_recent_events(
+        self, db: Session, company: Company, ir_status: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        """Hechos materiales de los últimos días con fecha y fuente. Solo lee
+        la base: en ``collect`` va después de ingerir filings e IR, así que
+        incluye lo recién traído. Un fallo no rompe la tesis."""
+        from app.services.recent_material_events import collect_recent_events
+
+        try:
+            return collect_recent_events(db, company, ir_status=ir_status)
+        except Exception as exc:  # noqa: BLE001 - best-effort
+            _log_source_failure("hechos recientes", company.ticker, exc)
+            return _pending("hechos recientes", "No se pudieron leer los hechos recientes.")
 
     # -- 5a. proximo earnings ---------------------------------------------------
     def _collect_earnings(self, db: Session, company: Company) -> dict[str, Any]:

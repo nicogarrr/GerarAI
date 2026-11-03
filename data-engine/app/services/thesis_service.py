@@ -1917,6 +1917,14 @@ class ThesisService:
             "Las noticias materiales requieren auditoría de fuentes y aprobación "
             "humana antes de versionar la tesis."
         )
+        recent = sources.get("recent_events") or {}
+        if recent.get("sources_checked") is not None:
+            # Hechos recientes con fecha y fuente (SEC, comunicados, IR,
+            # noticias), de más nuevo a más antiguo: sustituyen a la lista
+            # «por materialidad», que dejaba fuera lo último.
+            from app.services.recent_material_events import recent_events_markdown
+
+            return f"{base}\n\n{recent_events_markdown(recent)}"
         items = news.get("items") or []
         if not items:
             pending = news.get("detail", "sin noticias ingeridas")
