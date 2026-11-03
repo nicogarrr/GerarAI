@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { availableIndicators, barsSince, detectMovements, eventsInRange, movementEvents, indicatorSeries, markersByDay, volumeSpikeFlags, type PriceEvent } from '@/lib/market/price-events';
+import { barsSince, detectMovements, eventsInRange, movementEvents, markersByDay, targetDistancePercent, volumeSpikeFlags, type PriceEvent } from '@/lib/market/price-events';
 
 const day = (i: number) => new Date(Date.UTC(2026, 0, 1) + i * 86_400_000).toISOString().slice(0, 10);
 
@@ -14,17 +14,14 @@ describe('Precio y eventos: cálculos del gráfico de la ficha', () => {
         expect(flags[5]).toBe(false); // sin historia suficiente no se marca
     });
 
-    it('calcula distancia al objetivo, caída desde máximo y plusvalía en %', () => {
-        const bars = [{ date: day(0), close: 100, high: 120 }, { date: day(1), close: 90, high: 95 }];
-        expect(indicatorSeries(bars, 'target', { target: 135 }).map((p) => p.value)).toEqual([35, 50]);
-        expect(indicatorSeries(bars, 'drawdown', {}).map((p) => p.value)).toEqual([-16.67, -25]);
-        expect(indicatorSeries(bars, 'pnl', { averageCost: 80 }).map((p) => p.value)).toEqual([25, 12.5]);
-        expect(indicatorSeries(bars, 'target', { target: null })).toEqual([]);
-    });
-
-    it('solo ofrece los indicadores que tienen datos', () => {
-        expect(availableIndicators({})).toEqual(['drawdown']);
-        expect(availableIndicators({ target: 50, averageCost: 40 })).toEqual(['target', 'drawdown', 'pnl']);
+    it('distancia al objetivo en % frente al último precio (sin inventar si falta un dato)', () => {
+        expect(targetDistancePercent(135, 90)).toBe(50);
+        expect(targetDistancePercent(173.17, 113.79)).toBe(52.18);
+        expect(targetDistancePercent(80, 100)).toBe(-20);
+        expect(targetDistancePercent(null, 100)).toBeNull();
+        expect(targetDistancePercent(135, null)).toBeNull();
+        expect(targetDistancePercent(0, 100)).toBeNull();
+        expect(targetDistancePercent(135, 0)).toBeNull();
     });
 
     it('filtra eventos al tramo visible, más recientes primero, y junta los días con varios', () => {
