@@ -228,7 +228,7 @@
     "criteriaMany": "{count} criteria",
     "alertsOn": "alerts on",
     "alertsOff": "alerts off",
-    "lastRun": "last run {date}",
+    "lastRun": "Last run: {date}",
     "notRun": "never",
     "run": "Run",
     "running": "Running…",
