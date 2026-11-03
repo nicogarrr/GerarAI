@@ -94,6 +94,7 @@ ACTOR_CLASS: dict[str, str] = {
     "sync_paper_dividends": INGESTA,
     "sync_portfolio_dividends": INGESTA,
     "sync_tenant_ibkr_connections": INGESTA,
+    "retry_deferred_tenant_ibkr_connections": INGESTA,
     # calculo: pesado sobre datos ya ingeridos
     "consolidate_memory": CALCULO,
     "evaluate_dca_signals": CALCULO,
