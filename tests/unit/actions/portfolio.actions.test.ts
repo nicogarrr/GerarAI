@@ -110,6 +110,14 @@ describe('addTransaction / updateTransaction', () => {
         }
     });
 
+    it.each([['GBp', 'GBp'], [' GBp ', 'GBp'], ['GBP', 'GBP'], ['gbp', 'GBP'], ['GBX', 'GBX'], ['ZAc', 'ZAC'], ['ILa', 'ILA']])('preserva la unidad %s en alta y edición como %s', async (currency, expected) => {
+        researchRequest.mockResolvedValue({});
+        await addTransaction('tenant-one', 'TEST', 'buy', 1, 425.5, new Date('2026-10-27T00:00:00Z'), undefined, currency);
+        expect(JSON.parse(researchRequest.mock.calls[0][1].body).currency).toBe(expected);
+        await updateTransaction('tenant-one', '7', 'TEST', 'buy', 1, 425.5, new Date('2026-10-27T00:00:00Z'), undefined, currency);
+        expect(JSON.parse(researchRequest.mock.calls[1][1].body).currency).toBe(expected);
+    });
+
     it('update sin comisiones omite fees (el backend conserva la registrada)', async () => {
         researchRequest.mockResolvedValue({});
         await updateTransaction('tenant-one', '7', 'AAPL', 'sell', 1, 160, new Date('2026-10-27T00:00:00Z'));
