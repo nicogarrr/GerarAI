@@ -4856,6 +4856,51 @@ def sync_tenant_ibkr_connections() -> dict[str, Any]:
         return _handle_actor_error("sync_tenant_ibkr_connections", exc)
 
 
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=600_000)
+@_coalesce_on_success("retry_deferred_tenant_ibkr_connections", 20 * 3600, stale_after_seconds=None)
+def retry_deferred_tenant_ibkr_connections() -> dict[str, Any]:
+    """One later daily chance for recent deferred P/L, never failed credentials."""
+    from datetime import timedelta
+
+    from sqlalchemy import func, select
+
+    from app.core.database import SessionLocal
+    from app.models import IBKRConnection, IBKRSyncReceipt
+
+    try:
+        with SessionLocal() as admin:
+            latest = (
+                select(IBKRSyncReceipt.tenant_id,
+                       func.max(IBKRSyncReceipt.id).label("receipt_id"))
+                .group_by(IBKRSyncReceipt.tenant_id)
+                .subquery()
+            )
+            ids = set(admin.scalars(
+                select(IBKRConnection.tenant_id)
+                .join(latest, latest.c.tenant_id == IBKRConnection.tenant_id)
+                .join(IBKRSyncReceipt, IBKRSyncReceipt.id == latest.c.receipt_id)
+                .where(
+                    IBKRConnection.enabled.is_(True),
+                    IBKRConnection.token_ciphertext.is_not(None),
+                    IBKRConnection.status == "error",
+                    IBKRSyncReceipt.revision == IBKRConnection.revision,
+                    IBKRSyncReceipt.result == "error",
+                    IBKRSyncReceipt.error_code == "not_ready",
+                    IBKRSyncReceipt.started_at >= datetime.now(UTC) - timedelta(hours=24),
+                ).execution_options(include_all_tenants=True)
+            ).all())
+        actor = (sync_one_tenant_ibkr_dedicated
+                 if get_settings().ibkr_dedicated_sync_enabled else sync_one_tenant_ibkr)
+        scheduled = 0
+        for tenant_id, user_id in tenant_contexts():
+            if tenant_id in ids:
+                actor.send(tenant_id, user_id)
+                scheduled += 1
+        return {"scheduled": scheduled}
+    except Exception as exc:
+        return _handle_actor_error("retry_deferred_tenant_ibkr_connections", exc)
+
+
 @dramatiq.actor(max_retries=2, min_backoff=3_600_000, time_limit=1_800_000)
 def sync_one_tenant_ibkr(tenant_id: int, user_id: str) -> dict[str, Any]:
     from app.services import ibkr_connection_service as ibkr

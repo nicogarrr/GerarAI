@@ -55,6 +55,7 @@ from app.workers.dramatiq_app import (
     refresh_subtel_decrees,
     refresh_ticker_news,
     refresh_valuation_metrics,
+    retry_deferred_tenant_ibkr_connections,
     review_theses,
     run_daily_research,
     run_propicks_funnel,
@@ -269,6 +270,10 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         _register(scheduler, partial(coalesced_send, ibkr_actor), "cron", job_id="tenant_ibkr_post_close",
                   day_of_week="mon-fri", hour=18, minute=0, timezone="America/New_York")
     _register(scheduler, partial(coalesced_send, ibkr_actor), "cron", job_id="tenant_ibkr_flex_sync", hour=6, minute=50)
+    # After the morning retries, only deferred P/L gets one later daily window.
+    # The existing consumer still validates every report and bounds its retries.
+    _register(scheduler, partial(coalesced_send, retry_deferred_tenant_ibkr_connections),
+              "cron", job_id="tenant_ibkr_deferred_recovery", hour=16, minute=50)
     # One global GP + SupGP fetch every 2 h, never per tenant or more often.
     _register(scheduler, partial(coalesced_send, refresh_asts_catalog), "interval", job_id="asts_celestrak_refresh", hours=2)
     _register(scheduler, partial(coalesced_send, refresh_subtel_decrees), "interval", job_id="subtel_decrees_refresh", hours=24)
