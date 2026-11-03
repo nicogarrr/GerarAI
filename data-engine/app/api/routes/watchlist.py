@@ -1,6 +1,7 @@
 import unicodedata
 from datetime import UTC, date, datetime, timedelta
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc, func, select
@@ -66,6 +67,28 @@ class WatchItemCreate(BaseModel):
         ):
             raise ValueError("La etiqueta no puede llevar saltos de línea ni caracteres de control")
         return value
+
+
+# Sondas LATERAL del monitor (solo PG): una por empresa contra el indice
+# unico (company_id, date), en vez de ventanas/escaneos sobre toda la
+# historia. company_ids son ints leidos de la base, ligados como array.
+# El minimo conserva la ventana ORM: su desempate anterior no es estable
+# y cambiarlo alteraria low_52w_date cuando hay cierres empatados.
+# nosemgrep: gerarai-tenant-raw-sql -- market_prices es global (sin tenant); ids ligados como array tipado.
+_MONITOR_CIERRE_LATERAL_PG = """
+    SELECT m.company_id, m.close, m.date, m.quote_currency
+    FROM unnest(CAST(:ids AS integer[])) AS v(cid)
+    CROSS JOIN LATERAL (
+      SELECT company_id, close, date, quote_currency FROM market_prices
+      WHERE company_id = v.cid AND close IS NOT NULL AND close > 0
+      ORDER BY date DESC LIMIT 1) m
+"""
+_MONITOR_SESIONES_LATERAL_PG = """
+    SELECT v.cid, (SELECT count(*) FROM market_prices
+      WHERE company_id = v.cid AND close IS NOT NULL AND close > 0
+        AND date >= :cutoff) AS n
+    FROM unnest(CAST(:ids AS integer[])) AS v(cid)
+"""
 
 
 def _payload(item: WatchItem) -> dict:
@@ -186,12 +209,6 @@ async def watchlist_monitor(
     company_ids = [company.id for company in companies]
     valid_price = (MarketPrice.company_id.in_(company_ids),
                    MarketPrice.close.isnot(None), MarketPrice.close > 0)
-    # Constant query count: do not fetch one year's session IDs per company.
-    counts = dict(db.execute(
-        select(MarketPrice.company_id, func.count(MarketPrice.id))
-        .where(*valid_price, MarketPrice.date >= cutoff)
-        .group_by(MarketPrice.company_id)
-    ).all())
 
     def ranked_prices(order, *, recent=False):
         ranked = select(
@@ -206,6 +223,27 @@ async def watchlist_monitor(
             .where(ranked.c.rank == 1)
         ).all()}
 
+    if db.get_bind().dialect.name == "postgresql" and company_ids:
+        # Sondas LATERAL (constantes junto a _payload): medido en lab
+        # (60 empresas, 4,9M precios) closes 65 -> 0,5 ms, counts 39 -> 4 ms;
+        # minimo sin cambios, mismo numero constante de consultas.
+        closes = {
+            row.company_id: row
+            for row in db.execute(sa.text(_MONITOR_CIERRE_LATERAL_PG), {"ids": company_ids}).all()
+        }
+        counts = {
+            row.cid: row.n
+            for row in db.execute(
+                sa.text(_MONITOR_SESIONES_LATERAL_PG), {"ids": company_ids, "cutoff": cutoff}
+            ).all()
+        }
+    else:
+        # Constant query count: do not fetch one year's session IDs per company.
+        counts = dict(db.execute(
+            select(MarketPrice.company_id, func.count(MarketPrice.id))
+            .where(*valid_price, MarketPrice.date >= cutoff)
+            .group_by(MarketPrice.company_id)
+        ).all())
     lows = ranked_prices(MarketPrice.close.asc(), recent=True)
     # Split efectivo dentro de las 52 semanas: los cierres anteriores estan en
     # la base vieja (un contrasplit 1:10 dejaba el minimo diez veces abajo).
@@ -227,7 +265,8 @@ async def watchlist_monitor(
                                       MarketPrice.date >= since)
             .order_by(MarketPrice.close.asc(), MarketPrice.date.asc()).limit(1)
         ).first()
-    closes = ranked_prices(MarketPrice.date.desc())
+    if db.get_bind().dialect.name != "postgresql" or not company_ids:
+        closes = ranked_prices(MarketPrice.date.desc())
     # Valor justo ÚNICO (tesis o motor, misma precedencia que inicio y screener).
     fair_values = resolve_fair_values(db, companies)
     from decimal import Decimal
