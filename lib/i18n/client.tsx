@@ -14,7 +14,8 @@
  * router.refresh() (lo hace components/settings/LanguageForm.tsx).
  */
 
-import { createContext, use, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, use, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { loadCompactEnglish } from '#i18n-en-compact';
 // @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
 import { createFormatters, type Formatters } from '../format.ts';
@@ -22,24 +23,80 @@ import { createFormatters, type Formatters } from '../format.ts';
 import { DEFAULT_LOCALE, type Locale } from './locale.ts';
 // @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
 import { createTranslator, type TranslateFn } from './translate.ts';
+import {
+  I18N_AREAS,
+  getSpanishRecoveryVersion,
+  hasEnglishMessages,
+  hasSpanishAreas,
+  loadSpanishAreas,
+  registerCompactEnglish,
+  subscribeSpanishRecovery,
 // @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
-import { hasEnglishMessages, registerCompactEnglish } from './messages/index.ts';
+} from './messages/index.ts';
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { spanishAreasForPath } from './route-areas.ts';
 
 const LocaleContext = createContext<Locale>(DEFAULT_LOCALE);
 
-let englishReady: Promise<void> | null = null;
+// Una promesa estable por carga (se queda en caché al resolverse): use()
+// necesita la misma promesa en cada reintento de render. Si falla, se olvida
+// para reintentar.
+const ready = new Map<string, Promise<void>>();
+
+function ensure(key: string, load: () => Promise<void>): Promise<void> {
+  let promise = ready.get(key);
+  if (!promise) {
+    promise = load();
+    promise.catch(() => ready.delete(key));
+    ready.set(key, promise);
+  }
+  return promise;
+}
+
+function ensureSpanishAreas(areas: readonly string[]): Promise<void> {
+  return ensure(`es:${areas.join(',')}`, () => loadSpanishAreas(areas));
+}
 
 /** Carga (una vez) el diccionario inglés del navegador y lo registra. */
 function ensureEnglish(): Promise<void> {
-  englishReady ??= loadCompactEnglish().then(registerCompactEnglish);
-  return englishReady;
+  // El inglés compacto se expande sobre la estructura del castellano entero.
+  return ensure('en', () => Promise.all([loadSpanishAreas(I18N_AREAS), loadCompactEnglish()])
+    .then(([, compact]) => registerCompactEnglish(compact)));
 }
 
+// En desarrollo se cargan todas las áreas: así una clave nueva funciona sin
+// regenerar el mapa (el test y `npm run prebuild` lo mantienen al día).
+const DEV_ALL_AREAS = process.env.NODE_ENV !== 'production';
+
+// Fuera de producción no hace falta la ruta (y así los tests que simulan
+// next/navigation sin usePathname siguen funcionando).
+const useAreasPathname: () => string | null = DEV_ALL_AREAS ? () => null : usePathname;
+
 export function LocaleProvider({ locale, children }: { locale: Locale; children: ReactNode }) {
-  // En el navegador el inglés no va en el chunk común: si el locale es «en» y
-  // aún no está, se espera a su chunk antes de pintar (en la hidratación React
-  // conserva el HTML del servidor mientras tanto; no hay parpadeo al español).
+  const pathname = useAreasPathname();
+  // Con la página ya pintada, el resto de áreas se baja en segundo plano: la
+  // siguiente navegación no espera a ningún diccionario. (Los hooks van antes
+  // de los use() que pueden suspender.)
+  useEffect(() => {
+    if (hasSpanishAreas(I18N_AREAS)) return undefined;
+    const load = () => { void loadSpanishAreas(I18N_AREAS).catch(() => {}); };
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(load, { timeout: 4000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(load, 1500);
+    return () => window.clearTimeout(id);
+  }, []);
+  // En el navegador el castellano llega por áreas: se espera a las de esta ruta
+  // antes de pintar (en la hidratación React conserva el HTML del servidor;
+  // al navegar, la página anterior sigue a la vista hasta tenerlas). En el
+  // servidor están todas y no se espera nada.
+  const areas = DEV_ALL_AREAS ? I18N_AREAS : spanishAreasForPath(pathname);
+  if (!hasSpanishAreas(areas)) use(ensureSpanishAreas(areas));
+  // El inglés tampoco va en el chunk común: si el locale es «en» y aún no
+  // está, se espera a su chunk (y al castellano entero) antes de pintar.
   if (locale === 'en' && !hasEnglishMessages()) use(ensureEnglish());
+
   return <LocaleContext.Provider value={locale}>{children}</LocaleContext.Provider>;
 }
 
@@ -51,7 +108,13 @@ export function useLocale(): Locale {
 /** t() ligada al locale activo. */
 export function useT(): TranslateFn {
   const locale = useLocale();
-  return useMemo(() => createTranslator(locale), [locale]);
+  // Solo cambia si hubo que descargar un área que la ruta no traía (ver
+  // recoverSpanishArea): entonces se vuelve a pintar con el texto ya cargado.
+  const recovery = useSyncExternalStore(subscribeSpanishRecovery, getSpanishRecoveryVersion, () => 0);
+  return useMemo(() => {
+    void recovery;
+    return createTranslator(locale);
+  }, [locale, recovery]);
 }
 
 /** Funciones de formato (números, fechas, importes) ligadas al locale. */

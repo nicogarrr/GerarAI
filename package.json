@@ -3,6 +3,10 @@
     "version": "0.5.0",
     "private": true,
     "imports": {
+        "#i18n-es": {
+            "browser": "./lib/i18n/messages/es.browser.ts",
+            "default": "./lib/i18n/messages/es-full.ts"
+        },
         "#i18n-en-compact": {
             "browser": "./lib/i18n/messages/en-compact.browser.ts",
             "default": "./lib/i18n/messages/en-compact.ts"
@@ -10,7 +14,7 @@
     },
     "scripts": {
         "dev": "next dev --turbopack",
-        "prebuild": "node scripts/i18n-compact-en.mjs",
+        "prebuild": "node scripts/i18n-compact-en.mjs && node scripts/i18n-route-areas.mjs",
         "build": "next build",
         "start": "next start",
         "lint": "eslint",
