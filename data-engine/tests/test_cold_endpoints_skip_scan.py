@@ -38,6 +38,7 @@ from app.models.entities import (
 from app.services import screener_context_metrics as scm
 from app.services.data_health_service import inventory
 from app.services.screener_service import ScreenerService
+from app.valuation.margin_convention import MARGIN_OF_SAFETY_CONVENTION
 
 
 @pytest.fixture
@@ -357,7 +358,7 @@ def test_postgres_inventory_uses_bounded_probes_and_matches_portable_result(db, 
     bounded = inventory(db, now=now)
     assert bounded == portable
     recursive = [statement for statement in statements if "WITH RECURSIVE" in statement]
-    assert len(recursive) == 3
+    assert len(recursive) == 4  # hechos + noticias + documentos + precios
     assert all("company_id >= -2147483648" in statement for statement in recursive)
     assert all("tenant_id = ?" in statement for statement in recursive if "FROM market_prices" not in statement)
 
@@ -389,3 +390,30 @@ def test_margin_isolated_on_both_models_and_outputs(db):
     db.info["tenant_id"] = 1
     assert scm._any_margin_of_safety(db)
     assert model.company_id in scm._margin_of_safety(db)
+
+
+def test_sonda_margen_pg_literal_convenio_y_predicados():
+    """La sonda PG del margen (0124) fija su forma: literal en linea, no bind."""
+    sql = str(scm._MARGEN_SONDA_PG)
+    # El convenio va EN LINEA: un parametro jamas matchea el predicado de un
+    # indice parcial. El literal tiene que salir de la constante de modulo.
+    assert f"'{MARGIN_OF_SAFETY_CONVENTION}'" in sql
+    assert ":convention" not in sql and ":margin" not in sql
+    assert "json_typeof(o.output_payload -> 'margin_of_safety') NOT IN ('boolean', 'null')" in sql
+    # tenant en outputs, en el modelo y en el anti-join de versiones.
+    assert sql.count("tenant_id = :tenant") == 3
+    assert "m.status <> 'insufficient_data'" in sql
+    assert "n.version > m.version" in sql
+
+
+@pytest.mark.parametrize("margin", [None, True, "NaN", "Infinity", "not-a-number", {}, []])
+def test_margen_candidato_rechaza_valores_invalidos(margin):
+    """El criterio unico de aceptacion rechaza todo margen no decimal."""
+    assert not scm._margin_candidate_accepted(margin, MARGIN_OF_SAFETY_CONVENTION)
+
+
+def test_margen_candidato_acepta_decimal_y_rechaza_convenio_desconocido():
+    assert scm._margin_candidate_accepted("0.25", MARGIN_OF_SAFETY_CONVENTION)
+    assert scm._margin_candidate_accepted(Decimal("0.25"), MARGIN_OF_SAFETY_CONVENTION)
+    assert not scm._margin_candidate_accepted("0.25", "otra_convencion")
+    assert not scm._margin_candidate_accepted("0.25", None)

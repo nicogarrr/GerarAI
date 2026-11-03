@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import Company, ThesisVersion, ValuationModel, ValuationOutput
-from app.valuation.margin_convention import margin_convention_known
+from app.valuation.margin_convention import MARGIN_OF_SAFETY_CONVENTION, margin_convention_known
 
 MARGIN_OF_SAFETY = "margen_seguridad"
 HAS_THESIS = "tiene_tesis"
@@ -220,6 +220,38 @@ def _any_real_thesis(db: Session) -> bool:
     )
 
 
+def _margin_candidate_accepted(margin: Any, convention: Any) -> bool:
+    """Criterio unico de aceptacion de un margen candidato.
+
+    Lo usan la rama ORM (sqlite) y la sonda PG para que ambas acepten y
+    rechacen exactamente los mismos valores.
+    """
+    return margin_convention_known({"margin_of_safety_convention": convention}) and (
+        _decimal(margin) is not None
+    )
+
+
+# Sonda de candidatos a margen para PostgreSQL (indice parcial 0124
+# ix_val_outputs_margin_candidate). El literal del convenio va EN LINEA (no
+# bind): un parametro jamas matchea el predicado de un indice parcial. Sale
+# de MARGIN_OF_SAFETY_CONVENTION y un test fija que coinciden.
+_MARGEN_SONDA_PG = sa.text(
+    "SELECT o.output_payload -> 'margin_of_safety' AS margin, "
+    "o.output_payload -> 'trace' -> 'margin_of_safety_convention' AS convention "
+    "FROM valuation_outputs o "
+    "WHERE o.tenant_id = :tenant "
+    "AND (o.output_payload -> 'trace' ->> 'margin_of_safety_convention') = "
+    f"'{MARGIN_OF_SAFETY_CONVENTION}' "
+    "AND json_typeof(o.output_payload -> 'margin_of_safety') NOT IN ('boolean', 'null') "
+    "AND EXISTS (SELECT 1 FROM valuation_models m "
+    "WHERE m.id = o.valuation_model_id AND m.tenant_id = :tenant "
+    "AND m.status <> 'insufficient_data' "
+    "AND NOT EXISTS (SELECT 1 FROM valuation_models n "
+    "WHERE n.tenant_id = :tenant AND n.company_id = m.company_id "
+    "AND n.version > m.version))"
+)
+
+
 def _any_margin_of_safety(db: Session) -> bool:
     """Alguna empresa tiene margen conocido en su ultima valoracion.
 
@@ -228,7 +260,19 @@ def _any_margin_of_safety(db: Session) -> bool:
     solo margen/convenio de los outputs en consultas IN acotadas. No hidrata
     los traces ni las proyecciones completas para una prueba de existencia.
     Conserva la seleccion de ultima version y validacion decimal original.
+
+    En PostgreSQL va por la sonda de candidatos `_MARGEN_SONDA_PG` (indice
+    parcial 0124): en vez de proyectar margen/convenio de TODOS los outputs
+    de los ultimos modelos, el indice deja solo los candidatos (convenio
+    conocido + valor ni booleano ni nulo) y el post-chequeo en Python es el
+    mismo criterio de aceptacion de la rama ORM. El anti-join de versiones
+    superiores va por tenant, como la lectura ORM (empate de
+    (company_id, version): la sonda considera todos los empatados; la rama
+    ORM se quedaba con uno arbitrario segun el orden de filas).
     """
+    if db.get_bind().dialect.name == "postgresql":
+        rows = db.execute(_MARGEN_SONDA_PG, {"tenant": db.info["tenant_id"]}).all()
+        return any(_margin_candidate_accepted(margin, convention) for margin, convention in rows)
     latest = {}
     for model in db.execute(select(
         ValuationModel.id, ValuationModel.company_id,
@@ -255,8 +299,7 @@ def _any_margin_of_safety(db: Session) -> bool:
         for margin, convention, value_type in rows:
             if value_type in {"boolean", "true", "false"}:
                 continue
-            if (margin_convention_known({"margin_of_safety_convention": convention})
-                    and _decimal(margin) is not None):
+            if _margin_candidate_accepted(margin, convention):
                 return True
     return False
 
