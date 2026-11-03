@@ -121,13 +121,16 @@ def test_stale_automatic_dates_are_omitted_but_manual_stays():
     db = SessionLocal()
     try:
         n = _tenant_with_watch(db, ["ZSA", "ZSB"])
+        # Fechas relativas: con el día fijo 2026-11-02 el test expiró al llegar
+        # esa fecha (la fila "futura" pasó a ser pasada y ya no era stale_future).
+        today = date.today()
         old = datetime.now(UTC) - timedelta(days=5)
-        db.add(EarningsDate(ticker=n["ZSA"], event_date=date(2026, 11, 2), source="yahoo",
+        db.add(EarningsDate(ticker=n["ZSA"], event_date=today + timedelta(days=4), source="yahoo",
                             source_label="Yahoo", fetched_at=old))
-        db.add(EarningsDate(ticker=n["ZSB"], event_date=date(2026, 11, 3), source="manual",
+        db.add(EarningsDate(ticker=n["ZSB"], event_date=today + timedelta(days=5), source="manual",
                             source_label="Comunicado", fetched_at=old))
         db.commit()
-        cal = followed_calendar(db, date(2026, 11, 1), date(2026, 11, 30))
+        cal = followed_calendar(db, today - timedelta(days=1), today + timedelta(days=30))
         tickers = {e["ticker"] for d in cal["days"] for e in d["events"]}
         assert n["ZSA"] not in tickers and n["ZSA"] in cal["without_date_in_range"]
         assert n["ZSB"] in tickers
