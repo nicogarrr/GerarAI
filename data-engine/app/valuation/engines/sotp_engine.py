@@ -92,6 +92,34 @@ def sotp_discount_sensitivity(*, nav_per_share: float, base_discount: float) -> 
     return {"rows": rows, "trace": {"method": "sotp_holding_discount_sensitivity"}}
 
 
+def _inferred_discount(context: ValuationContext):
+    """Descuento holding INFERIDO (base + URLs) cuando no hay hecho.
+
+    Devuelve un sustituto con la forma que el motor lee de un hecho
+    (value/id/period/confidence) y su ficha etiquetada, o ``(None, None)``.
+    """
+    from types import SimpleNamespace
+
+    from app.valuation.engines.sector_specific import inferred_sourced
+
+    sourced = inferred_sourced(context, "holding_company_discount")
+    if sourced is None or sourced.estimate is None:
+        return None, None
+    stand_in = SimpleNamespace(
+        value=sourced.value, id=None, period=sourced.period, confidence=sourced.confidence,
+        metric="holding_company_discount", unit=None, fiscal_year=None,
+    )
+    return stand_in, dict(sourced.estimate)
+
+
+def _with_estimates(result: dict, estimate: dict | None) -> dict:
+    """Anade la ficha del input inferido al resultado y al trace."""
+    if estimate:
+        result["estimated_inputs"] = [*(result.get("estimated_inputs") or []), estimate]
+        result.setdefault("trace", {})["estimated_inputs"] = result["estimated_inputs"]
+    return result
+
+
 class SOTPEngine(ValuationEngine):
     """SOTP: suma de segmentos menos deuda neta, con descuento holding.
 
@@ -189,6 +217,9 @@ class SOTPEngine(ValuationEngine):
                 return nav_result
 
         discount_fact = latest_by_metric.get("holding_company_discount")
+        discount_estimate = None
+        if discount_fact is None:
+            discount_fact, discount_estimate = _inferred_discount(context)
 
         missing: list[str] = []
         if shares is None or shares <= 0:
@@ -311,7 +342,7 @@ class SOTPEngine(ValuationEngine):
             f"segment:{metric}" for metric in missing_segments
         ]
 
-        return apply_publication_blockers(
+        return _with_estimates(apply_publication_blockers(
             {
             "ticker": company.ticker,
             "model_type": company.valuation_model,
@@ -381,7 +412,7 @@ class SOTPEngine(ValuationEngine):
                 },
                 "sotp": base,
                 "holding_discount_base": discount,
-                "holding_discount_source": "financial_facts",
+                "holding_discount_source": "inferred_input" if discount_estimate else "financial_facts",
                 "probability_method": "source_confidence_plus_holding_discount",
                 "evidence_confidence": evidence_confidence,
                 "missing_optional_segments": missing_segments,
@@ -390,7 +421,7 @@ class SOTPEngine(ValuationEngine):
                 "weighted": weighted["trace"],
             },
             }
-        )
+        ), discount_estimate)
 
     def _reported_nav_value(
         self,
@@ -440,9 +471,12 @@ class SOTPEngine(ValuationEngine):
             )
         nav_per_share = nav_total / shares
         discount_fact = latest_by_metric.get("holding_company_discount")
+        discount_estimate = None
+        if discount_fact is None:
+            discount_fact, discount_estimate = _inferred_discount(context)
         if discount_fact is not None and 0 <= float(discount_fact.value) < 1:
             discount = float(discount_fact.value)
-            discount_source = "financial_facts"
+            discount_source = "inferred_input" if discount_estimate else "financial_facts"
         else:
             discount_fact = None
             discount = 0.0
@@ -473,7 +507,7 @@ class SOTPEngine(ValuationEngine):
             ]
         )
         expected = weighted["expected_value"]
-        return apply_publication_blockers(
+        return _with_estimates(apply_publication_blockers(
             {
                 "ticker": company.ticker,
                 "model_type": company.valuation_model,
@@ -539,4 +573,4 @@ class SOTPEngine(ValuationEngine):
                     "weighted": weighted["trace"],
                 },
             }
-        )
+        ), discount_estimate)

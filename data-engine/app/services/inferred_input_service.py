@@ -24,7 +24,14 @@ ALLOWED_KEYS: dict[str, tuple[float, float]] = {
     # WACC y g terminal: solo cuando no hay CalculatedMetric/dato oficial.
     "wacc": (0.04, 0.30),
     "terminal_growth": (0.0, 0.05),
+    # Inputs de motores sectoriales que ni el XBRL ni el texto del informe
+    # traen (o no se pudieron extraer): cap rate de mercado de un REIT, ratio
+    # combinado de una aseguradora y descuento holding de un holding.
+    "cap_rate": (0.02, 0.15),
+    "combined_ratio": (0.5, 1.5),
+    "holding_company_discount": (-1e-9, 0.60),
 }
+SECTOR_KEYS = frozenset({"cap_rate", "combined_ratio", "holding_company_discount"})
 MIN_BASE_CHARS = 20
 MAX_URLS = 10
 # run_dcf exige WACC > g; el par inferido debe dejar al menos este margen.

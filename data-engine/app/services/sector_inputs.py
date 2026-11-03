@@ -283,3 +283,39 @@ def extract_provenance(db: Session, fact_id: int | None) -> dict[str, Any] | Non
         "source_url": document.source_url,
         "form": (document.metadata_ or {}).get("form"),
     }
+
+
+SECTOR_INFERABLE = ("combined_ratio", "cap_rate", "holding_company_discount")
+
+
+def prepare_sector_inputs(db: Session, company: Company, valuation: dict[str, Any]) -> dict[str, Any]:
+    """Inferencia etiquetada del modelo para los inputs sectoriales que faltan.
+
+    Para llamar FUERA del SAVEPOINT de la tesis (la inferencia hace commit),
+    como el margen FCF objetivo. Solo pide lo que el motor declaro ausente
+    (o el descuento de un NAV publicado que se valoro a la par); respeta la
+    cuota diaria y el presupuesto del servicio de inferencia. Nunca lanza.
+    """
+    from app.services.async_bridge import run_from_any_context
+    from app.services.inferred_input_llm_service import infer_input
+    from app.services.inferred_input_service import InferredInputService
+
+    missing = set(valuation.get("missing_inputs") or [])
+    trace = valuation.get("trace") or {}
+    if trace.get("holding_discount_source") == "none_reported_nav_at_par":
+        missing.add("holding_company_discount")
+    out: dict[str, Any] = {}
+    for key in SECTOR_INFERABLE:
+        if key not in missing:
+            continue
+        if InferredInputService().latest_valid(db, company.id, key) is not None:
+            out[key] = "ya_inferido"
+            continue
+        try:
+            row = run_from_any_context(infer_input(db, company.ticker, input_key=key))  # type: ignore[arg-type]
+            db.commit()
+            out[key] = {"status": "inferido", "value": float(row.value)}
+        except Exception as exc:  # noqa: BLE001 - cuota, presupuesto, sin extractos: N/D honesto
+            db.rollback()
+            out[key] = f"omitido:{getattr(exc, 'reason', None) or type(exc).__name__}"
+    return out
