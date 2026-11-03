@@ -26,6 +26,17 @@ RUN pip install torch==2.14.1+cpu --index-url https://download.pytorch.org/whl/c
     && pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir --no-deps "pillow==13.0.0"
 
+# Compilers/headers are build-only. CVE-2026-99083 was reported against
+# linux-libc-dev in the final image, although this is a kernel-header package.
+# Keep shared libraries used by binary wheels; remove the build toolchain
+# and assert the flagged package is absent instead of suppressing the scan.
+RUN apt-mark manual libstdc++6 libgcc-s1 libffi8 libgomp1 libatomic1 libquadmath0 \
+    && apt-get purge --auto-remove -y gcc g++ libffi-dev linux-libc-dev \
+    && if dpkg-query -W -f='${Status}' linux-libc-dev 2>/dev/null | grep -q 'install ok installed'; then exit 1; fi \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -c "import numpy, scipy, arch, torch; import sentence_transformers" \
+    && tesseract --version
+
 # Copy source (quantstats package is vendored inside data-engine/)
 COPY . .
 
