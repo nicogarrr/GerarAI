@@ -223,6 +223,13 @@ MAX_DEADLINE_TICKERS = 60
 DEADLINE_BUDGET_SECONDS = 20.0
 DEADLINE_FAILURE_TTL_SECONDS = 120.0
 _FAILED_UNTIL: dict[str, float] = {}
+# Clave de EDGAR entero (no es un ticker) en la misma memoria de fallos: si en
+# una peticion NINGUN emisor consultado responde porque la red falla o se agota
+# el presupuesto, EDGAR esta caido y las cargas siguientes no vuelven a esperar
+# el presupuesto entero con los emisores que aun no se habian probado (con mas
+# de MAX_DEADLINE_TICKERS emisores US cada carga probaba otros 60 y esperaba
+# otra vez ~8 s). Un emisor sin CIK no cuenta: eso no es EDGAR caido.
+_EDGAR_DOWN_KEY = "*"
 
 
 async def fetch_filing_deadlines(
@@ -251,9 +258,12 @@ async def fetch_filing_deadlines(
     gate = asyncio.Semaphore(concurrency)
     now = time.monotonic()
     ordered = sorted(tickers)
-    to_query = [t for t in ordered if _FAILED_UNTIL.get(t, 0.0) <= now][:MAX_DEADLINE_TICKERS]
-    skipped_failed = [t for t in ordered if _FAILED_UNTIL.get(t, 0.0) > now]
+    edgar_down = _FAILED_UNTIL.get(_EDGAR_DOWN_KEY, 0.0) > now
+    to_query = [] if edgar_down else [t for t in ordered if _FAILED_UNTIL.get(t, 0.0) <= now][:MAX_DEADLINE_TICKERS]
+    skipped_failed = list(ordered) if edgar_down else [t for t in ordered if _FAILED_UNTIL.get(t, 0.0) > now]
     skipped_cap = [t for t in ordered if t not in to_query and t not in skipped_failed]
+
+    raised: set[str] = set()
 
     async def one(ticker: str) -> tuple[str, dict[str, Any] | None, bool]:
         async with gate:
@@ -264,6 +274,7 @@ async def fetch_filing_deadlines(
                 data = await get_submissions(cik)
             except Exception as exc:  # noqa: BLE001 - red/4xx/5xx: degradacion visible
                 logger.warning("plazos 10-Q/10-K %s: %s", ticker, type(exc).__name__)
+                raised.add(ticker)
                 return ticker, None, True
             return ticker, data if isinstance(data, dict) else None, not isinstance(data, dict)
 
@@ -287,6 +298,8 @@ async def fetch_filing_deadlines(
         if ticker not in answered:
             _FAILED_UNTIL[ticker] = now + DEADLINE_FAILURE_TTL_SECONDS
             errors.append(f"Plazos 10-Q/10-K: EDGAR no disponible para {ticker}")
+    if to_query and all(t in raised or t not in answered for t in to_query):
+        _FAILED_UNTIL[_EDGAR_DOWN_KEY] = now + DEADLINE_FAILURE_TTL_SECONDS
     for ticker, data, failed in sorted(results):
         if failed or data is None:
             _FAILED_UNTIL[ticker] = now + DEADLINE_FAILURE_TTL_SECONDS
