@@ -117,17 +117,22 @@ def test_market_timezone_and_yahoo_day_in_market_zone():
 def test_stale_automatic_dates_are_omitted_but_manual_stays():
     from datetime import UTC, datetime, timedelta
 
+    from app.core.local_date import local_today
+
     init_db()
     db = SessionLocal()
     try:
         n = _tenant_with_watch(db, ["ZSA", "ZSB"])
         old = datetime.now(UTC) - timedelta(days=5)
-        db.add(EarningsDate(ticker=n["ZSA"], event_date=date(2026, 11, 2), source="yahoo",
+        # Fechas relativas a hoy: con 2-3 nov 2026 fijos el test caducó el 3 nov
+        # (una fecha ya pasada no es «caducada», es pasada).
+        today = local_today()
+        db.add(EarningsDate(ticker=n["ZSA"], event_date=today + timedelta(days=1), source="yahoo",
                             source_label="Yahoo", fetched_at=old))
-        db.add(EarningsDate(ticker=n["ZSB"], event_date=date(2026, 11, 3), source="manual",
+        db.add(EarningsDate(ticker=n["ZSB"], event_date=today + timedelta(days=2), source="manual",
                             source_label="Comunicado", fetched_at=old))
         db.commit()
-        cal = followed_calendar(db, date(2026, 11, 1), date(2026, 11, 30))
+        cal = followed_calendar(db, today, today + timedelta(days=29))
         tickers = {e["ticker"] for d in cal["days"] for e in d["events"]}
         assert n["ZSA"] not in tickers and n["ZSA"] in cal["without_date_in_range"]
         assert n["ZSB"] in tickers
