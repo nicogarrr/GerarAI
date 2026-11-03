@@ -277,6 +277,39 @@ def build_tools(db: Session, *, today: date | None = None) -> dict[str, ToolSpec
             data={"year": year, "bands": bands},
         )
 
+    def sale_tax_estimate(ctx: RunContext) -> ToolOutput | None:
+        """IRPF del ahorro si vendieras hoy toda la posición (cálculo del código,
+        no del modelo): así el experto fiscal cita la cifra en vez de razonar
+        tramo a tramo (prueba real 2026-11-03: agotaba su tope y se perdía)."""
+        from decimal import Decimal
+
+        from app.services.tax_irpf_filing import calculate_savings_tax
+
+        position = user_position(ctx)
+        if position is None:
+            return None
+        company = _company(db, ctx)
+        rows = [p for p in _positions(ctx) if company is not None and p.company_id == company.id
+                and (_num(p.quantity) or 0) > 0]
+        bases = {p.base_currency for p in rows}
+        gain = position.data.get("unrealized_pnl_base")
+        if gain is None and position.data.get("market_value_base") is not None \
+                and position.data.get("cost_basis_base") is not None:
+            gain = position.data["market_value_base"] - position.data["cost_basis_base"]
+        if gain is None or len(bases) != 1 or not next(iter(bases)):
+            return None
+        year = (today or local_today()).year
+        gain = round(float(gain), 2)
+        tax = float(calculate_savings_tax(Decimal(str(gain)), year)) if gain > 0 else 0.0
+        return ToolOutput(
+            source={"table": "code:tax_irpf_filing.calculate_savings_tax", "law": "LIRPF art. 66 y 76",
+                    "date": _day(today or local_today())},
+            data={"ticker": position.data["ticker"], "base_currency": next(iter(bases)), "year": year,
+                  "gain_if_sold_all": gain, "irpf_if_sold_all": round(tax, 2),
+                  "effective_rate_pct": round(100 * tax / gain, 2) if gain > 0 else 0.0,
+                  "assumes": "sin otras ganancias o pérdidas del año; pérdida: compensa si no recompras en 2 meses"},
+        )
+
     specs = [
         ("financial_facts", financial_facts, "Hechos financieros reportados (SEC/ESEF), 2 últimos ejercicios"),
         ("valuation_engine", valuation_engine, "Motor de valoración y última versión de tesis"),
@@ -285,5 +318,6 @@ def build_tools(db: Session, *, today: date | None = None) -> dict[str, ToolSpec
         ("news_events", news_events, "Noticias de los últimos 90 días con materialidad"),
         ("user_position", user_position, "Posición del usuario en la empresa"),
         ("irpf_savings_bands", irpf_savings_bands, "Tramos de la base del ahorro del IRPF del año"),
+        ("sale_tax_estimate", sale_tax_estimate, "IRPF estimado si vendes hoy toda la posición"),
     ]
     return {name: ToolSpec(name=name, fn=fn, description=desc) for name, fn, desc in specs}

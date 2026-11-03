@@ -78,7 +78,7 @@ def default_experts() -> list[ExpertSpec]:
         ExpertSpec(
             name="tax",
             prompt_name="expert_tax",
-            tools=("user_position", "irpf_savings_bands"),
+            tools=("user_position", "irpf_savings_bands", "sale_tax_estimate"),
             broad=True,
             keywords=_TAX_KEYWORDS,
             applies=_tax_applies,
