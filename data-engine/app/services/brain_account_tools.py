@@ -309,6 +309,67 @@ def _unrealized(db: Session, tenant: int) -> tuple[float, float, str, object, li
     return value - cost, cost, currencies.pop(), max(p.as_of for p in known), left_out
 
 
+def realized_line_for_closed_ticker(db: Session, tenant: int, company_id: int, ticker: str,
+                                    question: str, english: bool) -> str | None:
+    """Ganancia realizada con las ventas guardadas de un ticker SIN posición abierta.
+
+    «¿Cuánto he ganado con KO?» tras venderla entera contestaba «No tienes ninguna
+    posición abierta en KO: no hay rentabilidad guardada que contar», aunque la
+    venta (+180 €) estaba en tu libro y en el informe fiscal. Mismo FIFO del
+    informe, en euros; «este año»/«2025» acotan el ejercicio. None si no hay ventas.
+    """
+    from sqlalchemy import extract
+
+    from app.models import Transaction
+    from app.services.brain_data_tools import _year_in_question
+
+    years = sorted({int(y) for y in db.scalars(
+        select(extract("year", Transaction.trade_date)).where(
+            Transaction.tenant_id == tenant, Transaction.company_id == company_id, Transaction.action == "sell")
+    ).all() if y is not None})
+    norm = _fold(question)
+    if re.search(r"\b20\d{2}\b|\beste\s+ano\b|\bano\s+pasado\b|\bthis\s+year\b|\blast\s+year\b", norm):
+        asked = _year_in_question(question, local_today())
+        if re.search(r"\blast\s+year\b", norm) and not re.search(r"\b20\d{2}\b", norm):
+            asked = local_today().year - 1
+        years = [y for y in years if y == asked]
+        if not years:
+            return (f"In {asked} there are no sales of {ticker} in your saved trades." if english
+                    else f"En {asked} no hay ventas de {ticker} en tus operaciones guardadas.")
+    if not years:
+        return None
+    total, count, unreliable, dates = Decimal("0"), 0, False, []
+    for year in years[-6:]:
+        data = _tax_data(db, year)
+        if data is None:
+            unreliable = True
+            continue
+        for bucket in data.get("realized") or []:
+            if bucket.get("ticker") != ticker:
+                continue
+            for sale in bucket.get("sales") or []:
+                count += 1
+                dates.append(sale["date"])
+                if sale.get("gain_base") is None:
+                    unreliable = True
+                else:
+                    total += Decimal(str(sale["gain_base"]))
+    if not count:
+        return None
+    noun = ("sale" if count == 1 else "sales") if english else ("venta" if count == 1 else "ventas")
+    when = ", ".join(_fdate(d, english) for d in sorted(dates)[-3:]) + ("…" if len(dates) > 3 else "")
+    if unreliable:
+        return (f"With your saved sales of {ticker} ({count} {noun}: {when}) there is no reliable realized figure; "
+                "the warning is in Taxes." if english else
+                f"Con tus ventas guardadas de {ticker} ({count} {noun}: {when}) no hay un realizado fiable; "
+                "el aviso está en Impuestos.")
+    if english:
+        return (f"Realized with your saved sales of {ticker}: {_money(total, 'EUR', signed=True, english=True)} "
+                f"({count} {noun}: {when}; in euros, FIFO as in the tax report).")
+    return (f"Realizado con tus ventas guardadas de {ticker}: {_money(total, 'EUR', signed=True)} "
+            f"({count} {noun}: {when}; en euros, FIFO como en el informe fiscal).")
+
+
 def _year_gains_answer(db: Session, tenant: int, year: int) -> ChatResponse:
     english = _english()
     today = local_today()
