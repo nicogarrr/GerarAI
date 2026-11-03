@@ -67,6 +67,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/alerts/email-preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Email Preferences */
+        get: operations["list_email_preferences_api_alerts_email_preferences_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/alerts/email-preferences/{event_type}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Email Preference */
+        put: operations["set_email_preference_api_alerts_email_preferences__event_type__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/alerts/push/config": {
         parameters: {
             query?: never;
@@ -8816,6 +8850,33 @@ export interface components {
              */
             force_new_thesis: boolean;
         };
+        /** EmailPreferenceIn */
+        EmailPreferenceIn: {
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+        };
+        /** EmailPreferenceOut */
+        EmailPreferenceOut: {
+            /** Enabled */
+            enabled: boolean;
+            /** Event Type */
+            event_type: string;
+        };
+        /** EmailStatusOut */
+        EmailStatusOut: {
+            /** Email */
+            email?: string | null;
+            /** Preferences */
+            preferences: components["schemas"]["EmailPreferenceOut"][];
+            /**
+             * Smtp
+             * @default false
+             */
+            smtp: boolean;
+        };
         /** EventHistoryItemOut */
         EventHistoryItemOut: {
             /** Eps Actual */
@@ -14139,6 +14200,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -14184,6 +14247,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -14222,6 +14287,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -14252,6 +14319,92 @@ export interface operations {
             };
         };
     };
+    list_email_preferences_api_alerts_email_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_email_preference_api_alerts_email_preferences__event_type__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path: {
+                event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest" | "dca_levels" | "macro_event" | "earnings";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailPreferenceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailPreferenceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     push_config_api_alerts_push_config_get: {
         parameters: {
             query?: never;
@@ -14264,6 +14417,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -14302,6 +14457,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest" | "dca_levels" | "macro_event" | "earnings";
@@ -14346,6 +14503,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -14384,6 +14543,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -14428,6 +14589,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -14477,6 +14640,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -14515,6 +14680,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -14555,6 +14722,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 rule_id: number;
@@ -14595,6 +14764,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -14633,6 +14804,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 challenge_id: number;
@@ -14673,6 +14846,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 challenge_id: number;
@@ -14717,6 +14892,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -14755,6 +14932,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -14793,6 +14972,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest" | "dca_levels" | "macro_event" | "earnings";
@@ -14837,6 +15018,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 alert_id: number;
@@ -14881,6 +15064,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 alert_id: number;
@@ -14921,6 +15106,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 alert_id: number;
@@ -14965,6 +15152,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 alert_id: number;
@@ -15012,6 +15201,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15050,6 +15241,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15091,6 +15284,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15129,6 +15324,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15169,6 +15366,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15209,6 +15408,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15249,6 +15450,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15289,6 +15492,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15329,6 +15534,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15369,6 +15576,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15412,6 +15621,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15455,6 +15666,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15498,6 +15711,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15538,6 +15753,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15578,6 +15795,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15622,6 +15841,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15696,6 +15917,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15736,6 +15959,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15776,6 +16001,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15819,6 +16046,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15859,6 +16088,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15904,6 +16135,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15944,6 +16177,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -15982,6 +16217,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -16026,6 +16263,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -16067,6 +16306,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -16107,6 +16348,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -16145,6 +16388,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -16183,6 +16428,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -16225,6 +16472,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16265,6 +16514,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16308,6 +16559,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16350,6 +16603,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16392,6 +16647,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16438,6 +16695,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16480,6 +16739,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16527,6 +16788,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16569,6 +16832,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16611,6 +16876,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16653,6 +16920,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16700,6 +16969,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16750,6 +17021,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16794,6 +17067,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16840,6 +17115,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16883,6 +17160,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16923,6 +17202,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -16965,6 +17246,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17007,6 +17290,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17050,6 +17335,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17093,6 +17380,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17135,6 +17424,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17179,6 +17470,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17221,6 +17514,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17263,6 +17558,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17309,6 +17606,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17355,6 +17654,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17395,6 +17696,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17435,6 +17738,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17475,6 +17780,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17519,6 +17826,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17561,6 +17870,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17603,6 +17914,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17645,6 +17958,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17691,6 +18006,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17738,6 +18055,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17782,6 +18101,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17822,6 +18143,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17862,6 +18185,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17904,6 +18229,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17948,6 +18275,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -17993,6 +18322,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18038,6 +18369,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18080,6 +18413,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18122,6 +18457,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18164,6 +18501,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18204,6 +18543,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18244,6 +18585,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18284,6 +18627,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18326,6 +18671,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18366,6 +18713,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18408,6 +18757,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18450,6 +18801,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18490,6 +18843,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18532,6 +18887,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18574,6 +18931,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18616,6 +18975,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -18658,6 +19019,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -18698,6 +19061,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -18742,6 +19107,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -18782,6 +19149,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -18822,6 +19191,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 action_id: number;
@@ -18860,6 +19231,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 action_id: number;
@@ -18924,6 +19297,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -18964,6 +19339,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -19006,6 +19383,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -19070,6 +19449,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -19116,6 +19497,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -19158,6 +19541,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 year: number;
@@ -19247,6 +19632,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -19291,6 +19678,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -19333,6 +19722,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -19375,6 +19766,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -19420,6 +19813,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -19460,6 +19855,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -19498,6 +19895,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -19540,6 +19939,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -19578,6 +19979,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -19616,6 +20019,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 slug: string;
@@ -19656,6 +20061,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 slug: string;
@@ -19700,6 +20107,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -19742,6 +20151,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 node_id: number;
@@ -19784,6 +20195,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -19824,6 +20237,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -19868,6 +20283,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -19908,6 +20325,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -19952,6 +20371,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 source_id: number;
@@ -19994,6 +20415,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -20034,6 +20457,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -20078,6 +20503,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -20118,6 +20545,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -20162,6 +20591,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -20202,6 +20633,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 collection_id: number;
@@ -20240,6 +20673,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -20287,6 +20722,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -20330,6 +20767,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -20374,6 +20813,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -20414,6 +20855,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -20458,6 +20901,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 document_id: number;
@@ -20500,6 +20945,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 document_id: number;
@@ -20538,6 +20985,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 document_id: number;
@@ -20587,6 +21036,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 document_id: number;
@@ -20629,6 +21080,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 document_id: number;
@@ -20674,6 +21127,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -20714,6 +21169,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 job_id: number;
@@ -20760,6 +21217,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -20804,6 +21263,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -20844,6 +21305,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 principle_id: number;
@@ -20890,6 +21353,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 principle_id: number;
@@ -20939,6 +21404,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -20984,6 +21451,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21024,6 +21493,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21064,6 +21535,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21104,6 +21577,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21144,6 +21619,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 norad_cat_id: number;
@@ -21190,6 +21667,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 symbol: string;
@@ -21234,6 +21713,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21274,6 +21755,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21312,6 +21795,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 theme_id: string;
@@ -21352,6 +21837,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21394,6 +21881,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21434,6 +21923,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 symbol: string;
@@ -21476,6 +21967,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21520,6 +22013,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21560,6 +22055,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21605,6 +22102,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21643,6 +22142,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21685,6 +22186,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 claim_id: number;
@@ -21725,6 +22228,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 claim_id: number;
@@ -21773,6 +22278,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21811,6 +22318,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21857,6 +22366,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21895,6 +22406,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21937,6 +22450,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -21981,6 +22496,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -22021,6 +22538,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -22061,6 +22580,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -22112,6 +22633,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22152,6 +22675,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22194,6 +22719,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22236,6 +22763,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22282,6 +22811,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 event_id: number;
@@ -22324,6 +22855,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 event_id: number;
@@ -22366,6 +22899,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 event_id: number;
@@ -22408,6 +22943,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22446,6 +22983,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22486,6 +23025,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22526,6 +23067,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22566,6 +23109,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 cik: string;
@@ -22606,6 +23151,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 cik: string;
@@ -22648,6 +23195,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22688,6 +23237,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22728,6 +23279,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22768,6 +23321,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22816,6 +23371,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22856,6 +23413,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22900,6 +23459,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 proposal_id: number;
@@ -22942,6 +23503,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -22982,6 +23545,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23022,6 +23587,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23062,6 +23629,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23106,6 +23675,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23148,6 +23719,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23188,6 +23761,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23232,6 +23807,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 contribution_id: number;
@@ -23270,6 +23847,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23317,6 +23896,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23355,6 +23936,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23393,6 +23976,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23435,6 +24020,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23473,6 +24060,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23515,6 +24104,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23557,6 +24148,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23595,6 +24188,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23633,6 +24228,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23675,6 +24272,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23713,6 +24312,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23753,6 +24354,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23791,6 +24394,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23829,6 +24434,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23872,6 +24479,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23910,6 +24519,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -23952,6 +24563,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -23990,6 +24603,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24036,6 +24651,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24076,6 +24693,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24120,6 +24739,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24164,6 +24785,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24206,6 +24829,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24248,6 +24873,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24286,6 +24913,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24328,6 +24957,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24370,6 +25001,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24414,6 +25047,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24452,6 +25087,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24497,6 +25134,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24535,6 +25174,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24579,6 +25220,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24617,6 +25260,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24661,6 +25306,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24701,6 +25348,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24739,6 +25388,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24777,6 +25428,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24821,6 +25474,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24859,6 +25514,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24901,6 +25558,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24948,6 +25607,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -24986,6 +25647,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 transaction_id: number;
@@ -25030,6 +25693,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 transaction_id: number;
@@ -25068,6 +25733,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 portfolio_id: number;
@@ -25108,6 +25775,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25168,6 +25837,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25219,6 +25890,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25263,6 +25936,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25303,6 +25978,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25341,6 +26018,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25387,6 +26066,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25427,6 +26108,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25469,6 +26152,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25509,6 +26194,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25551,6 +26238,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25591,6 +26280,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25631,6 +26322,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 run_id: number;
@@ -25671,6 +26364,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25711,6 +26406,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25751,6 +26448,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25791,6 +26490,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25835,6 +26536,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25877,6 +26580,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25915,6 +26620,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -25959,6 +26666,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 review_id: number;
@@ -26003,6 +26712,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26045,6 +26756,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26085,6 +26798,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26123,6 +26838,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26167,6 +26884,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26209,6 +26928,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26247,6 +26968,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26291,6 +27014,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26329,6 +27054,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26373,6 +27100,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 screen_id: number;
@@ -26419,6 +27148,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 screen_id: number;
@@ -26461,6 +27192,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 screen_id: number;
@@ -26503,6 +27236,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26547,6 +27282,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26587,6 +27324,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26625,6 +27364,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26667,6 +27408,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26707,6 +27450,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26751,6 +27496,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26791,6 +27538,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26831,6 +27580,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26869,6 +27620,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26911,6 +27664,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26949,6 +27704,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -26991,6 +27748,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -27033,6 +27792,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -27075,6 +27836,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -27125,6 +27888,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -27170,6 +27935,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -27210,6 +27977,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -27250,6 +28019,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -27294,6 +28065,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -27338,6 +28111,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 document_id: number;
@@ -27384,6 +28159,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 document_id: number;
@@ -27426,6 +28203,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 document_id: number;
@@ -27471,6 +28250,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -27509,6 +28290,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 candidate_id: number;
@@ -27553,6 +28336,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -27597,6 +28382,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -27637,6 +28424,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -27681,6 +28470,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -27721,6 +28512,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 fiscal_year: number;
@@ -27763,6 +28556,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 fiscal_year: number;
@@ -27805,6 +28600,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 fiscal_year: number;
@@ -27847,6 +28644,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 fiscal_year: number;
@@ -27896,6 +28695,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 fiscal_year: number;
@@ -27974,6 +28775,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -28016,6 +28819,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -28062,6 +28867,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -28100,6 +28907,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 run_id: number;
@@ -28140,6 +28949,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28188,6 +28999,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28230,6 +29043,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28274,6 +29089,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28314,6 +29131,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28356,6 +29175,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28398,6 +29219,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28438,6 +29261,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28478,6 +29303,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28518,6 +29345,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28558,6 +29387,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28604,6 +29435,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28650,6 +29483,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28693,6 +29528,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28733,6 +29570,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28773,6 +29612,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28816,6 +29657,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28859,6 +29702,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -28902,6 +29747,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -28942,6 +29789,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -28982,6 +29831,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -29026,6 +29877,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 ticker: string;
@@ -29068,6 +29921,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -29106,6 +29961,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -29150,6 +30007,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -29188,6 +30047,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -29226,6 +30087,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -29264,6 +30127,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 run_id: number;
@@ -29311,6 +30176,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 symbol: string;
@@ -29351,6 +30218,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 symbol: string;
@@ -29391,6 +30260,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 symbol: string;
@@ -29434,6 +30305,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -29472,6 +30345,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 symbol: string;
@@ -29512,6 +30387,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 symbol: string;
@@ -29550,6 +30427,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 symbol: string;
@@ -29594,6 +30473,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -29638,6 +30519,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -29678,6 +30561,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 name: string;
@@ -29721,6 +30606,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 name: string;
@@ -29768,6 +30655,8 @@ export interface operations {
                 "x-cavaai-method"?: string | null;
                 "x-cavaai-path"?: string | null;
                 "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
             };
             path: {
                 name: string;
