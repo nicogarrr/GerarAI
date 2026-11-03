@@ -844,6 +844,9 @@ _PORTFOLIO_RANKING_RE = re.compile(
 _PERFORMANCE_RE = re.compile(
     r"(?i)\b(?:rentabilidad|rendimiento|ganancia(?:s)?|p[ée]rdida(?:s)?|"
     r"cu[aá]nto\s+(?:he\s+)?(?:ganado|perdido)|c[oó]mo\s+(?:me\s+)?va\s+(?:la|mi)\s+inversi[oó]n)\b"
+    # «¿cuánto gané con KO?», «¿cuánto perdí con UBER?»: el pasado simple
+    # caía al volcado de la empresa («Todavía no tengo hechos financieros…»).
+    r"|\bcu[aá]nto\s+(?:gan[eé]|perd[ií])\b"
     # «¿cuánto pierdo con ASTS?» / «¿voy ganando o perdiendo?»: antes iban al
     # volcado de la empresa. Con «si …» es un escenario, no la cifra guardada.
     r"|\b(?:cu[aá]nto\s+(?:gano|pierdo|llevo\s+(?:ganado|perdido))|voy\s+(?:ganando|perdiendo)"
@@ -1796,14 +1799,20 @@ class ChatService:
             if ranking_answer is not None:
                 ranking_answer.context = context_echo
                 return ranking_answer
+        # «¿cuánto gané con KO en 2025?»: con año es fiscal, pero con una empresa
+        # el bloque fiscal no contesta y caía al volcado de la empresa. Va a lo
+        # realizado con las ventas de ese ticker en ese ejercicio.
+        fiscal_question = _asks_fiscal(question or "")
         if (
             not ticker
             and _asks_performance(question or "")
             and not _ORDER_VERB_RE.search(question or "")
-            and not _asks_fiscal(question or "")
+            and (not fiscal_question or company is not None)
             and not _DIVIDEND_YIELD_RE.search(question or "")
         ):
-            performance_answer = self._portfolio_performance(db, question or "", company)
+            performance_answer = self._portfolio_performance(
+                db, question or "", company, year_scoped=fiscal_question
+            )
             if performance_answer is not None:
                 performance_answer.context = context_echo
                 return performance_answer
@@ -2481,7 +2490,7 @@ class ChatService:
         return answer
 
     def _portfolio_performance(
-        self, db: Session, question: str, company: Company | None
+        self, db: Session, question: str, company: Company | None, year_scoped: bool = False
     ) -> ChatResponse | None:
         """Rentabilidad guardada: valor frente a coste de compra (simple, no TWR).
 
@@ -2500,6 +2509,25 @@ class ChatService:
             ).all()
         )
         english = _english()
+        if company is not None and year_scoped:
+            # Un ejercicio («en 2025», «el año pasado»): lo realizado con las ventas
+            # de ese ticker en ese año (FIFO del informe fiscal), tengas aún
+            # posición o no; la ganancia sin realizar no es de ningún ejercicio.
+            from app.services.brain_account_tools import realized_line_for_closed_ticker
+
+            realized = realized_line_for_closed_ticker(
+                db, tenant_id, company.id, company.ticker, question, english
+            )
+            if not realized:
+                return None
+            return ChatResponse(
+                answer=realized,
+                sources=[],
+                model="deterministic",
+                prompt_version="portfolio-performance-v1",
+                confidence=0.9,
+                llm_trace={"path": "portfolio_performance", "generated": False, "provider_calls": 0},
+            )
         if company is not None:
             rows = [row for row in rows if row[0].company_id == company.id]
             if not rows:
