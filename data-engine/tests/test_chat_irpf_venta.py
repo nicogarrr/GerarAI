@@ -604,3 +604,33 @@ def test_varios_valores_en_la_misma_venta_no_dice_que_no_los_tienes(db):
         assert "No tienes UBER" not in answer
         assert "UBER" in answer and "MSFT" in answer
         assert "una a una" in answer
+
+
+@pytest.mark.parametrize(
+    ("question", "whole", "one"),
+    [
+        ("¿Cuánto IRPF pagaría si compré 1,000 acciones de AAPL a 100 € y vendo 500 a 180 €?", "1000", "1"),
+        ("IRPF si compré 20 acciones de AAPL a 100 € y vendo 1,500 acciones a 180 €", "1500", "1,5"),
+    ],
+)
+def test_hipotetico_cantidad_ambigua_pregunta(db, question, whole, one):
+    """«1,000 acciones»: con coma es mil (estilo inglés) o una (coma decimal).
+    Antes se leía 1 acción y contestaba que la venta superaba lo comprado."""
+    _uber(db)
+    resp = _ask(db, question)
+    assert resp.llm_trace["path"] == "portfolio_sale_tax"
+    assert resp.llm_trace["provider_calls"] == 0
+    assert "IRPF estimado" not in resp.answer
+    assert resp.answer.endswith(
+        f"No sé si «{whole[0]},{whole[1:]}» son {whole} acciones o {one} (con coma decimal). "
+        f"Escribe «{whole}» o «{one}» y lo calculo."
+    )
+
+
+def test_hipotetico_precio_con_coma_no_es_cantidad_ambigua(db):
+    from app.services.sale_hypothetical import ambiguous_quantity
+
+    assert ambiguous_quantity("compré 10 acciones a 1,500 € y vendo 10 a 2,000 €") is None
+    assert ambiguous_quantity("compré 1.000 acciones a 10 €") is None
+    assert ambiguous_quantity("compré 1000 acciones a 10 €") is None
+    assert ambiguous_quantity("compré 1,000 acciones a 10 €") == "1,000"
