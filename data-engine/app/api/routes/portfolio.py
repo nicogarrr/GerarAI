@@ -16,6 +16,7 @@ from app.core.cache import invalidate_market_data_cache, invalidate_portfolio_ca
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.errors import safe_detail
+from app.core.gc_pause import gc_paused
 from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.core.ui_errors import ui_error
@@ -487,14 +488,17 @@ def portfolio_intelligence(
     years: int = Query(default=5, ge=1, le=20),
     db: Session = Depends(get_db),
 ) -> dict:
-    return PortfolioIntelligenceService().build(db, years=years)
+    # GC ciclico en pausa durante el calculo (misma respuesta; ver app/core/gc_pause.py).
+    with gc_paused():
+        return PortfolioIntelligenceService().build(db, years=years)
 
 
 @router.get("/risk-matrix", response_model=PortfolioRiskMatrixOut, response_model_exclude_unset=True)
 def portfolio_risk_matrix(db: Session = Depends(get_db)) -> dict:
     from app.services.portfolio_risk_matrix_service import PortfolioRiskMatrixService
 
-    return PortfolioRiskMatrixService().build(db)
+    with gc_paused():
+        return PortfolioRiskMatrixService().build(db)
 
 
 @router.get("/data-quality", response_model=PortfolioDataQualityOut, response_model_exclude_unset=True)
