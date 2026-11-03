@@ -138,7 +138,10 @@ def inventory(db: Session, *, now: datetime | None = None) -> dict:
     for label, model, source_field, max_age in LAYERS:
         source = getattr(model, source_field)
         try:
-            if db.get_bind().dialect.name == "postgresql" and model is not MarketPrice:
+            # Precios tambien por sonda: el A/B midio la sonda ~20-30x mas
+            # barata que el group-by (usa ix_market_prices_source_cov +
+            # ix_prices_source_upd); el group-by queda como ruta sqlite.
+            if db.get_bind().dialect.name == "postgresql":
                 groups = _coverage_groups(
                     db, table=model.__tablename__, source_col=source_field,
                     tenant=tenant, reported=model is FinancialFact,

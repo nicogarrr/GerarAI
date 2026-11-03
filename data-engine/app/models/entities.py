@@ -1485,6 +1485,22 @@ class ValuationAssumption(TenantOwnedMixin, Base, TimestampMixin):
 
 class ValuationOutput(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "valuation_outputs"
+    __table_args__ = (
+        # 0124: candidatos a margen de seguridad para _any_margin_of_safety
+        # (screener_context_metrics). El literal del convenio replica
+        # MARGIN_OF_SAFETY_CONVENTION (app/valuation/margin_convention.py):
+        # tiene que ir en linea para matchear el predicado del indice.
+        Index(
+            "ix_val_outputs_margin_candidate",
+            "tenant_id", "valuation_model_id",
+            postgresql_where=text(
+                "(output_payload -> 'trace' ->> 'margin_of_safety_convention')"
+                " = 'discount_to_value_v1'"
+                " AND json_typeof(output_payload -> 'margin_of_safety')"
+                " NOT IN ('boolean', 'null')"
+            ),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     valuation_model_id: Mapped[int] = mapped_column(
