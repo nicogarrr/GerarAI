@@ -1633,8 +1633,8 @@ class ChatService:
                 value = position_base_value(pos)
                 parts = [
                     (f"{num(float(pos.quantity), 6)} shares" if en else f"{num(float(pos.quantity), 6)} acciones"),
-                    (f"average cost {money(float(pos.average_cost or 0))} {pos.currency}"
-                     if en else f"coste medio {money(float(pos.average_cost or 0))} {pos.currency}"),
+                    (f"average cost {(money(float(pos.average_cost)) if pos.average_cost is not None else "N/D")} {pos.currency}"
+                     if en else f"coste medio {(money(float(pos.average_cost)) if pos.average_cost is not None else "N/D")} {pos.currency}"),
                 ]
                 if value is not None:
                     base = pos.base_currency or "EUR"
