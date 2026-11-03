@@ -1207,6 +1207,16 @@ def _team_advice(question: str, ticker: str) -> bool:
     return is_broad_question(question) and expert_chat.wants_team(question, ticker)
 
 
+# «¿Cuánto gané con la venta de Inditex (de mayo 2025)?», «¿cuánto gané vendiendo
+# UBER?»: una venta YA hecha. Antes simulaba vender hoy la posición (ruta de IRPF)
+# o daba los datos de la empresa. Va a lo realizado con tus ventas guardadas.
+_PAST_SALE_GAIN_RE = re.compile(
+    r"(?i)\b(?:cu[aá]nto|qu[eé])\s+(?:gan[eé]|perd[ií]|saqu[eé]|obtuve|he\s+(?:ganado|perdido|sacado))\b"
+    r"[^?.!\n]{0,40}?\b(?:con\s+la\s+venta|en\s+la\s+venta|vendiendo|al\s+vender|cuando\s+vend[ií])\b"
+    r"|\bhow\s+much\s+did\s+I\s+(?:make|gain|earn|lose)\b[^?.!\n]{0,40}?"
+    r"\b(?:selling|when\s+I\s+sold|on\s+the\s+sale\s+of|from\s+the\s+sale\s+of)\b"
+)
+
 def _empty_portfolio_response(path: str) -> ChatResponse:
     """Cartera sin posiciones abiertas: se dice, sin modelo. Antes «¿cuál es mi
     rentabilidad?», «¿cuántas posiciones tengo?» o «¿cuál es mi posición más
@@ -3072,6 +3082,28 @@ class ChatService:
                 found[company.id] = company
         return next(iter(found.values())) if len(found) == 1 else None
 
+    def _company_past_sale_answer(
+        self, db: Session, question: str, scope: str, ticker: str | None, tenant_id: int
+    ) -> ChatResponse | None:
+        """Realizado con las ventas guardadas de la empresa nombrada (mismo FIFO del informe)."""
+        from app.services.brain_account_tools import realized_line_for_closed_ticker
+
+        company = self._resolve_company(db, question, scope, ticker)
+        if company is None:
+            return None
+        english = _english()
+        realized = realized_line_for_closed_ticker(
+            db, tenant_id, company.id, company.ticker, question, english
+        )
+        if not realized:
+            realized = (f"You have no saved sales of {company.ticker}." if english
+                        else f"No tienes ventas guardadas de {company.ticker}.")
+        return ChatResponse(
+            answer=realized, sources=[], model="deterministic", prompt_version="portfolio-performance-v1",
+            confidence=0.9,
+            llm_trace={"path": "portfolio_realized_sale", "generated": False, "provider_calls": 0},
+        )
+
     def _sale_tax_route(
         self,
         db: Session,
@@ -3096,6 +3128,10 @@ class ChatService:
         tenant_id = db.info.get("tenant_id")
         if type(tenant_id) is not int or tenant_id <= 0:
             return None
+        if _PAST_SALE_GAIN_RE.search(q) and not re.search(r"(?i)\bsi\s+(?:vend|hubiera)", q):
+            past = self._company_past_sale_answer(db, q, scope, ticker, tenant_id)
+            if past is not None:
+                return past
         lots = parse_purchase_lots(q)
         intent = bool(
             (_SALE_TAX_RE.search(q) or (_HYPO_SALE_RE.search(q) and _HYPO_SALE_GAIN_RE.search(q)))
