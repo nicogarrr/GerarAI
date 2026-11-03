@@ -9,7 +9,10 @@ from alembic.config import Config
 from alembic import command
 from tests.test_alembic_chain import VERSIONS_DIR
 
-_NOMBRES = {"ix_news_lane_macro", "ix_news_lane_gobierno"}
+_NOMBRES = {"ix_news_lane_gobierno"}
+# Macro reutiliza el parcial de la 0120; el duplicado ya no se crea.
+_MACRO_0120 = "ix_news_events_macro_date_id"
+_DUPLICADO = "ix_news_lane_macro"
 
 
 def _sqlite_head(tmp_path, monkeypatch) -> sa.Engine:
@@ -34,14 +37,28 @@ def test_0125_indices_existen_tras_upgrade_head_en_sqlite(tmp_path, monkeypatch)
                 sa.text("select name from sqlite_master where type='index'")
             )
         }
-    assert nombres >= _NOMBRES
+    assert nombres >= _NOMBRES | {_MACRO_0120}
+    assert _DUPLICADO not in nombres
 
 
 def test_0125_modelo_declara_los_mismos_indices() -> None:
     from app.models.entities import NewsEvent
 
     nombres = {ix.name for ix in NewsEvent.__table__.indexes}
-    assert nombres >= _NOMBRES
+    assert nombres >= _NOMBRES | {_MACRO_0120}
+    assert _DUPLICADO not in nombres
+
+
+def test_0125_no_hay_dos_indices_con_la_misma_definicion() -> None:
+    # Dos indices iguales (columnas + predicado) solo duplican escritura.
+    from app.models.entities import NewsEvent
+
+    firmas: dict = {}
+    for ix in NewsEvent.__table__.indexes:
+        where = ix.dialect_options["postgresql"].get("where")
+        firma = (tuple(str(col) for col in ix.expressions), str(where) if where is not None else None)
+        assert firma not in firmas, f"{ix.name} duplica {firmas.get(firma)}"
+        firmas[firma] = ix.name
 
 
 def test_0125_predicado_de_la_ruta_es_literal_y_cubre_los_indexados() -> None:

@@ -29,9 +29,13 @@ depends_on = None
 
 _TABLA = "news_events"
 _INDICES = (
-    ("ix_news_lane_macro", "(metadata ->> 'news_lane') = 'macro'"),
     ("ix_news_lane_gobierno", "(metadata ->> 'news_lane') = 'gobierno'"),
 )
+# Macro NO lleva indice propio: ix_news_events_macro_date_id (0120) ya es
+# (date DESC, id DESC) WHERE metadata->>'news_lane' = 'macro', identico. Un
+# duplicado solo anadia escritura a cada insert de news_events. Las bases que
+# corrieron la primera version de esta 0125 lo pierden aqui (IF EXISTS).
+_DUPLICADO_RETIRADO = "ix_news_lane_macro"
 _COLUMNAS = [sa.desc("date"), sa.desc("id")]
 
 
@@ -54,6 +58,12 @@ def upgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
         with op.get_context().autocommit_block():
+            op.drop_index(
+                _DUPLICADO_RETIRADO,
+                table_name=_TABLA,
+                postgresql_concurrently=True,
+                if_exists=True,
+            )
             for nombre, where in _INDICES:
                 if _es_invalido(bind, nombre):
                     op.drop_index(
@@ -79,6 +89,8 @@ def upgrade() -> None:
             sa.text("select name from sqlite_master where type='index'")
         )
     }
+    if _DUPLICADO_RETIRADO in existentes:
+        op.drop_index(_DUPLICADO_RETIRADO, table_name=_TABLA)
     for nombre, where in _INDICES:
         if nombre not in existentes:
             op.create_index(nombre, _TABLA, _COLUMNAS, sqlite_where=sa.text(where))
