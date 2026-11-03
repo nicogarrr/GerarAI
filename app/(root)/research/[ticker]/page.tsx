@@ -144,6 +144,7 @@ import QuickAlertButton from '@/components/research/QuickAlertButton';
 import ThesisMemo from '@/components/research/ThesisMemo';
 import { valuationScenarioDisplay } from '@/lib/research/listed-share-values';
 import { baseAssumptionsText, blockerLabel, reverseDcfText, scenarioNotesList } from '@/lib/research/valuation-display';
+import { valuationMethodView } from '@/lib/research/valuation-method';
 import { scenarioNoteText } from '@/lib/research/scenario-notes-text';
 import ThesisExportMenu from '@/components/research/ThesisExportMenu';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
@@ -409,6 +410,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
   const notPublishable = valuation.status !== 'ok' || valuation.publishable === false;
   const scenarioNotes = scenarioNotesList(valuation.scenario_notes);
   const reverseText = reverseDcfText(valuation.reverse_dcf, locale);
+  const methodView = valuationMethodView(valuation);
   const assumptionsText = baseAssumptionsText(valuation.trace, locale);
   // F348: el precio del modelo es un snapshot persistido; el precio canónico
   // (en vivo) es el de la cabecera. El del modelo se rotula con su fecha,
@@ -474,6 +476,20 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
         <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-amber-300/80">
           {scenarioNotes.map((note) => <li key={note}>{scenarioNoteText(note, locale)}</li>)}
         </ul>
+      ) : null}
+      {methodView ? (
+        <div className="space-y-1 rounded-lg border border-sky-900/60 bg-sky-950/20 p-3 text-xs leading-5 text-sky-100">
+          {methodView.label ? <p className="font-semibold">{t('research.ficha.methodLabel', { label: methodView.label })}</p> : null}
+          {methodView.notes.map((note) => <p key={note}>{note}</p>)}
+          {methodView.warning ? <p className="text-amber-200">{t('research.ficha.methodWarning', { text: methodView.warning })}</p> : null}
+          {methodView.range ? (
+            <p>
+              {t('research.ficha.methodRange', { low: formatMoney(methodView.range.low, currency), high: formatMoney(methodView.range.high, currency) })}{' '}
+              {methodView.range.components.map((item) => `${item.label}: ${formatMoney(item.value, currency)}`).join(' · ')}
+            </p>
+          ) : null}
+          {methodView.priceImplies ? <p className="text-sky-200/80">{t('research.ficha.methodPriceImplies', { text: methodView.priceImplies })}</p> : null}
+        </div>
       ) : null}
       {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
       {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}

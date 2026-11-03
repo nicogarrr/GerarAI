@@ -380,7 +380,11 @@
     "impliedGrowthSplitTitle": "Where the value you pay today comes from",
     "impliedGrowthGridLabel": "Growth required if WACC or the margin changes",
     "reverseDcfUnavailable": "Unavailable: {inputs}.",
-    "reverseDcfMissingInputs": "market or financial inputs are missing"
+    "reverseDcfMissingInputs": "market or financial inputs are missing",
+    "methodLabel": "Fair value: {label} (an estimate with a stated method, not a reported figure).",
+    "methodWarning": "Warning: {text}",
+    "methodRange": "Cross-check range {low}–{high}:",
+    "methodPriceImplies": "What the price implies: {text}"
   },
   "identity": {
     "metaDescription": "Research on {subject}: versioned thesis, canonical financials, long-term model, valuation and evidence with traceable sources.",

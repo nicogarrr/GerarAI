@@ -940,6 +940,14 @@ class ValuationResponse(BaseModel):
     # en scenario_notes; nunca una cifra negativa.
     listed_share_values: dict[str, float | None] | None = None
     scenario_notes: dict[str, str] = {}
+    # Valor con método (capex normalizado / DCF multietapa): etiqueta visible y
+    # explicación; None/[] con el DCF plano de 5 años.
+    valuation_label: str | None = None
+    valuation_notes: list[str] = []
+    # Guarda 0,2x–5x el precio: aviso (el valor NO se borra) + rango.
+    plausibility_warning: dict | None = None
+    # Rango DCF + múltiplos de comparables (contraste, no valor publicado).
+    fair_value_range: dict | None = None
     reverse_dcf: dict = {}
     sensitivity: dict = {}
     moat: dict = {}

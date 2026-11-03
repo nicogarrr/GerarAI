@@ -13888,6 +13888,10 @@ export interface components {
             current_price?: number | null;
             /** Expected Value */
             expected_value?: number | null;
+            /** Fair Value Range */
+            fair_value_range?: {
+                [key: string]: unknown;
+            } | null;
             /** Listed Share Values */
             listed_share_values?: {
                 [key: string]: number | null;
@@ -13908,6 +13912,10 @@ export interface components {
             };
             /** Model Type */
             model_type: string;
+            /** Plausibility Warning */
+            plausibility_warning?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Publication Blockers
              * @default []
@@ -13953,6 +13961,13 @@ export interface components {
             trace: {
                 [key: string]: unknown;
             };
+            /** Valuation Label */
+            valuation_label?: string | null;
+            /**
+             * Valuation Notes
+             * @default []
+             */
+            valuation_notes: string[];
             /** Value Per Share Basis */
             value_per_share_basis?: string | null;
         };
