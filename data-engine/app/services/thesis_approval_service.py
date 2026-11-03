@@ -306,6 +306,12 @@ def send_thesis_approval_request(
             "status": "not_configured",
             "error": "Telegram approval requires TELEGRAM_ENABLED, TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID",
         }
+    from app.services.owner_destination import NOT_OWNER_ERROR, may_use_global_destination
+
+    # TELEGRAM_CHAT_ID es el chat del propietario: la tesis de otra cuenta no
+    # se manda alli (ni se aprueba desde alli).
+    if not may_use_global_destination(db, getattr(thesis, "tenant_id", None), settings):
+        return {"status": "not_configured", "error": NOT_OWNER_ERROR}
     text = build_approval_text(
         ticker, thesis.version, thesis.status, thesis.executive_summary
     )
