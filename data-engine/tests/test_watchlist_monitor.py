@@ -120,3 +120,16 @@ def test_watchlist_monitor_without_stored_date():
     row = res.json()["items"]["MONTEST"]
     assert row["next_earnings_date"] is None
     assert res.json()["earnings_status"] == "stored"
+
+
+def test_monitor_sondas_lateral_pg_fijan_su_forma():
+    """Los fragmentos LATERAL del monitor (solo PG) fijan su forma: sonda por
+    empresa contra el indice unico, ids ligados como array."""
+    from app.api.routes import watchlist as wl
+
+    for fragmento in (wl._MONITOR_CIERRE_LATERAL_PG,
+                      wl._MONITOR_SESIONES_LATERAL_PG):
+        assert "unnest(CAST(:ids AS integer[]))" in fragmento
+        assert "close IS NOT NULL AND close > 0" in fragmento
+    assert "ORDER BY date DESC LIMIT 1" in wl._MONITOR_CIERRE_LATERAL_PG
+    assert "date >= :cutoff" in wl._MONITOR_SESIONES_LATERAL_PG
