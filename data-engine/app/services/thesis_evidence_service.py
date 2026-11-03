@@ -108,7 +108,19 @@ SEC_EVIDENCE_TAGS: dict[str, tuple[list[str], str]] = {
 }
 
 ANNUAL_FORMS = {"10-K", "20-F"}
-FILING_FORMS = ("10-K", "10-Q", "8-K")
+# Informe anual de cualquier emisor SEC: domestico (10-K), extranjero en
+# US GAAP/IFRS (20-F) o canadiense MJDS (40-F, p. ej. BN), con enmiendas.
+ANNUAL_REPORT_FILING_FORMS = ("10-K", "10-K/A", "20-F", "20-F/A", "40-F", "40-F/A")
+# Informe periodico intermedio: 10-Q domestico; los extranjeros publican sus
+# resultados trimestrales como 6-K.
+INTERIM_FILING_FORMS = ("10-Q", "10-Q/A", "6-K")
+FILING_FORMS = (*ANNUAL_REPORT_FILING_FORMS, *INTERIM_FILING_FORMS, "8-K")
+# Antes se pedian los 8 filings mas recientes de 10-K/10-Q/8-K: un emisor con
+# muchos 8-K (CB, CPT, KKR) llenaba los 8 huecos con 8-K y 10-Q y el 10-K de
+# febrero no entraba nunca; un 40-F/6-K (BN) no entraba por formulario. Ahora
+# se lee un indice mas largo y el informe anual y el ultimo intermedio tienen
+# hueco garantizado (select_filings).
+FILING_LOOKUP_LIMIT = 80
 MAX_FILING_DOCUMENTS = 8
 MAX_IR_DOCUMENTS = 10
 MAX_NEWS_ITEMS = 5
@@ -195,6 +207,45 @@ def _dedupe_news_rows(rows: list, limit: int, ticker: str | None = None) -> list
             break
     return out
 
+def select_filings(filings: list[dict[str, Any]], limit: int = MAX_FILING_DOCUMENTS) -> list[dict[str, Any]]:
+    """Los ``limit`` filings a guardar: el ultimo informe anual y el ultimo
+    intermedio siempre, el resto por fecha de presentacion (lo mas reciente).
+
+    ``filings`` llega en el orden del indice de la SEC (mas reciente primero).
+    """
+    def _form(item: dict[str, Any]) -> str:
+        return str(item.get("form") or "").upper()
+
+    chosen: list[dict[str, Any]] = []
+    for family in (ANNUAL_REPORT_FILING_FORMS, INTERIM_FILING_FORMS):
+        first = next((f for f in filings if _form(f) in family), None)
+        if first is not None:
+            chosen.append(first)
+    for filing in filings:
+        if len(chosen) >= limit:
+            break
+        if not any(filing is c for c in chosen):
+            chosen.append(filing)
+    order = {id(f): i for i, f in enumerate(filings)}
+    return sorted(chosen[:limit], key=lambda f: order.get(id(f), 0))
+
+
+def annual_report_has_text(db: Session, company_id: int, url: str) -> bool:
+    """True si el documento de esa URL ya tiene texto troceado (chunks)."""
+    from app.models.entities import DocumentChunk
+
+    doc_ids = db.scalars(
+        select(Document.id).where(
+            Document.company_id == company_id,
+            Document.source_url == url,
+            *tenant_filters(db, Document),
+        )
+    ).all()
+    if not doc_ids:
+        return False
+    return db.scalar(select(DocumentChunk.id).where(DocumentChunk.document_id.in_(doc_ids)).limit(1)) is not None
+
+
 def _filing_published_at(filed: object):
     """Fecha de presentacion (YYYY-MM-DD) como datetime UTC, o None si no es valida."""
     from datetime import datetime
@@ -219,7 +270,31 @@ class ThesisEvidenceService:
 
     def _fetch_filings(self, cik: str) -> list[dict[str, Any]]:
         return _await_sync(
-            lambda: sec_edgar_connector.recent_filings(cik, forms=FILING_FORMS, limit=MAX_FILING_DOCUMENTS)
+            lambda: sec_edgar_connector.recent_filings(cik, forms=FILING_FORMS, limit=FILING_LOOKUP_LIMIT)
+        )
+
+    def _enqueue_annual_report_text(self, db: Session, company: Company, filing: dict[str, Any]) -> None:
+        """Encola la descarga + troceado del texto del informe anual (worker).
+
+        No se ingiere en linea: la ingesta confirma su propia transaccion y
+        lanza analisis/KPIs, y la tesis corre dentro de la suya. El actor
+        existente ``process_document`` hace la descarga con la identidad SEC.
+        """
+        from app.workers.dramatiq_app import process_document
+
+        process_document.send(
+            company.ticker,
+            _sec_filing_title(filing.get("form"), filing.get("filing_date")),
+            filing.get("document_url"),
+            "SEC",
+            filing.get("filing_date"),
+            db.info.get("tenant_id"),
+            db.info.get("user_id"),
+            filing_metadata={
+                "form": filing.get("form"),
+                "accession_number": filing.get("accession_number"),
+                "report_date": filing.get("report_date"),
+            },
         )
 
     def _fetch_quote(self, ticker: str) -> dict[str, Any]:
@@ -710,7 +785,8 @@ class ThesisEvidenceService:
             return _pending("SEC EDGAR submissions", "Filings de SEC EDGAR inaccesibles ahora mismo.")
         created = 0
         items: list[dict[str, Any]] = []
-        for filing in filings[:MAX_FILING_DOCUMENTS]:
+        filings = select_filings(filings)
+        for filing in filings:
             form = filing.get("form")
             url = filing.get("document_url") or filing.get("index_url")
             filed = filing.get("filing_date")
@@ -747,13 +823,40 @@ class ThesisEvidenceService:
             created += 1
         db.flush()
         if not items:
-            return _pending("SEC EDGAR submissions", "Sin 10-K/10-Q/8-K recientes.")
+            return _pending("SEC EDGAR submissions", "Sin informe anual, trimestral ni 8-K recientes.")
         return {
             "status": "ok",
             "source": "SEC EDGAR submissions",
             "items": items,
             "documents_created": created,
+            "annual_report": self._annual_report_text(db, company, filings),
         }
+
+    def _annual_report_text(
+        self, db: Session, company: Company, filings: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        """Estado del TEXTO del ultimo informe anual; si falta, se encola.
+
+        Los filings de arriba se guardan como ficha (URL + fecha, sin texto).
+        Los motores sectoriales necesitan el texto del informe anual (ratio
+        combinado, NOI, segmentos), asi que se pide su ingesta completa.
+        """
+        annual = next(
+            (f for f in filings if str(f.get("form") or "").upper() in ANNUAL_REPORT_FILING_FORMS),
+            None,
+        )
+        if annual is None or not annual.get("document_url"):
+            return _pending("SEC EDGAR (informe anual)", "No hay informe anual (10-K/20-F/40-F) en el indice de la SEC.")
+        url = annual["document_url"]
+        base = {"form": annual.get("form"), "filing_date": annual.get("filing_date"), "url": url}
+        if annual_report_has_text(db, company.id, url):
+            return {"status": "ok", "source": "SEC EDGAR (informe anual)", "text": "ingested", **base}
+        try:
+            self._enqueue_annual_report_text(db, company, annual)
+        except Exception as exc:  # noqa: BLE001 - best-effort: la tesis sigue
+            _log_source_failure("SEC EDGAR (informe anual)", company.ticker, exc)
+            return _pending("SEC EDGAR (informe anual)", "No se pudo encolar la descarga del informe anual.")
+        return {"status": "queued", "source": "SEC EDGAR (informe anual)", "text": "queued", **base}
 
     # -- 4. noticias (solo lectura del pipeline news) --------------------------
     def _collect_news(self, db: Session, company: Company) -> dict[str, Any]:

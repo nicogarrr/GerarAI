@@ -174,6 +174,15 @@ def _extension(filename: str, content_type: str | None = None) -> str:
     return ".txt"
 
 
+def _is_metadata_stub(db: Session, document: Document) -> bool:
+    """Ficha sin bytes guardados ni texto troceado."""
+    if document.storage_uri or document.checksum:
+        return False
+    return db.scalar(
+        select(DocumentChunk.id).where(DocumentChunk.document_id == document.id).limit(1)
+    ) is None
+
+
 class DocumentIngestionService:
     def ingest_bytes(
         self,
@@ -218,6 +227,12 @@ class DocumentIngestionService:
             )
             if duplicate is not None:
                 duplicate_reason = "archive_url"
+        # Una ficha de filing (URL + fecha, sin bytes ni texto: la crea la
+        # evidencia de tesis) no es el documento: con la misma URL de archivo
+        # bloqueaba para siempre la ingesta del texto del 10-K. Se completa.
+        stub = None
+        if duplicate is not None and duplicate_reason == "archive_url" and _is_metadata_stub(db, duplicate):
+            stub, duplicate, duplicate_reason = duplicate, None, None
         if duplicate is None:
             duplicate = db.scalar(
                 select(Document).where(Document.company_id == company.id, Document.checksum == checksum)
@@ -292,7 +307,16 @@ class DocumentIngestionService:
                 **self._jev_doc_type_meta(text),
             },
         )
-        db.add(document)
+        if stub is not None:
+            stub.title = title or stub.title
+            stub.source_type = source_type
+            stub.storage_uri = storage_uri
+            stub.checksum = checksum
+            stub.published_at = stub.published_at or document.published_at
+            stub.metadata_ = {**(stub.metadata_ or {}), **document.metadata_}
+            document = stub
+        else:
+            db.add(document)
         db.flush()
 
         chunks = self._chunk_blocks(parsed.blocks, checksum, parsed.parser, filename, source_url)
@@ -335,6 +359,19 @@ class DocumentIngestionService:
                 # Ingestion has already committed. A failed optional analysis
                 # must not disguise a successfully persisted source as failure.
                 filing_analysis = {"status": "failed", "error": type(exc).__name__}
+
+        # Inputs de los motores sectoriales (ratio combinado, NOI) del texto del
+        # informe anual: hechos NO reportados, etiquetados y con su cita.
+        sector_inputs: dict = {"status": "not_applicable"}
+        if db.info.get("tenant_id") is not None:
+            try:
+                from app.services.sector_inputs import extract_from_document
+
+                sector_inputs = extract_from_document(db, document)
+                db.commit()
+            except Exception as exc:
+                db.rollback()
+                sector_inputs = {"status": "failed", "error": type(exc).__name__}
 
         kpi_extraction = {"status": "not_queued"}
         if (
@@ -391,6 +428,7 @@ class DocumentIngestionService:
             "rag": rag_result,
             "intelligence": intelligence_result,
             "filing_analysis": filing_analysis,
+            "sector_inputs": sector_inputs,
         }
 
     def ingest_url(

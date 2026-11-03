@@ -71,9 +71,14 @@ MAX_EXPOSED_PERIODS = 3
 @dataclass(frozen=True)
 class SourcedValue:
     value: float
-    fact_id: int
+    fact_id: int | None
     period: str
     confidence: float
+    source_type: str = "financial_facts"
+    is_reported: bool = True
+    # Entrada calculada por el motor (p. ej. CoE por CAPM): su ficha
+    # etiquetada viaja a ``estimated_inputs``.
+    estimate: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -144,7 +149,10 @@ def _same_anchor_period(anchor: FinancialFact, candidate: FinancialFact) -> bool
 def _sourced(fact: FinancialFact | None) -> SourcedValue | None:
     if fact is None:
         return None
-    return SourcedValue(float(fact.value), fact.id, fact.period, float(fact.confidence))
+    return SourcedValue(
+        float(fact.value), fact.id, fact.period, float(fact.confidence),
+        source_type=fact.source_type or "", is_reported=bool(fact.is_reported),
+    )
 
 
 def _fact_trace(fact: FinancialFact) -> dict:
@@ -240,6 +248,112 @@ def _resolve_inputs(
                 sourced = replace(sourced, value=scaled)
         values[key] = sourced
     return ResolvedInputs(values=values, anchor=anchor, dropped=dropped, market_rates=rate_traces)
+
+
+
+# --- Inputs estimados / extraidos, etiquetados -----------------------------
+# CAPM: rangos de cordura de cada pieza (fraccion). Fuera de rango no hay CoE.
+CAPM_BETA_RANGE = (0.2, 3.5)
+
+
+def _rate(fact: FinancialFact) -> float:
+    """Tasa como fraccion: un 4.3 (en %) o un 0.043 (fraccion) dan 0.043."""
+    value = float(fact.value)
+    unit = (fact.unit or "").lower()
+    if "%" in unit or "percent" in unit or abs(value) > 1.0:
+        return value / 100.0
+    return value
+
+
+def _latest_usable(context: ValuationContext, metric: str) -> FinancialFact | None:
+    rows = context.db.scalars(
+        select(FinancialFact)
+        .where(FinancialFact.company_id == context.company.id, FinancialFact.metric == metric)
+        .order_by(FinancialFact.fiscal_year.desc().nullslast(), desc(FinancialFact.created_at))
+        .limit(5)
+    ).all()
+    return next((row for row in rows if usable_fact(row)), None)
+
+
+def capm_cost_of_equity(context: ValuationContext) -> SourcedValue | None:
+    """Coste del equity por CAPM con los hechos de mercado ya guardados.
+
+    ``CoE = rf + beta x ERP + CRP``: tipo libre de riesgo (FRED), beta
+    (proveedor de mercado), prima de riesgo de mercado y prima pais (politica
+    WACC). Es un CALCULO, no un dato: viaja como «estimado (CAPM)» con sus
+    entradas. Sin alguna pieza (salvo la prima pais) o con beta fuera de
+    rango no hay coste del equity.
+    """
+    rf = _latest_usable(context, "risk_free_rate")
+    beta = _latest_usable(context, "beta")
+    erp = _latest_usable(context, "equity_risk_premium")
+    if rf is None or beta is None or erp is None:
+        return None
+    crp = _latest_usable(context, "country_risk_premium")
+    beta_value = float(beta.value)
+    if not CAPM_BETA_RANGE[0] <= beta_value <= CAPM_BETA_RANGE[1]:
+        return None
+    rf_value, erp_value = _rate(rf), _rate(erp)
+    crp_value = _rate(crp) if crp is not None else 0.0
+    cost = rf_value + beta_value * erp_value + crp_value
+    if not 0.03 <= cost <= 0.30:
+        return None
+    pieces = [rf, beta, erp] + ([crp] if crp is not None else [])
+    method = (
+        f"CAPM: rf {rf_value:.2%} + beta {beta_value:.2f} x ERP {erp_value:.2%}"
+        + (f" + prima pais {crp_value:.2%}" if crp is not None else "")
+        + f" = {cost:.2%}"
+    )
+    estimate = {
+        "metric": "cost_of_equity",
+        "value": cost,
+        "period": rf.period,
+        "status": "estimado",
+        "method": method,
+        "note": "calculado por el motor con datos de mercado; no lo publica la empresa",
+        "sources": [
+            {"source": f"{fact.metric} ({fact.source_type})", "value": float(fact.value),
+             "period": fact.period, "fact_id": fact.id}
+            for fact in pieces
+        ],
+    }
+    confidence = min(float(fact.confidence) for fact in pieces)
+    return SourcedValue(cost, None, rf.period, confidence, source_type="calculated_capm",
+                        is_reported=False, estimate=estimate)
+
+
+def estimated_input_items(context: ValuationContext, values: dict[str, SourcedValue | None]) -> list[dict]:
+    """Fichas de los inputs que no son dato reportado (formato del puente)."""
+    from app.services.sector_inputs import extract_provenance
+
+    items: list[dict] = []
+    for key, value in values.items():
+        if value is None or value.is_reported:
+            continue
+        if value.estimate is not None:
+            items.append(dict(value.estimate))
+            continue
+        provenance = extract_provenance(context.db, value.fact_id)
+        if provenance is not None:
+            items.append({
+                "metric": key,
+                "value": value.value,
+                "period": value.period,
+                "status": "inferido",
+                "method": f"extraído del {provenance.get('form') or 'informe anual'}: {provenance['method']}",
+                "note": provenance["note"],
+                "sources": [{"source": provenance["source_title"], "url": provenance["source_url"],
+                             "value": value.value, "period": value.period, "quote": provenance["quote"]}],
+            })
+            continue
+        items.append({
+            "metric": key, "value": value.value, "period": value.period, "status": "inferido",
+            "method": f"hecho no reportado ({value.source_type or 'origen sin declarar'})",
+            "note": "no es una cifra publicada por la empresa",
+            "sources": [{"source": value.source_type, "fact_id": value.fact_id, "value": value.value,
+                         "period": value.period}],
+        })
+    return items
 
 
 def _probabilities(values: list[SourcedValue], directional_quality: float = 0.0) -> dict[str, float]:
@@ -346,6 +460,7 @@ def _result(
     assumptions: dict,
     sensitivity: dict | None = None,
     period_anchor: dict | None = None,
+    estimated_inputs: list[dict] | None = None,
 ) -> dict:
     expected = sum(scenario_values[name] * probabilities[name] for name in scenario_values)
     company = context.company
@@ -376,7 +491,9 @@ def _result(
     comparable_price = price / ratio if (ratio and price) else price
     trace["adr_ratio"] = ratio
     trace["comparable_price"] = comparable_price
-    return {
+    if estimated_inputs:
+        trace["estimated_inputs"] = estimated_inputs
+    result = {
         "ticker": company.ticker,
         "model_type": company.valuation_model,
         "status": "ok",
@@ -405,6 +522,11 @@ def _result(
         ),
         "trace": trace,
     }
+    if estimated_inputs:
+        # Mismo contrato que el puente de inputs del DCF: la tesis, el valor
+        # justo y la API lo muestran etiquetado, nunca como dato oficial.
+        result["estimated_inputs"] = estimated_inputs
+    return result
 
 
 class BankValuationEngine(ValuationEngine):
@@ -440,6 +562,8 @@ class BankValuationEngine(ValuationEngine):
             market_rates=("cost_of_equity",),
         )
         sourced = resolved.values
+        if sourced.get("cost_of_equity") is None:
+            sourced["cost_of_equity"] = capm_cost_of_equity(context)
         missing = [key for key, value in sourced.items() if value is None]
         if missing:
             return insufficient_result(
@@ -504,7 +628,7 @@ class BankValuationEngine(ValuationEngine):
             engine_key=self.key,
             scenario_values=values,
             probabilities=probabilities,
-            fact_ids={key: value.fact_id for key, value in sourced.items() if value},
+            fact_ids={key: value.fact_id for key, value in sourced.items() if value and value.fact_id is not None},
             periods={key: value.period for key, value in sourced.items() if value},
             assumptions={
                 "book_per_share": book_per_share,
@@ -513,6 +637,7 @@ class BankValuationEngine(ValuationEngine):
             },
             sensitivity=sensitivity,
             period_anchor=resolved.as_trace(),
+            estimated_inputs=estimated_input_items(context, sourced),
         )
 
 
@@ -551,6 +676,8 @@ class InsurerValuationEngine(ValuationEngine):
             market_rates=("cost_of_equity",),
         )
         sourced = resolved.values
+        if sourced.get("cost_of_equity") is None:
+            sourced["cost_of_equity"] = capm_cost_of_equity(context)
         missing = [key for key, value in sourced.items() if value is None]
         if missing:
             return insufficient_result(
@@ -613,7 +740,7 @@ class InsurerValuationEngine(ValuationEngine):
             engine_key=self.key,
             scenario_values=values,
             probabilities=probabilities,
-            fact_ids={key: value.fact_id for key, value in sourced.items() if value},
+            fact_ids={key: value.fact_id for key, value in sourced.items() if value and value.fact_id is not None},
             periods={key: value.period for key, value in sourced.items() if value},
             assumptions={
                 "book_per_share": book_per_share,
@@ -622,6 +749,7 @@ class InsurerValuationEngine(ValuationEngine):
             },
             sensitivity=sensitivity,
             period_anchor=resolved.as_trace(),
+            estimated_inputs=estimated_input_items(context, sourced),
         )
 
 
@@ -708,9 +836,10 @@ class ReitValuationEngine(ValuationEngine):
             engine_key=self.key,
             scenario_values=values,
             probabilities=probabilities,
-            fact_ids={key: value.fact_id for key, value in sourced.items() if value},
+            fact_ids={key: value.fact_id for key, value in sourced.items() if value and value.fact_id is not None},
             periods={key: value.period for key, value in sourced.items() if value},
             assumptions={"scenario_noi_cap_rate": specs, "net_debt": net_debt.value},
             sensitivity=sensitivity,
             period_anchor=resolved.as_trace(),
+            estimated_inputs=estimated_input_items(context, sourced),
         )
