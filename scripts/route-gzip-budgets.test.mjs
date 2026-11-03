@@ -2,7 +2,7 @@
  * Guard de presupuestos gzip por ruta (ver scripts/check-route-gzip-budgets.mjs).
  *
  * Las pruebas del parser corren siempre (un parser que devuelve 0 B daría
- * verde a todo: le pasa hoy a measure-client-bundle.mjs con el formato de
+ * verde a todo: le pasaba a measure-client-bundle.mjs con el formato de
  * manifest de Next 16). La medición real solo corre si hay un build de
  * producción (`.next/BUILD_ID`); sin build se marca como omitida.
  */
