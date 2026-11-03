@@ -2008,6 +2008,41 @@ class PushPreference(TenantOwnedMixin, Base, TimestampMixin):
     enabled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class UserEmailBinding(TenantOwnedMixin, Base, TimestampMixin):
+    """Correo del usuario, firmado por el frontend con la identidad de sesion.
+
+    La direccion NUNCA viene del cuerpo de una peticion: el frontend la firma
+    con el mismo secreto que la identidad, asi que el motor confia en ella
+    tanto como en el user_id. Las alertas de un usuario solo pueden salir a
+    SU direccion: nunca a la de otro usuario ni a la lista global.
+    """
+
+    __tablename__ = "user_email_bindings"
+    __table_args__ = (UniqueConstraint("tenant_id", "user_id", name="uq_user_email_binding_owner"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(160))
+    address: Mapped[str] = mapped_column(String(320))
+
+
+class EmailPreference(TenantOwnedMixin, Base, TimestampMixin):
+    """Opt-in de correo por usuario y tipo de evento (como Telegram/push).
+
+    Consentimiento: cada usuario activa los tipos que quiere recibir por
+    correo y los apaga cuando quiera (opt-out). ``enabled_at`` marca el alta:
+    una alerta creada antes no se envia aunque el tipo este activo ahora.
+    """
+
+    __tablename__ = "email_preferences"
+    __table_args__ = (UniqueConstraint("tenant_id", "user_id", "event_type", name="uq_email_preference_type"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(160))
+    event_type: Mapped[str] = mapped_column(String(40))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    enabled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class AlertDelivery(TenantOwnedMixin, Base, TimestampMixin):
     """Outbox de entrega por canal con claim atomico.
 

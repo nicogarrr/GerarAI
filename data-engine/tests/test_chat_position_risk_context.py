@@ -182,3 +182,22 @@ def test_degraded_synthesis_keeps_position_in_answer():
     ))
     assert result.llm_trace.get("fallback") is True
     assert "Tu posición en UBER: 20 acciones" in result.answer
+
+
+def test_missing_average_cost_is_nd_instead_of_zero(monkeypatch):
+    from app.services import chat_service
+
+    for en in (False, True):
+        db = seeded_session()
+        db.info['tenant_id'] = 1
+        uber = _company(db, 'UBER')
+        pos = db.scalars(select(Position).where(Position.tenant_id == 1, Position.company_id == uber.id)).one()
+        pos.average_cost = None
+        monkeypatch.setattr(chat_service, '_english', lambda: en)
+        with db.no_autoflush:
+            _, lines, _ = ChatService()._holding_context(db, uber)
+        line = lines[0]
+        assert ('average cost N/D' if en else 'coste medio N/D') in line
+        assert 'coste medio 0,00' not in line
+        assert 'average cost 0.00' not in line
+        db.close()

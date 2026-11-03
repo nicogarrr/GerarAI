@@ -218,9 +218,11 @@ describe("contrato frontend-backend: headers contra el cliente OpenAPI generado"
     "x-cavaai-path",
     "x-cavaai-body-hash",
     "x-cavaai-signature",
+    "x-cavaai-email",
+    "x-cavaai-email-signature",
   ];
 
-  it("los 8 headers firmados existen como parametros documentados en el spec generado", async () => {
+  it("los 10 headers firmados existen como parametros documentados en el spec generado", async () => {
     const { readFile } = await import("node:fs/promises");
     const spec = await readFile(
       new URL("../lib/research/openapi.generated.ts", import.meta.url),
@@ -234,7 +236,7 @@ describe("contrato frontend-backend: headers contra el cliente OpenAPI generado"
     }
   });
 
-  it("researchIdentityHeaders emite exactamente esos 8 y ninguno mas", () =>
+  it("researchIdentityHeaders emite exactamente esos 10 y ninguno mas", () =>
     withFixedEnv(async () => {
       const headers = await researchIdentityHeaders({
         method: "get",
@@ -244,4 +246,20 @@ describe("contrato frontend-backend: headers contra el cliente OpenAPI generado"
       const emitted = Object.keys(headers).map((k) => k.toLowerCase()).sort();
       assert.deepEqual(emitted, [...EXPECTED].sort());
     }));
+  it("sin email no emite email ni email-signature y conserva los ocho headers base", () =>
+    withFixedEnv(async () => {
+      const previous = process.env.GUARD_NO_EMAIL;
+      process.env.GUARD_NO_EMAIL = '1';
+      try {
+        const headers = await researchIdentityHeaders({ method: 'get', path: '/api/thesis/MSFT' });
+        const emitted = Object.keys(headers).map((key) => key.toLowerCase()).sort();
+        assert.equal(headers['X-CavaAI-Email'], undefined);
+        assert.equal(headers['X-CavaAI-Email-Signature'], undefined);
+        assert.deepEqual(emitted, EXPECTED.filter((key) => !key.startsWith('x-cavaai-email')).sort());
+      } finally {
+        if (previous === undefined) delete process.env.GUARD_NO_EMAIL;
+        else process.env.GUARD_NO_EMAIL = previous;
+      }
+    }));
+
 });

@@ -75,6 +75,7 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+  'components/alerts/EmailNotifications.tsx': 'useState/useEffect mantienen preferencias por usuario y onChange guarda el opt-in; useT consume el locale React',
   'components/LoadingState.tsx': 'useT lee el contexto de locale para estados de carga accesibles',
   'components/brain/BrainGuideAnswer.tsx': 'useT lee locale para el copy de respuestas guía (vacía/insuficiente) del Cerebro',
   'components/brain/BrainLibraryAnswer.tsx': 'useT lee locale para el copy de respuestas de biblioteca del Cerebro',

@@ -49,12 +49,29 @@ def test_pre_revenue():
     assert calc(company_type="pre_revenue")["status"] == "not_evaluable"
 
 
-def test_missing_is_not_zero_and_no_partial_score():
+def test_missing_is_not_zero_and_partial_score_is_flagged():
+    """Un input que falta no es un cero ni bloquea el resto (Nico, 2026-11-03):
+    se publica la puntuacion sobre los puntos evaluados, marcada como parcial
+    y con el hueco señalado en la señal; nunca se hace pasar por un F-score 9/9.
+    """
     out = calc([f for f in sample() if f.metric != "common_stock_issued"])
-    assert out["piotroski"]["score"] is None
+    assert out["status"] == "partial"
+    assert out["piotroski"]["score"] == 8
     assert out["piotroski"]["evaluated"] == 8
+    assert out["piotroski"]["partial"] is True
     assert out["piotroski"]["signals"][6]["point"] is None
+    assert "8/9" in out["reason"]
     assert out["altman"]["status"] == "ok"
+
+
+def test_no_evaluable_point_stays_not_evaluable():
+    facts = [f for f in sample() if f.metric == "net_income" and f.year == 2025]
+    out = calc(facts)
+    assert out["status"] == "not_evaluable"
+    assert out["piotroski"]["score"] is None
+    assert out["piotroski"]["evaluated"] == 0
+    assert out["piotroski"]["partial"] is True
+    assert out["reason"] == "Ningún punto verificable con los datos disponibles"
 
 
 def test_issuance_and_bad_signals_are_zero():
@@ -64,8 +81,13 @@ def test_issuance_and_bad_signals_are_zero():
 
 @pytest.mark.parametrize("change", [{"value": float("nan")}, {"value": float("inf")}, {"source_url": ""}, {"source_type": "seed"}])
 def test_invalid_inputs(change):
+    """El hecho invalido se descarta: su señal queda sin evaluar y el resto
+    publica puntuacion parcial marcada, no un falso 9/9 ni un cero."""
     facts = [replace(f, **change) if f.metric == "common_stock_issued" else f for f in sample()]
-    assert calc(facts)["piotroski"]["score"] is None
+    out = calc(facts)
+    assert out["piotroski"]["evaluated"] == 8
+    assert out["piotroski"]["partial"] is True
+    assert out["piotroski"]["score"] == 8
 
 
 def test_empty_future_stale_and_incoherent():
@@ -78,7 +100,14 @@ def test_empty_future_stale_and_incoherent():
 def test_currency_periods_denominators_and_missing_altman():
     for changes in ({"value": 0}, {"unit": "EUR"}, {"period_end": date(2023, 2, 1)}):
         facts = [replace(f, **changes) if f.metric == "total_assets" and f.year == 2023 else f for f in sample()]
-        assert calc(facts)["piotroski"]["score"] is None
+        out = calc(facts)
+        # Las señales que usan el hecho contaminado quedan sin evaluar; el
+        # resto publica puntuacion parcial marcada como tal.
+        assert out["piotroski"]["partial"] is True
+        assert out["piotroski"]["evaluated"] < 9
+        assert out["piotroski"]["score"] == sum(
+            sig["point"] for sig in out["piotroski"]["signals"] if sig["point"] is not None
+        )
     out = calc([f for f in sample() if f.metric != "retained_earnings"])
     assert out["altman"]["score"] is None
     assert out["piotroski"]["score"] == 9

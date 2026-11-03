@@ -872,6 +872,10 @@ _ADVICE_QUESTION_RE = re.compile(
     r"|\b(?:vendo|compro|mantengo|aguanto)\b[^.?!]{0,40}?\bo\s+(?:no\b|(?:la|lo|las|los|me\s+la|me\s+lo)\s+)?"
     r"(?:mantengo|vendo|compro|espero|aguanto|sigo|quedo|no)\b"
     r"|\b(?:sell|buy|hold)\s+or\s+(?:hold|sell|buy|wait|keep)\b"
+    # «¿Compro más MSFT? Dame tu opinión sincera» (prueba real 2026-11-03): la
+    # pregunta con «¿» delante o pedir opinión/parecer tampoco es una orden.
+    r"|[¿¡]\s*(?:compro|vendo)\b"
+    r"|\b(?:opini[oó]n|qu[eé]\s+(?:piensas|crees|har[ií]as)|tu\s+parecer|your\s+opinion|what\s+do\s+you\s+think)\b"
 )
 # «¿Uber está barata?», «Is AAPL cheap?»: preguntan por el precio de UNA
 # empresa, igual que «¿está cara?»; no por qué comprar hoy. Prueba real
@@ -1627,14 +1631,21 @@ class ChatService:
                     select(Position).where(Position.tenant_id == tenant_id, Position.quantity > 0)
                 ).all()
             )
+            from app.services.portfolio_ledger_service import trade_price_fallbacks
+
+            quote_missing = trade_price_fallbacks(db, book + positions, tenant_id=tenant_id)
             bases = {pos.base_currency or "EUR" for pos in book}
-            total = sum(float(position_base_value(pos) or 0) for pos in book) if len(bases) == 1 else 0.0
+            # Un peso necesita TODO el denominador medido, no sumar precios de
+            # operaciones ni sustituir valoraciones desconocidas por cero.
+            complete = not quote_missing and all(position_base_value(pos) is not None for pos in book)
+            total = sum(float(position_base_value(pos)) for pos in book) if complete and len(bases) == 1 else 0.0
             for pos in positions:
-                value = position_base_value(pos)
+                unquoted = pos.company_id in quote_missing
+                value = None if unquoted else position_base_value(pos)
                 parts = [
                     (f"{num(float(pos.quantity), 6)} shares" if en else f"{num(float(pos.quantity), 6)} acciones"),
-                    (f"average cost {money(float(pos.average_cost or 0))} {pos.currency}"
-                     if en else f"coste medio {money(float(pos.average_cost or 0))} {pos.currency}"),
+                    (f"average cost {(money(float(pos.average_cost)) if pos.average_cost is not None else "N/D")} {pos.currency}"
+                     if en else f"coste medio {(money(float(pos.average_cost)) if pos.average_cost is not None else "N/D")} {pos.currency}"),
                 ]
                 if value is not None:
                     base = pos.base_currency or "EUR"
@@ -1646,7 +1657,10 @@ class ChatService:
                         parts.append(
                             f"{num(weight, 1)}% of your portfolio" if en else f"{num(weight, 1)} % de tu cartera"
                         )
-                if pos.valuation_hold_reason:
+                if unquoted:
+                    parts.append("no real quote (last trade price is not a market quote)" if en
+                                 else "sin cotización real (el precio de la última operación no es una cotización)")
+                elif pos.valuation_hold_reason:
                     parts.append("valuation on hold" if en else "valoración en suspenso")
                 elif pos.market_price:
                     parts.append(

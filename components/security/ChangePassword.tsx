@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,10 @@ export default function ChangePassword() {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [busy, setBusy] = useState(false);
+    // Sin JS aún no hay onSubmit: un submit nativo sería GET con las
+    // contraseñas en la URL. Botón deshabilitado hasta hidratar + method="post".
+    const [hydrated, setHydrated] = useState(false);
+    useEffect(() => { setHydrated(true); }, []);
 
     const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -43,7 +47,7 @@ export default function ChangePassword() {
     };
 
     return (
-        <form className="space-y-4" onSubmit={onSubmit}>
+        <form className="space-y-4" method="post" onSubmit={onSubmit}>
             <div>
                 <Label htmlFor="current-password">{t('security.password.currentLabel')}</Label>
                 <Input
@@ -83,7 +87,7 @@ export default function ChangePassword() {
                     value={confirmPassword}
                 />
             </div>
-            <Button disabled={busy} type="submit">
+            <Button disabled={!hydrated || busy} type="submit">
                 {busy ? t('security.password.submitting') : t('security.password.submit')}
             </Button>
         </form>

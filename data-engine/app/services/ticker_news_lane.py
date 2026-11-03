@@ -44,6 +44,10 @@ VERIFIED_ALIASES: dict[str, tuple[str, ...]] = {
     "AMZN": ("AWS", "Amazon Web Services", "Whole Foods"),
     "MSFT": ("Azure", "LinkedIn", "GitHub", "Xbox"),
     "AAPL": ("iPhone", "iPad", "App Store"),
+    # C3.ai: la sigla «AI» es una palabra del sector; la prensa cita la marca
+    # «C3.ai». Sin el alias, el filtro de cita rechazaba hasta las noticias
+    # legitimas (el nombre legal no aporta tokens distintivos: «ai» < 4 letras).
+    "AI": ("C3.ai",),
     "ADBE": ("Photoshop", "Acrobat"),
 }
 # Siglas que coinciden con una palabra o lugar corriente (AENA en titulares de

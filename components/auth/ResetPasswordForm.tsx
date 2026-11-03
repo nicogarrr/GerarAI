@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -26,6 +26,10 @@ export default function ResetPasswordForm({
     const [message, setMessage] = useState<string | null>(null);
     const [isError, setIsError] = useState(false);
     const [done, setDone] = useState(false);
+    // Sin JS aún no hay onSubmit: un submit nativo sería GET con la nueva
+    // contraseña en la URL. Botón deshabilitado hasta hidratar + method="post".
+    const [hydrated, setHydrated] = useState(false);
+    useEffect(() => { setHydrated(true); }, []);
 
     if (!token || linkError) {
         return (
@@ -61,7 +65,7 @@ export default function ResetPasswordForm({
     };
 
     return (
-        <form className="space-y-4" onSubmit={onSubmit}>
+        <form className="space-y-4" method="post" onSubmit={onSubmit}>
             <div>
                 <Label htmlFor="reset-new-password">{t('auth.resetPassword.newPasswordLabel')}</Label>
                 <Input
@@ -91,7 +95,7 @@ export default function ResetPasswordForm({
                     value={confirmPassword}
                 />
             </div>
-            <Button disabled={busy || done} type="submit">
+            <Button disabled={!hydrated || busy || done} type="submit">
                 {busy ? t('auth.resetPassword.submitting') : done ? t('auth.resetPassword.updated') : t('auth.resetPassword.submit')}
             </Button>
             <AuthFormResult message={message} isError={isError} />

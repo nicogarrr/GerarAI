@@ -6,7 +6,7 @@
     "priceBelow": "Precio por debajo de",
     "priceChange": "Cambio de precio %",
     "news": "Nueva noticia",
-    "earnings": "Informe de ganancias"
+    "earnings": "Resultados"
   },
   "meta": {
     "title": "Alertas",
@@ -165,5 +165,13 @@
       "skipped": "omitida",
       "none": "sin registro de entrega"
     }
+  },
+  "email": {
+    "title": "Avisos por correo",
+    "intro": "Los avisos que actives llegan a tu correo:",
+    "legend": "Tipos de aviso por correo",
+    "serverOff": "Correo sin configurar en el servidor: los avisos solo llegan en la app",
+    "noBinding": "Todavía no conocemos el correo de tu sesión: recarga la página",
+    "errorSave": "No se pudo guardar la preferencia de correo"
   }
 }
