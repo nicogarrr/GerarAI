@@ -182,6 +182,65 @@ def _dca_levels(db: Session, companies: list[Company]) -> dict[int, Any]:
     return result
 
 
+def _any_dca_level(db: Session) -> bool:
+    """Equivalente booleano de `_dca_levels` sin hidratar filas ni empresas.
+
+    Mismo criterio de aceptacion: fila con tenant de sesion, `level` no nulo
+    y match por company_id O por symbol (upper) con alguna empresa. Degrada a
+    False si la tabla no existe o el esquema es distinto, igual que
+    `_dca_levels` (que devuelve {}).
+
+    Companies NO lleva tenant_id (es global, entities.py:279; el hook de
+    tenancy solo filtra TenantOwnedMixin), asi que las EXISTS no llevan
+    predicado de tenant: el aislamiento es el tenant_id de la FILA DCA,
+    identico al de la ruta vieja. Diferencias deliberadas:
+    1. Una empresa con ticker literal "NONE" ya no casa con symbol NULL
+       (artefacto de str(None).upper() en la ruta vieja); ninguna empresa
+       real lo tiene.
+    2. El filtro `level IS NOT NULL` es paridad defensiva con el
+       `row.level is None` de la ruta vieja: la columna es NOT NULL en el
+       esquema real, asi que no discrimina hoy; si una fila por company_id
+       tuviera level NULL y otra casara por symbol con nivel, la ruta vieja
+       descartaria (by_company gana) y la sonda aceptaria por symbol.
+    3. Con varias filas DCA para la misma empresa, la ruta vieja se quedaba
+       con una arbitraria (dict sin ORDER BY); la sonda acepta si alguna
+       tiene nivel: mismo criterio "alguna vale", sin arbitraje de fila.
+    """
+    if not dca_table_available(db):
+        return False
+    table = sa.table(
+        _DCA_TABLE,
+        sa.column("id"),
+        sa.column("tenant_id"),
+        sa.column("symbol"),
+        sa.column("company_id"),
+        sa.column("level"),
+        sa.column("status"),
+        sa.column("period"),
+        sa.column("signal_date"),
+    )
+    companies = Company.__table__
+    by_id = sa.exists(sa.select(1).select_from(companies).where(companies.c.id == table.c.company_id))
+    by_symbol = sa.exists(
+        sa.select(1)
+        .select_from(companies)
+        .where(sa.func.upper(companies.c.ticker) == sa.func.upper(table.c.symbol))
+    )
+    statement = (
+        sa.select(sa.literal(1))
+        .select_from(table)
+        .where(table.c.level.is_not(None), sa.or_(by_id, by_symbol))
+        .limit(1)
+    )
+    tenant_id = db.info.get("tenant_id")
+    if tenant_id is not None:
+        statement = statement.where(table.c.tenant_id == tenant_id)
+    try:
+        return db.execute(statement).first() is not None
+    except Exception:  # noqa: BLE001 - esquema distinto al esperado: se degrada a "sin nivel"
+        return False
+
+
 def context_observations(
     db: Session,
     names: Iterable[str],
@@ -306,8 +365,7 @@ def _any_margin_of_safety(db: Session) -> bool:
 
 def context_metrics_with_data(db: Session) -> list[str]:
     """Nombres de contexto que al menos una empresa tiene (para las sugerencias de la UI)."""
-    companies = list(db.scalars(select(Company)).all())
-    if not companies:
+    if db.scalar(select(Company.id).limit(1)) is None:
         return []
     names: set[str] = set()
     # tiene_tesis/tesis_publicada solo se ofrecen si alguna empresa tiene
@@ -317,7 +375,9 @@ def context_metrics_with_data(db: Session) -> list[str]:
         names |= {HAS_THESIS, PUBLISHED_THESIS}
     if _any_margin_of_safety(db):
         names.add(MARGIN_OF_SAFETY)
-    # Nivel DCA: {} si la tabla no existe o nadie tiene nivel (degrada limpio).
-    if _dca_levels(db, companies):
+    # Nivel DCA: False si la tabla no existe o nadie tiene nivel (degrada
+    # limpio). Sonda de existencia: ya no hidrata todas las filas DCA ni
+    # todas las empresas para un booleano (medido en lab: ~25 ms menos).
+    if _any_dca_level(db):
         names.add(DCA_LEVEL)
     return sorted(names)
