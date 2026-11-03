@@ -283,6 +283,14 @@ def snapshot_trace(snapshot: FinancialSnapshot) -> dict:
         "balance_sheet": snapshot.balance_sheet,
         "shares": snapshot.shares_period,
         "warnings": snapshot.warnings,
+        # Piezas del puente resueltas cruzando fuentes, con su etiqueta
+        # (confirmado / una sola fuente no oficial / discrepancia). Solo si
+        # las hay: la traza de siempre no cambia.
+        **(
+            {"bridge_provenance": dict(snapshot.bridge_provenance)}
+            if getattr(snapshot, "bridge_provenance", None)
+            else {}
+        ),
     }
 
 

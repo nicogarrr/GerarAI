@@ -314,9 +314,13 @@ class ThesisEvidenceService:
     ) -> dict[str, Any]:
         """SEC primero; sin CIK o sin us-gaap, el orden de fundamentals_fallback
         (oficial guardado > Yahoo revisado, no oficial)."""
-        from app.services.fundamentals_fallback import ingest_with_fallback
+        from app.services.fundamentals_fallback import fill_bridge_gaps, ingest_with_fallback
 
-        return ingest_with_fallback(db, company, self._ingest_fundamentals(db, company, cik))
+        block = ingest_with_fallback(db, company, self._ingest_fundamentals(db, company, cik))
+        # Deuda neta / acciones que siguen faltando (ESEF sin deuda mapeada,
+        # SEC sin tag de deuda reciente): Yahoo en modo huecos, no oficial.
+        block["bridge_gaps"] = fill_bridge_gaps(db, company)
+        return block
 
     def _ingest_fundamentals(
         self, db: Session, company: Company, cik: str | None
