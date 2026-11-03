@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import AlertsManager from '@/components/alerts/AlertsManager';
+import EmailNotifications from '@/components/alerts/EmailNotifications';
 import PushNotifications from '@/components/alerts/PushNotifications';
 import { PageHeader } from '@/components/ui/page-header';
 import { getT } from '@/lib/i18n/server';
@@ -26,6 +27,8 @@ export default async function AlertsPage() {
             />
 
             <PushNotifications />
+
+            <EmailNotifications />
 
             <AlertsManager />
         </main>

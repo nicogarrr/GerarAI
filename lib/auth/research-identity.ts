@@ -107,7 +107,7 @@ export async function researchIdentityHeaders(
     .update(`${tenantId}:${user.id}:${timestamp}:${nonce}:${method}:${path}:${bodyHash}`)
     .digest('hex');
 
-  return {
+  const headers: Record<string, string> = {
     'X-CavaAI-User': user.id,
     'X-CavaAI-Tenant': tenantId,
     'X-CavaAI-Timestamp': timestamp,
@@ -117,4 +117,18 @@ export async function researchIdentityHeaders(
     'X-CavaAI-Body-Hash': bodyHash,
     'X-CavaAI-Signature': signature,
   };
+
+  // Correo de la sesion con firma propia (ligada a la misma identidad y
+  // nonce): el motor de datos solo lo usa como destino de los avisos por
+  // correo del usuario si la firma verifica; nunca acepta una direccion sin
+  // firmar del cliente.
+  const email = (user.email ?? '').trim().toLowerCase();
+  if (email) {
+    headers['X-CavaAI-Email'] = email;
+    headers['X-CavaAI-Email-Signature'] = createHmac('sha256', secret)
+      .update(`${tenantId}:${user.id}:${timestamp}:${nonce}:email:${email}`)
+      .digest('hex');
+  }
+
+  return headers;
 }

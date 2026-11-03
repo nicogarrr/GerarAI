@@ -370,6 +370,9 @@ class LLMProvider(ABC):
         # Tope duro por corrida (inactivo salvo que haya un guard en el
         # contexto): reserva cupo ANTES de la red; ver app/llm/run_guard.py.
         reserve_request(url, payload, guard_required=bool(getattr(self, "guard_required", False)))
+        from app.llm.thesis_inference_quota import reserve_request as reserve_thesis_inference
+
+        reserve_thesis_inference(url, payload)
         if self.public_only:
             from app.llm.egress_guard import public_only_client
 

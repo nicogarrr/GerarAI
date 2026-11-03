@@ -73,7 +73,8 @@
       "zoneStrongTrim": "Strong trim zone",
       "planPlain": "Plain DCA",
       "planLevels": "Level-based DCA (adds extra)",
-      "planFixed": "Levels with fixed budget"
+      "planFixed": "Levels with fixed budget",
+      "legacyZoneNormal": "Normal contribution zone"
     },
     "run": {
       "startFailed": "Couldn't start the evaluation",

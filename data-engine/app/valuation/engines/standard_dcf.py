@@ -525,6 +525,9 @@ class StandardDCFEngine(ValuationEngine):
 
         # Terminal value share guard: a DCF where >80% of the EV is the terminal
         # value is not a 5-year forecast, it is a perpetuity assumption.
+
+        # The market-distance band is an attached warning, never a value veto.
+        # Nico's normalized multistage model keeps its independently calculated value.
         base_trace = scenario_results["base"]["trace"]
         pv_explicit = base_trace.get("pv_explicit_fcf")
         pv_terminal = base_trace.get("pv_terminal_value")

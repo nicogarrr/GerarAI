@@ -85,13 +85,28 @@ def build_summaries(db: Session, companies: list[Company], *, today: date | None
         snapshot = latest.get(company.id)
         reverse = (snapshot.snapshot or {}).get("reverse_dcf") if snapshot else None
         growth = _number(reverse.get("required_revenue_growth")) if isinstance(reverse, dict) and reverse.get("status") == "ok" else None
+        # El motivo del «No evaluable» viaja con el resumen: no es lo mismo
+        # «faltan datos» (insufficient_data) que «el precio queda fuera de
+        # todo escenario valorable» (out_of_bounds, AMZN 2026-11-03). Un
+        # «No evaluable» sin motivo parece un fallo de la app.
+        reverse_reason = None
+        if growth is None and isinstance(reverse, dict):
+            rev_status = reverse.get("status")
+            if rev_status == "out_of_bounds":
+                reverse_reason = ("El precio de mercado queda fuera de todo escenario "
+                    "que el modelo puede valorar con el margen FCF actual; "
+                    "hace falta un método acorde al tipo de empresa.")
+            elif rev_status == "insufficient_data":
+                missing = [str(m) for m in (reverse.get("missing_inputs") or []) if m]
+                reverse_reason = ("Faltan datos para el DCF inverso: " + ", ".join(missing)) if missing else None
         # This is a separately dated model scenario, never the chosen thesis's claim.
         reverse_summary = {"status": "ok" if growth is not None else "not_evaluable",
             "required_revenue_growth": growth,
             "as_of": snapshot.created_at.isoformat() if snapshot and growth is not None else None,
             "source": "Modelo fundamental persistido",
             "model_version_id": snapshot.model_version_id if snapshot else None,
-            "market_price": _number(snapshot.current_price) if snapshot else None}
+            "market_price": _number(snapshot.current_price) if snapshot else None,
+            "reason": reverse_reason}
         out[company.ticker.upper()] = {
             "ticker": company.ticker.upper(), "fair_value": reading,
             "margin_convention": "discount_to_value_v1",

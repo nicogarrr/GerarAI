@@ -29,6 +29,10 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
     const [accountNotice, setAccountNotice] = useState<PendingAccountState | null>(null);
     const [pendingCredentials, setPendingCredentials] = useState<{ email: string; password: string } | null>(null);
     const [isVerifying, setIsVerifying] = useState(false);
+    // Sin JS aún no hay onSubmit: un submit nativo haría GET con email y
+    // contraseña en la URL. Botón deshabilitado hasta hidratar + method="post".
+    const [hydrated, setHydrated] = useState(false);
+    React.useEffect(() => { setHydrated(true); }, []);
     const {
         register,
         handleSubmit,
@@ -116,7 +120,7 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
                     {t('auth.twoFactor.subtitle')}
                 </p>
 
-                <form onSubmit={handleSubmit((_data) => onVerifyTotp(getValues('totpCode') ?? ''))} className="space-y-5">
+                <form method="post" onSubmit={handleSubmit((_data) => onVerifyTotp(getValues('totpCode') ?? ''))} className="space-y-5">
                                     <InputField
                                         name="totpCode"
                                         label={t('auth.twoFactor.codeLabel')}
@@ -133,7 +137,7 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
                                         }}
                                     />
 
-                    <Button type="submit" disabled={isVerifying} className="brand-btn w-full mt-5">
+                    <Button type="submit" disabled={!hydrated || isVerifying} className="brand-btn w-full mt-5">
                         {isVerifying ? t('auth.twoFactor.verifying') : t('auth.twoFactor.submit')}
                     </Button>
 
@@ -157,7 +161,7 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
             <h1 className="form-title !mb-3">{t('auth.signIn.welcomeTitle')}</h1>
             <p className="mb-7 text-sm leading-6 text-gray-400">{t('auth.signIn.welcomeSubtitle')}</p>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <InputField
                     name="email"
                     label={t('auth.signIn.emailLabel')}
@@ -188,7 +192,7 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
                     </div>
                 ) : null}
 
-                <Button type="submit" disabled={isSubmitting} className="brand-btn w-full mt-5">
+                <Button type="submit" disabled={!hydrated || isSubmitting} className="brand-btn w-full mt-5">
                     {isSubmitting ? t('auth.signIn.submitting') : t('auth.signIn.submit')}
                 </Button>
 

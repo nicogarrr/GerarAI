@@ -23,14 +23,36 @@ from tests.test_valuation_engines_refined import (
 FACTS = {"revenue": 1000, "free_cash_flow": 11, "revenue_growth": 0.07, "shares_diluted": 100, "net_debt": 200}
 
 
-def _value(db, ticker, facts=FACTS, tags=()):
+def _value(db, ticker, facts=FACTS, tags=(), price=2.7):
     company = _make_company(
         db, ticker, company_type="standard", valuation_model="standard_dcf", factor_tags=list(tags)
     )
     _add_facts(db, company, facts)
-    _add_price(db, company, 20.0)
+    _add_price(db, company, price)
     _add_traceable_wacc(db, company)
     return ValuationService().value_company(db, company)
+
+
+def test_far_value_vs_market_is_published_with_warning_and_trace():
+    """Nico #4483: distance from market is a warning, not a value veto."""
+    init_db()
+    db = SessionLocal()
+    try:
+        result = _value(db, "NDG", price=20.0)
+        assert result["status"] == "ok"
+        assert result["publishable"] is True
+        assert result["expected_value"] is not None and result["expected_value"] > 0
+        assert result["margin_of_safety"] is not None
+        warning = result["plausibility_warning"]
+        assert warning["code"] == "fair_value_far_from_price"
+        assert warning["ratio_to_price"] == pytest.approx(result["expected_value"] / 20.0)
+        assert warning["ratio_to_price"] < 0.2
+        assert warning["band"] == [0.2, 5.0]
+        assert result["trace"]["comparable_price"] == 20.0
+        assert result["trace"]["plausibility_warning"] == warning
+    finally:
+        _cleanup(db, ["NDG"])
+        db.close()
 
 
 def test_negative_bear_scenario_is_explained_nd_and_expected_keeps_ordering():
@@ -82,7 +104,7 @@ def test_positive_scenarios_have_no_notes_and_keep_values():
     db = SessionLocal()
     try:
         healthy = {"revenue": 1000, "free_cash_flow": 120, "revenue_growth": 0.07, "shares_diluted": 100, "net_debt": 200}
-        result = _value(db, "NDB", facts=healthy)
+        result = _value(db, "NDB", facts=healthy, price=20.0)
         assert result["status"] == "ok"
         assert result["scenario_notes"] == {}
         assert result["bear_value"] is not None and result["bear_value"] > 0

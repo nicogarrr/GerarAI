@@ -35,9 +35,16 @@ describe('DCA: etiquetas del motor en el idioma de la pantalla', () => {
         expect(PLANS.map((p) => dcaEngineText(p, en))).toEqual(['Plain DCA', 'Level-based DCA (adds extra)', 'Levels with fixed budget']);
     });
 
-    it('en castellano, tal cual', () => {
+    it('en castellano, conserva las etiquetas y corrige la tilde antigua', () => {
         const all = [...ZONES.flatMap((z) => [z.label, z.zone]), ...GROUPS, ...PLANS];
-        expect(all.map((text) => dcaEngineText(text, es))).toEqual(all);
+        expect(all.map((text) => dcaEngineText(text, es))).toEqual(all.map((text) => text === 'Zona de aportacion normal' ? 'Zona de aportación normal' : text));
+    });
+
+    it('traduce la zona normal antigua y corregida sin perder otros textos', () => {
+        expect(dcaEngineText('Zona de aportacion normal', en)).toBe('Normal contribution zone');
+        expect(dcaEngineText('Zona de aportación normal', en)).toBe('Normal contribution zone');
+        expect(dcaEngineText('Zona de aportacion normal', es)).toBe('Zona de aportación normal');
+        expect(dcaEngineText('Unknown zone', en)).toBe('Unknown zone');
     });
 
     it('el distintivo de la watchlist en inglés: nivel y zona en inglés', async () => {

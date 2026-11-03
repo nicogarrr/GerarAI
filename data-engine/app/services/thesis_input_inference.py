@@ -90,7 +90,10 @@ def _prepare_sector_inputs(db: Session, company: Company, valuation: dict[str, A
     if fn is None:
         return "no_disponible"
     try:
-        result = fn(db, company, valuation)
+        from app.llm.thesis_inference_quota import scope
+
+        with scope(db.info.get("tenant_id")):
+            result = fn(db, company, valuation)
         db.commit()
         return result
     except Exception as exc:  # noqa: BLE001 - opcional
@@ -127,10 +130,12 @@ def prepare_missing_inputs(db: Session, company: Company) -> dict[str, Any]:
         if InferredInputService().latest_valid(db, company.id, "fcf_margin") is not None:
             out["fcf_margin_target"] = "ya_inferido"
             return out
+        from app.llm.thesis_inference_quota import scope
         from app.services.async_bridge import run_from_any_context
         from app.services.inferred_input_llm_service import infer_input
 
-        row = run_from_any_context(infer_input(db, company.ticker, input_key="fcf_margin"))
+        with scope(db.info.get("tenant_id")):
+            row = run_from_any_context(infer_input(db, company.ticker, input_key="fcf_margin"))
         db.commit()
         out["fcf_margin_target"] = {"status": "inferido", "value": float(row.value)}
     except Exception as exc:  # noqa: BLE001 - cuota, presupuesto, sin extractos: N/D honesto

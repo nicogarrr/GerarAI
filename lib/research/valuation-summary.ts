@@ -1,16 +1,17 @@
+import { translateMessage } from '@/lib/i18n/translate';
 import { chartPriceUnit } from '@/lib/market/chart-price-units';
 import { metricLabel } from '@/lib/research/metric-labels';
 
 export type HealthEvidence = { fact_id: number; metric: string; value: number; unit: string; period_end: string; source_url: string; source_type: string };
 export type FinancialHealth = {
   status: string; reason?: string; period_end?: string; notice: string;
-  piotroski: { score: number | null; evaluated: number; total: number; methodology_url: string; signals: { id: string; label: string; formula: string; point: number | null; missing_input: string | null; evidence: HealthEvidence[] }[] };
+  piotroski: { score: number | null; evaluated: number; total: number; partial?: boolean; methodology_url: string; signals: { id: string; label: string; formula: string; point: number | null; missing_input: string | null; evidence: HealthEvidence[] }[] };
   altman: { status: string; score: number | null; variant: string; reason?: string; methodology_url: string; evidence?: HealthEvidence[] };
 };
 export type ValuationSummary = {
   ticker: string;
-  fair_value: { value: number | null; currency: string | null; label: string; as_of: string | null; publishable: boolean; stale: boolean };
-  reverse_dcf: { status: string; required_revenue_growth: number | null; as_of: string | null; source: string; market_price: number | null; model_version_id: number | null };
+  fair_value: { value: number | null; currency: string | null; label: string; as_of: string | null; publishable: boolean; stale: boolean; reason?: string | null; missing_inputs?: string[] };
+  reverse_dcf: { status: string; required_revenue_growth: number | null; as_of: string | null; source: string; market_price: number | null; model_version_id: number | null; reason?: string | null };
   health: FinancialHealth;
 };
 
@@ -57,7 +58,6 @@ const SUMMARY_EN: Record<string, string> = {
   'Modelo no aplicable a financieras, REIT o empresas preingresos': 'Model not applicable to financials, REITs or pre-revenue companies',
   'Sin ejercicios anuales con fuente': 'No sourced annual fiscal years',
   'Ejercicio desactualizado o fechas incoherentes': 'Outdated fiscal year or inconsistent dates',
-  'Faltan puntos verificables; no se publica un F-score parcial': 'Verifiable points are missing; a partial F-score is not published',
   'Indicadores contables, no recomendación ni probabilidad de quiebra.': 'Accounting indicators, not a recommendation or a probability of bankruptcy.',
   'Modelo fundamental persistido': 'Saved fundamental model',
   'Sin valor justo': 'No fair value',
@@ -65,8 +65,16 @@ const SUMMARY_EN: Record<string, string> = {
   'Motor de valoración (orientativo)': 'Valuation engine (indicative)',
 };
 
+const SUMMARY_REASON_KEYS = [
+  'researchShared.valuationSummary.backendReasons.missingScore',
+  'researchShared.valuationSummary.backendReasons.noVerifiedPoints',
+  'researchShared.valuationSummary.backendReasons.outsideScenarios',
+] as const;
+
 export function valuationSummaryText(text: string, locale: 'es' | 'en' = 'es'): string {
   if (locale !== 'en' || !text) return text;
+  const reasonKey = SUMMARY_REASON_KEYS.find((key) => translateMessage('es', key) === text);
+  if (reasonKey) return translateMessage('en', reasonKey);
   if (SUMMARY_EN[text]) return SUMMARY_EN[text];
   const thesis = /^Tesis publicada v(\d+)( \(antigua\))?$/.exec(text);
   if (thesis) return `Published thesis v${thesis[1]}${thesis[2] ? ' (old)' : ''}`;

@@ -30,6 +30,8 @@ from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.screener_fundamentals import load_screener_ratios
 from app.valuation.margin_convention import historical_margin_note
 
+_MAX_DRAFTS_SHOWN = 5
+
 
 def _number(value) -> str:
     return f"{float(value):,.2f}".replace(",", "\x07").replace(".", ",").replace("\x07", ".")
@@ -661,8 +663,10 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
                 break
         return _response(["Últimas noticias guardadas de tus posiciones abiertas (titulares en su idioma original):", *lines] if lines else ["No hay noticias guardadas de tus posiciones abiertas que citen de verdad a esas empresas. No he consultado noticias en directo."], sources, "portfolio_news")
     if theses:
+        thesis_company = _company_in_question(db, question)
         rows = db.execute(select(ThesisVersion, Company).join(Company, Company.id == ThesisVersion.company_id).where(
             ThesisVersion.tenant_id == tenant,
+            *([ThesisVersion.company_id == thesis_company.id] if thesis_company is not None else []),
         ).order_by(Company.ticker, ThesisVersion.version.desc())).all()
         latest, published = {}, {}
         for thesis, company in rows:
@@ -676,8 +680,14 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
             sources.append(_source("thesis_version", thesis.id,
                                    f"{'Thesis' if english else 'Tesis'} {company.ticker} v{thesis.version}",
                                    _link(company, "thesis")))
+        # Con cientos de borradores la lista alfabética ahogaba la respuesta:
+        # se muestran unos pocos y se cuenta el resto.
+        extra = 0
         for thesis, company in latest.values():
             if thesis.status != "published":
+                if len(drafts) >= _MAX_DRAFTS_SHOWN:
+                    extra += 1
+                    continue
                 drafts.append(f"- {company.ticker}: v{thesis.version}, not active (draft or pending publication)." if english
                               else f"- {company.ticker}: v{thesis.version}, no activa (borrador o pendiente de publicación).")
                 sources.append(_source("thesis_version", thesis.id,
@@ -687,10 +697,14 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
             lines = ["Active theses (latest published per company):", *active] if active else ["There are no published theses saved."]
             if drafts:
                 lines += ["Other latest saved versions (not active):", *drafts]
+                if extra:
+                    lines.append(f"- … and {extra} more companies with a draft or pending version.")
             return _response(lines, sources, "portfolio_theses")
         lines = ["Tesis activas (última publicada por empresa):", *active] if active else ["No hay tesis publicadas guardadas."]
         if drafts:
             lines += ["Otras últimas versiones guardadas (no activas):", *drafts]
+            if extra:
+                lines.append(f"- … y {extra} empresas más con borrador o versión pendiente.")
         return _response(lines, sources, "portfolio_theses")
     # Exact catalog matches only. Comparisons need at least two explicit tickers;
     # a single-price query needs exactly one. No page-context guess here.
