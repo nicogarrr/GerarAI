@@ -47,6 +47,7 @@ describe('El HTML previo a la hidratación no permite un submit nativo por GET',
         expect(screen.getByRole('button', { name: 'Crear cuenta' })).toBeEnabled();
     });
 });
+
 describe('Recuperación y cambio de contraseña: mismo agujero de submit nativo', () => {
     it('recuperación: form con method="post" y botón deshabilitado en el HTML inicial', async () => {
         const { renderToString } = await import('react-dom/server');
@@ -59,6 +60,11 @@ describe('Recuperación y cambio de contraseña: mismo agujero de submit nativo'
         const { renderToString } = await import('react-dom/server');
         const { default: ResetPasswordForm } = await import('@/components/auth/ResetPasswordForm');
         const html = renderToString(<ResetPasswordForm token="token-de-prueba" linkError={false} />);
+        expect(html).toContain('method="post"');
+        expect(html).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled)[^>]*>/);
+    });
+});
+
 describe('Formularios con contraseña o secreto en Ajustes/Seguridad: mismo agujero', () => {
     it('2FA: los tres forms llevan method="post" y botones deshabilitados en el HTML inicial', async () => {
         const { renderToString } = await import('react-dom/server');
