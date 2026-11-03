@@ -871,6 +871,10 @@ _ADVICE_QUESTION_RE = re.compile(
     r"|\b(?:vendo|compro|mantengo|aguanto)\b[^.?!]{0,40}?\bo\s+(?:no\b|(?:la|lo|las|los|me\s+la|me\s+lo)\s+)?"
     r"(?:mantengo|vendo|compro|espero|aguanto|sigo|quedo|no)\b"
     r"|\b(?:sell|buy|hold)\s+or\s+(?:hold|sell|buy|wait|keep)\b"
+    # «¿Compro más MSFT? Dame tu opinión sincera» (prueba real 2026-11-03): la
+    # pregunta con «¿» delante o pedir opinión/parecer tampoco es una orden.
+    r"|[¿¡]\s*(?:compro|vendo)\b"
+    r"|\b(?:opini[oó]n|qu[eé]\s+(?:piensas|crees|har[ií]as)|tu\s+parecer|your\s+opinion|what\s+do\s+you\s+think)\b"
 )
 # «¿Uber está barata?», «Is AAPL cheap?»: preguntan por el precio de UNA
 # empresa, igual que «¿está cara?»; no por qué comprar hoy. Prueba real
