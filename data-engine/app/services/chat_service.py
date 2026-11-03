@@ -1023,7 +1023,12 @@ _SALE_VERB_RE = re.compile(r"(?i)\b(?:vend\w*|venta)\b")
 # venta hipotética propia sin la palabra impuesto. Es la misma simulación que
 # la del IRPF; antes caía en «No ejecuto órdenes» o en el volcado de empresa.
 # «¿Cuánto he ganado vendiendo KO?» (pasado) no es hipotética y no entra.
-_HYPO_SALE_RE = re.compile(r"(?i)\bsi\s+(?:las?\s+|los\s+)?vend\w*|\bvendi(?:era|ese)\w*")
+# «¿Cuánto ganaría vendiendo UBER?»: condicional + gerundio, también hipotética
+# (antes daba los datos de la empresa).
+_HYPO_SALE_RE = re.compile(
+    r"(?i)\bsi\s+(?:las?\s+|los\s+)?vend\w*|\bvendi(?:era|ese)\w*"
+    r"|\b(?:ganar|sacar|pagar|perder)[ií]as?\b[^?.!\n]{0,30}?\b(?:vendiendo|al\s+vender)\b"
+)
 _HYPO_SALE_GAIN_RE = re.compile(
     r"(?i)\b(?:gan(?:o|as|ar[ií]a|ar[ií]as)|ganancias?|beneficio|me\s+quedar[ií]a|sacar[ií]a)\b"
 )
