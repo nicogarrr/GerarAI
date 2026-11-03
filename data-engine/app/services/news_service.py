@@ -169,6 +169,43 @@ def _ticker_evidence_level(ticker: str, name: str | None, text: str) -> int:
     return EVIDENCE_CONTEXT if _near_finance_word(ticker, text) else 0
 
 
+def _fold_for_ticker_search(text: str) -> str:
+    """Texto plegado para el prefiltro de detect_ticker.
+
+    casefold() más «ı»→«i»: cubre todo lo que ``re.IGNORECASE`` iguala a una
+    letra ASCII (incluidos «ſ»→s y el signo Kelvin→k, que casefold ya pliega,
+    y la «ı» sin punto, que el motor de regex de Python iguala a «i»).
+    """
+    return (text or "").casefold().replace("\u0131", "i")
+
+
+_TICKER_CANDIDATES_KEY = "_detect_ticker_candidates"
+
+
+def _ticker_candidates(db: Session) -> list[tuple[Company, str | None]]:
+    """(empresa, clave del prefiltro) en el orden del catálogo, una vez por catálogo.
+
+    Toda evidencia de ``_ticker_evidence_level`` salvo la de los tickers
+    estrictos exige el ticker en el texto (cashtag, «(NYSE: X)» o la sigla
+    suelta), así que si ``ticker.lower()`` no está en el texto plegado el nivel
+    es 0. Clave ``None`` = evaluar siempre (tickers estrictos, no ASCII o
+    vacíos se dejan a la función completa).
+    """
+    companies = all_companies(db)
+    cached = db.info.get(_TICKER_CANDIDATES_KEY)
+    if cached is not None and cached[0] is companies:
+        return cached[1]
+    prepared: list[tuple[Company, str | None]] = []
+    for company in companies:
+        ticker = company.ticker or ""
+        if not ticker:
+            continue  # nivel 0 siempre
+        always = ticker.upper() in STRICT_TICKERS or not ticker.isascii()
+        prepared.append((company, None if always else ticker.lower()))
+    db.info[_TICKER_CANDIDATES_KEY] = (companies, prepared)
+    return prepared
+
+
 def _ticker_evidence(ticker: str, name: str | None, text: str) -> bool:
     return _ticker_evidence_level(ticker, name, text) > 0
 
@@ -205,7 +242,12 @@ class NewsService:
         """
         best_level = 0
         best: list[Company] = []
-        for company in all_companies(db):
+        folded = _fold_for_ticker_search(text)
+        for company, ticker_key in _ticker_candidates(db):
+            # Sin el ticker en el texto (ni en mayúsculas/minúsculas) el nivel
+            # es 0 seguro: se salta sin las 3-4 regex por empresa.
+            if ticker_key is not None and ticker_key not in folded:
+                continue
             level = _ticker_evidence_level(company.ticker, company.name, text)
             if level > best_level:
                 best_level, best = level, [company]
