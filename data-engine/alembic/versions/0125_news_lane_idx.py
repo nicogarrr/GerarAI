@@ -1,4 +1,4 @@
-"""Indices parciales de carril para el feed de noticias (macro/gobierno).
+"""Indice parcial de gobierno para el feed de noticias.
 Revision ID: 0125_news_lane_idx
 Revises: 0124_val_outputs_margin_idx
 Create Date: 2026-11-03T11:00:00.000Z
@@ -28,8 +28,9 @@ branch_labels = None
 depends_on = None
 
 _TABLA = "news_events"
+# Macro ya esta cubierto por ix_news_events_macro_date_id de 0120.
+# No recrearlo con otro nombre: duplica almacenamiento y trabajo de escritura.
 _INDICES = (
-    ("ix_news_lane_macro", "(metadata ->> 'news_lane') = 'macro'"),
     ("ix_news_lane_gobierno", "(metadata ->> 'news_lane') = 'gobierno'"),
 )
 _COLUMNAS = [sa.desc("date"), sa.desc("id")]

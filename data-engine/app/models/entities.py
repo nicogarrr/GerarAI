@@ -1336,13 +1336,9 @@ class NewsEvent(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "news_events"
     __table_args__ = (
         Index("ix_news_events_company_date", "company_id", "date"),
-        # 0125: carriles escasos del feed (macro/gobierno). El literal replica
+        # 0125: gobierno; macro usa el indice existente de 0120. El literal replica
         # _NEWS_LANES_INDEXADOS de app/api/routes/news.py: tiene que ir en
         # linea para matchear el predicado de la consulta (sin bind).
-        Index(
-            "ix_news_lane_macro", desc("date"), desc("id"),
-            postgresql_where=text("(metadata ->> 'news_lane') = 'macro'"),
-        ),
         Index(
             "ix_news_lane_gobierno", desc("date"), desc("id"),
             postgresql_where=text("(metadata ->> 'news_lane') = 'gobierno'"),
