@@ -23,7 +23,12 @@
     "loading": "Loading saved valuations…",
     "failed": "Valuation is unavailable right now. Positions and prices are unchanged.",
     "empty": "No companies with saved valuation data.",
-    "piotroskiPartialScore": "{score} points out of {count} assessed (of 9)"
+    "piotroskiPartialScore": "{score} points out of {count} assessed (of 9)",
+    "backendReasons": {
+      "missingScore": "Verifiable points are missing; a partial F-score is not published",
+      "noVerifiedPoints": "No verifiable point with the available data",
+      "outsideScenarios": "The market price is outside every scenario the model can value with the current FCF margin; a method suited to the company type is needed."
+    }
   },
   "translate": {
     "reason": {

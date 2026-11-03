@@ -23,7 +23,12 @@
     "loading": "Cargando valoraciones guardadas…",
     "failed": "La valoración no está disponible ahora. Las posiciones y los precios no cambian.",
     "empty": "Sin empresas con datos de valoración guardados.",
-    "piotroskiPartialScore": "{score} puntos sobre {count} evaluados (de 9)"
+    "piotroskiPartialScore": "{score} puntos sobre {count} evaluados (de 9)",
+    "backendReasons": {
+      "missingScore": "Faltan puntos verificables; no se publica un F-score parcial",
+      "noVerifiedPoints": "Ningún punto verificable con los datos disponibles",
+      "outsideScenarios": "El precio de mercado queda fuera de todo escenario que el modelo puede valorar con el margen FCF actual; hace falta un método acorde al tipo de empresa."
+    }
   },
   "translate": {
     "reason": {
