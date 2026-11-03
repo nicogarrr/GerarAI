@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.core.tenancy import tenant_filters
 from app.models import AlertDelivery, Company, NewsEvent, ResearchAlert
 from app.services.email_delivery import generic_alert_content, send_email, smtp_configured
+from app.services.owner_destination import NOT_OWNER_ERROR, may_use_global_destination
 
 # Un claim 'sending' mas viejo que esto se considera abandonado (worker muerto
 # entre el envio y el commit del resultado) y vuelve a ser reclamable. Es el
@@ -127,6 +128,14 @@ class NotificationService:
                     result = self._dispatch_telegram(settings, {**payload, **({"chat_id": subscription.chat_id} if subscription else {})})
                 elif channel == "push" and push_pref:
                     result = self._result(**web_push.send_to_user(db, settings, alert))
+                elif (
+                    channel in ("email", "push")
+                    and self._global_destination_configured(settings, channel)
+                    and not may_use_global_destination(db, alert.tenant_id, settings)
+                ):
+                    # Correo SMTP y webhooks de email/push van a UN destino
+                    # global (el del propietario): otra cuenta no lo usa.
+                    result = self._result("not_configured", error=NOT_OWNER_ERROR)
                 elif channel == "email" and smtp_configured(settings):
                     result = self._dispatch_email(settings, alert, payload)
                 else:
@@ -268,6 +277,12 @@ class NotificationService:
             return "pending"
         # Timeout, corte a mitad de respuesta, etc.: ambiguo por definicion.
         return "unknown"
+
+    @staticmethod
+    def _global_destination_configured(settings, channel: str) -> bool:
+        if channel == "email":
+            return smtp_configured(settings) or bool(getattr(settings, "alert_email_webhook_url", None))
+        return bool(getattr(settings, "alert_push_webhook_url", None))
 
     def _dispatch_webhook(self, settings, payload: dict, channel: str) -> dict:
         endpoint = (

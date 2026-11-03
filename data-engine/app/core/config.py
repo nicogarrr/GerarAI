@@ -442,6 +442,13 @@ class Settings(BaseSettings):
     smtp_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
     # Destinatarios separados por comas.
     alert_email_to: str | None = None
+    # Los destinos GLOBALES (ALERT_EMAIL_TO por SMTP, ALERT_EMAIL_WEBHOOK_URL,
+    # ALERT_PUSH_WEBHOOK_URL y el TELEGRAM_CHAT_ID de aprobacion de tesis) son
+    # del propietario: con varios usuarios, solo las alertas de SU cuenta
+    # salen por ellos; las de los demas quedan "not_configured" (sin fuga).
+    # Env: GLOBAL_ALERT_OWNER_USER_ID = id de usuario (better-auth) del
+    # propietario. Vacio = la primera cuenta creada (tenant activo de id mas bajo).
+    global_alert_owner_user_id: str | None = None
     # DCA_EVALUATION_ENABLED: la evaluacion diaria de senales DCA (guarda el
     # nivel 1X-4X de watchlist + cartera). Es independiente de los avisos: con
     # DCA_ALERTS_ENABLED=false se sigue evaluando y solo se callan los avisos.
