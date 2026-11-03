@@ -1644,8 +1644,17 @@ _LAST_BUYS = re.compile(
 )
 
 
+#: «¿cuál fue mi primera compra?», «¿cuándo compré MSFT por primera vez?»: la más
+#: antigua (antes, el modelo general o la lista de la más reciente a la más antigua).
+_FIRST_TRADE = re.compile(
+    r"\bmi\s+primera\s+(?:compra|venta|operacion)\b|\bpor\s+primera\s+vez\b"
+    r"|\bmy\s+(?:very\s+)?first\s+(?:purchase|buy|sale|trade)\b|\bfor\s+the\s+first\s+time\b"
+)
+
+
 def _asks_trades(text: str, question: str) -> bool:
-    return bool((_TRADES_ES.search(text) or _TRADES_EN.search(text) or _LAST_SELLS.search(text))
+    return bool((_TRADES_ES.search(text) or _TRADES_EN.search(text) or _LAST_SELLS.search(text)
+                 or _FIRST_TRADE.search(text))
                 and not _tickers_in(question)
                 and not re.search(r"\b(?:comision\w*|fees?|commissions?|deberia|should)\b", text))
 
@@ -1756,6 +1765,10 @@ def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = Non
     # (antes el periodo hacía listar las compras).
     sells_only = ticker is None and bool(_LAST_SELLS.search(text))
     buys_only = ticker is None and not sells_only and bool(_LAST_BUYS.search(text))
+    first = bool(_FIRST_TRADE.search(text))
+    if first and not ticker:
+        sells_only = bool(re.search(r"\bprimera\s+venta\b|\bfirst\s+(?:sale|sell)\b", text))
+        buys_only = bool(re.search(r"\bprimera\s+compra\b|\bfirst\s+(?:purchase|buy)\b", text))
     if ticker:
         # «¿cuándo compré UBER?» solo compras y «¿cuándo vendí UBER?» solo ventas
         # (antes listaba ambas); «mis operaciones de UBER» sigue con las dos.
@@ -1771,9 +1784,11 @@ def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = Non
         query = query.where(Transaction.trade_date >= period[0], Transaction.trade_date <= period[1])
     if ticker:
         query = query.where(Company.ticker == ticker)
-    rows = db.execute(
-        query.order_by(Transaction.trade_date.desc(), Transaction.id.desc()).limit(_MAX_TRADES + 1)
-    ).all()
+    if first:
+        query = query.order_by(Transaction.trade_date.asc(), Transaction.id.asc()).limit(1)
+    else:
+        query = query.order_by(Transaction.trade_date.desc(), Transaction.id.desc()).limit(_MAX_TRADES + 1)
+    rows = db.execute(query).all()
     if not rows:
         if ticker and sells_only:
             text_out = (f"You have no saved sells of {ticker}." if english
@@ -1804,6 +1819,24 @@ def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = Non
                         else "No tienes compras ni ventas guardadas. Puedes importarlas en Cartera.")
         return _response(text_out, sources, "account_trades")
     portfolios = db.scalar(select(func.count(Portfolio.id)).where(Portfolio.tenant_id == tenant)) or 0
+    if first:
+        tx, row_ticker, portfolio_name = rows[0]
+        kind_es = "venta" if tx.action == "sell" else "compra"
+        kind_en = "sale" if tx.action == "sell" else "purchase"
+        of_es = f" de {ticker}" if ticker else ""
+        of_en = f" of {ticker}" if ticker else ""
+        qty = _qty(float(tx.quantity), english) if tx.quantity is not None else ("N/A" if english else "N/D")
+        price = ((f"{_num_en(float(tx.price))} {tx.currency}" if english
+                  else f"{num_es(float(tx.price))} {tx.currency}")
+                 if tx.price is not None else ("N/A" if english else "N/D"))
+        where = f" ({portfolio_name})" if portfolios > 1 and portfolio_name else ""
+        if english:
+            text_out = (f"Your first saved {kind_en}{of_en}: {_date_en(tx.trade_date)}, "
+                        f"{qty} {row_ticker or '?'} at {price}{where}.")
+        else:
+            text_out = (f"Tu primera {kind_es} guardada{of_es}: {fecha_es(tx.trade_date)}, "
+                        f"{qty} {row_ticker or '?'} a {price}{where}.")
+        return _response(text_out, sources, "account_trades")
     counts = None
     if ticker and _TICKER_COUNT.search(text):
         counts = dict(db.execute(
