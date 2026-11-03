@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     devIndicators: false,
     outputFileTracingIncludes: { '/temas': ['./data/theme-fundamentals/*.json'] },
     /* Performance optimizations */
-    compress: true, // Enable gzip compression
+    compress: false, // Caddy owns response compression in the VM.
     productionBrowserSourceMaps: false, // Disable source maps in production for smaller bundle
     
     // Configuración vacía para Turbopack (Next.js 16+)
