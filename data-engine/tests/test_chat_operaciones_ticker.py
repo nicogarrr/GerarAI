@@ -200,3 +200,33 @@ def test_ticker_count_english(monkeypatch):
         "You have 1 buy of KO saved (most recent first):",
         "- Oct 5, 2026: bought 10 KO at 60.50 USD.",
     ]
+
+
+@pytest.mark.parametrize(
+    ("question", "answer"),
+    [
+        ("¿Cuál fue mi primera compra?", "Tu primera compra guardada: 12 sept 2026, 3 ITX a 45,20 USD."),
+        ("¿cuál fue mi primera operación?", "Tu primera venta guardada: 1 jun 2025, 2 KO a 58,00 USD."),
+        ("¿cuál fue mi primera venta?", "Tu primera venta guardada: 1 jun 2025, 2 KO a 58,00 USD."),
+        ("¿Cuándo compré KO por primera vez?", "Tu primera compra guardada de KO: 5 oct 2026, 10 KO a 60,50 USD."),
+    ],
+)
+def test_first_trade(question, answer):
+    """«¿cuál fue mi primera compra?» iba al modelo general; «¿cuándo compré KO por
+    primera vez?» listaba de la más reciente a la más antigua. Ahora, la más antigua."""
+    resp = _ask(_db(), question)
+    assert (resp.llm_trace or {}).get("path") == "account_trades"
+    assert resp.llm_trace["provider_calls"] == 0
+    assert resp.answer == answer
+
+
+def test_first_trade_english(monkeypatch):
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
+    get_settings.cache_clear()
+    db = _db()
+    db.info["language"] = "en"
+    try:
+        resp = _ask(db, "What was my first purchase?")
+    finally:
+        get_settings.cache_clear()
+    assert resp.answer == "Your first saved purchase: Sep 12, 2026, 3 ITX at 45.20 USD."
