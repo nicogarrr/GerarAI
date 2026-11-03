@@ -7,7 +7,12 @@ import pytest
 from app.core.config import Settings
 from app.llm.chat_provider import GROQ_MODEL, ChatFallbackProvider, create_chat_llm_provider
 from app.llm.contracts import LLMRequest, LLMResponse, Message, Usage
-from app.llm.errors import ProviderHTTPError, ProviderRequestError, ProviderTransportError
+from app.llm.errors import (
+    ProviderHTTPError,
+    ProviderRequestError,
+    ProviderResponseError,
+    ProviderTransportError,
+)
 
 
 def run_async(fn):
@@ -391,8 +396,11 @@ async def test_chain_valid_groq_never_calls_gemini_and_uses_pinned_model_and_pro
 async def test_chain_groq_failure_tries_35_then_38_with_pinned_models_and_prompt():
     from app.llm.chat_provider import GEMINI_MODELS
     p, g, m = _chain(ProviderHTTPError("groq", 429), ProviderHTTPError("gemini", 429))
-    with pytest.raises(ProviderHTTPError):
+    # Go cayó con 502 (no cuota): el 429 del último respaldo viaja como causa,
+    # sin hacerse pasar por «límite de uso» del modelo configurado.
+    with pytest.raises(ProviderResponseError) as caught:
         await ChatFallbackProvider(p, g, backup2=m).complete(LLMRequest([Message("user", "hola")], task="chat"))
+    assert isinstance(caught.value.__cause__, ProviderHTTPError)
     assert len(g.calls) == 1 and g.calls[0].model == GROQ_MODEL
     assert [c.model for c in m.calls] == list(GEMINI_MODELS) and GEMINI_MODELS == ("gemini-3.5-flash-lite", "gemini-3.8-flash")
     assert all("prosa plana" in c.messages[-1].content for c in m.calls)
