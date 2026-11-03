@@ -45,6 +45,12 @@ _BROAD_RE = re.compile(
     r"|\bwould\s+you\s+(?:buy|invest|hold|sell|recommend)\b|\bdo\s+you\s+recommend\b"
     r"|\bpros\s+and\s+cons\b|\b(?:bull|bear)(?:\s+and\s+bear)?\s+case\b|\boutlook\b|\bprospects\b"
     r"|\bdeep\s+dive\b"
+    # «¿Vendo Uber o la mantengo?», «¿compro más o espero?», «sell or hold?»: elegir
+    # entre dos opciones sobre una empresa (prueba real 2026-11-03: iba a la
+    # síntesis normal aunque el equipo estuviera encendido).
+    r"|\b(?:vendo|compro|mantengo|aguanto)\b[^?.!]{0,40}?\bo\s+(?:no\b|(?:(?:la|lo|las|los|me\s+la|me\s+lo)\s+)?"
+    r"(?:mantengo|vendo|compro|espero|aguanto|sigo|quedo)\b)"
+    r"|\b(?:sell|buy|hold)\s+or\s+(?:hold|sell|buy|wait|keep)\b"
 )
 
 
