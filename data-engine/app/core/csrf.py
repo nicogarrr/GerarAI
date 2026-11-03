@@ -10,11 +10,10 @@ import hmac
 import logging
 import secrets
 import time
-from collections.abc import Awaitable, Callable
 
-from fastapi import Request, Response
+from fastapi import Request
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.core.config import get_settings
 
@@ -84,16 +83,27 @@ def validate_csrf_token(token: str | None) -> bool:
     return hmac.compare_digest(signature, expected_signature)
 
 
-class CSRFMiddleware(BaseHTTPMiddleware):
-    """Middleware que exige un token CSRF valido en metodos mutantes (POST, PUT, DELETE, PATCH)."""
+class CSRFMiddleware:
+    """Middleware que exige un token CSRF valido en metodos mutantes (POST, PUT, DELETE, PATCH).
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
-        if request.method in _SAFE_METHODS:
-            return await call_next(request)
+    ASGI puro (antes BaseHTTPMiddleware): misma decision y misma respuesta 403,
+    sin la tarea y los canales extra que BaseHTTPMiddleware crea en CADA
+    peticion (tambien en los GET, que aqui solo pasan de largo).
+    """
 
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope["method"] in _SAFE_METHODS:
+            await self.app(scope, receive, send)
+            return
+
+        request = Request(scope)
         path = request.url.path
         if any(path.startswith(prefix) for prefix in _EXCLUDED_PATH_PREFIXES):
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
         # Extraer token de cabeceras o cookies
         csrf_token = (
@@ -113,10 +123,11 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             )
             if not has_internal_sig:
                 logger.warning(f"CSRF validation failed for {request.method} {path}")
-                return JSONResponse(
+                response = JSONResponse(
                     status_code=403,
                     content={"detail": "Falta el token CSRF o es inválido (403 Forbidden)."},
                 )
+                await response(scope, receive, send)
+                return
 
-        return await call_next(request)
-
+        await self.app(scope, receive, send)
