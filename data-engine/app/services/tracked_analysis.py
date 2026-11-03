@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, aliased
 
-from app.models import WorkflowRun
+from app.models import WatchItem, WorkflowRun
 from app.services.thesis_job_service import (
     WORKFLOW_NAME,
     _lock_generation,
@@ -86,3 +86,83 @@ def tracked_statuses(db: Session, tickers: list[str]) -> dict[str, dict]:
             if company_id is not None:
                 out[ticker]['missing_inputs'] = latest_missing_inputs(db, company_id)
     return out
+
+
+# Una empresa de la watchlist cuya ultima tesis quedo en «datos insuficientes»
+# se reintenta como mucho una vez cada este numero de dias: los huecos se
+# cierran con ingestas nuevas (fundamentales, Yahoo en modo huecos), no por
+# reintentar cada hora.
+RETRY_INSUFFICIENT_DAYS = 3
+
+
+def backfill_watchlist_theses(db: Session, *, limit: int = DAILY_LIMIT) -> dict:
+    """Tesis en segundo plano para la watchlist del tenant activo (owner 3-nov-2026:
+    «toda empresa que entre en watchlist se genere la tesis en segundo plano»).
+
+    El alta ya encola la tesis; esto cubre lo que el alta no garantiza: empresas
+    añadidas antes de existir esa generación, corridas fallidas y tesis que
+    salieron «datos insuficientes» cuando faltaba un dato que ya puede estar.
+    Reutiliza ``enqueue_tracked_analysis`` (dedupe por día, tope diario por
+    tenant, nunca dos generaciones activas del mismo ticker).
+    """
+    from app.models import Company, ThesisVersion
+
+    if db.info.get("tenant_id") is None:
+        return {"status": "skipped", "reason": "sin tenant"}
+    tenant = db.info["tenant_id"]
+    symbols = [
+        item.symbol
+        for item in db.scalars(
+            select(WatchItem).where(WatchItem.tenant_id == tenant).order_by(WatchItem.id)
+        ).all()
+    ]
+    if not symbols:
+        return {"status": "ok", "enqueued": [], "skipped": {}}
+    now = datetime.now(UTC)
+    companies = {
+        c.ticker: c.id for c in db.scalars(select(Company).where(Company.ticker.in_(symbols))).all()
+    }
+    ranked = select(
+        ThesisVersion.company_id,
+        ThesisVersion.status,
+        ThesisVersion.created_at,
+        func.row_number().over(
+            partition_by=ThesisVersion.company_id, order_by=desc(ThesisVersion.version)
+        ).label("rank_"),
+    ).where(
+        ThesisVersion.tenant_id == tenant,
+        ThesisVersion.company_id.in_(list(companies.values()) or [-1]),
+    ).subquery()
+    latest = {
+        row.company_id: (row.status, row.created_at)
+        for row in db.execute(select(ranked).where(ranked.c.rank_ == 1)).all()
+    }
+    enqueued: list[str] = []
+    skipped: dict[str, str] = {}
+    for symbol in symbols:
+        if len(enqueued) >= limit:
+            skipped[symbol] = "tope_diario"
+            continue
+        company_id = companies.get(symbol)
+        state = latest.get(company_id) if company_id is not None else None
+        if state is not None:
+            status, created = state
+            created = created.replace(tzinfo=UTC) if created.tzinfo is None else created.astimezone(UTC)
+            if status != "insufficient_data":
+                skipped[symbol] = f"tesis_{status}"
+                continue
+            if (now - created).days < RETRY_INSUFFICIENT_DAYS:
+                skipped[symbol] = "insuficiente_reciente"
+                continue
+        run = latest_generation(db, symbol, active_only=True)
+        if run is not None:
+            skipped[symbol] = "en_curso"
+            continue
+        before = latest_generation(db, symbol)
+        enqueue_tracked_analysis(db, symbol)
+        after = latest_generation(db, symbol)
+        if after is not None and (before is None or after.id != before.id or after.status in {"queued"}):
+            enqueued.append(symbol)
+        else:
+            skipped[symbol] = "deduplicado"
+    return {"status": "ok", "enqueued": enqueued, "skipped": skipped}

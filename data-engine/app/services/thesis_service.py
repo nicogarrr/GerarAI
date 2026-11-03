@@ -124,6 +124,40 @@ def _split_missing_ask(missing: list, excluded_items: list | None) -> tuple[list
 
 
 
+_ESTIMATED_METRIC_ES = {
+    "net_debt": "Deuda neta",
+    "shares_diluted": "Acciones diluidas",
+    "total_debt": "Deuda total",
+    "cash_and_equivalents": "Caja",
+}
+_ESTIMATED_STATUS_ES = {
+    "confirmed": "confirmado",
+    "single_source": "estimado: una sola fuente, no oficial",
+    "discrepancy": "estimado: fuentes en desacuerdo",
+    "primary_only": "estimado: fuente oficial de otro cierre",
+}
+
+
+def estimated_inputs_markdown(valuation: dict) -> str:
+    """Linea «Inputs estimados» de la tesis: cada pieza del puente que no salio
+    del cierre ancla, con su etiqueta, metodo, periodo y fuentes. Vacio si no
+    hay ninguna (la tesis de siempre no cambia)."""
+    items = valuation.get("estimated_inputs") or []
+    if not items:
+        return ""
+    parts = []
+    for item in items:
+        metric = _ESTIMATED_METRIC_ES.get(str(item.get("metric")), str(item.get("metric")))
+        status = _ESTIMATED_STATUS_ES.get(str(item.get("status")), "estimado")
+        value = item.get("value")
+        shown = f"{float(value):,.0f}".replace(",", ".") if isinstance(value, (int, float)) else "N/D"
+        parts.append(
+            f"{metric} {shown} ({status}; {item.get('method') or 'cruce de fuentes'}; "
+            f"periodo {item.get('period') or 'N/D'}; {item.get('note') or ''})".replace("; )", ")")
+        )
+    return "\nInputs estimados (no salen del cierre ancla oficial): " + " · ".join(parts) + "."
+
+
 def latest_missing_inputs(db: Session, company_id: int) -> list[str] | None:
     """Inputs pendientes del modelo fundamental persistido mas reciente.
 
@@ -2169,7 +2203,7 @@ class ThesisService:
 ## 1. Resumen ejecutivo
 {company.name} se sigue como {term_es(company.company_type)} con el modelo {term_es(company.valuation_model)}.
 Fuente de los inputs de valoración: {term_es((valuation.get("trace") or {}).get("input_source", "unknown"))}.
-Motor: {term_es((valuation.get("trace") or {}).get("engine", "unknown"))}.
+Motor: {term_es((valuation.get("trace") or {}).get("engine", "unknown"))}.{estimated_inputs_markdown(valuation)}
 
 ## 2. Hipótesis
 {hypothesis}

@@ -64,6 +64,9 @@ class Candidate:
     as_of: date | None
     publishable: bool = True
     thesis_version: int | None = None
+    # La corrida usó piezas del puente resueltas cruzando fuentes (deuda neta,
+    # acciones): la etiqueta lo dice («con inputs estimados»).
+    estimated_inputs: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -167,10 +170,13 @@ def _reading(source: str, candidate: Candidate, *, stale: bool, rule: str) -> di
         label = "Motor de valoración"
     else:
         label = "Motor de valoración (orientativo)"
+    if candidate.estimated_inputs:
+        label += " · con inputs estimados"
     return {
         "value": round(candidate.value, 4),
         "source": source,
         "label": label,
+        **({"estimated_inputs": list(candidate.estimated_inputs)} if candidate.estimated_inputs else {}),
         # Una tesis publicada es una cifra final; el motor solo si es publicable.
         "publishable": source != "motor_orientativo",
         "as_of": candidate.as_of.isoformat() if candidate.as_of else None,
@@ -247,6 +253,14 @@ def listed_value(source: object, *, fallback: dict | None) -> float | None:
         if value is not None:
             return value
     return None
+
+
+def _estimated_inputs(payload: object) -> tuple[str, ...]:
+    """Metricas del puente que la corrida tomó por cruce de fuentes."""
+    if not isinstance(payload, dict):
+        return ()
+    items = payload.get("estimated_inputs") or []
+    return tuple(str(i.get("metric")) for i in items if isinstance(i, dict) and i.get("metric"))
 
 
 def _engine_value(payload: object) -> float | None:
@@ -340,6 +354,7 @@ def persisted_engine_readings(
             value=value,
             as_of=_as_date(model.created_at),
             publishable=model.status == "final",
+            estimated_inputs=_estimated_inputs(output.output_payload),
         )
     return out, blocks
 

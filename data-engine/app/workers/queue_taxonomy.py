@@ -109,6 +109,7 @@ ACTOR_CLASS: dict[str, str] = {
     "refresh_propicks_prices": CALCULO,
     "refresh_valuation_metrics": CALCULO,
     "review_theses": CALCULO,
+    "backfill_watchlist_theses": CALCULO,  # solo encola tesis (la genera generate_thesis_job)
     "run_daily_research": CALCULO,
     "run_propicks_funnel": CALCULO,
     "scan_contradictions": CALCULO,

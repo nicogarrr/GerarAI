@@ -96,9 +96,12 @@ def seed_company_fundamentals(db: Session, company: Company) -> dict[str, Any]:
     """
     from app.services.async_bridge import run_from_any_context
     from app.services.financial_ingestion_service import FinancialIngestionService
+    from app.services.fundamentals_fallback import fill_bridge_gaps
 
     if tenant_has_facts(db, company):
-        return {"status": "ya_tiene_hechos", "ticker": company.ticker}
+        gaps = fill_bridge_gaps(db, company)
+        db.commit()
+        return {"status": "ya_tiene_hechos", "ticker": company.ticker, "bridge_gaps": gaps}
     lane = fundamentals_lane(company)
     service = FinancialIngestionService()
     if lane == "esef":
@@ -106,11 +109,14 @@ def seed_company_fundamentals(db: Session, company: Company) -> dict[str, Any]:
     else:
         result = run_from_any_context(service.refresh_from_sec(db=db, company=company))
     db.commit()
+    gaps = fill_bridge_gaps(db, company)
+    db.commit()
     return {
         "status": "sembrado",
         "ticker": company.ticker,
         "via": lane,
         "facts_imported": result.get("facts_imported"),
+        "bridge_gaps": gaps,
     }
 
 

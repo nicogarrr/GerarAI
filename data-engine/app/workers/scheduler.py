@@ -15,6 +15,7 @@ from app.workers.dramatiq_app import (
     backfill_document_kpis,
     backfill_finnhub_profiles,
     backfill_sec_fundamentals,
+    backfill_watchlist_theses,
     coalesced_send,
     consolidate_memory,
     dispatch_earnings_reminders,
@@ -402,6 +403,17 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         job_id="thesis_review",
         hour=7,
         minute=0,
+    )
+    # Tesis de la watchlist que faltan o se quedaron sin datos (owner 3-nov):
+    # despues del refresco nocturno de fundamentales, antes de abrir mercado.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, backfill_watchlist_theses),
+        "cron",
+        job_id="watchlist_thesis_backfill",
+        hour=6,
+        minute=20,
+        jitter=600,
     )
     _register(
         scheduler,

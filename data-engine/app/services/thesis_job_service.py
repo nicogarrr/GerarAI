@@ -818,6 +818,15 @@ def run_thesis_job(run_id: int) -> None:
                 # de red (largo); expire_on_commit=False mantiene `company`.
                 db.commit()
                 financial_refresh = run_from_any_context(refresh_free_financials(db, company))
+                # Deuda neta / acciones que la SEC/ESEF no traen: Yahoo en modo
+                # huecos (no oficial, etiquetado). Fuera del SAVEPOINT de la
+                # tesis, con su propio commit; nunca rompe la generacion.
+                from app.services.fundamentals_fallback import fill_bridge_gaps
+
+                bridge_gaps = fill_bridge_gaps(db, company)
+                db.commit()
+                if isinstance(financial_refresh, dict):
+                    financial_refresh = {**financial_refresh, "bridge_gaps": bridge_gaps}
                 kwargs["stored_evidence_only"] = True
                 kwargs["refresh_receipt"] = financial_refresh
             thesis = ThesisService().generate(
