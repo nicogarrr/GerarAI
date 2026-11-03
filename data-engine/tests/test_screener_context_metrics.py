@@ -228,3 +228,17 @@ def test_context_metrics_with_data_ofrece_nivel_dca_con_sonda(db):
     assert "nivel_dca" not in scm.context_metrics_with_data(db)
     _dca(db, "POOL", 3, company_id=pool.id)
     assert "nivel_dca" in scm.context_metrics_with_data(db)
+
+
+def test_any_dca_level_companies_son_globales_en_ambas_rutas(db):
+    """Company no es TenantOwned (entities.py:279): una fila DCA del tenant
+    que casa con una empresa global cuenta en las dos rutas. El aislamiento
+    lo da el tenant_id de la FILA DCA (caso cubierto en el test de
+    equivalencia), no el de la empresa."""
+    db.info["tenant_id"] = 1
+    pool = _company(db, "POOL")
+    _dca(db, "POOL", 3)  # solo por symbol, empresa global
+    companies = list(db.scalars(select(Company)).all())
+    assert bool(scm._dca_levels(db, companies)) is True
+    assert scm._any_dca_level(db) is True
+

@@ -188,9 +188,23 @@ def _any_dca_level(db: Session) -> bool:
     Mismo criterio de aceptacion: fila con tenant de sesion, `level` no nulo
     y match por company_id O por symbol (upper) con alguna empresa. Degrada a
     False si la tabla no existe o el esquema es distinto, igual que
-    `_dca_levels` (que devuelve {}). Diferencia deliberada: una empresa con
-    ticker literal "NONE" ya no casa con symbol NULL (artefacto de
-    str(None).upper() en la ruta vieja); ninguna empresa real lo tiene.
+    `_dca_levels` (que devuelve {}).
+
+    Companies NO lleva tenant_id (es global, entities.py:279; el hook de
+    tenancy solo filtra TenantOwnedMixin), asi que las EXISTS no llevan
+    predicado de tenant: el aislamiento es el tenant_id de la FILA DCA,
+    identico al de la ruta vieja. Diferencias deliberadas:
+    1. Una empresa con ticker literal "NONE" ya no casa con symbol NULL
+       (artefacto de str(None).upper() en la ruta vieja); ninguna empresa
+       real lo tiene.
+    2. El filtro `level IS NOT NULL` es paridad defensiva con el
+       `row.level is None` de la ruta vieja: la columna es NOT NULL en el
+       esquema real, asi que no discrimina hoy; si una fila por company_id
+       tuviera level NULL y otra casara por symbol con nivel, la ruta vieja
+       descartaria (by_company gana) y la sonda aceptaria por symbol.
+    3. Con varias filas DCA para la misma empresa, la ruta vieja se quedaba
+       con una arbitraria (dict sin ORDER BY); la sonda acepta si alguna
+       tiene nivel: mismo criterio "alguna vale", sin arbitraje de fila.
     """
     if not dca_table_available(db):
         return False
