@@ -52,20 +52,6 @@ export const EVENT_KIND_KEYS: Record<PriceEventKind, TranslationKey> = {
 
 export const EVENT_KIND_ORDER: PriceEventKind[] = ['results', 'ex_dividend', 'filing', 'insider', 'news', 'movement'];
 
-export type IndicatorKind = 'target' | 'drawdown' | 'pnl';
-
-export const INDICATOR_LABELS: Record<IndicatorKind, string> = {
-    target: 'Distancia al objetivo',
-    drawdown: 'Caída desde máximo 52 sem.',
-    pnl: 'Plusvalía latente',
-};
-
-export const INDICATOR_KEYS: Record<IndicatorKind, TranslationKey> = {
-    target: 'research.chart.indicatorTarget',
-    drawdown: 'research.chart.indicatorDrawdown',
-    pnl: 'research.chart.indicatorPnl',
-};
-
 export const VOLUME_SPIKE_RATIO = 2.5;
 export const VOLUME_WINDOW = 60;
 
@@ -84,47 +70,16 @@ export function volumeSpikeFlags(bars: EventBar[], window = VOLUME_WINDOW, ratio
     });
 }
 
-/** Indicadores disponibles: sin objetivo de analistas o sin posición no se ofrecen. */
-export function availableIndicators(opts: { target?: number | null; averageCost?: number | null }): IndicatorKind[] {
-    const out: IndicatorKind[] = [];
-    if (finite(opts.target) && opts.target > 0) out.push('target');
-    out.push('drawdown');
-    if (finite(opts.averageCost) && opts.averageCost > 0) out.push('pnl');
-    return out;
-}
-
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
-/** Serie del panel del indicador, en % (null si no se puede calcular sin inventar datos). */
-export function indicatorSeries(
-    bars: EventBar[],
-    kind: IndicatorKind,
-    opts: { target?: number | null; averageCost?: number | null },
-): Array<{ date: string; value: number }> {
-    if (kind === 'target') {
-        if (!finite(opts.target) || opts.target <= 0) return [];
-        const target = opts.target;
-        return bars.filter((b) => finite(b.close) && b.close > 0).map((b) => ({ date: b.date, value: round2((target / b.close - 1) * 100) }));
-    }
-    if (kind === 'pnl') {
-        if (!finite(opts.averageCost) || opts.averageCost <= 0) return [];
-        const cost = opts.averageCost;
-        return bars.filter((b) => finite(b.close) && b.close > 0).map((b) => ({ date: b.date, value: round2((b.close / cost - 1) * 100) }));
-    }
-    const out: Array<{ date: string; value: number }> = [];
-    bars.forEach((bar, index) => {
-        if (!finite(bar.close) || bar.close <= 0) return;
-        const start = new Date(`${bar.date.slice(0, 10)}T00:00:00Z`).getTime() - 365 * 86_400_000;
-        let peak = 0;
-        for (let i = index; i >= 0; i -= 1) {
-            const b = bars[i];
-            if (new Date(`${b.date.slice(0, 10)}T00:00:00Z`).getTime() <= start) break;
-            const high = finite(b.high) && b.high > 0 ? b.high : b.close;
-            if (high > peak) peak = high;
-        }
-        if (peak > 0) out.push({ date: bar.date, value: round2((bar.close / peak - 1) * 100) });
-    });
-    return out;
+/**
+ * Distancia al objetivo de analistas en % frente a un precio (el último del tramo): +52,18 = potencial,
+ * negativo = el precio ya supera el objetivo. Misma cuenta que el antiguo panel «Distancia al objetivo».
+ * null si falta el objetivo o el precio (no se inventa).
+ */
+export function targetDistancePercent(target: number | null | undefined, close: number | null | undefined): number | null {
+    if (!finite(target) || target <= 0 || !finite(close) || close <= 0) return null;
+    return round2((target / close - 1) * 100);
 }
 
 /** Eventos dentro del tramo visible (ambos extremos incluidos), los más recientes primero. */

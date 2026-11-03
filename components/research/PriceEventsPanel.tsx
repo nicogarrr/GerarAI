@@ -1,20 +1,17 @@
 import { useState } from 'react';
 import type { Formatters } from '@/lib/format';
 import type { TranslateFn } from '@/lib/i18n/translate';
-import { EVENT_KIND_KEYS, EVENT_KIND_ORDER, EVENT_KINDS, INDICATOR_KEYS, type IndicatorKind, type PriceEvent, type PriceEventKind } from '@/lib/market/price-events';
+import { EVENT_KIND_KEYS, EVENT_KIND_ORDER, EVENT_KINDS, type PriceEvent, type PriceEventKind } from '@/lib/market/price-events';
 
 /**
- * Parte de abajo del gráfico de precio de la ficha: qué mide el panel del indicador,
+ * Parte de abajo del gráfico de precio de la ficha: nota del volumen,
  * leyenda de eventos (activar/desactivar tipos) y la lista fechada, los más recientes primero.
  */
-export function PriceEventsPanel({ events, hiddenKinds, onToggleKind, onFocus, indicators, indicator, onIndicator, hourly, t, formatMarketDate }: {
+export function PriceEventsPanel({ events, hiddenKinds, onToggleKind, onFocus, hourly, t, formatMarketDate }: {
     events: PriceEvent[];
     hiddenKinds: ReadonlySet<PriceEventKind>;
     onToggleKind: (kind: PriceEventKind) => void;
     onFocus: (date: string) => void;
-    indicators: IndicatorKind[];
-    indicator: IndicatorKind;
-    onIndicator: (kind: IndicatorKind) => void;
     hourly: boolean;
     /** Traductor y formato de fecha del idioma elegido (los pasa el gráfico). */
     t: TranslateFn;
@@ -25,11 +22,7 @@ export function PriceEventsPanel({ events, hiddenKinds, onToggleKind, onFocus, i
     const present = new Set(events.map((event) => event.kind));
     return (
         <div className="mt-4 space-y-3 border-t border-gray-800 pt-3" data-testid="price-events">
-            {hourly ? null : <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t('research.chart.indicatorAria')}>
-                <span className="mr-1 text-[11px] text-gray-500">{t('research.chart.middlePanel')}</span>
-                {indicators.map((kind) => <button key={kind} type="button" aria-pressed={indicator === kind} onClick={() => onIndicator(kind)} className={`min-h-9 rounded-md px-2 text-[11px] ${indicator === kind ? 'bg-violet-400/10 font-semibold text-violet-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`}>{t(INDICATOR_KEYS[kind])}</button>)}
-                <span className="ml-auto text-[10px] text-gray-500">{t('research.chart.volumeNote')}</span>
-            </div>}
+            {hourly ? null : <p className="text-[10px] text-gray-500">{t('research.chart.volumeNote')}</p>}
             <div className="flex flex-wrap gap-1" role="group" aria-label={t('research.chart.kindsAria')}>
                 {EVENT_KIND_ORDER.filter((kind) => present.has(kind)).map((kind) => <button key={kind} type="button" aria-pressed={!hiddenKinds.has(kind)} onClick={() => onToggleKind(kind)} className={`inline-flex min-h-9 items-center gap-1 rounded-full border px-2 text-[11px] ${hiddenKinds.has(kind) ? 'border-gray-800 text-gray-500 line-through' : 'border-gray-700 text-gray-300'}`}>
                     <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: EVENT_KINDS[kind].color }} />{t(EVENT_KIND_KEYS[kind])}
