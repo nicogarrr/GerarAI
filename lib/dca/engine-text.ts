@@ -26,6 +26,8 @@ const ENGINE_KEYS: readonly TranslationKey[] = [
 ];
 
 export function dcaEngineText(text: string, t: TranslateFn): string {
-  const key = ENGINE_KEYS.find((k) => translateMessage('es', k) === text);
+  // Persisted/backend labels predate the corrected Spanish spelling.
+  const legacyKey = text === 'Zona de aportacion normal' ? 'watchlist.dca.engine.zoneNormal' : undefined;
+  const key = legacyKey ?? ENGINE_KEYS.find((k) => translateMessage('es', k) === text);
   return key ? t(key) : text;
 }
