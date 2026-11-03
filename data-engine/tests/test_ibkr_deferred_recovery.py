@@ -70,7 +70,9 @@ def test_recovery_schedule_exists_without_dedicated_worker(monkeypatch):
     assert job.func.func is sched.coalesced_send
     assert job.func.args == (workers.retry_deferred_tenant_ibkr_connections,)
     fire = job.trigger.get_next_fire_time(None, datetime(2026, 11, 3, tzinfo=UTC))
-    assert (fire.hour, fire.minute) == (16, 50)
+    # Default scheduler jitter spreads cron dispatch by at most five minutes.
+    assert fire.hour == 16
+    assert 50 <= fire.minute < 56
     assert str(fire.tzinfo) == 'UTC'
     assert workers.retry_deferred_tenant_ibkr_connections.options['max_retries'] == 2
 
