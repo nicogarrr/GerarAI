@@ -198,6 +198,10 @@ def _sale_question_es(question: str) -> str:
     mitad»; «sell 50%» → «vendo 50 %». Solo para leer cantidad y precio.
     """
     text = re.sub(r"(?i)\b(?:sell|sold|selling)\b", "vendo", question or "")
+    # «sold half my Apple shares at $280» → «vendo la mitad de mis …»: sin el «de
+    # mis» el precio dado no se leía y se usaba EN SILENCIO el valor guardado
+    # (prueba real 2026-11-03).
+    text = re.sub(r"(?i)\bvendo\s+(?:only\s+|just\s+)?half\s+(?:of\s+)?(?:my|the)\b", "vendo la mitad de mis", text)
     text = re.sub(r"(?i)\bvendo\s+(?:only\s+|just\s+)?(?:my\s+)?half\b", "vendo la mitad", text)
     text = re.sub(r"(?i)\bvendo\s+(?:only|just)\s+", "vendo ", text)
     # «sell a third / two thirds / a quarter / three quarters (of my …)»: antes la
@@ -1035,6 +1039,9 @@ _HYPO_SALE_GAIN_RE = re.compile(
 # Inglés (solo con el inglés elegido): impuesto o ganancia de vender tu posición.
 _SALE_TAX_EN_RE = re.compile(r"(?i)\b(?:irpf|tax(?:es)?|capital\s+gains?)\b")
 _SALE_VERB_EN_RE = re.compile(r"(?i)\b(?:sell|sold|selling|sale)\b")
+# Con Ajustes en español, una pregunta escrita en inglés («tax if I sold half my
+# Apple shares») también es la simulación de IRPF; «sale» no cuenta (es español).
+_SALE_VERB_EN_STRICT_RE = re.compile(r"(?i)\b(?:sell|sold|selling)\b")
 _SALE_CONTEXT_EN_RE = re.compile(r"(?i)\b(?:I|my|would|I'd)\b")
 _HYPO_SALE_EN_RE = re.compile(r"(?i)\bif\s+I\s+(?:sell|sold)\b|\bwere\s+I\s+to\s+sell\b")
 _HYPO_SALE_GAIN_EN_RE = re.compile(
@@ -3143,7 +3150,7 @@ class ChatService:
             and _SALE_VERB_RE.search(q)
             and _SALE_CONTEXT_RE.search(q)
         )
-        if not intent and _english():
+        if not intent and (_english() or _SALE_VERB_EN_STRICT_RE.search(q)):
             # «How much tax would I pay if I sell 10 UBER?», «What would I gain
             # if I sold MSFT?»: la misma simulación con tu posición, en inglés.
             intent = bool(
@@ -3380,7 +3387,7 @@ class ChatService:
         english = _english()
         # En inglés se leen cantidad y precio con el mismo analizador («sell 10
         # UBER at $80» → «vendo 10 UBER a $80»); los textos salen en inglés.
-        parse_q = _sale_question_es(question) if english else question
+        parse_q = _sale_question_es(question) if english or _SALE_VERB_EN_STRICT_RE.search(question or "") else question
         num = _fmt_number_en if english else _fmt_number_es
         money = _fmt_money_en if english else _fmt_money_es
         fdate = _fmt_date_en if english else _fmt_date_es
