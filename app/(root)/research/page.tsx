@@ -321,7 +321,7 @@ async function ResearchIndexSection({ query, requestedPage }: { query: string; r
                                     </Link>
                                 ) : null}
                                 <span className="text-xs whitespace-nowrap text-gray-500">
-                                    {t('research.pageOf', { current: formatNumber(slice.page), total: formatNumber(slice.pages) })}
+                                    {t('researchShared.pageOf', { current: formatNumber(slice.page), total: formatNumber(slice.pages) })}
                                 </span>
                                 {slice.page < slice.pages ? (
                                     <Link

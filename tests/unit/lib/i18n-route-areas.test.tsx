@@ -54,6 +54,9 @@ describe('castellano por área según la ruta: el mapa cubre cada página', () =
     const inicio = ROUTE_AREAS['/inicio'];
     expect(inicio).toContain('home');
     expect(inicio).toContain('portfolio');
+    // Las claves de research que usa /inicio viven en researchShared: research.json (27 KB gzip) no se descarga.
+    expect(inicio).toContain('researchShared');
+    expect(inicio).not.toContain('research');
     expect(inicio).not.toContain('taxes');
     expect(inicio).not.toContain('landing');
     expect(ROUTE_AREAS['/']).toContain('landing');

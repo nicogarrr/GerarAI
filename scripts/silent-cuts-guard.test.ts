@@ -37,8 +37,8 @@ describe('cortes de lista declarados', () => {
         assert.match(list, /total=\{main\.length\}/);
         assert.match(list, /total=\{pending\.length\}/);
         // «Página x de y» va en su propio span (huérfanos 390px): el contrato es paginación con total, no la adyacencia literal.
-        assert.match(pager, /t\('research\.pageOf', \{ current: page, total: pages \}\)/);
-        assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).pageOf, 'Página {current} de {total}');
+        assert.match(pager, /t\('researchShared\.pageOf', \{ current: page, total: pages \}\)/);
+        assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/researchShared.json', 'utf8')).pageOf, 'Página {current} de {total}');
         assert.match(pager, /· \{total\} \{label\}/);
     });
 });

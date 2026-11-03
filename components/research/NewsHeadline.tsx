@@ -43,7 +43,7 @@ export function NewsHeadline({ event }: { event: ResearchNewsEvent }) {
   const title = translated ?? newsDisplayTitle(event.title, event.ticker, event.headline_from_source, event.original_headline);
   return <div ref={ref} className="break-words">
     {event.url ? <a className="inline-flex min-h-11 items-center hover:text-teal-200" href={event.url} rel="noreferrer" target="_blank">{title}</a> : title}
-    {translated ? <><span className="mt-1 block text-xs text-gray-500">{t('research.translate.autoLabel')}</span><details className="mt-1 text-xs text-gray-400"><summary className="min-h-11 cursor-pointer py-3">{t('research.translate.viewOriginal')}</summary><p className="mt-1 break-words">{original}</p></details></> : null}
+    {translated ? <><span className="mt-1 block text-xs text-gray-500">{t('researchShared.translate.autoLabel')}</span><details className="mt-1 text-xs text-gray-400"><summary className="min-h-11 cursor-pointer py-3">{t('researchShared.translate.viewOriginal')}</summary><p className="mt-1 break-words">{original}</p></details></> : null}
     <RelatedTickersStrip items={event.related_tickers} locale={english ? 'en' : 'es'} />
   </div>;
 }

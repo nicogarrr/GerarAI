@@ -52,7 +52,7 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
                     <>
                     {pages > 1 ? <nav aria-label={t('research.analystTargets.paginationAria')} className="mt-3 flex items-center justify-between gap-2 text-xs text-gray-300">
                       <button type="button" className="min-h-11 px-2 disabled:opacity-40" disabled={current === 0} onClick={() => setPage(current - 1)}>{t('research.analystTargets.previous')}</button>
-                      <span aria-live="polite"><span className="whitespace-nowrap">{t('research.pageOf', { current: current + 1, total: pages })}</span> · {t('research.analystTargets.firms', { count })}</span>
+                      <span aria-live="polite"><span className="whitespace-nowrap">{t('researchShared.pageOf', { current: current + 1, total: pages })}</span> · {t('research.analystTargets.firms', { count })}</span>
                       <button type="button" className="min-h-11 px-2 disabled:opacity-40" disabled={current + 1 >= pages} onClick={() => setPage(current + 1)}>{t('research.analystTargets.next')}</button>
                     </nav> : null}
                     <ul aria-label={t('research.analystTargets.listAria')} className="mt-1 divide-y divide-gray-800 sm:hidden">

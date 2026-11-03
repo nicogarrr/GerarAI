@@ -60,6 +60,7 @@ const LOADERS: Partial<Record<SpanishArea, Loader>> = {
     portfolio: () => import('./es/portfolio.json'),
     propicks: () => import('./es/propicks.json'),
     research: () => import('./es/research.json'),
+    researchShared: () => import('./es/researchShared.json'),
     risk: () => import('./es/risk.json'),
     screener: () => import('./es/screener.json'),
     security: () => import('./es/security.json'),

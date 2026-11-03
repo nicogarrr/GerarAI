@@ -27,7 +27,7 @@ import { bundledCompactEnglish, type CompactEnglish } from '#i18n-en-compact';
 import { bundledSpanish, loadSpanishArea, type SpanishMessages } from '#i18n-es';
 
 /** Áreas registradas (el orden es el del contrato; no lo uses para pintar). */
-export const I18N_AREAS = ['alerts', 'auth', 'bottlenecks', 'brain', 'calendar', 'chat', 'common', 'corporateActions', 'data', 'discover', 'emails', 'errors', 'export', 'help', 'home', 'insider', 'investors', 'knowledge', 'knowledgeGraph', 'landing', 'markets', 'movers', 'nav', 'ownership', 'paperTrading', 'plan', 'portfolio', 'propicks', 'research', 'risk', 'screener', 'search', 'security', 'settings', 'shell', 'signals', 'stocks', 'taxes', 'themes', 'ui', 'watchlist', 'workProducts'] as const;
+export const I18N_AREAS = ['alerts', 'auth', 'bottlenecks', 'brain', 'calendar', 'chat', 'common', 'corporateActions', 'data', 'discover', 'emails', 'errors', 'export', 'help', 'home', 'insider', 'investors', 'knowledge', 'knowledgeGraph', 'landing', 'markets', 'movers', 'nav', 'ownership', 'paperTrading', 'plan', 'portfolio', 'propicks', 'research', 'researchShared', 'risk', 'screener', 'search', 'security', 'settings', 'shell', 'signals', 'stocks', 'taxes', 'themes', 'ui', 'watchlist', 'workProducts'] as const;
 
 export type I18nArea = (typeof I18N_AREAS)[number];
 
