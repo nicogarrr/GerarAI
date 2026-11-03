@@ -76,7 +76,9 @@ def test_flag_on_real_order_keeps_the_refusal(db, synthesis_calls, flag_on):
 def test_flag_off_should_i_buy_is_unchanged(db, synthesis_calls):
     provider = _FakeProvider()
     response = _ask(db, "¿Debería comprar CHAT?", provider)
-    assert response.llm_trace["path"] == "order_verb"
+    # Sin equipo sigue sin expertos; y pedir opinión ya no es «No ejecuto
+    # órdenes» (prueba real 2026-11-02): va a la respuesta de la empresa.
+    assert (response.llm_trace or {}).get("path") != "order_verb"
     assert not any(task.startswith("expert_team") for task in provider.tasks)
 
 

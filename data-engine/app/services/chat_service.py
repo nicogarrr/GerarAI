@@ -811,6 +811,14 @@ _PORTFOLIO_ANALYSIS_RE = re.compile(
     r"c[oó]mo\s+(?:la\s+)?(?:mejorar|veo)|risks?|diversif\w*)\b"
 )
 _ORDER_VERB_RE = re.compile(r"(?i)\b(compra|compro|comprar|vende|vendo|vender|ejecuta|buy|sell)\b")
+# «¿Es buen momento para comprar más MSFT?», «¿debería vender SAN?»: piden
+# opinión, no una orden. Prueba real 2026-11-02: contestaba «No ejecuto
+# órdenes».
+_ADVICE_QUESTION_RE = re.compile(
+    r"(?i)\b(?:deber[ií]a|deber[ií]amos|merece\s+la\s+pena|vale\s+la\s+pena|(?:es|ser[ií]a)\s+(?:un\s+)?buen\s+momento"
+    r"|buen\s+momento\s+para|conviene|me\s+conviene|ser[ií]a\s+(?:buena|mala)\s+idea|(?:me\s+)?recomiendas"
+    r"|(?:me\s+)?aconsejas|qu[eé]\s+opinas|should\s+i|good\s+time\s+to|worth\s+(?:buying|selling)|is\s+it\s+(?:a\s+)?good\s+idea)\b"
+)
 # «Avísame si MSFT baja de 300» / «ponme una alerta…»: el chat no crea
 # alertas. Antes caía en el volcado de la empresa, que podía leerse como si
 # la alerta hubiera quedado puesta.
@@ -1758,6 +1766,7 @@ class ChatService:
             company is not None
             and _ORDER_VERB_RE.search(question or "")
             and not _team_advice(question or "", company.ticker)
+            and not _ADVICE_QUESTION_RE.search(question or "")
         ):
             return ChatResponse(
                 answer=(
