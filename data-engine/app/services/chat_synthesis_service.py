@@ -100,8 +100,10 @@ def _section_states_no_data(section: SynthesisSection | None) -> bool:
 GROUNDED_SECTIONS = frozenset({"facts", "calculations", "inferences", "conclusion"})
 # Source types each grounded section may legitimately rest on.
 SECTION_SOURCE_TYPES: dict[str, set[str]] = {
-    "facts": {"financial_fact", "document_chunk", "claim_evidence", "market_price"},
-    "calculations": {"financial_fact", "document_chunk", "claim_evidence", "market_price"},
+    # position / risk_event: la cartera y los avisos abiertos del propio
+    # usuario (filas de su tenant), hechos suyos citables (chat-posicion-1).
+    "facts": {"financial_fact", "document_chunk", "claim_evidence", "market_price", "position", "risk_event"},
+    "calculations": {"financial_fact", "document_chunk", "claim_evidence", "market_price", "position"},
     "inferences": {
         "financial_fact",
         "document_chunk",
@@ -121,6 +123,8 @@ SECTION_SOURCE_TYPES: dict[str, set[str]] = {
         "thesis_version",
         "memory_item",
         "memory_writeback",
+        "position",
+        "risk_event",
     },
 }
 RESPONSE_SCHEMA = {

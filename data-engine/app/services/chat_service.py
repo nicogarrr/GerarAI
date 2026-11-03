@@ -27,6 +27,7 @@ from app.models import (
     NewsEvent,
     Position,
     ResearchSession,
+    RiskEvent,
     ThesisSection,
     ThesisVersion,
 )
@@ -1589,6 +1590,101 @@ class ChatService:
             return rows
         except Exception:
             return []
+
+    # Contexto propio del usuario sobre la empresa (PR chat-posicion-1, Nico
+    # 3 nov «si a todo»): R1-02 «¿Debería comprar más Uber?» contestaba «falta
+    # tu posición actual» con 20 UBER en cartera. Solo filas del tenant que
+    # pregunta (filtro explícito además del de sesión) y acotado a 3 + 3
+    # líneas (~150 tokens de entrada, 0 llamadas extra).
+    _HOLDING_LIMIT = 3
+
+    def _holding_context(self, db: Session, company: Company) -> tuple[list[dict], list[str], list[str]]:
+        """(fuentes, líneas citadas «Tu posición»/«Avisos abiertos», citas)."""
+        tenant_id = db.info.get("tenant_id")
+        if type(tenant_id) is not int or tenant_id <= 0:
+            return [], [], []
+        en = _english()
+        num = _fmt_number_en if en else _fmt_number_es
+        money = _fmt_money_en if en else _fmt_money_es
+        positions = list(
+            db.scalars(
+                select(Position)
+                .where(
+                    Position.tenant_id == tenant_id,
+                    Position.company_id == company.id,
+                    Position.quantity != 0,
+                )
+                .order_by(Position.id)
+                .limit(self._HOLDING_LIMIT)
+            ).all()
+        )
+        sources: list[dict] = []
+        lines: list[str] = []
+        citations: list[str] = []
+        if positions:
+            book = list(
+                db.scalars(
+                    select(Position).where(Position.tenant_id == tenant_id, Position.quantity > 0)
+                ).all()
+            )
+            bases = {pos.base_currency or "EUR" for pos in book}
+            total = sum(float(position_base_value(pos) or 0) for pos in book) if len(bases) == 1 else 0.0
+            for pos in positions:
+                value = position_base_value(pos)
+                parts = [
+                    (f"{num(float(pos.quantity), 6)} shares" if en else f"{num(float(pos.quantity), 6)} acciones"),
+                    (f"average cost {money(float(pos.average_cost or 0))} {pos.currency}"
+                     if en else f"coste medio {money(float(pos.average_cost or 0))} {pos.currency}"),
+                ]
+                if value is not None:
+                    base = pos.base_currency or "EUR"
+                    parts.append(
+                        f"value {money(float(value))} {base}" if en else f"valor {money(float(value))} {base}"
+                    )
+                    if total > 0 and float(pos.quantity) > 0:
+                        weight = float(value) / total * 100
+                        parts.append(
+                            f"{num(weight, 1)}% of your portfolio" if en else f"{num(weight, 1)} % de tu cartera"
+                        )
+                if pos.valuation_hold_reason:
+                    parts.append("valuation on hold" if en else "valoración en suspenso")
+                elif pos.market_price:
+                    parts.append(
+                        f"price {money(float(pos.market_price))} {pos.currency} as of {pos.as_of.isoformat()}"
+                        if en
+                        else f"precio {money(float(pos.market_price))} {pos.currency} a {pos.as_of.isoformat()}"
+                    )
+                label = f"Your position in {company.ticker}" if en else f"Tu posición en {company.ticker}"
+                text = f"{label}: {', '.join(parts)}"
+                lines.append(f"- {text} [position:{pos.id}]")
+                citations.append(f"position:{pos.id}")
+                sources.append(self._source_entry(
+                    "position", pos.id, label, text=text,
+                    quantity=float(pos.quantity), currency=pos.currency,
+                    as_of=pos.as_of.isoformat() if pos.as_of else None,
+                ))
+        events = list(
+            db.scalars(
+                select(RiskEvent)
+                .where(
+                    RiskEvent.tenant_id == tenant_id,
+                    RiskEvent.company_id == company.id,
+                    RiskEvent.status == "open",
+                )
+                .order_by(desc(RiskEvent.created_at), desc(RiskEvent.id))
+                .limit(self._HOLDING_LIMIT)
+            ).all()
+        )
+        for event in events:
+            label = "Open alert" if en else "Aviso abierto"
+            text = f"{label} ({event.severity}): {_short(event.message, 160)}"
+            lines.append(f"- {text} [risk_event:{event.id}]")
+            citations.append(f"risk_event:{event.id}")
+            sources.append(self._source_entry(
+                "risk_event", event.id, f"{label} {company.ticker}", text=text,
+                severity=event.severity, event_type=event.event_type,
+            ))
+        return sources, lines, citations
 
     def _source_entry(self, kind: str, source_id: int | str | None, title: str, **extra) -> dict:
         payload = {
@@ -4181,13 +4277,22 @@ class ChatService:
                 thesis_withheld=withheld_reason,
             )
 
+            holding_sources, holding_lines, holding_citations = self._holding_context(db, company)
+            sources.extend(holding_sources)
+            if holding_lines:
+                # El degradado también la ve: la prosa visible la lleva.
+                answer = f"{answer}\n\n" + "\n".join(
+                    re.sub(r" \[(?:position|risk_event):[^\]]+\]$", "", line).removeprefix("- ")
+                    for line in holding_lines
+                )
             sections = [
                 {
                     "key": "facts",
-                    "body": "\n".join([facts_text, *news_lines]),
+                    "body": "\n".join([facts_text, *news_lines, *holding_lines]),
                     "citations": [
                         *(f"financial_fact:{fact.id}" for fact in facts[:5]),
                         *([f"financial_fact:{market_cap_fact.id}"] if market_cap_fact is not None else []),
+                        *holding_citations,
                     ],
                 },
                 {
