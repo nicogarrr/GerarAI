@@ -45,7 +45,14 @@ RUN pip install torch==2.14.1+cpu --index-url https://download.pytorch.org/whl/c
 # linux-libc-dev in the final image, although this is a kernel-header package.
 # Keep shared libraries used by binary wheels; remove the build toolchain
 # and assert the flagged package is absent instead of suppressing the scan.
-RUN apt-mark manual libstdc++6 libgcc-s1 libffi8 libgomp1 libatomic1 libquadmath0 \
+# Some runtime libraries (notably libquadmath0) do not exist on arm64.
+# Mark only installed candidates, so autoremove preserves native wheel libs.
+RUN set -eu; \
+    for library in libstdc++6 libgcc-s1 libffi8 libgomp1 libatomic1 libquadmath0; do \
+        if dpkg-query -W -f='${Status}' "$library" 2>/dev/null | grep -q 'install ok installed'; then \
+            apt-mark manual "$library"; \
+        fi; \
+    done \
     && apt-get purge --auto-remove -y gcc g++ libffi-dev linux-libc-dev \
     && if dpkg-query -W -f='${Status}' linux-libc-dev 2>/dev/null | grep -q 'install ok installed'; then exit 1; fi \
     && rm -rf /var/lib/apt/lists/* \
