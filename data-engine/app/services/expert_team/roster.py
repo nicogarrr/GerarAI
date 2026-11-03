@@ -41,6 +41,7 @@ def default_experts() -> list[ExpertSpec]:
     return [
         ExpertSpec(
             name="fundamental",
+            typical_s=14.0,
             broad=True,
             prompt_name="expert_fundamental",
             tools=("financial_facts",),
@@ -49,6 +50,7 @@ def default_experts() -> list[ExpertSpec]:
         ),
         ExpertSpec(
             name="valuation",
+            typical_s=5.0,
             broad=True,
             prompt_name="expert_valuation",
             tools=("valuation_engine",),
@@ -58,6 +60,7 @@ def default_experts() -> list[ExpertSpec]:
         ),
         ExpertSpec(
             name="risk",
+            typical_s=11.0,
             broad=True,
             prompt_name="expert_risk",
             tools=("risk_events", "portfolio_concentration"),
@@ -66,6 +69,7 @@ def default_experts() -> list[ExpertSpec]:
         ),
         ExpertSpec(
             name="news",
+            typical_s=6.0,
             broad=True,
             prompt_name="expert_news",
             tools=("news_events",),
@@ -77,6 +81,7 @@ def default_experts() -> list[ExpertSpec]:
         ),
         ExpertSpec(
             name="tax",
+            typical_s=12.0,
             prompt_name="expert_tax",
             tools=("user_position", "irpf_savings_bands", "sale_tax_estimate"),
             broad=True,

@@ -62,6 +62,9 @@ class ExpertSpec:
     applies: Callable[[RunContext], bool] | None = None
     #: Entra también en preguntas amplias del chat («¿merece la pena X?»).
     broad: bool = False
+    #: Segundos típicos de su llamada al modelo (mediana medida). Solo ordena el
+    #: arranque: con más expertos que huecos, los más lentos empiezan primero.
+    typical_s: float = 0.0
 
 
 def basic_citation_check(claim: Claim, ledger: EvidenceLedger, spec: ExpertSpec) -> str:
@@ -144,10 +147,14 @@ async def run_expert(
     ledger: EvidenceLedger,
     reasoner: Reasoner,
     validator: Validator,
+    gathered: tuple[list[dict[str, Any]], list[str]] | None = None,
 ) -> ExpertReport:
     from app.services.prompt_registry import get_prompt
 
-    evidence, tool_errors = await gather_evidence(spec, ctx, tools, ledger)
+    if gathered is None:
+        evidence, tool_errors = await gather_evidence(spec, ctx, tools, ledger)
+    else:
+        evidence, tool_errors = gathered
     prompt = get_prompt(spec.prompt_name, lang=ctx.lang)
     report = ExpertReport(
         expert=spec.name, status="no_data", prompt_version=prompt.version, tool_errors=tool_errors
