@@ -2,7 +2,6 @@
 con coste ~lineal en escaneos profundos de portada."""
 
 import random
-import time
 from datetime import UTC, datetime, timedelta
 
 from app.models.entities import NewsEvent
@@ -123,9 +122,12 @@ def test_literal_match_keeps_first_group_even_with_story_candidates():
     assert idx.groups[1].coverage == []
 
 
-def test_deep_scan_cost_stays_near_linear():
-    # Vocabulario realista: palabras financieras comunes compartidas entre
-    # titulares + tokens únicos por historia, 15% de reescrituras.
+def test_deep_scan_cost_stays_near_linear(monkeypatch):
+    # El coste se mide en COMPARACIONES (candidatos examinados), no en reloj:
+    # es determinista. La versión con perf_counter rompía el coverage gate de
+    # main (898,6 ms bajo coverage vs cota 400 ms, CI run 41556544853) sin que
+    # cambiara el trabajo real: el reloj depende de la instrumentación, las
+    # comparaciones no.
     common = [f"common{i}" for i in range(500)]
     rnd = random.Random(11)
 
@@ -141,10 +143,22 @@ def test_deep_scan_cost_stays_near_linear():
         else:
             titles.append(headline(i))
     events = [_event(i, title, minutes=17) for i, title in enumerate(titles)]
-    start = time.perf_counter()
+
+    import app.services.news_story_cluster as cluster
+
+    calls = 0
+    real_same_story = cluster.same_story
+
+    def counting(*args):
+        nonlocal calls
+        calls += 1
+        return real_same_story(*args)
+
+    monkeypatch.setattr(cluster, "same_story", counting)
     result = _indexed(events)
-    elapsed_ms = (time.perf_counter() - start) * 1000
-    # Lista plana medida con ESTE mismo generador (lab, 2026-11-02): 979,0 ms.
-    # Índice: 107,2 ms (-89%). Cota holgada para CI lento.
-    assert elapsed_ms < 400, f"escaneo profundo {elapsed_ms:.1f} ms"
+    # Lista plana medida con ESTE mismo generador (2026-11-03): 1.881.589
+    # comparaciones, O(n²). Índice: 59.726 (~30 por evento, ~lineal). La cota
+    # deja holgura 1,7x para ajustes del índice; una regresión al barrido
+    # plano la superaría 18 veces.
+    assert calls < 100_000, f"candidatos examinados: {calls}"
     assert len(result) > 1500
