@@ -252,11 +252,19 @@ class ChatFallbackProvider(LLMProvider):
                 primary_label = f"{primary_name}:{primary_model or '?'}:timeout"
         try:
             response = await self._backup_chain(request)
-        except _FALL_THROUGH:
+        except _FALL_THROUGH as exc:
             # Todos fallan: el rechazo de idioma del primario vuelve a
             # complete_guarded para que su RETRY_HINT lo intente recuperar.
             if rejected_primary is not None:
                 return rejected_primary
+            if is_quota_exhausted(exc) and not primary_label.endswith(("429", ":cooling")):
+                # El 429 es del ULTIMO respaldo: Go respondio (rechazado) o
+                # agoto su plazo. No es «el modelo configurado llego a su
+                # limite de uso» (prueba real 2026-11-02, «¿Deberia vender
+                # Santander?»).
+                raise ProviderResponseError(
+                    f"backup chain exhausted after primary {primary_label}"
+                ) from exc
             raise
         logger.warning(
             "llm.fallback provider=%s model=%s because=%s",
