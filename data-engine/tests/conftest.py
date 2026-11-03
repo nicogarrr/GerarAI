@@ -229,6 +229,16 @@ def _reset_filing_deadline_failure_cache():
 
 
 @pytest.fixture(autouse=True)
+def _reset_company_filings_sec_down():
+    """La memoria corta de "SEC sin respuesta" de /filings es estado de proceso."""
+    from app.services import company_events_service
+
+    company_events_service._FAILED_UNTIL.clear()
+    yield
+    company_events_service._FAILED_UNTIL.clear()
+
+
+@pytest.fixture(autouse=True)
 def _reset_historical_stress_failure_cache():
     from app.services import historical_stress_service
 

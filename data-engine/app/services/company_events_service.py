@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -59,6 +60,15 @@ CALENDAR_CHUNK_DAYS = 90
 # Tope total (cik + submissions + reintentos + EFTS) de la SEC dentro del GET
 # /api/companies/{ticker}/filings.
 FILINGS_SEC_BUDGET_SECONDS = 4.0
+# Memoria corta de "SEC sin respuesta" (misma idea que los plazos 10-Q/10-K del
+# calendario): cuando una carga agota el presupuesto esperando a EDGAR, las
+# cargas de los siguientes DEADLINE segundos no vuelven a esperar los 4 s para
+# acabar sirviendo lo mismo (la base con el estado ``unavailable``). Solo un
+# agotamiento del presupuesto la activa: un 404/403 rapido o un ticker sin CIK
+# no esperan y no cuentan como SEC caida.
+FILINGS_SEC_DOWN_TTL_SECONDS = 120.0
+_FAILED_UNTIL: dict[str, float] = {}
+_SEC_DOWN_KEY = "sec"
 CALENDAR_PAST_DAYS = 400
 CALENDAR_FUTURE_DAYS = 120
 
@@ -269,6 +279,11 @@ class CompanyEventsService:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + FILINGS_SEC_BUDGET_SECONDS
         timed_out = False
+        # SEC sin respuesta hace poco: presupuesto ya agotado, misma salida
+        # que si se hubiera vuelto a esperar los 4 s.
+        sec_down = _FAILED_UNTIL.get(_SEC_DOWN_KEY, 0.0) > time.monotonic()
+        if sec_down:
+            deadline = loop.time()
         cik: str | None = company.cik
         if not cik:
             try:
@@ -314,6 +329,8 @@ class CompanyEventsService:
                 note = "SEC EDGAR no accesible desde el servidor en este momento."
         elif timed_out:
             note = "SEC EDGAR no respondió a tiempo; se listan los documentos ya importados."
+        if timed_out and not sec_down:
+            _FAILED_UNTIL[_SEC_DOWN_KEY] = time.monotonic() + FILINGS_SEC_DOWN_TTL_SECONDS
         if not filings:
             db_docs = self._db_documents(company, limit)
             if db_docs:
