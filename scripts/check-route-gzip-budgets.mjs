@@ -30,18 +30,18 @@ import { gzipSync } from 'node:zlib';
 
 export const KB = 1024;
 
-/** KB gzip (nivel 6). Medido en main 96237665 con `next build` el 3 nov 2026. */
+/** KB gzip (nivel 6), medido con `next build` el 3 nov 2026 (main 96237665; re-medido en 7a71c328e). */
 export const ROUTE_GZIP_BUDGETS_KB = {
-  // medido → presupuesto (KB gzip)
-  framework: 177, // 168,1
-  '(root)/inicio': 223, // 212,4
-  '(root)/portfolio': 234, // 222,4
-  '(root)/portfolio/intelligence': 201, // 190,9
-  '(root)/research/[ticker]': 269, // 255,8
-  '(root)/watchlist': 242, // 230,0
-  '(root)/plan': 239, // 227,4
-  '(auth)/sign-in': 168, // 159,9
-  '(public)': 149, // 141,1 (portada)
+  // medido → presupuesto (KB gzip). Re-medido tras #4432 (castellano por área), main 7a71c328e.
+  framework: 177, // 168,5
+  '(root)/inicio': 117, // 110,9
+  '(root)/portfolio': 128, // 121,6
+  '(root)/portfolio/intelligence': 94, // 88,9
+  '(root)/research/[ticker]': 162, // 154,2
+  '(root)/watchlist': 135, // 128,5
+  '(root)/plan': 132, // 125,1
+  '(auth)/sign-in': 61, // 57,3
+  '(public)': 41, // 38,4 (portada)
 };
 
 /**
