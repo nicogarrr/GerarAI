@@ -6452,10 +6452,19 @@ export interface paths {
          *
          *     Solo datos propios o de fuentes publicas con trazabilidad: minimo de 52
          *     semanas desde ``market_prices`` (ingesta propia), proximo resultado desde
-         *     el conector publico de NASDAQ (misma fuente que /api/calendar/earnings) y
-         *     comparacion con el valor justo UNICO (``fair_value_service``: tesis
-         *     publicada o motor, con su procedencia en ``fair_value_source``/``_label``).
-         *     Cualquier pieza sin dato va a ``None``; nunca se inventa.
+         *     la tabla ``earnings_dates`` que el job ``earnings_dates_refresh`` renueva
+         *     dos veces al dia (Yahoo Finance + calendario publico de NASDAQ + filas
+         *     manuales con su enlace) y comparacion con el valor justo UNICO
+         *     (``fair_value_service``: tesis publicada o motor, con su procedencia en
+         *     ``fair_value_source``/``_label``). Cualquier pieza sin dato va a ``None``;
+         *     nunca se inventa.
+         *
+         *     El monitor NO consulta NASDAQ en vivo: hacerlo ponia una espera de red de
+         *     hasta 8 s (deadline del conector) en el TTFB de cada vista de watchlist
+         *     cuando faltaba alguna fecha guardada. Una fecha aun sin refrescar aparece
+         *     como "sin fecha" hasta el siguiente pase del job; cada fecha mostrada
+         *     lleva su ``source_label`` y las automaticas sin renovar en 3 dias se
+         *     ocultan (``is_fresh``), nunca se exhiben como vigentes.
          */
         get: operations["watchlist_monitor_api_watchlist_monitor_get"];
         put?: never;
