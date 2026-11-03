@@ -149,7 +149,14 @@ def test_cross_check_skipped_when_resolved_engine_is_not_standard_dcf(db):
     for i in range(6):
         _peer(db, f"PEER{i}", price=30.0 + i, eps=2.5 + i * 0.1)
     result = ValuationService().value_company(db, subject)
-    assert "relative_multiples" not in result.get("cross_checks", {})
+    if result.get("status") == "insufficient_data":
+        assert "relative_multiples" not in result.get("cross_checks", {})
+    else:
+        # Owner 3-nov-2026: sin los datos del motor sectorial, los multiplos son
+        # un RESPALDO orientativo y etiquetado, nunca un contraste ni un final.
+        assert result["publication_blockers"] == ["sector_engine_fallback"]
+        assert result["publishable"] is False
+        assert result["trace"]["sector_engine_fallback"]["sector_engine"]
 
 
 def test_cross_check_publishes_status_never_an_invented_figure_without_peers(db):

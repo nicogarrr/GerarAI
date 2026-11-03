@@ -305,8 +305,19 @@ class StandardDCFEngine(ValuationEngine):
         if margin <= 0 and plan.margin_start is None:
             # A known-negative FCF margin means the company consumes cash. The
             # FCFF DCF cannot represent that: clamping the floor to +1% would
-            # turn a reported burn into a positive enterprise value. Refuse
-            # instead of publishing a sign-flipped valuation.
+            # turn a reported burn into a positive enterprise value.
+            # Owner 3-nov-2026 («cambiar a un método adecuado en vez de
+            # negarse»): con un margen FCF OBJETIVO inferido y validado (base +
+            # URLs) se publica la misma orientacion por convergencia de margen
+            # que el motor pre-ingresos (senda a rentabilidad en 5 anos),
+            # siempre orientativa. Sin objetivo con fuente, se niega.
+            from app.valuation.engines.pre_revenue import PreRevenueScenarioEngine
+
+            convergence = PreRevenueScenarioEngine()._margin_convergence_orientation(
+                context, snapshot, context.current_price, reported_margin=margin
+            )
+            if convergence is not None:
+                return convergence
             return insufficient_from_context(
                 context,
                 missing=["non_negative_fcf_margin"],
