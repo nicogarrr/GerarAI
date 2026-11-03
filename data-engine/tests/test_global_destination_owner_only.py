@@ -13,7 +13,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models.entities import Base, Company, ResearchAlert, Tenant
+from app.models.entities import Base, Company, ResearchAlert, Tenant, ThesisVersion
 from app.services import notification_service, owner_destination
 from app.services import thesis_approval_service as approval
 from app.services.notification_service import NotificationService
@@ -129,7 +129,7 @@ def test_thesis_of_another_user_is_not_sent_to_owner_telegram(monkeypatch, db):
         telegram_api_base_url="https://api.telegram.org", telegram_timeout_seconds=10,
         global_alert_owner_user_id=None,
     )
-    thesis = SimpleNamespace(
+    thesis = ThesisVersion(
         id=99, tenant_id=_tenant(db, "user-dos"), version=1, status="final",
         executive_summary="Tesis privada del usuario dos",
     )
