@@ -621,6 +621,26 @@ def _live_progress_supported(db: Session) -> bool:
     return getattr(getattr(bind, "dialect", None), "name", "") != "sqlite"
 
 
+def _ensure_price_history(db, company, tenant_id=None, user_id=None) -> None:
+    """Empresa nueva sin ningun precio (BFIT.AS, 3-nov-2026): el alta en la
+    watchlist solo encola el historial si la empresa ya existia, y la ficha la
+    crea despues este mismo job. Se encola aqui; nunca rompe la tesis."""
+    from sqlalchemy import select
+
+    from app.models import MarketPrice
+
+    tenant_id = tenant_id if tenant_id is not None else db.info.get("tenant_id")
+    user_id = user_id or db.info.get("user_id")
+    if tenant_id is None or not user_id or company.id is None:
+        return
+    has_price = db.scalar(select(MarketPrice.id).where(MarketPrice.company_id == company.id).limit(1))
+    if has_price is not None:
+        return
+    from app.services.market_close_sync import enqueue_price_backfills
+
+    enqueue_price_backfills(db, [company.id], tenant_id=int(tenant_id), user_id=str(user_id))
+
+
 def run_thesis_job(run_id: int) -> None:
     """Run a thesis delivery with tenant context and recoverable retries."""
     import contextlib
@@ -802,6 +822,19 @@ def run_thesis_job(run_id: int) -> None:
             # commitea aqui para no arrastrar su INSERT ni la tx de lectura
             # durante las llamadas de red de enriquecimiento/SEC que siguen.
             db.commit()
+            # Inputs que faltan (WACC, margen FCF objetivo): calculo y, si no
+            # basta, inferencia etiquetada del modelo. Fuera del SAVEPOINT.
+            try:
+                from app.services.company_resolver import resolve_company as _resolve
+                from app.services.thesis_input_inference import prepare_missing_inputs
+
+                _target = _resolve(db, payload["ticker"])
+                if _target is not None:
+                    _ensure_price_history(db, _target, payload.get("tenant_id"), payload.get("user_id"))
+                    prepare_missing_inputs(db, _target)
+                db.commit()
+            except Exception:  # noqa: BLE001 - nunca rompe la generacion
+                db.rollback()
             financial_refresh = None
             kwargs = {}
             if payload.get("tracked"):

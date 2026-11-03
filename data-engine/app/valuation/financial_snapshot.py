@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
 
-from sqlalchemy import desc, select
+from sqlalchemy import case, desc, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import Company, FinancialFact
@@ -50,6 +50,10 @@ INSTANT_METRICS = (
 REQUIRED_FOR_DCF = ("revenue", "shares_diluted", "net_debt")
 # Metrics used as a denominator or a scale, which must be strictly positive.
 POSITIVE_REQUIRED_FOR_DCF = ("revenue", "shares_diluted")
+# Inputs que se cruzan SIEMPRE entre fuentes (owner 3-nov-2026).
+CROSS_CHECKED_INPUTS = ("total_debt", "cash_and_equivalents", "net_debt", "shares_diluted", "free_cash_flow")
+# Un cero de una sola fuente en estos no se acepta (posible hueco de mapeo).
+ZERO_NEEDS_CONFIRMATION = ("total_debt", "shares_diluted")
 
 
 @dataclass
@@ -89,6 +93,9 @@ class FinancialSnapshot:
     # (confirmado, una sola fuente no oficial, discrepancia) en la traza y
     # en la tesis; nunca como dato oficial del ancla.
     bridge_provenance: dict[str, dict] = field(default_factory=dict)
+    # Cruce de fuentes de los inputs YA presentes (confirmado / discrepancia);
+    # no son estimaciones: van a la traza, no a «inputs estimados».
+    source_checks: dict[str, dict] = field(default_factory=dict)
 
     def value(self, metric: str) -> float | None:
         """Return a finite float, or ``None``.
@@ -123,12 +130,19 @@ def _period_type(period: str | None, fiscal_quarter: str | None) -> str:
     return "FY"
 
 
+_PRIMARY_SOURCE_TYPES = ("SEC", "ESEF", "CNMV")
+
+
 def _facts_for_metric(db: Session, company_id: int, metric: str) -> list[FinancialFact]:
     return [fact for fact in db.scalars(
             select(FinancialFact).options(selectinload(FinancialFact.source))
             .where(FinancialFact.company_id == company_id, FinancialFact.metric == metric)
             .order_by(
                 FinancialFact.fiscal_year.desc().nullslast(),
+                # Mismo ejercicio: la presentacion oficial antes que un
+                # agregador (Yahoo/FMP) aunque este se haya traido despues;
+                # el cruce de fuentes compara las demas (owner 3-nov-2026).
+                case((FinancialFact.source_type.in_(_PRIMARY_SOURCE_TYPES), 0), else_=1),
                 desc(FinancialFact.created_at),
             )
         ).all() if not fact_quarantine_reason(fact) and eligible_fact(fact)]
@@ -414,6 +428,61 @@ class FinancialSnapshotBuilder:
                 ]
 
     @staticmethod
+    def _cross_check_sources(
+        snapshot: FinancialSnapshot,
+        anchor: FinancialFact,
+        facts_for,
+        *,
+        as_of: date | None,
+        drop_unconfirmed_zero: bool,
+    ) -> None:
+        """Cruza SIEMPRE con todas las fuentes guardadas los inputs ya elegidos.
+
+        Owner 3-nov-2026: «siempre miramos todas las fuentes», no solo cuando
+        falta un dato. Para deuda, caja, deuda neta, acciones y FCF elegidos por
+        el camino estricto se comparan los cierres del MISMO periodo de cada
+        fuente (oficial, FMP, Yahoo...). Un cero que ninguna otra fuente
+        confirma se retira (puede ser un hueco de mapeo) para que el cruce de
+        huecos lo resuelva; una discrepancia queda en ``source_checks`` y en
+        los avisos, y manda la presentacion oficial mas reciente (la elegida).
+        """
+        from app.valuation import bridge_sources as bs
+
+        for metric in CROSS_CHECKED_INPUTS:
+            fact = snapshot.facts.get(metric)
+            if fact is None or metric in snapshot.source_checks or metric in snapshot.bridge_provenance:
+                continue
+            period_end = bs._period_end(fact)
+            if period_end is None:
+                continue
+            same_close = [
+                f for f in facts_for(metric)
+                if bs._period_end(f) == period_end and (as_of is None or period_end <= as_of)
+            ]
+            others = [c for c in bs.newest_per_source(same_close) if c.source != bs._source_key(fact)]
+            try:
+                chosen_value = float(fact.value)
+            except (TypeError, ValueError):
+                continue
+            chosen = bs.Candidate(bs._source_key(fact), chosen_value, fact.period, period_end, fact)
+            if not others:
+                if drop_unconfirmed_zero and abs(chosen_value) < 1e-9 and metric in ZERO_NEEDS_CONFIRMATION:
+                    snapshot.facts.pop(metric, None)
+                    snapshot.warnings.append(
+                        f"{metric} = 0 de una sola fuente ({bs.source_label(chosen.source)}) no se acepta: "
+                        "se busca en otras fuentes."
+                    )
+                continue
+            resolved = bs.resolve(metric, [chosen, *others])
+            if resolved is None:
+                if drop_unconfirmed_zero and metric in ZERO_NEEDS_CONFIRMATION:
+                    snapshot.facts.pop(metric, None)
+                continue
+            snapshot.source_checks[metric] = {**resolved.as_dict(), "estimated": False}
+            if resolved.status == "discrepancy":
+                snapshot.warnings.append(f"{metric}: {resolved.note}.")
+
+    @staticmethod
     def _resolve_bridge_gaps(
         db: Session,
         company: Company,
@@ -674,9 +743,11 @@ class FinancialSnapshotBuilder:
             facts_for("cash_and_equivalents"),
         )
         self._derive_free_cash_flow(snapshot)
+        self._cross_check_sources(snapshot, anchor, facts_for, as_of=as_of, drop_unconfirmed_zero=True)
         self._resolve_bridge_gaps(
             db, company, snapshot, anchor, facts_for, as_of=as_of, price_as_of=price_as_of
         )
+        self._cross_check_sources(snapshot, anchor, facts_for, as_of=as_of, drop_unconfirmed_zero=False)
 
         missing: list[str] = []
         for metric in REQUIRED_FOR_DCF:

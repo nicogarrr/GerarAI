@@ -262,10 +262,12 @@ def fill_bridge_gaps(
     *,
     refresh: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Completa deuda neta / acciones que faltan en el snapshot con Yahoo (no oficial).
+    """Trae deuda, caja, deuda neta y acciones de Yahoo (no oficial) en CADA tesis.
 
-    Solo actua si el snapshot actual pide alguna de ``BRIDGE_GAP_INPUTS``;
-    corre en su propio SAVEPOINT y nunca lanza (la tesis no se rompe por una
+    Owner 3-nov-2026 («siempre miramos todas las fuentes, no solo ahora»): se
+    trae aunque al snapshot no le falte nada, para que el cruce de fuentes del
+    snapshot confirme o marque discrepancias; si falta deuda neta o acciones,
+    ademas cierra el hueco (etiquetado). Corre en su propio SAVEPOINT y nunca lanza (la tesis no se rompe por una
     fuente). Devuelve que faltaba, que se intento y si el hueco se cerro.
     """
     from app.valuation.financial_snapshot import FinancialSnapshotBuilder
@@ -280,8 +282,7 @@ def fill_bridge_gaps(
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "detail": type(exc).__name__}
     wanted = sorted(before & BRIDGE_GAP_INPUTS)
-    if not wanted:
-        return {"status": "no_aplica", "missing": sorted(before)}
+    mode = "huecos" if wanted else "cruce"
     from app.services.yahoo_fundamentals_service import refresh_gaps_from_yahoo
 
     fn = refresh or refresh_gaps_from_yahoo
@@ -305,6 +306,7 @@ def fill_bridge_gaps(
         after = before
     return {
         "status": "ok",
+        "mode": mode,
         "source": YAHOO_LABEL,
         "single_source": True,
         "wanted": wanted,

@@ -291,6 +291,12 @@ def snapshot_trace(snapshot: FinancialSnapshot) -> dict:
             if getattr(snapshot, "bridge_provenance", None)
             else {}
         ),
+        # Cruce de fuentes de los inputs presentes (confirmado / discrepancia).
+        **(
+            {"source_checks": dict(snapshot.source_checks)}
+            if getattr(snapshot, "source_checks", None)
+            else {}
+        ),
     }
 
 
