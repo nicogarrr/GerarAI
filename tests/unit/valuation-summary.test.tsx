@@ -55,6 +55,19 @@ describe('shared valuation', () => {
     expect(screen.getByText('7/9')).toBeInTheDocument();
     expect(screen.getByText('Datos incompletos')).toBeInTheDocument();
   });
+  it('renders a flagged partial Piotroski and the reasons behind each No evaluable', () => {
+    const copy = structuredClone(item);
+    copy.fair_value = { ...copy.fair_value, value: null, publishable: false, label: 'Sin valor justo', reason: 'La última valoración del motor no dio cifra: faltan net_debt.' };
+    copy.reverse_dcf = { ...copy.reverse_dcf, status: 'not_evaluable', required_revenue_growth: null, as_of: null, reason: 'El precio de mercado queda fuera de todo escenario que el modelo puede valorar con el margen FCF actual; hace falta un método acorde al tipo de empresa.' };
+    copy.health.status = 'partial';
+    copy.health.piotroski.score = 6;
+    copy.health.piotroski.evaluated = 7;
+    copy.health.piotroski.partial = true;
+    render(<ValuationSummaryCard item={copy} quote={quote} />);
+    expect(screen.getByText('6 puntos sobre 7 evaluados (de 9)')).toBeInTheDocument();
+    expect(screen.getByText(/queda fuera de todo escenario/)).toBeInTheDocument();
+    expect(screen.getByText(/no dio cifra/)).toBeInTheDocument();
+  });
   it('loads a batch and does not show old symbols after a change', async () => {
     vi.mocked(getValuationSummaries).mockResolvedValue({ DEMO: item });
     const view = render(<ValuationSummaryGrid quotes={[quote]} />);

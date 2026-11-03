@@ -43,7 +43,7 @@ def calculate_health(facts: list[HealthFact], *, sector: str, company_type: str,
     """
     today = today or date.today()
     out: dict[str, Any] = {"status": "not_evaluable", "piotroski": {
-        "score": None, "evaluated": 0, "total": 9, "signals": [],
+        "score": None, "evaluated": 0, "total": 9, "partial": True, "signals": [],
         "methodology_url": PIOTROSKI_SOURCE}, "altman": {
         "variant": "Z_double_prime", "score": None, "status": "not_evaluable",
         "methodology_url": ALTMAN_SOURCE},
@@ -122,11 +122,21 @@ def calculate_health(facts: list[HealthFact], *, sector: str, company_type: str,
                         "evidence": [f.evidence() for f in dict.fromkeys(used)]})
     evaluated = sum(s["point"] is not None for s in signals)
     out["piotroski"]["evaluated"] = evaluated
+    # Un input que falta NO bloquea el resto (regla de Nico, 2026-11-03, tras
+    # PLTR 6/9 y AMZN 7/9 mostrados como «No evaluable»): se publica la
+    # puntuacion parcial con sus huecos señalados (``partial=True`` +
+    # ``missing_input`` por señal), nunca como un F-score completo. Solo un
+    # ejercicio sin ningun punto evaluable queda «No evaluable».
     if evaluated == 9:
         out["piotroski"]["score"] = sum(s["point"] for s in signals)
+        out["piotroski"]["partial"] = False
         out["status"] = "ok"
+    elif evaluated > 0:
+        out["piotroski"]["score"] = sum(s["point"] for s in signals if s["point"] is not None)
+        out["status"] = "partial"
+        out["reason"] = f"F-score parcial: {evaluated}/9 puntos con datos"
     else:
-        out["reason"] = "Faltan puntos verificables; no se publica un F-score parcial"
+        out["reason"] = "Ningún punto verificable con los datos disponibles"
     used = []
     try:
         assets = v("total_assets")

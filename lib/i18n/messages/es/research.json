@@ -447,7 +447,8 @@
     "title": "Valoración y salud financiera",
     "loading": "Cargando valoraciones guardadas…",
     "failed": "La valoración no está disponible ahora. Las posiciones y los precios no cambian.",
-    "empty": "Sin empresas con datos de valoración guardados."
+    "empty": "Sin empresas con datos de valoración guardados.",
+    "piotroskiPartialScore": "{score} puntos sobre {count} evaluados (de 9)"
   },
   "moat": {
     "check": {

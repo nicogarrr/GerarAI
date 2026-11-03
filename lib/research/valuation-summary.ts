@@ -4,13 +4,13 @@ import { metricLabel } from '@/lib/research/metric-labels';
 export type HealthEvidence = { fact_id: number; metric: string; value: number; unit: string; period_end: string; source_url: string; source_type: string };
 export type FinancialHealth = {
   status: string; reason?: string; period_end?: string; notice: string;
-  piotroski: { score: number | null; evaluated: number; total: number; methodology_url: string; signals: { id: string; label: string; formula: string; point: number | null; missing_input: string | null; evidence: HealthEvidence[] }[] };
+  piotroski: { score: number | null; evaluated: number; total: number; partial?: boolean; methodology_url: string; signals: { id: string; label: string; formula: string; point: number | null; missing_input: string | null; evidence: HealthEvidence[] }[] };
   altman: { status: string; score: number | null; variant: string; reason?: string; methodology_url: string; evidence?: HealthEvidence[] };
 };
 export type ValuationSummary = {
   ticker: string;
-  fair_value: { value: number | null; currency: string | null; label: string; as_of: string | null; publishable: boolean; stale: boolean };
-  reverse_dcf: { status: string; required_revenue_growth: number | null; as_of: string | null; source: string; market_price: number | null; model_version_id: number | null };
+  fair_value: { value: number | null; currency: string | null; label: string; as_of: string | null; publishable: boolean; stale: boolean; reason?: string | null; missing_inputs?: string[] };
+  reverse_dcf: { status: string; required_revenue_growth: number | null; as_of: string | null; source: string; market_price: number | null; model_version_id: number | null; reason?: string | null };
   health: FinancialHealth;
 };
 
@@ -58,6 +58,8 @@ const SUMMARY_EN: Record<string, string> = {
   'Sin ejercicios anuales con fuente': 'No sourced annual fiscal years',
   'Ejercicio desactualizado o fechas incoherentes': 'Outdated fiscal year or inconsistent dates',
   'Faltan puntos verificables; no se publica un F-score parcial': 'Verifiable points are missing; a partial F-score is not published',
+  'Ningún punto verificable con los datos disponibles': 'No verifiable point with the available data',
+  'El precio de mercado queda fuera de todo escenario que el modelo puede valorar con el margen FCF actual; hace falta un método acorde al tipo de empresa.': 'The market price is outside every scenario the model can value with the current FCF margin; a method suited to the company type is needed.',
   'Indicadores contables, no recomendación ni probabilidad de quiebra.': 'Accounting indicators, not a recommendation or a probability of bankruptcy.',
   'Modelo fundamental persistido': 'Saved fundamental model',
   'Sin valor justo': 'No fair value',
