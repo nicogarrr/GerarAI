@@ -9,6 +9,7 @@ excepción final. El ritmo con la SEC no cambia.
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -40,7 +41,10 @@ def _run(steps, monkeypatch, *, max_retries: int = 3):
     def fake_rate_limited(response):
         events.append(("seen", response.status_code))
 
-    monkeypatch.setattr(sec_module.asyncio, "sleep", fake_sleep)
+    # Patching asyncio.sleep on the module object also changes it for every
+    # background loop in this process, contaminating the retry event trace.
+    # Replace only the connector's reference, preserving the real module.
+    monkeypatch.setattr(sec_module, "asyncio", SimpleNamespace(**(vars(asyncio) | {"sleep": fake_sleep})))
     monkeypatch.setattr(SECClient, "_throttle", fake_throttle)
     monkeypatch.setattr(sec_pacing, "rate_limited", fake_rate_limited)
 
@@ -128,3 +132,19 @@ def test_max_retries_zero(monkeypatch):
     assert isinstance(out, httpx.HTTPStatusError) and events == ["throttle", ("seen", 503)]
     out, events = _run([httpx.ConnectError], monkeypatch, max_retries=0)
     assert isinstance(out, httpx.ConnectError) and events == ["throttle"]
+
+
+def test_retry_sleep_mock_does_not_patch_other_asyncio_consumers(monkeypatch):
+    """Other loops/background tasks must retain their real sleep function."""
+    real_sleep = asyncio.sleep
+    real_retrying = sec_module.AsyncRetrying
+
+    def check_retrying(**kwargs):
+        assert asyncio.sleep is real_sleep
+        return real_retrying(**kwargs)
+
+    monkeypatch.setattr(sec_module, "AsyncRetrying", check_retrying)
+    out, events = _run([503, 200], monkeypatch)
+    assert isinstance(out, httpx.Response), repr(out)
+    assert out.status_code == 200
+    assert [e for e in events if e[0] == "sleep"] == [("sleep", 1.0)]
