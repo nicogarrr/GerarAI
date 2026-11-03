@@ -29,12 +29,17 @@ class _SlowValuation(_FakeProvider):
     async def complete(self, request):
         if "valuation" in dict(request.metadata).get("expert_team_task", ""):
             self.tasks.append("valuation:slow")
-            await asyncio.sleep(5)
+            # Muy por encima de cualquier presupuesto del test: el equipo lo corta.
+            await asyncio.sleep(60)
         return await super().complete(request)
 
 
 def test_slow_expert_does_not_lose_the_others(db, synthesis_calls, flag_on, monkeypatch):
-    monkeypatch.setattr(team_chat, "CHAT_TEAM_TIMEOUT_S", 1.5)
+    # Tope de 6 s → 3 s para los expertos (team_budget_s) y 2,25 s para el juez.
+    # Con 1,5 s (0,75 s para los rápidos) fallaba con la máquina cargada: el
+    # juez o los expertos rápidos no llegaban y el chat caía a la síntesis.
+    monkeypatch.setattr(team_chat, "CHAT_TEAM_TIMEOUT_S", 6.0)
+    assert team_chat.team_budget_s(6.0) == 3.0
     response = _ask(db, QUESTION, _SlowValuation())
     assert response.model == "expert_team"
     trace = response.llm_trace["expert_team"]
