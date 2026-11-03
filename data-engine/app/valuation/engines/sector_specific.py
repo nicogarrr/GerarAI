@@ -322,6 +322,33 @@ def capm_cost_of_equity(context: ValuationContext) -> SourcedValue | None:
                         is_reported=False, estimate=estimate)
 
 
+def inferred_sourced(context: ValuationContext, key: str) -> SourcedValue | None:
+    """Ultimo INFERIDO valido del tenant para ``key`` (base + URLs), etiquetado.
+
+    Solo entra cuando no hay hecho ni extraccion del informe: es una
+    inferencia del modelo sobre los documentos ingeridos (una sola fuente, no
+    oficial) y asi viaja en ``estimated_inputs``.
+    """
+    from app.services.inferred_input_service import InferredInputService
+
+    row = InferredInputService().latest_valid(context.db, context.company.id, key)
+    if row is None:
+        return None
+    created = row.created_at.date().isoformat() if row.created_at else None
+    estimate = {
+        "metric": key,
+        "value": float(row.value),
+        "period": created,
+        "status": "inferido",
+        "method": f"inferido por el modelo: {row.base}",
+        "note": "una sola fuente, no oficial (inferencia del modelo sobre documentos de la empresa)",
+        "sources": [{"source": "documento de la empresa", "url": url} for url in (row.source_urls or [])],
+        "inferred_input_id": row.id,
+    }
+    return SourcedValue(float(row.value), None, created or "inferido", 0.5,
+                        source_type="inferred_input", is_reported=False, estimate=estimate)
+
+
 def estimated_input_items(context: ValuationContext, values: dict[str, SourcedValue | None]) -> list[dict]:
     """Fichas de los inputs que no son dato reportado (formato del puente)."""
     from app.services.sector_inputs import extract_provenance
@@ -676,6 +703,8 @@ class InsurerValuationEngine(ValuationEngine):
             market_rates=("cost_of_equity",),
         )
         sourced = resolved.values
+        if sourced.get("combined_ratio") is None:
+            sourced["combined_ratio"] = inferred_sourced(context, "combined_ratio")
         if sourced.get("cost_of_equity") is None:
             sourced["cost_of_equity"] = capm_cost_of_equity(context)
         missing = [key for key, value in sourced.items() if value is None]
@@ -782,6 +811,8 @@ class ReitValuationEngine(ValuationEngine):
             market_rates=("cap_rate",),
         )
         sourced = resolved.values
+        if sourced.get("cap_rate") is None:
+            sourced["cap_rate"] = inferred_sourced(context, "cap_rate")
         missing = [key for key, value in sourced.items() if value is None]
         if missing:
             return insufficient_result(
