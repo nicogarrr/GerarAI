@@ -664,8 +664,10 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
                 break
         return _response(["Últimas noticias guardadas de tus posiciones abiertas (titulares en su idioma original):", *lines] if lines else ["No hay noticias guardadas de tus posiciones abiertas que citen de verdad a esas empresas. No he consultado noticias en directo."], sources, "portfolio_news")
     if theses:
+        thesis_company = _company_in_question(db, question)
         rows = db.execute(select(ThesisVersion, Company).join(Company, Company.id == ThesisVersion.company_id).where(
             ThesisVersion.tenant_id == tenant,
+            *([ThesisVersion.company_id == thesis_company.id] if thesis_company is not None else []),
         ).order_by(Company.ticker, ThesisVersion.version.desc())).all()
         latest, published = {}, {}
         for thesis, company in rows:

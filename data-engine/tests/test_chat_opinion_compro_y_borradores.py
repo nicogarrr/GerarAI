@@ -72,3 +72,9 @@ def test_lista_de_tesis_limita_los_borradores():
     assert response.llm_trace["path"] == "portfolio_theses"
     assert response.answer.count("v1, no activa") == 5
     assert "y 7 empresas más" in response.answer
+    assert len(response.sources) == 5
+    scoped = asyncio.run(ChatService(provider=_NoLLM()).answer(
+        session, "¿Qué tesis tengo de T11?", "global", None))
+    assert "T11: v1" in scoped.answer
+    assert "T00" not in scoped.answer
+    assert len(scoped.sources) == 1
