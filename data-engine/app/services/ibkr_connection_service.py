@@ -390,5 +390,10 @@ def record_failure(db: Session, *, revision: int | None, receipt_id: int | None 
     if row and row.enabled and row.revision == revision:
         row.last_attempt_at = datetime.now(UTC)
         row.status = "error"
-        row.message = "No se pudo sincronizar. Conservamos los datos anteriores; revisa la conexión y vuelve a intentarlo."
+        row.message = (
+            "IBKR aún prepara la PyG del extracto. Conservamos los datos anteriores; "
+            "se reintentará en la próxima sincronización."
+            if error_code == "not_ready"
+            else "No se pudo sincronizar. Conservamos los datos anteriores; revisa la conexión y vuelve a intentarlo."
+        )
     db.commit()
