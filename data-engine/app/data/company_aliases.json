@@ -1,0 +1,81 @@
+{
+ "version": 1,
+ "nota": "Alias y relaciones por empresa para vincular noticias que no citan el ticker. Clave = ticker del catálogo. Se carga una vez por proceso (app/services/company_aliases.py). 'aliases' => la noticia es SOBRE la empresa; 'requiere' = al menos uno de esos términos en el texto; 'excluye' = ninguno. Términos en palabra completa; sin 'mayusculas': true se ignoran mayúsculas/minúsculas. Revisado a mano: nada de términos de sector sueltos como alias.",
+ "empresas": {
+  "ASTS": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "AST SpaceMobile"
+    },
+    {
+     "termino": "AST Space Mobile"
+    },
+    {
+     "termino": "SpaceMobile"
+    },
+    {
+     "termino": "AST & Science"
+    },
+    {
+     "termino": "AST Science"
+    },
+    {
+     "termino": "BlueBird",
+     "mayusculas": true,
+     "requiere": [
+      "satellite",
+      "satellites",
+      "satélite",
+      "satélites",
+      "satelite",
+      "satelites",
+      "constellation",
+      "constelación",
+      "constelacion",
+      "launch",
+      "launches",
+      "launched",
+      "lanzamiento",
+      "lanza",
+      "orbit",
+      "órbita",
+      "orbita",
+      "Block 2",
+      "Falcon 9",
+      "New Glenn",
+      "LVM3",
+      "array",
+      "arrays",
+      "cellular",
+      "broadband",
+      "phased array"
+     ],
+     "excluye": [
+      "bluebird bio",
+      "Blue Bird Corporation",
+      "Blue Bird Corp",
+      "school bus",
+      "school buses",
+      "BLBD"
+     ]
+    },
+    {
+     "termino": "Abel Avellan",
+     "tipo": "persona"
+    },
+    {
+     "termino": "Scott Wisniewski",
+     "tipo": "persona",
+     "requiere": [
+      "AST",
+      "SpaceMobile",
+      "satellite",
+      "satélite",
+      "BlueBird"
+     ]
+    }
+   ]
+  }
+ }
+}

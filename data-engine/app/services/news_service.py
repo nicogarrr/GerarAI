@@ -65,6 +65,7 @@ def position_change_cluster_title(ticker: str | None, source: str, count: int) -
     la fila se marca headline_from_source=False)."""
     donde = f" en {ticker}" if ticker else ""
     return f"{count} movimientos de inversores institucionales{donde} · {source}"
+from app.services.company_aliases import LINK_ABOUT, CompanyLink, find_alias_link
 from app.services.thesis_graph_service import ThesisGraphService
 from app.services.ticker_news_lane import (
     STRICT_NAME_PATTERNS as STRICT_TICKERS,
@@ -269,6 +270,10 @@ class NewsService:
         en el nivel mas alto no se vincula nada. Las siglas ambiguas (A, ALL,
         IT, ON...) solo valen con cashtag, bolsa o nombre.
         """
+        return self._detect_by_ticker(db, text)[0]
+
+    def _detect_by_ticker(self, db: Session, text: str) -> tuple[Company | None, int]:
+        """(empresa o None, nivel de evidencia más alto visto)."""
         best_level = 0
         best: list[Company] = []
         folded = _fold_for_ticker_search(text)
@@ -282,16 +287,28 @@ class NewsService:
                 best_level, best = level, [company]
             elif level == best_level and level > 0:
                 best.append(company)
-        return best[0] if len(best) == 1 else None
+        return (best[0] if len(best) == 1 else None), best_level
 
-    def _company_for_item(
+    def detect_company_link(self, db: Session, text: str) -> CompanyLink | None:
+        """detect_ticker y, SOLO si el ticker no aparece con evidencia alguna,
+        los alias de la empresa (nombre, marcas, filiales, personas).
+
+        Lo que detect_ticker ya vinculaba (o descartaba por empate) no cambia:
+        los alias solo actúan sobre textos con nivel de evidencia 0.
+        """
+        company, level = self._detect_by_ticker(db, text)
+        if level > 0:
+            return CompanyLink(company, LINK_ABOUT, "ticker") if company is not None else None
+        return find_alias_link(db, text)
+
+    def _link_for_item(
         self,
         db: Session,
         text: str,
         ticker: str | None = None,
         *,
         feed_ticker_trusted: bool = True,
-    ) -> Company | None:
+    ) -> CompanyLink | None:
         if ticker:
             company = resolve_company(db, ticker)
             # Sigla ambigua con ticker NO autoritativo (busqueda GDELT/RSS):
@@ -303,8 +320,19 @@ class NewsService:
                 or not _feed_ticker_needs_evidence(ticker)
                 or company_mentioned(company, text, _ticker_evidence_level)
             ):
-                return company
-        return self.detect_ticker(db, text)
+                return CompanyLink(company, LINK_ABOUT, "feed")
+        return self.detect_company_link(db, text)
+
+    def _company_for_item(
+        self,
+        db: Session,
+        text: str,
+        ticker: str | None = None,
+        *,
+        feed_ticker_trusted: bool = True,
+    ) -> Company | None:
+        link = self._link_for_item(db, text, ticker, feed_ticker_trusted=feed_ticker_trusted)
+        return link.company if link is not None else None
 
     def _is_duplicate(
         self,
@@ -381,11 +409,12 @@ class NewsService:
     ) -> ManualNewsResponse:
         # detect_company=False: carriles sin ticker (p.ej. macro) nunca
         # vinculan empresa por coincidencia de texto.
-        company = (
-            self._company_for_item(db, text, ticker, feed_ticker_trusted=feed_ticker_trusted)
+        link = (
+            self._link_for_item(db, text, ticker, feed_ticker_trusted=feed_ticker_trusted)
             if detect_company
             else None
         )
+        company = link.company if link is not None else None
         # Gate Jev (3): duplicate/noise con confianza >= 0.85 -> via ligera:
         # se registra el evento en el tracker pero se omite el analisis
         # semantico, el ThesisChange/review y el claim scan. Best-effort:
@@ -503,6 +532,10 @@ class NewsService:
         # noticias nuevas sin connector y la reingesta las trata como previas.
         if connector:
             news_metadata["connector"] = connector
+        # Vínculo sin ticker (alias/nombre): se guarda por qué se asignó la
+        # empresa para poder auditarlo. Los vínculos por ticker no cambian.
+        if link is not None and link.via not in ("ticker", "feed"):
+            news_metadata["vinculo"] = link.as_metadata()
         # Carril editorial (p.ej. macro) y tema en la MISMA transacción de
         # creación, igual que la procedencia del conector.
         if news_lane:
