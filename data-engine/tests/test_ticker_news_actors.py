@@ -97,8 +97,9 @@ def test_refresh_ticker_news_single_ticker_adds_google(env, monkeypatch):
         dramatiq_app, "_companies", lambda db, ticker=None: [_co(1, "SPCX")]
     )
     out = _fn("refresh_ticker_news")(tenant_id=1, user_id="u", ticker="SPCX")
-    assert len(env.polled) == 3  # yahoo + google en + google es
-    assert out["feeds_processed"] == 3
+    # yahoo + google en + google es + google marca («SpaceX» / «Starlink»)
+    assert len(env.polled) == 4
+    assert out["feeds_processed"] == 4
     assert out["status"] == "ok"
 
 
