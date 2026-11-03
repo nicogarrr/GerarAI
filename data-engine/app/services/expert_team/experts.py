@@ -51,7 +51,10 @@ class ExpertSpec:
     prompt_name: str
     tools: tuple[str, ...]
     timeout_s: float = 45.0
-    max_tokens: int = 900
+    #: Tope de salida con sitio para el razonamiento: con 900 (2.600 en el chat)
+    #: deepseek-v4.1-flash se cortaba o devolvía vacío (prueba real 2026-11-03).
+    #: Solo se paga lo que se genera; una respuesta cortada se paga y se tira.
+    max_tokens: int = 4000
     modes: frozenset[str] = field(default_factory=lambda: frozenset({"thesis", "chat"}))
     #: Palabras (sin tildes, minúsculas) que activan al experto en el chat.
     keywords: tuple[str, ...] = ()
