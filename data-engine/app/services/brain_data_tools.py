@@ -189,12 +189,15 @@ def _ledger_dividends_line(db: Session, year: int, english: bool) -> str | None:
     gross = summary.get("total_dividends_base")
     if not gross:
         return None
-    withheld = summary.get("total_withholding_base") or 0
+    withheld = summary.get("total_withholding_base")
+    withheld_display = (
+        "N/A" if english else "N/D"
+    ) if withheld is None else (_money_en(withheld, "EUR") if english else _money(withheld, "EUR"))
     if english:
         return (f"In your saved trades for {year}: {_money_en(gross, 'EUR')} of gross dividends received and "
-                f"{_money_en(withheld, 'EUR')} withheld at source (in euros, as in the tax report).")
+                f"{withheld_display} withheld at source (in euros, as in the tax report).")
     return (f"En tus operaciones guardadas de {year} constan {_money(gross, 'EUR')} de dividendos brutos cobrados "
-            f"y {_money(withheld, 'EUR')} de retención en origen (en euros, como en el informe fiscal).")
+            f"y {withheld_display} de retención en origen (en euros, como en el informe fiscal).")
 
 
 def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | None:
