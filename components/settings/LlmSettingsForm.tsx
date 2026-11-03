@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -115,6 +115,10 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
     const [clearApiKey, setClearApiKey] = useState(false);
     const [enabled, setEnabled] = useState(initial.enabled);
     const [busy, setBusy] = useState(false);
+    // Sin JS aún no hay onSubmit: un submit nativo sería GET con las
+    // credenciales en la URL. Botón deshabilitado hasta hidratar + method="post".
+    const [hydrated, setHydrated] = useState(false);
+    useEffect(() => { setHydrated(true); }, []);
     const [testing, setTesting] = useState(false);
     const [testResult, setTestResult] = useState<LlmTestResult | null>(null);
 
@@ -197,7 +201,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
     }
 
     return (
-        <form aria-label={t('settings.llm.formAria')} className="space-y-4" onSubmit={submit}>
+        <form aria-label={t('settings.llm.formAria')} className="space-y-4" method="post" onSubmit={submit}>
             <div className="rounded-lg border border-gray-700/50 bg-gray-900/40 p-3 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-gray-100">{statusLabel(status, t)}</span>
@@ -376,7 +380,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                 {hasTestKey ? t('settings.llm.testHelpReady') : t('settings.llm.testHelpNoKey')}
             </p>
             <div className="flex flex-wrap gap-2">
-                <Button disabled={busy || !model.trim()} type="submit">
+                <Button disabled={!hydrated || busy || !model.trim()} type="submit">
                     {busy ? t('settings.llm.saving') : t('settings.common.save')}
                 </Button>
                 <Button
