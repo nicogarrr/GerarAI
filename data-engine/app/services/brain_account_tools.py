@@ -328,11 +328,14 @@ def realized_line_for_closed_ticker(db: Session, tenant: int, company_id: int, t
             Transaction.tenant_id == tenant, Transaction.company_id == company_id, Transaction.action == "sell")
     ).all() if y is not None})
     norm = _fold(question)
+    scope_es = scope_en = ""
     if re.search(r"\b20\d{2}\b|\beste\s+ano\b|\bano\s+pasado\b|\bthis\s+year\b|\blast\s+year\b", norm):
         asked = _year_in_question(question, local_today())
         if re.search(r"\blast\s+year\b", norm) and not re.search(r"\b20\d{2}\b", norm):
             asked = local_today().year - 1
         years = [y for y in years if y == asked]
+        # El ejercicio va en la respuesta: «Realizado en 2025 con…».
+        scope_es, scope_en = f" en {asked}", f" in {asked}"
         if not years:
             return (f"In {asked} there are no sales of {ticker} in your saved trades." if english
                     else f"En {asked} no hay ventas de {ticker} en tus operaciones guardadas.")
@@ -364,9 +367,10 @@ def realized_line_for_closed_ticker(db: Session, tenant: int, company_id: int, t
                 f"Con tus ventas guardadas de {ticker} ({count} {noun}: {when}) no hay un realizado fiable; "
                 "el aviso está en Impuestos.")
     if english:
-        return (f"Realized with your saved sales of {ticker}: {_money(total, 'EUR', signed=True, english=True)} "
+        return (f"Realized{scope_en} with your saved sales of {ticker}: "
+                f"{_money(total, 'EUR', signed=True, english=True)} "
                 f"({count} {noun}: {when}; in euros, FIFO as in the tax report).")
-    return (f"Realizado con tus ventas guardadas de {ticker}: {_money(total, 'EUR', signed=True)} "
+    return (f"Realizado{scope_es} con tus ventas guardadas de {ticker}: {_money(total, 'EUR', signed=True)} "
             f"({count} {noun}: {when}; en euros, FIFO como en el informe fiscal).")
 
 
