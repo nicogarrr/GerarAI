@@ -818,6 +818,11 @@ _ADVICE_QUESTION_RE = re.compile(
     r"(?i)\b(?:deber[ií]a|deber[ií]amos|merece\s+la\s+pena|vale\s+la\s+pena|(?:es|ser[ií]a)\s+(?:un\s+)?buen\s+momento"
     r"|buen\s+momento\s+para|conviene|me\s+conviene|ser[ií]a\s+(?:buena|mala)\s+idea|(?:me\s+)?recomiendas"
     r"|(?:me\s+)?aconsejas|qu[eé]\s+opinas|should\s+i|good\s+time\s+to|worth\s+(?:buying|selling)|is\s+it\s+(?:a\s+)?good\s+idea)\b"
+    # «¿Vendo Uber o la mantengo?», «¿compro más o espero?», «sell or hold?»:
+    # elegir entre dos opciones también es pedir opinión (prueba real 2026-11-03).
+    r"|\b(?:vendo|compro|mantengo|aguanto)\b[^.?!]{0,40}?\bo\s+(?:no\b|(?:la|lo|las|los|me\s+la|me\s+lo)\s+)?"
+    r"(?:mantengo|vendo|compro|espero|aguanto|sigo|quedo|no)\b"
+    r"|\b(?:sell|buy|hold)\s+or\s+(?:hold|sell|buy|wait|keep)\b"
 )
 # «¿Uber está barata?», «Is AAPL cheap?»: preguntan por el precio de UNA
 # empresa, igual que «¿está cara?»; no por qué comprar hoy. Prueba real
