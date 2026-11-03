@@ -32,7 +32,6 @@ from app.schemas.api import (
     WatchlistMetricsOut,
     WatchlistMonitorOut,
 )
-from app.services.connectors.earnings_calendar import fetch_earnings_range
 from app.services.dca_on_add import (
     enqueue_dca_on_add,
     enqueue_market_data_on_add,
@@ -165,10 +164,19 @@ async def watchlist_monitor(
 
     Solo datos propios o de fuentes publicas con trazabilidad: minimo de 52
     semanas desde ``market_prices`` (ingesta propia), proximo resultado desde
-    el conector publico de NASDAQ (misma fuente que /api/calendar/earnings) y
-    comparacion con el valor justo UNICO (``fair_value_service``: tesis
-    publicada o motor, con su procedencia en ``fair_value_source``/``_label``).
-    Cualquier pieza sin dato va a ``None``; nunca se inventa.
+    la tabla ``earnings_dates`` que el job ``earnings_dates_refresh`` renueva
+    dos veces al dia (Yahoo Finance + calendario publico de NASDAQ + filas
+    manuales con su enlace) y comparacion con el valor justo UNICO
+    (``fair_value_service``: tesis publicada o motor, con su procedencia en
+    ``fair_value_source``/``_label``). Cualquier pieza sin dato va a ``None``;
+    nunca se inventa.
+
+    El monitor NO consulta NASDAQ en vivo: hacerlo ponia una espera de red de
+    hasta 8 s (deadline del conector) en el TTFB de cada vista de watchlist
+    cuando faltaba alguna fecha guardada. Una fecha aun sin refrescar aparece
+    como "sin fecha" hasta el siguiente pase del job; cada fecha mostrada
+    lleva su ``source_label`` y las automaticas sin renovar en 3 dias se
+    ocultan (``is_fresh``), nunca se exhiben como vigentes.
     """
     wanted = list(dict.fromkeys(t.strip().upper() for t in tickers.split(",") if t.strip()))[:60]
     today = date.today()
@@ -271,10 +279,12 @@ async def watchlist_monitor(
             "next_earnings_confirmed": None,
         }
 
-    # Proximos resultados (NASDAQ publico, mismo conector que /api/calendar).
-    earnings_status = "skipped"
-    # Primero la tabla de fechas refrescada (Yahoo/NASDAQ/manual): cubre tambien
-    # lineas no US y lleva la fuente y si esta confirmada.
+    # Proximos resultados: SOLO la tabla refrescada por el job (Yahoo/NASDAQ/
+    # manual). Sin llamada en vivo: ver el docstring. earnings_status pasa a
+    # describir el modo de servicio; el front solo lo usa para avisar cuando el
+    # calendario en vivo fallaba ("unavailable"/"partial"), casos que ya no
+    # existen en esta ruta (el cliente lo sigue emitiendo si la peticion falla).
+    earnings_status = "stored"
     stored = db.execute(
         select(EarningsDate)
         .where(EarningsDate.ticker.in_(list(items) or [""]), EarningsDate.event_date >= today)
@@ -288,23 +298,6 @@ async def watchlist_monitor(
             target["next_earnings_date"] = row.event_date.isoformat()
             target["next_earnings_source"] = row.source_label
             target["next_earnings_confirmed"] = row.confirmed
-    us_wanted = [t for t, v in items.items() if v["next_earnings_date"] is None]
-    if us_wanted:
-        try:
-            # El conector rechaza rangos de mas de 31 dias inclusive: hoy+31
-            # son 32 y el ValueError se tragaba como "unavailable" siempre.
-            result = await fetch_earnings_range(today, today + timedelta(days=30))
-            earnings_status = str(result.get("status", "unavailable"))
-            for event in result.get("events", []):
-                symbol = str(event.get("symbol") or "").upper()
-                day = str(event.get("date") or "")
-                row = items.get(symbol)
-                if row is not None and day and row["next_earnings_date"] is None:
-                    row["next_earnings_date"] = day
-                    row["next_earnings_source"] = "NASDAQ (api.nasdaq.com)"
-        except Exception:
-            earnings_status = "unavailable"
-
     return {"items": items, "earnings_status": earnings_status}
 
 

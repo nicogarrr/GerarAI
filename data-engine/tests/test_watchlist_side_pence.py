@@ -46,11 +46,7 @@ def _seed(ticker: str, close: float, quote: str | None, currency: str, fair: flo
         db.close()
 
 
-def _side(monkeypatch, ticker: str):
-    async def no_earnings(desde, hasta, client=None):
-        return {"status": "ok", "events": [], "errors": []}
-
-    monkeypatch.setattr("app.api.routes.watchlist.fetch_earnings_range", no_earnings)
+def _side(ticker: str):
     res = TestClient(main.app).get("/api/watchlist/monitor", params={"tickers": ticker})
     assert res.status_code == 200
     row = res.json()["items"][ticker]
@@ -60,16 +56,16 @@ def _side(monkeypatch, ticker: str):
 def test_london_close_in_pence_below_fair_value_is_undervalued(monkeypatch):
     # 26,50 £ (2.650 peniques) frente a un valor justo de 30 £.
     _seed("PNCW.L", 2650.0, "GBp", "GBP", 30.0)
-    assert _side(monkeypatch, "PNCW.L") == "infravalorada"
+    assert _side("PNCW.L") == "infravalorada"
 
 
 def test_london_close_in_pence_above_fair_value_is_overvalued(monkeypatch):
     _seed("PNCX.L", 3200.0, "GBp", "GBP", 30.0)
-    assert _side(monkeypatch, "PNCX.L") == "sobrevalorada"
+    assert _side("PNCX.L") == "sobrevalorada"
 
 
 def test_ficha_en_gbx_compara_en_libras(monkeypatch):
     # Ficha creada solo con el ticker: divisa «GBX» (sufijo .L). El cierre en
     # peniques quedaba en peniques (misma unidad que la ficha) frente a 30 £.
     _seed("PNCZ.L", 2650.0, "GBp", "GBX", 30.0)
-    assert _side(monkeypatch, "PNCZ.L") == "infravalorada"
+    assert _side("PNCZ.L") == "infravalorada"

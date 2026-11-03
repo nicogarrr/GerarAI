@@ -51,9 +51,6 @@ def test_home_batch_and_watchlist_never_expose_blocked_thesis(saved, monkeypatch
     db, company, thesis, _ = saved
     if publishable is not None:
         model(db, company, publishable=publishable)
-    async def earnings(*_args):
-        return {"status": "unavailable", "events": []}
-    monkeypatch.setattr(watchlist, "fetch_earnings_range", earnings)
     assert fvs.thesis_candidates(db, [company.id]) == {}
     home = valuation.fair_values("AAPL", db)["items"]["AAPL"]
     monitor = asyncio.run(watchlist.watchlist_monitor(tickers="AAPL", db=db))["items"]["AAPL"]
