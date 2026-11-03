@@ -1,7 +1,7 @@
 'use client';
 import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 
-import { useState, useRef, useEffect } from 'react';
+import { memo, useCallback, useState, useRef, useEffect, type ComponentProps } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -128,14 +128,16 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
         if (openDetail.detail?.question) setInput(openDetail.detail.question.slice(0, 2000));
     }, [openDetail]);
 
-    async function copyMessage(index: number, content: string) {
+    // Estable entre renders (solo usa setCopied): así BrainMessageBubble
+    // (memo) no se vuelve a pintar al teclear en el campo de mensaje.
+    const copyMessage = useCallback(async (index: number, content: string) => {
         try {
             await navigator.clipboard.writeText(content);
             setCopied(index);
         } catch {
             setCopied(null);
         }
-    }
+    }, []);
 
     // Al cambiar el contexto de conocimiento (página de biblioteca o handoff) el
     // modo guía se reinicia: es lo que hacía el shell antes del split. Ajuste
@@ -452,62 +454,13 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                     className="h-full overflow-y-auto p-4 space-y-4"
                 >
                     {messages.map((m, i) => (
-                        <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`flex items-start gap-2 max-w-[90%] ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${m.role === 'user' ? 'bg-blue-600' : 'bg-indigo-600'}`}>
-                                    {m.role === 'user' ? <User aria-hidden="true" className="h-3 w-3 text-white" /> : <Bot aria-hidden="true" className="h-3 w-3 text-white" />}
-                                </div>
-                                <div className={`p-3 rounded-lg text-sm overflow-hidden ${m.role === 'user'
-                                    ? 'bg-blue-600 text-white rounded-tr-none'
-                                    : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-none'
-                                    }`}>
-                                    {m.role === 'assistant' && m.library ? (
-                                        <BrainLibraryAnswer result={m.library} />
-                                    ) : m.role === 'assistant' && m.guide ? (
-                                        <BrainGuideAnswer result={m.guide} />
-                                    ) : m.role === 'assistant' ? (
-                                        <div className="prose prose-invert prose-sm max-w-none [&>h3]:text-indigo-400 [&>h3]:font-bold [&>h3]:mt-2 [&>h3]:mb-1 [&>ul]:list-disc [&>ul]:pl-4 [&>strong]:text-white">
-                                            <ReactMarkdown
-                                                components={{
-                                                    h3: ({ node, ...props }) => <h3 className="text-base font-bold text-indigo-300 mt-2 mb-1" {...props} />,
-                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-4 space-y-1" {...props} />,
-                                                    li: ({ node, ...props }) => <li className="text-slate-300" {...props} />,
-                                                    strong: ({ node, ...props }) => <strong className="font-semibold text-white bg-indigo-500/10 px-1 rounded" {...props} />,
-                                                    // Los enlaces de la respuesta son navegación real: las rutas
-                                                    // internas (/research/ASTS, /portfolio…) abren con next/link
-                                                    // sin recargar la app; las externas abren en pestaña nueva.
-                                                    a: ({ node, href, children, ...props }) =>
-                                                        href && href.startsWith('/') ? (
-                                                            <Link href={href} className="text-indigo-300 underline underline-offset-2 hover:text-indigo-200">
-                                                                {children}
-                                                            </Link>
-                                                        ) : (
-                                                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-300 underline underline-offset-2 hover:text-indigo-200" {...props}>
-                                                                {children}
-                                                            </a>
-                                                        )
-                                                }}
-                                            >
-                                                {m.content}
-                                            </ReactMarkdown>
-                                            <BrainExpertTeam experts={m.experts} timedOut={m.expertsTimedOut} summary={m.expertSummary} />
-                                            <BrainSources citations={m.citations} />
-                                        </div>
-                                    ) : (
-                                        m.content
-                                    )}
-                                    {m.role === 'assistant' && i > 0 && (
-                                        <button
-                                            type="button"
-                                            onClick={() => void copyMessage(i, m.content)}
-                                            className="mt-2 block min-h-11 text-xs text-indigo-300 hover:text-indigo-200"
-                                        >
-                                            {copied === i ? t('brain.panel.copied') : t('brain.panel.copy')}
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
+                        <BrainMessageBubble
+                            key={i}
+                            message={m}
+                            index={i}
+                            copied={copied === i}
+                            onCopy={copyMessage}
+                        />
                     ))}
                     {messages.length === 1 && !loading && (
                         <div className="flex flex-wrap gap-2" aria-label={t('brain.panel.suggestedAria')}>
@@ -574,3 +527,78 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
     );
     return panel;
 }
+
+// Elementos del markdown de las respuestas, fijos a nivel de módulo: un objeto
+// nuevo en cada render obligaba a react-markdown a rehacer todo el árbol.
+const MARKDOWN_COMPONENTS: ComponentProps<typeof ReactMarkdown>['components'] = {
+    h3: ({ node, ...props }) => <h3 className="text-base font-bold text-indigo-300 mt-2 mb-1" {...props} />,
+    ul: ({ node, ...props }) => <ul className="list-disc pl-4 space-y-1" {...props} />,
+    li: ({ node, ...props }) => <li className="text-slate-300" {...props} />,
+    strong: ({ node, ...props }) => <strong className="font-semibold text-white bg-indigo-500/10 px-1 rounded" {...props} />,
+    // Los enlaces de la respuesta son navegación real: las rutas
+    // internas (/research/ASTS, /portfolio…) abren con next/link
+    // sin recargar la app; las externas abren en pestaña nueva.
+    a: ({ node, href, children, ...props }) =>
+        href && href.startsWith('/') ? (
+            <Link href={href} className="text-indigo-300 underline underline-offset-2 hover:text-indigo-200">
+                {children}
+            </Link>
+        ) : (
+            <a href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-300 underline underline-offset-2 hover:text-indigo-200" {...props}>
+                {children}
+            </a>
+        ),
+};
+
+/**
+ * Un mensaje del chat. Memoizado: teclear en el campo de mensaje cambia el
+ * estado del panel en cada pulsación, y antes eso volvía a parsear y pintar
+ * el markdown de TODAS las respuestas (30 mensajes ≈ 95 ms por tecla en el
+ * banco). Ahora solo se repinta el mensaje que cambia (p. ej. «Copiado»).
+ */
+const BrainMessageBubble = memo(function BrainMessageBubble({ message: m, index: i, copied, onCopy }: {
+    message: BrainMessage;
+    index: number;
+    copied: boolean;
+    onCopy: (index: number, content: string) => Promise<void>;
+}) {
+    const t = useT();
+    return (
+        <div className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`flex items-start gap-2 max-w-[90%] ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${m.role === 'user' ? 'bg-blue-600' : 'bg-indigo-600'}`}>
+                    {m.role === 'user' ? <User aria-hidden="true" className="h-3 w-3 text-white" /> : <Bot aria-hidden="true" className="h-3 w-3 text-white" />}
+                </div>
+                <div className={`p-3 rounded-lg text-sm overflow-hidden ${m.role === 'user'
+                    ? 'bg-blue-600 text-white rounded-tr-none'
+                    : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-none'
+                    }`}>
+                    {m.role === 'assistant' && m.library ? (
+                        <BrainLibraryAnswer result={m.library} />
+                    ) : m.role === 'assistant' && m.guide ? (
+                        <BrainGuideAnswer result={m.guide} />
+                    ) : m.role === 'assistant' ? (
+                        <div className="prose prose-invert prose-sm max-w-none [&>h3]:text-indigo-400 [&>h3]:font-bold [&>h3]:mt-2 [&>h3]:mb-1 [&>ul]:list-disc [&>ul]:pl-4 [&>strong]:text-white">
+                            <ReactMarkdown components={MARKDOWN_COMPONENTS}>
+                                {m.content}
+                            </ReactMarkdown>
+                            <BrainExpertTeam experts={m.experts} timedOut={m.expertsTimedOut} summary={m.expertSummary} />
+                            <BrainSources citations={m.citations} />
+                        </div>
+                    ) : (
+                        m.content
+                    )}
+                    {m.role === 'assistant' && i > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => void onCopy(i, m.content)}
+                            className="mt-2 block min-h-11 text-xs text-indigo-300 hover:text-indigo-200"
+                        >
+                            {copied ? t('brain.panel.copied') : t('brain.panel.copy')}
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+});
