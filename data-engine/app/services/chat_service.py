@@ -191,6 +191,37 @@ def _price_display_en(value: Decimal | int | float, currency: str | None) -> str
     return f"{text} {'€' if currency == 'EUR' else currency}"
 
 
+# Precio guardado de una posición más viejo que el del resto de la cartera:
+# antes salía «con datos a 30 oct 2026» (la fecha más nueva) con un precio de
+# feb 2024 sin avisar (prueba real 2026-11-03).
+STALE_PRICE_DAYS = 7
+
+
+def _is_stale(as_of: Any, newest: Any) -> bool:
+    try:
+        return as_of is not None and newest is not None and (newest - as_of).days > STALE_PRICE_DAYS
+    except TypeError:
+        return False
+
+
+def _stale_price_note(as_of: Any, newest: Any, *, english: bool) -> str:
+    if not _is_stale(as_of, newest):
+        return ""
+    if english:
+        return f" (price from {_fmt_date_en(as_of.isoformat())}, out of date)"
+    return f" (precio de {_fmt_date_es(as_of.isoformat())}, desactualizado)"
+
+
+def _stale_price_warning(as_of: Any, newest: Any, *, english: bool) -> str:
+    if not _is_stale(as_of, newest):
+        return ""
+    if english:
+        return (f" Note: that price is from {_fmt_date_en(as_of.isoformat())}, older than the rest of your "
+                f"portfolio ({_fmt_date_en(newest.isoformat())}); it may not reflect today's price.")
+    return (f" Ojo: ese precio es del {_fmt_date_es(as_of.isoformat())}, más antiguo que el del resto de tu "
+            f"cartera ({_fmt_date_es(newest.isoformat())}); puede no reflejar la cotización de hoy.")
+
+
 def _sale_question_es(question: str) -> str:
     """Venta en inglés con la sintaxis que entiende el analizador de ventas.
 
@@ -2287,6 +2318,7 @@ class ChatService:
                 f"- {comp.ticker}: {_fmt_number_es(float(pos.quantity), 4)} acciones, "
                 f"coste medio {_fmt_money_es(float(pos.average_cost))} {_currency_display(pos.currency)}, "
                 + value_text
+                + _stale_price_note(pos.as_of, as_of, english=False)
             )
             sources.append(self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of)))
         extra = f"\n(Se muestran las {limit} mayores de {len(rows)}.)" if len(rows) > limit else ""
@@ -2322,6 +2354,7 @@ class ChatService:
     def _portfolio_overview_en(rows, value_of, total, unvalued, mixed, base, as_of, limit) -> str:
         """El mismo resumen de cartera que en español, redactado en inglés."""
         lines = []
+        newest = max(pos.as_of for pos, _ in rows)
         for pos, comp in rows[:limit]:
             value = value_of(pos)
             weight = (
@@ -2339,6 +2372,7 @@ class ChatService:
                 f"- {comp.ticker}: {_fmt_number_en(quantity, 4)} share{'' if quantity == 1 else 's'}, "
                 f"average cost {_fmt_money_en(float(pos.average_cost))} {_currency_display(pos.currency)}, "
                 + value_text
+                + _stale_price_note(pos.as_of, newest, english=True)
             )
         extra = f"\n(Showing the {limit} largest of {len(rows)}.)" if len(rows) > limit else ""
         total_text = (
@@ -3037,6 +3071,7 @@ class ChatService:
                 f"{value_text}, "
                 f"as of {_fmt_date_en(pos.as_of.isoformat())}."
             )
+            answer += _stale_price_warning(pos.as_of, max(p.as_of for p, _ in rows), english=True)
         else:
             if value is None:
                 weight_text = ""
@@ -3056,6 +3091,7 @@ class ChatService:
                 f"{value_text}, "
                 f"con datos a {_fmt_date_es(pos.as_of.isoformat())}."
             )
+            answer += _stale_price_warning(pos.as_of, max(p.as_of for p, _ in rows), english=False)
         if not english and _NET_WORTH_CUE_RE.search(question):
             cash_line = self._cash_line(
                 db, tenant_id, None if mixed else (pos.base_currency or "EUR"),
