@@ -64,8 +64,8 @@ def test_tengo_ticker_sin_posicion_lo_dice(db):
 
 
 @pytest.mark.parametrize(("question", "fragment"), [
-    ("¿Cuánto he invertido en MSFT?", "coste 1.500,00 €"),
-    ("¿Cuánto tengo invertido?", "coste 4.600,00 €"),
+    ("¿Cuánto he invertido en MSFT?", "Tienes invertidos 1.500,00 € en MSFT"),
+    ("¿Cuánto tengo invertido?", "Tienes invertidos 4.600,00 € en tus posiciones abiertas"),
 ])
 def test_cuanto_he_invertido_es_el_coste(db, question, fragment):
     resp = _ask(db, question)

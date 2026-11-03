@@ -888,6 +888,13 @@ _PERFORMANCE_RE = re.compile(
     r"(?![^.!?\n]*\bsi\b)"
 )
 
+# «¿Cuánto tengo invertido?», «how much have I invested?»: la respuesta directa
+# es el coste de compra (antes contestaba con la rentabilidad y el coste dentro).
+_INVESTED_RE = re.compile(
+    r"(?i)\bcu[aá]nto\s+(?:dinero\s+)?(?:he|tengo)\s+invertido\b"
+    r"|\bhow\s+much\s+(?:money\s+)?(?:have\s+I|do\s+I\s+have)\s+invested\b"
+)
+
 # «¿Cuál es mi rentabilidad por dividendo?» no es la rentabilidad sobre coste
 # (que excluye los dividendos): va a la ruta de dividendos.
 _DIVIDEND_YIELD_RE = re.compile(
@@ -2656,9 +2663,11 @@ class ChatService:
         # «¿mi rentabilidad este año?»: la cifra es desde la compra; se dice (sin flujos
         # de caja no hay rentabilidad del año calculada). La cifra no cambia.
         year_note = bool(_YEAR_RETURN_RE.search(question or ""))
+        invested = bool(_INVESTED_RE.search(question or "")) and not year_note
         if english:
             answer = self._performance_text_en(
                 company, pct, pnl, total_value, total_cost, cur, as_of.isoformat(), unknown_cost,
+                invested=invested,
             )
             if year_note:
                 answer += " It is since purchase, not for a single year: the return by year is not calculated."
@@ -2674,14 +2683,23 @@ class ChatService:
                 llm_trace={"path": "portfolio_performance", "generated": False, "provider_calls": 0},
             )
         label = "tu cartera" if company is None else f"tu posición en {company.ticker}"
-        answer = (
-            f"La rentabilidad guardada de {label} es {_signed(pct).replace(' %', '')} % "
-            f"sobre el coste de compra: valor {_fmt_money_es(total_value)} {_currency_display(cur)} "
-            f"frente a coste {_fmt_money_es(total_cost)} {_currency_display(cur)} "
-            f"({_signed(pnl)} {_currency_display(cur)}), con datos a {_fmt_date_es(as_of.isoformat())}. "
-            "Es rentabilidad simple sobre el coste de las posiciones abiertas, no TWR: "
-            "no cuenta caja, dividendos ni ventas cerradas."
-        )
+        if invested:
+            answer = (
+                f"Tienes invertidos {_fmt_money_es(total_cost)} {_currency_display(cur)} en "
+                f"{'tus posiciones abiertas' if company is None else company.ticker} (coste de compra guardado); "
+                f"hoy valen {_fmt_money_es(total_value)} {_currency_display(cur)} "
+                f"({_signed(pct).replace(' %', '')} %, {_signed(pnl)} {_currency_display(cur)}), "
+                f"con datos a {_fmt_date_es(as_of.isoformat())}. No cuenta caja ni ventas cerradas."
+            )
+        else:
+            answer = (
+                f"La rentabilidad guardada de {label} es {_signed(pct).replace(' %', '')} % "
+                f"sobre el coste de compra: valor {_fmt_money_es(total_value)} {_currency_display(cur)} "
+                f"frente a coste {_fmt_money_es(total_cost)} {_currency_display(cur)} "
+                f"({_signed(pnl)} {_currency_display(cur)}), con datos a {_fmt_date_es(as_of.isoformat())}. "
+                "Es rentabilidad simple sobre el coste de las posiciones abiertas, no TWR: "
+                "no cuenta caja, dividendos ni ventas cerradas."
+            )
         if unknown_cost:
             answer += (
                 " Sin coste de compra guardado y fuera del cálculo: "
@@ -2714,6 +2732,7 @@ class ChatService:
         cur: str,
         as_of: str,
         unknown_cost: list[str],
+        invested: bool = False,
     ) -> str:
         """Misma rentabilidad simple que la versión en español, redactada en inglés."""
 
@@ -2723,6 +2742,17 @@ class ChatService:
         pct_text = f"+{_fmt_number_en(pct)}" if pct >= 0 else _fmt_number_en(pct)
         label = "your portfolio" if company is None else f"your position in {company.ticker}"
         money = _currency_display(cur)
+        if invested:
+            answer = (
+                f"You have {_fmt_money_en(total_cost)} {money} invested in "
+                f"{'your open positions' if company is None else company.ticker} (saved purchase cost); "
+                f"today it is worth {_fmt_money_en(total_value)} {money} ({pct_text}%, {_signed(pnl)} {money}), "
+                f"as of {_fmt_date_en(as_of)}. Cash and closed sales are not included."
+            )
+            if unknown_cost:
+                answer += (" No purchase cost saved, so left out: " + ", ".join(unknown_cost[:10])
+                           + (f" and {len(unknown_cost) - 10} more" if len(unknown_cost) > 10 else "") + ".")
+            return answer
         answer = (
             f"The saved return on {label} is {pct_text}% on the purchase cost: "
             f"value {_fmt_money_en(total_value)} {money} against a cost of {_fmt_money_en(total_cost)} {money} "
