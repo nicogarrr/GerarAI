@@ -70,6 +70,7 @@ from app.services.ticker_news_lane import (
     STRICT_NAME_PATTERNS as STRICT_TICKERS,
 )
 from app.services.ticker_news_lane import (
+    company_mentioned,
     fails_strict_name,
     is_competitor_only,
     is_law_firm_solicitation,
@@ -211,6 +212,33 @@ def _ticker_evidence(ticker: str, name: str | None, text: str) -> bool:
     return _ticker_evidence_level(ticker, name, text) > 0
 
 
+# Carriles cuyo ticker es autoritativo por construccion: SEC (el item sale del
+# CIK de la empresa, no de una busqueda) e IR (la newsroom propia de la
+# empresa). Sus titulares («8-K presentado ante la SEC») no citan a la
+# empresa y aun asi el vinculo es correcto; exigirles evidencia de texto los
+# desvincularia.
+_FEED_TICKER_TRUSTED_CONNECTORS = frozenset({"sec", "ir"})
+
+
+def _feed_ticker_needs_evidence(ticker: str) -> bool:
+    """Siglas que son palabras o abreviaturas corrientes: el ticker que trae
+    el feed no basta para vincular; el texto debe citar a la empresa.
+
+    GDELT busca por empresa con «("C3.ai, Inc." OR AI)» y «AI» casa con
+    cualquier articulo del sector IA: «Profitmind Launches Awase, Bringing
+    Competitive Intelligence to Every Product a Retailer Sells» (news ids
+    411767/411828) quedo vinculada a C3.ai por el ticker del feed sin que el
+    texto la citara. Misma regla que detect_ticker: sigla ambigua, de una
+    letra o con patron de nombre estricto (CPT visado, AENA).
+    """
+    text_ticker = (ticker or "").strip().upper()
+    return (
+        len(text_ticker) == 1
+        or text_ticker in _AMBIGUOUS_TICKERS
+        or text_ticker in STRICT_TICKERS
+    )
+
+
 class _LLMBudgetSkipped(Exception):
     """Salta el bloque de enriquecimiento Jev/LLM al agotarse el presupuesto."""
 
@@ -256,10 +284,25 @@ class NewsService:
                 best.append(company)
         return best[0] if len(best) == 1 else None
 
-    def _company_for_item(self, db: Session, text: str, ticker: str | None = None) -> Company | None:
+    def _company_for_item(
+        self,
+        db: Session,
+        text: str,
+        ticker: str | None = None,
+        *,
+        feed_ticker_trusted: bool = True,
+    ) -> Company | None:
         if ticker:
             company = resolve_company(db, ticker)
-            if company:
+            # Sigla ambigua con ticker NO autoritativo (busqueda GDELT/RSS):
+            # el vinculo directo colaba noticias del sector (Profitmind/Awase
+            # bajo AI). Se exige que el texto cite a la empresa; sin cita,
+            # cae a la deteccion por evidencia como cualquier otro texto.
+            if company and (
+                feed_ticker_trusted
+                or not _feed_ticker_needs_evidence(ticker)
+                or company_mentioned(company, text, _ticker_evidence_level)
+            ):
                 return company
         return self.detect_ticker(db, text)
 
@@ -334,10 +377,15 @@ class NewsService:
         macro_theme: str | None = None,
         detect_company: bool = True,
         llm_deadline: float | None = None,
+        feed_ticker_trusted: bool = True,
     ) -> ManualNewsResponse:
         # detect_company=False: carriles sin ticker (p.ej. macro) nunca
         # vinculan empresa por coincidencia de texto.
-        company = self._company_for_item(db, text, ticker) if detect_company else None
+        company = (
+            self._company_for_item(db, text, ticker, feed_ticker_trusted=feed_ticker_trusted)
+            if detect_company
+            else None
+        )
         # Gate Jev (3): duplicate/noise con confianza >= 0.85 -> via ligera:
         # se registra el evento en el tracker pero se omite el analisis
         # semantico, el ThesisChange/review y el claim scan. Best-effort:
@@ -725,7 +773,18 @@ class NewsService:
             ):
                 parts.insert(0, item.ticker)
             text = " ".join(part for part in parts if part)
-            company = self._company_for_item(db, text, item.ticker) if detect_company else None
+            # El ticker es autoritativo cuando el carril lo garantiza (SEC/IR)
+            # o cuando lo envia la API manual (connector=None = envio explicito).
+            # GDELT/RSS por consulta traen aciertos de palabra clave: ahi las
+            # siglas ambiguas exigen cita de la empresa en el texto.
+            feed_ticker_trusted = connector is None or connector in _FEED_TICKER_TRUSTED_CONNECTORS
+            company = (
+                self._company_for_item(
+                    db, text, item.ticker, feed_ticker_trusted=feed_ticker_trusted
+                )
+                if detect_company
+                else None
+            )
             # Noticia de un competidor etiquetada con el ticker del feed (RKLB
             # bajo ASTS): sin cita de la empresa no se vincula a ella.
             if (
@@ -762,6 +821,7 @@ class NewsService:
                     llm_deadline=llm_deadline,
                     macro_theme=macro_theme,
                     detect_company=detect_company,
+                    feed_ticker_trusted=feed_ticker_trusted,
                 )
             )
 
