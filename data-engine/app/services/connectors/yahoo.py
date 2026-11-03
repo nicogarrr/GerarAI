@@ -163,3 +163,36 @@ class YahooFinanceClient:
         events = node.get("events") or {}
         rows = list((events.get("splits") or {}).values())
         return _with_exchange_timezone(rows, node.get("meta"))
+
+
+def chart_listing_probe(symbol: str, *, timeout: float) -> tuple[bool | None, str | None]:
+    """¿Cotiza ``symbol``? Consulta corta y síncrona a la chart API (5 días).
+
+    Devuelve (existe, nombre). 404/400 o serie vacía = (False, None): la
+    fuente respondió que no existe. Red, 429/999, otro estado o un 200 sin
+    JSON = (None, None): sin respuesta, el caller no decide por ella. No
+    toca el registry de salud: es una consulta interactiva de un símbolo.
+    """
+    try:
+        response = httpx.get(
+            f"{YahooFinanceClient.base_url}/{yahoo_chart_symbol(symbol)}",
+            params={"interval": "1d", "range": "5d"},
+            headers=YahooFinanceClient.headers,
+            timeout=timeout,
+        )
+    except httpx.HTTPError:
+        return None, None
+    if response.status_code in (400, 404):
+        return False, None
+    if response.status_code != 200:
+        return None, None
+    try:
+        payload = response.json()
+    except ValueError:
+        return None, None
+    result = (payload.get("chart") or {}).get("result") if isinstance(payload, dict) else None
+    if not result or not isinstance(result[0], dict):
+        return False, None
+    meta = result[0].get("meta") or {}
+    name = meta.get("longName") or meta.get("shortName")
+    return True, name if isinstance(name, str) and name.strip() else None
