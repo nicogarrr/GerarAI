@@ -22,8 +22,16 @@ BASIC_FIT = ListingIdentity(
 BY_ISIN = {BASIC_FIT.isin: BASIC_FIT}
 
 
+BY_TICKER = {listing.ticker: listing for listing in BY_ISIN.values()}
+
+
 def reviewed_listing(isin: str | None) -> ListingIdentity | None:
     return BY_ISIN.get((isin or "").strip().upper())
+
+
+def reviewed_listing_for_ticker(ticker: str | None) -> ListingIdentity | None:
+    """Listado revisado cuyo ticker canonico es exactamente ``ticker`` (BFIT.AS)."""
+    return BY_TICKER.get((ticker or "").strip().upper())
 
 
 def ambiguous_bare_symbol(symbol: str | None, currency: str | None) -> ListingIdentity | None:

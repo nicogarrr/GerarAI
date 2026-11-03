@@ -33,10 +33,12 @@ import asyncio
 import json
 from pathlib import Path
 
-from app.services.connectors.esef import (
+from app.services.connectors.esef import (  # noqa: F401 - re-export: tests y callers del script
     EsefClient,
     EsefError,
     EsefFiling,
+    filings_per_lei,
+    merge_facts,
     normalize_xbrl_json,
 )
 from app.services.esef_issuer_mapping import (
@@ -178,60 +180,6 @@ def latest_filing_per_lei(filings: list[EsefFiling]) -> dict[str, EsefFiling]:
             continue
         best[f.lei] = f  # sorted ascending: last write wins = latest period
     return best
-
-
-def filings_per_lei(filings: list[EsefFiling], max_filings: int = 5) -> dict[str, list[EsefFiling]]:
-    """Hasta max_filings filings por LEI: period_end distintos, mas reciente
-    primero, solo con json_url. La historia de 5y de las metricas windowed
-    sale de aqui; sin filings antiguos esas metricas quedan honestamente
-    insufficient_history."""
-    selected: dict[str, list[EsefFiling]] = {}
-    for f in sorted(filings, key=lambda x: x.period_end or "", reverse=True):
-        if not f.json_url:
-            continue
-        chosen = selected.setdefault(f.lei, [])
-        if len(chosen) >= max_filings or any(c.period_end == f.period_end for c in chosen):
-            continue
-        chosen.append(f)
-    return selected
-
-
-def merge_facts(normalized_docs: list[dict]) -> dict:
-    """Fusiona facts normalizados de varios filings (mas reciente primero).
-    Dedup por (concepto, unidad, start, end|instant): el filing mas reciente
-    gana porque recoge las reexpresiones.
-
-    OJO con los instantes (balance): su periodo es solo "instant", sin
-    start/end. Si la clave no lo incluye, TODOS los instantes de un concepto
-    colapsan en uno solo y el balance queda con un unico ejercicio (bug
-    detectado 2026-09-25: total_assets/total_equity con 1 solo ano en BD
-    pese a tener 6 anos de filings).
-
-    La clave incluye las dimensiones (dims). Un desglose por miembro
-    (ifrs-full:SegmentAxis) comparte concepto, unidad y periodo con el
-    consolidado, asi que sin `dims` en la clave un miembro podia ocupar el
-    sitio del consolidado segun el orden del JSON. `refresh_from_esef` descarta
-    las entradas con dims, de modo que el consolidado se perdia y el ejercicio
-    desaparecia entero de la serie, sin aviso."""
-    merged: dict = {}
-    seen: set = set()
-    for facts in normalized_docs:
-        for concept, units in facts.items():
-            for unit, entries in units.items():
-                bucket = merged.setdefault(concept, {}).setdefault(unit, [])
-                for entry in entries:
-                    key = (
-                        concept,
-                        unit,
-                        entry.get("start"),
-                        entry.get("end") or entry.get("instant"),
-                        tuple(entry.get("dims") or ()),
-                    )
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    bucket.append(entry)
-    return merged
 
 
 async def build(out: Path, countries: str | list[str], fetched_at: str, client: EsefClient,

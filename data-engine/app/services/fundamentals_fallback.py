@@ -11,9 +11,13 @@ Orden, de mas a menos fiable, y cada eslabon queda en ``fallback_chain``:
 2. Hechos oficiales ya guardados (ESEF/CNMV, de refresh/esef): no se
    re-ingieren aqui (esa ingesta hace commit y la tesis corre en un
    SAVEPOINT), solo se cuentan y mandan sobre cualquier otra fuente.
-3. Yahoo Finance (no oficial) solo para tickers del mapa REVISADO a mano
+3. Yahoo Finance (no oficial) para tickers del mapa REVISADO a mano
    (``yahoo_fundamentals_service.REVIEWED_MAP``): complemento, nunca
    sustituto - no toca un par (metrica, ejercicio) con hecho oficial.
+4. Emisor sin CIK y sin mapa revisado (UE/UK/resto, nov 2026): ESEF en
+   vivo por LEI (filings.xbrl.org, oficial) y, si no hay, los estados
+   completos de Yahoo como UNICA fuente, etiquetados «una sola fuente, no
+   oficial» (``_non_sec_fallback``).
 
 Nunca lanza: un fallo de red o de identidad deja el bloque en "pending" con
 el motivo de cada eslabon, y lo escrito se revierte con un savepoint propio.
@@ -86,6 +90,10 @@ def ingest_with_fallback(
     entry = REVIEWED_MAP.get(ticker)
     yahoo_result: dict[str, Any] | None = None
     if entry is None:
+        if not company.cik and not official and _non_sec_fallback_enabled():
+            return _non_sec_fallback(db, company, sec_block, chain)
+        # Emisor SEC con un fallo puntual (no se rellena con una fuente no
+        # oficial) o con oficial ya guardado: como antes.
         chain.append({"source": YAHOO_LABEL, "status": "no_aplica", "detail": "ticker sin mapa revisado"})
     else:
         refresh = yahoo_refresh or refresh_from_yahoo
@@ -134,6 +142,114 @@ def ingest_with_fallback(
             "fallback_chain": chain,
         }
     return {**sec_block, "fallback_chain": chain}
+
+
+ESEF_LIVE_LABEL = "ESEF (filings.xbrl.org, informe anual oficial)"
+YAHOO_FULL_LABEL = "Yahoo Finance (una sola fuente, no oficial)"
+
+
+def _non_sec_fallback_enabled() -> bool:
+    from app.services.esef_live import live_lookup_enabled
+
+    return live_lookup_enabled()
+
+
+def _non_sec_fallback(
+    db: Session,
+    company: Company,
+    sec_block: dict[str, Any],
+    chain: list[dict[str, Any]],
+    *,
+    esef_refresh: Callable[..., Any] | None = None,
+    yahoo_full: Callable[..., dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Emisor sin SEC ni mapa Yahoo revisado (BFIT.AS, nov 2026).
+
+    Solo se llama sin hechos oficiales guardados.
+    1. ESEF en vivo por LEI (oficial).
+    2. Si sigue sin datos: estados completos de Yahoo como UNICA fuente,
+       etiquetados «una sola fuente, no oficial».
+    Cada eslabon en su SAVEPOINT; nunca lanza.
+    """
+    official = 0
+    from app.services.async_bridge import run_from_any_context
+    from app.services.financial_ingestion_service import FinancialIngestionService
+
+    nested = db.begin_nested()
+    try:
+        if esef_refresh is not None:
+            result = esef_refresh(db, company)
+        else:
+            result = run_from_any_context(
+                FinancialIngestionService().refresh_from_esef(db=db, company=company, commit=False)
+            )
+        nested.commit()
+        official = _stored_official_facts(db, company)
+        chain.append({
+            "source": ESEF_LIVE_LABEL,
+            "status": "ok" if official else "sin_datos",
+            "facts": result.get("facts_imported", 0),
+            "lei": result.get("lei"),
+            "period_end": result.get("period_end"),
+        })
+        if official:
+            return {
+                "status": "ok",
+                "source": ESEF_LIVE_LABEL,
+                "official": True,
+                "facts_imported": result.get("facts_imported", 0),
+                "lei": result.get("lei"),
+                "period_end": result.get("period_end"),
+                "fallback_chain": chain,
+            }
+    except Exception as exc:  # noqa: BLE001 - la tesis nunca se rompe por una fuente
+        if nested.is_active:
+            nested.rollback()
+        chain.append({"source": ESEF_LIVE_LABEL, "status": "error", "detail": redact_secrets(str(exc))[:200]})
+
+    from app.services.yahoo_fundamentals_service import SINGLE_SOURCE_NOTE, refresh_full_from_yahoo
+
+    refresh = yahoo_full or refresh_full_from_yahoo
+    nested = db.begin_nested()
+    try:
+        yahoo_result = refresh(db, company, commit=False)
+        nested.commit()
+    except Exception as exc:  # noqa: BLE001
+        if nested.is_active:
+            nested.rollback()
+        chain.append({"source": YAHOO_FULL_LABEL, "status": "error", "detail": redact_secrets(str(exc))[:200]})
+        if official:
+            return {
+                "status": "ok",
+                "source": "ESEF/CNMV guardado",
+                "official": True,
+                "facts_imported": 0,
+                "already_present": official,
+                "fallback_chain": chain,
+            }
+        return {**sec_block, "fallback_chain": chain}
+    chain.append({
+        "source": YAHOO_FULL_LABEL,
+        "status": "ok",
+        "facts": yahoo_result.get("facts_imported", 0),
+        "symbol": yahoo_result.get("symbol"),
+    })
+    return {
+        "status": "ok",
+        "source": YAHOO_FULL_LABEL,
+        "official": False,
+        "single_source": True,
+        "note": SINGLE_SOURCE_NOTE,
+        "symbol": yahoo_result.get("symbol"),
+        "currency": yahoo_result.get("currency"),
+        "facts_imported": yahoo_result.get("facts_imported", 0),
+        "already_present": yahoo_result.get("facts_skipped_official", 0) + official,
+        "metrics": yahoo_result.get("metrics_covered", []),
+        "document_id": yahoo_result.get("source_document_id"),
+        "source_url": yahoo_result.get("source_url"),
+        "retrieved_at": yahoo_result.get("retrieved_at"),
+        "fallback_chain": chain,
+    }
 
 
 # Piezas del puente de valoracion que el modo huecos de Yahoo puede aportar.
