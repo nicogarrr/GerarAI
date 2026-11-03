@@ -1,5 +1,8 @@
 // Guard: el monitor denso de watchlist solo pinta datos con fuente propia
-// (market_prices), conector publico trazable (NASDAQ) o tesis publicada.
+// (market_prices), la tabla de fechas de resultados refrescada dos veces al
+// dia desde conectores publicos trazables (Yahoo/NASDAQ/manual) o tesis
+// publicada. NUNCA una consulta en vivo a un proveedor dentro de la peticion:
+// ponia hasta 8 s de red en el TTFB de cada vista de watchlist.
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +20,9 @@ test('proximos resultados y chip 52 semanas vienen del monitor, no hardcodeados'
     const wl = JSON.parse(readFileSync('lib/i18n/messages/es/watchlist.json', 'utf8')).page;
     assert.ok(page.includes("t('watchlist.page.sort.earnings')") && wl.sort.earnings === 'Próx. resultados');
     assert.ok(page.includes("t('watchlist.page.low52')") && wl.low52 === 'Mínimo 52 sem');
-    assert.match(route, /fetch_earnings_range/);
+    assert.match(route, /EarningsDate/);
+    assert.match(route, /is_fresh/);
+    assert.doesNotMatch(route, /fetch_earnings_range/);
     assert.match(route, /MarketPrice/);
 });
 

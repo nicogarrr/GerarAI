@@ -1,10 +1,10 @@
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi.testclient import TestClient
 
 import main
 from app.core.database import SessionLocal, init_db
-from app.models import Company, FundamentalModelVersion, MarketPrice, Tenant, ThesisVersion
+from app.models import Company, EarningsDate, FundamentalModelVersion, MarketPrice, Tenant, ThesisVersion
 
 
 def _seed_monitor_fixtures() -> int:
@@ -54,17 +54,26 @@ def _seed_monitor_fixtures() -> int:
         db.close()
 
 
-def test_watchlist_monitor_returns_own_data(monkeypatch):
+def _set_earnings_rows(rows: list[EarningsDate]) -> None:
+    db = SessionLocal()
+    try:
+        db.query(EarningsDate).filter(EarningsDate.ticker == "MONTEST").delete()
+        for row in rows:
+            db.add(row)
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_watchlist_monitor_returns_own_data():
     _seed_monitor_fixtures()
-
-    async def fake_earnings(desde, hasta, client=None):
-        return {"status": "ok", "events": [
-            {"symbol": "MONTEST", "date": (date.today() + timedelta(days=9)).isoformat()},
-            {"symbol": "OTHER", "date": (date.today() + timedelta(days=3)).isoformat()},
-        ], "errors": []}
-
-    monkeypatch.setattr(
-        "app.api.routes.watchlist.fetch_earnings_range", fake_earnings)
+    # La fecha viene SOLO de la tabla refrescada por el job (con su fuente y
+    # confirmacion); la ruta ya no consulta NASDAQ en vivo.
+    _set_earnings_rows([EarningsDate(
+        ticker="MONTEST", event_date=date.today() + timedelta(days=9),
+        confirmed=True, source="nasdaq+yahoo",
+        source_label="Calendario público de NASDAQ + Yahoo Finance (calendarEvents)",
+        fetched_at=datetime.now(UTC))])
     client = TestClient(main.app)
     res = client.get("/api/watchlist/monitor", params={"tickers": "montest,NOEXISTE"})
     assert res.status_code == 200
@@ -76,20 +85,38 @@ def test_watchlist_monitor_returns_own_data(monkeypatch):
     assert row["fair_value"] == 150.0
     assert row["valuation_side"] == "infravalorada"
     assert row["next_earnings_date"] == (date.today() + timedelta(days=9)).isoformat()
-    assert row["next_earnings_source"] == "NASDAQ (api.nasdaq.com)"
+    assert row["next_earnings_source"] == "Calendario público de NASDAQ + Yahoo Finance (calendarEvents)"
+    assert row["next_earnings_confirmed"] is True
+    assert body["earnings_status"] == "stored"
     assert "NOEXISTE" not in body["items"]
 
 
-def test_watchlist_monitor_degrades_without_earnings(monkeypatch):
+def test_watchlist_monitor_stale_stored_date_is_hidden():
+    # Una fila automatica sin renovar en mas de STALE_AFTER no se muestra: el
+    # ticker aparece "sin fecha" en lugar de exhibir un dato posiblemente movido.
     _seed_monitor_fixtures()
-
-    async def broken(desde, hasta, client=None):
-        raise RuntimeError("nasdaq down")
-
-    monkeypatch.setattr("app.api.routes.watchlist.fetch_earnings_range", broken)
+    _set_earnings_rows([EarningsDate(
+        ticker="MONTEST", event_date=date.today() + timedelta(days=9),
+        confirmed=True, source="nasdaq",
+        source_label="Calendario público de NASDAQ",
+        fetched_at=datetime.now(UTC) - timedelta(days=5))])
     client = TestClient(main.app)
     res = client.get("/api/watchlist/monitor", params={"tickers": "MONTEST"})
     assert res.status_code == 200
     row = res.json()["items"]["MONTEST"]
     assert row["next_earnings_date"] is None
-    assert res.json()["earnings_status"] == "unavailable"
+    assert row["next_earnings_source"] is None
+    assert res.json()["earnings_status"] == "stored"
+
+
+def test_watchlist_monitor_without_stored_date():
+    # Sin fila guardada: hueco honesto a None; nunca una fecha inventada ni una
+    # espera de red en la peticion.
+    _seed_monitor_fixtures()
+    _set_earnings_rows([])
+    client = TestClient(main.app)
+    res = client.get("/api/watchlist/monitor", params={"tickers": "MONTEST"})
+    assert res.status_code == 200
+    row = res.json()["items"]["MONTEST"]
+    assert row["next_earnings_date"] is None
+    assert res.json()["earnings_status"] == "stored"

@@ -424,7 +424,7 @@ def test_corporate_actions_dividends_and_sync_status_are_tenant_scoped(two):
     ) == later.replace(tzinfo=None)
 
 
-def test_watchlist_monitor_uses_only_the_active_tenants_thesis(two, monkeypatch):
+def test_watchlist_monitor_uses_only_the_active_tenants_thesis(two):
     db, tenant_a, tenant_b, company_a, _ = two
     db.add(
         MarketPrice(
@@ -439,11 +439,6 @@ def test_watchlist_monitor_uses_only_the_active_tenants_thesis(two, monkeypatch)
     db.commit()
     _thesis(db, tenant_a, company_a, 1, 10)
     _thesis(db, tenant_b, company_a, 2, 20)
-
-    async def _no_earnings(*args, **kwargs):
-        return {"status": "ok", "events": []}
-
-    monkeypatch.setattr("app.api.routes.watchlist.fetch_earnings_range", _no_earnings)
 
     from app.api.routes.watchlist import watchlist_monitor
 

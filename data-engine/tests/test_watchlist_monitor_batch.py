@@ -9,7 +9,7 @@ from app.api.routes import watchlist
 from app.models.entities import Base, Company, FundamentalModelVersion, MarketPrice, ThesisVersion
 
 
-def test_monitor_twenty_companies_has_constant_query_count(monkeypatch):
+def test_monitor_twenty_companies_has_constant_query_count():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     db = Session(engine)
@@ -32,9 +32,6 @@ def test_monitor_twenty_companies_has_constant_query_count(monkeypatch):
         for days, price in ((400, 1), (20, 80), (1, 100), (0, 110)):
             db.add(MarketPrice(company_id=company.id, date=today-timedelta(days=days), close=price))
     db.commit()
-    async def earnings(*args):
-        return {"status": "unavailable", "events": []}
-    monkeypatch.setattr(watchlist, "fetch_earnings_range", earnings)
     statements = []
     event.listen(engine, "before_cursor_execute", lambda *a: statements.append(a[2]))
     result = asyncio.run(watchlist.watchlist_monitor(
@@ -58,7 +55,7 @@ def test_monitor_twenty_companies_has_constant_query_count(monkeypatch):
     db.close()
 
 
-def test_latest_published_inferred_thesis_is_not_replaced_by_older_fair_value(monkeypatch):
+def test_latest_published_inferred_thesis_is_not_replaced_by_older_fair_value():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     db = Session(engine)
@@ -71,9 +68,6 @@ def test_latest_published_inferred_thesis_is_not_replaced_by_older_fair_value(mo
                              expected_value=150, valuation_basis=basis,
                              thesis_markdown="t", executive_summary="s"))
     db.commit()
-    async def earnings(*args):
-        return {"status": "unavailable", "events": []}
-    monkeypatch.setattr(watchlist, "fetch_earnings_range", earnings)
     out = asyncio.run(watchlist.watchlist_monitor(tickers="INFERRED", db=db))
     row = out["items"]["INFERRED"]
     assert row["fair_value"] is None
