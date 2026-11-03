@@ -657,8 +657,18 @@ def _asks_fees(text: str) -> bool:
                 and not re.search(r"\bsi\b|\bif\b|\bcobra\w*|\bcharges?\b|\bter\b", text))
 
 
+#: Pregunta de plan o consejo que menciona la caja de pasada («Tengo 2.500 € en
+#: efectivo… ¿qué cambiarías de mi cartera, paso a paso?»): no es «¿cuánto efectivo
+#: tengo?». Prueba real 2026-11-02: contestaba solo «Tu efectivo guardado: 2.500,00 €».
+_CASH_PLAN = re.compile(
+    r"\b(?:cambiar\w*|deberia\w*|jubil\w*|objetivo|paso\s+a\s+paso|recomiend\w*|aconsej\w*|conviene"
+    r"|estrategia|diversific\w*|should|change|retire\w*|retirement|strategy)\b"
+)
+
+
 def _asks_cash(text: str, question: str) -> bool:
     return bool(_CASH.search(text) and _CASH_ASK.search(text) and not _CASH_NOT.search(text)
+                and not _CASH_PLAN.search(text)
                 and not _tickers_in(question)
                 and not (_CASH_THIRD.search(text) and not _CASH_MINE.search(text)))
 
