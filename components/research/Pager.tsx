@@ -16,7 +16,7 @@ export function Pager({ page, pages, onPage, total, label }: {
   return (
     <nav aria-label={t('ui.pagination.ariaOf', { label })} className="mt-4 flex items-center justify-between gap-3">
       <button className={btn} disabled={page <= 1} onClick={() => onPage(page - 1)} type="button">{t('ui.pagination.prev')}</button>
-      <span aria-live="polite" className="text-xs text-gray-400"><span className="whitespace-nowrap">{t('research.pageOf', { current: page, total: pages })}</span> · {total} {label}</span>
+      <span aria-live="polite" className="text-xs text-gray-400"><span className="whitespace-nowrap">{t('researchShared.pageOf', { current: page, total: pages })}</span> · {total} {label}</span>
       <button className={btn} disabled={page >= pages} onClick={() => onPage(page + 1)} type="button">{t('ui.pagination.next')}</button>
     </nav>
   );

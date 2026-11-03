@@ -102,8 +102,8 @@ void test('la página usa el helper y declara el contador honesto de lo visible'
     assert.match(page, /\{ordered\.length\s*\?/, 'el estado vacío depende del registro, no del filtro');
     assert.match(page, /title=\{t\('research\.emptyTitle'\)\}/, 'el estado sin empresas se conserva');
     assert.equal(es.emptyTitle, 'Todavía no hay ninguna empresa con research.');
-    assert.match(page, /t\('research\.pageOf', \{ current: formatNumber\(slice\.page\), total: formatNumber\(slice\.pages\) \}\)/, 'posición de página declarada');
-    assert.equal(es.pageOf, 'Página {current} de {total}');
+    assert.match(page, /t\('researchShared\.pageOf', \{ current: formatNumber\(slice\.page\), total: formatNumber\(slice\.pages\) \}\)/, 'posición de página declarada');
+    assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/researchShared.json', 'utf8')).pageOf, 'Página {current} de {total}');
 });
 
 void test('el buscador es un formulario GET accesible y las coincidencias vacías son honestas', () => {

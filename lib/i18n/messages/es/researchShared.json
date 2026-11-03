@@ -1,0 +1,56 @@
+{
+  "valuationSummary": {
+    "fact": "hecho {id}",
+    "fairValue": "Valor justo",
+    "notEvaluable": "No evaluable",
+    "reviewAge": "Revisar antigüedad",
+    "margin": "Margen de seguridad",
+    "marginHelp": "(Valor justo − precio) / valor justo. Solo misma divisa y valor publicable.",
+    "reverseDcf": "DCF inverso: crecimiento exigido",
+    "perYear": "{pct} anual",
+    "modelPrice": " · precio del modelo {price}",
+    "scenarioNote": "Escenario separado de la tesis; no es una previsión.",
+    "piotroski": "Salud financiera · Piotroski",
+    "piotroskiPartial": "No evaluable ({count}/9 puntos con datos)",
+    "fiscalYear": "Ejercicio cerrado {date}",
+    "details": "Ver puntos, fuentes y Altman Z''",
+    "pending": "Dato pendiente: {item}",
+    "altmanNote": "Patrimonio contable, sin ajuste de mercados emergentes.",
+    "profitNote": "El beneficio es el neto reportado; no se reconstruyen partidas extraordinarias ausentes.",
+    "piotroskiMethod": "Método Piotroski",
+    "altmanMethod": "Método Altman",
+    "title": "Valoración y salud financiera",
+    "loading": "Cargando valoraciones guardadas…",
+    "failed": "La valoración no está disponible ahora. Las posiciones y los precios no cambian.",
+    "empty": "Sin empresas con datos de valoración guardados."
+  },
+  "translate": {
+    "reason": {
+      "cooldown": "Reintento programado en unos minutos.",
+      "busy": "Otra traducción está en curso. Inténtalo en unos segundos.",
+      "budget": "Límite diario de traducción alcanzado.",
+      "quota": "Límite de traducciones por minuto alcanzado. Inténtalo en un minuto.",
+      "badOutput": "El traductor automático no dio un resultado fiable para este texto.",
+      "providerRateLimited": "Los traductores gratuitos están saturados ahora mismo. Inténtalo en unos minutos.",
+      "providerTimeout": "El traductor no respondió a tiempo. Inténtalo de nuevo en unos minutos.",
+      "provider": "El traductor falló. Inténtalo de nuevo en unos minutos.",
+      "changed": "La noticia cambió mientras se traducía. Inténtalo de nuevo."
+    },
+    "genericFailure": "Traducción no disponible ahora mismo. Inténtalo de nuevo en un rato.",
+    "autoLabel": "Traducción automática · español",
+    "viewTranslation": "Ver traducción",
+    "viewOriginal": "Ver original",
+    "translating": "Traduciendo…",
+    "translate": "Traducir",
+    "originalHeadline": "Titular original (sin traducir)",
+    "autoViewOriginal": "Traducción automática · ver original"
+  },
+  "changeCopy": {
+    "noStoredThesis": "No hay una tesis guardada para evaluar el impacto.",
+    "noNodeMatched": "No se ha encontrado una relación suficientemente fiable con la tesis.",
+    "affectsClaims": "Afecta a {count} afirmaciones y a estos apartados de la tesis: {areas}",
+    "affectsNoClaim": "No afecta a ninguna afirmación concreta; toca estos apartados de la tesis: {areas}",
+    "affectsOneClaim": "Afecta a 1 afirmación y a estos apartados de la tesis: {areas}"
+  },
+  "pageOf": "Página {current} de {total}"
+}

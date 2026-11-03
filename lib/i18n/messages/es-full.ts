@@ -33,6 +33,7 @@ import plan__es from './es/plan.json' with { type: 'json' };
 import portfolio__es from './es/portfolio.json' with { type: 'json' };
 import propicks__es from './es/propicks.json' with { type: 'json' };
 import research__es from './es/research.json' with { type: 'json' };
+import researchShared__es from './es/researchShared.json' with { type: 'json' };
 import risk__es from './es/risk.json' with { type: 'json' };
 import screener__es from './es/screener.json' with { type: 'json' };
 import search__es from './es/search.json' with { type: 'json' };
@@ -77,6 +78,7 @@ export const bundledSpanish = {
     portfolio: portfolio__es,
     propicks: propicks__es,
     research: research__es,
+    researchShared: researchShared__es,
     risk: risk__es,
     screener: screener__es,
     search: search__es,

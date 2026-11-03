@@ -316,7 +316,7 @@ export default async function ResearchSourcesPage({
               </Link>
             ) : null}
             <span className="text-xs whitespace-nowrap text-gray-500">
-              {t('research.pageOf', { current: formatNumber(pageInfo.page, { maximumFractionDigits: 0 }), total: formatNumber(pageInfo.pages, { maximumFractionDigits: 0 }) })}
+              {t('researchShared.pageOf', { current: formatNumber(pageInfo.page, { maximumFractionDigits: 0 }), total: formatNumber(pageInfo.pages, { maximumFractionDigits: 0 }) })}
             </span>
             {pageInfo.page < pageInfo.pages ? (
               <Link

@@ -66,15 +66,15 @@ const SPANISH_NODE_TO_EN: Record<string, string> = {
 function englishSummary(text: string): string {
     const t = createTranslator('en');
     return text
-        .replace(NO_STORED_THESIS, t('research.changeCopy.noStoredThesis'))
-        .replace(NO_NODE_MATCHED, t('research.changeCopy.noNodeMatched'))
+        .replace(NO_STORED_THESIS, t('researchShared.changeCopy.noStoredThesis'))
+        .replace(NO_NODE_MATCHED, t('researchShared.changeCopy.noNodeMatched'))
         .replace(AFFECTS_AREAS, (_match: string, en?: string, es?: string, labels: string = '') => {
             const count = Number(en ?? es ?? 0);
             const areas = labels.split(', ').filter(Boolean).map((label: string) => SPANISH_NODE_TO_EN[label] ?? label).join(', ');
-            if (count === 1) return t('research.changeCopy.affectsOneClaim', { areas });
+            if (count === 1) return t('researchShared.changeCopy.affectsOneClaim', { areas });
             return count > 0
-                ? t('research.changeCopy.affectsClaims', { count: String(count), areas })
-                : t('research.changeCopy.affectsNoClaim', { areas });
+                ? t('researchShared.changeCopy.affectsClaims', { count: String(count), areas })
+                : t('researchShared.changeCopy.affectsNoClaim', { areas });
         });
 }
 

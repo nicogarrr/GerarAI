@@ -10,15 +10,15 @@ import { useT } from '@/lib/i18n/client';
  *  honesto para la persona. Medido en prod 19-oct-2026: un fallo devolvía el
  *  botón a «Traducir» sin decir nada. Sin motivo conocido, mensaje genérico. */
 const REASON_KEYS = {
-  cooldown: 'research.translate.reason.cooldown',
-  busy: 'research.translate.reason.busy',
-  budget: 'research.translate.reason.budget',
-  quota: 'research.translate.reason.quota',
-  bad_output: 'research.translate.reason.badOutput',
-  provider_rate_limited: 'research.translate.reason.providerRateLimited',
-  provider_timeout: 'research.translate.reason.providerTimeout',
-  provider: 'research.translate.reason.provider',
-  changed: 'research.translate.reason.changed',
+  cooldown: 'researchShared.translate.reason.cooldown',
+  busy: 'researchShared.translate.reason.busy',
+  budget: 'researchShared.translate.reason.budget',
+  quota: 'researchShared.translate.reason.quota',
+  bad_output: 'researchShared.translate.reason.badOutput',
+  provider_rate_limited: 'researchShared.translate.reason.providerRateLimited',
+  provider_timeout: 'researchShared.translate.reason.providerTimeout',
+  provider: 'researchShared.translate.reason.provider',
+  changed: 'researchShared.translate.reason.changed',
 } as const;
 
 /** Resumen/cuerpo ingerido con traducción bajo demanda (Nico: traducir cada
@@ -65,19 +65,19 @@ export function NewsSummary({ event }: { event: ResearchNewsEvent }) {
       <p className="text-sm text-gray-400">{showingTranslation ? translated : original}</p>
       {translated !== null ? (
         <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
-          <span>{t('research.translate.autoLabel')}</span>
+          <span>{t('researchShared.translate.autoLabel')}</span>
           <button className="min-h-11 text-teal-300 hover:text-teal-200 sm:min-h-0" type="button" onClick={() => setShowOriginal(v => !v)}>
-            {showOriginal ? t('research.translate.viewTranslation') : t('research.translate.viewOriginal')}
+            {showOriginal ? t('researchShared.translate.viewTranslation') : t('researchShared.translate.viewOriginal')}
           </button>
         </span>
       ) : translatable ? (
         <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
           <button className="min-h-11 text-teal-300 hover:text-teal-200 sm:min-h-0" type="button" disabled={busy} onClick={onTranslate}>
-            {busy ? t('research.translate.translating') : t('research.translate.translate')}
+            {busy ? t('researchShared.translate.translating') : t('researchShared.translate.translate')}
           </button>
           {failure ? (
             <span className="text-gray-500" role="status">
-              {Object.hasOwn(REASON_KEYS, failure) ? t(REASON_KEYS[failure as keyof typeof REASON_KEYS]) : t('research.translate.genericFailure')}
+              {Object.hasOwn(REASON_KEYS, failure) ? t(REASON_KEYS[failure as keyof typeof REASON_KEYS]) : t('researchShared.translate.genericFailure')}
             </span>
           ) : null}
         </span>
