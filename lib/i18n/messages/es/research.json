@@ -380,7 +380,11 @@
     "impliedGrowthSplitTitle": "De dónde sale el valor que pagas hoy",
     "impliedGrowthGridLabel": "Crecimiento exigido si cambian el WACC o el margen",
     "reverseDcfUnavailable": "No disponible: {inputs}.",
-    "reverseDcfMissingInputs": "faltan inputs de mercado o financieros"
+    "reverseDcfMissingInputs": "faltan inputs de mercado o financieros",
+    "methodLabel": "Valor razonable: {label} (estimación con método, no es un dato reportado).",
+    "methodWarning": "Aviso: {text}",
+    "methodRange": "Rango de contraste {low}–{high}:",
+    "methodPriceImplies": "Qué descuenta el precio: {text}"
   },
   "identity": {
     "metaDescription": "Research de {subject}: tesis versionada, financieros canónicos, modelo a largo plazo, valoración y evidencia con fuentes trazables.",

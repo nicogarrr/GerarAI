@@ -512,6 +512,38 @@ def _last_official_close_date(as_of: datetime | None):
     return day
 
 
+
+def valuation_method_lines(valuation: dict) -> list[str]:
+    """Método del valor razonable cuando es una estimación con método.
+
+    Capex normalizado / DCF multietapa (``valuation_label``), su explicación,
+    el aviso 0,2x–5x con el rango por múltiplos y lo que descuenta el precio
+    (DCF inverso). Sin etiqueta ni aviso no añade nada.
+    """
+    lines: list[str] = []
+    label = valuation.get("valuation_label")
+    if label:
+        lines.append(f"- Valor razonable: {label} (no es un dato reportado; método abajo)")
+        lines.extend(f"  - {note}" for note in valuation.get("valuation_notes") or [])
+    warning = valuation.get("plausibility_warning")
+    if isinstance(warning, dict) and warning.get("message_es"):
+        lines.append(f"- Aviso: {warning['message_es']}")
+    fair_range = valuation.get("fair_value_range")
+    if isinstance(fair_range, dict) and fair_range.get("components"):
+        parts = "; ".join(
+            f"{item.get('label')}: {number_es(item.get('value'))}"
+            for item in fair_range["components"]
+            if isinstance(item.get("value"), (int, float))
+        )
+        lines.append(
+            f"- Rango de contraste: {number_es(fair_range.get('low'))}–{number_es(fair_range.get('high'))} "
+            f"{fair_range.get('currency') or ''} ({parts})".rstrip()
+        )
+    reverse = valuation.get("reverse_dcf") or {}
+    if label and isinstance(reverse, dict) and reverse.get("explanation_es"):
+        lines.append(f"- Qué descuenta el precio: {reverse['explanation_es']}")
+    return lines
+
 class ThesisService:
     def __init__(self) -> None:
         self.valuation_service = ValuationService()
@@ -1809,6 +1841,7 @@ class ThesisService:
                 *self._range_lines(valuation).split("\n"),
                 f"- Fuente de inputs: {term_es((valuation.get('trace') or {}).get('input_source', 'unknown'))}",
                 f"- Motor: {term_es((valuation.get('trace') or {}).get('engine', 'unknown'))}",
+                *valuation_method_lines(valuation),
             ]
         )
 

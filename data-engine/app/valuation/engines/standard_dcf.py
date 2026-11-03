@@ -31,6 +31,14 @@ from app.valuation.engines.base import (
     snapshot_trace,
 )
 from app.valuation.moat_framework import empty_moat_framework
+from app.valuation.normalized_fcf import (
+    ProjectionPlan,
+    build_projection,
+    planned_reverse_dcf,
+    planned_sensitivity,
+    plausibility_warning,
+    run_planned,
+)
 from app.valuation.reverse_dcf import ReverseDCFInputs, solve_required_growth
 from app.valuation.scenario_definitions import mechanical_dcf_scenarios
 from app.valuation.scenario_model import Scenario, probability_weighted_value
@@ -157,6 +165,73 @@ def _normalized_fcf_margin(
     return normalized, normalization
 
 
+
+def _run_scenario(
+    plan: ProjectionPlan,
+    *,
+    revenue: float,
+    assumptions: dict,
+    base_margin: float,
+    net_debt: float,
+    shares: float,
+    minority_interest: float,
+    preferred_stock: float,
+):
+    """Un escenario mecánico: DCF plano de 5 años o la trayectoria del plan.
+
+    Con plan activo el escenario desplaza TODA la trayectoria (crecimiento de
+    la etapa 1 y margen de entrada/llegada) con el mismo delta que el modelo
+    mecánico aplica al base, así bear <= base <= bull se conserva.
+    """
+    if not plan.active:
+        return run_dcf(
+            DCFInputs(
+                revenue=revenue,
+                revenue_growth=float(assumptions["revenue_growth"]),
+                fcf_margin=float(assumptions["fcf_margin"]),
+                wacc=float(assumptions["wacc"]),
+                terminal_growth=float(assumptions["terminal_growth"]),
+                net_debt=net_debt,
+                shares_outstanding=shares,
+                minority_interest=minority_interest,
+                preferred_stock=preferred_stock,
+            )
+        )
+    return run_planned(
+        plan,
+        revenue=revenue,
+        growth=float(assumptions["revenue_growth"]),
+        margin=float(assumptions["fcf_margin"]),
+        base_margin=base_margin,
+        wacc=float(assumptions["wacc"]),
+        terminal_growth=float(assumptions["terminal_growth"]),
+        net_debt=net_debt,
+        shares_outstanding=shares,
+        minority_interest=minority_interest,
+        preferred_stock=preferred_stock,
+    )
+
+
+
+def _with_projection_labels(result: dict, *, projection: dict | None, warning: dict | None) -> dict:
+    """Etiqueta del método y aviso de plausibilidad, solo cuando existen.
+
+    Con la proyección plana de 5 años y el valor dentro de 0,2x–5x el precio
+    el resultado no cambia ni un campo (los goldens lo comprueban). Con
+    capex normalizado o DCF multietapa el valor es una estimación con método:
+    ``valuation_label`` lo dice y ``valuation_notes`` lo explica. La guarda
+    0,2x–5x es un AVISO: el valor se publica igual y el servicio añade el
+    contraste por múltiplos.
+    """
+    if projection is not None:
+        result["valuation_label"] = projection.get("label")
+        result["valuation_notes"] = list(projection.get("notes_es") or [])
+        result["trace"]["projection"] = projection
+    if warning is not None:
+        result["plausibility_warning"] = warning
+        result["trace"]["plausibility_warning"] = warning
+    return result
+
 class StandardDCFEngine(ValuationEngine):
     """DCF FCFF estándar sobre snapshot coherente.
 
@@ -209,7 +284,25 @@ class StandardDCFEngine(ValuationEngine):
                 )
             margin = fcf / revenue
 
-        if margin <= 0:
+        # Forma de la proyección (capex normalizado / DCF multietapa): ver
+        # app/valuation/normalized_fcf.py. Con capex de crecimiento material
+        # el margen de entrada converge al de ciclo medio con capex de
+        # mantenimiento; con crecimiento >= 10 % se añade la etapa 6–10 años.
+        growth_fact = snapshot.value("revenue_growth")
+        projection = build_projection(
+            context.db,
+            company.id,
+            context.as_of,
+            margin=margin,
+            growth=max(
+                min(growth_fact if growth_fact is not None else default_growth(company), 0.45),
+                -0.15,
+            ),
+            growth_sourced=growth_fact is not None,
+        )
+        plan = projection["plan"]
+
+        if margin <= 0 and plan.margin_start is None:
             # A known-negative FCF margin means the company consumes cash. The
             # FCFF DCF cannot represent that: clamping the floor to +1% would
             # turn a reported burn into a positive enterprise value. Refuse
@@ -235,6 +328,14 @@ class StandardDCFEngine(ValuationEngine):
         raw_margin = margin
         growth = max(min(raw_growth, 0.45), -0.15)
         margin, margin_clamped = clamp_fcf_margin(margin, ceiling=0.50)
+        growth_after_clamp = growth
+        if plan.margin_start is not None:
+            # Margen de llegada = ciclo medio (ya acotado en normalized_fcf);
+            # el de entrada (reportado) queda en plan.margin_start.
+            raw_margin = margin = projection["margin"]
+            margin_clamped = False
+        if plan.growth_fade:
+            growth = projection["growth"]
 
         wacc, wacc_source, terminal, terminal_source, dropped_inferred = resolve_rates(
             context.db, company, as_of=context.as_of
@@ -289,18 +390,15 @@ class StandardDCFEngine(ValuationEngine):
         )
         scenario_results = {}
         for scenario in scenarios:
-            result = run_dcf(
-                DCFInputs(
-                    revenue=revenue,
-                    revenue_growth=float(scenario.assumptions["revenue_growth"]),
-                    fcf_margin=float(scenario.assumptions["fcf_margin"]),
-                    wacc=float(scenario.assumptions["wacc"]),
-                    terminal_growth=float(scenario.assumptions["terminal_growth"]),
-                    net_debt=net_debt,
-                    shares_outstanding=shares,
-                    minority_interest=minority_interest,
-                    preferred_stock=preferred_stock,
-                )
+            result = _run_scenario(
+                plan,
+                revenue=revenue,
+                assumptions=scenario.assumptions,
+                base_margin=margin,
+                net_debt=net_debt,
+                shares=shares,
+                minority_interest=minority_interest,
+                preferred_stock=preferred_stock,
             )
             scenario_results[scenario.name] = {
                 "definition": scenario_definition_trace(scenario),
@@ -359,12 +457,44 @@ class StandardDCFEngine(ValuationEngine):
             # WACC con los que se resolvio (la vista del modelo usa el margen
             # normalizado y puede dar otra cifra con otra base).
             reverse = {**reverse, "fcf_margin": margin, "wacc": wacc}
+            if plan.active:
+                # Mismo camino que el modelo (multietapa / margen convergente):
+                # el inverso de un DCF plano contradiría la valoración mostrada.
+                planned = planned_reverse_dcf(
+                    plan,
+                    market_price=comparable_price,
+                    revenue=revenue,
+                    growth=growth,
+                    margin=margin,
+                    wacc=wacc,
+                    terminal_growth=terminal,
+                    net_debt=net_debt,
+                    shares_outstanding=shares,
+                    minority_interest=minority_interest,
+                    preferred_stock=preferred_stock,
+                    historical_cagr=(projection["info"] or {}).get("revenue_cagr_3y"),
+                )
+                reverse = {**planned, "fcf_margin": margin, "wacc": wacc}
 
-        sensitivity = sensitivity_grid(
-            base_inputs,
-            growth_values=[growth - 0.04, growth, growth + 0.04],
-            wacc_values=[wacc - 0.01, wacc, wacc + 0.01],
-        )
+        if plan.active:
+            sensitivity = planned_sensitivity(
+                plan,
+                revenue=revenue,
+                margin=margin,
+                terminal_growth=terminal,
+                net_debt=net_debt,
+                shares_outstanding=shares,
+                growth_values=[growth - 0.04, growth, growth + 0.04],
+                wacc_values=[wacc - 0.01, wacc, wacc + 0.01],
+                minority_interest=minority_interest,
+                preferred_stock=preferred_stock,
+            )
+        else:
+            sensitivity = sensitivity_grid(
+                base_inputs,
+                growth_values=[growth - 0.04, growth, growth + 0.04],
+                wacc_values=[wacc - 0.01, wacc, wacc + 0.01],
+            )
 
         expected_raw = weighted["expected_value"]
         bear = scenario_results["bear"]["value_per_share"]
@@ -431,8 +561,10 @@ class StandardDCFEngine(ValuationEngine):
         clamp_notes: list[str] = []
         if margin_clamped:
             clamp_notes.append(f"fcf_margin {raw_margin:.4f} clamped to the {margin:.4f} ceiling")
-        if growth != raw_growth:
-            clamp_notes.append(f"revenue_growth {raw_growth:.4f} clamped to {growth:.4f}")
+        if growth_after_clamp != raw_growth:
+            clamp_notes.append(
+                f"revenue_growth {raw_growth:.4f} clamped to {growth_after_clamp:.4f}"
+            )
         if terminal_share is not None and terminal_share > 0.80:
             clamp_notes.append(
                 f"terminal value is {terminal_share:.1%} of enterprise value; "
@@ -446,7 +578,17 @@ class StandardDCFEngine(ValuationEngine):
             publication_blockers.append("forecast_is_not_the_driver")
 
 
+        warning = plausibility_warning(expected, comparable_price)
+        if plan.active and projection["info"] is not None:
+            latest = (projection["info"].get("capex_normalization") or {}).get("latest")
+            if plan.margin_start is not None and latest:
+                # FCF con capex de mantenimiento por acción (base de las
+                # acciones del DCF): alimenta el contraste P/FCF normalizado.
+                projection["info"]["normalized_fcf_per_share"] = (
+                    latest["operating_cash_flow"] - latest["maintenance_capex"]
+                ) / shares
         return apply_publication_blockers(
+            _with_projection_labels(
             {
             "ticker": company.ticker,
             "model_type": company.valuation_model,
@@ -476,6 +618,7 @@ class StandardDCFEngine(ValuationEngine):
             "comparable_price_basis": "ordinary_share" if ratio else "listed_share",
             "reverse_dcf": reverse,
             "sensitivity": sensitivity,
+
             "moat": empty_moat_framework(
                 company.company_type, company.factor_tags or [], company.special_risks or []
             ),
@@ -487,7 +630,7 @@ class StandardDCFEngine(ValuationEngine):
                 "status": "ok",
                 "model_version": MODEL_VERSION,
                 "growth_source": growth_source,
-                "growth_clamped_from": raw_growth if growth != raw_growth else None,
+                "growth_clamped_from": raw_growth if growth_after_clamp != raw_growth else None,
                 "fcf_margin_source": "financial_facts",
                 "fcf_margin_normalization": margin_normalization,
                 "fcf_margin_clamped_from": raw_margin if margin_clamped else None,
@@ -517,5 +660,8 @@ class StandardDCFEngine(ValuationEngine):
                 "weighted": weighted["trace"],
                 "reverse_dcf": reverse.get("trace") if reverse else None,
             },
-            }
+            },
+            projection=projection["info"] if plan.active else None,
+            warning=warning,
+            )
         )

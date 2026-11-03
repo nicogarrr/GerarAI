@@ -18,7 +18,7 @@ from decimal import Decimal
 from sqlalchemy import delete, select
 
 from app.core.database import SessionLocal, init_db
-from app.models import Company, Document, FinancialFact
+from app.models import Company, Document, FinancialFact, InferredInput
 from app.models.entities import DocumentChunk
 from app.services import sector_inputs
 from app.services.thesis_evidence_service import ThesisEvidenceService, select_filings
@@ -98,6 +98,10 @@ def _cleanup(db, company_id: int) -> None:
     db.rollback()
     doc_ids = db.scalars(select(Document.id).where(Document.company_id == company_id)).all()
     db.execute(delete(FinancialFact).where(FinancialFact.company_id == company_id))
+    db.execute(
+        delete(InferredInput).where(InferredInput.company_id == company_id),
+        execution_options={"include_all_tenants": True},
+    )
     if doc_ids:
         db.execute(delete(DocumentChunk).where(DocumentChunk.document_id.in_(doc_ids)))
         db.execute(delete(Document).where(Document.id.in_(doc_ids)))
