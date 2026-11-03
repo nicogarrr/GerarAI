@@ -128,6 +128,24 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
     const effectivePeriod = periodData[chartPeriod].length >= 2 ? chartPeriod : 'Todo';
     const chartData = periodData[effectivePeriod];
     const hasDrawableHistory = periodData.Todo.length >= 2;
+    // Cambiar el periodo del gráfico solo cambia el panel del gráfico. Las
+    // métricas, el donut de distribución y el tearsheet no dependen del
+    // periodo: con sus elementos memoizados React se los salta en vez de
+    // volver a pintar todo «Resumen» en cada clic de 1S/1M/3M/…
+    const summaryMetrics = useMemo(() => (
+        <div className="mb-6">
+            <PortfolioSummary summary={summary} />
+            <PortfolioDataNotice quality={summary.quality} />
+        </div>
+    ), [summary]);
+    const allocationPanel = useMemo(() => (
+        <PortfolioAllocation
+            holdings={summary.holdings}
+            cash={summary.cash}
+            baseCurrency={summary.baseCurrency}
+        />
+    ), [summary.holdings, summary.cash, summary.baseCurrency]);
+    const tearsheetPanel = useMemo(() => <PortfolioTearsheet tearsheet={tearsheet} />, [tearsheet]);
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-[1600px] flex-col overflow-x-clip">
                 {/* Header */}
@@ -212,10 +230,7 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                 {/* Tab: Resumen */}
                 <TabsContent value="resumen" className="mt-0">
                     {/* Métricas en fila */}
-                    <div className="mb-6">
-                        <PortfolioSummary summary={summary} />
-                        <PortfolioDataNotice quality={summary.quality} />
-                    </div>
+                    {summaryMetrics}
 
                     {/* Grid: gráfico de rendimiento + distribución */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -290,16 +305,12 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                         </div>
 
                         {/* Panel Derecho: Pie Chart Completo */}
-                        <PortfolioAllocation
-                            holdings={summary.holdings}
-                            cash={summary.cash}
-                            baseCurrency={summary.baseCurrency}
-                        />
+                        {allocationPanel}
                     </div>
 
                     {/* Tearsheet: Sharpe, drawdown, win rate */}
                     <div className="mt-6">
-                        <PortfolioTearsheet tearsheet={tearsheet} />
+                        {tearsheetPanel}
                     </div>
                     {/* Salida cruzada a las otras dos páginas de riesgo: el
                         resumen es pesos y precio; el riesgo medido está en
