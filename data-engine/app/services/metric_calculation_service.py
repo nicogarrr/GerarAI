@@ -811,6 +811,17 @@ class MetricCalculationService:
             {},
         )
 
+    def _latest_loss_evidence(self, db: Session, company: Company) -> FinancialFact | None:
+        """Hecho REPORTADO mas reciente de resultado antes de impuestos (o neto)
+        si es negativo: la empresa esta en perdidas. None si no lo esta o no
+        hay dato (entonces no se supone nada)."""
+        for alias in ("income_before_tax", "pretax_income", "net_income"):
+            facts = [f for f in self._facts_for_metric(db, company, alias) if f.is_reported]
+            if facts:
+                latest = facts[0]
+                return latest if Decimal(latest.value) < 0 else None
+        return None
+
     def _tax_rate_for_period(
         self,
         db: Session,
@@ -1125,6 +1136,27 @@ class MetricCalculationService:
                 allow_latest=True,
             )
             facts.update(tax_facts)
+            if tax_rate is None:
+                # Empresa en perdidas (owner 3-nov-2026: la tesis no puede
+                # quedarse sin WACC por esto): sin beneficio no hay tasa
+                # efectiva que medir, y la deuda no genera escudo fiscal. El
+                # WACC se calcula con escudo 0 % y queda ETIQUETADO como
+                # estimado en la traza; sin evidencia de perdidas sigue N/D.
+                loss = self._latest_loss_evidence(db, company)
+                if loss is not None:
+                    tax_rate = Decimal("0")
+                    tax_trace = {
+                        **tax_trace,
+                        "tax_rate": "0",
+                        "tax_rate_source": "loss_making_no_tax_shield",
+                        "tax_rate_fallback": True,
+                        "estimated": True,
+                        "tax_rate_fallback_reason": (
+                            f"estimado: {loss.metric} {loss.period} negativo; "
+                            "sin beneficio no hay escudo fiscal de la deuda"
+                        ),
+                        "tax_rate_input_fact_ids": [loss.id],
+                    }
             if tax_rate is None:
                 missing.append("tax_rate")
 

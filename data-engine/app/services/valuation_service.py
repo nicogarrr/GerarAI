@@ -334,6 +334,86 @@ def _currency_blocked_result(engine: ValuationEngine, context: ValuationContext,
 logger = logging.getLogger(__name__)
 
 
+# Motores con su propio N/D honesto o ya genericos: sin respaldo por multiplos.
+_NO_SECTOR_FALLBACK = frozenset({"standard_dcf", "pre_revenue", "relative_multiples"})
+
+
+def _sector_fallback(
+    db: Session,
+    company: Company,
+    context: ValuationContext,
+    insufficient: dict,
+    *,
+    to_listing: float | None,
+    price_currency: str,
+    reporting_currency: str | None,
+) -> dict:
+    """Respaldo ORIENTATIVO por multiplos de comparables cuando el motor
+    sectorial (aseguradora, REIT, holding, banco...) no tiene sus datos.
+
+    Owner 3-nov-2026: «que salgan las tesis» en vez de «datos insuficientes».
+    El motor de multiplos se auto-rechaza sin acciones, precio o peers; si
+    tampoco da cifra, se devuelve el N/D original intacto. Con cifra, el
+    resultado es siempre orientativo (blocker ``sector_engine_fallback``) y
+    la traza conserva por que el motor sectorial no pudo calcular.
+    """
+    cross = _relative_multiples_cross_check(
+        db,
+        company,
+        context,
+        resolved_engine="standard_dcf",
+        to_listing=to_listing,
+        price_currency=price_currency,
+        reporting_currency=reporting_currency,
+    )
+    if not isinstance(cross, dict) or cross.get("status") == "insufficient_data":
+        return insufficient
+    if not any(cross.get(key) is not None for key in ("expected_value", "base_value")):
+        return insufficient
+    sector_engine = (insufficient.get("trace") or {}).get("engine") or resolve_engine_key(company)
+    missing = list(insufficient.get("missing_inputs") or [])
+    result = dict(insufficient)
+    for key in ("bear_value", "base_value", "bull_value", "expected_value", "margin_of_safety",
+                "listed_share_values", "adr_ratio"):
+        if key in cross:
+            result[key] = cross[key]
+    result["status"] = "partial"
+    result["publishable"] = False
+    result["publication_blockers"] = ["sector_engine_fallback"]
+    result["missing_inputs"] = []
+    trace = dict(insufficient.get("trace") or {})
+    trace.update({
+        "engine": "relative_multiples",
+        "status": "partial",
+        "publishable": False,
+        "publication_blockers": ["sector_engine_fallback"],
+        "sector_engine_fallback": {
+            "sector_engine": sector_engine,
+            "sector_missing_inputs": missing,
+            "sector_reason": (insufficient.get("trace") or {}).get("reason"),
+            "headline_multiple": cross.get("headline_multiple"),
+            "peer_median": cross.get("peer_median"),
+        },
+        "notice": (
+            "Valoración orientativa por múltiplos de comparables: el motor "
+            f"sectorial ({sector_engine}) no tiene sus datos ({', '.join(missing) or 'N/D'})."
+        ),
+    })
+    result["trace"] = trace
+    result.setdefault("cross_checks", {})["relative_multiples"] = cross
+    result["estimated_inputs"] = [
+        *(insufficient.get("estimated_inputs") or []),
+        {
+            "metric": "motor",
+            "status": "sector_fallback",
+            "method": "múltiplos de comparables (orientativo)",
+            "note": f"faltan datos del motor sectorial {sector_engine}: {', '.join(missing) or 'N/D'}",
+            "estimated": True,
+        },
+    ]
+    return result
+
+
 def _relative_multiples_cross_check(
     db: Session,
     company: Company,
@@ -623,6 +703,20 @@ class ValuationService:
                             "high": fair_range["high"],
                             "currency": fair_range["currency"],
                         }
+        if (
+            currency_gate["status"] != "blocked"
+            and result.get("status") == "insufficient_data"
+            and resolve_engine_key(company) not in _NO_SECTOR_FALLBACK
+        ):
+            result = _sector_fallback(
+                db,
+                company,
+                context,
+                result,
+                to_listing=currency_gate.get("reporting_to_listing"),
+                price_currency=price_currency,
+                reporting_currency=currency_gate.get("reporting_currency"),
+            )
         result["value_currency"] = price_currency if currency_gate["status"] != "blocked" else None
         result["currency"] = {
             key: value

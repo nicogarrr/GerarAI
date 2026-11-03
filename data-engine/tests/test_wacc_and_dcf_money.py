@@ -484,3 +484,35 @@ def test_tax_rate_stays_missing_without_pretax_pair(company_factory):
 
     assert rate is None
     assert trace["tax_rate_source"] == "unavailable"
+
+
+
+def test_wacc_de_empresa_en_perdidas_usa_escudo_fiscal_cero_etiquetado(company_factory):
+    """Owner 3-nov-2026: ASTS/SPCX/IBRX/RXRX se quedaban sin WACC (y sin tesis
+    publicable) porque, en perdidas, no hay tasa efectiva que medir."""
+    db, company = company_factory
+    _wacc_facts(db, company, market_cap_source="yfinance", total_debt_source="SEC",
+                market_cap="10000", total_debt="3000", effective_tax_rate=None)
+    db.add(_fact(company, "income_before_tax", "-250", PERIOD, 2025, None))
+    db.commit()
+
+    result = MetricCalculationService().calculate(db, company, "wacc", persist=False)
+
+    assert result.status == "ok"
+    trace = result.calculation_trace
+    assert trace["tax_rate_source"] == "loss_making_no_tax_shield"
+    assert trace["tax_rate_fallback"] is True and trace["estimated"] is True
+    assert "estimado" in trace["tax_rate_fallback_reason"]
+
+
+def test_wacc_sin_tasa_ni_perdidas_sigue_sin_calcularse(company_factory):
+    db, company = company_factory
+    _wacc_facts(db, company, market_cap_source="yfinance", total_debt_source="SEC",
+                market_cap="10000", total_debt="3000", effective_tax_rate=None)
+    db.add(_fact(company, "income_before_tax", "250", PERIOD, 2025, None))
+    db.commit()
+
+    result = MetricCalculationService().calculate(db, company, "wacc", persist=False)
+
+    assert result.status == "unavailable"
+    assert "tax_rate" in result.calculation_trace["missing_inputs"]
