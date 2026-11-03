@@ -25,6 +25,8 @@ from __future__ import annotations
 import math
 from bisect import bisect_right
 from datetime import date, timedelta
+from itertools import groupby
+from operator import itemgetter
 from typing import Any
 
 import numpy as np
@@ -111,6 +113,34 @@ def _fx_series_by_pair(
         rates = [rate * factor for _, rate in chosen]
         result[raw] = (dates, rates, direction)
     return result
+
+
+def _load_price_series(db: Session, company_ids: list[int], cutoff: date) -> dict[int, list[Any]]:
+    """Cierres desde ``cutoff`` por empresa, en el orden de ``company_ids``.
+
+    Una consulta (columnas ligeras, como intelligence) por Core
+    (``db.connection()``), no por la capa de resultados ORM, igual que
+    ``PortfolioIntelligenceService._closes_rows``: son decenas de miles de
+    filas y MarketPrice no es de tenant, asi que no hay criteria que perder.
+    Las filas llegan ordenadas por (empresa, fecha) y se reparten por tramos
+    (``groupby``) en vez de un setdefault + append por fila. Mismas filas,
+    mismos valores y nombres de columna, mismo orden de claves.
+    """
+    price_series: dict[int, list[Any]] = {company_id: [] for company_id in company_ids}
+    all_prices = db.connection().execute(
+        select(
+            MarketPrice.company_id,
+            MarketPrice.date,
+            MarketPrice.close,
+            MarketPrice.adj_close,
+            MarketPrice.source,
+        )
+        .where(MarketPrice.company_id.in_(company_ids), MarketPrice.date >= cutoff)
+        .order_by(MarketPrice.company_id, MarketPrice.date)
+    ).all()
+    for company_id, company_prices in groupby(all_prices, key=itemgetter(0)):
+        price_series[company_id] = list(company_prices)
+    return price_series
 
 
 def _convert_returns_to_base(
@@ -201,25 +231,7 @@ class PortfolioRiskMatrixService:
 
         # Series de precios en lote (misma forma que intelligence: columnas
         # ligeras, una query) y retornos por posicion.
-        price_series: dict[int, list[Any]] = {company.id: [] for _, company in rows}
-        all_prices = list(
-            db.execute(
-                select(
-                    MarketPrice.company_id,
-                    MarketPrice.date,
-                    MarketPrice.close,
-                    MarketPrice.adj_close,
-                    MarketPrice.source,
-                )
-                .where(
-                    MarketPrice.company_id.in_([company.id for _, company in rows]),
-                    MarketPrice.date >= cutoff,
-                )
-                .order_by(MarketPrice.company_id, MarketPrice.date)
-            ).all()
-        )
-        for price in all_prices:
-            price_series.setdefault(price.company_id, []).append(price)
+        price_series = _load_price_series(db, [company.id for _, company in rows], cutoff)
         price_series = {
             company_id: PortfolioIntelligenceService._fill_trailing_spot(series)
             for company_id, series in price_series.items()
