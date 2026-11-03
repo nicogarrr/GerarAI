@@ -754,6 +754,19 @@ _COMPANY_CUE_RE = re.compile(
     r"acci[oó]n(?:es)?|cotiza\w*|precio|valoraci[oó]n|resultados|balance|"
     r"riesgos?|catalizadores?|noticias?|dividendos?|fundamentales|stock)\b"
 )
+# Pista de consulta de inversión para aceptar una errata en el nombre de una
+# empresa propia («micrsoft esta cara?», «¿qué opinas de Mircosoft?»).
+_TYPO_CUE_RE = re.compile(
+    r"(?i)\b(?:car[oa]s?|barat[oa]s?|expensive|cheap|opinas?|opini[oó]n|compr\w*|vend\w*|mantengo|"
+    r"aguanto|posici[oó]n|invertir|sobrevalorad\w*|infravalorad\w*|qu[eé]\s+tal|c[oó]mo\s+va|tesis)\b"
+)
+# Palabras de la propia pregunta que nunca son una errata de empresa.
+_TYPO_SKIP_WORDS = frozenset({
+    "cartera", "carteras", "posicion", "posiciones", "acciones", "comprar", "compro", "vender", "vendo",
+    "precio", "precios", "opinas", "valoracion", "noticias", "riesgos", "dividendo", "dividendos",
+    "empresa", "empresas", "tesis", "resultados", "balance", "mantengo", "deberia", "barata", "barato",
+    "caras", "baratas", "cuanto", "cuanta", "tengo", "invertir", "inversion", "beneficio", "deuda",
+})
 # "Que puedes hacer?" se responde de forma determinista con lo que el
 # asistente cumple de verdad; el generador libre prometia capacidades que
 # no existen ("revisar carteras y sugerir ajustes").
@@ -1343,7 +1356,35 @@ class ChatService:
             named = companies_named_in(question, companies)
             if len(named.companies) == 1 and not named.ambiguous:
                 return named.companies[0]
+            if not named.companies and not named.ambiguous:
+                misspelled = self._misspelled_own_company(db, question, companies)
+                if misspelled is not None:
+                    return misspelled
         return next(iter(found.values())) if len(found) == 1 else None
+
+    def _misspelled_own_company(self, db: Session, question: str, companies: list[Company]) -> Company | None:
+        """«micrsoft esta cara?»: errata en el nombre de una empresa que tienes o sigues.
+
+        Solo con pista de consulta de inversión y solo contra tus posiciones y
+        tu lista de seguimiento, para no convertir palabras corrientes en
+        empresas del maestro.
+        """
+        if not (_TYPO_CUE_RE.search(question) or _COMPANY_CUE_RE.search(question) or _question_metrics(question)):
+            return None
+        tenant_id = db.info.get("tenant_id")
+        if type(tenant_id) is not int or tenant_id <= 0:
+            return None
+        from app.models.entities import WatchItem
+        from app.services.company_names import company_misspelled_in
+
+        held = set(db.scalars(
+            select(Position.company_id).where(Position.tenant_id == tenant_id, Position.quantity > 0)
+        ).all())
+        watched = {s.upper() for s in db.scalars(
+            select(WatchItem.symbol).where(WatchItem.tenant_id == tenant_id)
+        ).all() if s}
+        own = [c for c in companies if c.id in held or (c.ticker or "").upper() in watched]
+        return company_misspelled_in(question, own, skip_words=_TYPO_SKIP_WORDS)
 
     def _history_company(
         self, db: Session, question: str, history: list[ChatTurn] | None

@@ -171,3 +171,65 @@ def companies_named_in(question: str, companies: Iterable[Company]) -> NameMatch
 def ambiguous_name_answer(word: str, candidates: list[Company]) -> str:
     options = " o ".join(f"{c.ticker} ({c.name})" for c in candidates[:4])
     return f"«{word}» puede ser varias empresas de GerarAI: ¿te refieres a {options}?"
+
+
+def _osa_distance(a: str, b: str, limit: int) -> int:
+    """Distancia de edición con transposición de dos letras vecinas (OSA), cortada en ``limit + 1``."""
+    if abs(len(a) - len(b)) > limit:
+        return limit + 1
+    prev2: list[int] = []
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            cost = 0 if ca == cb else 1
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+            if i > 1 and j > 1 and ca == b[j - 2] and a[i - 2] == cb:
+                cur[j] = min(cur[j], prev2[j - 2] + 1)
+        if min(cur) > limit:
+            return limit + 1
+        prev2, prev = prev, cur
+    return prev[-1]
+
+
+def company_misspelled_in(
+    question: str, companies: Iterable[Company], *, skip_words: frozenset[str] = frozenset()
+) -> Company | None:
+    """Empresa escrita con una errata («micrsoft», «Mircosoft», «microsfot»).
+
+    Prueba real 2026-11-03: «micrsoft esta cara?» no se reconocía y la
+    respuesta era genérica, sin tus datos. Solo palabras de ≥ 5 letras contra
+    nombres de ≥ 5 letras no genéricos; una letra de diferencia (o dos
+    vecinas cambiadas) hasta 7 letras, dos desde 8; en minúsculas también
+    vale el nombre exacto. Si encaja con más de una empresa no se elige.
+    Quien llama decide sobre qué empresas buscar (las del usuario) y exige
+    una pista de consulta de inversión.
+    """
+    names: dict[str, set[int]] = {}
+    by_id: dict[int, Company] = {}
+    for company in companies:
+        words = _core_words(company.name or "")
+        if words and words[0] == "the" and len(words) >= 2:
+            words = words[1:]
+        if not words:
+            continue
+        keys = {words[0]}
+        if len(words) >= 2:
+            keys.add("".join(words))
+        for key in keys:
+            if len(key) >= 5 and key not in _GENERIC_FIRST_WORDS and key.isalpha():
+                names.setdefault(key, set()).add(company.id)
+                by_id[company.id] = company
+    if not names:
+        return None
+    found: set[int] = set()
+    for token in set(_words(question)):
+        if len(token) < 5 or not token.isalpha() or token in skip_words:
+            continue
+        limit = 1 if len(token) <= 7 else 2
+        for key, ids in names.items():
+            if _osa_distance(token, key, limit) <= limit:
+                found |= ids
+    if len(found) != 1:
+        return None
+    return by_id[next(iter(found))]
