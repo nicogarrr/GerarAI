@@ -3521,7 +3521,7 @@ def refresh_ticker_news(
             PRIORITY_TICKERS,
             Deadline,
             finalize_status,
-            google_feed_url,
+            google_lanes,
             is_us_listed,
             label_google,
             label_yahoo,
@@ -3551,9 +3551,9 @@ def refresh_ticker_news(
             def _lanes(company):
                 lanes = [("yahoo", yahoo_feed_url(company.ticker))] if is_us_listed(company) else []
                 if scope == "tracked" or ticker:
-                    lanes.append(("google-en", google_feed_url(company, lang="en")))
-                    if company.ticker.upper() in PRIORITY_TICKERS:
-                        lanes.append(("google-es", google_feed_url(company, lang="es")))
+                    lanes.extend(
+                        google_lanes(company, priority=company.ticker.upper() in PRIORITY_TICKERS)
+                    )
                 # Freno por proveedor: el carril pausado (429) ni se intenta.
                 return [
                     (lane, url)

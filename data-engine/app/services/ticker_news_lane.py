@@ -228,6 +228,48 @@ def google_feed_url(company, *, lang: str = "en") -> str:
     )
 
 
+# Marcas que se buscan en un feed propio de Google News, además del nombre
+# legal. La consulta por nombre («"Space Exploration Technologies" OR SPCX»)
+# no trae lo que la prensa publica con la marca: el estudio de Ookla del
+# 3-nov-2026 sobre el directo al móvil de Starlink («Testing the limits of
+# Starlink's D2D text and data performance in the U.S.») no llegó nunca a la
+# app. Solo marcas propias, distintivas y ya verificadas en VERIFIED_ALIASES:
+# nada de palabras corrientes («BlueBird» también es una marca de autobuses)
+# ni marcas tan amplias que llenarían el feed («Google», «Facebook»).
+QUERY_ALIASES: dict[str, tuple[str, ...]] = {
+    "SPCX": ("SpaceX", "Starlink"),
+}
+# El feed de marca es amplio: solo lo reciente, para no rellenar con archivo.
+ALIAS_QUERY_WINDOW = "when:7d"
+
+
+def google_alias_feed_url(company, *, lang: str = "en") -> str | None:
+    """Feed de Google News por las marcas de la empresa, o None si no tiene."""
+    ticker = (getattr(company, "ticker", "") or "").upper()
+    verified = {a.casefold() for a in VERIFIED_ALIASES.get(ticker, ())}
+    aliases = [a for a in QUERY_ALIASES.get(ticker, ()) if a.casefold() in verified]
+    if not aliases:
+        return None
+    query = " OR ".join(f'"{alias}"' for alias in aliases) + f" {ALIAS_QUERY_WINDOW}"
+    hl, gl, ceid = ("es", "ES", "ES:es") if lang == "es" else ("en-US", "US", "US:en")
+    return (
+        f"https://news.google.com/rss/search?q={quote_plus(query)}"
+        f"&hl={hl}&gl={gl}&ceid={ceid}"
+    )
+
+
+def google_lanes(company, *, priority: bool) -> list[tuple[str, str]]:
+    """Feeds de Google News de una empresa en el barrido por ticker: nombre
+    en inglés, nombre en español (solo prioritarias) y marcas (si tiene)."""
+    lanes = [("google-en", google_feed_url(company, lang="en"))]
+    if priority:
+        lanes.append(("google-es", google_feed_url(company, lang="es")))
+    alias_url = google_alias_feed_url(company, lang="en")
+    if alias_url:
+        lanes.append(("google-en-marca", alias_url))
+    return lanes
+
+
 def is_competitor_only(company, text: str, evidence_level) -> bool:
     terms = COMPETITOR_ONLY_TERMS.get((getattr(company, "ticker", "") or "").upper(), ())
     if not terms or not any(
