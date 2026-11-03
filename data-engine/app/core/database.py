@@ -317,6 +317,21 @@ def get_db(
                 )
             db.info["tenant_id"] = tenant.id
             db.info["user_id"] = principal.user_id
+            principal_email = getattr(principal, "email", None)
+            if principal_email:
+                db.info["user_email"] = principal_email
+                # La direccion llega firmada con la identidad: es la de la
+                # sesion, no un dato del cliente. Se guarda como destino
+                # propio para los avisos por correo del usuario.
+                from app.services.email_alerts import sync_binding
+
+                try:
+                    sync_binding(db, tenant.id, principal.user_id, principal_email)
+                    db.commit()
+                except IntegrityError:
+                    # Carrera con otra peticion del mismo usuario: la fila ya
+                    # existe; la siguiente peticion la actualiza si hace falta.
+                    db.rollback()
             # #E5: el middleware de latencia por endpoint tiene que particionar
             # sus filas por tenant, y el id interno del tenant SOLO se resuelve
             # aqui (la identidad firmada lleva el external_id). request.state

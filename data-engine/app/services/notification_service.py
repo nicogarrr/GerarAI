@@ -98,11 +98,16 @@ class NotificationService:
 
         category = event_type(db, alert)
         subscription = subscription_for(db, alert) if category else None
-        from app.services import web_push
+        from app.services import email_alerts, web_push
 
         push_pref = web_push.preference_for(db, alert) if category else None
+        email_target = email_alerts.preference_for(db, alert) if category else None
         channels = list(alert.channels)
-        added = [c for c, ok in (("telegram", subscription), ("push", push_pref)) if ok and c not in channels]
+        added = [
+            c
+            for c, ok in (("telegram", subscription), ("push", push_pref), ("email", email_target))
+            if ok and c not in channels
+        ]
         if added:
             channels.extend(added)
             alert.channels = channels
@@ -128,6 +133,18 @@ class NotificationService:
                     result = self._dispatch_telegram(settings, {**payload, **({"chat_id": subscription.chat_id} if subscription else {})})
                 elif channel == "push" and push_pref:
                     result = self._result(**web_push.send_to_user(db, settings, alert))
+                elif channel == "email" and email_target is not None:
+                    # Correo por usuario: la alerta sale a la direccion que el
+                    # frontend firmo para ESTE usuario, nunca a la global ni a
+                    # la de otro. No necesita ALERT_EMAIL_TO.
+                    result = self._dispatch_user_email(
+                        settings, alert, payload, email_target.binding.address
+                    )
+                elif channel == "email" and email_alerts.opted_out(db, alert):
+                    # El usuario decidio sobre este tipo (apagado u opt-in
+                    # posterior a la alerta): el correo se omite, nunca cae a
+                    # la lista global.
+                    result = self._result("skipped", error="Sin consentimiento para este tipo de alerta")
                 elif (
                     channel in ("email", "push")
                     and self._global_destination_configured(settings, channel)
@@ -314,21 +331,31 @@ class NotificationService:
                 retry_after=self._extract_retry_after(exc),
             )
 
-    def _dispatch_email(self, settings, alert: ResearchAlert, payload: dict) -> dict:
-        """Correo por SMTP. DCA y resultados usan su plantilla; el resto, la generica."""
+    @staticmethod
+    def _email_content(alert: ResearchAlert, payload: dict):
+        """Plantilla del aviso: DCA y resultados tienen la suya; el resto, la generica."""
         dca = (alert.metadata_ or {}).get("dca")
         earnings = (alert.metadata_ or {}).get("earnings")
         if alert.alert_type == "dca_level" and isinstance(dca, dict):
             from app.services.dca_alert_copy import email_content
 
-            content = email_content(dca, str((alert.metadata_ or {}).get("language") or "es"))
-        elif alert.alert_type == "earnings_reminder" and isinstance(earnings, dict):
+            return email_content(dca, str((alert.metadata_ or {}).get("language") or "es"))
+        if alert.alert_type == "earnings_reminder" and isinstance(earnings, dict):
             from app.services.earnings_alert_copy import email_content
 
-            content = email_content(earnings, str((alert.metadata_ or {}).get("language") or "es"))
-        else:
-            content = generic_alert_content(payload)
-        outcome = send_email(settings, content)
+            return email_content(earnings, str((alert.metadata_ or {}).get("language") or "es"))
+        return generic_alert_content(payload)
+
+    def _dispatch_email(self, settings, alert: ResearchAlert, payload: dict) -> dict:
+        """Correo por SMTP a la lista global ALERT_EMAIL_TO (cuenta propietaria)."""
+        outcome = send_email(settings, self._email_content(alert, payload))
+        return self._result(outcome["status"], error=outcome.get("error"))
+
+    def _dispatch_user_email(
+        self, settings, alert: ResearchAlert, payload: dict, address: str
+    ) -> dict:
+        """Correo por SMTP a la direccion propia del usuario (una sola)."""
+        outcome = send_email(settings, self._email_content(alert, payload), to=[address])
         return self._result(outcome["status"], error=outcome.get("error"))
 
     def _ensure_delivery_row(self, db: Session, alert: ResearchAlert, channel: str) -> None:

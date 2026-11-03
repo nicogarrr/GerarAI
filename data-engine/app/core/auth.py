@@ -39,6 +39,10 @@ EMPTY_BODY_HASH = hashlib.sha256(b"").hexdigest()
 class ResearchPrincipal:
     user_id: str
     tenant_external_id: str
+    # Correo de la sesion, solo si llego con firma propia valida (el frontend
+    # lo firma con el mismo secreto que la identidad). Nunca de la cabecera a
+    # pelo: sin firma valida se descarta.
+    email: str | None = None
 
 
 def signature_payload(
@@ -91,6 +95,61 @@ def sign_research_identity(
     ).hexdigest()
 
 
+def sign_email_identity(
+    secret: str,
+    *,
+    tenant_id: str,
+    user_id: str,
+    timestamp: str,
+    nonce: str,
+    email: str,
+) -> str:
+    """Firma del correo de sesion: va ligada a la misma identidad y nonce."""
+    return hmac.new(
+        secret.encode("utf-8"),
+        f"{tenant_id}:{user_id}:{timestamp}:{nonce}:email:{email}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def verified_email_identity(
+    secret: str,
+    *,
+    tenant_id: str,
+    user_id: str,
+    timestamp: str,
+    nonce: str | None,
+    email_header: str | None,
+    signature: str | None,
+) -> str | None:
+    """Correo de la sesion si su firma es valida; None en cualquier otro caso.
+
+    Nunca rechaza la peticion: una cabecera ausente o falsificada solo deja
+    al principal sin correo (compatible con clientes antiguos).
+    """
+    if not email_header or not signature or nonce is None:
+        return None
+    email = email_header.strip().lower()
+    if len(email) > 320 or _EMAIL_RE.fullmatch(email) is None:
+        return None
+    if re.fullmatch(r"[0-9a-f]{64}", signature) is None:
+        return None
+    expected = sign_email_identity(
+        secret,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        timestamp=timestamp,
+        nonce=nonce,
+        email=email,
+    )
+    if not hmac.compare_digest(expected, signature):
+        return None
+    return email
+
+
 def body_digest(body: bytes) -> str:
     """SHA-256 hexdigest of the raw request body bytes."""
     return hashlib.sha256(body).hexdigest()
@@ -138,6 +197,8 @@ async def get_research_principal(
     x_cavaai_method: str | None = Header(default=None),
     x_cavaai_path: str | None = Header(default=None),
     x_cavaai_body_hash: str | None = Header(default=None),
+    x_cavaai_email: str | None = Header(default=None),
+    x_cavaai_email_signature: str | None = Header(default=None),
 ) -> ResearchPrincipal | None:
     settings = get_settings()
     required = settings.research_auth_required or getattr(
@@ -256,4 +317,13 @@ async def get_research_principal(
     return ResearchPrincipal(
         user_id=(x_cavaai_user or "").strip(),
         tenant_external_id=(x_cavaai_tenant or "").strip(),
+        email=verified_email_identity(
+            research_auth_secret,
+            tenant_id=(x_cavaai_tenant or "").strip(),
+            user_id=(x_cavaai_user or "").strip(),
+            timestamp=x_cavaai_timestamp or "",
+            nonce=x_cavaai_nonce if uses_bound_payload else None,
+            email_header=x_cavaai_email,
+            signature=x_cavaai_email_signature,
+        ),
     )
