@@ -20,14 +20,19 @@ class Store:
         self.lock = threading.Lock()
         self.counts = {}
 
-    def eval(self, script, nkeys, key, cap):
-        assert script == q._SCRIPT and nkeys == 1
+    def eval(self, script, nkeys, key, global_key, enabled_key, cap, global_cap):
+        assert script == q._SCRIPT and nkeys == 3 and enabled_key == q.ENABLED_KEY
         with self.lock:
+            if self.counts.get(enabled_key) == "0":
+                return -1
             n = self.counts.get(key, 0)
-            if n >= cap:
+            g = self.counts.get(global_key, 0)
+            if n >= cap or g >= global_cap:
                 return 0
             self.counts[key] = n + 1
+            self.counts[global_key] = g + 1
             return n + 1
+
 
 
 @pytest.fixture
@@ -72,7 +77,7 @@ def test_concurrent_attempts_atomic_shared_daily_tenant_cap(store):
         assert sum(pool.map(call, range(80))) == 10
     with q.scope(3):
         q.reserve_request(URL, PAYLOAD)
-    assert sorted(store.counts.values()) == [1, 10]
+    assert sorted(store.counts.values()) == [1, 10, 11]
 
 
 def test_utc_day_and_tenant_are_separate(store):
@@ -81,7 +86,7 @@ def test_utc_day_and_tenant_are_separate(store):
     with pytest.raises(q.ThesisInferenceQuotaError):
         q._reserve(2, datetime(2026, 11, 3, 23, 59, tzinfo=UTC))
     q._reserve(2, datetime(2026, 11, 4, tzinfo=UTC))
-    assert len(store.counts) == 2
+    assert len(store.counts) == 4
 
 
 def test_redis_unavailable_fails_closed_only_in_feature(monkeypatch):
@@ -107,14 +112,50 @@ def test_http_retries_and_failures_consume_attempts_other_routes_unaffected(stor
         with pytest.raises(LLMError):
             asyncio.run(call(True))
     assert len(calls) == 10
-    assert list(store.counts.values()) == [10]
+    assert list(store.counts.values()) == [10, 10]
     with pytest.raises(LLMError):
         asyncio.run(call(False))
     assert len(calls) == 12
-    assert list(store.counts.values()) == [10]
+    assert list(store.counts.values()) == [10, 10]
 
 
 def test_oversize_input_fails_before_reserving(store):
     with q.scope(2), pytest.raises(q.ThesisInferenceQuotaError, match="request_bytes_exceeded"):
         q.reserve_request(URL, {**PAYLOAD, "messages": [{"content": "x" * 65536}]})
     assert not store.counts
+
+
+def test_global_atomic_cap_across_many_tenants_and_utc_reset(store):
+    now = datetime(2026, 11, 3, 23, 59, tzinfo=UTC)
+    def call(i):
+        try:
+            q._reserve(i % 16 + 1, now)
+            return 1
+        except q.ThesisInferenceQuotaError:
+            return 0
+    with ThreadPoolExecutor(max_workers=32) as pool:
+        assert sum(pool.map(call, range(320))) == 30
+    assert store.counts["cavaai:thesis-input-inference:global:day:20261103"] == 30
+    assert max(v for k, v in store.counts.items() if ":global:" not in k) <= 10
+    before = store.counts.copy()
+    with pytest.raises(q.ThesisInferenceQuotaError):
+        q._reserve(99, now)
+    assert store.counts == before  # no tenant reservation when global is exhausted
+    q._reserve(99, datetime(2026, 11, 4, tzinfo=UTC))
+    assert store.counts["cavaai:thesis-input-inference:global:day:20261104"] == 1
+
+
+def test_tenant_rejection_does_not_consume_global_and_flag_only_feature(store):
+    now = datetime(2026, 11, 3, tzinfo=UTC)
+    for _ in range(10):
+        q._reserve(2, now)
+    before = store.counts.copy()
+    with pytest.raises(q.ThesisInferenceQuotaError):
+        q._reserve(2, now)
+    assert store.counts == before
+    store.counts[q.ENABLED_KEY] = "0"
+    before = store.counts.copy()
+    with q.scope(3), pytest.raises(q.ThesisInferenceQuotaError, match="feature_disabled"):
+        q.reserve_request(URL, PAYLOAD)
+    q.reserve_request("https://other.example", {})
+    assert store.counts == before

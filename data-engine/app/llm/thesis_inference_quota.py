@@ -11,16 +11,22 @@ from urllib.parse import urlparse
 from app.llm.errors import LLMError
 
 DAILY_ATTEMPTS = 10
+GLOBAL_DAILY_ATTEMPTS = 30
+ENABLED_KEY = "cavaai:thesis-input-inference:enabled"
 MAX_OUTPUT_TOKENS = 700
 MAX_REQUEST_BYTES = 65_536
 MODEL = "deepseek-v4.1-flash"
 _current: contextvars.ContextVar[int | None] = contextvars.ContextVar("thesis_inference_tenant", default=None)
 _SCRIPT = """
-local n = tonumber(redis.call('GET', KEYS[1]) or '0')
-if n >= tonumber(ARGV[1]) then return 0 end
-n = redis.call('INCR', KEYS[1])
-if n == 1 then redis.call('EXPIRE', KEYS[1], 172800) end
-return n
+if redis.call('GET', KEYS[3]) == '0' then return -1 end
+local tenant = tonumber(redis.call('GET', KEYS[1]) or '0')
+local global = tonumber(redis.call('GET', KEYS[2]) or '0')
+if tenant >= tonumber(ARGV[1]) or global >= tonumber(ARGV[2]) then return 0 end
+local t = redis.call('INCR', KEYS[1])
+local g = redis.call('INCR', KEYS[2])
+if t == 1 then redis.call('EXPIRE', KEYS[1], 172800) end
+if g == 1 then redis.call('EXPIRE', KEYS[2], 172800) end
+return t
 """
 
 
@@ -47,9 +53,12 @@ def _reserve(tenant: int, now: datetime) -> None:
         raise ThesisInferenceQuotaError("attempt_store_unavailable")
     key = f"cavaai:thesis-input-inference:{tenant}:day:{now:%Y%m%d}"
     try:
-        allowed = int(client.eval(_SCRIPT, 1, key, DAILY_ATTEMPTS))
+        global_key = f"cavaai:thesis-input-inference:global:day:{now:%Y%m%d}"
+        allowed = int(client.eval(_SCRIPT, 3, key, global_key, ENABLED_KEY, DAILY_ATTEMPTS, GLOBAL_DAILY_ATTEMPTS))
     except Exception:
         raise ThesisInferenceQuotaError("attempt_store_unavailable") from None
+    if allowed == -1:
+        raise ThesisInferenceQuotaError("feature_disabled")
     if not allowed:
         raise ThesisInferenceQuotaError("daily_attempts_exhausted")
 
