@@ -170,7 +170,7 @@ def _year_in_question(question: str, today: date) -> int:
     return today.year
 
 
-def _ledger_dividends_line(db: Session, year: int, english: bool) -> str | None:
+def _ledger_dividends_line(db: Session, year: int, english: bool, ticker: str | None = None) -> str | None:
     """Dividendos COBRADOS según tus operaciones guardadas (filas de dividendo del
     libro, en euros como el informe fiscal), o None si no hay o no se pueden calcular.
 
@@ -187,16 +187,23 @@ def _ledger_dividends_line(db: Session, year: int, english: bool) -> str | None:
         return None
     summary = (data or {}).get("summary") or {}
     gross = summary.get("total_dividends_base")
+    withheld = summary.get("total_withholding_base")
+    if ticker is not None:
+        # «¿cuánto cobré de dividendos de MSFT?»: solo esa empresa (antes, con una
+        # empresa nombrada no se miraba el libro y decía «No hay dividendos guardados»).
+        bucket = next((b for b in (data or {}).get("dividends") or [] if b.get("ticker") == ticker), None)
+        gross = bucket.get("dividends_base") if bucket else None
+        withheld = bucket.get("withholding_base") if bucket else None
     if not gross:
         return None
-    withheld = summary.get("total_withholding_base")
+    of = "" if ticker is None else (f" from {ticker}" if english else f" de {ticker}")
     withheld_display = (
         "N/A" if english else "N/D"
     ) if withheld is None else (_money_en(withheld, "EUR") if english else _money(withheld, "EUR"))
     if english:
-        return (f"In your saved trades for {year}: {_money_en(gross, 'EUR')} of gross dividends received and "
+        return (f"In your saved trades for {year}: {_money_en(gross, 'EUR')} of gross dividends received{of} and "
                 f"{withheld_display} withheld at source (in euros, as in the tax report).")
-    return (f"En tus operaciones guardadas de {year} constan {_money(gross, 'EUR')} de dividendos brutos cobrados "
+    return (f"En tus operaciones guardadas de {year} constan {_money(gross, 'EUR')} de dividendos brutos cobrados{of} "
             f"y {withheld_display} de retención en origen (en euros, como en el informe fiscal).")
 
 
@@ -262,6 +269,11 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
     if named is not None:
         rows = [row for row in rows if row[1].id == named.id]
         if not rows:
+            # Ya vendida: lo cobrado de ella sigue en tu libro.
+            sold_ledger = (_ledger_dividends_line(db, _year_in_question(question, today), english, named.ticker)
+                           if re.search(r"(?i)\bcobr\w*|\b(?:received|collected|earned)\b", question) else None)
+            if sold_ledger:
+                return _response([sold_ledger], [], "portfolio_dividends")
             return _response([
                 f"You don't hold {named.ticker} in your portfolio right now; portfolio dividends "
                 "are calculated with the shares you hold today."
@@ -308,15 +320,22 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
         sources.append(_source("dividend_record", records[-1].id,
                                f"{'Dividend' if english else 'Dividendo'} {comp.ticker} · {records[-1].ex_date}", _link(comp)))
     if not lines and not uncertain_tickers:
-        ledger = _ledger_dividends_line(db, year, english) if named is None else None
+        ledger = _ledger_dividends_line(db, year, english, named.ticker if named is not None else None)
         if ledger:
+            whose = ("your open positions" if english else "tus posiciones abiertas") if named is None else named.ticker
             return _response([
                 ledger,
-                f"The provider has no saved declared dividends from your open positions for {year}."
+                f"The provider has no saved declared dividends from {whose} for {year}."
                 if english else
-                f"El proveedor no tiene dividendos declarados guardados de tus posiciones abiertas para {year}.",
+                f"El proveedor no tiene dividendos declarados guardados de {whose} para {year}.",
             ], [_source("tax_report", year, f"{'Tax report' if english else 'Informe fiscal'} {year}", "/taxes")],
                 "portfolio_dividends")
+        if named is not None:
+            return _response([
+                f"There are no saved dividends from {named.ticker} for {year}. I haven't checked the provider live."
+                if english else
+                f"No hay dividendos guardados de {named.ticker} para {year}. No he consultado el proveedor en directo."
+            ], [], "portfolio_dividends")
         return _response([
             f"There are no saved dividends from your positions for {year}. I haven't checked the provider live."
             if english else
