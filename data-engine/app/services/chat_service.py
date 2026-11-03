@@ -819,6 +819,26 @@ _ADVICE_QUESTION_RE = re.compile(
     r"|buen\s+momento\s+para|conviene|me\s+conviene|ser[ií]a\s+(?:buena|mala)\s+idea|(?:me\s+)?recomiendas"
     r"|(?:me\s+)?aconsejas|qu[eé]\s+opinas|should\s+i|good\s+time\s+to|worth\s+(?:buying|selling)|is\s+it\s+(?:a\s+)?good\s+idea)\b"
 )
+# «¿Uber está barata?», «Is AAPL cheap?»: preguntan por el precio de UNA
+# empresa, igual que «¿está cara?»; no por qué comprar hoy. Prueba real
+# 2026-11-03: caían en el resumen personal y no hablaban de la empresa.
+_COMPANY_CHEAP_RE = re.compile(
+    r"(?i)\b(?:barat[oa]s?|cheap|undervalued|infravalorad[oa]s?|margen\s+de\s+seguridad)\b"
+)
+# Lo que sí es elegir qué comprar (o mirar la lista propia): sigue en el resumen personal.
+_PURCHASE_PICK_RE = re.compile(
+    r"(?i)\b(?:qu[eé]\s+(?:compro|debo\s+comprar|deber[ií]a\s+comprar|comprar|me\s+compro)"
+    r"|d[oó]nde\s+(?:meto|invierto|pongo|aporto)|zona\s+de\s+compra|niveles?\s+dca|[1-4]x"
+    r"|watch\s?-?list|lista\s+de\s+seguimiento|(?:mi|mis|tu|tus|la)\s+cartera|my\s+portfolio"
+    r"|what\s+(?:should\s+i|to)\s+buy|aportaci[oó]n)\b"
+)
+# Sin nombrar la empresa, en su ficha: «¿está barata?», «is it cheap?».
+_SUBJECTLESS_CHEAP_RE = re.compile(
+    r"(?i)^\W*(?:(?:est[aá]|es|is\s+it|it'?s)\s+(?:muy\s+|very\s+|too\s+)?"
+    r"(?:barat[oa]|cheap|undervalued|infravalorad[oa])|(?:tiene\s+)?margen\s+de\s+seguridad)\b"
+)
+
+
 # «Avísame si MSFT baja de 300» / «ponme una alerta…»: el chat no crea
 # alertas. Antes caía en el volcado de la empresa, que podía leerse como si
 # la alerta hubiera quedado puesta.
@@ -1203,6 +1223,15 @@ class ChatService:
         # con question.upper() convertia cada palabra en candidata y
         # resolvia "es" (o cualquier sigla) como ticker real.
         return self._explicit_mention(db, question)
+
+    def _company_cheap_question(self, db: Session, question: str, ticker: str | None) -> bool:
+        """«¿Uber está barata?» (o «¿está barata?» en su ficha): es sobre esa
+        empresa, no el resumen personal de qué comprar."""
+        if not _COMPANY_CHEAP_RE.search(question) or _PURCHASE_PICK_RE.search(question):
+            return False
+        if self._explicit_mention(db, question) is not None:
+            return True
+        return bool(ticker) and bool(_SUBJECTLESS_CHEAP_RE.search(question))
 
     def _explicit_mention(self, db: Session, question: str) -> Company | None:
         """Empresa nombrada por su ticker en el texto, para el scope global.
@@ -1602,7 +1631,11 @@ class ChatService:
         from app.services.personal_answer import answer_personal_question, detect_personal_intent
 
         purchase_intent = detect_personal_intent(question or "")
-        if purchase_intent is not None and purchase_intent.kind == "barato":
+        if (
+            purchase_intent is not None
+            and purchase_intent.kind == "barato"
+            and not self._company_cheap_question(db, question or "", ticker)
+        ):
             history_text = "\n".join(
                 f"{turn.role}: {turn.content[:300]}" for turn in (history or [])[-4:] if turn.content
             ) or None
