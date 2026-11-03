@@ -443,6 +443,84 @@ def _year_gains_answer(db: Session, tenant: int, year: int) -> ChatResponse:
     return _response("\n".join(lines), sources, "account_year_gains")
 
 
+def _month_gains_answer(db: Session, period: tuple[date, date, str, str]) -> ChatResponse:
+    """«¿Cuánto gané en octubre?»: realizado con ventas y dividendos cobrados de ese mes.
+
+    Mismas cifras que el informe fiscal del año (FIFO en euros), filtradas por la
+    fecha de cada venta y de cada cobro. Lo latente no es de un mes y no entra.
+    """
+    english = _english()
+    start, end, label_es, label_en = period
+    data = _tax_data(db, start.year)
+    sources = [_source("tax_report", start.year, f"Informe fiscal {start.year}", "/taxes")]
+    lines = [f"In {label_en}:" if english else f"En {label_es}:"]
+    if data is None:
+        lines.append("- I couldn't calculate your sales and dividends right now (tax report)." if english
+                     else "- No he podido calcular ahora tus ventas y dividendos (informe fiscal).")
+        return _response("\n".join(lines), sources, "account_month_gains")
+
+    def _in_month(value: object) -> bool:
+        try:
+            day = date.fromisoformat(str(value)[:10])
+        except ValueError:
+            return False
+        return start <= day <= end
+
+    gain, count, names, unreliable = Decimal("0"), 0, [], False
+    for bucket in data.get("realized") or []:
+        for sale in bucket.get("sales") or []:
+            if not _in_month(sale.get("date")):
+                continue
+            count += 1
+            if bucket.get("ticker") not in names:
+                names.append(bucket.get("ticker"))
+            if sale.get("gain_base") is None:
+                unreliable = True
+            else:
+                gain += Decimal(str(sale["gain_base"]))
+    shown = ", ".join(str(n) for n in names[:8]) + ("…" if len(names) > 8 else "")
+    if not count:
+        lines.append("- Realized from sales: nothing, no sales that month." if english
+                     else "- Realizado con ventas: nada, no hay ventas ese mes.")
+    elif unreliable:
+        lines.append(f"- Realized from sales ({shown}): no reliable figure (see Taxes for the warning)." if english
+                     else f"- Realizado con ventas ({shown}): sin dato fiable (el aviso está en Impuestos).")
+    else:
+        noun = ("sale" if count == 1 else "sales") if english else ("venta" if count == 1 else "ventas")
+        lines.append(f"- Realized from sales: {_money(gain, 'EUR', signed=True, english=True)} ({count} {noun}: {shown})."
+                     if english else
+                     f"- Realizado con ventas: {_money(gain, 'EUR', signed=True)} ({count} {noun}: {shown}).")
+    gross, withheld, paid, missing = Decimal("0"), Decimal("0"), 0, False
+    for bucket in data.get("dividends") or []:
+        for payment in bucket.get("payments") or []:
+            if payment.get("type") not in ("dividend", "withholding") or not _in_month(payment.get("date")):
+                continue
+            amount = payment.get("amount_base")
+            if amount is None:
+                missing = True
+            elif payment["type"] == "dividend":
+                paid += 1
+                gross += Decimal(str(amount))
+            else:
+                withheld += abs(Decimal(str(amount)))
+    if missing:
+        lines.append("- Dividends received: no reliable figure." if english
+                     else "- Dividendos cobrados: sin dato fiable.")
+    elif not paid:
+        lines.append("- Dividends received: none that month." if english
+                     else "- Dividendos cobrados: ninguno ese mes.")
+    else:
+        lines.append(f"- Dividends received: {_money(gross, 'EUR', english=True)} gross, "
+                     f"{_money(withheld, 'EUR', english=True)} withheld at source." if english else
+                     f"- Dividendos cobrados: {_money(gross, 'EUR')} brutos, "
+                     f"{_money(withheld, 'EUR')} de retención en origen.")
+    lines.append("In euros, as in the tax report (draft, not tax advice). Unrealized gains are not for a single "
+                 "month and are left out." if english else
+                 "En euros, como en el informe fiscal (borrador, no asesoría fiscal). Lo latente no es de un mes "
+                 "y no entra.")
+    return _response("\n".join(lines), sources, "account_month_gains")
+
+
 def _sales_answer(db: Session, year: int, only: set[str]) -> ChatResponse:
     english = _english()
     data = _tax_data(db, year)
@@ -2201,6 +2279,12 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
         return _trades_answer(db, tenant, text)
     if year is not None and _SALES.search(text):
         return _sales_answer(db, year, _tickers_in(question))
+    # «¿Cuánto gané en octubre?» / «… este mes» / «… el mes pasado»: antes, el modelo general.
+    if (_YEAR_GAINS.search(text) and not _tickers_in(question) and not re.search(r"\bsi\b", text)
+            and (_NAMED_MONTH.search(text) or _LAST_MONTH.search(text) or _THIS_MONTH.search(text))):
+        period = _trades_period(text)
+        if period is not None and period[0] <= local_today():
+            return _month_gains_answer(db, period)
     # Solo el año en curso: un ejercicio pasado ya lo responde el bloque fiscal (#3952).
     if (year == local_today().year and _YEAR_GAINS.search(text) and not _tickers_in(question)
             and not re.search(r"\bsi\b", text)):
