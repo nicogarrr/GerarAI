@@ -168,3 +168,35 @@ def test_english(monkeypatch, question, expected):
 def test_other_questions_unchanged(question):
     resp = _ask(_db(), question)
     assert (resp.llm_trace or {}).get("path") != "account_trades"
+
+
+@pytest.mark.parametrize(
+    ("question", "head"),
+    [
+        ("¿Cuántas veces he comprado KO?", "Tienes 1 compra de KO guardada (la más reciente primero):"),
+        ("¿cuántas compras de KO he hecho?", "Tienes 1 compra de KO guardada (la más reciente primero):"),
+        ("¿cuántas veces vendí KO?", "Tienes 1 venta de KO guardada (la más reciente primero):"),
+        ("¿cuántas operaciones de KO tengo?", "Tienes 1 compra y 1 venta de KO guardadas (la más reciente primero):"),
+    ],
+)
+def test_ticker_count(question, head):
+    """«¿cuántas veces he comprado KO?» daba los datos de la empresa; ahora el recuento y la lista."""
+    resp = _ask(_db(), question)
+    assert (resp.llm_trace or {}).get("path") == "account_trades"
+    assert resp.llm_trace["provider_calls"] == 0
+    assert resp.answer.splitlines()[0] == head
+
+
+def test_ticker_count_english(monkeypatch):
+    monkeypatch.setenv("I18N_GENERATION_ENABLED", "true")
+    get_settings.cache_clear()
+    db = _db()
+    db.info["language"] = "en"
+    try:
+        resp = _ask(db, "How many times did I buy KO?")
+    finally:
+        get_settings.cache_clear()
+    assert resp.answer.splitlines() == [
+        "You have 1 buy of KO saved (most recent first):",
+        "- Oct 5, 2026: bought 10 KO at 60.50 USD.",
+    ]

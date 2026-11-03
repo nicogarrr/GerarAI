@@ -1717,17 +1717,23 @@ _TICKER_TRADES = re.compile(
     r"|\bque\s+operaciones\s+(?:he\s+hecho|hice)\s+(?:de|en|con)\b"
     r"|\bwhen\s+(?:did\s+i\s+(?:buy|sell)|have\s+i\s+(?:bought|sold))\b"
     r"|\bmy\s+(?:trades|transactions|purchases)\s+(?:of|in|on|for)\b|\bmy\s+[a-z0-9.]{1,6}\s+trades\b"
+    # «¿cuántas veces he comprado UBER?», «¿cuántas compras de UBER he hecho?»:
+    # recuento de un ticker (antes, los datos de la empresa).
+    r"|\bcuant[ao]s\s+veces\s+(?:he\s+comprado|compre|he\s+vendido|vendi)\b"
+    r"|\bcuant[ao]s\s+(?:compras|ventas|operaciones)\s+(?:de|en|con)\b"
+    r"|\bhow\s+many\s+times\s+(?:did\s+i\s+(?:buy|sell)|have\s+i\s+(?:bought|sold))\b"
 )
+_TICKER_COUNT = re.compile(r"\bcuant[ao]s\b|\bhow\s+many\b")
 
 
 #: Verbo de compra o de venta en la pregunta de un ticker (ver _TICKER_TRADES).
 _TICKER_BUYS = re.compile(
-    r"\bcuando\s+(?:compre|he\s+comprado)\b|\bmis\s+compras\s+(?:de|en|con)\b"
-    r"|\bwhen\s+(?:did\s+i\s+buy|have\s+i\s+bought)\b|\bmy\s+purchases\s+(?:of|in|on|for)\b"
+    r"\b(?:cuando|cuant[ao]s\s+veces)\s+(?:compre|he\s+comprado)\b|\b(?:mis|cuantas)\s+compras\s+(?:de|en|con)\b"
+    r"|\b(?:when|how\s+many\s+times)\s+(?:did\s+i\s+buy|have\s+i\s+bought)\b|\bmy\s+purchases\s+(?:of|in|on|for)\b"
 )
 _TICKER_SELLS = re.compile(
-    r"\bcuando\s+(?:vendi|he\s+vendido)\b|\bmis\s+ventas\s+(?:de|en|con)\b"
-    r"|\bwhen\s+(?:did\s+i\s+sell|have\s+i\s+sold)\b"
+    r"\b(?:cuando|cuant[ao]s\s+veces)\s+(?:vendi|he\s+vendido)\b|\b(?:mis|cuantas)\s+ventas\s+(?:de|en|con)\b"
+    r"|\b(?:when|how\s+many\s+times)\s+(?:did\s+i\s+sell|have\s+i\s+sold)\b"
 )
 
 
@@ -1798,7 +1804,21 @@ def _trades_answer(db: Session, tenant: int, text: str, ticker: str | None = Non
                         else "No tienes compras ni ventas guardadas. Puedes importarlas en Cartera.")
         return _response(text_out, sources, "account_trades")
     portfolios = db.scalar(select(func.count(Portfolio.id)).where(Portfolio.tenant_id == tenant)) or 0
-    if ticker and sells_only:
+    counts = None
+    if ticker and _TICKER_COUNT.search(text):
+        counts = dict(db.execute(
+            select(Transaction.action, func.count(Transaction.id))
+            .join(Company, Company.id == Transaction.company_id)
+            .where(Transaction.tenant_id == tenant, Company.ticker == ticker,
+                   Transaction.action.in_(("sell",) if sells_only else ("buy",) if buys_only else ("buy", "sell")))
+            .group_by(Transaction.action)
+        ).all())
+    if counts is not None:
+        n_buys, n_sells = counts.get("buy", 0), counts.get("sell", 0)
+        lines = [f"You have {_count_words(n_buys, n_sells, True)} of {ticker} saved (most recent first):" if english
+                 else f"Tienes {_count_words(n_buys, n_sells, False)} de {ticker} "
+                 f"guardada{'' if n_buys + n_sells == 1 else 's'} (la más reciente primero):"]
+    elif ticker and sells_only:
         lines = [f"Your saved sells of {ticker} (most recent first):" if english
                  else f"Tus ventas guardadas de {ticker} (la más reciente primero):"]
     elif ticker and buys_only:
