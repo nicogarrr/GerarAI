@@ -4134,6 +4134,23 @@ def scan_contradictions(
 REVIEW_THESES_BUDGET_SECONDS = 360
 
 
+@dramatiq.actor(max_retries=1, time_limit=300_000)
+@_coalesce_on_success("backfill_watchlist_theses", 20 * 3600, ("tenant_id",))
+def backfill_watchlist_theses(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
+    """Encola (por la via de siempre) la tesis de las empresas de la watchlist
+    que no la tienen o se quedaron en «datos insuficientes» hace dias."""
+    from app.services.tracked_analysis import backfill_watchlist_theses as backfill
+
+    try:
+        db = _session(tenant_id, user_id)
+        try:
+            return {"actor": "backfill_watchlist_theses", **backfill(db)}
+        finally:
+            db.close()
+    except Exception as exc:
+        return _handle_actor_error("backfill_watchlist_theses", exc, tenant_id=tenant_id)
+
+
 @dramatiq.actor(max_retries=1)
 @_coalesce_on_success("review_theses", 20 * 3600, ("tenant_id", "ticker"))
 def review_theses(

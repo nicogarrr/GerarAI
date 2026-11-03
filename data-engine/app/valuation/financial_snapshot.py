@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import desc, select
@@ -83,6 +83,12 @@ class FinancialSnapshot:
     # precio es de hoy (o del as_of); sin esto un 4:1 tras el cierre dejaba el
     # valor por accion x4 frente a un precio ya dividido entre 4.
     split_factors: dict[str, float] = field(default_factory=dict)
+    # metric -> procedencia multi-fuente (bridge_sources) de las piezas del
+    # puente que el camino estricto no encontro y se resolvieron cruzando
+    # fuentes / cierres cercanos. Todo lo que hay aqui se muestra ETIQUETADO
+    # (confirmado, una sola fuente no oficial, discrepancia) en la traza y
+    # en la tesis; nunca como dato oficial del ancla.
+    bridge_provenance: dict[str, dict] = field(default_factory=dict)
 
     def value(self, metric: str) -> float | None:
         """Return a finite float, or ``None``.
@@ -407,6 +413,135 @@ class FinancialSnapshotBuilder:
                     i for i in (revenue.id,) if i is not None
                 ]
 
+    @staticmethod
+    def _resolve_bridge_gaps(
+        db: Session,
+        company: Company,
+        snapshot: FinancialSnapshot,
+        anchor: FinancialFact,
+        facts_for,
+        *,
+        as_of: date | None,
+        price_as_of: date | None,
+    ) -> None:
+        """Deuda neta / acciones que el camino estricto no encontro.
+
+        Cruza TODAS las fuentes guardadas (oficial, FMP, Yahoo) con la regla
+        de :mod:`app.valuation.bridge_sources` en una ventana de cierres
+        cercanos al ancla. Lo resuelto entra al snapshot como hecho transitorio
+        (no se persiste) y su procedencia en ``bridge_provenance``.
+        """
+        from app.valuation import bridge_sources as bs
+
+        anchor_end = bs._period_end(anchor) or date.today()
+        not_before = anchor_end - timedelta(days=bs.MAX_STALENESS_DAYS)
+        not_after = anchor_end + timedelta(days=366)
+        if as_of is not None:
+            not_after = min(not_after, as_of)
+
+        def _transient(metric: str, cand: bs.Candidate, value: float, unit: str | None) -> FinancialFact:
+            base = cand.fact
+            return FinancialFact(
+                company_id=company.id,
+                metric=metric,
+                value=Decimal(str(value)),
+                unit=unit,
+                period=cand.period,
+                fiscal_year=getattr(base, "fiscal_year", None),
+                fiscal_quarter=getattr(base, "fiscal_quarter", None),
+                source_type=cand.source,
+                is_reported=False,
+            )
+
+        if "net_debt" not in snapshot.facts:
+            direct = bs.newest_per_source(facts_for("net_debt"), not_after=not_after, not_before=not_before)
+            debts = bs.newest_per_source(facts_for("total_debt"), not_after=not_after, not_before=not_before)
+            cash_all = facts_for("cash_and_equivalents")
+            by_source = {c.source: c for c in direct}
+            derived_ids: dict[str, list[int]] = {}
+            for debt in debts:
+                if debt.source in by_source:
+                    continue
+                # Caja de la MISMA fuente y del MISMO cierre que la deuda; si esa
+                # fuente no la trae, la oficial de ese cierre (la caja es la pieza
+                # que el oficial casi siempre publica).
+                cash = next(
+                    (
+                        c for c in bs.newest_per_source(
+                            [f for f in cash_all if bs._period_end(f) == debt.period_end]
+                        )
+                        if c.source == debt.source
+                    ),
+                    None,
+                ) or next(
+                    iter(
+                        bs.newest_per_source(
+                            [f for f in cash_all if bs._period_end(f) == debt.period_end]
+                        )
+                    ),
+                    None,
+                )
+                if cash is None:
+                    continue
+                fact = _transient("net_debt", debt, debt.value - cash.value, getattr(debt.fact, "unit", None))
+                by_source[debt.source] = bs.Candidate(
+                    debt.source, debt.value - cash.value, debt.period, debt.period_end, fact
+                )
+                derived_ids[debt.source] = [
+                    i for i in (getattr(debt.fact, "id", None), getattr(cash.fact, "id", None)) if i
+                ]
+            candidates = sorted(by_source.values(), key=lambda c: (c.period_end or date.min), reverse=True)
+            scale = max((abs(d.value) for d in debts), default=None)
+            resolved = bs.resolve("net_debt", candidates, scale=scale)
+            if resolved is not None:
+                snapshot.facts["net_debt"] = resolved.chosen.fact
+                snapshot.balance_sheet = resolved.chosen.period
+                if resolved.chosen.source in derived_ids:
+                    snapshot.derived["net_debt"] = derived_ids[resolved.chosen.source]
+                snapshot.bridge_provenance["net_debt"] = {
+                    **resolved.as_dict(),
+                    "method": "deuda total − caja" if resolved.chosen.source in derived_ids else "deuda neta declarada",
+                    "estimated": True,
+                }
+                snapshot.warnings.append(f"net_debt resuelta por cruce de fuentes: {resolved.note}.")
+
+        if "shares_diluted" not in snapshot.facts:
+            diluted = bs.newest_per_source(facts_for("shares_diluted"), not_after=not_after, not_before=not_before)
+            outstanding = bs.newest_per_source(
+                facts_for("shares_outstanding"), not_after=not_after, not_before=not_before
+            )
+            sources = {c.source for c in diluted}
+            # Acciones en circulacion como candidata de la fuente que no da
+            # diluidas: aproximacion etiquetada (sin la dilucion de opciones).
+            approx = [c for c in outstanding if c.source not in sources]
+            candidates = sorted([*diluted, *approx], key=lambda c: (c.period_end or date.min), reverse=True)
+            resolved = bs.resolve("shares_diluted", candidates)
+            if resolved is not None and resolved.chosen.value > 0:
+                chosen_fact = resolved.chosen.fact
+                snapshot.facts["shares_diluted"] = chosen_fact
+                snapshot.shares_period = resolved.chosen.period
+                factor = float(
+                    split_factor_for_fact(
+                        db,
+                        company.id,
+                        period=resolved.chosen.period,
+                        filed=getattr(chosen_fact, "filed", None),
+                        cutoff=price_as_of or as_of or date.today(),
+                    )
+                )
+                if factor != 1.0:
+                    snapshot.split_factors["shares_diluted"] = factor
+                snapshot.bridge_provenance["shares_diluted"] = {
+                    **resolved.as_dict(),
+                    "method": (
+                        "acciones en circulación (sin dilución)"
+                        if resolved.chosen in approx
+                        else "acciones diluidas declaradas"
+                    ),
+                    "estimated": True,
+                }
+                snapshot.warnings.append(f"shares_diluted resueltas por cruce de fuentes: {resolved.note}.")
+
     def build(
         self,
         db: Session,
@@ -539,6 +674,9 @@ class FinancialSnapshotBuilder:
             facts_for("cash_and_equivalents"),
         )
         self._derive_free_cash_flow(snapshot)
+        self._resolve_bridge_gaps(
+            db, company, snapshot, anchor, facts_for, as_of=as_of, price_as_of=price_as_of
+        )
 
         missing: list[str] = []
         for metric in REQUIRED_FOR_DCF:

@@ -134,3 +134,67 @@ def ingest_with_fallback(
             "fallback_chain": chain,
         }
     return {**sec_block, "fallback_chain": chain}
+
+
+# Piezas del puente de valoracion que el modo huecos de Yahoo puede aportar.
+BRIDGE_GAP_INPUTS = frozenset({"net_debt", "shares_diluted"})
+
+
+def fill_bridge_gaps(
+    db: Session,
+    company: Company,
+    *,
+    refresh: Callable[..., dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Completa deuda neta / acciones que faltan en el snapshot con Yahoo (no oficial).
+
+    Solo actua si el snapshot actual pide alguna de ``BRIDGE_GAP_INPUTS``;
+    corre en su propio SAVEPOINT y nunca lanza (la tesis no se rompe por una
+    fuente). Devuelve que faltaba, que se intento y si el hueco se cerro.
+    """
+    from app.valuation.financial_snapshot import FinancialSnapshotBuilder
+
+    if refresh is None:
+        from app.core.config import get_settings
+
+        if not get_settings().yahoo_bridge_gaps_enabled:
+            return {"status": "desactivado"}
+    try:
+        before = set(FinancialSnapshotBuilder().build(db, company).missing_inputs)
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "detail": type(exc).__name__}
+    wanted = sorted(before & BRIDGE_GAP_INPUTS)
+    if not wanted:
+        return {"status": "no_aplica", "missing": sorted(before)}
+    from app.services.yahoo_fundamentals_service import refresh_gaps_from_yahoo
+
+    fn = refresh or refresh_gaps_from_yahoo
+    nested = db.begin_nested()
+    try:
+        result = fn(db, company, commit=False)
+        nested.commit()
+    except Exception as exc:  # noqa: BLE001 - fuente opcional
+        if nested.is_active:
+            nested.rollback()
+        logger.info("huecos Yahoo no disponibles para %s: %s", company.ticker, type(exc).__name__)
+        return {
+            "status": "error",
+            "source": YAHOO_LABEL,
+            "wanted": wanted,
+            "detail": redact_secrets(str(exc))[:200],
+        }
+    try:
+        after = set(FinancialSnapshotBuilder().build(db, company).missing_inputs)
+    except Exception:  # noqa: BLE001
+        after = before
+    return {
+        "status": "ok",
+        "source": YAHOO_LABEL,
+        "single_source": True,
+        "wanted": wanted,
+        "closed": sorted(set(wanted) - after),
+        "still_missing": sorted(set(wanted) & after),
+        "facts_imported": result.get("facts_imported", 0),
+        "symbol": result.get("symbol"),
+        "document_id": result.get("source_document_id"),
+    }

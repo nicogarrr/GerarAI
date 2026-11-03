@@ -166,6 +166,14 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "es": "Se necesita el contexto del usuario.",
         "en": "User context is required.",
     },
+    "watchlist_ticker_unknown": {
+        "es": "No encontramos la empresa «{ticker}». Revisa el ticker.",
+        "en": "We couldn't find the company «{ticker}». Check the ticker.",
+    },
+    "watchlist_ticker_unknown_hint": {
+        "es": "No encontramos la empresa «{ticker}». Revisa el ticker: ¿quizá {suggestions}?",
+        "en": "We couldn't find the company «{ticker}». Check the ticker: maybe {suggestions}?",
+    },
     "ticker_not_in_watchlist": {
         "es": "Ese ticker no está en tu watchlist",
         "en": "That ticker is not in your watchlist",

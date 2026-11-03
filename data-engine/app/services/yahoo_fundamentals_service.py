@@ -164,6 +164,71 @@ def _metric_rows(entry: dict[str, Any]) -> list[tuple[str, str, list[str], bool 
     return [row for row in YAHOO_METRIC_MAP if row[0] in allowed]
 
 
+# Modo HUECOS (owner 3-nov-2026: «a ver como conseguimos esos datos»): para
+# CUALQUIER emisor con listado Yahoo seguro, solo las piezas del puente de
+# valoracion que faltan (deuda, deuda neta, caja, acciones) y solo en los
+# pares (metrica, ejercicio) sin hecho oficial. Comprobado en prod el 3-nov:
+# AENA/EBRO/SAN/VIS (ESEF sin deuda mapeada) y PLTR/HIMS (SEC sin tag de
+# deuda reciente; HIMS tiene 1.120 M en convertibles, asi que «sin tag» NO
+# era deuda cero). Cada cifra queda como fuente NO oficial y de UNA sola
+# fuente salvo que el oficial la confirme; nunca sustituye a SEC/ESEF/CNMV.
+GAP_METRICS: tuple[str, ...] = ("total_debt", "net_debt", "cash_and_equivalents", "shares_diluted")
+GAP_EXTRA_ROWS: list[tuple[str, str, list[str], bool | str]] = [
+    ("net_debt", "balance", ["Net Debt"], False),
+]
+GAP_TITLE_PREFIX = "Yahoo Finance huecos del puente (fuente no oficial)"
+SINGLE_SOURCE_NOTE = "una sola fuente, no oficial (Yahoo Finance)"
+
+
+def gap_entry(db: Session, company: Company) -> dict[str, Any] | None:
+    """Entrada sintetica del modo huecos, o None si no hay listado seguro.
+
+    El simbolo es el MISMO que usan los precios (``yahoo_symbol``: bolsa
+    mapeada -> sufijo, ISIN revisado -> su listado; sin simbolo seguro no hay
+    entrada). La identidad se prueba despues contra el nombre real de la
+    Company (una ficha con el ticker como nombre no acredita nada) y la
+    divisa contra la de los hechos oficiales ya guardados o la del maestro.
+    """
+    from app.services.propicks_price_service import yahoo_symbol
+
+    symbol = yahoo_symbol(company)
+    if not symbol:
+        return None
+    official_units = {
+        (unit or "").split("/")[0].upper()
+        for (unit,) in db.execute(
+            select(FinancialFact.unit).where(
+                FinancialFact.company_id == company.id,
+                FinancialFact.source_type.in_(OFFICIAL_SOURCE_TYPES),
+                FinancialFact.metric.in_(("revenue", "cash_and_equivalents", "total_assets")),
+                *tenant_filters(db, FinancialFact),
+            ).distinct()
+        ).all()
+        if unit
+    }
+    currencies = {u for u in official_units if len(u) == 3 and u.isalpha()}
+    if len(currencies) > 1:
+        return None  # hechos oficiales en varias divisas: no se mezcla una tercera fuente
+    currency = next(iter(currencies)) if currencies else (company.currency or "").upper() or None
+    return {
+        "symbol": symbol,
+        "currency": currency,
+        "names": [company.name],
+        "metrics": GAP_METRICS,
+        "gap_only": True,
+    }
+
+
+def refresh_gaps_from_yahoo(
+    db: Session, company: Company, *, fetcher: Any = _fetch_yahoo, commit: bool = True
+) -> dict[str, Any]:
+    """Modo huecos para cualquier emisor (ver GAP_METRICS)."""
+    entry = gap_entry(db, company)
+    if entry is None:
+        raise RuntimeError(f"Sin listado Yahoo seguro para {company.ticker}")
+    return _refresh(db, company, entry, fetcher=fetcher, commit=commit)
+
+
 def refresh_from_yahoo(
     db: Session, company: Company, *, fetcher: Any = _fetch_yahoo, commit: bool = True
 ) -> dict[str, Any]:
@@ -175,6 +240,14 @@ def refresh_from_yahoo(
     entry = REVIEWED_MAP.get(ticker)
     if entry is None:
         raise RuntimeError(f"Sin mapa Yahoo revisado para {ticker}")
+    return _refresh(db, company, entry, fetcher=fetcher, commit=commit)
+
+
+def _refresh(
+    db: Session, company: Company, entry: dict[str, Any], *, fetcher: Any, commit: bool
+) -> dict[str, Any]:
+    ticker = company.ticker.upper()
+    gap_only = bool(entry.get("gap_only"))
 
     # Pares (metrica, ejercicio) con hecho OFICIAL anual: Yahoo no los toca.
     official_pairs = {
@@ -195,6 +268,11 @@ def refresh_from_yahoo(
     # sin enriquecer): no aporta identidad, asi que manda la prueba contra los
     # nombres REVISADOS del mapa. Un nombre real distinto sigue bloqueando.
     placeholder_name = (company.name or "").strip().upper() in {"", ticker}
+    if gap_only and placeholder_name:
+        raise RuntimeError(
+            f"company_mismatch: la Company {ticker} no tiene nombre real con el que "
+            "acreditar identidad frente a Yahoo"
+        )
     if not (
         (placeholder_name or _name_identity_ok(company.name, yname))
         and any(_name_identity_ok(n, yname) for n in entry["names"])
@@ -205,6 +283,8 @@ def refresh_from_yahoo(
         )
     currency = entry["currency"]
     declared = (data.get("currency") or "").upper()
+    if gap_only and not (declared and currency):
+        raise RuntimeError("currency_unknown: sin divisa declarada con la que comparar")
     if declared and declared != currency:
         raise RuntimeError(
             f"currency_mismatch: Yahoo declara {declared}, el mapa revisado dice {currency}"
@@ -212,7 +292,11 @@ def refresh_from_yahoo(
 
     symbol = entry["symbol"]
     retrieved_at = datetime.now(UTC).isoformat()
-    title = f"Yahoo Finance fundamentals (fuente no oficial) - {symbol}"
+    title = (
+        f"{GAP_TITLE_PREFIX} - {symbol}"
+        if gap_only
+        else f"Yahoo Finance fundamentals (fuente no oficial) - {symbol}"
+    )
     tenant_id = db.info.get("tenant_id")
     document = db.scalar(
         select(Document).where(
@@ -245,11 +329,33 @@ def refresh_from_yahoo(
     coverage: dict[str, list[str]] = {}
     periods_by_metric: dict[str, dict[str, Decimal]] = {}
     rows = _metric_rows(entry)
+    if gap_only:
+        rows = [*rows, *GAP_EXTRA_ROWS]
     for metric, statement, labels, _per_share in rows:
         by_period = _row_by_period(data.get(statement), labels)
         if by_period:
             coverage[metric] = sorted(by_period, reverse=True)
             periods_by_metric[metric] = by_period
+
+    if gap_only:
+        # Deuda neta sin fila «Net Debt» (Yahoo la omite con caja neta, p. ej.
+        # PLTR): deuda total menos caja del MISMO balance de Yahoo.
+        debt_rows = periods_by_metric.get("total_debt", {})
+        cash_rows = periods_by_metric.get("cash_and_equivalents", {})
+        net_rows = dict(periods_by_metric.get("net_debt", {}))
+        for period_date, debt_value in debt_rows.items():
+            if period_date not in net_rows and period_date in cash_rows:
+                net_rows[period_date] = debt_value - cash_rows[period_date]
+        if net_rows:
+            periods_by_metric["net_debt"] = net_rows
+            coverage["net_debt"] = sorted(net_rows, reverse=True)
+        # Un ejercicio con deuda OFICIAL (total o neta) ya tiene puente: la
+        # deuda neta de Yahoo lo taparia en el snapshot (prefiere net_debt).
+        official_pairs = official_pairs | {
+            ("net_debt", fiscal_year)
+            for metric, fiscal_year in official_pairs
+            if metric == "total_debt"
+        }
 
     # Complemento, nunca sustituto: si TODA la cobertura posible ya tiene
     # hecho oficial, no hay nada que aportar desde una fuente no oficial.
@@ -265,6 +371,8 @@ def refresh_from_yahoo(
 
     imported = 0
     skipped_official = 0
+    if gap_only and "net_debt" in periods_by_metric and not any(r[0] == "net_debt" for r in rows):
+        rows = [*rows, *GAP_EXTRA_ROWS]
     for metric, statement, labels, per_share in rows:
         by_period = periods_by_metric.get(metric, {})
         for period_date, val in sorted(by_period.items(), reverse=True)[:10]:
@@ -298,6 +406,7 @@ def refresh_from_yahoo(
         "metrics_covered": sorted(coverage),
         "last_refreshed_at": retrieved_at,
         "verified_against": list(entry.get("verified_against") or []),
+        **({"gap_only": True, "single_source": True, "note": SINGLE_SOURCE_NOTE} if gap_only else {}),
     }
     drop_shadowed_facts(db, company.id, document.id, tenant_condition(db))
     sync_company_fact_chunks(db, company)

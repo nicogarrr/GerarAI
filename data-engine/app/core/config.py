@@ -147,6 +147,8 @@ class Settings(BaseSettings):
     eia_api_key: str | None = None
 
     app_env: str = "local"
+    # Huecos de deuda neta / acciones con Yahoo (no oficial) al preparar tesis.
+    yahoo_bridge_gaps_enabled: bool = True
     app_name: str = "GerarAI Research Engine"
     api_prefix: str = "/api"
     # NoDecode: la plantilla (docker.env.example) y cualquier .env escriben

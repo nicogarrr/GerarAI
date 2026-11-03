@@ -527,6 +527,11 @@ class ValuationService:
         result.setdefault("status", "ok")
         result.setdefault("publishable", result.get("status") == "ok")
         result.setdefault("missing_inputs", [])
+        # Piezas del puente resueltas cruzando fuentes / cierres cercanos: la
+        # tesis, la API y la UI las muestran etiquetadas, nunca como oficiales.
+        provenance = getattr(getattr(context, "snapshot", None), "bridge_provenance", None) or {}
+        if provenance:
+            result["estimated_inputs"] = [dict(item) for item in provenance.values()]
         result.setdefault("reverse_dcf", {})
         result.setdefault("sensitivity", {"rows": []})
         result.setdefault("moat", {})
