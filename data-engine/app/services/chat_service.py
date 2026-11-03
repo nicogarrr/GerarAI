@@ -2494,13 +2494,25 @@ class ChatService:
         if company is not None:
             rows = [row for row in rows if row[0].company_id == company.id]
             if not rows:
-                return ChatResponse(
-                    answer=(
-                        f"You have no open position in {company.ticker}, so there is no saved return to report."
+                from app.services.brain_account_tools import realized_line_for_closed_ticker
+
+                realized = realized_line_for_closed_ticker(
+                    db, tenant_id, company.id, company.ticker, question, english
+                )
+                closed = (
+                    f"You have no open position in {company.ticker}, so there is no saved return to report."
+                    if english
+                    else f"No tienes ninguna posición abierta en {company.ticker}: "
+                    "no hay rentabilidad guardada que contar."
+                )
+                if realized:
+                    closed = (
+                        f"You no longer have an open position in {company.ticker}. {realized}"
                         if english
-                        else f"No tienes ninguna posición abierta en {company.ticker}: "
-                        "no hay rentabilidad guardada que contar."
-                    ),
+                        else f"Ya no tienes posición abierta en {company.ticker}. {realized}"
+                    )
+                return ChatResponse(
+                    answer=closed,
                     sources=[],
                     model="deterministic",
                     prompt_version="portfolio-performance-v1",
