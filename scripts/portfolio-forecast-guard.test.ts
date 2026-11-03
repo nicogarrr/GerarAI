@@ -64,12 +64,14 @@ async function renderForecast(payload: PortfolioForecast): Promise<string> {
         // Compile the real locale context and translator, not a translation stub.
         mkdirSync(`${dir}/i18n/messages`, { recursive: true });
         cpSync('lib/i18n/messages', `${dir}/i18n/messages`, { recursive: true });
-        for (const file of ['client.tsx', 'locale.ts', 'parse-number.ts', 'translate.ts', 't.ts', 'messages/index.ts', 'messages/en-compact.ts']) {
+        for (const file of ['client.tsx', 'locale.ts', 'parse-number.ts', 'translate.ts', 't.ts', 'route-areas.ts', 'route-areas.generated.ts', 'messages/index.ts', 'messages/en-compact.ts', 'messages/es-full.ts']) {
             const target = file.replace(/\.tsx?$/, '.mjs');
             // `#i18n-en-compact` (package.json "imports") no se resuelve bajo
             // node_modules/.cache: se apunta al inglés estático compilado aquí.
             const enCompact = file.startsWith('messages/') ? './en-compact.mjs' : './messages/en-compact.mjs';
-            writeFileSync(`${dir}/i18n/${target}`, compile(`lib/i18n/${file}`).replace(/\.ts(['"])/g, '.mjs$1').replaceAll("'#i18n-en-compact'", `'${enCompact}'`));
+            // Igual con `#i18n-es`: el castellano completo y estático.
+            const esFull = file.startsWith('messages/') ? './es-full.mjs' : './messages/es-full.mjs';
+            writeFileSync(`${dir}/i18n/${target}`, compile(`lib/i18n/${file}`).replace(/\.ts(['"])/g, '.mjs$1').replaceAll("'#i18n-en-compact'", `'${enCompact}'`).replaceAll("'#i18n-es'", `'${esFull}'`).replaceAll("'next/navigation'", "'next/navigation.js'"));
         }
         // format.ts importa el registro de locales (i18n): se compila también
         // y se reescribe la ruta al .mjs local, como con los demás stubs.

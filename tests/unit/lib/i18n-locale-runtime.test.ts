@@ -28,6 +28,8 @@ describe('locale runtime', () => {
     // la caída al español se verifica con diccionarios sintéticos para no
     // depender de qué área siga pendiente en cada momento.
     vi.doMock('@/lib/i18n/messages/index.ts', () => ({
+      isSpanishAreaPending: () => false,
+      recoverSpanishArea: () => {},
       getMessages: (locale: string) => (locale === 'en' ? {} : { synthetic: { pending: 'Pendiente {n}' } }),
     }));
     vi.resetModules();

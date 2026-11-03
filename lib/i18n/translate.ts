@@ -12,7 +12,7 @@
 // @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
 import { DEFAULT_LOCALE, type Locale } from './locale.ts';
 // @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
-import { getMessages, type Messages } from './messages/index.ts';
+import { getMessages, isSpanishAreaPending, recoverSpanishArea, type Messages } from './messages/index.ts';
 
 export type TranslationVars = Record<string, string | number>;
 
@@ -54,6 +54,12 @@ export function translateMessage(locale: Locale, path: string, vars?: Translatio
     value = lookup(getMessages(DEFAULT_LOCALE), path);
   }
   if (typeof value !== 'string') {
+    const area = path.slice(0, path.indexOf('.'));
+    if (area && isSpanishAreaPending(area)) {
+      // Solo en el navegador: el área aún no está descargada para esta ruta.
+      recoverSpanishArea(area);
+      return '';
+    }
     if (process.env.NODE_ENV !== 'production') {
       throw new Error(`[i18n] Falta la clave "${path}" en los diccionarios (lib/i18n/messages/${DEFAULT_LOCALE}/)`);
     }
