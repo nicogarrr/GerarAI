@@ -17,7 +17,7 @@ import ExtendedHoursLine from '@/components/common/ExtendedHoursLine';
 import { valuationHoldLabel } from '@/lib/portfolio/holding-display';
 import type { PortfolioFxRate, PortfolioHolding } from '@/lib/actions/portfolio.actions';
 import { deleteHolding, refreshPortfolioHoldings } from '@/lib/actions/portfolio.actions';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw } from 'lucide-react';
@@ -139,6 +139,187 @@ function holdingSortLabels(ti: TFunction): Record<HoldingSort, string> {
 export function holdingGainKnown(h: PortfolioHolding): boolean {
   return !h.fxMissing && !h.quoteMissing && h.cost > 0 && Number.isFinite(h.gainPercent);
 }
+
+type HoldingItemProps = {
+  holding: PortfolioHolding;
+  /** Peso ya formateado: un string estable deja a memo saltarse la fila. */
+  weightLabel: string;
+  signals: ReturnType<typeof useHoldingSignals>;
+  deleting: boolean;
+  setConfirmSymbol: (symbol: string) => void;
+  fxRates?: PortfolioFxRate[];
+};
+
+// Cada posición es un componente memoizado: abrir o cancelar «Eliminar», el
+// estado «borrando» de una fila o reordenar ya no vuelve a pintar las 300
+// posiciones ×2 (tarjeta móvil + fila de escritorio) — solo cambia la fila
+// afectada, o el orden de las ya pintadas.
+/** Tarjeta de una posición (móvil). */
+const HoldingCard = memo(function HoldingCard({ holding, weightLabel, signals, deleting, setConfirmSymbol, fxRates }: HoldingItemProps) {
+  const ti = useT();
+  const locale = useLocale();
+  const f = useFormat();
+  const format = (value: number, currency: string) => f.formatMoney(value, currency, { maximumFractionDigits: 2 });
+  const gainKnown = holdingGainKnown(holding);
+  const isPositive = holding.gain >= 0;
+
+  return (
+    <div className="rounded-xl border border-gray-700 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <Link
+          href={`/research/${holding.symbol}`}
+          className="flex min-h-[44px] items-center gap-2 font-mono text-lg font-bold text-teal-400 hover:text-teal-300"
+        >
+          <CompanyLogo ticker={holding.symbol} name={holding.symbol} className="size-8 shrink-0 rounded-lg" />
+          {holding.symbol}
+        </Link>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setConfirmSymbol(holding.symbol)}
+          disabled={deleting}
+          aria-busy={deleting}
+          className="min-h-[44px] min-w-[44px] text-red-400 hover:text-red-300 hover:bg-red-950/20"
+          title={ti('portfolio.holdings.deleteTitle')}
+          aria-label={ti('portfolio.holdings.deleteAria', { symbol: holding.symbol })}
+        >
+          <Trash2 aria-hidden="true" className="h-4 w-4" />
+        </Button>
+      </div>
+      <TrackedAnalysisStatus analysis={holding.analysis} locale={locale} />
+      {holding.costReviewMessage ? <p role="status" className="mt-2 text-sm text-amber-300">{holding.costReviewMessage}</p> : null}
+      <dl className="mt-3 space-y-1.5 text-sm">
+        <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colQuantity')}</dt><dd className="text-gray-200">{formatQuantity(holding.quantity)}</dd></div>
+        <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colAverage')}</dt><dd className="text-gray-200">{holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : ti('common.na')}</dd></div>
+        <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colCurrent')}</dt><dd className="font-medium text-gray-200">{holding.currentPrice === null ? ti('common.na') : format(holding.currentPrice, holding.nativeCurrency)}</dd></div>
+        <div className="-mt-1 flex justify-end"><ExtendedHoursLine symbol={holding.symbol} currency={holding.nativeCurrency} /></div>
+        <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colValue')}</dt><dd className="font-semibold text-gray-100">{holding.valuationHold ? valuationHoldLabel(holding.valuationHold, locale) : holding.costReviewMessage ? (holding.valueMissing ? ti('common.na') : format(holding.value, holding.baseCurrency)) : holding.fxMissing ? ti('portfolio.holdings.valueNoConversion') : format(holding.value, holding.baseCurrency)}</dd></div>
+        <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colWeight')}</dt><dd className="font-semibold text-gray-100">{weightLabel}</dd></div>
+        <div className="flex items-center justify-between gap-2">
+          <dt className="text-gray-500">{ti('portfolio.holdings.colGain')}</dt>
+          <dd className="flex items-center gap-2">
+            <span className={`font-semibold ${!gainKnown ? 'text-gray-400' : isPositive ? 'text-green-400' : 'text-red-400'}`}>
+              {gainKnown ? format(holding.gain, holding.baseCurrency) : ti('common.na')}
+            </span>
+            <Badge
+              variant={!gainKnown ? 'outline' : isPositive ? 'default' : 'destructive'}
+              className={`${!gainKnown ? 'text-gray-400' : isPositive ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'}`}
+            >
+              {gainKnown ? f.formatPercent(holding.gainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' }, ti('common.na')) : ti('common.na')}
+            </Badge>
+          </dd>
+        </div>
+        <NativePnlLine holding={holding} gainKnown={gainKnown} format={format} ti={ti} f={f} />
+        {gainKnown ? <FxEffectLine holding={holding} format={format} ti={ti} /> : null}
+        {/* Dato decisional fiscal reubicado (SERIE 1, auditoría): accesible por fila, nulo honesto. */}
+        <div className="flex items-center justify-between gap-2">
+          <dt className="text-gray-500">{ti('portfolio.holdings.colFiscal')}</dt>
+          <dd>
+            {holding.fiscalBucket ? (
+              <Badge
+                variant="outline"
+                className={
+                  holding.fiscalBucket === 'largo_plazo'
+                    ? 'border-blue-700 text-blue-300'
+                    : 'border-amber-700 text-amber-300'
+                }
+              >
+                {holding.fiscalBucket === 'largo_plazo' ? ti('portfolio.holdings.fiscalLong') : ti('portfolio.holdings.fiscalShort')}
+                {holding.holdingDays !== null ? ` · ${holding.holdingDays}d` : ''}
+              </Badge>
+            ) : (
+              <span className="text-xs text-gray-500" title={ti('portfolio.holdings.fiscalNoHistory')}>{ti('common.na')}</span>
+            )}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colSince')}</dt><dd className="text-gray-200">{f.formatDate(holding.firstBuyDate)}</dd></div>
+        <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colDca')}</dt><dd><DcaLevelChip symbol={holding.symbol} signals={signals} /></dd></div>
+        <div className="flex items-start justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colFairValue')}</dt><dd><FairValueLine symbol={holding.symbol} price={holding.currentPrice} priceCurrency={holding.nativeCurrency} signals={signals} /></dd></div>
+        <div className="flex items-center justify-between gap-2"><dt className="text-gray-500" title={ti('portfolio.holdings.analystTitle')}>{ti('portfolio.holdings.colAnalyst')}</dt><dd><AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice !== null && holding.currentPrice > 0 ? holding.currentPrice : null} fxRates={fxRates} baseCurrency={holding.baseCurrency} /></dd></div>
+      </dl>
+    </div>
+
+  );
+});
+
+/** Fila de una posición (tabla de escritorio). */
+const HoldingRow = memo(function HoldingRow({ holding, weightLabel, signals, deleting, setConfirmSymbol, fxRates }: HoldingItemProps) {
+  const ti = useT();
+  const locale = useLocale();
+  const f = useFormat();
+  const format = (value: number, currency: string) => f.formatMoney(value, currency, { maximumFractionDigits: 2 });
+  const gainKnown = holdingGainKnown(holding);
+  const isPositive = holding.gain >= 0;
+
+  return (
+    <TableRow className="border-gray-700 hover:bg-gray-800/50">
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <CompanyLogo ticker={holding.symbol} name={holding.symbol} className="size-8 shrink-0 rounded-lg" />
+          <Link href={`/research/${holding.symbol}`} className="font-mono font-bold text-teal-400 hover:text-teal-300 transition-colors">{holding.symbol}</Link><TrackedAnalysisStatus analysis={holding.analysis} locale={locale} />
+          <details className="relative">
+            <summary className="min-h-9 cursor-pointer rounded px-2 py-2 text-xs text-gray-400 hover:text-gray-100" aria-label={ti('portfolio.holdings.optionsAria', { symbol: holding.symbol })}>{ti('portfolio.holdings.options')}</summary>
+            <div className="mt-1 min-w-36 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
+              {/* Dato decisional fiscal reubicado (SERIE 1, auditoría): sin columna propia, accesible aquí. */}
+              <div className="border-b border-gray-800 px-2 py-1.5 text-xs">
+                {holding.fiscalBucket ? (
+                  <span className={holding.fiscalBucket === 'largo_plazo' ? 'text-blue-300' : 'text-amber-300'}>
+                    {holding.fiscalBucket === 'largo_plazo' ? ti('portfolio.holdings.fiscalLong') : ti('portfolio.holdings.fiscalShort')}
+                    {holding.holdingDays !== null ? ` · ${holding.holdingDays}d` : ''}
+                  </span>
+                ) : (
+                  <span className="text-gray-500" title={ti('portfolio.holdings.fiscalNoHistory')}>{ti('portfolio.holdings.fiscalNa', { na: ti('common.na') })}</span>
+                )}
+                <span className="block text-gray-500">{ti('portfolio.holdings.sincePrefix', { date: f.formatDate(holding.firstBuyDate) })}</span>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setConfirmSymbol(holding.symbol)} disabled={deleting} aria-busy={deleting} className="min-h-10 w-full justify-start gap-2 text-red-300" aria-label={ti('portfolio.holdings.deleteAriaTable', { symbol: holding.symbol })}><Trash2 aria-hidden="true" className="h-4 w-4" />{ti('portfolio.holdings.deleteCta')}</Button>
+            </div>
+          </details>
+        </div>
+      </TableCell>
+      <TableCell className="text-right text-gray-300">
+        {formatQuantity(holding.quantity)}
+      </TableCell>
+      <TableCell className="text-right text-gray-300">
+        {holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : ti('common.na')}
+        {holding.costReviewMessage ? <p role="status" className="mt-1 max-w-64 text-xs text-amber-300">{holding.costReviewMessage}</p> : null}
+      </TableCell>
+      <TableCell className="text-right text-gray-300 font-medium">
+        {holding.currentPrice === null ? ti('common.na') : format(holding.currentPrice, holding.nativeCurrency)}
+        <ExtendedHoursLine symbol={holding.symbol} currency={holding.nativeCurrency} />
+      </TableCell>
+      <TableCell className="text-right font-semibold text-gray-100">
+        {holding.valuationHold ? <Badge variant="outline">{valuationHoldLabel(holding.valuationHold, locale)}</Badge> : holding.costReviewMessage ? (holding.valueMissing ? ti('common.na') : format(holding.value, holding.baseCurrency)) : holding.fxMissing ? <Badge variant="outline">{ti('portfolio.holdings.valueNoConversion')}</Badge> : format(holding.value, holding.baseCurrency)}
+      </TableCell>
+      <TableCell className="text-right font-semibold text-gray-100">{weightLabel}</TableCell>
+      <TableCell className="text-right">
+        <div className="flex flex-col items-end gap-1">
+          <span className={`font-semibold ${!gainKnown ? 'text-gray-400' : isPositive ? 'text-green-400' : 'text-red-400'}`}>
+            {gainKnown ? format(holding.gain, holding.baseCurrency) : ti('common.na')}
+          </span>
+          <Badge
+            variant={!gainKnown ? 'outline' : isPositive ? 'default' : 'destructive'}
+            className={`${!gainKnown ? 'text-gray-400' : isPositive ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'}`}
+          >
+            {gainKnown ? f.formatPercent(holding.gainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' }, ti('common.na')) : ti('common.na')}
+          </Badge>
+          <NativePnlLine holding={holding} gainKnown={gainKnown} format={format} ti={ti} f={f} />
+      {gainKnown ? <FxEffectLine holding={holding} format={format} ti={ti} /> : null}
+        </div>
+      </TableCell>
+      <TableCell className="text-right text-sm">
+        <AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice !== null && holding.currentPrice > 0 ? holding.currentPrice : null} fxRates={fxRates} baseCurrency={holding.baseCurrency} />
+      </TableCell>
+      <TableCell className="text-right text-sm">
+        <div className="flex flex-col items-end gap-1">
+          <DcaLevelChip symbol={holding.symbol} signals={signals} />
+          <FairValueLine symbol={holding.symbol} price={holding.currentPrice} priceCurrency={holding.nativeCurrency} signals={signals} />
+        </div>
+      </TableCell>
+    </TableRow>
+
+  );
+});
 
 export function sortHoldings(holdings: PortfolioHolding[], sort: HoldingSort, locale: string = 'es'): PortfolioHolding[] {
   const valueKnown = (h: PortfolioHolding) => !h.valueMissing && !h.fxMissing && h.currentPrice !== null && Number.isFinite(h.value);
@@ -314,86 +495,17 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
             ) : null}
             {/* Móvil: cards sin scroll horizontal */}
             <div className="space-y-3 md:hidden">
-              {sortedHoldings.map((holding) => {
-                const gainKnown = holdingGainKnown(holding);
-                const isPositive = holding.gain >= 0;
-                return (
-                  <div key={holding.symbol} className="rounded-xl border border-gray-700 p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <Link
-                        href={`/research/${holding.symbol}`}
-                        className="flex min-h-[44px] items-center gap-2 font-mono text-lg font-bold text-teal-400 hover:text-teal-300"
-                      >
-                        <CompanyLogo ticker={holding.symbol} name={holding.symbol} className="size-8 shrink-0 rounded-lg" />
-                        {holding.symbol}
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setConfirmSymbol(holding.symbol)}
-                        disabled={deleting === holding.symbol}
-                        aria-busy={deleting === holding.symbol}
-                        className="min-h-[44px] min-w-[44px] text-red-400 hover:text-red-300 hover:bg-red-950/20"
-                        title={ti('portfolio.holdings.deleteTitle')}
-                        aria-label={ti('portfolio.holdings.deleteAria', { symbol: holding.symbol })}
-                      >
-                        <Trash2 aria-hidden="true" className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <TrackedAnalysisStatus analysis={holding.analysis} locale={locale} />
-                    {holding.costReviewMessage ? <p role="status" className="mt-2 text-sm text-amber-300">{holding.costReviewMessage}</p> : null}
-                    <dl className="mt-3 space-y-1.5 text-sm">
-                      <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colQuantity')}</dt><dd className="text-gray-200">{formatQuantity(holding.quantity)}</dd></div>
-                      <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colAverage')}</dt><dd className="text-gray-200">{holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : ti('common.na')}</dd></div>
-                      <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colCurrent')}</dt><dd className="font-medium text-gray-200">{holding.currentPrice === null ? ti('common.na') : format(holding.currentPrice, holding.nativeCurrency)}</dd></div>
-                      <div className="-mt-1 flex justify-end"><ExtendedHoursLine symbol={holding.symbol} currency={holding.nativeCurrency} /></div>
-                      <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colValue')}</dt><dd className="font-semibold text-gray-100">{holding.valuationHold ? valuationHoldLabel(holding.valuationHold, locale) : holding.costReviewMessage ? (holding.valueMissing ? ti('common.na') : format(holding.value, holding.baseCurrency)) : holding.fxMissing ? ti('portfolio.holdings.valueNoConversion') : format(holding.value, holding.baseCurrency)}</dd></div>
-                      <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colWeight')}</dt><dd className="font-semibold text-gray-100">{weight(holding.symbol)}</dd></div>
-                      <div className="flex items-center justify-between gap-2">
-                        <dt className="text-gray-500">{ti('portfolio.holdings.colGain')}</dt>
-                        <dd className="flex items-center gap-2">
-                          <span className={`font-semibold ${!gainKnown ? 'text-gray-400' : isPositive ? 'text-green-400' : 'text-red-400'}`}>
-                            {gainKnown ? format(holding.gain, holding.baseCurrency) : ti('common.na')}
-                          </span>
-                          <Badge
-                            variant={!gainKnown ? 'outline' : isPositive ? 'default' : 'destructive'}
-                            className={`${!gainKnown ? 'text-gray-400' : isPositive ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'}`}
-                          >
-                            {gainKnown ? f.formatPercent(holding.gainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' }, ti('common.na')) : ti('common.na')}
-                          </Badge>
-                        </dd>
-                      </div>
-                      <NativePnlLine holding={holding} gainKnown={gainKnown} format={format} ti={ti} f={f} />
-                      {gainKnown ? <FxEffectLine holding={holding} format={format} ti={ti} /> : null}
-                      {/* Dato decisional fiscal reubicado (SERIE 1, auditoría): accesible por fila, nulo honesto. */}
-                      <div className="flex items-center justify-between gap-2">
-                        <dt className="text-gray-500">{ti('portfolio.holdings.colFiscal')}</dt>
-                        <dd>
-                          {holding.fiscalBucket ? (
-                            <Badge
-                              variant="outline"
-                              className={
-                                holding.fiscalBucket === 'largo_plazo'
-                                  ? 'border-blue-700 text-blue-300'
-                                  : 'border-amber-700 text-amber-300'
-                              }
-                            >
-                              {holding.fiscalBucket === 'largo_plazo' ? ti('portfolio.holdings.fiscalLong') : ti('portfolio.holdings.fiscalShort')}
-                              {holding.holdingDays !== null ? ` · ${holding.holdingDays}d` : ''}
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-gray-500" title={ti('portfolio.holdings.fiscalNoHistory')}>{ti('common.na')}</span>
-                          )}
-                        </dd>
-                      </div>
-                      <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colSince')}</dt><dd className="text-gray-200">{f.formatDate(holding.firstBuyDate)}</dd></div>
-                      <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colDca')}</dt><dd><DcaLevelChip symbol={holding.symbol} signals={signals} /></dd></div>
-                      <div className="flex items-start justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colFairValue')}</dt><dd><FairValueLine symbol={holding.symbol} price={holding.currentPrice} priceCurrency={holding.nativeCurrency} signals={signals} /></dd></div>
-                      <div className="flex items-center justify-between gap-2"><dt className="text-gray-500" title={ti('portfolio.holdings.analystTitle')}>{ti('portfolio.holdings.colAnalyst')}</dt><dd><AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice !== null && holding.currentPrice > 0 ? holding.currentPrice : null} fxRates={fxRates} baseCurrency={holding.baseCurrency} /></dd></div>
-                    </dl>
-                  </div>
-                );
-              })}
+              {sortedHoldings.map((holding) => (
+                  <HoldingCard
+                    key={holding.symbol}
+                    holding={holding}
+                    weightLabel={weight(holding.symbol)}
+                    signals={signals}
+                    deleting={deleting === holding.symbol}
+                    setConfirmSymbol={setConfirmSymbol}
+                    fxRates={fxRates}
+                  />
+                ))}
               {showCash && (
                 <div className="rounded-xl border border-gray-700 border-dashed p-4">
                   <div className="flex items-center justify-between gap-2">
@@ -426,77 +538,17 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedHoldings.map((holding) => {
-                  const gainKnown = holdingGainKnown(holding);
-                  const isPositive = holding.gain >= 0;
-                  return (
-                    <TableRow key={holding.symbol} className="border-gray-700 hover:bg-gray-800/50">
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <CompanyLogo ticker={holding.symbol} name={holding.symbol} className="size-8 shrink-0 rounded-lg" />
-                          <Link href={`/research/${holding.symbol}`} className="font-mono font-bold text-teal-400 hover:text-teal-300 transition-colors">{holding.symbol}</Link><TrackedAnalysisStatus analysis={holding.analysis} locale={locale} />
-                          <details className="relative">
-                            <summary className="min-h-9 cursor-pointer rounded px-2 py-2 text-xs text-gray-400 hover:text-gray-100" aria-label={ti('portfolio.holdings.optionsAria', { symbol: holding.symbol })}>{ti('portfolio.holdings.options')}</summary>
-                            <div className="mt-1 min-w-36 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
-                              {/* Dato decisional fiscal reubicado (SERIE 1, auditoría): sin columna propia, accesible aquí. */}
-                              <div className="border-b border-gray-800 px-2 py-1.5 text-xs">
-                                {holding.fiscalBucket ? (
-                                  <span className={holding.fiscalBucket === 'largo_plazo' ? 'text-blue-300' : 'text-amber-300'}>
-                                    {holding.fiscalBucket === 'largo_plazo' ? ti('portfolio.holdings.fiscalLong') : ti('portfolio.holdings.fiscalShort')}
-                                    {holding.holdingDays !== null ? ` · ${holding.holdingDays}d` : ''}
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-500" title={ti('portfolio.holdings.fiscalNoHistory')}>{ti('portfolio.holdings.fiscalNa', { na: ti('common.na') })}</span>
-                                )}
-                                <span className="block text-gray-500">{ti('portfolio.holdings.sincePrefix', { date: f.formatDate(holding.firstBuyDate) })}</span>
-                              </div>
-                              <Button variant="ghost" size="sm" onClick={() => setConfirmSymbol(holding.symbol)} disabled={deleting === holding.symbol} aria-busy={deleting === holding.symbol} className="min-h-10 w-full justify-start gap-2 text-red-300" aria-label={ti('portfolio.holdings.deleteAriaTable', { symbol: holding.symbol })}><Trash2 aria-hidden="true" className="h-4 w-4" />{ti('portfolio.holdings.deleteCta')}</Button>
-                            </div>
-                          </details>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right text-gray-300">
-                        {formatQuantity(holding.quantity)}
-                      </TableCell>
-                      <TableCell className="text-right text-gray-300">
-                        {holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : ti('common.na')}
-                        {holding.costReviewMessage ? <p role="status" className="mt-1 max-w-64 text-xs text-amber-300">{holding.costReviewMessage}</p> : null}
-                      </TableCell>
-                      <TableCell className="text-right text-gray-300 font-medium">
-                        {holding.currentPrice === null ? ti('common.na') : format(holding.currentPrice, holding.nativeCurrency)}
-                        <ExtendedHoursLine symbol={holding.symbol} currency={holding.nativeCurrency} />
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-gray-100">
-                        {holding.valuationHold ? <Badge variant="outline">{valuationHoldLabel(holding.valuationHold, locale)}</Badge> : holding.costReviewMessage ? (holding.valueMissing ? ti('common.na') : format(holding.value, holding.baseCurrency)) : holding.fxMissing ? <Badge variant="outline">{ti('portfolio.holdings.valueNoConversion')}</Badge> : format(holding.value, holding.baseCurrency)}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-gray-100">{weight(holding.symbol)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex flex-col items-end gap-1">
-                          <span className={`font-semibold ${!gainKnown ? 'text-gray-400' : isPositive ? 'text-green-400' : 'text-red-400'}`}>
-                            {gainKnown ? format(holding.gain, holding.baseCurrency) : ti('common.na')}
-                          </span>
-                          <Badge
-                            variant={!gainKnown ? 'outline' : isPositive ? 'default' : 'destructive'}
-                            className={`${!gainKnown ? 'text-gray-400' : isPositive ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'}`}
-                          >
-                            {gainKnown ? f.formatPercent(holding.gainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' }, ti('common.na')) : ti('common.na')}
-                          </Badge>
-                          <NativePnlLine holding={holding} gainKnown={gainKnown} format={format} ti={ti} f={f} />
-                      {gainKnown ? <FxEffectLine holding={holding} format={format} ti={ti} /> : null}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right text-sm">
-                        <AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice !== null && holding.currentPrice > 0 ? holding.currentPrice : null} fxRates={fxRates} baseCurrency={holding.baseCurrency} />
-                      </TableCell>
-                      <TableCell className="text-right text-sm">
-                        <div className="flex flex-col items-end gap-1">
-                          <DcaLevelChip symbol={holding.symbol} signals={signals} />
-                          <FairValueLine symbol={holding.symbol} price={holding.currentPrice} priceCurrency={holding.nativeCurrency} signals={signals} />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {sortedHoldings.map((holding) => (
+                    <HoldingRow
+                      key={holding.symbol}
+                      holding={holding}
+                      weightLabel={weight(holding.symbol)}
+                      signals={signals}
+                      deleting={deleting === holding.symbol}
+                      setConfirmSymbol={setConfirmSymbol}
+                      fxRates={fxRates}
+                    />
+                  ))}
                 {showCash && (
                   <TableRow className="border-gray-700 border-dashed hover:bg-gray-800/50">
                     <TableCell>
