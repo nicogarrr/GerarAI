@@ -387,6 +387,22 @@ def latest_quote(db: Session, company: Company) -> tuple[Decimal, date, int] | N
     return (price, row[1], row[2]) if price is not None else None
 
 
+#: «compré 1,000 acciones»: con coma y grupos de tres cifras es mil (estilo
+#: inglés) o una (coma decimal española). parse_number lee 1; no se adivina.
+_AMBIGUOUS_QTY_RE = re.compile(
+    r"(?i)(?:\b(?:compr|vend|adquir)\w*\s+(?:otras\s+|unas\s+)?)?(?<![\d.,])(?P<qty>[1-9]\d{0,2}(?:,\d{3})+)(?![\d.,])"
+    r"(?P<unit>\s*(?:acciones|t[ií]tulos|participaciones))?"
+)
+
+
+def ambiguous_quantity(question: str) -> str | None:
+    """La cantidad escrita «1,000» (¿mil o una?) si la hay en la pregunta."""
+    for m in _AMBIGUOUS_QTY_RE.finditer(question or ""):
+        if m.group("unit") or m.group(0)[:1].isalpha():
+            return m.group("qty")
+    return None
+
+
 def simulate_hypothetical_sale(
     db: Session,
     *,
@@ -404,6 +420,17 @@ def simulate_hypothetical_sale(
         return HypoSale(
             quantity=Decimal("0"), held=sum((lot.quantity for lot in lots), Decimal("0")),
             sale_price=None, sale_currency=TAX_CURRENCY, sale_price_source="falta", missing=[issue],
+        )
+    ambiguous = ambiguous_quantity(question)
+    if ambiguous:
+        held = sum((lot.quantity for lot in lots), Decimal("0"))
+        whole = ambiguous.replace(",", "")
+        one = ambiguous.rstrip("0").rstrip(",")
+        return HypoSale(
+            quantity=Decimal("0"), held=held, sale_price=None, sale_currency=TAX_CURRENCY,
+            sale_price_source="falta",
+            invalid=(f"No sé si «{ambiguous}» son {whole} acciones o {one} (con coma decimal). "
+                     f"Escribe «{whole}» o «{one}» y lo calculo."),
         )
     explicit = next((lot.currency for lot in lots if lot.currency), None)
     sale = parse_sale_price(question)
