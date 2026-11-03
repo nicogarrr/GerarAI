@@ -285,6 +285,39 @@ _NUMBER_WORD_RE = re.compile(
     r"seiscientos|setecientos|ochocientos|novecientos|mil|mill[oó]n|millones|"
     r"billones?|por\s+ciento|porcentaje|duplic\w*|tripl\w*|doblad\w*)\b"
 )
+# Prueba real 2026-11-03 (Go, preguntas de concepto): 8 de 8 respuestas
+# educativas correctas caían al degradado por recuentos («dos formas»),
+# ejemplos («un PER de 15») o «según el sector». Lo que sigue protegido: una
+# cantidad con dinero o escala (millones, €, $) sin aproximador.
+_SMALL_COUNT_RE = re.compile(r"(?i)uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez")
+_COUNT_IS_MAGNITUDE_RE = re.compile(
+    r"(?i)\s*(?:[$€£%]|mil\b|mill[oó]n|millones|billones?|d[oó]lares?|euros?|libras?|usd|eur\b|"
+    r"por\s+ciento|veces\b|puntos?\b|empleados?|acciones\b)"
+)
+_MONEY_OR_SCALE_AFTER_RE = re.compile(
+    r"(?i)\s*(?:[.,]\d+\s*)?(?:[$€£%]|por\s+ciento|mil\b|mill[oó]n|millones|billones?|d[oó]lares?|euros?|libras?|usd|eur\b)"
+)
+_ILLUSTRATIVE_PREFIX_RE = re.compile(
+    r"(?i)\b(?:un|una)\s+(?:[a-záéíóúñ]+\s+){1,2}(?:de|del)\s+$"
+)
+_HYPOTHETICAL_RE = re.compile(
+    r"(?i)\b(?:por\s+ejemplo|pongamos(?:\s+que)?|imagina(?:\s+que)?|supongamos(?:\s+que)?|sup[oó]n(?:\s+que)?|"
+    r"si\s+(?:una|un)\s+(?:acci[oó]n|empresa|fondo|valor)"
+    r"|si\s+(?:hab[ií]a|hay|tienes|tuvieras|compras|compraras|estimas|inviertes|invirtieras|ahorras|pagas|"
+    r"cotiza|cotizara|vale|valiera|cae|cayera|sube|subiera|baja|bajara))\b"
+)
+_CONDITIONAL_SEGUN_RE = re.compile(
+    r"(?i)\bseg[uú]n\s+(?:"
+    r"(?:c[oó]mo|qu[eé]|cu[aá]ndo|cu[aá]nt[oa]s?|si|d[oó]nde|cada)\b"
+    r"|(?:(?:el|la|los|las|tu|tus|su|sus)\s+)?(?:sector(?:es)?|ratios?|casos?|periodos?|per[ií]odos?|plazos?|"
+    r"horizonte|perfil|objetivos?|tipos?|negocios?|pa[ií]s(?:es)?|momento|situaci[oó]n|circunstancias|"
+    r"necesidades|tolerancia|edad|fiscalidad|estrategia|uso|criterios?|m[eé]tricas?|industria)\b)"
+)
+_POSTFIX_APPROX_RE = re.compile(
+    r"(?i)\s*(?:%|por\s+ciento)?\s*(?:[-–]\s*\d[\d.,]*\s*(?:%|por\s+ciento)?\s*)?"
+    r"(?:o\s+m[aá]s|o\s+menos|como\s+m[ií]nimo|como\s+poco|o\s+as[ií]|aproximadamente)\b"
+)
+_FUND_RE = re.compile(r"(?i)\b(?:fondos?|etfs?|[ií]ndices?|indexad\w*)\b")
 
 
 def _general_scope(question: str) -> str:
@@ -663,6 +696,10 @@ def _general_text_rejection(
     ):
         return "atribución a una fuente oficial no dada"
     attribution = re.sub(r"(?i)seg[uú]n (?:la [eé]poca|normativa contable)\b", "", attribution)
+    # «según el sector», «según el periodo que mires», «según cómo…»: «según»
+    # como «dependiendo de», no como fuente (prueba real 2026-11-03: tiraba
+    # respuestas educativas correctas).
+    attribution = _CONDITIONAL_SEGUN_RE.sub("", attribution)
     if not allow_named_attribution and re.search(r"(?i)\bseg[uú]n\b", attribution):
         return "«según» sin fuente dada"
     if _reports_named_investor_opinion(attribution):
@@ -691,15 +728,24 @@ def _general_text_rejection(
     hits, total = _english_hits(text)
     if hits >= 2 and hits / max(total, 1) >= 0.15:
         return "texto en inglés"
-    if _PORTFOLIO_CLAIM_RE.search(text) and not allow_portfolio_claims:
+    if not allow_portfolio_claims and any(
+        not (m.group().lower().startswith("su ") and _FUND_RE.search(text))
+        for m in _PORTFOLIO_CLAIM_RE.finditer(text)
+    ):
+        # «las empresas de su cartera» hablando de un fondo o ETF es la cartera
+        # del fondo, no la del usuario.
         return "afirmación sobre la cartera del usuario"
     if not quantitative:
         return None
     # Cada clausula con cantidad requiere su propio aproximador. Una frase
     # previa o una cantidad marcada no legitima otra cantidad exacta.
-    clauses = re.split(
-        r"[;!?\n]|(?<!\d)[.](?!\d)|\b(?:y(?!\s*(?:el\s+)?\d)|pero|and|but)\b", _without_list_markers(text)
-    )
+    # Cláusulas con la frase a la que pertenecen: un ejemplo («si había 100
+    # acciones y se amortizan 10») sigue siéndolo en su segunda cláusula.
+    clauses = [
+        (clause, sentence)
+        for sentence in re.split(r"[!?\n]|(?<!\d)[.](?!\d)", _without_list_markers(text))
+        for clause in re.split(r";|\b(?:y(?!\s*(?:el\s+)?\d)|pero|and|but)\b", sentence)
+    ]
     number = re.compile(r"\d[\d.,]*|" + _NUMBER_WORD_RE.pattern.replace("(?i)", ""), re.I)
     approximate = re.compile(
         r"(?i)(?:unos?|unas?|aproximadamente|aproximad\w*|estimad\w*|"
@@ -707,9 +753,9 @@ def _general_text_rejection(
         r"en el orden de(?:l)?|algo m[aá]s de(?:l)?|m[aá]s de(?:l)?|menos de(?:l)?|"
         r"por encima de(?:l)?|por debajo de(?:l)?|"
         r"superan?(?: holgadamente| con holgura)?|rondar[ií]a|"
-        r"rondar[ií]an|ronda|rondan|rondaba|rondaban|cercan[oa]s? a|decenas de|cientos de|miles de|entre)\s+(?:(?:el|la|los|las|de|del)\s+){0,3}$"
+        r"rondar[ií]an|ronda|rondan|rondaba|rondaban|cercan[oa]s? al?|decenas de|cientos de|miles de|entre)\s+(?:(?:el|la|los|las|de|del|un|una)\s+){0,3}$"
     )
-    for clause in clauses:
+    for clause, sentence in clauses:
         if allow_named_attribution and not _MAGNITUDE_MARKER_RE.search(clause):
             # Respuesta de doctrina: los recuentos del propio texto ("tres
             # ideas", "dos condiciones") no son cifras empresariales. Las
@@ -719,6 +765,24 @@ def _general_text_rejection(
             token = match.group().strip().rstrip(".,")
             if grounded_numbers and _number_key(token) in grounded_numbers:
                 continue
+            after = clause[match.end():]
+            if token.lower() == "porcentaje":
+                continue  # la palabra «porcentaje» no es una cantidad
+            if (
+                _SMALL_COUNT_RE.fullmatch(token)
+                and re.match(r"\s+[a-záéíóúñ]", after, re.I)
+                and not _COUNT_IS_MAGNITUDE_RE.match(after)
+            ):
+                continue  # recuento («dos formas», «los dos meses»), no una cifra
+            if not _MONEY_OR_SCALE_AFTER_RE.match(after) and (
+                _ILLUSTRATIVE_PREFIX_RE.search(clause[max(0, match.start() - 60):match.start()])
+                or _HYPOTHETICAL_RE.search(sentence)
+            ):
+                continue  # ejemplo («un PER de 15», «por ejemplo, si vale 100»), sin dinero ni escala
+            if _POSTFIX_APPROX_RE.match(after):
+                continue  # «un 40-50 % o más», «20 como mínimo»
+            if re.search(r"[×*/]\s*$|\bx\s*$", clause[:match.start()]):
+                continue  # operando de una fórmula («… × 100»)
             # Periodos/fechas no son una cifra empresarial. No convertirlos
             # en fuente: solo se permite el formato de fecha o año aislado.
             prefix = clause[max(0, match.start() - 90):match.start()]
@@ -747,7 +811,7 @@ def _general_text_rejection(
                 # Rango: el segundo extremo comparte aproximador SOLO cuando
                 # lo une 'a'/guion, no una nueva afirmacion.
                 previous = clause[:match.start()]
-                range_start = re.search(r"\d[\d.,]*%?\s*(?:-|–|a|y(?:\s+el)?)\s*$", previous)
+                range_start = re.search(r"\d[\d.,]*%?\s*(?:-|–|a|o|y(?:\s+el)?)\s*$", previous)
                 if range_start is None or not approximate.search(previous[:range_start.start()]):
                     return f"cifra exacta sin aproximador: {token}"
     return None
