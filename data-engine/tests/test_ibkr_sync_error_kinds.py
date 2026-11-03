@@ -144,3 +144,30 @@ def test_successful_import_keeps_origin_in_counts(monkeypatch):
         counts = view["last_sync"]["counts"]
         assert counts["origin"] == "manual"  # import_report directo = flujo manual
         assert counts["positions_imported"] == 1
+
+
+@pytest.mark.parametrize("error_code", ["not_ready", "credentials", "texto desconocido"])
+def test_record_failure_explains_not_ready_without_blame_on_connection(error_code):
+    init_db()
+    with SessionLocal() as db:
+        tenant(db)
+        save(db)
+        row = service.connection(db)
+        revision = row.revision
+        statement_date = row.statement_date
+        receipt_id = service.start_receipt(db, revision=revision, origin="scheduled")
+        service.record_failure(db, revision=revision, receipt_id=receipt_id,
+                               error_code=error_code)
+        state = service.view(db)
+        assert state["status"] == "error"
+        assert state["connected"] is True
+        assert service.connection(db).statement_date == statement_date
+        if error_code == "not_ready":
+            assert "IBKR aún prepara la PyG" in state["message"]
+            assert "Conservamos los datos anteriores" in state["message"]
+            assert "próxima sincronización" in state["message"]
+            assert "revisa la conexión" not in state["message"]
+            assert db.scalar(select(IBKRSyncReceipt)).error_code == "not_ready"
+        else:
+            assert "revisa la conexión" in state["message"]
+            assert "PyG" not in state["message"]
