@@ -19,6 +19,7 @@ os.environ["RESEARCH_AUTH_REQUIRED"] = "false"
 os.environ["WORKERS_ENABLED"] = "false"
 # Sin red en la suite: los huecos Yahoo se prueban con un refresh inyectado.
 os.environ["YAHOO_BRIDGE_GAPS_ENABLED"] = "false"
+os.environ["NON_SEC_FUNDAMENTALS_FALLBACK_ENABLED"] = "false"
 # Backend de matplotlib fijo y sin pantalla. Si el entorno hereda otro (p. ej. el
 # de Jupyter/VS Code, `module://matplotlib_inline.backend_inline`, o TkAgg sin
 # display), importar pyplot falla durante la recolección de los tests de riesgo.

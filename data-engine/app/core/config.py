@@ -149,6 +149,9 @@ class Settings(BaseSettings):
     app_env: str = "local"
     # Huecos de deuda neta / acciones con Yahoo (no oficial) al preparar tesis.
     yahoo_bridge_gaps_enabled: bool = True
+    # Emisor sin CIK ni mapa revisado: ESEF en vivo por LEI y, si no hay,
+    # estados completos de Yahoo etiquetados «una sola fuente, no oficial».
+    non_sec_fundamentals_fallback_enabled: bool = True
     app_name: str = "GerarAI Research Engine"
     api_prefix: str = "/api"
     # NoDecode: la plantilla (docker.env.example) y cualquier .env escriben

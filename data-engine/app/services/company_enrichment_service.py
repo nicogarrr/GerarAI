@@ -296,6 +296,31 @@ def fill_default_currency(company: Company) -> None:
     company.currency = listing_quote_unit(company.ticker)
 
 
+def _fill_listing_identity(company: Company) -> bool:
+    """Rellena SOLO huecos (ISIN vacio, bolsa UNKNOWN, divisa vacia) de una ficha
+    ya creada con el listado revisado de su ticker. Nunca pisa un valor real ni
+    una divisa distinta (eso es otra linea de cotizacion, no un hueco)."""
+    from app.services.listing_identity import PLACEHOLDER_EXCHANGES, reviewed_listing_for_ticker
+
+    listing = reviewed_listing_for_ticker(company.ticker)
+    if listing is None:
+        return False
+    currency = (company.currency or "").strip().upper()
+    if currency and currency != listing.currency:
+        return False
+    changed = False
+    if not (company.isin or "").strip():
+        company.isin = listing.isin
+        changed = True
+    if (company.exchange or "").strip().upper() in PLACEHOLDER_EXCHANGES:
+        company.exchange = listing.exchange
+        changed = True
+    if not currency:
+        company.currency = listing.currency
+        changed = True
+    return changed
+
+
 def ensure_company_stub(db: Session, ticker: str) -> Company:
     """Devuelve la Company para ticker, creando la ficha minima si no existe.
 
@@ -305,16 +330,26 @@ def ensure_company_stub(db: Session, ticker: str) -> Company:
     Finnhub best-effort (si falla, queda el stub; nunca rompe al caller).
     """
     ticker = ticker.strip().upper()
+    from app.services.listing_identity import reviewed_listing_for_ticker
+
     company = db.scalar(select(Company).where(Company.ticker == ticker))
     if company is not None:
+        _fill_listing_identity(company)
         return company
+
+    # Listado revisado conocido (BFIT.AS -> Basic-Fit, Euronext Amsterdam,
+    # EUR, NL0011872650): la ficha nace con su identidad. Sin esto el stub
+    # quedaba con ISIN vacio y bolsa UNKNOWN y ninguna fuente primaria
+    # (ESEF por ISIN->LEI) podia acreditar quien es.
+    listing = reviewed_listing_for_ticker(ticker)
     company = Company(
         ticker=ticker,
-        name=ticker,
-        exchange="UNKNOWN",
+        name=listing.name if listing else ticker,
+        isin=listing.isin if listing else None,
+        exchange=listing.exchange if listing else "UNKNOWN",
         # Vacía a propósito: el enriquecimiento solo rellena la divisa vacía;
         # con "USD" una DKK/EUR/GBX nueva se quedaba en USD para siempre.
-        currency="",
+        currency=listing.currency if listing else "",
         sector="Unknown",
         industry="Unknown",
         company_type="research_candidate",
