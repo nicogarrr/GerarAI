@@ -12,6 +12,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DataError as SQLAlchemyDataError
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.api.router import api_router as research_api_router
 from app.api.routes.health import router as health_router
@@ -336,15 +338,41 @@ async def job_queue_unavailable_handler(request: Request, exc: Exception) -> JSO
     )
 
 
-@app.middleware("http")
-async def security_headers_middleware(request: Request, call_next):
-    """Agrega cabeceras de seguridad estandar a todas las respuestas HTTP."""
-    response = await call_next(request)
-    response.headers.setdefault("X-Content-Type-Options", "nosniff")
-    response.headers.setdefault("X-Frame-Options", "DENY")
-    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-    return response
+class SecurityHeadersMiddleware:
+    """Agrega cabeceras de seguridad estandar a todas las respuestas HTTP.
+
+    ASGI puro (antes ``@app.middleware("http")``, que es BaseHTTPMiddleware):
+    mismas cabeceras con la misma semantica de ``setdefault`` y en la misma
+    posicion de la pila (la mas externa de las propias), sin la tarea y los
+    canales extra por peticion ni el reenvio del cuerpo por un canal en memoria.
+    """
+
+    _HEADERS = (
+        ("X-Content-Type-Options", "nosniff"),
+        ("X-Frame-Options", "DENY"),
+        ("Referrer-Policy", "strict-origin-when-cross-origin"),
+        ("Permissions-Policy", "camera=(), microphone=(), geolocation=()"),
+    )
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                for name, value in self._HEADERS:
+                    headers.setdefault(name, value)
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 try:

@@ -130,8 +130,8 @@ def test_safe_get_methods_do_not_require_csrf(client: TestClient):
 def test_dispatch_anota_call_next_awaitable():
     """pyright fallaba con '"Response" is not awaitable' (x3): la anotacion
     decia Callable[[Request], Response] pero el codigo hace await call_next.
-    Si alguien la revierte, CI (backend-lint) y este test vuelven a fallar."""
+    Ahora el middleware es ASGI puro (sin call_next): se fija su firma tipada."""
     source = (Path(__file__).resolve().parents[1] / "app" / "core" / "csrf.py").read_text(
         encoding="utf-8"
     )
-    assert "Callable[[Request], Awaitable[Response]]" in source
+    assert "async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:" in source
