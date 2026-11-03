@@ -98,7 +98,12 @@ export default async function CalendarPage({
                 kicker={ti('calendar.catalysts.kicker')}
                 title={ti('calendar.catalysts.headerTitle')}
                 description={(
-                    <Suspense fallback={<Skeleton className="h-4 w-72 max-w-full" />}>
+                    // La descripción va dentro del <p> de PageHeader: su skeleton
+                    // tiene que ser un <span> (contenido de frase). Un <div> ahí
+                    // hace que el navegador cierre el <p> al parsear el HTML, el
+                    // DOM ya no casa con el de React y la hidratación fallaba
+                    // (React #418 en cada carga de /calendar).
+                    <Suspense fallback={<span className="block h-4 w-72 max-w-full animate-pulse rounded-md bg-muted" />}>
                         <CalendarDescription calendarPromise={calendarPromise} />
                     </Suspense>
                 )}

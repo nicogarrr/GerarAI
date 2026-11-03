@@ -17,5 +17,6 @@ test('una sola petición compartida por cabecera y lista (promesa sin await en l
 test('cabecera y lista van en Suspense con skeleton', () => {
   assert.ok(src.indexOf('<PageHeader') < src.indexOf('<Suspense fallback'), 'PageHeader antes del primer Suspense de datos');
   assert.match(src, /<Suspense fallback=\{<CalendarListSkeleton \/>\}>/);
-  assert.match(src, /<Suspense fallback=\{<Skeleton className="h-4 w-72 max-w-full" \/>\}>/);
+  // Dentro del <p> de PageHeader el skeleton es un <span> (un <div> rompía la hidratación, React #418).
+  assert.match(src, /<Suspense fallback=\{<span className="block h-4 w-72 max-w-full animate-pulse rounded-md bg-muted" \/>\}>/);
 });
