@@ -141,13 +141,16 @@ def test_spanish_unchanged(es):
     )
     assert resp.answer.endswith("Es una estimación, no asesoría fiscal; el detalle está en Fiscal.")
     assert _ask(es, "vendo 10 UBER").answer.startswith("No ejecuto órdenes")
-    # La frase en inglés sin el inglés elegido sigue su ruta de siempre.
-    assert _ask(es, "How much tax would I pay if I sell 10 UBER?").llm_trace["path"] == "order_verb"
+    # La frase en inglés con el español elegido es la misma simulación de IRPF
+    # (antes «No ejecuto órdenes»: prueba real 2026-11-03), contestada en español.
+    resp = _ask(es, "How much tax would I pay if I sell 10 UBER?")
+    assert resp.llm_trace["path"] == "portfolio_sale_tax"
+    assert resp.answer.startswith("Si vendieras hoy 10 de tus 30 acciones de UBER")
 
 
 def test_sale_question_parsing():
     assert _sale_question_es("if I sell 10 UBER at $80") == "if I vendo 10 UBER a $80"
-    assert _sale_question_es("if I sell half my UBER") == "if I vendo la mitad my UBER"
+    assert _sale_question_es("if I sell half my UBER") == "if I vendo la mitad de mis UBER"
     assert _sale_question_es("if I sold all my UBER") == "if I vendo mis UBER"
     assert _sale_question_es("if I sell 50 percent of UBER") == "if I vendo 50 % of UBER"
 
