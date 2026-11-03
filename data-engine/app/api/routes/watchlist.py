@@ -128,8 +128,27 @@ def upsert_watch_item(
     payload: WatchItemCreate, db: Session = Depends(get_db)
 ) -> dict:
     """Add a symbol to the watchlist, or update its label if it exists."""
-    symbol = payload.symbol.strip().upper()
-    item = _find_watch_item(db, symbol)
+    # Solo se dan de alta empresas que existen (watchlist_ticker_validation):
+    # un símbolo que el proveedor no conoce -> 422 sin fila ni trabajos
+    # encolados; un alias (GOOGLE, BFIT con ISIN de Basic-Fit) se guarda con su
+    # ticker canónico y, si ya está en la watchlist, se devuelve esa fila.
+    from app.services.watchlist_ticker_validation import resolve_watch_symbol
+
+    requested = payload.symbol.strip().upper()
+    item = _find_watch_item(db, requested)
+    symbol = requested
+    if item is None:
+        verdict = resolve_watch_symbol(db, requested)
+        if verdict.status == "unknown":
+            if verdict.suggestions:
+                raise ui_error(
+                    422, "watchlist_ticker_unknown_hint",
+                    ticker=requested, suggestions=", ".join(verdict.suggestions),
+                )
+            raise ui_error(422, "watchlist_ticker_unknown", ticker=requested)
+        symbol = verdict.ticker.strip().upper()
+        if symbol != requested:
+            item = _find_watch_item(db, symbol)
     created = item is None
     if item is None:
         item = WatchItem(symbol=symbol, company=payload.company)
