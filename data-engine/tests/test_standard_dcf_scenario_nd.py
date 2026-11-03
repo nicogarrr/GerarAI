@@ -23,14 +23,41 @@ from tests.test_valuation_engines_refined import (
 FACTS = {"revenue": 1000, "free_cash_flow": 11, "revenue_growth": 0.07, "shares_diluted": 100, "net_debt": 200}
 
 
-def _value(db, ticker, facts=FACTS, tags=()):
+def _value(db, ticker, facts=FACTS, tags=(), price=2.7):
     company = _make_company(
         db, ticker, company_type="standard", valuation_model="standard_dcf", factor_tags=list(tags)
     )
     _add_facts(db, company, facts)
-    _add_price(db, company, 20.0)
+    _add_price(db, company, price)
     _add_traceable_wacc(db, company)
     return ValuationService().value_company(db, company)
+
+
+def test_implausible_value_vs_market_is_insufficient_data_not_a_number():
+    """Caso real (AMZN, 03-nov-2026): el motor publicaba «valor justo 26,32 US$»
+    con el precio ~9,5x por encima (margen de seguridad -854,8 %). Un FCFF DCF
+    sobre el margen FCF actual de una megacap en ciclo de inversión no encaja
+    con la empresa: fuera de la banda [0,2x, 5x] del precio la corrida queda
+    insufficient_data con el motivo y el bruto en la traza, NUNCA una cifra
+    insostenible (regla de Nico: N/D antes que un valor absurdo).
+    """
+    init_db()
+    db = SessionLocal()
+    try:
+        result = _value(db, "NDG", price=20.0)
+        assert result["status"] == "insufficient_data"
+        assert result["publishable"] is False
+        assert result["expected_value"] is None
+        assert result["margin_of_safety"] is None
+        guard = result["trace"]["plausibility_guard"]
+        assert guard["expected_value"] > 0
+        assert guard["comparable_price"] == 20.0
+        assert guard["ratio_to_price"] < 0.2
+        assert guard["band"] == [0.2, 5.0]
+        assert "no encaja" in result["trace"]["reason"]
+    finally:
+        _cleanup(db, ["NDG"])
+        db.close()
 
 
 def test_negative_bear_scenario_is_explained_nd_and_expected_keeps_ordering():
@@ -82,7 +109,7 @@ def test_positive_scenarios_have_no_notes_and_keep_values():
     db = SessionLocal()
     try:
         healthy = {"revenue": 1000, "free_cash_flow": 120, "revenue_growth": 0.07, "shares_diluted": 100, "net_debt": 200}
-        result = _value(db, "NDB", facts=healthy)
+        result = _value(db, "NDB", facts=healthy, price=20.0)
         assert result["status"] == "ok"
         assert result["scenario_notes"] == {}
         assert result["bear_value"] is not None and result["bear_value"] > 0

@@ -128,6 +128,9 @@ def test_margin_is_median_of_last_3_fy_and_trace_shows_it(db):
 
 
 def test_single_fiscal_year_keeps_previous_behaviour(db):
+    # Precio dentro de la banda de plausibilidad [0,2x, 5x] del valor para
+    # que la guardia de valor absurdo (AMZN, 03-nov-2026) no intervenga:
+    # este test mide la normalizacion del margen, no la guardia.
     company = _company(db)
     _fact(db, company, "fcf_margin", 0.1007, year=2024)
     _fact(db, company, "revenue", 47_000_000_000, year=2024)
@@ -138,14 +141,14 @@ def test_single_fiscal_year_keeps_previous_behaviour(db):
         MarketPrice(
             company_id=company.id,
             date=date(2026, 10, 30),
-            close=Decimal("94.08"),
-            adj_close=Decimal("94.08"),
+            close=Decimal("40.00"),
+            adj_close=Decimal("40.00"),
             source="dcf_norm_test",
         )
     )
     db.commit()
     engine = StandardDCFEngine()
-    result = engine.value(engine.build_context(db, company, 94.08))
+    result = engine.value(engine.build_context(db, company, 40.0))
     assert result["trace"]["fcf_margin_normalization"] is None
     assert result["base_value"] < 20.0
 

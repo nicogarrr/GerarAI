@@ -214,9 +214,9 @@
         "gate_does_not_omit_itself",
         "adr_ratio_basis"
       ],
-      "price": 25,
+      "price": 100,
       "wacc": 0.04,
-      "hand_calculation": "WACC 0.04 contra terminal 0.03 (spread 1pp): el valor terminal se lleva 0.9569 del EV (>0.95), o sea que el forecast de 5 anos no mueve el valor. Blocker forecast_is_not_the_driver. base=192.997712."
+      "hand_calculation": "WACC 0.04 contra terminal 0.03 (spread 1pp): el valor terminal se lleva 0.9569 del EV (>0.95), o sea que el forecast de 5 anos no mueve el valor. Blocker forecast_is_not_the_driver. base=192.997712. Precio 25 -> 100 (03-nov-2026): con 25 el valor esperado quedaba a mas de 5x del precio y la nueva guardia de plausibilidad frente al mercado (banda [0,2x, 5x], caso AMZN) convertia la corrida en insufficient_data; este caso mide forecast_is_not_the_driver, no la guardia."
     },
     {
       "id": "evdcf16_half_point_spread_breaks_scenario_order",
@@ -266,10 +266,10 @@
         "gate_does_not_omit_itself",
         "adr_ratio_basis"
       ],
-      "price": 25,
+      "price": 100,
       "wacc": 0.035,
       "note": "HALLAZGO C2-1 (defecto real del motor, ver INTEGRACION PENDIENTE): con spread WACC-terminal de 5pb el escenario bull usa max(WACC-1pp, terminal+1pp) = 4%, que es UN WACC MAS ALTO que el 3.5% del base. El valor terminal se divide por el spread, asi que el bull vale MENOS que el base (386.1491 < 388.8115) y el orden bear <= base <= bull se rompe. Este caso comprueba el resto del contrato (blocker, forma cerrada, probabilidades, sensibilidad) pero queda fuera de bear_le_base_le_bull porque el fallo es del motor, no del caso: la forma cerrada aqui esta calculada con la misma formula que el motor.",
-      "hand_calculation": "WACC 0.035 contra terminal 0.03 (spread 5pb). bear = DCF(0.00, 0.09, 0.11); base = DCF(0.08, 0.15, 0.035); bull = DCF(0.16, 0.21, max(0.025, 0.04)=0.04). bear=30.2144 <= base=388.8115 pero bull=386.1491 < base: el bull descuenta MAS que el base."
+      "hand_calculation": "WACC 0.035 contra terminal 0.03 (spread 5pb). bear = DCF(0.00, 0.09, 0.11); base = DCF(0.08, 0.15, 0.035); bull = DCF(0.16, 0.21, max(0.025, 0.04)=0.04). bear=30.2144 <= base=388.8115 pero bull=386.1491 < base: el bull descuenta MAS que el base. Precio 25 -> 100 (03-nov-2026): con 25 el valor esperado quedaba a mas de 5x del precio y la nueva guardia de plausibilidad frente al mercado (banda [0,2x, 5x], caso AMZN) convertia la corrida en insufficient_data; este caso mide forecast_is_not_the_driver, no la guardia."
     },
     {
       "id": "evdcf05_no_revenue_anchor",

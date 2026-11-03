@@ -22,7 +22,8 @@
     "title": "Valuation and financial health",
     "loading": "Loading saved valuations…",
     "failed": "Valuation is unavailable right now. Positions and prices are unchanged.",
-    "empty": "No companies with saved valuation data."
+    "empty": "No companies with saved valuation data.",
+    "piotroskiPartialScore": "{score} points out of {count} assessed (of 9)"
   },
   "translate": {
     "reason": {
