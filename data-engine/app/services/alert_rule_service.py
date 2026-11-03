@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, event, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -135,7 +135,37 @@ class AlertRuleService:
     ) -> list[dict[str, Any]]:
         # Los criterios medibles de las tesis entran como reglas
         # `thesis_invalidation` antes de la pasada: mismo evaluador, mismo
-        # cooldown y misma entrega por canales que el resto de reglas.
+        # cooldown y misma entrega por canales que el resto de reglas (en
+        # _evaluate_all).
+
+        # El mapa de identidad de la sesion es debil: cada Company y cada
+        # ThesisVersion que se suelta tras usarse se borra de el, y el
+        # siguiente ``db.get`` de la misma fila vuelve a hacer SELECT (una por
+        # regla: con 200 tesis x 3 criterios eran 800 lecturas de companies y
+        # 600 de thesis_versions, cada una con todo el texto de la tesis).
+        # Retener lo cargado durante la pasada deja que ``db.get`` lo
+        # encuentre en el mapa: mismas filas, misma sesion, menos consultas.
+        loaded: list[Any] = []
+
+        def _keep_loaded(_session: Session, instance: Any) -> None:
+            loaded.append(instance)
+
+        event.listen(db, "loaded_as_persistent", _keep_loaded)
+        try:
+            return self._evaluate_all(
+                db, skip_closed_markets=skip_closed_markets, market_day=market_day
+            )
+        finally:
+            event.remove(db, "loaded_as_persistent", _keep_loaded)
+            loaded.clear()
+
+    def _evaluate_all(
+        self,
+        db: Session,
+        *,
+        skip_closed_markets: bool,
+        market_day: date | None,
+    ) -> list[dict[str, Any]]:
         from app.services.thesis_invalidation_rules import sync_all_thesis_rules
 
         sync_all_thesis_rules(db)
