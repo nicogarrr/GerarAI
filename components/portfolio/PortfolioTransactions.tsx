@@ -9,7 +9,7 @@ import { t } from '@/lib/i18n/t';
 
 const esT: TFunction = t;
 const esF = createFormatters('es');
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -68,6 +68,102 @@ export function describeDeletion(tx: PortfolioTransaction | undefined, ti: TFunc
   const price = currency ? f.formatPrice(tx.price, currency) : ti('common.na');
   return ti('portfolio.transactions.deleteDetail', { kind, quantity: qty, symbol: tx.symbol, date: f.formatUserDate(tx.date), price, tail });
 }
+
+type TransactionRowProps = {
+  tx: PortfolioTransaction;
+  userId: string;
+  deleting: boolean;
+  setConfirmId: (id: string) => void;
+};
+
+// Cada movimiento es un componente memoizado: abrir o cancelar «Eliminar» o el
+// estado «borrando» de una fila ya no vuelve a pintar toda la página de
+// movimientos (50 filas, cada una con su diálogo de edición), solo la afectada.
+const TransactionRow = memo(function TransactionRow({ tx, userId, deleting, setConfirmId }: TransactionRowProps) {
+  const ti = useT();
+  const f = useFormat();
+  const currency = transactionCurrency(tx.currency);
+  // El backend no manda importe por movimiento (solo cantidad,
+  // precio y comisiones), así que el único número derivable es el
+  // nocional cantidad x precio: se rotula «bruto» porque no
+  // descuenta las comisiones que el ledger guarda aparte. Antes
+  // se pintaba como si fuera el importe del movimiento.
+  const gross = tx.quantity * tx.price;
+  return (
+    <div className="p-4 hover:bg-gray-800/30 transition-colors group">
+      <div className="flex flex-col gap-2 mb-1 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className={`h-8 w-8 rounded-full flex items-center justify-center ${tx.type === 'buy' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-500'
+            }`}>
+            {tx.type === 'buy' ? '+' : '-'}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <CompanyLogo ticker={tx.symbol} name={tx.symbol} className="size-7 shrink-0 rounded-md" />
+              <Link
+                href={`/research/${tx.symbol}`}
+                className="inline-flex min-h-[44px] items-center font-bold text-gray-200 hover:text-teal-300 transition-colors"
+              >
+                {tx.symbol}
+              </Link>
+              <span className={`text-xs px-1.5 py-0.5 rounded ${tx.type === 'buy' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                }`}>
+                {tx.type === 'buy' ? ti('portfolio.transactions.typeBuy') : ti('portfolio.transactions.typeSell')}
+              </span>
+            </div>
+            {isZeroCostBuy(tx) ? (
+              <p
+                className="mt-1 inline-flex rounded bg-amber-500/10 px-1.5 py-0.5 text-xs text-amber-300"
+                title={ti('portfolio.transactions.zeroCostTitle')}
+              >
+                {ti('portfolio.transactions.zeroCostLabel')}
+              </p>
+            ) : null}
+            <p className="text-xs text-gray-500 mt-0.5">
+              {f.formatUserDate(tx.date)}
+            </p>
+            {tx.notes?.trim() ? (
+              <p className="mt-0.5 max-w-[16rem] truncate text-xs text-gray-400" title={tx.notes}>
+                {tx.notes}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <div className="pl-11 sm:pl-0 sm:text-right">
+          <p className="font-medium text-gray-200">
+            {currency ? f.formatMoney(gross, currency) : ti('common.na')}
+            <span className="ml-1.5 text-[10px] uppercase tracking-wide text-gray-500">{ti('portfolio.transactions.grossTag')}</span>
+          </p>
+          <p className="text-xs text-gray-500">
+            {ti('portfolio.transactions.sharesLine', { quantity: f.formatNumber(tx.quantity, { maximumFractionDigits: 4 }), price: currency ? f.formatPrice(tx.price, currency) : ti('common.na') })}
+          </p>
+          {/* Las comisiones se guardaban (alta, edición, IBKR) pero no se
+              veían en ningún sitio de Movimientos. */}
+          {tx.fees !== undefined && Number.isFinite(tx.fees) && tx.fees > 0 ? (
+            <p className="text-xs text-gray-500">
+              {ti('portfolio.transactions.feeLabel', { amount: currency ? f.formatPrice(tx.fees, currency) : ti('common.na') })}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Acciones siempre visibles en táctil, solo hover en escritorio */}
+      <div className="flex justify-end gap-2 mt-2 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
+        <EditTransactionDialog transaction={tx} userId={userId} />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setConfirmId(tx._id)}
+          disabled={deleting}
+          aria-label={ti('portfolio.transactions.deleteAria')}
+          className="h-11 w-11 p-0 text-gray-400 hover:text-red-400 hover:bg-red-950/20 md:h-7 md:w-7"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+});
 
 export default function PortfolioTransactions({ transactions, userId, page }: Props) {
   const ti = useT();
@@ -178,89 +274,15 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
         ) : (
           <div className="overflow-y-auto h-full max-h-[400px] scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent">
             <div className="divide-y divide-gray-800/50">
-              {transactions.map((tx) => {
-                const currency = transactionCurrency(tx.currency);
-                // El backend no manda importe por movimiento (solo cantidad,
-                // precio y comisiones), así que el único número derivable es el
-                // nocional cantidad x precio: se rotula «bruto» porque no
-                // descuenta las comisiones que el ledger guarda aparte. Antes
-                // se pintaba como si fuera el importe del movimiento.
-                const gross = tx.quantity * tx.price;
-                return (
-                  <div key={tx._id} className="p-4 hover:bg-gray-800/30 transition-colors group">
-                    <div className="flex flex-col gap-2 mb-1 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className={`h-8 w-8 rounded-full flex items-center justify-center ${tx.type === 'buy' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-500'
-                          }`}>
-                          {tx.type === 'buy' ? '+' : '-'}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <CompanyLogo ticker={tx.symbol} name={tx.symbol} className="size-7 shrink-0 rounded-md" />
-                            <Link
-                              href={`/research/${tx.symbol}`}
-                              className="inline-flex min-h-[44px] items-center font-bold text-gray-200 hover:text-teal-300 transition-colors"
-                            >
-                              {tx.symbol}
-                            </Link>
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${tx.type === 'buy' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-                              }`}>
-                              {tx.type === 'buy' ? ti('portfolio.transactions.typeBuy') : ti('portfolio.transactions.typeSell')}
-                            </span>
-                          </div>
-                          {isZeroCostBuy(tx) ? (
-                            <p
-                              className="mt-1 inline-flex rounded bg-amber-500/10 px-1.5 py-0.5 text-xs text-amber-300"
-                              title={ti('portfolio.transactions.zeroCostTitle')}
-                            >
-                              {ti('portfolio.transactions.zeroCostLabel')}
-                            </p>
-                          ) : null}
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            {f.formatUserDate(tx.date)}
-                          </p>
-                          {tx.notes?.trim() ? (
-                            <p className="mt-0.5 max-w-[16rem] truncate text-xs text-gray-400" title={tx.notes}>
-                              {tx.notes}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="pl-11 sm:pl-0 sm:text-right">
-                        <p className="font-medium text-gray-200">
-                          {currency ? f.formatMoney(gross, currency) : ti('common.na')}
-                          <span className="ml-1.5 text-[10px] uppercase tracking-wide text-gray-500">{ti('portfolio.transactions.grossTag')}</span>
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {ti('portfolio.transactions.sharesLine', { quantity: f.formatNumber(tx.quantity, { maximumFractionDigits: 4 }), price: currency ? f.formatPrice(tx.price, currency) : ti('common.na') })}
-                        </p>
-                        {/* Las comisiones se guardaban (alta, edición, IBKR) pero no se
-                            veían en ningún sitio de Movimientos. */}
-                        {tx.fees !== undefined && Number.isFinite(tx.fees) && tx.fees > 0 ? (
-                          <p className="text-xs text-gray-500">
-                            {ti('portfolio.transactions.feeLabel', { amount: currency ? f.formatPrice(tx.fees, currency) : ti('common.na') })}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    {/* Acciones siempre visibles en táctil, solo hover en escritorio */}
-                    <div className="flex justify-end gap-2 mt-2 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
-                      <EditTransactionDialog transaction={tx} userId={userId} />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setConfirmId(tx._id)}
-                        disabled={deleting === tx._id}
-                        aria-label={ti('portfolio.transactions.deleteAria')}
-                        className="h-11 w-11 p-0 text-gray-400 hover:text-red-400 hover:bg-red-950/20 md:h-7 md:w-7"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
+              {transactions.map((tx) => (
+                <TransactionRow
+                  key={tx._id}
+                  tx={tx}
+                  userId={userId}
+                  deleting={deleting === tx._id}
+                  setConfirmId={setConfirmId}
+                />
+              ))}
             </div>
           </div>
         )}
