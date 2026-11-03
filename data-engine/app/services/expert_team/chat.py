@@ -93,11 +93,13 @@ _TABLES = {
         "financial_facts": "Estados financieros", "valuation_engine": "Motor de valoración",
         "thesis_versions": "Tesis guardada", "risk_events": "Aviso de riesgo", "positions": "Tu cartera",
         "news_events": "Noticia", "code:tax_irpf_filing.savings_bands": "Tramos del IRPF del ahorro",
+        "code:tax_irpf_filing.calculate_savings_tax": "IRPF estimado si vendes hoy",
     },
     "en": {
         "financial_facts": "Financial statements", "valuation_engine": "Valuation engine",
         "thesis_versions": "Saved thesis", "risk_events": "Risk alert", "positions": "Your portfolio",
         "news_events": "News", "code:tax_irpf_filing.savings_bands": "IRPF (Spanish income tax) savings bands",
+        "code:tax_irpf_filing.calculate_savings_tax": "Estimated IRPF if you sell today",
     },
 }
 

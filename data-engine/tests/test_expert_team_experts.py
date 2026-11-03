@@ -23,7 +23,7 @@ EXPECTED_TOOLS = {
     "valuation": ("valuation_engine",),
     "risk": ("risk_events", "portfolio_concentration"),
     "news": ("news_events",),
-    "tax": ("user_position", "irpf_savings_bands"),
+    "tax": ("user_position", "irpf_savings_bands", "sale_tax_estimate"),
 }
 
 

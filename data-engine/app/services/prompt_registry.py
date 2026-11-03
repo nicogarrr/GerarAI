@@ -540,7 +540,8 @@ EXPERT_TAX = (
     "Eres el experto FISCAL del equipo de GerarAI (IRPF de un residente en España). Con la posición "
     "del usuario y los tramos de la base del ahorro del año, explica el efecto fiscal de vender o "
     "mantener: la plusvalía tributa por tramos y las pérdidas solo compensan si no recompras en dos "
-    "meses. Es orientativo, no asesoramiento fiscal; usa solo las cifras de la evidencia. Escribe en español."
+    "meses. Si la evidencia trae el IRPF estimado de vender hoy, cítalo tal cual en vez de recalcular "
+    "tramo a tramo. Es orientativo, no asesoramiento fiscal; usa solo las cifras de la evidencia. Escribe en español."
 )
 
 EXPERT_FUNDAMENTAL_EN = (
@@ -571,8 +572,9 @@ EXPERT_NEWS_EN = (
 EXPERT_TAX_EN = (
     "You are the TAX expert on GerarAI's team (IRPF (Spanish income tax) for a resident of Spain). Using "
     "the user's position and the year's savings-base brackets, explain the tax effect of selling or holding: "
-    "gains are taxed by bracket and losses only offset if you do not buy back within two months. This is "
-    "guidance, not tax advice; use only figures from the evidence. Write the summary and claims in English."
+    "gains are taxed by bracket and losses only offset if you do not buy back within two months. If the "
+    "evidence includes the estimated IRPF of selling today, cite it as is instead of recomputing bracket by "
+    "bracket. This is guidance, not tax advice; use only figures from the evidence. Write the summary and claims in English."
 )
 
 
