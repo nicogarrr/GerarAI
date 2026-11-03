@@ -14,11 +14,12 @@ from decimal import Decimal
 
 import pytest
 import sqlalchemy as sa
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from app.core.database import Base
-from app.models import Company, ThesisVersion, ValuationModel, ValuationOutput
+from app.models import Company, DcaSignalState, ThesisVersion, ValuationModel, ValuationOutput
+from app.services import screener_context_metrics as scm
 from app.services.screener_context_metrics import CONTEXT_METRICS, context_observations
 from app.services.screener_service import ScreenerService
 
@@ -178,3 +179,52 @@ def test_unknown_margin_cannot_pass_screener_as_current(db, convention):
     # History remains untouched, and no fallback to the older verified version.
     latest = db.scalar(sa.select(ValuationOutput).order_by(ValuationOutput.id.desc()))
     assert latest.output_payload["margin_of_safety"] == 0.8
+
+
+def test_any_dca_level_equivale_al_escaneo_completo(db):
+    """La sonda de existencia acepta/rechaza igual que _dca_levels (booleano)."""
+    db.info["tenant_id"] = 1
+    assert scm._any_dca_level(db) is False
+
+    pool = _company(db, "POOL")
+    companies = lambda: list(db.scalars(select(Company)).all())
+
+    # Match por company_id.
+    _dca(db, "POOL", 3, company_id=pool.id)
+    assert bool(scm._dca_levels(db, companies())) == scm._any_dca_level(db) == True
+    for row in db.scalars(select(DcaSignalState)).all():
+        db.delete(row)
+    db.commit()
+
+    # Match solo por symbol (company_id NULL).
+    _dca(db, "POOL", 4)
+    assert bool(scm._dca_levels(db, companies())) == scm._any_dca_level(db) == True
+    for row in db.scalars(select(DcaSignalState)).all():
+        db.delete(row)
+    db.commit()
+
+    # Symbol sin empresa registrada: no cuenta.
+    _dca(db, "NADIE", 4)
+    assert bool(scm._dca_levels(db, companies())) == scm._any_dca_level(db) == False
+    for row in db.scalars(select(DcaSignalState)).all():
+        db.delete(row)
+    db.commit()
+
+    # Fila de otro tenant: aislada. El guard ORM rechaza escrituras
+    # cross-tenant; se planta como propia y se mueve por Core (patron del
+    # piloto en test_cold_endpoints_skip_scan).
+    db.add(_real_dca_row(tenant=1, symbol="POOL", level=3, company_id=pool.id))
+    db.commit()
+    db.connection().execute(
+        sa.text("UPDATE dca_signal_states SET tenant_id=2 WHERE symbol='POOL'")
+    )
+    db.commit()
+    assert bool(scm._dca_levels(db, companies())) == scm._any_dca_level(db) == False
+
+
+def test_context_metrics_with_data_ofrece_nivel_dca_con_sonda(db):
+    db.info["tenant_id"] = 1
+    pool = _company(db, "POOL")
+    assert "nivel_dca" not in scm.context_metrics_with_data(db)
+    _dca(db, "POOL", 3, company_id=pool.id)
+    assert "nivel_dca" in scm.context_metrics_with_data(db)
