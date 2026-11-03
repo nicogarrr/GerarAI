@@ -126,7 +126,7 @@ function NarrativeText({ text, sourceLabel }: { text: string; sourceLabel: strin
     : <span key={index}>{cleanThesisText(part)}</span>)}</>;
 }
 
-function ScoreBar({ label, value, scale = 'quality' }: { label: string; value: number; scale?: 'quality' | 'risk' }) {
+function ScoreBar({ label, value, scale = 'quality', legend }: { label: string; value: number; scale?: 'quality' | 'risk'; legend: string }) {
   const clamped = Math.max(0, Math.min(100, value));
   // 'quality': cuanto más alto, mejor. 'risk' (riesgo de valoración): cuanto
   // más alto, peor; sin invertir, una especulativa (75/100) salía en verde.
@@ -142,6 +142,7 @@ function ScoreBar({ label, value, scale = 'quality' }: { label: string; value: n
       <div className="mt-1 h-1.5 w-full rounded-full bg-gray-800">
         <div className={`h-1.5 rounded-full ${tone}`} style={{ width: `${clamped}%` }} />
       </div>
+      <div className="mt-0.5 text-[10px] leading-4 text-gray-500">{legend}</div>
     </div>
   );
 }
@@ -466,10 +467,10 @@ export default function ThesisMemo({
           {t('research.memo.evidenceQuality')}
         </h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <ScoreBar label={t('research.memo.dataConfidence')} value={thesis.data_confidence_score} />
-          <ScoreBar label={t('research.memo.sourceCoverage')} value={thesis.source_coverage_score} />
-          <ScoreBar label={t('research.memo.redTeam')} value={thesis.red_team_score} />
-          <ScoreBar label={t('research.memo.valuationRisk')} value={thesis.valuation_risk_score} scale="risk" />
+          <ScoreBar label={t('research.memo.dataConfidence')} value={thesis.data_confidence_score} legend={t('research.memo.scaleHigherBetter')} />
+          <ScoreBar label={t('research.memo.sourceCoverage')} value={thesis.source_coverage_score} legend={t('research.memo.scaleHigherBetter')} />
+          <ScoreBar label={t('research.memo.redTeam')} value={thesis.red_team_score} legend={t('research.memo.scaleHigherBetter')} />
+          <ScoreBar label={t('research.memo.valuationRisk')} value={thesis.valuation_risk_score} scale="risk" legend={t('research.memo.scaleHigherWorse')} />
         </div>
       </section>
 

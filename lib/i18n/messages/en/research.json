@@ -641,7 +641,9 @@
       "insufficient": "insufficient data",
       "missingDrivers": "operating data pending",
       "preview": "preview only"
-    }
+    },
+    "marginOutOfRange": "N/A: margin outside the interpretable range (over ±100% of revenue); with near-zero revenue the percentage is not a usable proportion.",
+    "fcfOutOfRange": "N/A: FCF derived from a margin outside the interpretable range; the figure is not usable."
   },
   "journal": {
     "title": "Decision journal",
@@ -934,7 +936,9 @@
     "invalidationPending": "Pending: generate a new version to record invalidation criteria.",
     "debate": "Bull/bear debate",
     "debateNoTicker": "Debate unavailable without a ticker: reload the page to challenge the thesis.",
-    "fullMemo": "Full memo"
+    "fullMemo": "Full memo",
+    "scaleHigherBetter": "Higher = better",
+    "scaleHigherWorse": "Higher = more risk"
   },
   "thesisDoc": {
     "metaTitle": "Investment thesis",
