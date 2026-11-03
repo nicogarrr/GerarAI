@@ -1,7 +1,7 @@
 'use client';
 
 import { downloadBlob } from '@/lib/download-blob';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Download, ShieldAlert } from 'lucide-react';
@@ -21,6 +21,10 @@ export default function PrivacySettings({ email }: { email: string }) {
     const router = useRouter();
     const [exporting, setExporting] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    // Sin JS aún no hay onSubmit: un submit nativo sería GET con las
+    // credenciales en la URL. Botón deshabilitado hasta hidratar + method="post".
+    const [hydrated, setHydrated] = useState(false);
+    useEffect(() => { setHydrated(true); }, []);
     const [confirmation, setConfirmation] = useState('');
     const [password, setPassword] = useState('');
     const [understood, setUnderstood] = useState(false);
@@ -96,7 +100,7 @@ export default function PrivacySettings({ email }: { email: string }) {
                     </div>
                 </div>
 
-                <form className="mt-5 space-y-4" onSubmit={handleDelete}>
+                <form className="mt-5 space-y-4" method="post" onSubmit={handleDelete}>
                     <div>
                         <Label className="block break-words leading-6" htmlFor="delete-confirmation">
                             {t('security.privacy.typeToConfirmBefore')} <span className="block font-mono text-gray-200 [overflow-wrap:anywhere]">{email}</span> {t('security.privacy.typeToConfirmAfter')}
@@ -137,7 +141,7 @@ export default function PrivacySettings({ email }: { email: string }) {
                     </label>
                     <Button
                         className="w-full min-w-0 whitespace-normal text-left sm:w-auto"
-                        disabled={deleting || !understood || !confirmation || !password}
+                        disabled={!hydrated || deleting || !understood || !confirmation || !password}
                         type="submit"
                         variant="destructive"
                     >

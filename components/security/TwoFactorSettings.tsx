@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,10 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
     const [enabled, setEnabled] = useState(initiallyEnabled);
     const [setup, setSetup] = useState<{ totpURI: string; backupCodes: string[] } | null>(null);
     const [busy, setBusy] = useState(false);
+    // Sin JS aún no hay onSubmit: un submit nativo sería GET con las
+    // credenciales en la URL. Botón deshabilitado hasta hidratar + method="post".
+    const [hydrated, setHydrated] = useState(false);
+    useEffect(() => { setHydrated(true); }, []);
 
     const totpSecret = setup ? totpSecretFromUri(setup.totpURI) : null;
 
@@ -147,7 +151,7 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
             )}
 
             {!enabled && !setup && (
-                <form onSubmit={passwordForm.handleSubmit(handleEnable)} className="space-y-4 rounded-lg border border-gray-800 p-5">
+                <form method="post" onSubmit={passwordForm.handleSubmit(handleEnable)} className="space-y-4 rounded-lg border border-gray-800 p-5">
                     <p className="text-sm text-gray-300">{t('security.twoFactor.confirmToEnable')}</p>
                     <InputField
                         name="password"
@@ -158,7 +162,7 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
                         error={passwordForm.formState.errors.password}
                         validation={{ required: t('security.twoFactor.passwordRequired') }}
                     />
-                    <Button type="submit" disabled={busy} className="brand-btn">
+                    <Button type="submit" disabled={!hydrated || busy} className="brand-btn">
                         {busy ? t('security.twoFactor.generating') : t('security.twoFactor.enable')}
                     </Button>
                 </form>
@@ -213,7 +217,7 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
                         </Button>
                     </div>
 
-                    <form onSubmit={totpForm.handleSubmit(handleActivate)} className="space-y-4 pt-2">
+                    <form method="post" onSubmit={totpForm.handleSubmit(handleActivate)} className="space-y-4 pt-2">
                         <p className="text-sm text-gray-300 font-medium">{t('security.twoFactor.step3')}</p>
                         <InputField
                             name="totpCode"
@@ -227,7 +231,7 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
                                 pattern: { value: /^\d{6}$/, message: t('security.twoFactor.codeDigits') },
                             }}
                         />
-                        <Button type="submit" disabled={busy} className="brand-btn">
+                        <Button type="submit" disabled={!hydrated || busy} className="brand-btn">
                             {busy ? t('security.twoFactor.verifying') : t('security.twoFactor.enable')}
                         </Button>
                         <button
@@ -242,7 +246,7 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
             )}
 
             {enabled && (
-                <form onSubmit={passwordForm.handleSubmit(handleDisable)} className="space-y-4 rounded-lg border border-gray-800 p-5">
+                <form method="post" onSubmit={passwordForm.handleSubmit(handleDisable)} className="space-y-4 rounded-lg border border-gray-800 p-5">
                     <p className="text-sm text-gray-300">{t('security.twoFactor.confirmToDisable')}</p>
                     <InputField
                         name="password"
@@ -253,7 +257,7 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
                         error={passwordForm.formState.errors.password}
                         validation={{ required: t('security.twoFactor.passwordRequired') }}
                     />
-                    <Button type="submit" disabled={busy} variant="destructive" className="w-full sm:w-auto">
+                    <Button type="submit" disabled={!hydrated || busy} variant="destructive" className="w-full sm:w-auto">
                         {busy ? t('security.twoFactor.disabling') : t('security.twoFactor.disable')}
                     </Button>
                 </form>
