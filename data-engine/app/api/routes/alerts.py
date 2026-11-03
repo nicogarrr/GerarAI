@@ -542,6 +542,90 @@ def set_telegram_subscription(
     return {"event_type": event_type, "enabled": row.enabled, "chat_id": row.chat_id}
 
 
+# --- Correo por usuario -----------------------------------------------------
+
+EmailEventType = Literal["thesis_broken", "new_filing", "insiders", "shorts_rising", "daily_digest",
+                         "dca_levels", "macro_event", "earnings"]
+
+
+class EmailPreferenceIn(BaseModel):
+    enabled: bool = False
+
+
+class EmailPreferenceOut(BaseModel):
+    event_type: str
+    enabled: bool
+
+
+class EmailStatusOut(BaseModel):
+    # Direccion propia firmada por la sesion (None si el frontend aun no la
+    # envio), SMTP listo para enviar y opt-in por tipo.
+    email: str | None = None
+    smtp: bool = False
+    preferences: list[EmailPreferenceOut]
+
+
+@router.get("/email-preferences", response_model=EmailStatusOut)
+def list_email_preferences(db: Session = Depends(get_db)) -> dict:
+    from app.models import EmailPreference
+    from app.services import email_alerts
+    from app.services.email_delivery import smtp_host_configured
+    from app.services.outbound_alerts import EVENT_TYPES
+
+    tenant, user = db.info.get("tenant_id"), db.info.get("user_id")
+    if not tenant or not user:
+        raise ui_error(401, "verified_identity_required")
+    rows = {row.event_type: row for row in db.scalars(select(EmailPreference).where(
+        EmailPreference.tenant_id == tenant,
+        EmailPreference.user_id == user,
+    ))}
+    binding = email_alerts.binding_for(db, tenant, user)
+    return {
+        "email": binding.address if binding else None,
+        "smtp": smtp_host_configured(get_settings()),
+        "preferences": [
+            {"event_type": kind, "enabled": rows[kind].enabled if kind in rows else False}
+            for kind in EVENT_TYPES
+        ],
+    }
+
+
+@router.put("/email-preferences/{event_type}", response_model=EmailPreferenceOut)
+def set_email_preference(
+    event_type: EmailEventType,
+    payload: EmailPreferenceIn,
+    db: Session = Depends(get_db),
+) -> dict:
+    from app.models import EmailPreference
+    from app.services import email_alerts
+
+    tenant, user = db.info.get("tenant_id"), db.info.get("user_id")
+    if not tenant or not user:
+        raise ui_error(401, "verified_identity_required")
+    if payload.enabled and email_alerts.binding_for(db, tenant, user) is None:
+        # Sin direccion firmada por la sesion no hay destino propio: activar
+        # el opt-in no debe caer en la lista global de otra cuenta.
+        raise ui_error(403, "email_binding_required")
+    row = db.scalar(select(EmailPreference).where(
+        EmailPreference.tenant_id == tenant,
+        EmailPreference.user_id == user,
+        EmailPreference.event_type == event_type,
+    ))
+    now = datetime.now(UTC)
+    if row is None:
+        row = EmailPreference(tenant_id=tenant, user_id=user, event_type=event_type,
+                              enabled=payload.enabled, enabled_at=now)
+        db.add(row)
+    else:
+        # enabled_at solo se mueve al (re)activar: las alertas anteriores al
+        # alta nunca salen por correo.
+        if payload.enabled and not row.enabled:
+            row.enabled_at = now
+        row.enabled = payload.enabled
+    db.commit()
+    return {"event_type": event_type, "enabled": row.enabled}
+
+
 # --- Web Push (PWA) -------------------------------------------------------
 
 PushEventType = Literal["thesis_broken", "new_filing", "insiders", "shorts_rising", "daily_digest",

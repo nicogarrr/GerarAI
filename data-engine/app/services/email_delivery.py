@@ -56,11 +56,22 @@ def smtp_configured(settings: Any) -> bool:
     )
 
 
-def build_message(settings: Any, content: EmailContent) -> EmailMessage:
+def smtp_host_configured(settings: Any) -> bool:
+    """True con solo servidor y remitente: basta para enviar a un destinatario
+    propio (correo por usuario), sin la lista global ALERT_EMAIL_TO."""
+    return bool(
+        (getattr(settings, "smtp_host", None) or "").strip()
+        and (getattr(settings, "smtp_from", None) or "").strip()
+    )
+
+
+def build_message(
+    settings: Any, content: EmailContent, *, to: list[str] | None = None
+) -> EmailMessage:
     message = EmailMessage()
     message["Subject"] = content.subject
     message["From"] = str(settings.smtp_from).strip()
-    message["To"] = ", ".join(recipients(settings))
+    message["To"] = ", ".join(recipients(settings) if to is None else to)
     message["Date"] = formatdate(localtime=False, usegmt=True)
     domain = str(settings.smtp_from).rsplit("@", 1)[-1].strip(" >") or None
     message["Message-ID"] = make_msgid(domain=domain)
@@ -112,21 +123,33 @@ def send_email(
     settings: Any,
     content: EmailContent,
     *,
+    to: list[str] | None = None,
     smtp_factory: SmtpFactory | None = None,
     smtp_ssl_factory: SmtpFactory | None = None,
 ) -> dict:
-    """Envia ``content`` a ALERT_EMAIL_TO. Devuelve ``{"status", "error"}``.
+    """Envia ``content``. Devuelve ``{"status", "error"}``.
+
+    Sin ``to`` va a la lista global ALERT_EMAIL_TO (comportamiento de
+    siempre). Con ``to`` sale a ESAS direcciones y solo a esas (correo por
+    usuario: una alerta, un destinatario, nunca la lista global ni la
+    direccion de otro usuario).
 
     No lanza: cualquier excepcion se clasifica. Las factorias son inyectables
     para los tests (por defecto ``smtplib.SMTP`` / ``smtplib.SMTP_SSL``).
     """
-    if not smtp_configured(settings):
-        return _result("not_configured", "SMTP sin configurar")
+    if to is None:
+        if not smtp_configured(settings):
+            return _result("not_configured", "SMTP sin configurar")
+        targets = recipients(settings)
+    else:
+        targets = [address.strip() for address in to if address and address.strip()]
+        if not targets or not smtp_host_configured(settings):
+            return _result("not_configured", "SMTP sin configurar")
     host = str(settings.smtp_host).strip()
     port = int(settings.smtp_port)
     timeout = float(settings.smtp_timeout_seconds)
     use_ssl = bool(settings.smtp_ssl)
-    message = build_message(settings, content)
+    message = build_message(settings, content, to=None if to is None else targets)
     session_started = False
     client: smtplib.SMTP | None = None
     try:

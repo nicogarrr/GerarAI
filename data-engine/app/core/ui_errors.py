@@ -26,6 +26,10 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "es": "Símbolo no reconocido: {ticker}. Comprueba que exista en bolsa.",
         "en": "Symbol not recognized: {ticker}. Check that it is listed on an exchange.",
     },
+    "email_binding_required": {
+        "es": "Tu sesión todavía no ha registrado su correo; recarga la página e inténtalo de nuevo",
+        "en": "Your session has not registered its email yet; reload the page and try again",
+    },
     "chat_link_required": {
         "es": "Vincula y confirma este chat con Asistenta antes de activarlo",
         "en": "Link and confirm this chat with Asistenta before enabling it",
