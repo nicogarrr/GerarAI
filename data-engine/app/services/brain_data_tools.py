@@ -30,7 +30,6 @@ from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.screener_fundamentals import load_screener_ratios
 from app.valuation.margin_convention import historical_margin_note
 
-
 _MAX_DRAFTS_SHOWN = 5
 
 
