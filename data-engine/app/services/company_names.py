@@ -42,6 +42,11 @@ _GENERIC_FIRST_WORDS = frozenset({
 })
 
 
+# Primeras palabras genéricas tras las que va el nombre propio («Banco
+# Santander»). Solo sin conector: «Banco de Sabadell» no entra («de»).
+_PREFIX_FIRST_WORDS = frozenset({"banco", "grupo"})
+
+
 def _fold(text: str) -> str:
     return "".join(
         c for c in unicodedata.normalize("NFD", text or "") if unicodedata.category(c) != "Mn"
@@ -117,8 +122,17 @@ def companies_named_in(question: str, companies: Iterable[Company]) -> NameMatch
     seen: set[int] = set()
     for company in companies:
         words = _core_words(company.name or "")
+        if words and words[0] == "the" and len(words) >= 2:
+            words = words[1:]  # «The Coca-Cola Company» → «coca cola»
         if not words:
             continue
+        if len(words) >= 2 and len(compact := "".join(words)) >= 6 and compact in folded:
+            # Nombre de varias palabras escrito junto («cocacola»), en cualquier caja.
+            for m in _phrase_re([compact]).finditer(folded):
+                if company.id not in seen:
+                    seen.add(company.id)
+                    out.companies.append(company)
+                out.spans.append((m.start(), m.end()))
         # A literal substring is a necessary (not sufficient) condition of
         # this regex. Avoid compiling/searching patterns that cannot match.
         # Unlike token-set filtering this also preserves names containing '&'.
@@ -129,6 +143,10 @@ def companies_named_in(question: str, companies: Iterable[Company]) -> NameMatch
                     out.companies.append(company)
                 out.spans.append((m.start(), m.end()))
         first = next(iter(words))
+        if first in _PREFIX_FIRST_WORDS and len(words) >= 2:
+            # «Banco Santander», «Grupo Ezentis»: se nombran por la segunda
+            # palabra («¿vendo Santander?»), con mayúscula como la primera.
+            first = words[1]
         if len(first) >= 4 and first not in _GENERIC_FIRST_WORDS and first in folded:
             by_first.setdefault(first, []).append(company)
     for first, candidates in by_first.items():
