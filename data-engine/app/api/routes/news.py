@@ -2,6 +2,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import Select, desc, false, select
@@ -54,6 +55,21 @@ async def translate_external(payload: ExternalHeadlineRequest, db: Session = Dep
 
 _SCAN_CHUNK = 200
 _SCAN_LIMIT = 2000
+
+
+# Fragmento JSON compartido por el predicado y los indices parciales 0125.
+_NEWS_LANE_FRAGMENTO = "(news_events.metadata ->> 'news_lane')"
+_NEWS_LANES_INDEXADOS = ("macro", "gobierno")
+
+
+def _lane_predicado(lane: str):
+    """Predicado de carril con el literal EN LINEA (valores fijos del Literal
+    de la ruta, nunca entrada de usuario): un parametro ligado jamas matchea
+    el predicado de un indice parcial (0125), y la clave del ->> tambien va
+    en linea por el mismo motivo."""
+    assert lane in _NEWS_LANES_INDEXADOS
+    # nosemgrep: gerarai-sql-injection -- lane sale del Literal fijo de la ruta (assert arriba), nunca de entrada libre.
+    return sa.text(f"{_NEWS_LANE_FRAGMENTO} = '{lane}'")
 
 
 def _is_off_topic(event: NewsEvent, company: Company | None) -> bool:
@@ -133,9 +149,9 @@ def news_events(
         stmt = stmt.where(NewsEvent.company_id.is_not(None))
     elif lane == "gobierno":
         # Fuentes oficiales RSS, sin empresa.
-        stmt = stmt.where(NewsEvent.metadata_["news_lane"].as_string() == lane)
+        stmt = stmt.where(_lane_predicado("gobierno"))
     elif lane == "macro":
-        stmt = stmt.where(NewsEvent.metadata_["news_lane"].as_string() == "macro")
+        stmt = stmt.where(_lane_predicado("macro"))
     def _scan(ordered_stmt: Select[NewsEvent, Company]) -> tuple[list, dict, list]:
         """Filas visibles (con clustering) de una consulta ordenada."""
         # Lectura: se ocultan filas etiquetadas con un ticker cuyo titular y resumen
@@ -149,11 +165,24 @@ def news_events(
         # primer evento del grupo. En la ficha de empresa se muestran sin agrupar.
         clusters: dict[tuple, dict] = {}
         story_index = StoryClusterIndex()
+        # Paginacion keyset entre chunks: la consulta ordenada es siempre
+        # (date DESC, id DESC), asi que seguir tras la ultima fila leida es
+        # equivalente a OFFSET pero sin releer lo ya barrido (el peor caso
+        # del carril gobierno/macro visitaba ~11.000 filas por ~2.000
+        # barridas; medido en lab 217-273 ms -> ~40-60 ms). (date, id) es
+        # unico por id, orden total deterministico.
+        last_key = None
         while len(rows) < limit and scanned < _SCAN_LIMIT:
-            chunk = db.execute(ordered_stmt.limit(_SCAN_CHUNK).offset(scanned)).all()
+            page_stmt = ordered_stmt
+            if last_key is not None:
+                page_stmt = ordered_stmt.where(
+                    sa.tuple_(NewsEvent.date, NewsEvent.id) < sa.tuple_(*last_key)
+                )
+            chunk = db.execute(page_stmt.limit(_SCAN_CHUNK)).all()
             if not chunk:
                 break
             scanned += len(chunk)
+            last_key = (chunk[-1][0].date, chunk[-1][0].id)
             for event, company in chunk:
                 if _is_off_topic(event, company):
                     continue
