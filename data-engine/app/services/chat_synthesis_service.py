@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import unicodedata
@@ -25,6 +26,7 @@ from app.services.langfuse_client import LangfuseTracer
 from app.services.llm_output_guard import _english_hits, _spanish_hits, inspect_response_text
 from app.services.prompt_registry import get_prompt
 
+logger = logging.getLogger(__name__)
 PROMPT_VERSION = get_prompt("chat_source_synthesis", allow_remote=False).version
 GENERAL_PROMPT_VERSION = get_prompt("chat_general", allow_remote=False).version
 SECTION_ORDER = (
@@ -377,6 +379,21 @@ def grounded_numbers_in(texts: list[str]) -> frozenset[str]:
 
 _SECRET_RE = re.compile(r"(?i)\b(?:sk-[a-z0-9_-]{16,}|ghp_[a-z0-9]{20,}|akia[0-9a-z]{12,}|bearer\s+[a-z0-9._-]{20,})")
 _SECTION_LINK_RE = re.compile(r"(?i)https?://|www[.]|<\s*(?:img|a|script|iframe)\b|!?\[[^\]]*\]\([^)]*\)")
+_CREDENTIAL_PAIR_RE = re.compile(r"(?i)\b(api[_-]?key|token|secret|password|authorization)\b\s*[=:]\s*\S+")
+FALLBACK_DETAIL_MAX = 200
+
+
+def _fallback_detail(exc: BaseException) -> str:
+    """Mensaje del fallo para la traza (sin secretos, acotado).
+
+    Prueba real 2026-11-03: una de cada ~7 respuestas caia al degradado y la
+    traza solo guardaba el tipo («ValueError»), sin forma de saber cual de
+    las ~10 validaciones la habia tirado.
+    """
+    text = " ".join(str(exc).split()) or type(exc).__name__
+    text = _SECRET_RE.sub("[redactado]", text)
+    text = _CREDENTIAL_PAIR_RE.sub(lambda m: f"{m.group(1)}=[redactado]", text)
+    return text[:FALLBACK_DETAIL_MAX]
 
 
 def _flatten_text(value: Any) -> list[str]:
@@ -403,8 +420,9 @@ def _reject_untrusted_output(payload: dict, baseline: Any, question: str) -> Non
         raise ValueError("External link or HTML in section body")
     context = [question or "", *_flatten_text([s.model_dump() for s in baseline.sections]),
                *_flatten_text(baseline.sources)]
-    if _ungrounded_figures(answer, context):
-        raise ValueError("Ungrounded number in model answer")
+    missing = _ungrounded_figures(answer, context)
+    if missing:
+        raise ValueError(f"Ungrounded number in model answer: {', '.join(missing[:5])}")
 
 
 def _figure_readings(token: str) -> list[tuple[float, int]]:
@@ -581,14 +599,16 @@ def _inferred_general_text_valid_en(
     return True
 
 
-def _inferred_general_text_valid(
+def _general_text_rejection(
     text: str, *, allow_placeholders: bool = False, quantitative: bool = True,
     allow_named_attribution: bool = False,
     allowed_investors: frozenset[str] = frozenset(),
     grounded_numbers: frozenset[str] = frozenset(),
     allow_portfolio_claims: bool = False,
-) -> bool:
-    """Prosa natural: no atribuciones/citas falsas, cifras aproximadas locales.
+) -> str | None:
+    """Motivo por el que se rechaza la prosa libre (None = valida).
+
+    Prosa natural: no atribuciones/citas falsas, cifras aproximadas locales.
 
     ``allow_portfolio_claims``: solo la ruta mixta carta + cartera, que pasa
     las posiciones guardadas al prompt, puede hablar de la cartera del usuario.
@@ -603,15 +623,15 @@ def _inferred_general_text_valid(
     datos que nadie le ha dado.
     """
     if len(text) > 8000 or not text.strip() or re.search(r"https?://|www[.]|\bdoi:", text, re.I):
-        return False
+        return "texto vacío, demasiado largo o con enlace"
     if _SECRET_RE.search(text):
-        return False
+        return "token con forma de secreto"
     if re.search(
         r"(?i)\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
         r"(?:com|org|net|io|ai|es|gov|edu|co|uk|de|fr|app|dev|info|biz|eu)\b(?:/[^\s]*)?",
         text,
     ):
-        return False
+        return "dominio web en el texto"
     if allow_placeholders:
         def placeholder(match: re.Match[str]) -> str:
             content = match.group(1).strip()
@@ -628,7 +648,7 @@ def _inferred_general_text_valid(
             return ""
         text = re.sub(r"\[([^\]]+)\]", placeholder, text)
     if re.search(r"\[[^\]]+\]", text):
-        return False
+        return "marcador entre corchetes"
     attribution = re.sub(r"(?i)seg[uú]n lo que (?:s[eé]|recuerdo)", "", text)
     # Una recomendacion sin cantidades no atribuye datos a esa fuente.
     attribution = re.sub(
@@ -641,13 +661,13 @@ def _inferred_general_text_valid(
         r"seg[uú]n\s+(?:(?:su|el|la|los|las|un|una)\s+)?"
         r"(?:informe|fuentes?|documentos?|datos|comunicado|reporte|balance|estudio|sec))\b", attribution
     ):
-        return False
+        return "atribución a una fuente oficial no dada"
     attribution = re.sub(r"(?i)seg[uú]n (?:la [eé]poca|normativa contable)\b", "", attribution)
     if not allow_named_attribution and re.search(r"(?i)\bseg[uú]n\b", attribution):
-        return False
+        return "«según» sin fuente dada"
     if _reports_named_investor_opinion(attribution):
         if not allow_named_attribution:
-            return False
+            return "opinión de un inversor sin doctrina"
         # Atribuir a un inversor concreto exige un fragmento DE ESE autor en
         # el contexto: con doctrina de otros (p. ej. cartas de un fondo) no
         # se puede poner la opinion en boca de Buffett.
@@ -660,20 +680,21 @@ def _inferred_general_text_valid(
             if re.search(rf"\b{name}\b", plain)
         }
         if not named <= allowed_investors:
-            return False
+            return "inversor que no está en la doctrina recuperada"
     # Aproximar no convierte una cifra contable con decimales en estimacion.
-    if any(
-        _number_key(m.group()) not in grounded_numbers
-        for m in re.finditer(r"\d[\d.,]*[.,]\d{2}(?!\d)", text)
-    ):
-        return False
+    bad_decimals = [
+        m.group() for m in re.finditer(r"\d[\d.,]*[.,]\d{2}(?!\d)", text)
+        if _number_key(m.group()) not in grounded_numbers
+    ]
+    if bad_decimals:
+        return "cifra con decimales no aproximada: " + bad_decimals[0]
     hits, total = _english_hits(text)
     if hits >= 2 and hits / max(total, 1) >= 0.15:
-        return False
+        return "texto en inglés"
     if _PORTFOLIO_CLAIM_RE.search(text) and not allow_portfolio_claims:
-        return False
+        return "afirmación sobre la cartera del usuario"
     if not quantitative:
-        return True
+        return None
     # Cada clausula con cantidad requiere su propio aproximador. Una frase
     # previa o una cantidad marcada no legitima otra cantidad exacta.
     clauses = re.split(
@@ -728,8 +749,19 @@ def _inferred_general_text_valid(
                 previous = clause[:match.start()]
                 range_start = re.search(r"\d[\d.,]*%?\s*(?:-|–|a|y(?:\s+el)?)\s*$", previous)
                 if range_start is None or not approximate.search(previous[:range_start.start()]):
-                    return False
-    return True
+                    return f"cifra exacta sin aproximador: {token}"
+    return None
+
+def _inferred_general_text_valid(text: str, **kwargs: Any) -> bool:
+    """Prosa natural valida (ver ``_general_text_rejection`` para el motivo)."""
+    return _general_text_rejection(text, **kwargs) is None
+
+
+def _general_rejection(text: str, *, lang: str | None, **kwargs: Any) -> str | None:
+    """Motivo de rechazo de la prosa libre en el idioma de la respuesta."""
+    if lang == "en":
+        return None if _inferred_general_text_valid_en(text, **kwargs) else "prosa en inglés no válida"
+    return _general_text_rejection(text, **kwargs)
 
 
 _HISTORY_TURNS = 4
@@ -1031,10 +1063,15 @@ class ChatSynthesisService:
                     "json_validity": not isinstance(exc, (ValueError, ValidationError)),
                     "fallback": True,
                     "fallback_reason": type(exc).__name__,
+                    "fallback_detail": _fallback_detail(exc),
                     "evaluation_score": baseline.confidence,
                 }
                 trace.update(**baseline.llm_trace)
                 trace.output = {"fallback": True, "reason": type(exc).__name__}
+                logger.warning(
+                    "chat synthesis fallback for %s: %s: %s",
+                    ticker, type(exc).__name__, baseline.llm_trace["fallback_detail"],
+                )
                 return baseline
 
     async def synthesize_general(
@@ -1264,19 +1301,16 @@ class ChatSynthesisService:
                 lang = current_language()
                 if inspect_response_text(resp.text, english="strict", expected_language=lang):
                     raise ValueError("Invalid response language")
-                validator = (
-                    _inferred_general_text_valid_en if lang == "en"
-                    else _inferred_general_text_valid
-                )
-                if not validator(
-                    resp.text.strip(), allow_placeholders=scope == "ordinary",
+                rejection = _general_rejection(
+                    resp.text.strip(), lang=lang, allow_placeholders=scope == "ordinary",
                     quantitative=scope != "ordinary" or _general_quantity_context(resp.text),
                     allow_named_attribution=bool(doctrine),
                     allowed_investors=allowed_investors,
                     grounded_numbers=doctrine_numbers,
                     allow_portfolio_claims=bool(portfolio_rows),
-                ):
-                    raise ValueError("Ungrounded general output")
+                )
+                if rejection is not None:
+                    raise ValueError(f"Ungrounded general output: {rejection}")
 
             bind = getattr(self.provider, "with_candidate_validator", None)
             provider = bind(_validate_candidate, _record) if bind else self.provider
@@ -1292,22 +1326,26 @@ class ChatSynthesisService:
         except Exception as exc:  # proveedor caido, guard agotado o presupuesto: fallback honesto
             from app.llm.chat_provider import is_quota_exhausted
 
-            return self._general_fallback(baseline, reason="quota" if is_quota_exhausted(exc) else "provider_or_guard_failure")
+            logger.warning("chat general fallback: %s: %s", type(exc).__name__, _fallback_detail(exc))
+            return self._general_fallback(
+                baseline,
+                reason="quota" if is_quota_exhausted(exc) else "provider_or_guard_failure",
+                detail=f"{type(exc).__name__}: {_fallback_detail(exc)}",
+            )
         text = (guarded.response.text or "").strip()
-        _post_validator = (
-            _inferred_general_text_valid_en if current_language() == "en"
-            else _inferred_general_text_valid
-        )
-        if not _post_validator(
+        rejection = _general_rejection(
             text,
+            lang=current_language(),
             allow_placeholders=scope == "ordinary",
             quantitative=scope != "ordinary" or _general_quantity_context(text),
             allow_named_attribution=bool(doctrine),
             allowed_investors=allowed_investors,
             grounded_numbers=doctrine_numbers,
             allow_portfolio_claims=bool(portfolio_rows),
-        ):
-            return self._general_fallback(baseline, reason="ungrounded")
+        )
+        if rejection is not None:
+            logger.warning("chat general fallback: ungrounded: %s", rejection)
+            return self._general_fallback(baseline, reason="ungrounded", detail=_fallback_detail(ValueError(rejection)))
         # Fuentes visibles: SOLO la doctrina que la respuesta usa de verdad
         # (autor o titulo mencionado). Antes se adjuntaban siempre las top-3,
         # usadas o no ("Hola" salia con "Fuentes" de cartas de fondos).
@@ -1341,7 +1379,7 @@ class ChatSynthesisService:
         )
 
     @staticmethod
-    def _general_fallback(baseline: ChatResponse, *, reason: str) -> ChatResponse:
+    def _general_fallback(baseline: ChatResponse, *, reason: str, detail: str | None = None) -> ChatResponse:
         """Degradado honesto en espanol: nunca texto crudo del proveedor.
 
         Sin fuentes adjuntas: el degradado no uso ninguna y ensenarlas
@@ -1372,7 +1410,10 @@ class ChatSynthesisService:
             model="fallback",
             prompt_version=GENERAL_PROMPT_VERSION,
             confidence=0.2,
-            llm_trace={"path": "general", "fallback": True, "reason": reason},
+            llm_trace={
+                "path": "general", "fallback": True, "reason": reason,
+                **({"fallback_detail": detail} if detail else {}),
+            },
         )
 
     @staticmethod
