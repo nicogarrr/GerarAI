@@ -30,6 +30,11 @@ const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false
     const t = useT();
     const router = useRouter()
     const [registeredState, setRegisteredState] = React.useState<PendingAccountState | null>(null);
+    // Sin JS aún no hay onSubmit: un submit nativo haría GET con los campos en la
+    // URL (contraseña incluida). El botón nace deshabilitado hasta hidratar y el
+    // form declara method="post" como segunda barrera.
+    const [hydrated, setHydrated] = React.useState(false);
+    React.useEffect(() => { setHydrated(true); }, []);
     const {
         register,
         handleSubmit,
@@ -135,7 +140,7 @@ const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false
                 <AccessRequestForm />
                 <div className="mt-6"><FooterLink text={t('auth.signUp.haveAccount')} linkText={t('auth.signIn.submit')} href="/sign-in" /></div>
             </> : (
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <InputField
                     name="fullName"
                     label={t('auth.signUp.fullNameLabel')}
@@ -245,7 +250,7 @@ const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false
                     ) : null}
                 </div>
 
-                <Button type="submit" disabled={isSubmitting || !signUpOpen} className="brand-btn w-full mt-5">
+                <Button type="submit" disabled={!hydrated || isSubmitting || !signUpOpen} className="brand-btn w-full mt-5">
                     {isSubmitting ? t('auth.signUp.submitting') : signUpOpen ? t('auth.signUp.submitOpen') : t('auth.signUp.submitClosed')}
                 </Button>
 
