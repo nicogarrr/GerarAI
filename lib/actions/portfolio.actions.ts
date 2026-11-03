@@ -15,6 +15,7 @@ import { sumCashByCurrency } from '@/lib/portfolio-cash';
 import { buildAllocationSlices } from '@/lib/portfolio-allocation';
 import { partitionSettledRefreshes } from '@/lib/portfolio/refresh-settled';
 import { importRejection, type ImportRejection } from '@/lib/portfolio/import-rejection';
+import { transactionCurrencyCode } from '@/lib/portfolio/transaction-currency';
 import { ledgerRejection } from '@/lib/portfolio/ledger-rejection';
 import { requestLocale } from '@/lib/research/backend-error-locale';
 import { transactionFiltersQuery, type TransactionFilters } from '@/lib/portfolio/transaction-filters';
@@ -180,7 +181,7 @@ export async function addTransaction(
                 price,
                 trade_date: date.toISOString().slice(0, 10),
                 notes: notes || null,
-                currency: currency.toUpperCase(),
+                currency: transactionCurrencyCode(currency),
                 fees,
             }),
         });
@@ -416,7 +417,7 @@ export async function updateTransaction(
                     price,
                     trade_date: date.toISOString().slice(0, 10),
                     notes: notes || null,
-                    currency: currency.toUpperCase(),
+                    currency: transactionCurrencyCode(currency),
                     // Omitido = el backend conserva la comisión registrada.
                     ...(fees !== undefined ? { fees } : {}),
                 }),
