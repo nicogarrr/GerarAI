@@ -12,6 +12,7 @@ import { paginateAll } from '@/lib/paginate-all';
 import type { components } from '@/lib/research/openapi.generated';
 import type { JournalFairValue, JournalTrade } from '@/lib/research/journal-trade';
 import type { ResearchTtm } from '@/lib/research/ttm-display';
+import type { ValuationMethodLike } from '@/lib/research/valuation-method';
 
 
 type ResearchCompany = {
@@ -159,10 +160,18 @@ export type ResearchValuation = {
   listed_share_values?: Partial<Record<'bear' | 'base' | 'bull' | 'expected', number | null>> | null;
   /** Escenarios N/D (valor por acción <= 0): motivo en español, uno por escenario. */
   scenario_notes?: Record<string, string> | null;
+  /** Estimación con método (capex normalizado / DCF multietapa); null = DCF plano. */
+  valuation_label?: string | null;
+  valuation_notes?: string[] | null;
+  /** Guarda 0,2x–5x: aviso, el valor no se borra. */
+  plausibility_warning?: ValuationMethodLike['plausibility_warning'];
+  /** Rango DCF + múltiplos de comparables (contraste, no valor publicado). */
+  fair_value_range?: ValuationMethodLike['fair_value_range'];
   reverse_dcf: {
     status?: string;
     out_of_bounds?: boolean;
     reason?: string;
+    explanation_es?: string | null;
     required_revenue_growth?: number;
     solved_value_per_share?: number;
     fcf_margin?: number | null;

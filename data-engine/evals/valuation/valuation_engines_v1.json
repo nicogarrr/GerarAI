@@ -749,10 +749,10 @@
         "adr_ratio": null,
         "trace_engine": "standard_dcf",
         "closed_form": {
-          "bear_value": 40.0278691646,
-          "base_value": 124.398835178,
-          "bull_value": 278.44677662,
-          "expected_value": 156.087386553
+          "bear_value": 65.217610732,
+          "base_value": 232.244784774,
+          "bull_value": 592.16581495,
+          "expected_value": 309.7500272
         }
       },
       "applies_to": [
@@ -771,7 +771,7 @@
       ],
       "price": 40,
       "wacc": 0.09,
-      "hand_calculation": "crecimiento 0.95 de facts, acotado a 0.45 por el motor: trace.growth_clamped_from=0.95. base=124.398835."
+      "hand_calculation": "crecimiento 0.95 de facts, acotado a 0.45 por el motor: trace.growth_clamped_from=0.95. Crecimiento >= 10 % de hechos -> DCF multietapa (normalized_fcf): anos 1-5 al crecimiento del escenario y anos 6-10 bajando linealmente hasta el 3 % terminal, Gordon sobre el FCF del ano 10. bear=(0.37, 0.09, 0.11) -> 65.217611; base=(0.45, 0.15, 0.09) -> 232.244785; bull=(0.53, 0.21, 0.08) -> 592.165815 (calculado a mano fuera del motor); expected=sum(p*v) con las probabilidades del motor (sin cambios) = 309.750027."
     },
     {
       "id": "evbnk01_justified_price_to_book",

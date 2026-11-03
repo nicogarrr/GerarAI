@@ -67,6 +67,9 @@ class Candidate:
     # La corrida usó piezas del puente resueltas cruzando fuentes (deuda neta,
     # acciones): la etiqueta lo dice («con inputs estimados»).
     estimated_inputs: tuple[str, ...] = ()
+    # Valor con método (capex normalizado / DCF multietapa): la etiqueta del
+    # motor viaja con la cifra para que nunca se lea como un dato reportado.
+    method_label: str | None = None
 
 
 @dataclass(frozen=True)
@@ -172,11 +175,14 @@ def _reading(source: str, candidate: Candidate, *, stale: bool, rule: str) -> di
         label = "Motor de valoración (orientativo)"
     if candidate.estimated_inputs:
         label += " · con inputs estimados"
+    if candidate.method_label and source != "tesis":
+        label += f" · {candidate.method_label}"
     return {
         "value": round(candidate.value, 4),
         "source": source,
         "label": label,
         **({"estimated_inputs": list(candidate.estimated_inputs)} if candidate.estimated_inputs else {}),
+        **({"method_label": candidate.method_label} if candidate.method_label else {}),
         # Una tesis publicada es una cifra final; el motor solo si es publicable.
         "publishable": source != "motor_orientativo",
         "as_of": candidate.as_of.isoformat() if candidate.as_of else None,
@@ -261,6 +267,14 @@ def _estimated_inputs(payload: object) -> tuple[str, ...]:
         return ()
     items = payload.get("estimated_inputs") or []
     return tuple(str(i.get("metric")) for i in items if isinstance(i, dict) and i.get("metric"))
+
+
+def _method_label(payload: object) -> str | None:
+    """Etiqueta del método con que el motor estimó la cifra (si la hay)."""
+    if not isinstance(payload, dict):
+        return None
+    label = payload.get("valuation_label")
+    return str(label) if isinstance(label, str) and label else None
 
 
 def _engine_value(payload: object) -> float | None:
@@ -355,6 +369,7 @@ def persisted_engine_readings(
             as_of=_as_date(model.created_at),
             publishable=model.status == "final",
             estimated_inputs=_estimated_inputs(output.output_payload),
+            method_label=_method_label(output.output_payload),
         )
     return out, blocks
 

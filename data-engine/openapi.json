@@ -22485,6 +22485,18 @@
             ],
             "title": "Expected Value"
           },
+          "fair_value_range": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value Range"
+          },
           "listed_share_values": {
             "anyOf": [
               {
@@ -22535,6 +22547,18 @@
             "title": "Model Type",
             "type": "string"
           },
+          "plausibility_warning": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plausibility Warning"
+          },
           "publication_blockers": {
             "default": [],
             "items": {
@@ -22582,6 +22606,25 @@
             "default": {},
             "title": "Trace",
             "type": "object"
+          },
+          "valuation_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Label"
+          },
+          "valuation_notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Valuation Notes",
+            "type": "array"
           },
           "value_per_share_basis": {
             "anyOf": [

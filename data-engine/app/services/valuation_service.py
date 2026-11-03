@@ -424,7 +424,102 @@ def _relative_multiples_cross_check(
             "model_version": trace.get("model_version"),
         },
     }
+    screens = _multiple_screens(trace.get("screens"), scale)
+    if screens:
+        # Valor implícito por múltiplo (p25/mediana/p75 de los peers), mismo
+        # reescalado único: base del rango de valor razonable.
+        cross["screens"] = screens
     return cross
+
+
+#: Múltiplos que entran en el rango de contraste, en orden de lectura.
+RANGE_MULTIPLES = ("ev_to_ebitda", "p_to_fcf", "ev_to_sales", "pe")
+RANGE_MULTIPLE_LABELS = {
+    "ev_to_ebitda": "EV/EBITDA",
+    "p_to_fcf": "P/FCF",
+    "ev_to_sales": "EV/Ventas",
+    "pe": "PER",
+}
+
+
+def _multiple_screens(screens: object, scale: float) -> dict:
+    if not isinstance(screens, dict):
+        return {}
+    out: dict[str, dict] = {}
+    for kind in RANGE_MULTIPLES:
+        screen = screens.get(kind)
+        if not isinstance(screen, dict) or screen.get("status") != "ok":
+            continue
+        implied = screen.get("implied_value_per_share") or {}
+        values = {
+            key: implied.get(key) * scale
+            for key in ("p25", "median", "p75")
+            if isinstance(implied.get(key), (int, float)) and implied.get(key) > 0
+        }
+        if "median" not in values:
+            continue
+        stats = screen.get("peer_stats") or {}
+        out[kind] = {
+            **values,
+            "label": RANGE_MULTIPLE_LABELS[kind],
+            "peer_median_multiple": stats.get("median"),
+            "peer_set_size": stats.get("peer_set_size"),
+        }
+    return out
+
+
+def _fair_value_range(result: dict, cross: dict) -> dict | None:
+    """Rango de valor: DCF + múltiplos de peers (+ P/FCF con FCF normalizado).
+
+    Solo cifras ya calculadas con fuente: el valor esperado del DCF, la
+    mediana implícita de cada múltiplo con peers válidos y, si el capex se
+    normalizó, la mediana P/FCF de los peers aplicada al FCF normalizado por
+    acción. Sin al menos dos métodos no hay rango (uno solo no es contraste).
+    """
+    components: list[dict] = []
+    dcf_value = result.get("expected_value")
+    if isinstance(dcf_value, (int, float)) and dcf_value > 0:
+        label = result.get("valuation_label")
+        components.append(
+            {"method": "dcf", "label": f"DCF ({label})" if label else "DCF", "value": dcf_value}
+        )
+    screens = cross.get("screens") or {}
+    for kind, screen in screens.items():
+        components.append(
+            {
+                "method": kind,
+                "label": f"{screen['label']} de peers (mediana {screen.get('peer_median_multiple')})",
+                "value": screen["median"],
+                "low": screen.get("p25"),
+                "high": screen.get("p75"),
+            }
+        )
+    projection = (result.get("trace") or {}).get("projection") or {}
+    per_share = projection.get("normalized_fcf_per_share")
+    p_fcf = (screens.get("p_to_fcf") or {}).get("peer_median_multiple")
+    scale = cross.get("scale_factor_to_listing") or 1.0
+    if isinstance(per_share, (int, float)) and per_share > 0 and isinstance(p_fcf, (int, float)) and p_fcf > 0:
+        components.append(
+            {
+                "method": "p_to_fcf_normalized",
+                "label": f"P/FCF normalizado (capex de mantenimiento, mediana peers {p_fcf:.1f}x)",
+                "value": per_share * scale * p_fcf,
+            }
+        )
+    if len(components) < 2:
+        return None
+    values = [item["value"] for item in components]
+    return {
+        "low": min(values),
+        "high": max(values),
+        "components": components,
+        "currency": cross.get("value_currency"),
+        "method": "dcf_plus_peer_multiples",
+        "note_es": (
+            "Rango entre el valor del DCF y el valor implícito por múltiplos de comparables "
+            "(mediana de los peers aplicada a la cifra propia). Contraste, no valor publicado."
+        ),
+    }
 
 
 class ValuationService:
@@ -516,6 +611,18 @@ class ValuationService:
             )
             if cross is not None:
                 result.setdefault("cross_checks", {})["relative_multiples"] = cross
+                fair_range = _fair_value_range(result, cross)
+                if fair_range is not None:
+                    result["fair_value_range"] = fair_range
+                    warning = result.get("plausibility_warning")
+                    if isinstance(warning, dict):
+                        # La guarda 0,2x–5x avisa y dispara el contraste: el
+                        # rango viaja con el aviso, el valor no se borra.
+                        warning["range"] = {
+                            "low": fair_range["low"],
+                            "high": fair_range["high"],
+                            "currency": fair_range["currency"],
+                        }
         result["value_currency"] = price_currency if currency_gate["status"] != "blocked" else None
         result["currency"] = {
             key: value
