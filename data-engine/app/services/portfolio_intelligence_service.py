@@ -14,7 +14,7 @@ from typing import Any
 
 import numpy as np
 import pyxirr
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.core.local_date import local_today
@@ -203,6 +203,75 @@ def _fx_rate_with_date(
             return (inverse[idx][0], Decimal("1") / inverse[idx][1])
     return None
 
+
+
+# Ultimo cierre estrictamente anterior al corte, una sonda por compania que
+# recorre hacia atras uq_market_price_company_date (company_id, date) y para
+# en la primera fila. Mismo resultado que la ventana row_number() de
+# _prior_closes (ORDER BY date DESC, id DESC, rn = 1), sin ordenar toda la
+# historia previa al corte: banco 300 posiciones, horizonte de 1 año,
+# 221 -> 4 ms.
+_PRIOR_CLOSE_LATERAL_PG = """
+    SELECT m.company_id, m.date, m.adj_close
+    FROM unnest(CAST(:ids AS integer[])) AS v(cid)
+    CROSS JOIN LATERAL (
+      SELECT company_id, date, adj_close FROM market_prices
+      WHERE company_id = v.cid AND date < :cutoff
+      ORDER BY date DESC, id DESC LIMIT 1) m
+"""
+
+
+def _prior_closes(
+    db: Session, company_ids: list[int], cutoff: date, *, lateral: bool | None = None
+) -> dict[int, Any]:
+    """Last close strictly before ``cutoff`` per company (company_id, date, adj_close).
+
+    PostgreSQL uses one LATERAL index probe per company; other dialects keep
+    the portable window query. Both return exactly one row per company that
+    has a pre-cutoff price, chosen by (date DESC, id DESC).
+    """
+    if not company_ids:
+        return {}
+    if lateral is None:
+        lateral = db.get_bind().dialect.name == "postgresql"
+    if lateral:
+        return {
+            row.company_id: row
+            for row in db.execute(
+                text(_PRIOR_CLOSE_LATERAL_PG),
+                {"ids": sorted(set(company_ids)), "cutoff": cutoff},
+            ).all()
+        }
+    # Last close strictly before the cutoff per company, bounded in SQL:
+    # row_number() OVER (PARTITION BY company ORDER BY date DESC, id DESC)
+    # = 1 returns EXACTLY one row per company, deterministic even for
+    # same-date ties (the model forbids them with
+    # uq_market_price_company_date since migration 0001; the window makes
+    # the selection deterministic by construction, and MAX(date)+join
+    # would return every tied row and pick one by undefined order). Only
+    # the used columns are projected (company_id, date, adj_close); the
+    # full pre-cutoff history was loaded as ORM rows before.
+    ranked_prior = (
+        select(
+            MarketPrice.id.label("id"),
+            func.row_number()
+            .over(
+                partition_by=MarketPrice.company_id,
+                order_by=(MarketPrice.date.desc(), MarketPrice.id.desc()),
+            )
+            .label("rn"),
+        )
+        .where(MarketPrice.company_id.in_(company_ids), MarketPrice.date < cutoff)
+        .subquery("bounded_prior_prices")
+    )
+    return {
+        price.company_id: price
+        for price in db.execute(
+            select(MarketPrice.company_id, MarketPrice.date, MarketPrice.adj_close)
+            .join(ranked_prior, ranked_prior.c.id == MarketPrice.id)
+            .where(ranked_prior.c.rn == 1)
+        ).all()
+    }
 
 def _live_benchmark_prices(cutoff: date) -> list[Any] | None:
     """SPY ajustado desde Yahoo (gratis, ya usado en Estrés histórico), sin filas en el master.
@@ -1297,35 +1366,7 @@ class PortfolioIntelligenceService:
             as_of_max=date.today(),
         )
 
-        # Last close strictly before the cutoff per company, bounded in SQL:
-        # row_number() OVER (PARTITION BY company ORDER BY date DESC, id DESC)
-        # = 1 returns EXACTLY one row per company, deterministic even for
-        # same-date ties (the model forbids them with
-        # uq_market_price_company_date since migration 0001; the window makes
-        # the selection deterministic by construction, and MAX(date)+join
-        # would return every tied row and pick one by undefined order). Only
-        # the used columns are projected (company_id, date, adj_close); the
-        # full pre-cutoff history was loaded as ORM rows before.
-        ranked_prior = (
-            select(
-                MarketPrice.id.label("id"),
-                func.row_number()
-                .over(
-                    partition_by=MarketPrice.company_id,
-                    order_by=(MarketPrice.date.desc(), MarketPrice.id.desc()),
-                )
-                .label("rn"),
-            )
-            .where(MarketPrice.company_id.in_(company_ids), MarketPrice.date < cutoff)
-            .subquery("bounded_prior_prices")
-        )
-        prior_prices: dict[int, Any] = {}
-        for price in db.execute(
-            select(MarketPrice.company_id, MarketPrice.date, MarketPrice.adj_close)
-            .join(ranked_prior, ranked_prior.c.id == MarketPrice.id)
-            .where(ranked_prior.c.rn == 1)
-        ).all():
-            prior_prices[price.company_id] = price
+        prior_prices: dict[int, Any] = _prior_closes(db, company_ids, cutoff)
 
         positions_out = []
         reasons: dict[str, int] = defaultdict(int)
