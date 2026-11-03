@@ -842,6 +842,12 @@ _SUBJECTLESS_CHEAP_RE = re.compile(
     r"(?i)^\W*(?:(?:est[aá]|es|is\s+it|it'?s)\s+(?:muy\s+|very\s+|too\s+)?"
     r"(?:barat[oa]|cheap|undervalued|infravalorad[oa])|(?:tiene\s+)?margen\s+de\s+seguridad)\b"
 )
+# «¿Y su valor justo?», «and its fair value?»: seguimiento de valoración de la
+# empresa del hilo (prueba real 2026-11-02: caía en «No puedo responderte»).
+_VALUATION_FOLLOWUP_RE = re.compile(
+    r"(?i)\b(?:valor\s+(?:justo|razonable|intr[ií]nseco)|precio\s+objetivo|valoraci[oó]n"
+    r"|margen\s+de\s+seguridad|fair\s+value|intrinsic\s+value|price\s+target|valuation)\b"
+)
 
 
 # «Avísame si MSFT baja de 300» / «ponme una alerta…»: el chat no crea
@@ -1318,7 +1324,7 @@ class ChatService:
         text = question or ""
         if not history:
             return None
-        if not (_COMPANY_CUE_RE.search(text) or _question_metrics(text)):
+        if not (_COMPANY_CUE_RE.search(text) or _question_metrics(text) or _VALUATION_FOLLOWUP_RE.search(text)):
             return None
         if (
             _PORTFOLIO_SELF_RE.search(text)
