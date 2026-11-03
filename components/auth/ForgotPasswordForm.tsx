@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { AuthFormFooterLink, AuthFormNotice, AuthFormResult } from '@/components/auth/form-bits';
@@ -22,6 +22,10 @@ export default function ForgotPasswordForm({
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
     const [isError, setIsError] = useState(false);
+    // Sin JS aún no hay onSubmit: un submit nativo sería GET con el email en la
+    // URL. Botón deshabilitado hasta hidratar + method="post".
+    const [hydrated, setHydrated] = useState(false);
+    useEffect(() => { setHydrated(true); }, []);
 
     if (!emailConfigured) {
         return (
@@ -53,7 +57,7 @@ export default function ForgotPasswordForm({
     };
 
     return (
-        <form className="space-y-4" onSubmit={onSubmit}>
+        <form className="space-y-4" method="post" onSubmit={onSubmit}>
             <div>
                 <Label htmlFor="forgot-email">{t('auth.forgotPassword.emailLabel')}</Label>
                 <Input
@@ -66,7 +70,7 @@ export default function ForgotPasswordForm({
                     value={email}
                 />
             </div>
-            <Button disabled={busy} type="submit">
+            <Button disabled={!hydrated || busy} type="submit">
                 {busy ? t('auth.forgotPassword.submitting') : t('auth.forgotPassword.submit')}
             </Button>
             <AuthFormResult message={message} isError={isError} />

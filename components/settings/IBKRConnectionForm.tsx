@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { connectIBKR, disconnectIBKR, syncIBKR, type IBKRConnection, type IBKRResult } from '@/lib/actions/ibkr-settings.actions';
@@ -19,6 +19,10 @@ export default function IBKRConnectionForm({ initial }: { initial: IBKRConnectio
   const [account, setAccount] = useState(initial.account_id ?? '');
   const [complete, setComplete] = useState(initial.complete_query);
   const [busy, setBusy] = useState(false);
+  // Sin JS aún no hay onSubmit: un submit nativo sería GET con las
+  // credenciales en la URL. Botón deshabilitado hasta hidratar + method="post".
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { setHydrated(true); }, []);
   const [message, setMessage] = useState('');
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
@@ -93,7 +97,7 @@ export default function IBKRConnectionForm({ initial }: { initial: IBKRConnectio
         <p className="mt-2 text-xs text-gray-400">{t('settings.ibkr.tokenNote')}</p>
       </details>
       {!connection.connected ? (
-        <form className="space-y-4 rounded-lg border border-gray-800 p-4" onSubmit={connect} aria-label={t('settings.ibkr.formAria')}>
+        <form className="space-y-4 rounded-lg border border-gray-800 p-4" method="post" onSubmit={connect} aria-label={t('settings.ibkr.formAria')}>
           <p className="text-sm font-medium text-gray-100">{t('settings.ibkr.connectionData')}</p>
           <label className="block space-y-1 text-sm text-gray-300" htmlFor="ibkr-token">
             <span>{t('settings.ibkr.tokenLabel')}</span>
@@ -116,7 +120,7 @@ export default function IBKRConnectionForm({ initial }: { initial: IBKRConnectio
             <span>{t('settings.ibkr.completeQuery')}</span>
           </label>
           </details>
-          <Button className="h-11 w-full sm:w-auto" type="submit" disabled={busy || !token.trim() || !query.trim() || !account.trim()}>{busy ? t('settings.ibkr.connecting') : t('settings.ibkr.connectImport')}</Button>
+          <Button className="h-11 w-full sm:w-auto" type="submit" disabled={!hydrated || busy || !token.trim() || !query.trim() || !account.trim()}>{busy ? t('settings.ibkr.connecting') : t('settings.ibkr.connectImport')}</Button>
         </form>
       ) : (
         <div className="flex flex-wrap gap-3">
