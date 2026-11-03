@@ -26,13 +26,21 @@ OUTPUT_CONTRACT = {
         "Responde SOLO con JSON: {\"summary\": str, \"stance\": \"positive|negative|neutral\", "
         "\"claims\": [{\"text\": str, \"numbers\": [numero], \"metric\": str|null, "
         "\"citations\": [\"ev-N\"]}]}. Cada afirmación cita los ids de la evidencia de "
-        "la que sale y cada número debe estar en esa evidencia. Sin evidencia, no hay afirmación."
+        "la que sale y cada número debe estar en esa evidencia. Sin evidencia, no hay afirmación. "
+        "Escribe las cifras para una persona: importes grandes en millones o miles de millones con su "
+        "moneda (51.200 millones de USD, nunca 51200000000 ni 51,200,000,000), punto para los miles, coma "
+        "decimal y cada precio con su moneda (69,00 USD). No escribas nombres de campos internos "
+        "(publishable, net_debt, materiality_score…): di con palabras qué falta («falta la deuda neta»)."
     ),
     "en": (
         "Answer ONLY with JSON: {\"summary\": str, \"stance\": \"positive|negative|neutral\", "
         "\"claims\": [{\"text\": str, \"numbers\": [number], \"metric\": str|null, "
         "\"citations\": [\"ev-N\"]}]}. Every claim cites the evidence ids it comes from and "
-        "every number must appear in that evidence. No evidence, no claim."
+        "every number must appear in that evidence. No evidence, no claim. "
+        "Write figures for a person: large amounts in millions or billions with their currency "
+        "($51.2 billion or $51,200 million, never 51200000000), and every price with its currency "
+        "($69.00). Do not write internal field names (publishable, net_debt, materiality_score…): "
+        "say in plain words what is missing (\"net debt is missing\")."
     ),
 }
 
