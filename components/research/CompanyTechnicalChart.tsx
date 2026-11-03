@@ -223,11 +223,13 @@ function PriceCanvas({ bars, levels, currency, hourly = false, indicator = [], i
                     grid: { vertLines: { visible: false }, horzLines: { color: '#27272a' } },
                     rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.12, bottom: 0.08 } },
                     timeScale: { borderVisible: false, rightOffset: 6 },
-                    localization: { locale: intlLocale(latest.current.fmt.locale), priceFormatter: (value: number) => price(value, latest.current.currency, latest.current.fmt) },
+                    // Sin priceFormatter global: en lightweight-charts pisa el priceFormat de TODAS las series y
+                    // el panel del indicador (en %) y el volumen salían con la moneda («99,10 US$»).
+                    localization: { locale: intlLocale(latest.current.fmt.locale) },
                 });
-                const line = chart.addSeries(AreaSeries, { lineColor: '#5eead4', topColor: 'rgba(94,234,212,0.12)', bottomColor: 'rgba(94,234,212,0)', lineWidth: 2, priceLineVisible: false });
+                const line = chart.addSeries(AreaSeries, { lineColor: '#5eead4', topColor: 'rgba(94,234,212,0.12)', bottomColor: 'rgba(94,234,212,0)', lineWidth: 2, priceLineVisible: false, priceFormat: { type: 'custom', formatter: (value: number) => price(value, latest.current.currency, latest.current.fmt), minMove: 0.01 } });
                 // Tres paneles con el mismo eje de tiempo: precio, indicador y volumen.
-                const indicatorSeriesApi = chart.addSeries(LineSeries, { color: '#a78bfa', lineWidth: 1, priceLineVisible: false, lastValueVisible: true, priceFormat: { type: 'custom', formatter: (value: number) => latest.current.percent(latest.current.fmt.formatNumber(value, { maximumFractionDigits: 1 })), minMove: 0.01 } }, 1);
+                const indicatorSeriesApi = chart.addSeries(LineSeries, { color: '#a78bfa', lineWidth: 1, priceLineVisible: false, lastValueVisible: true, priceFormat: { type: 'custom', formatter: (value: number) => `${value > 0 ? '+' : ''}${latest.current.percent(latest.current.fmt.formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))}`, minMove: 0.01 } }, 1);
                 const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false }, 2);
                 const panes = chart.panes();
                 panes[0]?.setStretchFactor(3);
