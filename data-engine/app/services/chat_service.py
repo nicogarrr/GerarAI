@@ -1207,6 +1207,23 @@ def _team_advice(question: str, ticker: str) -> bool:
     return is_broad_question(question) and expert_chat.wants_team(question, ticker)
 
 
+def _empty_portfolio_response(path: str) -> ChatResponse:
+    """Cartera sin posiciones abiertas: se dice, sin modelo. Antes «¿cuál es mi
+    rentabilidad?», «¿cuántas posiciones tengo?» o «¿cuál es mi posición más
+    grande?» caían al modelo general («No tengo fuentes verificadas…»)."""
+    answer = (
+        "You have no saved positions in your portfolio (/portfolio). Import the IBKR CSV or add your "
+        "positions and I'll tell you how it's doing, with each one's weight, P&L and DCA level."
+        if _english()
+        else "No tienes posiciones guardadas en la cartera (/portfolio). Importa el CSV de IBKR o añade "
+        "las posiciones y te digo cómo va, con peso, P&L y nivel DCA de cada una."
+    )
+    return ChatResponse(
+        answer=answer, sources=[], model="deterministic", prompt_version="portfolio-empty-v1",
+        confidence=0.9, llm_trace={"path": path, "generated": False, "provider_calls": 0, "empty_portfolio": True},
+    )
+
+
 def _asks_purchase_cost(question: str) -> bool:
     if _PURCHASE_COST_RE.search(question):
         return True
@@ -2396,7 +2413,7 @@ class ChatService:
             ).all()
         )
         if not rows:
-            return None
+            return _empty_portfolio_response("portfolio_ranking")
         key_name, label, highest = metric
 
         def _value(pos: Position) -> float:
@@ -2608,7 +2625,7 @@ class ChatService:
                     llm_trace={"path": "portfolio_performance", "generated": False, "provider_calls": 0},
                 )
         if not rows:
-            return None
+            return _empty_portfolio_response("portfolio_performance")
 
         def _pair(pos: Position) -> tuple[float | None, float, str]:
             if pos.market_value_base is not None and pos.cost_basis_base is not None:
