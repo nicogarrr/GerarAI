@@ -1,0 +1,335 @@
+{
+ "dataset": "news_links_asts_v1",
+ "fecha": "2026-11-03",
+ "nota": "Titulares realistas de noticias relacionadas con AST SpaceMobile (ASTS) SIN el ticker, y negativos que no deben vincularse a ASTS. 'espera' = sobre | relacionada | ninguna (para ASTS).",
+ "casos": [
+  {
+   "texto": "AST SpaceMobile shares jump after successful BlueBird 6 launch",
+   "espera": "sobre"
+  },
+  {
+   "texto": "AST SpaceMobile raises $1 billion in convertible notes offering",
+   "espera": "sobre"
+  },
+  {
+   "texto": "AST SpaceMobile secures FCC approval to begin commercial service in the United States",
+   "espera": "sobre"
+  },
+  {
+   "texto": "BlueBird satellites unfold the largest commercial communications arrays in low Earth orbit",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Next batch of Block 2 BlueBird satellites to fly on Falcon 9 in December",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Abel Avellan says space-based cellular broadband will reach every phone on Earth",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Abel Avellan: «Tendremos 60 satélites en órbita a finales de 2026»",
+   "espera": "sobre"
+  },
+  {
+   "texto": "SpaceMobile network completes first video call from space with an unmodified smartphone",
+   "espera": "sobre"
+  },
+  {
+   "texto": "AST SpaceMobile y Vodafone crean SatCo para ofrecer cobertura satelital en Europa",
+   "espera": "sobre"
+  },
+  {
+   "texto": "La constelación BlueBird de AST SpaceMobile suma cinco satélites más",
+   "espera": "sobre"
+  },
+  {
+   "texto": "AST SpaceMobile stock soars as Verizon commits $100 million and spectrum",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Short sellers pile into AST SpaceMobile ahead of launch cadence update",
+   "espera": "sobre"
+  },
+  {
+   "texto": "AST SpaceMobile files to sell up to $800 million in stock through at-the-market program",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Scott Wisniewski, president of AST SpaceMobile, outlines 2027 coverage targets",
+   "espera": "sobre"
+  },
+  {
+   "texto": "India's LVM3 rocket to carry a Block 2 BlueBird satellite into orbit",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Texas satellite factory of AST SpaceMobile expands to meet BlueBird demand",
+   "espera": "sobre"
+  },
+  {
+   "texto": "AST SpaceMobile wins Space Development Agency contract for HALO program",
+   "espera": "sobre"
+  },
+  {
+   "texto": "AST SpaceMobile CEO Abel Avellan buys more shares in open market",
+   "espera": "sobre"
+  },
+  {
+   "texto": "SpaceMobile service beta to begin with AT&T customers next year",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Ligado and AST SpaceMobile finalize L-band spectrum agreement",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Satélites BlueBird: AST SpaceMobile adelanta su calendario de lanzamientos",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Blue Origin's New Glenn will launch BlueBird satellites in 2026",
+   "espera": "sobre"
+  },
+  {
+   "texto": "AST Space Mobile gains 12% as analysts lift price targets after Q3 update",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Why AST SpaceMobile stock is soaring today",
+   "espera": "sobre"
+  },
+  {
+   "texto": "AT&T to offer satellite-to-smartphone service in 2026, CFO says",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Verizon expands direct-to-cell satellite plans to rural customers",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Vodafone plans space-based mobile broadband across Europe",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Rakuten Mobile tests direct-to-smartphone video call via satellite",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Starlink direct-to-cell service now covers one million T-Mobile users",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "SpaceX buys EchoStar spectrum for $17 billion to boost direct-to-cell",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "T-Mobile T-Satellite launches nationwide texting via satellite",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Lynk Global and Omnispace merge to challenge satellite-to-phone rivals",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "FCC approves supplemental coverage from space framework",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "FCC opens comment on SCS power limits for direct-to-device satellites",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Ligado Networks emerges from bankruptcy with new L-band plan",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Apple and Globalstar expand satellite messaging on the iPhone",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Vodafone Idea signs deal for satellite connectivity in India",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Telefónica y Vodafone prueban conexión desde el espacio directa al móvil en España",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Direct-to-device satellite market to reach $20 billion by 2030, report says",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Skylo brings satellite texting to more Android phones",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "AST levels elevated in patients with liver disease, study finds",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Compiler update rewrites the AST parser for faster builds",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "AST exam schedule released for nursing students",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Bluebird bio receives FDA approval for gene therapy launch",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Blue Bird Corporation reports record school bus deliveries",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Eastern bluebird populations rebound across the Midwest",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Starlink outage disrupts internet for thousands of users",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "SpaceX Falcon 9 launches 24 Starlink satellites from Florida",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "AT&T raises dividend and beats subscriber estimates",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Verizon to cut 13,000 jobs in cost overhaul",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Vodafone sells Spanish unit to Zegona",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Rakuten Group posts loss on mobile unit costs",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "FCC fines broadcaster over indecency complaint",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "FCC chair proposes to roll back net neutrality rules",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Globalstar shares rise on Apple funding",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Iridium beats revenue estimates on government contracts",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Rocket Lab launches Electron for NASA",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Amazon Kuiper satellites begin beta broadband service",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Weather satellite captures hurricane imagery",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Abel Ferrara film premieres in Venice",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "T-Mobile reports strong postpaid phone net adds",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "The AST of a JavaScript program is a tree",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Astra Space delays rocket test",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "SES and Intelsat complete merger",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Viasat posts quarterly loss",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Bluebird Cafe in Nashville hosts songwriter night",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "AT&T Stadium hosts Cowboys game on Sunday",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Vodafone Idea shares fall as AGR dues weigh",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "FCC approves Paramount-Skydance merger",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "China launches Guowang internet satellites",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Space stocks rally as Rocket Lab posts record backlog",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Apple iPhone 17 sales strong in China",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Rakuten Mobile adds one million subscribers",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Orange posts higher earnings in France",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Telefónica recorta plantilla en España",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Mobile World Congress: what to expect this year",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Satellite TV provider DirecTV adds new channels",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Blue Origin New Glenn launches NASA probe",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Spectrum auction raises $80 billion",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "SpaceX valuation hits $400 billion in tender offer",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "Verizon and AT&T raise prices on unlimited plans",
+   "espera": "ninguna"
+  },
+  {
+   "texto": "BlueBird school buses get electric upgrade",
+   "espera": "ninguna"
+  }
+ ]
+}
