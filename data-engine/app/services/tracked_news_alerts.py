@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.i18n import generation_language
 from app.core.local_date import local_today
-from app.models import Company, NewsEvent, Position, ResearchAlert, WatchItem
+from app.models import AlertAnalysis, Company, NewsEvent, Position, ResearchAlert, WatchItem
 from app.services.date_format import readable_date
 from app.services.notification_service import NotificationService
 from app.services.ticker_news_lane import _NAME_NOISE, VERIFIED_ALIASES
@@ -128,6 +128,8 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
         NewsEvent.metadata_["source_headline"].as_string().is_not(None),
     )
     companies = {c.id: c for c in db.scalars(select(Company).where(Company.id.in_(tracked))).all()}
+    from app.services.alert_analysis_service import VERSION as ANALYSIS_VERSION
+
     cursor = None
     while True:
         query = select(NewsEvent).where(eligible)
@@ -136,6 +138,28 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
         candidates = db.scalars(query.order_by(NewsEvent.date, NewsEvent.id).limit(limit)).all()
         if not candidates:
             break
+        # Alertas ya emitidas de esta página en UNA consulta (fingerprint es
+        # único por tenant: uq_research_alert_fingerprint) y, de ellas, las que
+        # ya tienen su análisis. Antes eran tres consultas por noticia ya
+        # avisada (alerta previa + evento + análisis dentro de queue_analysis)
+        # en cada pasada de 15 min sobre la ventana de 48 h.
+        page_urls = [(event.company_id, _valid_source_url(event.url)) for event in candidates]
+        page_fps = {
+            _fingerprint(tenant_id, company_id, url)
+            for company_id, url in page_urls
+            if company_id is not None and url
+        }
+        prior_by_fp = {
+            alert.fingerprint: alert
+            for alert in db.scalars(select(ResearchAlert).where(
+                ResearchAlert.tenant_id == tenant_id, ResearchAlert.fingerprint.in_(page_fps),
+            )).all()
+        } if page_fps else {}
+        analysed_ids = set(db.scalars(select(AlertAnalysis.alert_id).where(
+            AlertAnalysis.tenant_id == tenant_id,
+            AlertAnalysis.alert_id.in_([alert.id for alert in prior_by_fp.values()]),
+            AlertAnalysis.version == ANALYSIS_VERSION,
+        )).all()) if prior_by_fp else set()
         for event in candidates:
             stats["examined"] += 1
             url = _valid_source_url(event.url)
@@ -165,18 +189,24 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
                 stats["unverified_skips"] += 1
                 continue
             fp = _fingerprint(tenant_id, company.id, url)
-            prior_alert = db.scalar(select(ResearchAlert).where(
-                ResearchAlert.tenant_id == tenant_id, ResearchAlert.fingerprint == fp,
-            ))
+            prior_alert = prior_by_fp.get(fp)
             if prior_alert is not None:
                 # A past queue_analysis commit may have failed after alert commit.
                 # Repair on the next gated evaluation, without redispatching it.
-                from app.services.alert_analysis_service import queue_analysis
+                # Con su análisis ya creado, queue_analysis no escribe nada (lo
+                # devuelve o descarta el evento): se ahorra la llamada.
+                already_analysed = (
+                    prior_alert.id in analysed_ids
+                    and prior_alert.alert_type == "tracked_news"
+                    and prior_alert.tenant_id == tenant_id
+                )
+                if not already_analysed:
+                    from app.services.alert_analysis_service import queue_analysis
 
-                try:
-                    queue_analysis(db, prior_alert)
-                except Exception:
-                    db.rollback()
+                    try:
+                        queue_analysis(db, prior_alert)
+                    except Exception:
+                        db.rollback()
                 stats["duplicates"] += 1
                 continue
             from app.services.news_identity import equivalent_news_alert
@@ -224,6 +254,9 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
                 stats["duplicates"] += 1
                 continue
             db.commit()
+            # Otra noticia de esta misma página con la misma URL y empresa la ve
+            # como ya avisada, igual que con la consulta por fila.
+            prior_by_fp[fp] = alert
             # Persist baseline work before enqueue: a Redis failure must not
             # erase a valid alert. Only a newly gated alert gets one analysis.
             from app.services.alert_analysis_service import queue_analysis
