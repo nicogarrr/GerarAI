@@ -338,6 +338,23 @@ def _passage(text: str, terms: list[str], size: int = PASSAGE_CHARS) -> str:
     return ("…" if start > 0 else "") + out + ("…" if end < len(compact) else "")
 
 
+def _best_window(hits: list[tuple[int, str]], idf: dict[str, float], span: int = 400) -> float:
+    """Mayor suma de idf de términos distintos en una ventana [pos, pos+span) que
+    empieza en un acierto. ``hits`` va ordenado por posición. Dos punteros: mismo
+    resultado que recorrer todos los aciertos para cada posición, sin el coste
+    cuadrático en fragmentos con muchos aciertos."""
+    best = 0.0
+    lo = hi = 0
+    for pos, _ in hits:
+        while hits[lo][0] < pos:
+            lo += 1
+        hi = max(hi, lo)
+        while hi < len(hits) and hits[hi][0] < pos + span:
+            hi += 1
+        best = max(best, sum(idf[t] for t in {t for _, t in hits[lo:hi]}))
+    return best
+
+
 def company_passages(db: Session, company: Company, question: str, limit: int = 4) -> list[Passage]:
     """Los ``limit`` pasajes de los documentos de la empresa que mejor responden."""
     tenant_id = db.info.get("tenant_id")
@@ -358,7 +375,14 @@ def company_passages(db: Session, company: Company, question: str, limit: int = 
         return []
     lowered = {c.id: " ".join(c.text.lower().split()) for c, _ in rows}
     patterns = {t: _term_re(t) for t in terms}
-    found = {cid: {t for t, rx in patterns.items() if rx.search(txt)} for cid, txt in lowered.items()}
+    # El texto ya va en minúsculas y con espacios simples: si el término no está
+    # como subcadena, su expresión no puede casar. La subcadena (rapidísima)
+    # descarta antes de la expresión con lookbehind, que es la parte cara.
+    literal = {t: " ".join(t.lower().split()) for t in terms}
+    found = {
+        cid: {t for t, rx in patterns.items() if literal[t] in txt and rx.search(txt)}
+        for cid, txt in lowered.items()
+    }
     df = {t: sum(1 for hits in found.values() if t in hits) for t in terms}
     n = len(rows)
     quantity = bool(_QUANTITY_CUE_RE.search(_fold(question)))
@@ -373,10 +397,7 @@ def company_passages(db: Session, company: Company, question: str, limit: int = 
         # Terminos juntos en la misma frase valen mas que repartidos por un
         # fragmento de 2.500 caracteres: se puntua la mejor ventana de 400.
         hits = sorted((m.start(), t) for t in matched for m in patterns[t].finditer(txt))
-        best = 0.0
-        for pos, _ in hits:
-            window = {t for p, t in hits if pos <= p < pos + 400}
-            best = max(best, sum(idf[t] for t in window))
+        best = _best_window(hits, idf)
         value = best + 0.25 * sum(idf[t] for t in matched)
         if quantity:
             # "¿Cuantos empleados?": premia la cifra pegada al termino
