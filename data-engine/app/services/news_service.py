@@ -12,6 +12,7 @@ from app.services.claim_intelligence_service import ClaimIntelligenceService
 from app.services.company_catalog import all_companies
 from app.services.company_resolver import resolve_company
 from app.services.materiality_service import MaterialityService, apply_recency_policy
+from app.services.news_identity import NewsDedupBatch, prefetch_news_dedup
 from app.services.review_alert_service import ReviewAlertService
 from app.services.source_hierarchy_service import classify_source
 from app.services.text_clip import clip_words, normalize_scraped_text
@@ -271,13 +272,18 @@ class NewsService:
         *,
         title_is_identity: bool = True,
         headline: str | None = None,
+        dedup_batch: NewsDedupBatch | None = None,
     ) -> bool:
         if url:
-            duplicate_url = db.scalar(
-                select(NewsEvent.id)
-                .where(NewsEvent.url == url, *tenant_filters(db, NewsEvent))
-                .limit(1)
+            if dedup_batch is not None and url in dedup_batch.known_urls:
+                return True
+            url_query = select(NewsEvent.id).where(
+                NewsEvent.url == url, *tenant_filters(db, NewsEvent)
             )
+            if dedup_batch is not None:
+                # Lo anterior a la tanda ya está en known_urls: solo filas nuevas.
+                url_query = url_query.where(NewsEvent.id > dedup_batch.max_id)
+            duplicate_url = db.scalar(url_query.limit(1))
             if duplicate_url:
                 return True
         if not title_is_identity:
@@ -291,7 +297,8 @@ class NewsService:
 
         # Misma URL con otra query/fragmento, o mismo titular con otra puntuación: es la misma noticia.
         if equivalent_news_event(
-            db, company_id=company.id if company else None, url=url, title=text
+            db, company_id=company.id if company else None, url=url, title=text,
+            batch=dedup_batch,
         ) is not None:
             return True
         # El título guardado puede ser el compuesto recortado (histórico) o el
@@ -681,6 +688,13 @@ class NewsService:
     ) -> NewsIngestResponse:
         created_events: list[ManualNewsResponse] = []
         skipped_duplicates = 0
+        # Deduplicación en lote: una lectura por tanda en vez de un seq scan
+        # de news_events por noticia (mismo resultado, ver NewsDedupBatch).
+        dedup_batch = prefetch_news_dedup(
+            db,
+            [item.url for item in items],
+            pattern_urls=[item.url for item in items if item.headline_from_source],
+        ) if items else None
 
         for item in items:
             # Captacion de demandantes de despachos: no es un hecho de la empresa.
@@ -726,6 +740,7 @@ class NewsService:
                 db, company, text, item.url,
                 title_is_identity=item.headline_from_source or not item.url,
                 headline=item.title if item.headline_from_source else None,
+                dedup_batch=dedup_batch,
             ):
                 skipped_duplicates += 1
                 continue
