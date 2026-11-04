@@ -126,7 +126,10 @@ def _checks(kind, data):
                 if not any("total" in label.lower() for label, _ in components[1:]):
                     liabilities = sum(v for _, v in components)
         if liabilities is not None and equity is not None:
-            equation("balance_bridge", total, liabilities+equity+(redeemable or 0))
+            if redeemable is None:
+                equation("balance_bridge", total, liabilities+equity)
+            else:
+                equation("balance_bridge", total, liabilities+equity+redeemable)
     elif kind == "income":
         rev = _find(data, r"(?:total )?revenues?")
         cost = _find(data, r"total costs and expenses")
@@ -158,7 +161,13 @@ def _checks(kind, data):
             # deduction (Charter). Provision/benefit is algebraic (Uber).
             if _find(data, r"income tax expense") is not None:
                 tax = abs(tax)
-            equation("pretax_to_net_income", net, pretax-tax+(equity_loss or 0))
+            includes_equity = any("and income/loss from equity method investments" in label.lower()
+                                  for label, _ in data)
+            if includes_equity:
+                if equity_loss is not None:
+                    equation("pretax_to_net_income", net, pretax-tax+equity_loss)
+            else:
+                equation("pretax_to_net_income", net, pretax-tax)
         attributable = _find(data, METRICS["net_income_attributable"])
         minority = _find(data, r"(?:less: )?net (?:income|loss) attributable to non-?controlling interests?")
         if attributable is not None and net is not None and minority is not None:

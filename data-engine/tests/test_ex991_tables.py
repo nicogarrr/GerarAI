@@ -181,3 +181,14 @@ def test_valid_result_retains_source_and_publication_on_every_fact():
         assert f['published'] == date(2026, 11, 4)
         assert f['provisional'] is True
         assert f['source_label']
+
+
+def test_missing_equity_loss_operand_does_not_mean_zero():
+    from app.valuation.ex991_tables import _checks
+    data = [("Revenue", Decimal(100)), ("total costs and expenses", Decimal(20)),
+            ("Operating income", Decimal(80)),
+            ("Income before income taxes and income/loss from equity method investments", Decimal(70)),
+            ("Provision for income taxes", Decimal(10)), ("Net income", Decimal(60))]
+    assert not any(c["name"] == "pretax_to_net_income" for c in _checks("income", data))
+    explicit = _checks("income", data + [("Loss from equity method investments", Decimal(0))])
+    assert any(c["name"] == "pretax_to_net_income" and c["ok"] for c in explicit)
