@@ -237,7 +237,7 @@ def natural_company_answer_en(
     *, company: Company, facts: list[FinancialFact], thesis: ThesisVersion | None, news: list[NewsEvent],
     missing_metrics: list[str], claims: list[Claim], contradiction_claims: list[Claim], price_line: str | None,
     memory_notes: list[str] | None, market_cap_fact: FinancialFact | None, question: str,
-    thesis_withheld: str | None, sec: bool,
+    thesis_withheld: str | None, sec: bool, margin_line: str | None = None,
 ) -> str:
     parts: list[str] = []
     thesis_line: str | None = None
@@ -295,6 +295,8 @@ def natural_company_answer_en(
     )
     if lead:
         parts = [lead, *[p for p in parts if not lead.startswith(p)]]
+    if margin_line:
+        parts.insert(0, margin_line)
     if re.search(r"compar|\bvs\.?\b|versus|against", (question or "").lower()):
         parts.insert(
             1 if lead else 0,

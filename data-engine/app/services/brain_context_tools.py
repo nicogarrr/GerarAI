@@ -552,6 +552,48 @@ _ENGINE_RE = re.compile(
 )
 
 
+# Etiquetas públicas en castellano para los inputs que el motor declara
+# ausentes: las claves internas (``holding_company_discount``,
+# ``segment_*_operating_metric``) no se le muestran al usuario en inglés
+# (regla de Nico: textos de usuario en español; probado 2026-11-04 con
+# CGEO.L). Las familias con comodín de segmento se agrupan en una sola
+# frase y las claves sin etiqueta conocida se cuentan, nunca se vuelcan.
+_MISSING_INPUT_LABELS_ES = {
+    "revenue": "los ingresos",
+    "operating_cash_flow": "el flujo de caja operativo",
+    "free_cash_flow": "el flujo de caja libre",
+    "net_income": "el beneficio neto",
+    "net_debt": "la deuda neta",
+    "total_debt": "la deuda total",
+    "cash_and_equivalents": "el efectivo y equivalentes",
+    "shares_diluted": "las acciones diluidas",
+    "market_cap": "la capitalización bursátil",
+    "holding_company_discount": "el descuento de sociedad holding",
+}
+
+
+def _missing_inputs_label_es(missing) -> str:
+    """Lista legible de inputs ausentes; nunca claves internas en bruto."""
+    labels: list[str] = []
+    segment = False
+    unknown = 0
+    for item in missing or []:
+        key = str(item)
+        if key.startswith("segment_"):
+            segment = True
+        elif key in _MISSING_INPUT_LABELS_ES:
+            label = _MISSING_INPUT_LABELS_ES[key]
+            if label not in labels:
+                labels.append(label)
+        else:
+            unknown += 1
+    if segment:
+        labels.append("la métrica operativa y el múltiplo de valoración de cada segmento")
+    if unknown:
+        labels.append(f"otros {unknown} datos del modelo" if unknown > 1 else "otro dato del modelo")
+    return ", ".join(labels)
+
+
 def engine_valuation_answer(db: Session, company: Company) -> ChatResponse:
     """Salida del motor de valoración (escenarios, margen, publicable) sin LLM."""
     from app.services.valuation_service import ValuationService
@@ -580,7 +622,7 @@ def engine_valuation_answer(db: Session, company: Company) -> ChatResponse:
                  else "Escenarios por acción: ")
     values = [(label, value) for label, value in values if value is not None]
     if not values:
-        missing = ", ".join(result.get("missing_inputs") or []) or "datos suficientes"
+        missing = _missing_inputs_label_es(result.get("missing_inputs")) or "datos suficientes"
         return _response([f"El motor no tiene valoración de {company.ticker}: faltan {missing}."],
                          [_source("valuation", company.ticker, f"Valoración {company.ticker}", link)],
                          "engine_valuation")
