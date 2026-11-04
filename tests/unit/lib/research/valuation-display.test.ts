@@ -5,6 +5,7 @@ import {
   blockerLabel,
   reverseDcfText,
   scenarioNotesList,
+  scenarioWarningLines,
   waccSourceLabel,
 } from '@/lib/research/valuation-display';
 
@@ -86,5 +87,39 @@ describe('scenarioNotesList', () => {
   it('lista vacía sin notas', () => {
     expect(scenarioNotesList(null)).toEqual([]);
     expect(scenarioNotesList({})).toEqual([]);
+  });
+});
+
+describe('scenarioWarningLines', () => {
+  const trace = {
+    scenario_set: {
+      scenarios: [
+        { name: 'bear', warnings: [{ id: 'growth_outside_reference', value: 0.5265, reference_low: -0.15, reference_high: 0.45 }] },
+        { name: 'bull', warnings: [{ id: 'margin_above_reference', value: 0.55, reference: 0.5 }] },
+        { name: 'base', warnings: [] },
+      ],
+    },
+  };
+  it('avisa en español con nombre, valor y referencia', () => {
+    const lines = scenarioWarningLines(trace, 'es');
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain('«bear»');
+    expect(lines[0]).toContain('52,65');
+    expect(lines[0]).toContain('fuera de la referencia general');
+    expect(lines[1]).toContain('«bull»');
+    expect(lines[1]).toContain('55');
+    expect(lines[1]).toContain('por encima de la referencia general');
+  });
+  it('avisa en inglés', () => {
+    const lines = scenarioWarningLines(trace, 'en');
+    expect(lines[0]).toContain('"bear"');
+    expect(lines[0]).toContain('52.65');
+    expect(lines[0]).toContain('outside the general reference range');
+    expect(lines[1]).toContain('above the general reference');
+  });
+  it('sin traza ni avisos no dice nada', () => {
+    expect(scenarioWarningLines(null)).toEqual([]);
+    expect(scenarioWarningLines({})).toEqual([]);
+    expect(scenarioWarningLines({ scenario_set: { scenarios: [{ name: 'a' }] } })).toEqual([]);
   });
 });

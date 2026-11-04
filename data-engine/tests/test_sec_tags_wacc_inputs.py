@@ -17,3 +17,14 @@ def test_combined_debt_tag_keeps_priority_over_components():
     tags = metric_concepts("total_debt")
     assert tags[0] == "DebtLongtermAndShorttermCombinedAmount"
     assert "LongTermDebtAndCapitalLeaseObligations" in tags
+
+
+def test_interest_expense_admite_el_tag_neto_no_operativo_como_ultimo_alias():
+    tags = metric_concepts("interest_expense")
+    assert tags[-1] == "InterestIncomeExpenseNonoperatingNet"
+    assert concept_to_metric("InterestIncomeExpenseNonoperatingNet") == "interest_expense"
+
+
+def test_coste_de_deuda_reportado_mapea_a_cost_of_debt():
+    assert metric_concepts("cost_of_debt") == ["DebtWeightedAverageInterestRate"]
+    assert concept_to_metric("DebtWeightedAverageInterestRate") == "cost_of_debt"

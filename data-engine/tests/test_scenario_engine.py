@@ -266,6 +266,74 @@ def test_invalid_declared_scenarios_fall_back_with_reason(db, monkeypatch, bad):
     assert result["expected_value"] == pytest.approx(plain["expected_value"])
 
 
+def test_declared_scenarios_outside_reference_run_with_warnings(db, monkeypatch):
+    """Decisión de Nico (4-nov-2026): crecimiento fuera de [-15 %, 45 %] o
+    margen > 50 % con fuente NO se rechaza ni se oculta: el escenario corre y
+    lleva el aviso estructurado en la traza (lo muestra la ficha)."""
+    monkeypatch.setitem(
+        valuation_scenarios.VALUATION_SCENARIOS,
+        "XSCN",
+        {
+            "source": "test",
+            "scenarios": [
+                {"name": "bear", "probability": 0.25, "method": "dcf", "revenue_growth": -0.20, "fcf_margin": 0.09},
+                {"name": "base", "probability": 0.50, "method": "dcf", "revenue_growth": 0.60, "fcf_margin": 0.11},
+                {"name": "bull", "probability": 0.25, "method": "dcf", "revenue_growth": 0.08, "fcf_margin": 0.55},
+            ],
+        },
+    )
+    result = ValuationService().value_company(db, _company(db, "scenario_auto_energy_fsd"))
+    trace = result["trace"]
+    assert trace["engine"] == "scenario"
+    assert "engine_fallback" not in trace
+    assert trace["scenario_set"]["source"] == "declared"
+    by_name = {s["name"]: s for s in trace["scenario_set"]["scenarios"]}
+    assert by_name["bear"]["warnings"] == [
+        {"id": "growth_outside_reference", "value": -0.20, "reference_low": -0.15, "reference_high": 0.45}
+    ]
+    assert by_name["base"]["warnings"] == [
+        {"id": "growth_outside_reference", "value": 0.60, "reference_low": -0.15, "reference_high": 0.45}
+    ]
+    assert by_name["bull"]["warnings"] == [
+        {"id": "margin_above_reference", "value": 0.55, "reference": 0.50}
+    ]
+    # Un juego con fuente dentro de referencias no lleva avisos.
+    monkeypatch.setitem(valuation_scenarios.VALUATION_SCENARIOS, "XPLA", SOURCED_SET)
+    plain = ValuationService().value_company(db, _company(db, "scenario_auto_energy_fsd", ticker="XPLA"))
+    assert all(not s["warnings"] for s in plain["trace"]["scenario_set"]["scenarios"])
+
+
+def test_tsla_declared_set_is_ark_sourced_and_valid(db):
+    """El set declarado de TSLA es el de ARK (2031, 19-oct-2026): pesos de los
+    percentiles de su Monte Carlo y CAGRs de su tabla de ventas; el margen se
+    hereda del base de TSLA porque ARK no publica margen FCF."""
+    entry = valuation_scenarios.VALUATION_SCENARIOS["TSLA"]
+    assert "ark-invest.com" in entry["source"]
+    assert "2031" in entry["source"]
+    scenarios = entry["scenarios"]
+    assert [s["name"] for s in scenarios] == ["bear", "base", "bull"]
+    assert [s["probability"] for s in scenarios] == [0.25, 0.50, 0.25]
+    # CAGRs de la tabla ARK: 95 BUSD (2025A) -> 1.202 / 1.449 / 1.622 BUSD (2031E).
+    for spec, target in zip(scenarios, (1202, 1449, 1622), strict=True):
+        assert spec["revenue_growth"] == pytest.approx((target / 95) ** (1 / 6) - 1, abs=1e-6)
+        # Sin margen declarado: se hereda el del DCF base (regla del motor).
+        assert "fcf_margin" not in spec
+    # El motor lo acepta y lo etiqueta como declarado, con avisos por
+    # crecimiento fuera de la referencia general.
+    result = ValuationService().value_company(db, _company(db, "scenario_auto_energy_fsd", ticker="TSLA"))
+    trace = result["trace"]
+    assert trace["scenario_set"]["source"] == "declared"
+    assert "ark-invest.com" in trace["scenario_set"]["data_source"]
+    assert "engine_fallback" not in trace
+    by_name = {s["name"]: s for s in trace["scenario_set"]["scenarios"]}
+    assert [w["id"] for w in by_name["bear"]["warnings"]] == ["growth_outside_reference"]
+    values = [by_name[n]["value_per_share"] for n in ("bear", "base", "bull")]
+    assert values[0] < values[1] < values[2]
+    assert result["expected_value"] == pytest.approx(
+        sum(s["probability"] * s["value_per_share"] for s in by_name.values())
+    )
+
+
 def test_cash_burner_falls_back_to_classification_engine_with_reason(db, monkeypatch):
     monkeypatch.setitem(valuation_scenarios.VALUATION_SCENARIOS, "XBRN", SOURCED_SET)
     burner = {
