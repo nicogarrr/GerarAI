@@ -115,6 +115,12 @@ def revenue_cagr(history: dict[int, dict], years: int = 3) -> dict | None:
     start = latest - years
     if start not in revenues:
         return None
+    # Un cambio de moneda de presentación no es crecimiento del negocio.
+    # Sin unidades comparables no hay CAGR demostrado ni conversión implícita.
+    start_unit = history[start]["revenue"].unit
+    latest_unit = history[latest]["revenue"].unit
+    if not start_unit or start_unit != latest_unit:
+        return None
     cagr = (revenues[latest] / revenues[start]) ** (1 / years) - 1
     return {
         "years": years,
