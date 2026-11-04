@@ -271,6 +271,55 @@ def insufficient_from_context(
     )
 
 
+WACC_ABOVE_TERMINAL_GROWTH = "wacc_above_terminal_growth"
+
+
+def wacc_terminal_growth_reason(wacc: float | None, terminal: float | None) -> str:
+    """Motivo en castellano (con las cifras cuando se conocen)."""
+    if wacc is None or terminal is None:
+        detail = "El WACC no supera el crecimiento terminal"
+    else:
+        detail = (
+            f"El WACC ({wacc * 100:.2f} %) no supera el crecimiento terminal "
+            f"({terminal * 100:.2f} %)"
+        )
+    return (
+        f"{detail}: el valor terminal (Gordon) no está definido y el DCF no es "
+        "válido con estos datos. No se recortan el WACC ni la g; la valoración "
+        "sigue por los demás caminos."
+    )
+
+
+def wacc_not_above_terminal_result(
+    context: ValuationContext,
+    *,
+    wacc: float | None,
+    terminal: float | None,
+    wacc_source: str | None = None,
+    terminal_source: str | None = None,
+) -> dict | None:
+    """``insufficient_data`` explicado si WACC <= g; ``None`` si el par es válido.
+
+    WACC <= g es una condición de los datos (una empresa muy apalancada con
+    WACC calculado bajo), no un error de programa: el camino DCF se declara
+    no válido en vez de dejar escapar el ``ValueError`` de la función pura,
+    que tumbaba la valoración y la tesis enteras (CHTR, 3 y 4-nov-2026).
+    """
+    if wacc is not None and terminal is not None and wacc > terminal:
+        return None
+    return insufficient_from_context(
+        context,
+        missing=[WACC_ABOVE_TERMINAL_GROWTH],
+        reason=wacc_terminal_growth_reason(wacc, terminal),
+        extra_trace={
+            "wacc": wacc,
+            "wacc_source": wacc_source,
+            "terminal_growth": terminal,
+            "terminal_growth_source": terminal_source,
+        },
+    )
+
+
 def snapshot_trace(snapshot: FinancialSnapshot) -> dict:
     """Corte del snapshot usado en la valoracion, para la traza del resultado.
 

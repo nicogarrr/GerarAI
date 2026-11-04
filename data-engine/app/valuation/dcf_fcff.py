@@ -52,11 +52,25 @@ class DCFResult:
     trace: dict
 
 
+class WaccNotAboveTerminalGrowthError(ValueError):
+    """WACC <= crecimiento terminal: la perpetuidad de Gordon no está definida.
+
+    Es una condición de los DATOS (p. ej. una empresa muy apalancada con
+    deuda barata y WACC calculado bajo), no un fallo de programación. Sigue
+    siendo ``ValueError`` con el mismo mensaje para las funciones puras; los
+    motores y ``ValuationService`` la distinguen para declarar ese camino de
+    valoración no válido sin tumbar la valoración (ni la tesis) entera.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("wacc must be greater than terminal_growth")
+
+
 def run_dcf(inputs: DCFInputs) -> DCFResult:
     if inputs.shares_outstanding <= 0:
         raise ValueError("shares_outstanding must be positive")
     if inputs.wacc <= inputs.terminal_growth:
-        raise ValueError("wacc must be greater than terminal_growth")
+        raise WaccNotAboveTerminalGrowthError()
     if inputs.years < 1:
         raise ValueError("years must be at least 1")
     if 1 + inputs.wacc <= 0:
@@ -139,7 +153,7 @@ def run_dcf_margin_convergence(inputs: ConvergenceDCFInputs) -> DCFResult:
     if inputs.shares_outstanding <= 0:
         raise ValueError("shares_outstanding must be positive")
     if inputs.wacc <= inputs.terminal_growth:
-        raise ValueError("wacc must be greater than terminal_growth")
+        raise WaccNotAboveTerminalGrowthError()
     if inputs.years < 1:
         raise ValueError("years must be at least 1")
     if 1 + inputs.wacc <= 0:
