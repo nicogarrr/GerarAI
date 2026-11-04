@@ -785,7 +785,17 @@ class StandardDCFEngine(ValuationEngine):
                 "evidence_confidence": evidence_confidence,
                 "evidence_confidence_inputs": sorted(MODEL_INPUT_METRICS & set(snapshot.facts)),
                 "fact_ids": snapshot.fact_ids(),
-                "periods": snapshot.periods(),
+                # Periodo VERDADERO de cada input: la base de ventas efectiva
+                # puede ser TTM al ultimo trimestre (revenue_base); etiquetarla
+                # con el FY ancla haria parecer anual un dato que es TTM.
+                "periods": {
+                    **snapshot.periods(),
+                    **(
+                        {"revenue": f"TTM-{revenue_base.period_end.isoformat()}"}
+                        if revenue_base.basis == "ttm" and revenue_base.period_end is not None
+                        else {}
+                    ),
+                },
                 "snapshot": snapshot_trace(snapshot),
                 "scenarios": scenario_results,
                 "weighted": weighted["trace"],

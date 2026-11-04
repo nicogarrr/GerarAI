@@ -401,7 +401,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
   const method = typeof valuation.trace?.method === 'string' ? valuation.trace.method : null;
   const periods = Object.entries(valuation.trace?.periods ?? {})
     .filter(([, value]) => value)
-    .map(([metric, period]) => `${termLabel(metric, locale)}: ${period}`)
+    .map(([metric, period]) => `${termLabel(metric, locale)}: ${financialPeriod(String(period), locale)}`)
     .join(' · ');
   // Una valoración no publicable (estado distinto de ok, p.ej. partial por
   // entradas sin trazabilidad fechada como traceable_wacc) no puede

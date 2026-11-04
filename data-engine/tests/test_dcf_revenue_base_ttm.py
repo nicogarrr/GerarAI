@@ -136,6 +136,9 @@ def test_tres_trimestres_tras_el_fy_parte_del_ttm(db):
     assert base["period_end"] == "2026-09-30"
     assert base["new_quarters_after_fy"] == 3
     assert [q["origin"] for q in base["quarters"]] == ["FY-9M", "10-Q", "10-Q", "10-Q"]
+    # El periodo que ve la ficha dice la verdad: la base de ventas es TTM,
+    # no el ejercicio ancla FY2025.
+    assert result["trace"]["periods"]["revenue"] == "TTM-2026-09-30"
 
 
 def test_el_ttm_sube_el_valor_frente_al_anual(db):
@@ -159,6 +162,8 @@ def test_un_solo_trimestre_nuevo_mantiene_el_anual(db):
     assert base["value"] == pytest.approx(FY_REVENUE)
     assert base["period_end"] == "2025-12-31"
     assert base["new_quarters_after_fy"] == 1
+    # Con base anual, el periodo de ventas sigue siendo el FY.
+    assert _value(db, company)["trace"]["periods"]["revenue"] == "2025-12-31:FY"
 
 
 def test_trimestre_previo_ausente_no_se_extrapola(db):
