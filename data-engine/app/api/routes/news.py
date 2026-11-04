@@ -347,6 +347,13 @@ def news_events(
                 # Tira de tickers relacionados (solo evidencia explicita en el
                 # texto) con ultimo cierre y variacion; ausente si no hay.
                 "related_tickers": related_by_event.get(event.id) or None,
+                # Por qué la noticia está en esta empresa cuando no cita el
+                # ticker: {ticker, tipo: «sobre»|«relacionada», via}. Ausente
+                # (None) en las vinculadas por ticker o por el feed de la empresa.
+                "vinculo": (event.metadata_ or {}).get("vinculo"),
+                # Otras empresas relacionadas (socio, competidor...) que el
+                # esquema actual no puede vincular a la vez (una por noticia).
+                "relacionadas": (event.metadata_ or {}).get("relacionadas"),
             }
         )
     return events
