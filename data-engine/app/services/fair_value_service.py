@@ -42,6 +42,7 @@ from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.i18n import current_language
 from app.core.local_date import as_date as _as_date
 from app.core.tenancy import tenant_filters
 from app.models import Company, ThesisVersion, ValuationModel, ValuationOutput
@@ -137,15 +138,24 @@ def choose(
         missing_inputs = list(engine_block.missing_inputs)
     elif engine is not None:
         # Borrador orientativo caducado (o sin fecha): no se sirve el numero.
-        age_text = (
-            f" de hace {engine_age} {'día' if engine_age == 1 else 'días'} (> {max_age_days})"
-            if engine_age is not None
-            else " sin fecha"
-        )
-        reason = (
-            f"La última valoración del motor es un borrador orientativo{age_text}: "
-            "no se sirve sin recalcular."
-        )
+        if current_language() == "en":
+            age_text = (
+                f" from {engine_age} {'day' if engine_age == 1 else 'days'} ago (> {max_age_days})"
+                if engine_age is not None else " with no date"
+            )
+            reason = (
+                f"The latest engine valuation is an indicative draft{age_text}: "
+                "it is withheld until recalculated."
+            )
+        else:
+            age_text = (
+                f" de hace {engine_age} {'día' if engine_age == 1 else 'días'} (> {max_age_days})"
+                if engine_age is not None else " sin fecha"
+            )
+            reason = (
+                f"La última valoración del motor es un borrador orientativo{age_text}: "
+                "no se sirve sin recalcular."
+            )
         missing_inputs = []
     else:
         reason = None
@@ -153,7 +163,7 @@ def choose(
     return {
         "value": None,
         "source": None,
-        "label": "Sin valor justo",
+        "label": "No fair value" if current_language() == "en" else "Sin valor justo",
         "publishable": False,
         "as_of": None,
         "thesis_version": None,
@@ -283,6 +293,27 @@ def _engine_value(payload: object) -> float | None:
     return listed_value(payload, fallback=payload)
 
 
+def _insufficient_reason(detail: str, missing: tuple[str, ...], *, as_of: date | None = None) -> str:
+    """Localize the wrapper, keeping a persisted free-text reason verbatim."""
+    english = current_language() == "en"
+    if missing:
+        detail = ("missing " if english else "faltan ") + ", ".join(missing)
+    if not detail:
+        detail = (
+            "the engine could not calculate a value with the available data"
+            if english else "el motor no pudo calcular un valor con los datos disponibles"
+        )
+    when = (
+        (" from " if english else " del ") + readable_date(as_of, "en" if english else "es")
+        if as_of else ""
+    )
+    prefix = (
+        f"The latest engine valuation{when} produced no value"
+        if english else f"La última valoración del motor{when} no dio cifra"
+    )
+    return f"{prefix}: {detail}."
+
+
 def _engine_block(model: ValuationModel) -> EngineBlock:
     """Por que la ultima corrida ``insufficient_data`` no sirvio cifra.
 
@@ -293,15 +324,10 @@ def _engine_block(model: ValuationModel) -> EngineBlock:
     trace = model.calculation_trace if isinstance(model.calculation_trace, dict) else {}
     missing = tuple(str(item) for item in trace.get("missing_inputs") or [] if item)
     detail = str(trace.get("reason") or "").strip()
-    if missing:
-        detail = "faltan " + ", ".join(missing)
-    if not detail:
-        detail = "el motor no pudo calcular un valor con los datos disponibles"
     as_of = _as_date(model.created_at)
-    when = f" del {readable_date(as_of)}" if as_of else ""
     return EngineBlock(
         kind="insufficient_data",
-        reason=f"La última valoración del motor{when} no dio cifra: {detail}.",
+        reason=_insufficient_reason(detail, missing, as_of=as_of),
         missing_inputs=missing,
         as_of=as_of,
     )
@@ -417,7 +443,7 @@ FAIR_VALUE_LIVE_CACHE_TTL_SECONDS = 15 * 60
 
 def _live_cache_key(db: Session, company: Company) -> str:
     tenant = db.info.get("tenant_id")
-    return f"fair_value_live:{tenant}:{int(company.id)}:{date.today().isoformat()}"
+    return f"fair_value_live:{tenant}:{int(company.id)}:{current_language()}:{date.today().isoformat()}"
 
 
 def resolve_fair_value_cached(
@@ -497,13 +523,9 @@ def resolve_fair_value(
                     if item
                 )
                 detail = str(trace.get("reason") or "").strip()
-                if missing:
-                    detail = "faltan " + ", ".join(missing)
-                if not detail:
-                    detail = "el motor no pudo calcular un valor con los datos disponibles"
                 block = EngineBlock(
                     kind="insufficient_data",
-                    reason=f"La última valoración del motor no dio cifra: {detail}.",
+                    reason=_insufficient_reason(detail, missing),
                     missing_inputs=missing,
                     as_of=today,
                 )
