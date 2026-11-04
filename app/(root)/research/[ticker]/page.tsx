@@ -147,7 +147,7 @@ import { findUnavailableViewFailure, viewRetryHref } from '@/lib/research/view-o
 import QuickAlertButton from '@/components/research/QuickAlertButton';
 import ThesisMemo from '@/components/research/ThesisMemo';
 import { valuationScenarioDisplay } from '@/lib/research/listed-share-values';
-import { baseAssumptionsText, blockerLabel, reverseDcfText, scenarioNotesList } from '@/lib/research/valuation-display';
+import { baseAssumptionsText, blockerLabel, reverseDcfText, scenarioNotesList, scenarioWarningLines } from '@/lib/research/valuation-display';
 import { valuationMethodView } from '@/lib/research/valuation-method';
 import { scenarioNoteText } from '@/lib/research/scenario-notes-text';
 import ThesisExportMenu from '@/components/research/ThesisExportMenu';
@@ -414,6 +414,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
   const engineNotice = typeof valuation.trace?.notice === 'string' ? valuation.trace.notice : null;
   const notPublishable = valuation.status !== 'ok' || valuation.publishable === false;
   const scenarioNotes = scenarioNotesList(valuation.scenario_notes);
+  const scenarioWarnings = scenarioWarningLines(valuation.trace, locale);
   const reverseText = reverseDcfText(valuation.reverse_dcf, locale);
   const methodView = valuationMethodView(valuation);
   const assumptionsText = baseAssumptionsText(valuation.trace, locale);
@@ -459,6 +460,11 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
             {scenarioNotes.map((note) => <li key={note}>{scenarioNoteText(note, locale)}</li>)}
           </ul>
         ) : null}
+        {scenarioWarnings.length ? (
+          <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-amber-300/80">
+            {scenarioWarnings.map((line) => <li key={line}>{line}</li>)}
+          </ul>
+        ) : null}
         {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
         {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
         <p className="text-xs leading-5 text-gray-500">
@@ -480,6 +486,11 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
       {scenarioNotes.length ? (
         <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-amber-300/80">
           {scenarioNotes.map((note) => <li key={note}>{scenarioNoteText(note, locale)}</li>)}
+        </ul>
+      ) : null}
+      {scenarioWarnings.length ? (
+        <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-amber-300/80">
+          {scenarioWarnings.map((line) => <li key={line}>{line}</li>)}
         </ul>
       ) : null}
       {methodView ? (

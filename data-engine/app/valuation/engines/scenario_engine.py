@@ -27,6 +27,12 @@ la mitad del crecimiento (al menos -3 pp) y tres cuartos del margen (al menos
 del DCF: crecimiento 45 %, margen 50 %). El WACC y la g terminal no se tocan en
 ningún escenario: los escenarios describen el negocio, no la tasa.
 
+Referencias generales en escenarios DECLARADOS (decisión de Nico, 4-nov-2026):
+crecimiento fuera de [-15 %, 45 %] o margen FCF por encima del 50 % NO se
+rechazan; el escenario corre y la traza lleva un aviso estructurado por
+supuesto fuera de referencia (``warnings`` en cada escenario), que la ficha
+muestra. El dato con fuente no se oculta ni se rechaza; se etiqueta.
+
 Respaldo (al motor que resolvería la clasificación sin esta ruta, con el
 motivo en ``trace.engine_fallback``): sin ingresos positivos
 (``scenario_requires_revenue``), sin DCF base válido, p. ej. una empresa que
@@ -67,7 +73,9 @@ PROBABILITY_TOLERANCE = 0.01
 METHODS = frozenset({"dcf", "forward_multiple"})
 FORWARD_METRICS = frozenset({"revenue", "fcf"})
 MAX_FORWARD_YEAR = 10
-# Mismos topes que el DCF estándar.
+# Referencias generales (las mismas cotas que usa el DCF estándar para sus
+# entradas). En escenarios declarados NO son rechazo: el escenario corre y el
+# supuesto fuera de referencia queda avisado en la traza y en la ficha.
 GROWTH_FLOOR, GROWTH_CEILING = -0.15, 0.45
 MARGIN_CEILING = 0.50
 # Campos que un escenario puede llevar; el WACC y la g terminal no están.
@@ -99,6 +107,7 @@ class ScenarioSpec:
     multiple: float | None = None
     year: int | None = None
     description: str = ""
+    warnings: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -142,12 +151,20 @@ def parse_scenarios(raw: Any, *, base_growth: float, base_margin: float) -> list
             raise ScenarioInputsError(f"escenario «{name}»: método «{method}» desconocido")
         growth = _finite(item.get("revenue_growth", base_growth), "revenue_growth", name)
         margin = _finite(item.get("fcf_margin", base_margin), "fcf_margin", name)
+        warnings: list[dict] = []
         if not GROWTH_FLOOR <= growth <= GROWTH_CEILING:
-            raise ScenarioInputsError(
-                f"escenario «{name}»: crecimiento {growth} fuera de [{GROWTH_FLOOR}, {GROWTH_CEILING}]"
+            warnings.append(
+                {
+                    "id": "growth_outside_reference",
+                    "value": growth,
+                    "reference_low": GROWTH_FLOOR,
+                    "reference_high": GROWTH_CEILING,
+                }
             )
         if margin > MARGIN_CEILING:
-            raise ScenarioInputsError(f"escenario «{name}»: margen {margin} por encima de {MARGIN_CEILING}")
+            warnings.append(
+                {"id": "margin_above_reference", "value": margin, "reference": MARGIN_CEILING}
+            )
         metric = multiple = year = None
         if method == "forward_multiple":
             metric = str(item.get("metric") or "").strip()
@@ -171,6 +188,7 @@ def parse_scenarios(raw: Any, *, base_growth: float, base_margin: float) -> list
                 multiple=multiple,
                 year=year,
                 description=str(item.get("description") or ""),
+                warnings=tuple(warnings),
             )
         )
     total = sum(spec.probability for spec in specs)
@@ -346,6 +364,7 @@ class ScenarioValuationEngine(ValuationEngine):
                 "definition": scenario_definition_trace(definition),
                 "value_per_share": value,
                 "trace": run_trace,
+                "warnings": [dict(w) for w in spec.warnings],
             }
             summary.append(
                 {
@@ -355,6 +374,7 @@ class ScenarioValuationEngine(ValuationEngine):
                     "value_per_share": value,
                     "assumptions": assumptions,
                     "description": spec.description,
+                    "warnings": [dict(w) for w in spec.warnings],
                 }
             )
 
