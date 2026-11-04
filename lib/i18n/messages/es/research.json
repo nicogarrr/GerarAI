@@ -1784,6 +1784,10 @@
       "calculated_metric": "calculado con insumos trazables",
       "inferred_input": "inferido, con fuentes",
       "tag_default": "tipo por defecto del modelo, sin fuente trazable"
+    },
+    "scenarioWarnings": {
+      "growthOutsideReference": "Escenario «{name}»: crecimiento de ventas {value}, fuera de la referencia general ({low} a {high}); se muestra tal cual, con su fuente.",
+      "marginAboveReference": "Escenario «{name}»: margen FCF {value}, por encima de la referencia general ({reference}); se muestra tal cual, con su fuente."
     }
   },
   "peerFormat": {
