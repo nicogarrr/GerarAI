@@ -241,5 +241,8 @@ def test_normalized_margin_does_not_turn_a_cash_burner_into_scenarios(db):
     fallback = trace["engine_fallback"]
     assert fallback["reason"] == "scenario_base_dcf_unavailable"
     assert fallback["resolved_engine"] == "pre_revenue"
-    assert "normalizado" in fallback["detail"]
+    # Con el tope de la normalización (nunca por encima del mejor margen FCF
+    # real de 5 ejercicios, aquí negativo) ya ni se normaliza: el DCF base se
+    # niega por el margen reportado negativo, que es lo que este caso protege.
+    assert "burns cash" in fallback["detail"]
     assert trace["engine"] == "pre_revenue"

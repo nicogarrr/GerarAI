@@ -137,7 +137,16 @@ def test_capex_normalization_amzn_like_history():
         (r["operating_cash_flow"] - min(abs(r["capital_expenditure"]), r["depreciation_amortization"])) / r["revenue"]
         for r in AMZN.values()
     ) / 7
-    assert result["target_margin"] == pytest.approx(expected)
+    # Tope (4-nov-2026): nunca por encima del mejor margen FCF real (flujo
+    # operativo − capex total) de los últimos 5 ejercicios.
+    best_real = max(
+        (r["operating_cash_flow"] - abs(r["capital_expenditure"])) / r["revenue"]
+        for year, r in AMZN.items()
+        if year >= 2021
+    )
+    assert best_real < expected
+    assert result["target_margin"] == pytest.approx(best_real)
+    assert result["target_margin_capped_from"] == pytest.approx(expected)
     assert result["midcycle_years"] == list(range(2025, 2018, -1))
     assert result["initial_margin"] == pytest.approx(0.010733)
     assert "capex normalizado" in result["note_es"].lower() or "Capex normalizado" in result["note_es"]
