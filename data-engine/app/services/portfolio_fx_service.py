@@ -82,7 +82,9 @@ class PortfolioFXService:
         as_of: date,
     ) -> dict | None:
         """Misma seleccion que ``rate`` (unica implementacion): ultima tasa
-        con rate_date <= as_of, directa antes que inversa, desempate por
+        con rate_date <= as_of. Entre la ultima fila directa y la ultima
+        inversa gana la de fecha mas reciente (en empate, la directa): una
+        directa vieja no tapa una inversa de ayer. Dentro de cada sentido,
         rate_date desc y created_at desc. Devuelve la tasa efectiva y su
         procedencia: rate_date y source de la fila usada y direction
         ("same", "direct" o "inverse"; en inversa rate = 1 / fila.rate)."""
@@ -111,13 +113,6 @@ class PortfolioFXService:
             .order_by(desc(FXRate.rate_date), desc(FXRate.created_at))
             .limit(1)
         )
-        if direct:
-            return {
-                "rate": direct.rate,
-                "rate_date": direct.rate_date,
-                "source": direct.source,
-                "direction": "direct",
-            }
         inverse = db.scalar(
             select(FXRate)
             .where(
@@ -128,7 +123,16 @@ class PortfolioFXService:
             .order_by(desc(FXRate.rate_date), desc(FXRate.created_at))
             .limit(1)
         )
-        if inverse and inverse.rate:
+        if not (inverse and inverse.rate):
+            inverse = None
+        if direct and not (inverse and inverse.rate_date > direct.rate_date):
+            return {
+                "rate": direct.rate,
+                "rate_date": direct.rate_date,
+                "source": direct.source,
+                "direction": "direct",
+            }
+        if inverse:
             return {
                 "rate": Decimal("1") / inverse.rate,
                 "rate_date": inverse.rate_date,
@@ -136,6 +140,38 @@ class PortfolioFXService:
                 "direction": "inverse",
             }
         return None
+
+    @staticmethod
+    def latest_point_from_table(
+        table: dict[tuple[str, str], list[tuple[date, Decimal]]],
+        *,
+        base: str,
+        quote: str,
+        as_of: date,
+    ) -> tuple[date, Decimal, bool] | None:
+        """Ultimo punto <= as_of del par (base, quote) en ``fx_table``.
+
+        Devuelve (rate_date, rate_de_la_fila, invertida). Como
+        :meth:`rate_with_provenance`: entre la ultima fila directa y la
+        ultima inversa (con tipo no nulo) gana la de fecha mas reciente, y en
+        empate la directa. ``base``/``quote`` ya normalizados (mayusculas).
+        """
+        from bisect import bisect_right
+
+        best: tuple[date, Decimal, bool] | None = None
+        for key, inverted in (((base, quote), False), ((quote, base), True)):
+            series = table.get(key)
+            if not series:
+                continue
+            idx = bisect_right(series, (as_of, Decimal("Infinity"))) - 1
+            if idx < 0:
+                continue
+            rate_date, rate = series[idx]
+            if inverted and not rate:
+                continue
+            if best is None or rate_date > best[0]:
+                best = (rate_date, rate, inverted)
+        return best
 
     def fx_table(
         self,
@@ -193,24 +229,18 @@ class PortfolioFXService:
         as_of: date,
     ) -> Decimal | None:
         """Equivalente puro en memoria de :meth:`rate` sobre ``fx_table``."""
-        from bisect import bisect_right
-
         quote, quote_divisor = normalize_currency(quote_currency)
         base, base_divisor = normalize_currency(base_currency)
         factor = Decimal(base_divisor) / Decimal(quote_divisor)
         if quote == base:
             return factor
-        series = table.get((base, quote))
-        if series:
-            idx = bisect_right(series, (as_of, Decimal("Infinity"))) - 1
-            if idx >= 0:
-                return series[idx][1] * factor
-        inverse = table.get((quote, base))
-        if inverse:
-            idx = bisect_right(inverse, (as_of, Decimal("Infinity"))) - 1
-            if idx >= 0 and inverse[idx][1]:
-                return factor / inverse[idx][1]
-        return None
+        point = PortfolioFXService.latest_point_from_table(
+            table, base=base or "", quote=quote or "", as_of=as_of
+        )
+        if point is None:
+            return None
+        _rate_date, rate, inverted = point
+        return factor / rate if inverted else rate * factor
 
     def rates_for(
         self,

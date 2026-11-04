@@ -161,6 +161,8 @@ def _rate_not_older_than(
 
     Devuelve el último tipo publicado en o antes de ``as_of`` solo si tiene
     como mucho ``max_age_days`` días; si no, ``None`` (importe desconocido).
+    Entre directo e inverso válidos gana el de fecha más reciente (en empate,
+    el directo), igual que ``rate_from_table``.
     """
     from bisect import bisect_right
 
@@ -169,6 +171,7 @@ def _rate_not_older_than(
     factor = Decimal(base_divisor) / Decimal(quote_divisor)
     if quote == base:
         return factor
+    best: tuple[date, Decimal, bool] | None = None
     for key, invert in (((base, quote), False), ((quote, base), True)):
         series = table.get(key)
         if not series:
@@ -179,8 +182,12 @@ def _rate_not_older_than(
         rate_date, rate = series[idx]
         if (as_of - rate_date).days > max_age_days or not rate:
             continue
-        return factor / rate if invert else rate * factor
-    return None
+        if best is None or rate_date > best[0]:
+            best = (rate_date, rate, invert)
+    if best is None:
+        return None
+    _rate_date, rate, invert = best
+    return factor / rate if invert else rate * factor
 
 
 def _defer_base(lot: dict, take: Decimal, sale: dict) -> None:

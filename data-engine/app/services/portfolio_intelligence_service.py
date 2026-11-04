@@ -185,23 +185,17 @@ def _fx_rate_with_date(
     inversa) pero devolviendo la fecha del dato usado, imprescindible para
     no comparar un spot historico contra un corte posterior.
     """
-    from bisect import bisect_right
-
     quote = quote_currency.upper()
     base = base_currency.upper()
     if quote == base:
         return (as_of, Decimal("1"))
-    series = fx_table.get((base, quote))
-    if series:
-        idx = bisect_right(series, (as_of, Decimal("Infinity"))) - 1
-        if idx >= 0:
-            return series[idx]
-    inverse = fx_table.get((quote, base))
-    if inverse:
-        idx = bisect_right(inverse, (as_of, Decimal("Infinity"))) - 1
-        if idx >= 0 and inverse[idx][1]:
-            return (inverse[idx][0], Decimal("1") / inverse[idx][1])
-    return None
+    point = PortfolioFXService.latest_point_from_table(
+        fx_table, base=base, quote=quote, as_of=as_of
+    )
+    if point is None:
+        return None
+    rate_date, rate, inverted = point
+    return (rate_date, Decimal("1") / rate) if inverted else (rate_date, rate)
 
 
 
