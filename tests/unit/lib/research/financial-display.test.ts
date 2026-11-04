@@ -11,6 +11,8 @@ describe('financialPeriod', () => {
         expect(financialPeriod('FY2025')).toBe('Ejercicio 2025');
         expect(financialPeriod('Q3 2025')).toBe('T3 2025');
         expect(financialPeriod('2026-03-31:TTM')).toBe('2026-03-31:TTM');
+        expect(financialPeriod('TTM-2026-09-30')).toBe('TTM al 30/09/2026');
+        expect(financialPeriod('TTM-2026-09-30', 'en')).toBe('TTM ended 2026-09-30');
     });
 });
 
