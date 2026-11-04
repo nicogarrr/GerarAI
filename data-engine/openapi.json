@@ -6734,6 +6734,56 @@
         "title": "EventHistoryItemOut",
         "type": "object"
       },
+      "ExitMultipleContrast": {
+        "properties": {
+          "gordon_value_per_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gordon Value Per Share"
+          },
+          "implied_multiple_for_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implied Multiple For Price"
+          },
+          "metric": {
+            "const": "terminal_year_fcf",
+            "default": "terminal_year_fcf",
+            "title": "Metric",
+            "type": "string"
+          },
+          "multiple": {
+            "default": 25.0,
+            "title": "Multiple",
+            "type": "number"
+          },
+          "value_per_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Per Share"
+          }
+        },
+        "title": "ExitMultipleContrast",
+        "type": "object"
+      },
       "ExpertThesisClaimOut": {
         "properties": {
           "refs": {
@@ -8898,6 +8948,110 @@
           "image_base64"
         ],
         "title": "ImageInput",
+        "type": "object"
+      },
+      "ImpliedGrowth": {
+        "description": "Crecimiento de la etapa 1 que justifica el precio (DCF inverso del motor).",
+        "properties": {
+          "current_revenue_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Revenue Growth"
+          },
+          "method": {
+            "default": "reverse_dcf_stage1_growth",
+            "title": "Method",
+            "type": "string"
+          },
+          "required_revenue_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Revenue Growth"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ImpliedGrowth",
+        "type": "object"
+      },
+      "ImpliedWacc": {
+        "properties": {
+          "bounds": {
+            "default": [],
+            "items": {
+              "type": "number"
+            },
+            "title": "Bounds",
+            "type": "array"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "enum": [
+                  "below_min",
+                  "above_max"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "out_of_range",
+              "not_available"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "target_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Price"
+          },
+          "wacc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wacc"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ImpliedWacc",
         "type": "object"
       },
       "InferredInputCreate": {
@@ -23850,6 +24004,184 @@
           "earnings_status"
         ],
         "title": "WatchlistMonitorOut",
+        "type": "object"
+      },
+      "WhatToBelieve": {
+        "properties": {
+          "base_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Value"
+          },
+          "consensus_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consensus Price"
+          },
+          "consensus_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consensus Source"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "current_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Price"
+          },
+          "engine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine"
+          },
+          "exit_multiple": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExitMultipleContrast"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "implied_growth": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImpliedGrowth"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "implied_wacc_consensus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImpliedWacc"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "implied_wacc_price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImpliedWacc"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "engine_not_dcf",
+                  "no_base_value",
+                  "no_price",
+                  "valuation_unavailable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "not_applicable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "terminal_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminal Growth"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "wacc_used": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wacc Used"
+          }
+        },
+        "required": [
+          "ticker",
+          "status"
+        ],
+        "title": "WhatToBelieve",
         "type": "object"
       },
       "WorkProductRequest": {
@@ -99196,6 +99528,209 @@
           }
         },
         "summary": "Historical Valuation",
+        "tags": [
+          "valuation"
+        ]
+      }
+    },
+    "/api/valuation/{ticker}/what-to-believe": {
+      "get": {
+        "description": "\u00abQu\u00e9 hace falta creer\u00bb para justificar el precio con el DCF de la empresa.\n\nSolo lee: la valoraci\u00f3n vigente (misma que /api/valuation/{ticker}, con su\nWACC tal y como lo resolvi\u00f3 el motor), el WACC impl\u00edcito al precio y al\nconsenso simple de analistas (si est\u00e1 en la misma divisa), el crecimiento\ndel DCF inverso del motor y el contraste con un m\u00faltiplo de salida. Los\nm\u00e9todos que no son un DCF FCFF responden \u00abno aplica\u00bb con el motivo.",
+        "operationId": "what_to_believe_api_valuation__ticker__what_to_believe_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatToBelieve"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "What To Believe",
         "tags": [
           "valuation"
         ]
