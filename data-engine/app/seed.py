@@ -3,6 +3,7 @@ from sqlalchemy import select
 from app.core.database import SessionLocal, init_db
 from app.data.company_master import COMPANY_MASTER
 from app.models import Company
+from app.services.company_types import POSITION_COMPANY_TYPES
 
 
 def upsert_company(db, payload: dict) -> Company:
@@ -38,10 +39,15 @@ TAXONOMY_FIELDS = (
 )
 
 # Filas placeholder con identidad sin verificar: las crea el buscador/ensure
-# (research_candidate) o la importacion IBKR (imported_holding). Ambas son
-# placeholders del mismo tipo: el maestro verificado manda sobre ellas.
+# (research_candidate), la importacion IBKR (imported_holding) o las altas de
+# cartera antiguas (portfolio_holding). Todas son placeholders del mismo tipo:
+# el maestro verificado manda sobre ellas. Los tipos de «posicion en cartera»
+# salen de company_types.POSITION_COMPANY_TYPES (sin lista paralela): en prod
+# BN, BABA, HYMC y KRKNF seguian como portfolio_holding/unassigned y nunca
+# recibian su taxonomia (BN sin asset_manager_holding, HYMC sin commodity).
 STUB_COMPANY_PAIRS = frozenset(
-    {(STUB_TYPE, STUB_MODEL), ("imported_holding", STUB_MODEL)}
+    {(STUB_TYPE, STUB_MODEL)}
+    | {(company_type, STUB_MODEL) for company_type in POSITION_COMPANY_TYPES}
 )
 # Identidad que el maestro tiene verificada y el stub deja en placeholder
 # (p.ej. KRKNF en prod: sector "Unknown" -> framework/equivalencias mal
