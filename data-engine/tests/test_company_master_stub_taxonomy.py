@@ -129,3 +129,36 @@ def test_real_identity_fields_are_not_overwritten():
     assert company.company_type == "defense_contract_backlog"
     assert company.sector == "Industrials"
     assert company.exchange == "OTC"  # placeholder "UNKNOWN" -> maestro
+
+
+def test_portfolio_holding_stub_gets_master_taxonomy():
+    """BN, BABA, HYMC y KRKNF en prod (4-nov-2026): fichas de posición
+    heredadas como portfolio_holding/unassigned. Es el mismo placeholder que
+    imported_holding (company_types.POSITION_COMPANY_TYPES), pero el maestro no
+    lo reconocía como stub y BN se quedaba sin asset_manager_holding para
+    siempre. El maestro verificado manda sobre cualquier placeholder de posición."""
+    db = _db()
+    db.add(_stub("BN", company_type="portfolio_holding", industry="Financial Services"))
+    db.add(_stub("HYMC", company_type="portfolio_holding"))
+    db.commit()
+    assert sorted(apply_master_taxonomy_to_stubs(db)) == ["BN", "HYMC"]
+    db.commit()
+    bn = db.query(Company).filter_by(ticker="BN").one()
+    assert bn.company_type == "asset_manager_holding"
+    assert bn.valuation_model == "sotp+asset_management_multiple"
+    # Un dato real de otra fuente no se pisa: solo los placeholders.
+    assert bn.industry == "Financial Services"
+    hymc = db.query(Company).filter_by(ticker="HYMC").one()
+    assert hymc.company_type == "mining_pre_revenue"
+    assert resolve_engine_key(hymc) == "commodity"
+
+
+def test_every_position_company_type_is_a_master_stub():
+    """Cualquier tipo de «posición en cartera» con modelo sin asignar es un
+    placeholder: si mañana se añade otro a POSITION_COMPANY_TYPES, el maestro
+    también lo completa (sin lista paralela que olvidar)."""
+    from app.seed import STUB_COMPANY_PAIRS, STUB_MODEL
+    from app.services.company_types import POSITION_COMPANY_TYPES
+
+    for company_type in POSITION_COMPANY_TYPES:
+        assert (company_type, STUB_MODEL) in STUB_COMPANY_PAIRS
