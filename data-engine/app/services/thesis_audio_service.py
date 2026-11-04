@@ -84,23 +84,35 @@ def memo_to_speech_text(markdown: str, *, ticker: str, version: int) -> str:
 _FORMAT = "f3"  # subir al cambiar memo_to_speech_text para invalidar la cache
 
 
+# Limite de longitud de clave del sidecar TTS (tts_sidecar/server.py KEY_RE).
+KEY_MAX_LEN = 80
+
+
 def audio_key(
     ticker: str,
     version: int,
     speech_text: str = "",
     *,
+    tenant_id: int | None,
     draft: bool = False,
     data_day: str = "nd",
 ) -> str:
-    """Clave estable: ticker + version + estado + dia del ultimo dato + formato.
+    """Clave estable: ticker + version + estado + dia del ultimo dato + formato + tenant.
 
     No depende del texto (el memo lleva datos vivos y su hash cambiaba entre
     llamadas). ``data_day`` (YYYYMMDD) cambia solo cuando llegan datos de otro
     dia, asi que el audio no queda con cifras viejas indefinidamente.
+
+    ``tenant_id`` es obligatorio: las tesis son de cada tenant y cada uno
+    numera sus versiones desde 1, asi que sin el tenant dos usuarios con la v1
+    del mismo ticker compartian clave y el segundo recibia el mp3 locutado con
+    la tesis del primero. ``None`` (sesion sin tenant, solo dev/test) es su
+    propio espacio, nunca el de un tenant real.
     """
     safe = re.sub(r"[^A-Za-z0-9]", "", ticker.upper())[:20] or "X"
     day = re.sub(r"[^0-9a-z]", "", str(data_day).lower())[:8] or "nd"
-    return f"{safe}-v{int(version)}-{'d' if draft else 'p'}-{day}-{_FORMAT}"
+    owner = f"t{int(tenant_id)}" if tenant_id is not None else "tnone"
+    return f"{safe}-v{int(version)}-{'d' if draft else 'p'}-{day}-{_FORMAT}-{owner}"
 
 
 def data_day(latest_data_at) -> str:
