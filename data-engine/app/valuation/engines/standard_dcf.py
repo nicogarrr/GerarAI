@@ -694,6 +694,20 @@ class StandardDCFEngine(ValuationEngine):
                 "model_version": MODEL_VERSION,
                 "revenue_base": revenue_base.trace(),
                 "growth_source": growth_source,
+                "growth_semantics": {
+                    "observed_latest_revenue_growth": growth_fact,
+                    "historical_revenue_cagr": (projection["info"] or {}).get("revenue_cagr_3y"),
+                    "applied_stage1_revenue_growth": growth,
+                    "applied_growth_basis": (
+                        "cyclical_flat_terminal" if cyclical_applied else
+                        (projection["info"] or {}).get("stage1_growth_basis", growth_source)
+                    ),
+                    "applied_growth_path": scenario_results["base"]["trace"]["inputs"].get("growth_path"),
+                    "market_implied_revenue_growth": reverse.get("required_revenue_growth"),
+                    "market_implied_method": (reverse.get("trace") or {}).get("method"),
+                    "market_implied_is_forecast": False,
+                    "same_projection_as_base": True,
+                },
                 **({"cyclical_midcycle": cyclical} if cyclical else {}),
                 "growth_clamped_from": raw_growth if growth_after_clamp != raw_growth else None,
                 "fcf_margin_source": "financial_facts",

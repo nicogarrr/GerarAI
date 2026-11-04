@@ -320,3 +320,19 @@ def test_valuation_api_schema_keeps_labels():
     assert out["fair_value_range"]["high"] == 315.5
     assert out["reverse_dcf"]["explanation_es"].startswith("El precio")
     assert ValuationResponse(ticker="X", model_type="dcf").model_dump()["valuation_label"] is None
+
+
+def test_growth_semantics_separates_observed_applied_and_market_implied(db):
+    company = _seed(db, "GROWTHX", PLTR, shares=2_565.2 * M, net_debt=-6_000 * M,
+                    price=178.34, wacc=0.1204)
+    engine = StandardDCFEngine()
+    result = engine.value(engine.build_context(db, company, 178.34))
+    semantics = result["trace"]["growth_semantics"]
+    applied = result["trace"]["scenarios"]["base"]["trace"]["inputs"]
+    assert semantics["applied_stage1_revenue_growth"] == applied["growth_path"][0]
+    assert semantics["applied_growth_path"] == applied["growth_path"]
+    assert semantics["applied_growth_basis"] == "revenue_cagr_3y"
+    assert semantics["historical_revenue_cagr"]["value"] == applied["growth_path"][0]
+    assert semantics["market_implied_revenue_growth"] == result["reverse_dcf"]["required_revenue_growth"]
+    assert semantics["market_implied_is_forecast"] is False
+    assert semantics["observed_latest_revenue_growth"] != semantics["market_implied_revenue_growth"]
