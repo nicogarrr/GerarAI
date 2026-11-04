@@ -323,6 +323,33 @@ def resolve_fx(
     return None
 
 
+def _price_es(value: float) -> str:
+    """Precio con dos decimales en formato español (1.234,56), como el texto del DCF inverso."""
+    return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _rescale_reverse_explanation(reverse: dict, old_price: object, new_price: object) -> None:
+    """El texto del DCF inverso cita el precio con el que se resolvió.
+
+    El motor lo resuelve con el precio traducido a la divisa de las cuentas;
+    tras reescalar ``market_price`` a la divisa del listado, el texto
+    («El precio de X descuenta…», «…justifica el precio de X.») tiene que citar
+    ese mismo precio y no el traducido. Solo cambia la cifra del precio: las
+    tasas del texto (crecimiento, margen, WACC) no dependen de la divisa.
+    """
+    text = reverse.get("explanation_es")
+    if not isinstance(text, str) or not text:
+        return
+    if isinstance(old_price, bool) or isinstance(new_price, bool):
+        return
+    if not isinstance(old_price, (int, float)) or not isinstance(new_price, (int, float)):
+        return
+    before, after = _price_es(old_price), _price_es(new_price)
+    if before == after:
+        return
+    reverse["explanation_es"] = text.replace(f"precio de {before}", f"precio de {after}")
+
+
 # Campos por accion del resultado de un motor, en la divisa del motor.
 _PER_SHARE_FIELDS = ("bear_value", "base_value", "bull_value", "expected_value")
 
@@ -355,9 +382,11 @@ def scale_per_share_outputs(result: dict, factor: float) -> None:
                     cell["value_per_share"] = scaled(cell["value_per_share"])
     reverse = result.get("reverse_dcf")
     if isinstance(reverse, dict):
+        engine_price = reverse.get("market_price")
         for key in ("market_price", "solved_value_per_share"):
             if key in reverse:
                 reverse[key] = scaled(reverse[key])
+        _rescale_reverse_explanation(reverse, engine_price, reverse.get("market_price"))
     scenarios = result.get("scenarios")
     if isinstance(scenarios, dict):
         for data in scenarios.values():
