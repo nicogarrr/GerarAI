@@ -255,8 +255,12 @@ def latest_inputs_provenance(
         value = used.get("value")
         base = used.get("base_inferencia")
         urls = list(used.get("urls_inferencia") or [])
-        if validate_inferred(key, value, base, urls):
-            continue
+        # Re-validacion contra las reglas ACTUALES: un input que la valoracion
+        # consumio siendo valido puede dejar de serlo (p. ej. rango endurecido
+        # despues). Antes se omitia en silencio y el registro «esta tesis
+        # consumio X» desaparecia; ahora se conserva marcado
+        # «consumido (hoy no valido)»: el historico no se falsea.
+        hoy_no_valido = bool(validate_inferred(key, value, base, urls))
         classified.append(
             {
                 "key": f"{key}_usado_en_valoracion",
@@ -274,6 +278,7 @@ def latest_inputs_provenance(
                 "urls_inferencia": urls,
                 "base_documentada": True,
                 "inferred_input_id": used.get("inferred_input_id"),
+                "validez": "consumido_hoy_no_valido" if hoy_no_valido else "vigente",
             }
         )
     return classified
@@ -2081,8 +2086,13 @@ class ThesisService:
             ids = ", ".join(str(f) for f in facts)
             citation = (f"{len(facts)} hecho citado ({ids})" if len(facts) == 1 else f"{len(facts)} hechos citados ({ids})") if facts else "-"
             method = (item.get("method") or "-").replace("|", "/")
+            label = str(item.get("label"))
+            if item.get("validez") == "consumido_hoy_no_valido":
+                # La valoracion lo consumio siendo valido; las reglas actuales
+                # ya no lo aceptarian. Se declara, no se oculta.
+                label = f"{label} (consumido, hoy no válido)"
             lines.append(
-                f"| {term_es(item.get('key'))} | {item.get('label')} | {value_txt} | {method} | {citation} |"
+                f"| {term_es(item.get('key'))} | {label} | {value_txt} | {method} | {citation} |"
             )
         return "\n".join(lines)
 
