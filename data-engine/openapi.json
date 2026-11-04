@@ -397,6 +397,164 @@
         "title": "AnalystConsensus",
         "type": "object"
       },
+      "AnalystHistory": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "best_horizon": {
+            "anyOf": [
+              {
+                "enum": [
+                  "6m",
+                  "12m"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Horizon"
+          },
+          "consensus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SimpleConsensus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "fetched_at": {
+            "title": "Fetched At",
+            "type": "integer"
+          },
+          "first_target_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Target Date"
+          },
+          "horizons": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/HorizonSummary"
+            },
+            "title": "Horizons",
+            "type": "array"
+          },
+          "min_samples": {
+            "default": 5,
+            "title": "Min Samples",
+            "type": "integer"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "note_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "fetch_failed",
+                  "not_equity",
+                  "no_history",
+                  "no_matured"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note Code"
+          },
+          "rating_changes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RatingChanges"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "default": "Yahoo Finance (no oficial): hist\u00f3rico de recomendaciones y cierres diarios",
+            "title": "Source",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "status": {
+            "default": "unavailable",
+            "enum": [
+              "available",
+              "empty",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "targets_total": {
+            "default": 0,
+            "title": "Targets Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "symbol",
+          "fetched_at"
+        ],
+        "title": "AnalystHistory",
+        "type": "object"
+      },
       "AnalystTargetRow": {
         "properties": {
           "action": {
@@ -7415,6 +7573,70 @@
         "title": "FinancialRefreshResponse",
         "type": "object"
       },
+      "FirmScore": {
+        "properties": {
+          "direction_hit_rate": {
+            "title": "Direction Hit Rate",
+            "type": "number"
+          },
+          "firm": {
+            "title": "Firm",
+            "type": "string"
+          },
+          "last_date": {
+            "title": "Last Date",
+            "type": "string"
+          },
+          "last_target": {
+            "title": "Last Target",
+            "type": "number"
+          },
+          "median_abs_error_pct": {
+            "title": "Median Abs Error Pct",
+            "type": "number"
+          },
+          "median_bias_pct": {
+            "title": "Median Bias Pct",
+            "type": "number"
+          },
+          "peer_scored_samples": {
+            "default": 0,
+            "title": "Peer Scored Samples",
+            "type": "integer"
+          },
+          "relative_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relative Error"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "small_sample": {
+            "default": false,
+            "title": "Small Sample",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "firm",
+          "samples",
+          "median_abs_error_pct",
+          "median_bias_pct",
+          "direction_hit_rate",
+          "last_date",
+          "last_target"
+        ],
+        "title": "FirmScore",
+        "type": "object"
+      },
       "FlowDestinationOut": {
         "properties": {
           "amount": {
@@ -8350,6 +8572,92 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HorizonSummary": {
+        "properties": {
+          "bottom": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/FirmScore"
+            },
+            "title": "Bottom",
+            "type": "array"
+          },
+          "direction_hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction Hit Rate"
+          },
+          "horizon": {
+            "enum": [
+              "6m",
+              "12m"
+            ],
+            "title": "Horizon",
+            "type": "string"
+          },
+          "matured_targets": {
+            "title": "Matured Targets",
+            "type": "integer"
+          },
+          "median_abs_error_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Abs Error Pct"
+          },
+          "median_bias_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Bias Pct"
+          },
+          "months": {
+            "title": "Months",
+            "type": "integer"
+          },
+          "ranked_firms": {
+            "default": 0,
+            "title": "Ranked Firms",
+            "type": "integer"
+          },
+          "small_sample_firms": {
+            "default": 0,
+            "title": "Small Sample Firms",
+            "type": "integer"
+          },
+          "top": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/FirmScore"
+            },
+            "title": "Top",
+            "type": "array"
+          }
+        },
+        "required": [
+          "horizon",
+          "months",
+          "matured_targets"
+        ],
+        "title": "HorizonSummary",
         "type": "object"
       },
       "IBKRConnectRequest": {
@@ -17397,6 +17705,27 @@
         "title": "Range52w",
         "type": "object"
       },
+      "RatingChanges": {
+        "properties": {
+          "downgrades": {
+            "default": 0,
+            "title": "Downgrades",
+            "type": "integer"
+          },
+          "upgrades": {
+            "default": 0,
+            "title": "Upgrades",
+            "type": "integer"
+          },
+          "window_days": {
+            "default": 90,
+            "title": "Window Days",
+            "type": "integer"
+          }
+        },
+        "title": "RatingChanges",
+        "type": "object"
+      },
       "RefreshMarketStageOut": {
         "properties": {
           "alert_rules": {
@@ -19548,6 +19877,57 @@
           "created_at"
         ],
         "title": "ScreenerSavedScreenOut",
+        "type": "object"
+      },
+      "SimpleConsensus": {
+        "properties": {
+          "firms": {
+            "title": "Firms",
+            "type": "integer"
+          },
+          "mean": {
+            "title": "Mean",
+            "type": "number"
+          },
+          "median": {
+            "title": "Median",
+            "type": "number"
+          },
+          "method": {
+            "const": "simple_mean",
+            "default": "simple_mean",
+            "title": "Method",
+            "type": "string"
+          },
+          "reference_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Price"
+          },
+          "upside_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upside Percent"
+          }
+        },
+        "required": [
+          "mean",
+          "median",
+          "firms"
+        ],
+        "title": "SimpleConsensus",
         "type": "object"
       },
       "SnapshotCountsOut": {
@@ -34377,6 +34757,209 @@
           }
         },
         "summary": "Get Company",
+        "tags": [
+          "companies"
+        ]
+      }
+    },
+    "/api/companies/{ticker}/analyst-history": {
+      "get": {
+        "description": "How each analyst firm's past price targets fared for this ticker (Yahoo\nFinance via yfinance, free and unofficial): matured 6- and 12-month\ntargets vs the realized close, absolute and peer-relative error,\ndirection hit rate, Bayesian shrinkage and a minimum sample to rank.\nThe consensus is the SIMPLE mean of live targets. Public market data\nonly: no tenant data is read or returned here. No coverage -> status\n`empty` with its reason; a source failure -> `unavailable`.",
+        "operationId": "company_analyst_history_api_companies__ticker__analyst_history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalystHistory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Company Analyst History",
         "tags": [
           "companies"
         ]

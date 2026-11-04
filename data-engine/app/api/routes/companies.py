@@ -44,6 +44,7 @@ from app.schemas import (
 from app.schemas.api import not_blank
 from app.schemas.ttm import CompanyTtmOut
 from app.services import market_change
+from app.services.analyst_history_service import AnalystHistory, analyst_history_service
 from app.services.analyst_targets_service import AnalystTargets, analyst_targets_service
 from app.services.async_bridge import run_from_any_context
 from app.services.company_changes_service import changes_since
@@ -132,6 +133,18 @@ async def company_analyst_targets(ticker: str) -> AnalystTargets:
             ),
         }
     )
+
+
+@router.get("/{ticker}/analyst-history", response_model=AnalystHistory)
+async def company_analyst_history(ticker: str) -> AnalystHistory:
+    """How each analyst firm's past price targets fared for this ticker (Yahoo
+    Finance via yfinance, free and unofficial): matured 6- and 12-month
+    targets vs the realized close, absolute and peer-relative error,
+    direction hit rate, Bayesian shrinkage and a minimum sample to rank.
+    The consensus is the SIMPLE mean of live targets. Public market data
+    only: no tenant data is read or returned here. No coverage -> status
+    `empty` with its reason; a source failure -> `unavailable`."""
+    return await analyst_history_service.get(ticker)
 
 
 @router.get("/{ticker}/key-stats", response_model=KeyStats)
