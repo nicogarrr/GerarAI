@@ -92,7 +92,7 @@ def test_no_future_unknown_filing_currency_or_listing_mix(engine, monkeypatch, f
 def test_only_new_public_tables_in_upgrade_and_default_off():
     from app.core.config import Settings
     assert Settings.model_fields['public_market_data_enabled'].default is False
-    path = Path(__file__).parents[1] / 'alembic/versions/0127_public_market_data.py'
+    path = Path(__file__).parents[1] / 'alembic/versions/0128_public_market_data.py'
     spec = importlib.util.spec_from_file_location('public_migration', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

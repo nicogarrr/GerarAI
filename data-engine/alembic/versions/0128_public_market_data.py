@@ -3,8 +3,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = '0127_public_market_data'
-down_revision = '0126_email_user_prefs'
+revision = '0128_public_market_data'
+down_revision = '0127_declared_input_values'
 branch_labels = None
 depends_on = None
 

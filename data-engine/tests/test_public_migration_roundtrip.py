@@ -8,7 +8,7 @@ from sqlalchemy import MetaData, Table, create_engine, func, inspect, select, te
 
 
 def test_upgrade_and_downgrade_touch_only_new_public_tables():
-    path = Path(__file__).parents[1] / 'alembic/versions/0127_public_market_data.py'
+    path = Path(__file__).parents[1] / 'alembic/versions/0128_public_market_data.py'
     spec = importlib.util.spec_from_file_location('public_migration_actual', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -30,3 +30,14 @@ def test_upgrade_and_downgrade_touch_only_new_public_tables():
         assert set(inspect(conn).get_table_names()) == {'companies', 'financial_facts'}
         assert conn.execute(text('SELECT * FROM financial_facts')).all() == [(1, 2, 'private unchanged')]
     engine.dispose()
+
+
+def test_public_revision_extends_declared_inputs_and_is_the_only_head():
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    root = Path(__file__).parents[1]
+    config = Config(str(root / 'alembic.ini'))
+    config.set_main_option('script_location', str(root / 'alembic'))
+    scripts = ScriptDirectory.from_config(config)
+    assert scripts.get_heads() == ['0128_public_market_data']
+    assert scripts.get_revision('0128_public_market_data').down_revision == '0127_declared_input_values'
