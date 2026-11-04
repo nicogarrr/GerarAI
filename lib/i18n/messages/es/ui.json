@@ -58,7 +58,27 @@
     "firmsOther": "{n} firmas con objetivo en 12 meses",
     "firmsNone": "solo consenso agregado, sin detalle por firma",
     "convertedFrom": "(convertido de {currency})",
-    "notOfficial": "Fuente no oficial"
+    "notOfficial": "Fuente no oficial",
+    "notes": {
+      "fetchFailed": "No se pudo consultar el consenso ahora; reintenta en unos minutos.",
+      "notEquity": "El valor {symbol} está identificado como {instrument}, no como una acción, así que no hay precios objetivo de analistas que mostrar para una empresa con este ticker.",
+      "consensusOnly": "Solo hay consenso agregado, sin detalle por firma.",
+      "noTargets": "No hay precios objetivo por analista para este valor."
+    },
+    "instrument": {
+      "ETF": "un ETF",
+      "MUTUALFUND": "un fondo",
+      "INDEX": "un índice",
+      "CURRENCY": "una divisa",
+      "CRYPTOCURRENCY": "una criptomoneda",
+      "FUTURE": "un futuro",
+      "OPTION": "una opción",
+      "other": "un instrumento de tipo {type}",
+      "unknown": "un instrumento que no es una acción"
+    },
+    "referencePriceSource": {
+      "marketAtFetch": "fuente de mercado, precio al obtener los datos"
+    }
   },
   "system": {
     "badge": "Motor de análisis desconectado",

@@ -58,9 +58,17 @@ class AnalystTargets(BaseModel):
     currency: str | None = None
     reference_price: float | None = None
     reference_price_source: str | None = None
+    # Codigos estables de los textos de arriba: el front los traduce con sus
+    # diccionarios (es/en). `note` y `reference_price_source` siguen en
+    # castellano por compatibilidad; con la app en ingles se pintaban tal cual.
+    reference_price_source_code: Literal["market_at_fetch"] | None = None
     consensus: AnalystConsensus | None = None
     rows: list[AnalystTargetRow] = []
     note: str | None = None
+    note_code: Literal["fetch_failed", "not_equity", "consensus_only", "no_targets"] | None = None
+    # Tipo de instrumento que declara Yahoo (ETF, MUTUALFUND...) cuando no es
+    # una accion; acompana a note_code="not_equity" para traducir la nota.
+    instrument_type: str | None = None
 
 
 # Subunidades que Yahoo distingue solo por mayusculas/minusculas.
@@ -316,6 +324,7 @@ class AnalystTargetsService:
                 symbol=key,
                 fetched_at=fetched_at,
                 note="No se pudo consultar el consenso ahora; reintenta en unos minutos.",
+                note_code="fetch_failed",
             )
         # Guard de identidad: si Yahoo dice que el ticker NO es una accion
         # (ETF, fondo, indice...), sus "objetivos de analistas" pertenecen a
@@ -334,6 +343,8 @@ class AnalystTargetsService:
                     "acción, así que no hay precios objetivo de analistas que "
                     "mostrar para una empresa con este ticker."
                 ),
+                note_code="not_equity",
+                instrument_type=(data.get("quote_type") or "").strip().upper() or None,
             )
             self._cache[key] = (now, result)
             return result
@@ -359,12 +370,13 @@ class AnalystTargetsService:
         )
         # Disponible tambien con SOLO consenso agregado (sin detalle por firma,
         # p.ej. PNG.V): el consenso es dato real y se etiqueta como agregado.
+        note_code: Literal["consensus_only", "no_targets"] | None
         if rows:
-            note = None
+            note, note_code = None, None
         elif has_consensus:
-            note = "Solo hay consenso agregado, sin detalle por firma."
+            note, note_code = "Solo hay consenso agregado, sin detalle por firma.", "consensus_only"
         else:
-            note = "No hay precios objetivo por analista para este valor."
+            note, note_code = "No hay precios objetivo por analista para este valor.", "no_targets"
         result = AnalystTargets(
             symbol=key,
             status="available" if rows or has_consensus else "empty",
@@ -373,9 +385,11 @@ class AnalystTargetsService:
             currency=data.get("currency"),
             reference_price=reference,
             reference_price_source="fuente de mercado, precio al obtener los datos" if reference else None,
+            reference_price_source_code="market_at_fetch" if reference else None,
             consensus=consensus if has_consensus else None,
             rows=rows,
             note=note,
+            note_code=note_code,
         )
         self._cache[key] = (now, result)
         return result

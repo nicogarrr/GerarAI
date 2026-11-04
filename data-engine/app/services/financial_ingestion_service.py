@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
 from app.models import Company, Document, FinancialFact, FinancialStatement, MarketPrice
+from app.services.company_identity_verification import sec_identity_mismatch
 from app.services.connectors import esef as esef_connector
 from app.services.connectors import fred as fred_connector
 from app.services.connectors import sec_edgar as sec_edgar_connector
@@ -1615,6 +1616,25 @@ class FinancialIngestionService:
                     "otro emisor (fail closed)"
                 )
 
+        # Mismo ticker, otro emisor: fuera de EE. UU. el símbolo de EDGAR no
+        # identifica a nadie (PRIM en BME y Perimeter Solutions en NYSE son
+        # ambos «PRM»; sus 10-K acabaron en la ficha de PRIM y el DCF dio 198 €
+        # con la acción a 12,30). Con listado extranjero la razón social de la
+        # SEC tiene que casar con la de la ficha. Fail closed, y lo que un
+        # refresco anterior atribuyó al homónimo (hechos de ESTE documento SEC
+        # y el CIK de la ficha) se retira: nunca fue del emisor.
+        identity_problem = sec_identity_mismatch(
+            company_name=getattr(company, "name", None),
+            exchange=getattr(company, "exchange", None),
+            sec_entity_name=str(facts_data.get("entityName") or ""),
+        )
+        if identity_problem:
+            self._retire_foreign_sec_data(db, company, ticker, resolved_cik)
+            raise RuntimeError(
+                f"SEC para {ticker}: {identity_problem}; no se atribuyen sus "
+                "hechos (usa la fuente de su mercado local, p. ej. ESEF)"
+            )
+
         us_gaap = facts_data.get("facts", {}).get("us-gaap", {})
         # 40-F/20-F en IFRS (BN): sin us-gaap, la misma lectura va sobre
         # ifrs-full con su mapa de conceptos; el resto de reglas no cambia.
@@ -2906,6 +2926,37 @@ class FinancialIngestionService:
                 derived += 1
         db.flush()
         return derived
+
+    def _retire_foreign_sec_data(
+        self, db: Session, company: Company, ticker: str, foreign_cik: str
+    ) -> None:
+        """Retira lo que la ingesta SEC atribuyó a la ficha desde OTRO emisor.
+
+        Solo los hechos del documento SEC de esta ficha en el tenant actual
+        (los de otras fuentes, documentos o tenants no se tocan; las
+        correcciones humanas aprobadas sobreviven, ver delete_financial_facts)
+        y el CIK de la ficha si es el del homónimo. Se confirma aquí porque
+        el llamador recibe una excepción y puede deshacer la sesión.
+        """
+        document = db.scalar(
+            select(Document).where(
+                Document.company_id == company.id,
+                Document.source_type == "SEC",
+                Document.title == f"SEC XBRL facts - {ticker}",
+            )
+        )
+        if document is not None:
+            delete_financial_facts(
+                db,
+                FinancialFact.company_id == company.id,
+                FinancialFact.source_id == document.id,
+                tenant_condition(db),
+            )
+        card_cik = str(getattr(company, "cik", "") or "").strip()
+        if card_cik and card_cik.zfill(10) == str(foreign_cik).zfill(10):
+            company.cik = None
+            db.add(company)
+        db.commit()
 
     def _source_document_sec(self, db: Session, company: Company, ticker: str) -> Document:
         return get_or_create_source_document(

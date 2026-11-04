@@ -58,7 +58,27 @@
     "firmsOther": "{n} firms with 12-month targets",
     "firmsNone": "aggregate consensus only, no per-firm detail",
     "convertedFrom": "(converted from {currency})",
-    "notOfficial": "Unofficial source"
+    "notOfficial": "Unofficial source",
+    "notes": {
+      "fetchFailed": "The consensus could not be retrieved right now; retry in a few minutes.",
+      "notEquity": "{symbol} is identified as {instrument}, not as a stock, so there are no analyst price targets to show for a company with this ticker.",
+      "consensusOnly": "Aggregate consensus only, no per-firm detail.",
+      "noTargets": "No analyst price targets for this stock."
+    },
+    "instrument": {
+      "ETF": "an ETF",
+      "MUTUALFUND": "a fund",
+      "INDEX": "an index",
+      "CURRENCY": "a currency",
+      "CRYPTOCURRENCY": "a cryptocurrency",
+      "FUTURE": "a future",
+      "OPTION": "an option",
+      "other": "an instrument of type {type}",
+      "unknown": "an instrument that is not a stock"
+    },
+    "referencePriceSource": {
+      "marketAtFetch": "market source, price when the data was fetched"
+    }
   },
   "system": {
     "badge": "Analysis engine disconnected",

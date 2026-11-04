@@ -6895,12 +6895,18 @@ export interface components {
             currency?: string | null;
             /** Fetched At */
             fetched_at: number;
+            /** Instrument Type */
+            instrument_type?: string | null;
             /** Note */
             note?: string | null;
+            /** Note Code */
+            note_code?: ("fetch_failed" | "not_equity" | "consensus_only" | "no_targets") | null;
             /** Reference Price */
             reference_price?: number | null;
             /** Reference Price Source */
             reference_price_source?: string | null;
+            /** Reference Price Source Code */
+            reference_price_source_code?: "market_at_fetch" | null;
             /**
              * Rows
              * @default []
