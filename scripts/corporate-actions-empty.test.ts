@@ -22,3 +22,11 @@ test('sin estado de fuentes tampoco afirma nada', () => {
 test('la vista ya no trae el «Todo al día» fijo', () => {
     assert.doesNotMatch(readFileSync('components/corporate-actions/CorporateActionsView.tsx', 'utf8'), /Todo al día/);
 });
+
+test('inglés (Ajustes → Idioma): el estado vacío y su fecha en inglés', () => {
+    const status = { dividends_last_import: '2026-10-10T06:20:00Z', splits_last_import: '2026-10-15T06:20:00Z' };
+    assert.equal(corporateActionsEmptyMessage(status, 'en'), 'No pending events. Last data import: 10/15/2026.');
+    assert.match(corporateActionsEmptyMessage({ dividends_last_import: null, splits_last_import: null }, 'en'), /^No events: no dividends or splits/);
+    assert.match(corporateActionsEmptyMessage(null, 'en'), /^No events and no source status/);
+    assert.match(corporateActionsEmptyMessage(status, 'es'), /Última importación de datos: 15\/10\/2026/);
+});
