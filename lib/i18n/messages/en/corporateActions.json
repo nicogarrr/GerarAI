@@ -48,5 +48,10 @@
     "applied": "Applied",
     "historical": "Historical, already reflected",
     "noPosition": "No position: nothing to adjust"
+  },
+  "emptyState": {
+    "noStatus": "No events and no source status right now. Try again in a few seconds.",
+    "noImports": "No events: no dividends or splits have been imported yet.",
+    "lastImport": "No pending events. Last data import: {day}."
   }
 }

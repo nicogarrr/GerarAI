@@ -1755,5 +1755,10 @@
       "inferred_input": "inferido, con fuentes",
       "tag_default": "tipo por defecto del modelo, sin fuente trazable"
     }
+  },
+  "peerFormat": {
+    "noData": "Sin datos",
+    "insufficient": "muestra insuficiente",
+    "insufficientThreshold": "muestra insuficiente (n<{threshold})"
   }
 }
