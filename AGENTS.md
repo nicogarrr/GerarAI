@@ -29,3 +29,21 @@ Frontend: `npm run lint` y `npm run typecheck`.
 - PRs pequenas, una por tema; declara en el cuerpo lo agrupado y los limites.
 - No se mergea sin auditoria favorable ni CI verde (excepto Vercel, size guard y el check `qa` preexistente).
 - No toques produccion (contenedores, volumenes, DB) sin backup previo y apuntando por nombre exacto.
+
+## Cambio mínimo y deuda (reglas de solución, no de PR)
+
+- **Reuso primero, en este orden:** helper/componente/servicio ya en el repo -> stdlib o
+  función de la plataforma -> dependencia ya instalada. Nunca una dependencia nueva para
+  unas pocas líneas.
+- **YAGNI:** prohibida abstracción, wrapper, opción, config o código "para después" que
+  nadie pidió. Borrar es mejor que añadir. Mantén las capas, interfaces y convenciones
+  que el repo ya tiene.
+- **Mapa de alcance antes de tocar:** lista callers, tests, fixtures, config y exports
+  que el cambio alcanza; grep de cada llamador de la función tocada y arregla la causa
+  raíz una sola vez en el código compartido.
+- **Atajos con límite conocido:** se marcan `shortcut: <límite>, <cuándo revisarlo>` y se
+  listan con `git grep -nE '(#|//) ?shortcut:'` para que un aplazamiento no se vuelva
+  permanente.
+- **Suelo que nunca se recorta** (ni por minimalismo ni por cobertura): validación en
+  fronteras de confianza, manejo de errores que evita pérdida de datos, seguridad,
+  accesibilidad, y la regla de tests por cada feature. Los gates de arriba no cambian.
