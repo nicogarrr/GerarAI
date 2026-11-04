@@ -1,3 +1,5 @@
+import math
+import re
 from datetime import date
 from decimal import Decimal
 
@@ -27,6 +29,158 @@ def _decimal_string(value: Decimal | None) -> str | None:
 
 
 MIN_PEER_SAMPLE = 3
+
+# Selección automática (sin ``PeerRelationship`` curadas). Un candidato solo
+# entra en el grupo si comparte INDUSTRIA (la clasificación más fina de la
+# ficha) o, si no, el SECTOR y al menos ``PEER_MIN_EXTRA_FACTORS_WITH_SECTOR``
+# factores reales más: etiquetas de negocio compartidas (``factor_tags``) o un
+# tamaño parecido (capitalización en USD dentro de ``PEER_SIZE_BAND_MAX_RATIO``
+# veces). Divisa, bolsa o país no cuentan como similitud: casi todo el
+# universo cotiza en EE. UU. en USD, y con eso bastaba para que un comercio
+# electrónico chino tuviera de comparables a minoristas y hoteles de EE. UU.
+# Una cotización extranjera o un ADR puede tomar pares de cualquier región,
+# pero solo de su misma industria. Con menos de ``MIN_PEER_SAMPLE`` válidos
+# el contraste por múltiplos no se publica (``NO_SAME_INDUSTRY_PEERS_REASON``).
+PEER_ELIGIBILITY_RULE = "PEER_ELIGIBILITY_V1"
+PEER_MIN_EXTRA_FACTORS_WITH_SECTOR = 1
+PEER_SIZE_BAND_MAX_RATIO = Decimal("3")
+# Factores que describen el NEGOCIO. Solo estos bastan junto al sector: un
+# tamaño parecido no hace comparable a un operador de satélites con una
+# discográfica (los dos son «Communication Services»); el tamaño solo ordena.
+PEER_BUSINESS_FACTORS = ("factor_tags",)
+# Puntuación de tamaño en escala logarítmica: 1 a igual capitalización y 0 a
+# 10^PEER_SIZE_SCORE_LOG10_SPAN veces. Con la escala lineal anterior (0 a
+# partir de 10x) un gigante empataba con todas las microcaps de su industria
+# y el orden lo decidía el ticker.
+PEER_SIZE_SCORE_LOG10_SPAN = 3.0
+NO_SAME_INDUSTRY_PEERS_REASON = "sin comparables de la misma industria"
+_UNKNOWN_LABELS = frozenset({"", "unknown", "n/a", "na", "none", "other"})
+
+
+def _label(value: str | None) -> str | None:
+    text = " ".join((value or "").split()).casefold()
+    return None if text in _UNKNOWN_LABELS else text
+
+
+def _business_tags(company: Company) -> set[str]:
+    """Etiquetas de negocio; ``adr``/``adr:N`` describe la cotización, no el negocio."""
+    tags: set[str] = set()
+    for tag in company.factor_tags or []:
+        text = str(tag).strip().casefold()
+        if text and text != "adr" and not text.startswith("adr:"):
+            tags.add(text)
+    return tags
+
+
+_NAME_SUFFIXES = frozenset({
+    "inc", "incorporated", "corp", "corporation", "co", "company", "ltd", "limited",
+    "plc", "sa", "ag", "nv", "se", "spa", "holdings", "holding", "group", "class",
+    "a", "b", "c", "the",
+})
+_LABEL_STOPWORDS = frozenset({"and", "&", "of", "the", "other"})
+
+
+def _issuer_keys(company: Company) -> set[str]:
+    """Emisor: el CIK de la SEC y el nombre sin sufijos societarios ni clase.
+
+    Las clases de acción de un mismo emisor (GOOG/GOOGL, BF.A/BF.B) comparten
+    CIK o nombre; a veces solo una de las dos fichas tiene el CIK.
+    """
+    keys: set[str] = set()
+    cik = (company.cik or "").strip().lstrip("0")
+    if cik:
+        keys.add(f"cik:{cik}")
+    words = [
+        word
+        for word in re.sub(r"[^0-9a-z]+", " ", (company.name or "").casefold()).split()
+        if word not in _NAME_SUFFIXES
+    ]
+    if words:
+        keys.add("name:" + " ".join(words))
+    return keys
+
+
+def _same_issuer(target: Company, candidate: Company) -> bool:
+    return bool(_issuer_keys(target) & _issuer_keys(candidate))
+
+
+def _label_words(value: str | None) -> frozenset[str]:
+    label = _label(value)
+    if label is None:
+        return frozenset()
+    return frozenset(
+        word for word in re.sub(r"[^0-9a-z&]+", " ", label).split() if word not in _LABEL_STOPWORDS
+    )
+
+
+def _industry_match(target: Company, candidate: Company) -> str | None:
+    """``industry`` si coinciden; ``industry_keywords`` si las palabras de una
+    están todas en la otra («Utilities» ⊂ «Electric Utilities», «Software» ⊂
+    «Data analytics software»): dos taxonomías llaman distinto a lo mismo."""
+    industry = _label(target.industry)
+    other = _label(candidate.industry)
+    if industry is None or other is None:
+        return None
+    if industry == other:
+        return "industry"
+    mine, theirs = _label_words(target.industry), _label_words(candidate.industry)
+    if mine and theirs and (mine <= theirs or theirs <= mine):
+        return "industry_keywords"
+    return None
+
+
+def _is_foreign_issuer(company: Company) -> bool:
+    """ADR (marca o ratio conocido) o ficha en una bolsa conocida fuera de EE. UU."""
+    from app.services.company_identity_verification import is_foreign_listing
+    from app.valuation.engines.base import adr_ratio
+
+    tags = {str(tag).strip().casefold() for tag in (company.factor_tags or [])}
+    if "adr" in tags or any(tag.startswith("adr:") for tag in tags):
+        return True
+    if is_foreign_listing(company.exchange):
+        return True
+    try:
+        return adr_ratio(company) is not None
+    except Exception:
+        return False
+
+
+def peer_eligibility(
+    target: Company,
+    candidate: Company,
+    target_market_cap: Decimal | None,
+    candidate_market_cap: Decimal | None,
+    *,
+    target_is_foreign: bool | None = None,
+) -> str | None:
+    """Por qué el candidato puede ser comparable (``industry``,
+    ``sector+factor_tags``, ``sector+size_band``...) o None si no puede."""
+    industry_match = _industry_match(target, candidate)
+    if industry_match is not None:
+        return industry_match
+    foreign = _is_foreign_issuer(target) if target_is_foreign is None else target_is_foreign
+    if foreign:
+        return None
+    sector = _label(target.sector)
+    if sector is None or _label(candidate.sector) != sector:
+        return None
+    extras: list[str] = []
+    if _business_tags(target) & _business_tags(candidate):
+        extras.append("factor_tags")
+    if (
+        target_market_cap is not None
+        and candidate_market_cap is not None
+        and target_market_cap > 0
+        and candidate_market_cap > 0
+        and max(target_market_cap, candidate_market_cap)
+        / min(target_market_cap, candidate_market_cap)
+        <= PEER_SIZE_BAND_MAX_RATIO
+    ):
+        extras.append("size_band")
+    business = [factor for factor in extras if factor in PEER_BUSINESS_FACTORS]
+    if len(business) < PEER_MIN_EXTRA_FACTORS_WITH_SECTOR:
+        return None
+    return "sector+" + "+".join(extras)
 
 
 class PeerComparisonService:
@@ -108,10 +262,26 @@ class PeerComparisonService:
             db, [company.id, *(candidate.id for candidate in candidates)]
         )
         target_market_cap = market_caps.get(company.id)
+        target_is_foreign = _is_foreign_issuer(company)
         scored: list[tuple[float, Company, list[str], dict]] = []
+        eligibility_by_id: dict[int, str] = {}
         for candidate in candidates:
             if candidate.id in selected_ids:
                 continue
+            eligibility = peer_eligibility(
+                company,
+                candidate,
+                target_market_cap,
+                market_caps.get(candidate.id),
+                target_is_foreign=target_is_foreign,
+            )
+            if eligibility is None:
+                continue
+            if _same_issuer(company, candidate):
+                # Otra clase de acción del mismo emisor (GOOG/GOOGL, BF.A/BF.B):
+                # es la misma empresa, no un comparable.
+                continue
+            eligibility_by_id[candidate.id] = eligibility
             score, rationale, dimensions = self._peer_score(
                 db,
                 company,
@@ -122,7 +292,25 @@ class PeerComparisonService:
             if score <= 0:
                 continue
             scored.append((score, candidate, rationale, dimensions))
-        scored.sort(key=lambda item: (-item[0], item[1].ticker))
+        # Primero los de la misma industria; los que entran por sector y un
+        # factor solo completan el grupo. Dentro de cada nivel manda la
+        # puntuación. Varias clases del mismo emisor cuentan una vez.
+        scored.sort(
+            key=lambda item: (
+                not str(eligibility_by_id.get(item[1].id) or "").startswith("industry"),
+                -item[0],
+                item[1].ticker,
+            )
+        )
+        seen_issuers: set[str] = set()
+        unique_scored: list[tuple[float, Company, list[str], dict]] = []
+        for item in scored:
+            issuer = _issuer_keys(item[1])
+            if issuer & seen_issuers:
+                continue
+            seen_issuers |= issuer
+            unique_scored.append(item)
+        scored = unique_scored
         selected.extend(
             candidate
             for _, candidate, _, _ in scored[: max(0, limit - len(selected))]
@@ -135,6 +323,7 @@ class PeerComparisonService:
                 "selected": candidate.id in selected_ids,
                 "rationale": rationale,
                 "dimensions": dimensions,
+                "eligibility": eligibility_by_id.get(candidate.id),
             }
             for score, candidate, rationale, dimensions in scored
         ]
@@ -156,8 +345,26 @@ class PeerComparisonService:
             if manual_rows
             else "multifactor_business_model_stage_size"
         )
+        eligible_count = len(scored)
+        insufficient_reason = (
+            NO_SAME_INDUSTRY_PEERS_REASON
+            if not manual_rows and eligible_count < MIN_PEER_SAMPLE
+            else None
+        )
         return selected, basis, {
             "method": "PEER_SELECTION_V2",
+            "eligibility_rule": {
+                "rule": PEER_ELIGIBILITY_RULE,
+                "requires": "industry, or sector + business factor",
+                "min_extra_factors_with_sector": PEER_MIN_EXTRA_FACTORS_WITH_SECTOR,
+                "extra_factors": ["factor_tags", "size_band"],
+                "business_factors": list(PEER_BUSINESS_FACTORS),
+                "size_band_max_ratio": str(PEER_SIZE_BAND_MAX_RATIO),
+                "foreign_or_adr_target_requires_industry": True,
+                "target_is_foreign": target_is_foreign,
+            },
+            "eligible_count": eligible_count,
+            "insufficient_reason": insufficient_reason,
             "target_market_cap": (
                 str(target_market_cap) if target_market_cap is not None else None
             ),
@@ -222,7 +429,9 @@ class PeerComparisonService:
             ratio = max(target_market_cap, candidate_market_cap) / min(
                 target_market_cap, candidate_market_cap
             )
-            size_score = max(0.0, 1.0 - min(float(ratio), 10.0) / 10.0)
+            size_score = max(
+                0.0, 1.0 - math.log10(float(ratio)) / PEER_SIZE_SCORE_LOG10_SPAN
+            )
             score += 0.17 * size_score
             dimensions["market_cap"] = round(size_score, 4)
             rationale.append(f"market-cap ratio {float(ratio):.2f}x")

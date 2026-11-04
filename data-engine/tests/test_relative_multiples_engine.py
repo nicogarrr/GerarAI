@@ -465,7 +465,8 @@ def test_relative_engine_publishes_every_peer_with_its_source_and_date(db):
 
 def test_relative_engine_uses_a_stored_provider_multiple_with_its_source(db):
     company = _subject(db)
-    _peers(db, count=2)
+    # 3 pares: con menos, el selector automático no publica contraste.
+    _peers(db, count=3)
     metric = PROVIDER_MULTIPLE_TEMPLATE.format(kind="pe", ticker="RELP0")
     db.add(
         FinancialFact(
