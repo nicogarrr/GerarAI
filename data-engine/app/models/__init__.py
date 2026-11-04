@@ -269,6 +269,10 @@ from app.models.benchmark_price import BenchmarkPrice as BenchmarkPrice  # noqa:
 
 __all__.append("BenchmarkPrice")
 
+from app.models.declared_input_value import DeclaredInputValue as DeclaredInputValue  # noqa: E402
+
+__all__.append("DeclaredInputValue")
+
 from app.models.knowledge_rag import (  # noqa: E402
     KnowledgeRagParent as KnowledgeRagParent,
 )
