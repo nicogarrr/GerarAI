@@ -38,8 +38,9 @@ def test_market_cap_en_otra_divisa_se_pasa_a_usd():
     db.commit()
     _peers, _basis, trace = PeerComparisonService()._find_peers(db, target, limit=8)
     row = _candidate_row(trace, toyota.ticker)
-    # Mismo tamaño (ratio 1,00x): 0,9, el maximo de la escala (antes 0: 150x).
-    assert row["dimensions"]["market_cap"] == 0.9
+    # Mismo tamaño (ratio 1,00x): 1,0, el maximo de la escala logaritmica
+    # (antes 0: 150x).
+    assert row["dimensions"]["market_cap"] == 1.0
 
 
 def test_market_cap_sin_tipo_de_cambio_no_puntua_tamano():

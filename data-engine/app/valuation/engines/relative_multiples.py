@@ -347,24 +347,37 @@ class RelativeMultiplesEngine(ValuationEngine):
             )
 
         peers, peer_provenance = _peer_set(context)
-        if not peers:
+        # Selección automática con menos de MIN_PEER_SAMPLE candidatos de la
+        # misma industria (o sector + un factor real): no hay contraste.
+        selection_shortfall = (peer_provenance.get("trace") or {}).get("insufficient_reason")
+        if not peer_provenance.get("fallback_only"):
+            selection_shortfall = None
+        peer_input_contract = {
+            "selection": "PeerComparisonService (manual overrides, then PEER_SELECTION_V2)",
+            "provider_multiple": PROVIDER_MULTIPLE_TEMPLATE.format(
+                kind="<kind>", ticker="<peer ticker>"
+            ),
+            "otherwise": "derived from the peer's own price and facts",
+        }
+        if not peers or selection_shortfall:
+            reason = (
+                "No peer set. A relative multiple is a statement about the "
+                "peers, so without them there is no statement: a peer "
+                "multiple is never estimated or filled in."
+            )
+            if selection_shortfall:
+                reason = (
+                    f"{selection_shortfall}: el selector automático encontró "
+                    f"{len(peers)} candidatos válidos (hacen falta {MIN_VALID_PEERS}), "
+                    "así que no se publica contraste por múltiplos. " + reason
+                )
             return _insufficient(
                 context,
                 missing=["peer_multiples"],
-                reason=(
-                    "No peer set. A relative multiple is a statement about the "
-                    "peers, so without them there is no statement: a peer "
-                    "multiple is never estimated or filled in."
-                ),
+                reason=reason,
                 extra_trace={
                     "peer_set": peer_provenance,
-                    "peer_input_contract": {
-                        "selection": "PeerComparisonService (manual overrides, then PEER_SELECTION_V2)",
-                        "provider_multiple": PROVIDER_MULTIPLE_TEMPLATE.format(
-                            kind="<kind>", ticker="<peer ticker>"
-                        ),
-                        "otherwise": "derived from the peer's own price and facts",
-                    },
+                    "peer_input_contract": peer_input_contract,
                 },
             )
 
