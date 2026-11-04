@@ -342,3 +342,31 @@ def _pick(links: list[CompanyLink]) -> CompanyLink | None:
 def find_alias_link(db: Session, text: str) -> CompanyLink | None:
     """Capa 1: empresa de la que trata el texto por alias o nombre, o None."""
     return _pick(_matcher(db, relations=False).matches(text))
+
+
+def find_links(
+    db: Session, text: str, about: CompanyLink | None
+) -> tuple[CompanyLink | None, list[CompanyLink]]:
+    """Capa 2: (vínculo principal, empresas relacionadas).
+
+    ``about`` es el vínculo «sobre» ya decidido (ticker o alias) o None.
+    Relacionadas = reglas de relación (socio, competidor, regulador, sector)
+    que se cumplen, una por empresa y sin la empresa «sobre». Si no hay
+    empresa «sobre» y solo UNA empresa queda relacionada, esa pasa a ser el
+    vínculo principal con tipo «relacionada» (la noticia aparece en su ficha
+    marcada como relacionada); con varias, ninguna se elige (el esquema
+    actual guarda una sola empresa por noticia: ver HANDOFF/propuesta).
+    """
+    seen: dict[str, CompanyLink] = {}
+    for link in _matcher(db, relations=True).matches(text):
+        if link.link_type != LINK_RELATED:
+            continue
+        if about is not None and link.ticker == about.ticker:
+            continue
+        seen.setdefault(link.ticker, link)
+    related = list(seen.values())
+    if about is not None:
+        return about, related
+    if len(related) == 1:
+        return related[0], []
+    return None, related

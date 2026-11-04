@@ -1,0 +1,177 @@
+{
+ "dataset": "news_links_otros_v1",
+ "fecha": "2026-11-03",
+ "nota": "Titulares sin ticker de otras empresas sembradas. 'espera' = {ticker, tipo} o null (ninguna).",
+ "casos": [
+  {
+   "texto": "Jensen Huang says demand for Blackwell chips is insane",
+   "ticker": "NVDA",
+   "tipo": "sobre"
+  },
+  {
+   "texto": "GB200 servers ship to hyperscalers ahead of schedule",
+   "ticker": "NVDA",
+   "tipo": "sobre"
+  },
+  {
+   "texto": "TSMC boosts CoWoS capacity to meet AI chip demand",
+   "ticker": null,
+   "tipo": "anotada:NVDA,AMD"
+  },
+  {
+   "texto": "SK Hynix sells out HBM supply for next year",
+   "ticker": "NVDA",
+   "tipo": "relacionada"
+  },
+  {
+   "texto": "Lisa Su unveils MI355X accelerator",
+   "ticker": "AMD",
+   "tipo": "sobre"
+  },
+  {
+   "texto": "Cybertruck recall covers 46,000 vehicles",
+   "ticker": "TSLA",
+   "tipo": "sobre"
+  },
+  {
+   "texto": "BYD overtakes rivals in global EV sales",
+   "ticker": "TSLA",
+   "tipo": "relacionada"
+  },
+  {
+   "texto": "Peter Beck: Neutron rocket on track for first launch",
+   "ticker": "RKLB",
+   "tipo": "sobre"
+  },
+  {
+   "texto": "Firefly Aerospace wins small launch contract from NASA",
+   "ticker": "RKLB",
+   "tipo": "relacionada"
+  },
+  {
+   "texto": "Satya Nadella outlines AI spending plans",
+   "ticker": "MSFT",
+   "tipo": "sobre"
+  },
+  {
+   "texto": "Mark Zuckerberg touts Llama 5 open-source model",
+   "ticker": "META",
+   "tipo": "sobre"
+  },
+  {
+   "texto": "Prime Video adds live sports package",
+   "ticker": "AMZN",
+   "tipo": "sobre"
+  },
+  {
+   "texto": "Wegovy sales beat expectations in third quarter",
+   "ticker": "NVO",
+   "tipo": "sobre"
+  },
+  {
+   "texto": "Eli Lilly's Zepbound gains share in obesity market",
+   "ticker": "NVO",
+   "tipo": "relacionada"
+  },
+  {
+   "texto": "Spot uranium price climbs to 18-month high",
+   "ticker": "CCJ",
+   "tipo": "relacionada"
+  },
+  {
+   "texto": "Alex Karp defends Palantir's defense contracts",
+   "ticker": "PLTR",
+   "tipo": "sobre"
+  },
+  {
+   "texto": "Westinghouse signs deal for four AP1000 reactors",
+   "ticker": null,
+   "tipo": "anotada:CCJ,BN"
+  },
+  {
+   "texto": "Netflix raises prices in the US",
+   "ticker": "NFLX",
+   "tipo": "sobre"
+  },
+  {
+   "texto": "Amazon rainforest deforestation hits record",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Nikola Tesla museum opens in Belgrade",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Meta-analysis finds coffee lowers risk",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Intel Foundry signs new customer",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Firefly Aerospace's Alpha rocket fails to reach orbit",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Electron microscope reveals new protein structure",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Threads of history: a weaving exhibition",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Llama farm opens to visitors in Peru",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Westinghouse Air Brake raises guidance",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Windows of opportunity close for bond traders",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Model 3 of the new curriculum released",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Ondas de calor azotan el sur de España",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Zeta potential measurement in colloids",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Elon Musk's xAI raises new funding",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Blackwell family reunion draws hundreds",
+   "ticker": null,
+   "tipo": null
+  },
+  {
+   "texto": "Uranium miners' union calls strike",
+   "ticker": null,
+   "tipo": null
+  }
+ ]
+}

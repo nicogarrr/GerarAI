@@ -65,7 +65,7 @@ def position_change_cluster_title(ticker: str | None, source: str, count: int) -
     la fila se marca headline_from_source=False)."""
     donde = f" en {ticker}" if ticker else ""
     return f"{count} movimientos de inversores institucionales{donde} · {source}"
-from app.services.company_aliases import LINK_ABOUT, CompanyLink, find_alias_link
+from app.services.company_aliases import LINK_ABOUT, LINK_RELATED, CompanyLink, find_alias_link, find_links
 from app.services.thesis_graph_service import ThesisGraphService
 from app.services.ticker_news_lane import (
     STRICT_NAME_PATTERNS as STRICT_TICKERS,
@@ -301,14 +301,23 @@ class NewsService:
             return CompanyLink(company, LINK_ABOUT, "ticker") if company is not None else None
         return find_alias_link(db, text)
 
-    def _link_for_item(
+    def detect_company_links(self, db: Session, text: str) -> tuple[CompanyLink | None, list[CompanyLink]]:
+        """(vínculo principal, empresas relacionadas) de un texto.
+
+        Principal = detect_company_link («sobre»); si no hay ninguna y una sola
+        empresa queda relacionada (socio, competidor, regulador, sector con
+        su contexto obligatorio), esa con tipo «relacionada».
+        """
+        return find_links(db, text, self.detect_company_link(db, text))
+
+    def _links_for_item(
         self,
         db: Session,
         text: str,
         ticker: str | None = None,
         *,
         feed_ticker_trusted: bool = True,
-    ) -> CompanyLink | None:
+    ) -> tuple[CompanyLink | None, list[CompanyLink]]:
         if ticker:
             company = resolve_company(db, ticker)
             # Sigla ambigua con ticker NO autoritativo (busqueda GDELT/RSS):
@@ -320,8 +329,18 @@ class NewsService:
                 or not _feed_ticker_needs_evidence(ticker)
                 or company_mentioned(company, text, _ticker_evidence_level)
             ):
-                return CompanyLink(company, LINK_ABOUT, "feed")
-        return self.detect_company_link(db, text)
+                return find_links(db, text, CompanyLink(company, LINK_ABOUT, "feed"))
+        return self.detect_company_links(db, text)
+
+    def _link_for_item(
+        self,
+        db: Session,
+        text: str,
+        ticker: str | None = None,
+        *,
+        feed_ticker_trusted: bool = True,
+    ) -> CompanyLink | None:
+        return self._links_for_item(db, text, ticker, feed_ticker_trusted=feed_ticker_trusted)[0]
 
     def _company_for_item(
         self,
@@ -409,10 +428,10 @@ class NewsService:
     ) -> ManualNewsResponse:
         # detect_company=False: carriles sin ticker (p.ej. macro) nunca
         # vinculan empresa por coincidencia de texto.
-        link = (
-            self._link_for_item(db, text, ticker, feed_ticker_trusted=feed_ticker_trusted)
+        link, related = (
+            self._links_for_item(db, text, ticker, feed_ticker_trusted=feed_ticker_trusted)
             if detect_company
-            else None
+            else (None, [])
         )
         company = link.company if link is not None else None
         # Gate Jev (3): duplicate/noise con confianza >= 0.85 -> via ligera:
@@ -485,6 +504,16 @@ class NewsService:
             materiality_reasons.append(
                 f"sin mención de la empresa en fuente genérica => max {UNRELATED_NEWS_MAX_MATERIALITY}"
             )
+        # Noticia «relacionada» (no trata de la empresa: socio, competidor,
+        # regulador o sector): se muestra en su ficha, pero no abre revisión
+        # de tesis ni alerta material.
+        if link is not None and link.link_type == LINK_RELATED:
+            if materiality_score > UNRELATED_NEWS_MAX_MATERIALITY:
+                materiality_score = UNRELATED_NEWS_MAX_MATERIALITY
+            requires_update = False
+            materiality_reasons.append(
+                f"vínculo relacionada ({link.via}) => max {UNRELATED_NEWS_MAX_MATERIALITY}, sin revisión"
+            )
         # La politica de recencia tambien cubre la urgencia derivada del
         # impacto semantico: un filing antiguo nunca es urgente por recencia.
         requires_update = apply_recency_policy(requires_update, published_at, materiality_reasons)
@@ -536,6 +565,10 @@ class NewsService:
         # empresa para poder auditarlo. Los vínculos por ticker no cambian.
         if link is not None and link.via not in ("ticker", "feed"):
             news_metadata["vinculo"] = link.as_metadata()
+        # Otras empresas relacionadas (socios, competidores...): hoy solo
+        # quedan anotadas; el esquema guarda una empresa por noticia.
+        if related:
+            news_metadata["relacionadas"] = [r.as_metadata() for r in related]
         # Carril editorial (p.ej. macro) y tema en la MISMA transacción de
         # creación, igual que la procedencia del conector.
         if news_lane:

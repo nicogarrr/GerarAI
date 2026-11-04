@@ -1,6 +1,6 @@
 {
  "version": 1,
- "nota": "Alias y relaciones por empresa para vincular noticias que no citan el ticker. Clave = ticker del catálogo. Se carga una vez por proceso (app/services/company_aliases.py). 'aliases' => la noticia es SOBRE la empresa; 'requiere' = al menos uno de esos términos en el texto; 'excluye' = ninguno. Términos en palabra completa; sin 'mayusculas': true se ignoran mayúsculas/minúsculas. Revisado a mano: nada de términos de sector sueltos como alias.",
+ "nota": "Alias y relaciones por empresa para vincular noticias que no citan el ticker. Clave = ticker del catálogo. Se carga una vez por proceso (app/services/company_aliases.py). 'aliases' => la noticia es SOBRE la empresa; 'relaciones' => la noticia queda RELACIONADA con la empresa, con su tipo (socio, cliente, proveedor, competidor, regulador, espectro, inversor, sector). 'pendiente_revisar' = lo que no se siembra por ambiguo. 'requiere' = al menos uno de esos términos en el texto; 'excluye' = ninguno. Términos en palabra completa; sin 'mayusculas': true se ignoran mayúsculas/minúsculas. Revisado a mano: nada de términos de sector sueltos como alias.",
  "empresas": {
   "ASTS": {
    "revisado": "2026-11-03",
@@ -75,7 +75,1099 @@
       "BlueBird"
      ]
     }
+   ],
+   "relaciones": [
+    {
+     "tipo": "socio",
+     "terminos": [
+      "AT&T",
+      "Verizon",
+      "Vodafone",
+      "Vodafone Idea",
+      "Rakuten",
+      "Rakuten Mobile",
+      "Telefónica",
+      "Telefonica",
+      "Orange",
+      "Bell Canada",
+      "Telstra",
+      "América Movil",
+      "America Movil",
+      "Liberty Latin America",
+      "Africell",
+      "Telkomsel",
+      "Indosat",
+      "Globe Telecom",
+      "Smart Communications",
+      "Vodafone Turkey",
+      "Saudi Telecom",
+      "Zain"
+     ],
+     "requiere": [
+      "satellite-to-smartphone",
+      "satellite-to-phone",
+      "satellite to phone",
+      "direct-to-cell",
+      "direct to cell",
+      "direct-to-device",
+      "direct to device",
+      "direct-to-smartphone",
+      "space-based",
+      "from space",
+      "desde el espacio",
+      "satélite-móvil",
+      "satelite-movil",
+      "satellite cellular",
+      "cellular broadband",
+      "satellite phone service",
+      "satellite mobile",
+      "satellite connectivity",
+      "conectividad satelital",
+      "cobertura satelital",
+      "SatCo",
+      "D2D",
+      "D2C",
+      "SCS"
+     ]
+    },
+    {
+     "tipo": "competidor",
+     "terminos": [
+      "Starlink",
+      "SpaceX",
+      "T-Mobile",
+      "T-Satellite",
+      "Lynk",
+      "Lynk Global",
+      "Globalstar",
+      "Skylo",
+      "Iridium",
+      "EchoStar",
+      "Omnispace",
+      "Starlink Mobile",
+      "Apple",
+      "Viasat",
+      "Inmarsat",
+      "Amazon Kuiper",
+      "Project Kuiper",
+      "Space42"
+     ],
+     "requiere": [
+      "direct-to-cell",
+      "direct to cell",
+      "direct-to-device",
+      "direct to device",
+      "satellite-to-phone",
+      "satellite to phone",
+      "satellite-to-smartphone",
+      "T-Satellite",
+      "texting via satellite",
+      "satellite texting",
+      "satellite messaging",
+      "D2D",
+      "D2C",
+      "SCS",
+      "supplemental coverage from space",
+      "unmodified phones",
+      "unmodified smartphones",
+      "directo al móvil",
+      "directo al movil"
+     ]
+    },
+    {
+     "tipo": "regulador",
+     "terminos": [
+      "FCC",
+      "Federal Communications Commission"
+     ],
+     "requiere": [
+      "supplemental coverage from space",
+      "SCS",
+      "direct-to-device",
+      "direct to device",
+      "direct-to-cell",
+      "satellite-to-phone",
+      "Ligado",
+      "L-band",
+      "banda L"
+     ]
+    },
+    {
+     "tipo": "espectro",
+     "terminos": [
+      "Ligado",
+      "Ligado Networks"
+     ]
+    },
+    {
+     "tipo": "sector",
+     "terminos": [
+      "direct-to-device",
+      "direct-to-cell",
+      "satellite-to-phone",
+      "satellite-to-smartphone",
+      "space-based cellular",
+      "supplemental coverage from space",
+      "direct-to-smartphone",
+      "satellite-to-cell",
+      "D2D satellite",
+      "D2D satellites",
+      "space-based cellular broadband",
+      "non-terrestrial network",
+      "non-terrestrial networks",
+      "NTN",
+      "satélite directo al móvil",
+      "satelital directa al móvil"
+     ]
+    },
+    {
+     "tipo": "cliente",
+     "terminos": [
+      "Space Development Agency",
+      "SDA",
+      "U.S. Space Force",
+      "Space Force",
+      "Department of Defense",
+      "Pentagon",
+      "Department of War"
+     ],
+     "requiere": [
+      "direct-to-device",
+      "direct-to-cell",
+      "satellite-to-phone",
+      "space-based cellular",
+      "HALO",
+      "phased array",
+      "phased-array"
+     ]
+    },
+    {
+     "tipo": "inversor",
+     "terminos": [
+      "American Tower",
+      "Google"
+     ],
+     "requiere": [
+      "direct-to-cell",
+      "direct-to-device",
+      "satellite-to-phone",
+      "space-based cellular",
+      "cellular broadband from space"
+     ]
+    }
+   ],
+   "pendiente_revisar": "Proveedores de ASTS (componentes de los BlueBird, lanzadores) no se siembran como relación: sus noticias citan BlueBird o AST y ya son «sobre». 'Google' como inversor solo con contexto D2D."
+  },
+  "NVDA": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Nvidia",
+     "mayusculas": true
+    },
+    {
+     "termino": "NVIDIA",
+     "mayusculas": true
+    },
+    {
+     "termino": "Jensen Huang",
+     "tipo": "persona"
+    },
+    {
+     "termino": "GeForce",
+     "mayusculas": true
+    },
+    {
+     "termino": "CUDA",
+     "mayusculas": true
+    },
+    {
+     "termino": "H100",
+     "mayusculas": true
+    },
+    {
+     "termino": "H200",
+     "mayusculas": true
+    },
+    {
+     "termino": "GB200",
+     "mayusculas": true
+    },
+    {
+     "termino": "GB300",
+     "mayusculas": true
+    },
+    {
+     "termino": "B200",
+     "mayusculas": true
+    },
+    {
+     "termino": "Blackwell",
+     "mayusculas": true,
+     "requiere": [
+      "AI chip",
+      "AI chips",
+      "GPU",
+      "GPUs",
+      "AI accelerator",
+      "AI accelerators",
+      "data center GPU",
+      "AI servers",
+      "AI server",
+      "CoWoS",
+      "HBM",
+      "high-bandwidth memory",
+      "chip",
+      "chips"
+     ]
+    },
+    {
+     "termino": "Rubin",
+     "mayusculas": true,
+     "requiere": [
+      "GPU",
+      "GPUs",
+      "AI chip",
+      "AI chips",
+      "Vera Rubin"
+     ]
+    }
+   ],
+   "relaciones": [
+    {
+     "tipo": "proveedor",
+     "terminos": [
+      "TSMC",
+      "Taiwan Semiconductor",
+      "SK Hynix",
+      "Micron",
+      "Foxconn",
+      "Hon Hai"
+     ],
+     "requiere": [
+      "AI chip",
+      "AI chips",
+      "GPU",
+      "GPUs",
+      "AI accelerator",
+      "AI accelerators",
+      "data center GPU",
+      "AI servers",
+      "AI server",
+      "CoWoS",
+      "HBM",
+      "high-bandwidth memory"
+     ]
+    },
+    {
+     "tipo": "competidor",
+     "terminos": [
+      "Intel",
+      "Broadcom",
+      "Cerebras",
+      "Groq"
+     ],
+     "requiere": [
+      "AI chip",
+      "AI chips",
+      "AI accelerator",
+      "AI accelerators",
+      "GPU",
+      "GPUs"
+     ]
+    },
+    {
+     "tipo": "cliente",
+     "terminos": [
+      "CoreWeave",
+      "Oracle",
+      "xAI",
+      "OpenAI"
+     ],
+     "requiere": [
+      "GPU",
+      "GPUs",
+      "AI chips",
+      "H100",
+      "GB200"
+     ]
+    },
+    {
+     "tipo": "regulador",
+     "terminos": [
+      "Commerce Department",
+      "Bureau of Industry and Security",
+      "BIS"
+     ],
+     "requiere": [
+      "chip export",
+      "chip exports",
+      "export controls",
+      "AI chips"
+     ]
+    }
+   ],
+   "pendiente_revisar": "AMD comparte varias relaciones (TSMC, export controls): con las dos en catálogo esas noticias quedan anotadas en ambas, sin empresa principal."
+  },
+  "AMD": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Lisa Su",
+     "tipo": "persona"
+    },
+    {
+     "termino": "Ryzen",
+     "mayusculas": true
+    },
+    {
+     "termino": "Radeon",
+     "mayusculas": true
+    },
+    {
+     "termino": "EPYC",
+     "mayusculas": true
+    },
+    {
+     "termino": "MI300X",
+     "mayusculas": true
+    },
+    {
+     "termino": "MI325X",
+     "mayusculas": true
+    },
+    {
+     "termino": "MI350",
+     "mayusculas": true
+    },
+    {
+     "termino": "MI355X",
+     "mayusculas": true
+    },
+    {
+     "termino": "Xilinx",
+     "mayusculas": true
+    }
+   ],
+   "relaciones": [
+    {
+     "tipo": "proveedor",
+     "terminos": [
+      "TSMC",
+      "Taiwan Semiconductor"
+     ],
+     "requiere": [
+      "AI chip",
+      "AI chips",
+      "GPU",
+      "GPUs",
+      "AI accelerator",
+      "AI accelerators",
+      "data center GPU",
+      "AI servers",
+      "AI server",
+      "CoWoS",
+      "HBM",
+      "high-bandwidth memory"
+     ]
+    },
+    {
+     "tipo": "competidor",
+     "terminos": [
+      "Intel"
+     ],
+     "requiere": [
+      "CPU",
+      "CPUs",
+      "server chips",
+      "x86",
+      "GPU",
+      "GPUs",
+      "AI chips"
+     ]
+    },
+    {
+     "tipo": "regulador",
+     "terminos": [
+      "Commerce Department",
+      "Bureau of Industry and Security"
+     ],
+     "requiere": [
+      "chip export",
+      "chip exports",
+      "export controls",
+      "AI chips"
+     ]
+    }
    ]
+  },
+  "TSLA": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Tesla",
+     "mayusculas": true,
+     "excluye": [
+      "Nikola Tesla",
+      "Tesla coil",
+      "Nikola Motor"
+     ]
+    },
+    {
+     "termino": "Cybertruck",
+     "mayusculas": true
+    },
+    {
+     "termino": "Gigafactory",
+     "mayusculas": true
+    },
+    {
+     "termino": "Model Y",
+     "mayusculas": true
+    },
+    {
+     "termino": "Model 3",
+     "mayusculas": true,
+     "requiere": [
+      "Tesla",
+      "EV",
+      "electric",
+      "sedan",
+      "car",
+      "cars",
+      "deliveries"
+     ]
+    },
+    {
+     "termino": "Optimus",
+     "mayusculas": true,
+     "requiere": [
+      "robot",
+      "robots",
+      "humanoid",
+      "Tesla"
+     ]
+    }
+   ],
+   "relaciones": [
+    {
+     "tipo": "competidor",
+     "terminos": [
+      "BYD",
+      "Rivian",
+      "Lucid",
+      "Xpeng",
+      "XPeng",
+      "Nio",
+      "NIO",
+      "Li Auto"
+     ],
+     "requiere": [
+      "EV",
+      "EVs",
+      "electric vehicle",
+      "electric vehicles",
+      "EV sales",
+      "deliveries",
+      "vehículos eléctricos",
+      "coches eléctricos"
+     ]
+    },
+    {
+     "tipo": "sector",
+     "terminos": [
+      "EV tax credit",
+      "electric vehicle tax credit",
+      "EV tariffs",
+      "robotaxi",
+      "robotaxis"
+     ]
+    }
+   ],
+   "pendiente_revisar": "«Elon Musk» NO es alias de Tesla: también dirige SpaceX, X y xAI (ambiguo)."
+  },
+  "RKLB": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Peter Beck",
+     "tipo": "persona",
+     "requiere": [
+      "Rocket Lab",
+      "rocket",
+      "launch",
+      "Neutron",
+      "Electron",
+      "space"
+     ]
+    },
+    {
+     "termino": "Neutron",
+     "mayusculas": true,
+     "requiere": [
+      "rocket",
+      "launch",
+      "Rocket Lab",
+      "pad"
+     ]
+    },
+    {
+     "termino": "Electron",
+     "mayusculas": true,
+     "requiere": [
+      "rocket",
+      "launch",
+      "Rocket Lab",
+      "mission"
+     ],
+     "excluye": [
+      "electron microscope",
+      "electron microscopy",
+      "Electron app",
+      "Electron framework",
+      "electron beam"
+     ]
+    }
+   ],
+   "relaciones": [
+    {
+     "tipo": "competidor",
+     "terminos": [
+      "Firefly Aerospace",
+      "Firefly",
+      "Relativity Space",
+      "United Launch Alliance",
+      "ULA",
+      "Blue Origin",
+      "SpaceX"
+     ],
+     "requiere": [
+      "small launch",
+      "small-satellite launch",
+      "launch contract",
+      "launch contracts",
+      "medium-lift",
+      "launch market",
+      "rideshare"
+     ]
+    },
+    {
+     "tipo": "cliente",
+     "terminos": [
+      "NASA",
+      "Space Development Agency",
+      "Space Force"
+     ],
+     "requiere": [
+      "launch contract",
+      "small launch",
+      "Neutron",
+      "Electron rocket"
+     ]
+    }
+   ]
+  },
+  "MSFT": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Microsoft",
+     "mayusculas": true
+    },
+    {
+     "termino": "Satya Nadella",
+     "tipo": "persona"
+    },
+    {
+     "termino": "Copilot",
+     "mayusculas": true,
+     "requiere": [
+      "Microsoft",
+      "GitHub",
+      "AI assistant",
+      "AI",
+      "asistente"
+     ]
+    },
+    {
+     "termino": "Windows",
+     "mayusculas": true,
+     "requiere": [
+      "Microsoft",
+      "PC",
+      "PCs",
+      "Windows 11",
+      "Windows 10",
+      "operating system",
+      "sistema operativo"
+     ]
+    },
+    {
+     "termino": "Activision",
+     "mayusculas": true
+    }
+   ],
+   "relaciones": [
+    {
+     "tipo": "socio",
+     "terminos": [
+      "OpenAI"
+     ],
+     "requiere": [
+      "Azure",
+      "Copilot",
+      "ChatGPT Enterprise",
+      "cloud"
+     ]
+    }
+   ],
+   "pendiente_revisar": "«Windows» y «Copilot» con mayúscula: revisar en la simulación si meten ruido (GitHub Copilot ya es MSFT)."
+  },
+  "META": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Mark Zuckerberg",
+     "tipo": "persona"
+    },
+    {
+     "termino": "Threads",
+     "mayusculas": true,
+     "requiere": [
+      "Meta",
+      "Instagram",
+      "app",
+      "users",
+      "usuarios"
+     ]
+    },
+    {
+     "termino": "Ray-Ban Meta",
+     "mayusculas": true
+    },
+    {
+     "termino": "Llama",
+     "mayusculas": true,
+     "requiere": [
+      "Meta",
+      "AI model",
+      "open-source",
+      "open source",
+      "LLM",
+      "modelo"
+     ]
+    }
+   ],
+   "relaciones": [],
+   "pendiente_revisar": "«Meta» a secas no se siembra (meta-análisis, «meta» en español); «Threads»/«Llama» con mayúscula: revisar en la simulación."
+  },
+  "AMZN": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Andy Jassy",
+     "tipo": "persona"
+    },
+    {
+     "termino": "Prime Video",
+     "mayusculas": true
+    },
+    {
+     "termino": "Alexa",
+     "mayusculas": true,
+     "requiere": [
+      "Amazon",
+      "Echo",
+      "voice assistant",
+      "assistant",
+      "asistente"
+     ]
+    },
+    {
+     "termino": "Amazon",
+     "mayusculas": true,
+     "excluye": [
+      "Amazon rainforest",
+      "Amazon River",
+      "Amazon basin",
+      "Amazonía",
+      "Amazonia",
+      "selva amazónica",
+      "río Amazonas"
+     ]
+    }
+   ],
+   "relaciones": []
+  },
+  "NFLX": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Netflix",
+     "mayusculas": true
+    },
+    {
+     "termino": "Ted Sarandos",
+     "tipo": "persona"
+    },
+    {
+     "termino": "Greg Peters",
+     "tipo": "persona",
+     "requiere": [
+      "Netflix",
+      "streaming"
+     ]
+    }
+   ],
+   "relaciones": [
+    {
+     "tipo": "competidor",
+     "terminos": [
+      "Disney+",
+      "HBO Max",
+      "Paramount+",
+      "Peacock"
+     ],
+     "requiere": [
+      "subscribers",
+      "streaming",
+      "suscriptores"
+     ]
+    }
+   ]
+  },
+  "PLTR": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Palantir",
+     "mayusculas": true
+    },
+    {
+     "termino": "Alex Karp",
+     "tipo": "persona"
+    }
+   ],
+   "relaciones": [],
+   "pendiente_revisar": "«Foundry», «Gotham» y «AIP» no se siembran: chocan con Intel Foundry, la ciudad y siglas corrientes."
+  },
+  "UBER": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Uber",
+     "mayusculas": true
+    },
+    {
+     "termino": "Dara Khosrowshahi",
+     "tipo": "persona"
+    },
+    {
+     "termino": "Uber Eats",
+     "mayusculas": true
+    }
+   ],
+   "relaciones": [
+    {
+     "tipo": "competidor",
+     "terminos": [
+      "Lyft",
+      "DoorDash",
+      "Waymo"
+     ],
+     "requiere": [
+      "ride-hailing",
+      "ridehailing",
+      "robotaxi",
+      "robotaxis",
+      "rides",
+      "delivery app"
+     ]
+    }
+   ]
+  },
+  "ADBE": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Adobe",
+     "mayusculas": true
+    },
+    {
+     "termino": "Premiere Pro",
+     "mayusculas": true
+    },
+    {
+     "termino": "Creative Cloud",
+     "mayusculas": true
+    },
+    {
+     "termino": "Firefly",
+     "mayusculas": true,
+     "requiere": [
+      "Adobe",
+      "generative",
+      "image model",
+      "video model",
+      "AI images",
+      "Photoshop"
+     ],
+     "excluye": [
+      "Firefly Aerospace",
+      "Alpha rocket",
+      "Blue Ghost"
+     ]
+    }
+   ],
+   "relaciones": [],
+   "pendiente_revisar": "«Firefly» solo con contexto de IA generativa y nunca con «Firefly Aerospace» (competidor de RKLB)."
+  },
+  "NVO": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Novo Nordisk",
+     "mayusculas": true
+    },
+    {
+     "termino": "Wegovy",
+     "mayusculas": true
+    },
+    {
+     "termino": "Ozempic",
+     "mayusculas": true
+    },
+    {
+     "termino": "Rybelsus",
+     "mayusculas": true
+    }
+   ],
+   "relaciones": [
+    {
+     "tipo": "competidor",
+     "terminos": [
+      "Eli Lilly",
+      "Lilly",
+      "Zepbound",
+      "Mounjaro"
+     ],
+     "requiere": [
+      "obesity",
+      "weight-loss",
+      "weight loss",
+      "GLP-1",
+      "obesidad"
+     ]
+    }
+   ]
+  },
+  "HIMS": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Hims & Hers",
+     "mayusculas": true
+    },
+    {
+     "termino": "Hims and Hers",
+     "mayusculas": true
+    }
+   ],
+   "relaciones": [
+    {
+     "tipo": "sector",
+     "terminos": [
+      "compounded semaglutide",
+      "compounded GLP-1",
+      "compounded tirzepatide"
+     ]
+    }
+   ]
+  },
+  "BABA": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Alibaba",
+     "mayusculas": true
+    },
+    {
+     "termino": "Taobao",
+     "mayusculas": true
+    },
+    {
+     "termino": "Tmall",
+     "mayusculas": true
+    },
+    {
+     "termino": "Qwen",
+     "mayusculas": true
+    },
+    {
+     "termino": "Eddie Wu",
+     "tipo": "persona"
+    }
+   ],
+   "relaciones": []
+  },
+  "CCJ": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Cameco",
+     "mayusculas": true
+    },
+    {
+     "termino": "Cigar Lake",
+     "mayusculas": true
+    },
+    {
+     "termino": "McArthur River",
+     "mayusculas": true
+    }
+   ],
+   "relaciones": [
+    {
+     "tipo": "sector",
+     "terminos": [
+      "uranium price",
+      "uranium prices",
+      "spot uranium",
+      "uranium enrichment",
+      "precio del uranio"
+     ]
+    },
+    {
+     "tipo": "competidor",
+     "terminos": [
+      "Kazatomprom",
+      "NexGen",
+      "Orano"
+     ],
+     "requiere": [
+      "uranium",
+      "uranio"
+     ]
+    },
+    {
+     "tipo": "participada",
+     "terminos": [
+      "Westinghouse",
+      "Westinghouse Electric"
+     ],
+     "requiere": [
+      "nuclear",
+      "reactor",
+      "reactors",
+      "AP1000",
+      "AP300",
+      "reactores"
+     ],
+     "excluye": [
+      "Westinghouse Air Brake",
+      "Wabtec"
+     ]
+    }
+   ]
+  },
+  "NOW": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "ServiceNow",
+     "mayusculas": true
+    },
+    {
+     "termino": "Bill McDermott",
+     "tipo": "persona"
+    }
+   ],
+   "relaciones": []
+  },
+  "NBIS": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Nebius",
+     "mayusculas": true
+    },
+    {
+     "termino": "Arkady Volozh",
+     "tipo": "persona"
+    }
+   ],
+   "relaciones": [
+    {
+     "tipo": "competidor",
+     "terminos": [
+      "CoreWeave",
+      "Lambda",
+      "Crusoe"
+     ],
+     "requiere": [
+      "neocloud",
+      "neoclouds",
+      "GPU cloud",
+      "AI cloud"
+     ]
+    }
+   ]
+  },
+  "ZETA": {
+   "revisado": "2026-11-03",
+   "aliases": [],
+   "relaciones": [],
+   "pendiente_revisar": "«Zeta» a secas es ambiguo (letra griega, tormenta Zeta): solo el nombre generado «Zeta Global»."
+  },
+  "ONDS": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Ondas Holdings",
+     "mayusculas": true
+    },
+    {
+     "termino": "American Robotics",
+     "mayusculas": true
+    },
+    {
+     "termino": "Airobotics",
+     "mayusculas": true
+    }
+   ],
+   "relaciones": [],
+   "pendiente_revisar": "«Ondas» a secas es una palabra española (ondas de calor): no se siembra."
+  },
+  "BN": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Bruce Flatt",
+     "tipo": "persona"
+    }
+   ],
+   "relaciones": [
+    {
+     "tipo": "participada",
+     "terminos": [
+      "Westinghouse",
+      "Westinghouse Electric"
+     ],
+     "requiere": [
+      "nuclear",
+      "reactor",
+      "reactors",
+      "AP1000",
+      "AP300",
+      "reactores"
+     ],
+     "excluye": [
+      "Westinghouse Air Brake",
+      "Wabtec"
+     ]
+    }
+   ],
+   "pendiente_revisar": "Westinghouse es participada de Brookfield y Cameco: sus noticias nucleares quedan anotadas en las dos."
   }
  }
 }
