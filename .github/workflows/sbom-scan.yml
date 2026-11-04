@@ -449,10 +449,16 @@ jobs:
           fi
           echo "status=$status" >> "$GITHUB_OUTPUT"
 
+      - name: Install pinned Trivy from official GitHub release
+        run: |
+          bash scripts/security/install-trivy.sh "$RUNNER_TEMP/trivy-bin"
+          echo "$RUNNER_TEMP/trivy-bin" >> "$GITHUB_PATH"
+
       - name: "Motor 1: trivy sobre la imagen (vuln)"
         id: trivy_vuln
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
           image-ref: cavaai/${{ matrix.name }}:${{ github.sha }}
           format: json
           output: reports/trivy-vuln-${{ matrix.name }}.json
@@ -475,6 +481,7 @@ jobs:
         id: trivy_secret
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
           # Paso aparte, no por coste: un secret solo se detecta en las capas de la
           # imagen, y asi el informe de secrets y el de CVEs no se pisan. Si uno
           # de los dos escaneres no llega a correr, el gate lo nota por separado.
@@ -489,6 +496,7 @@ jobs:
         id: trivy_misconfig
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
           # Se evalua el repo entero, no solo el Dockerfile de esta imagen: una
           # imagen de produccion tampoco es segura si el compose que la levanta
           # la monta en root sobre un volumen con datos.
