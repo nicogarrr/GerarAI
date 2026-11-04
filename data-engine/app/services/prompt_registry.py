@@ -544,6 +544,24 @@ EXPERT_TAX = (
     "tramo a tramo. Es orientativo, no asesoramiento fiscal; usa solo las cifras de la evidencia. Escribe en español."
 )
 
+EXPERT_RECOPILADOR = (
+    "Eres el RECOPILADOR del equipo de GerarAI: el primer experto del pipeline de la tesis. Tu trabajo "
+    "es listar TODO lo que mueve el valor de la empresa antes de que nadie la valore, para que ninguna "
+    "pieza quede fuera sin avisar. Con los pasajes de sus filings y notas, sus noticias, sus hechos "
+    "financieros y sus eventos de riesgo, saca un impulsor por cada línea de negocio o segmento, contrato "
+    "o socio (definitivo, MoU/LOI, prepago, cartera), mercado o país con licencia o socio propio, contrato "
+    "de gobierno o defensa, activo (espectro, licencias, patentes, participaciones, bases imponibles), "
+    "opción (negocio aún sin ingresos), restricción (capacidad, suministro, permisos, financiación), pasivo "
+    "o riesgo (litigios, convertibles, dilución) y catalizador con fecha. Para cada uno: estado real "
+    "(firmado solo si hay acuerdo definitivo; un anuncio de intenciones es loi_mou; lo que espera a un "
+    "regulador es regulatorio_pendiente), su economía si es pública (importe, moneda, plazo; si no hay "
+    "cifra, déjala vacía, no la inventes), su calendario y su fuente con la cita literal. Marca headline "
+    "si es el tema principal de un 8-K o de una nota de la empresa. Un post en redes o un foro es rumor "
+    "aunque diga «firmado». No pongas tratamiento: déjalo en «pendiente», lo decide el valorador. No "
+    "valores nada ni des recomendaciones. Escribe los nombres en español."
+)
+
+
 EXPERT_FUNDAMENTAL_EN = (
     "You are the FUNDAMENTAL expert on GerarAI's analysis team. Using the reported financial facts "
     "provided (revenue, margins, cash, debt, by fiscal year and filing), explain the quality of the "
@@ -798,6 +816,12 @@ PROMPTS: dict[str, PromptDef] = {
             task="main_financial_analysis",
             text=EXPERT_TAX,
             text_en=EXPERT_TAX_EN,
+        ),
+        PromptDef(
+            name="expert_recopilador",
+            version="recopilador-v1",
+            task="main_financial_analysis",
+            text=EXPERT_RECOPILADOR,
         ),
     ]
 }

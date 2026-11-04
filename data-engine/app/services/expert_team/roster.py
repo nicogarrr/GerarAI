@@ -89,3 +89,26 @@ def default_experts() -> list[ExpertSpec]:
             applies=_tax_applies,
         ),
     ]
+
+
+def recopilador_expert() -> ExpertSpec:
+    """«Recopilador»: inventario de impulsores de valor (etapa 1 del pipeline de la tesis).
+
+    No entra en ``default_experts``: no responde preguntas ni opina, produce el
+    inventario que leen el valorador, la mezcla de analistas y el escéptico. Lo
+    corre ``expert_team.recopilador.run_recopilador`` (con EXPERT_TEAM_ENABLED).
+    """
+    from app.services.expert_team.recopilador import RECOPILADOR_NAME, RECOPILADOR_TOOLS
+
+    return ExpertSpec(
+        name=RECOPILADOR_NAME,
+        typical_s=25.0,
+        prompt_name="expert_recopilador",
+        tools=RECOPILADOR_TOOLS,
+        max_tokens=8000,
+    )
+
+
+def pipeline_experts() -> list[ExpertSpec]:
+    """Roles del pipeline automático de la tesis, en orden. Hoy: el Recopilador."""
+    return [recopilador_expert()]
