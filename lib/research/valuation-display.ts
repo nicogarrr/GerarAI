@@ -4,7 +4,6 @@
  * campo ausente degrada a null (la vista omite la línea), nunca se inventa.
  */
 import { formatPercent } from '@/lib/format';
-import type { TranslationKey } from '@/lib/i18n/t';
 import type { Locale } from '@/lib/i18n/locale';
 import { createTranslator } from '@/lib/i18n/translate';
 
@@ -26,7 +25,7 @@ const BLOCKER_LABELS_EN: Record<string, string> = {
 /** Etiquetas NUEVAS de blockers: viven en el catálogo i18n
  *  (research.valuationText.blockers.*); el fichero está en su techo de
  *  check:i18n y no admite más literales a mano. */
-const BLOCKER_LABEL_KEYS: Record<string, TranslationKey> = {
+const BLOCKER_LABEL_KEYS: Record<string, string> = {
   scenario_set_missing: 'research.valuationText.blockers.scenarioSetMissing',
 };
 
