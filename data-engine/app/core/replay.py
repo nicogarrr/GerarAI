@@ -45,7 +45,12 @@ async def consume_nonce(
 
             from app.core.redis_retry import no_retry_async
 
-            client = redis.from_url(redis_url, socket_connect_timeout=0.25, socket_timeout=0.5, retry=no_retry_async())
+            # Cold-start CPU contention can exceed 250/500 ms. Keep a bounded
+            # wait, no retry of an ambiguously committed write, and fail closed.
+            client = redis.from_url(
+                redis_url, socket_connect_timeout=1.0, socket_timeout=1.5,
+                retry=no_retry_async(),
+            )
             try:
                 acquired = await client.set(
                     nonce_key, "1", nx=True, ex=max(int(ttl_seconds), 1)
