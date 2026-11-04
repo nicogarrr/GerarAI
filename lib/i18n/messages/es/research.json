@@ -599,6 +599,15 @@
       "insufficient": "datos insuficientes",
       "missingDrivers": "con datos operativos pendientes",
       "preview": "solo vista previa"
+    },
+    "noValuationTag": " · valor/acción no calculable: {causes}",
+    "pendingInputs": "Datos operativos pendientes: {items}.",
+    "valuationBlocker": {
+      "forecastMissing": "falta la proyección de drivers",
+      "currentNetDebtMissing": "falta la deuda neta actual",
+      "terminalSharesMissing": "falta el número de acciones diluidas",
+      "waccNotAboveTerminalGrowth": "el WACC no supera el crecimiento terminal",
+      "terminalFcfNotPositive": "el FCF terminal no es positivo"
     }
   },
   "journal": {

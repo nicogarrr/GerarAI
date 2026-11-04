@@ -599,6 +599,15 @@
       "insufficient": "insufficient data",
       "missingDrivers": "operating data pending",
       "preview": "preview only"
+    },
+    "noValuationTag": " · value per share not computable: {causes}",
+    "pendingInputs": "Operating inputs pending: {items}.",
+    "valuationBlocker": {
+      "forecastMissing": "driver forecast missing",
+      "currentNetDebtMissing": "current net debt missing",
+      "terminalSharesMissing": "diluted share count missing",
+      "waccNotAboveTerminalGrowth": "WACC does not exceed terminal growth",
+      "terminalFcfNotPositive": "terminal FCF is not positive"
     }
   },
   "journal": {

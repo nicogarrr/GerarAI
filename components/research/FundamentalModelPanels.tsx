@@ -7,6 +7,7 @@ import type { Locale } from '@/lib/i18n/locale';
 import { t, type TranslationKey, type TranslationVars } from '@/lib/i18n/t';
 import { etiquetaTipoEvento } from '@/lib/labels';
 import { metricLabel } from '@/lib/research/metric-labels';
+import { modelUnvaluedCauseKeys, scenarioValuationCause } from '@/lib/research/valuation-blockers';
 import { financialFormula } from '@/lib/research/financial-display';
 import { frameworkLabel, frameworkTerm } from '@/lib/research/framework-terms';
 import { expectationMetricLabel, reviewStatusLabel } from '@/lib/research/expectation-labels';
@@ -175,6 +176,9 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
   const terminal = base?.terminal_year;
   const growthAssumption = model.assumptions.revenue_growth;
   const marginAssumption = model.assumptions.fcf_margin;
+  // Cabecera honesta: si ningún escenario tiene valor/acción, «completo» y
+  // «100 % de los presentes» no bastan; la cabecera nombra la causa.
+  const unvaluedCauseKeys = modelUnvaluedCauseKeys(model.scenarios);
 
   return (
     <section className="rounded-lg border border-gray-800 bg-surface-1 p-5">
@@ -190,6 +194,7 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
           {ti('research.model.horizon', { years: model.horizon_years, status: translate(MODEL_STATUS_LABELS, model.status, ti, model.status) })}
           {ti('research.model.coverage', { pct: fmt.formatNumber(model.source_coverage.coverage_percent, { maximumFractionDigits: 0 }) })}
           {model.publishable ? '' : ti('research.model.notPublishableTag')}
+          {unvaluedCauseKeys.length ? ti('research.model.noValuationTag', { causes: unvaluedCauseKeys.map((key) => ti(key)).join(' · ') }) : ''}
         </span>
       </div>
       <p className="mb-4 text-xs leading-5 text-gray-500">
@@ -211,7 +216,7 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
 
       {model.missing_inputs.length ? (
         <div className="mb-4 rounded-md border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
-          {ti('research.model.notPublishable', { items: model.missing_inputs.map(term).join(', ') })}
+          {ti(model.publishable ? 'research.model.pendingInputs' : 'research.model.notPublishable', { items: model.missing_inputs.map(term).join(', ') })}
         </div>
       ) : null}
 
@@ -251,6 +256,9 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
                     <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.fcf')}</dt><dd className="text-gray-300">{num(point?.free_cash_flow)}</dd></div>
                     <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.fcfMargin')}</dt><dd className="text-gray-300">{pctv(point?.fcf_margin)}</dd></div>
                     <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.valuePerShare')}</dt><dd className="font-semibold text-teal-200">{num(scenario.valuation?.value_per_share)}</dd></div>
+                    {scenario.valuation == null && scenarioValuationCause(scenario, ti) ? (
+                      <p className="text-xs leading-5 text-gray-500">{scenarioValuationCause(scenario, ti)}</p>
+                    ) : null}
                   </dl>
                 </div>
               );
@@ -277,7 +285,12 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
                       <td className="py-3 text-right text-gray-300">{num(point?.revenue)}</td>
                       <td className="py-3 text-right text-gray-300">{num(point?.free_cash_flow)}</td>
                       <td className="py-3 text-right text-gray-300">{pctv(point?.fcf_margin)}</td>
-                      <td className="py-3 text-right text-teal-200">{num(scenario.valuation?.value_per_share)}</td>
+                      <td className="py-3 text-right text-teal-200">
+                        {num(scenario.valuation?.value_per_share)}
+                        {scenario.valuation == null && scenarioValuationCause(scenario, ti) ? (
+                          <div className="mt-1 text-xs leading-4 text-gray-500">{scenarioValuationCause(scenario, ti)}</div>
+                        ) : null}
+                      </td>
                     </tr>
                   );
                 })}
