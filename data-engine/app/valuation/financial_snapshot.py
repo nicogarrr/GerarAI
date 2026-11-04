@@ -365,6 +365,77 @@ class FinancialSnapshotBuilder:
         snapshot.derived["net_debt"] = [i for i in (debt.id, cash.id) if i is not None]
 
     @staticmethod
+    def _net_of_short_term_investments(
+        snapshot: FinancialSnapshot,
+        investments: FinancialFact | None,
+    ) -> None:
+        """Resta las inversiones financieras a corto plazo de una deuda neta solo-caja.
+
+        FMP (netDebt), Yahoo («Net Debt») y la derivada local calculan la deuda
+        neta como deuda total − efectivo y equivalentes, dejando fuera los
+        valores negociables / inversiones a corto plazo que el emisor presenta
+        aparte (PLTR 31/12/2025: 1.424 M de caja y 5.753 M en
+        MarketableSecuritiesCurrent; la deuda neta salía −1.194 M en vez de
+        −6.948 M). Solo se ajusta cuando la deuda neta resuelta ES exactamente
+        deuda − caja (o −caja sin deuda) del MISMO cierre y divisa que las
+        inversiones: si la fuente ya da otra definición (p.ej. ya incluye las
+        inversiones, o un emisor ESEF con su propia deuda neta) no se toca, y
+        nunca se resta dos veces. El resultado es un hecho transitorio
+        ``DERIVED`` con sus fuentes en ``snapshot.derived["net_debt"]``.
+        """
+        net = snapshot.facts.get("net_debt")
+        cash = snapshot.facts.get("cash_and_equivalents")
+        if net is None or cash is None or investments is None:
+            return
+        debt = snapshot.facts.get("total_debt")
+        units = {(net.unit or ""), (cash.unit or ""), (investments.unit or "")}
+        if debt is not None:
+            units.add(debt.unit or "")
+        if len(units) != 1:
+            return
+        if not (_same_balance_instant(net, investments) and _same_balance_instant(net, cash)):
+            return
+        if debt is not None and not _same_balance_instant(net, debt):
+            debt = None
+        try:
+            n, c, s = float(net.value), float(cash.value), float(investments.value)
+            d = float(debt.value) if debt is not None else 0.0
+        except (TypeError, ValueError):
+            return
+        if not all(math.isfinite(x) for x in (n, c, s, d)) or s <= 0:
+            return
+        tolerance = max(1.0, 0.005 * max(abs(d), abs(c)))
+        if abs(n - (d - c)) > tolerance:
+            # La deuda neta de la fuente no es «deuda − caja» de este cierre:
+            # definición distinta (o ya neta de inversiones). No se adivina.
+            return
+        sources = list(snapshot.derived.get("net_debt") or ([net.id] if net.id is not None else []))
+        if investments.id is not None:
+            sources.append(investments.id)
+        snapshot.facts["net_debt"] = FinancialFact(
+            company_id=net.company_id,
+            source_id=net.source_id if net.source_id == investments.source_id else None,
+            metric="net_debt",
+            value=Decimal(str(n - s)),
+            period=net.period,
+            fiscal_year=net.fiscal_year,
+            fiscal_quarter=net.fiscal_quarter,
+            unit=net.unit,
+            source_type="DERIVED",
+            is_reported=False,
+            is_adjusted=False,
+            confidence=min(
+                Decimal(str(net.confidence if net.confidence is not None else "0.8")),
+                Decimal(str(investments.confidence if investments.confidence is not None else "0.8")),
+            ),
+        )
+        snapshot.derived["net_debt"] = sources
+        snapshot.warnings.append(
+            f"net_debt {net.period}: se restan {s:,.0f} {net.unit or ''} de inversiones "
+            "financieras a corto plazo (la fuente solo restaba efectivo y equivalentes)."
+        )
+
+    @staticmethod
     def _derive_free_cash_flow(snapshot: FinancialSnapshot) -> None:
         """free_cash_flow = operating_cash_flow - |capital_expenditure| (+ margen).
 
@@ -750,6 +821,9 @@ class FinancialSnapshotBuilder:
             db, company, snapshot, anchor, facts_for, as_of=as_of, price_as_of=price_as_of
         )
         self._cross_check_sources(snapshot, anchor, facts_for, as_of=as_of, drop_unconfirmed_zero=False)
+        self._net_of_short_term_investments(
+            snapshot, _pick_matching(facts_for("short_term_investments"), anchor, instant=True)
+        )
 
         missing: list[str] = []
         for metric in REQUIRED_FOR_DCF:
