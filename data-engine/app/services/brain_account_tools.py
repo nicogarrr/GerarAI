@@ -342,7 +342,9 @@ def realized_line_for_closed_ticker(db: Session, tenant: int, company_id: int, t
     if not years:
         return None
     total, count, unreliable, dates = Decimal("0"), 0, False, []
-    for year in years[-6:]:
+    # Todos los ejercicios con ventas: con ``years[-6:]`` una venta de hace más
+    # de seis ejercicios desaparecía del total y del recuento sin aviso.
+    for year in years:
         data = _tax_data(db, year)
         if data is None:
             unreliable = True
