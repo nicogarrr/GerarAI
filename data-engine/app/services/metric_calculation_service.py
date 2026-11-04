@@ -242,6 +242,28 @@ def _beta_is_plausible(beta: Decimal) -> bool:
     return low <= beta <= high
 
 
+# Desfase maximo (en ejercicios) entre el gasto financiero y la deuda con la
+# que se divide para estimar el coste de la deuda. 2 tolera el hueco de
+# ingesta habitual (gasto FY2023 con deuda FY2025, ~275 empresas en prod el
+# 4-nov-2026) y corta lo claramente obsoleto (CHTR: FY2013 sobre FY2025).
+MAX_INTEREST_DEBT_YEAR_GAP = 2
+
+
+def _fact_year(fact: FinancialFact) -> int | None:
+    if fact.fiscal_year is not None:
+        return int(fact.fiscal_year)
+    head = (fact.period or "")[:4]
+    return int(head) if head.isdigit() else None
+
+
+def _fiscal_year_gap(a: FinancialFact, b: FinancialFact) -> int | None:
+    """Ejercicios de distancia entre dos hechos; ``None`` si alguno no se sabe."""
+    year_a, year_b = _fact_year(a), _fact_year(b)
+    if year_a is None or year_b is None:
+        return None
+    return abs(year_a - year_b)
+
+
 def _gated_input(
     name: str,
     reason: str,
@@ -1183,7 +1205,30 @@ class MetricCalculationService:
                     facts["total_debt"],
                     allow_latest=True,
                 )
-                if interest:
+                year_gap = (
+                    _fiscal_year_gap(interest[1], facts["total_debt"]) if interest else None
+                )
+                if interest and year_gap is not None and year_gap > MAX_INTEREST_DEBT_YEAR_GAP:
+                    # El gasto financiero es un flujo y la deuda un saldo: solo
+                    # se dividen si sus ejercicios estan cerca (<= 2 anos).
+                    # `allow_latest` cogia el ultimo gasto disponible aunque
+                    # fuera de hace 12 anos: CHTR, 846 M$ de FY2013 sobre
+                    # 94.756 M$ de deuda FY2025 = coste de deuda 0,89 %, WACC
+                    # 1,72 % < g y la tesis caia entera. Se declara ausente.
+                    missing.append("interest_expense_same_period_as_debt")
+                    gated.append(
+                        _gated_input(
+                            "interest_expense",
+                            "interest_expense_stale_vs_debt",
+                            f"gasto financiero de {interest[1].period} frente a "
+                            f"deuda de {facts['total_debt'].period} ({year_gap} "
+                            "anos de desfase): un flujo viejo sobre un saldo "
+                            "actual no es el coste de la deuda; se declara "
+                            "ausente en vez de usarlo",
+                            value=Decimal(interest[1].value),
+                        )
+                    )
+                elif interest:
                     facts["interest_expense"] = interest[1]
                     cost_of_debt = (
                         abs(Decimal(interest[1].value))
