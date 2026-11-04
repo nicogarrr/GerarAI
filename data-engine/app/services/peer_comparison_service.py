@@ -182,6 +182,17 @@ def peer_eligibility(
         return None
     return "sector+" + "+".join(extras)
 
+# Valores que significan «sin clasificar»: una coincidencia entre vacíos no es
+# evidencia de negocio (tenant 5, 4-nov-2026: el 100 % del universo era stub y
+# BFIT.AS salía con la A de la lista alfabética — A3M, ACS, ACX, AENA... — por
+# «mismo company_type/valuation_model» vacíos compartidos).
+_UNKNOWN_TOKENS = frozenset({"", "unknown", "unassigned", "none", "n/a"})
+
+
+def _known(value: object) -> bool:
+    """El valor clasifica de verdad (no es un placeholder de «sin clasificar»)."""
+    return str(value or "").strip().lower() not in _UNKNOWN_TOKENS
+
 
 class PeerComparisonService:
     def __init__(self) -> None:
@@ -383,19 +394,37 @@ class PeerComparisonService:
         score = 0.0
         rationale: list[str] = []
         dimensions: dict[str, float] = {}
-        if target.industry != "Unknown" and candidate.industry == target.industry:
+        same_industry = _known(target.industry) and _known(candidate.industry) and candidate.industry == target.industry
+        same_sector = _known(target.sector) and _known(candidate.sector) and candidate.sector == target.sector
+        industry_conflict = _known(target.industry) and _known(candidate.industry) and candidate.industry != target.industry
+        sector_conflict = _known(target.sector) and _known(candidate.sector) and candidate.sector != target.sector
+        # Puerta de negocio conocido incompatible: una constructora (industria y
+        # sector conocidos, distintos) nunca es comparable de un gimnasio, por
+        # mucha divisa/plaza/tamaño que comparta. Misma industria o mismo sector
+        # conocido sí deja pasar (CHTR-CMCSA: industria distinta, sector común).
+        if (industry_conflict and not same_sector) or (sector_conflict and not same_industry):
+            dimensions["excluded"] = 1.0
+            return 0.0, ["excluded: known industry/sector mismatch"], dimensions
+        same_company_type = (
+            _known(target.company_type) and _known(candidate.company_type)
+            and candidate.company_type == target.company_type
+        )
+        if same_industry:
             score += 0.30
             dimensions["industry"] = 1.0
             rationale.append("same industry")
-        elif target.sector != "Unknown" and candidate.sector == target.sector:
+        elif same_sector:
             score += 0.14
             dimensions["sector"] = 1.0
             rationale.append("same sector")
-        if candidate.company_type == target.company_type:
+        if same_company_type:
             score += 0.16
             dimensions["business_model"] = 1.0
             rationale.append("same company type")
-        if candidate.valuation_model == target.valuation_model:
+        if (
+            _known(target.valuation_model) and _known(candidate.valuation_model)
+            and candidate.valuation_model == target.valuation_model
+        ):
             score += 0.10
             dimensions["capital_profile"] = 1.0
             rationale.append("same valuation/capital profile")
@@ -435,6 +464,13 @@ class PeerComparisonService:
             score += 0.17 * size_score
             dimensions["market_cap"] = round(size_score, 4)
             rationale.append(f"market-cap ratio {float(ratio):.2f}x")
+        # Sin al menos una evidencia de negocio conocida (industria, sector,
+        # tipo conocido o tags compartidos), divisa/plaza/tamaño solos NO
+        # forman cohorte: mejor «sin comparables» (muestra insuficiente, N/D)
+        # que una cohorte fabricada por orden alfabético.
+        if not (same_industry or same_sector or same_company_type or dimensions.get("factor_tags")):
+            dimensions["excluded"] = 1.0
+            return 0.0, ["excluded: no known business evidence in common"], dimensions
         return score, rationale, dimensions
 
     def _latest_market_caps_usd(
