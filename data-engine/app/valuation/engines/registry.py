@@ -158,6 +158,63 @@ def resolve_engine_key(company: Company) -> str:
     return "standard_dcf"
 
 
+# Métodos que el modelo declarado (company.valuation_model, p. ej.
+# «sotp+asset_management_multiple») puede nombrar como principal (su primer
+# componente) y los motores que los implementan. Un método fuera de esta tabla
+# («scenario_auto_energy_fsd», «defense_backlog_scenario_model») no tiene
+# motor propio: corre el que resuelve resolve_engine_key y queda dicho.
+_DECLARED_METHOD_ENGINES: tuple[tuple[str, frozenset[str]], ...] = (
+    ("sotp", frozenset({"sotp", "holding_company"})),
+    ("commodity", frozenset({"commodity"})),
+    ("probability_weighted_scenarios", frozenset({"pre_revenue"})),
+    ("speculative", frozenset({"pre_revenue"})),
+    # NAV aproximado: el de una minera es el del motor de materias primas.
+    ("nav_rough", frozenset({"pre_revenue", "commodity"})),
+    ("bank", frozenset({"bank"})),
+    ("insur", frozenset({"insurer"})),
+    ("reit", frozenset({"reit"})),
+    ("dcf", frozenset({"standard_dcf"})),
+)
+_UNDECLARED_MODELS = frozenset({"", "unassigned"})
+
+
+def declared_engine_fallback(
+    company: Company, resolved_engine: str | None = None
+) -> dict[str, str] | None:
+    """Por qué el motor que corre no es el del modelo declarado, o None.
+
+    TSLA (4-nov-2026): declarado «scenario_auto_energy_fsd», resuelto
+    standard_dcf sin rastro; la traza y el modelo guardado decían el método
+    declarado como si hubiera corrido. Motivos:
+    - ``declared_method_without_engine``: ningún motor implementa el método
+      principal declarado; corre el motor resuelto (respaldo).
+    - ``overridden_by_classification``: el método tiene motor, pero el tipo o
+      la industria de la empresa mandan a otro (p. ej. un DCF declarado sobre
+      un banco va al motor bancario).
+    """
+    declared = (getattr(company, "valuation_model", None) or "").strip()
+    if declared.lower() in _UNDECLARED_MODELS:
+        return None
+    method = declared.lower().split("+", 1)[0].strip()
+    resolved = resolved_engine or resolve_engine_key(company)
+    engines = next(
+        (allowed for marker, allowed in _DECLARED_METHOD_ENGINES if marker in method),
+        None,
+    )
+    if engines is None:
+        reason = "declared_method_without_engine"
+    elif resolved in engines:
+        return None
+    else:
+        reason = "overridden_by_classification"
+    return {
+        "declared_model": declared,
+        "declared_method": method,
+        "resolved_engine": resolved,
+        "reason": reason,
+    }
+
+
 def resolve(company: Company) -> ValuationEngine:
     key = resolve_engine_key(company)
     engine_cls = VALUATION_ENGINES.get(key, StandardDCFEngine)

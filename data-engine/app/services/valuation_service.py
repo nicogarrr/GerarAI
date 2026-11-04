@@ -36,6 +36,7 @@ from app.valuation.engines.base import (
     insufficient_result,
     wacc_terminal_growth_reason,
 )
+from app.valuation.engines.registry import declared_engine_fallback
 from app.valuation.margin_convention import MARGIN_OF_SAFETY_CONVENTION
 from app.valuation.point_in_time import (
     PRECISION_UNKNOWN,
@@ -778,6 +779,15 @@ class ValuationService:
         # Written only by a fresh computation, never added when reading history.
         result["trace"]["margin_of_safety_convention"] = MARGIN_OF_SAFETY_CONVENTION
         result["trace"]["resolved_engine"] = resolve_engine_key(company)
+        # El método declarado viaja con el motor que corrió: si no coinciden,
+        # el motivo queda en la traza (y en el modelo guardado) en vez de
+        # presentar el declarado como si hubiera corrido (TSLA, KRKNF).
+        result["trace"]["declared_model"] = getattr(company, "valuation_model", None)
+        fallback = declared_engine_fallback(company, result["trace"]["resolved_engine"])
+        if fallback is not None:
+            result["trace"]["engine_fallback"] = fallback
+        else:
+            result["trace"].pop("engine_fallback", None)
         free_data = _free_data_trace(db, company)
         if free_data is not None:
             result["trace"]["free_data"] = free_data
