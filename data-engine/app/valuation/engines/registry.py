@@ -65,6 +65,16 @@ def resolve_engine_key(company: Company) -> str:
     industry = (getattr(company, "industry", None) or "").lower()
     if "insurance" in industry and "broker" not in industry:
         return "insurer"
+    # Lo mismo para bancos («Banks - Regional», «Banks», «Banking»): el flujo
+    # operativo de un banco mueve depósitos y créditos, no es caja libre, y un
+    # FCFF DCF sobre él inventa cifras (SAN, 3-nov-2026: 232 € frente a 10 €
+    # de precio, con un margen FCF «normalizado» del 44 %). El marco de la
+    # empresa ya lo trata como banco (company_framework); el motor tiene que
+    # ser el mismo. Si al motor bank le faltan datos, valuation_service pasa
+    # al respaldo orientativo por múltiplos (no publicable) o deja N/D, nunca
+    # un DCF de caja libre.
+    if "bank" in industry:
+        return "bank"
     # El cambio de motor por identidad SOLO entra para tickers verificados a
     # mano (identidad comprobada 19 oct 2026 en prod). Mover por industria a
     # bancos/gestoras/REITs haria que motores fail-closed reemplazaran un DCF
