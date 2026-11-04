@@ -437,15 +437,6 @@ class ScenarioValuationEngine(ValuationEngine):
             }
         )
         result["trace"] = trace
-        if source != "declared":
-            # Sin juego de escenarios con fuente el valor es el juego por
-            # defecto (25/50/25, default_derived): el modelo declarado no ha
-            # corrido y el numero es una orientacion degradada con el motivo,
-            # nunca una valoracion final (dato ausente = N/D).
-            blockers = [str(b) for b in (result.get("publication_blockers") or []) if str(b).strip()]
-            if "scenario_set_missing" not in blockers:
-                blockers.append("scenario_set_missing")
-            result["publication_blockers"] = blockers
         return apply_publication_blockers(result)
 
     def _fallback(self, context: ValuationContext, base: dict | None, reason: str, detail: str) -> dict:

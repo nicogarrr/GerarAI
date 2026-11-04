@@ -22,16 +22,7 @@ const BLOCKER_LABELS_EN: Record<string, string> = {
   inferred_fcf_margin_target: 'inferred FCF margin target (with sources): indicative margin convergence for a growing company, not a final valuation',
 };
 
-/** Etiquetas NUEVAS de blockers: viven en el catálogo i18n
- *  (research.valuationText.blockers.*); el fichero está en su techo de
- *  check:i18n y no admite más literales a mano. */
-const BLOCKER_LABEL_KEYS: Record<string, string> = {
-  scenario_set_missing: 'research.valuationText.blockers.scenarioSetMissing',
-};
-
 export function blockerLabel(id: string, locale: 'es' | 'en' = 'es'): string {
-  const key = BLOCKER_LABEL_KEYS[id];
-  if (key) return createTranslator(locale)(key);
   return (locale === 'en' ? BLOCKER_LABELS_EN : BLOCKER_LABELS)[id] ?? id;
 }
 

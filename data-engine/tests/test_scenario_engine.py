@@ -128,43 +128,6 @@ def test_scenario_model_runs_default_scenarios_and_weights_them(db):
         assert item["assumptions"]["wacc"] == pytest.approx(plain["trace"]["wacc"])
 
 
-def test_default_scenarios_without_sourced_set_are_not_publishable(db, monkeypatch):
-    """Sin juego de escenarios con fuente el valor es el juego por defecto
-    (25/50/25): el modelo declarado no ha corrido, así que los números son una
-    orientación degradada con el motivo, nunca una valoración final (dato
-    ausente = N/D; la ficha ya tiene la rama degradada)."""
-    company = _company(db, "scenario_auto_energy_fsd")
-    result = ValuationService().value_company(db, company)
-    assert result["trace"]["scenario_set"]["source"] == "default_derived"
-    assert result["publishable"] is False
-    assert result["status"] == "partial"
-    assert "scenario_set_missing" in result["publication_blockers"]
-    assert "scenario_set_missing" in result["trace"]["publication_blockers"]
-    # Los números se quedan: mismo juego por defecto que antes, solo cambia la etiqueta.
-    assert result["expected_value"] is not None
-    names = [s["name"] for s in result["trace"]["scenario_set"]["scenarios"]]
-    assert names == ["bear", "base", "bull"]
-
-    # Con juego declarado en datos sí publica: la degradación viene de que el
-    # juego no tiene fuente, no del motor de escenarios en sí.
-    monkeypatch.setitem(
-        valuation_scenarios.VALUATION_SCENARIOS,
-        "XDCL",
-        {
-            "source": "test",
-            "scenarios": [
-                {"name": "bear", "probability": 0.25, "method": "dcf", "revenue_growth": 0.02, "fcf_margin": 0.09},
-                {"name": "base", "probability": 0.50, "method": "dcf", "revenue_growth": 0.05, "fcf_margin": 0.11},
-                {"name": "bull", "probability": 0.25, "method": "dcf", "revenue_growth": 0.08, "fcf_margin": 0.13},
-            ],
-        },
-    )
-    declared = ValuationService().value_company(db, _company(db, "scenario_auto_energy_fsd", ticker="XDCL"))
-    assert declared["trace"]["scenario_set"]["source"] == "declared"
-    assert declared["publishable"] is True
-    assert declared["status"] == "ok"
-
-
 def test_declared_scenarios_weighted_value_equals_hand_sum(db, monkeypatch):
     monkeypatch.setitem(
         valuation_scenarios.VALUATION_SCENARIOS,

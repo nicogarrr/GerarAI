@@ -6219,12 +6219,10 @@
       },
       "expected": {
         "engine_key": "scenario",
-        "status": "partial",
-        "publishable": false,
+        "status": "ok",
+        "publishable": true,
         "missing_inputs": [],
-        "publication_blockers": [
-          "scenario_set_missing"
-        ],
+        "publication_blockers": [],
         "adr_ratio": null,
         "trace_engine": "scenario",
         "closed_form": {
@@ -6273,12 +6271,10 @@
       },
       "expected": {
         "engine_key": "scenario",
-        "status": "partial",
-        "publishable": false,
+        "status": "ok",
+        "publishable": true,
         "missing_inputs": [],
-        "publication_blockers": [
-          "scenario_set_missing"
-        ],
+        "publication_blockers": [],
         "adr_ratio": null,
         "trace_engine": "scenario",
         "closed_form": {
@@ -6331,8 +6327,7 @@
         "publishable": false,
         "missing_inputs": [],
         "publication_blockers": [
-          "traceable_wacc",
-          "scenario_set_missing"
+          "traceable_wacc"
         ],
         "adr_ratio": null,
         "trace_engine": "scenario",
@@ -6384,8 +6379,7 @@
         "publishable": false,
         "missing_inputs": [],
         "publication_blockers": [
-          "forecast_is_not_the_driver",
-          "scenario_set_missing"
+          "forecast_is_not_the_driver"
         ],
         "adr_ratio": null,
         "trace_engine": "scenario",
@@ -6566,12 +6560,10 @@
       },
       "expected": {
         "engine_key": "scenario",
-        "status": "partial",
-        "publishable": false,
+        "status": "ok",
+        "publishable": true,
         "missing_inputs": [],
-        "publication_blockers": [
-          "scenario_set_missing"
-        ],
+        "publication_blockers": [],
         "adr_ratio": 8,
         "trace_engine": "scenario",
         "closed_form": {
@@ -6707,12 +6699,10 @@
       },
       "expected": {
         "engine_key": "scenario",
-        "status": "partial",
-        "publishable": false,
+        "status": "ok",
+        "publishable": true,
         "missing_inputs": [],
-        "publication_blockers": [
-          "scenario_set_missing"
-        ],
+        "publication_blockers": [],
         "adr_ratio": null,
         "trace_engine": "scenario",
         "closed_form": {
@@ -6761,12 +6751,10 @@
       },
       "expected": {
         "engine_key": "scenario",
-        "status": "partial",
-        "publishable": false,
+        "status": "ok",
+        "publishable": true,
         "missing_inputs": [],
-        "publication_blockers": [
-          "scenario_set_missing"
-        ],
+        "publication_blockers": [],
         "adr_ratio": null,
         "trace_engine": "scenario",
         "closed_form": {
