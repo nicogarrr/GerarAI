@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 // @ts-expect-error Node strip-types requires the explicit TS extension.
 import { researchValuability, modelConditionState, visibleThesisRating } from '../lib/research/coverage-state.ts';
-const complete = { latest_thesis: { status: 'ok' }, model_summary: { status: 'ok', publishable: true }, valuation_summary: { status: 'ok' } };
+const complete = { latest_thesis: { status: 'final' }, model_summary: { status: 'ok', publishable: true }, valuation_summary: { status: 'ok' } };
 test('coverage never makes insufficient thesis or blocked model valueable', () => {
   assert.equal(researchValuability({ ...complete, latest_thesis: { status: 'insufficient_data' } }), 'No valorable / falta evidencia');
   assert.equal(researchValuability({ ...complete, model_summary: { status: 'blocked', publishable: false } }), 'No valorable / falta evidencia');
@@ -38,4 +38,20 @@ test('un veredicto de valoración no contradice el estado no valorable (caso ADB
   assert.equal(visibleThesisRating('expensive', blocked), null);
   assert.equal(visibleThesisRating('attractive', complete), 'attractive');
   assert.equal(visibleThesisRating('insufficient_data', blocked), 'insufficient_data');
+});
+
+test('el badge de rating solo acompaña a una tesis pública (final/published)', () => {
+  // Un borrador con valoración «partial» (p. ej. respaldo orientativo por
+  // múltiplos, no publicable) no puede lucir veredicto sin la etiqueta
+  // «orientativo» que el texto sí lleva.
+  const final = { ...complete, latest_thesis: { status: 'final' } };
+  assert.equal(visibleThesisRating('attractive', { ...complete, latest_thesis: { status: 'draft' } }), null);
+  assert.equal(visibleThesisRating('expensive', { ...complete, latest_thesis: { status: 'draft' } }), null);
+  assert.equal(visibleThesisRating('watch', { ...complete, latest_thesis: { status: 'draft_failed_audit' } }), null);
+  assert.equal(visibleThesisRating('attractive', { ...complete, latest_thesis: { status: 'review' } }), null);
+  assert.equal(visibleThesisRating('attractive', { ...complete, latest_thesis: null }), null);
+  // La tesis pública conserva su badge, veredicto o no.
+  assert.equal(visibleThesisRating('attractive', final), 'attractive');
+  assert.equal(visibleThesisRating('watch', { ...complete, latest_thesis: { status: 'published' } }), 'watch');
+  assert.equal(visibleThesisRating('insufficient_data', final), 'insufficient_data');
 });
