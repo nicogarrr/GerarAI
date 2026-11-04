@@ -82,6 +82,10 @@ def _fact_rows(case: dict) -> list[dict]:
             {
                 "metric": metric,
                 "value": value,
+                # Unidad explicita opcional (p. ej. "EUR" o "shares"): sin ella
+                # se deriva del valor como siempre. Los casos en otra divisa la
+                # necesitan para que la banda de WACC no asuma USD en silencio.
+                "unit": meta.get("unit") or _unit(value),
                 "period": meta.get("period", DEFAULT_PERIOD),
                 "fiscal_year": meta.get("fiscal_year", DEFAULT_FISCAL_YEAR),
                 "fiscal_quarter": meta.get("fiscal_quarter", DEFAULT_FISCAL_QUARTER),
@@ -101,7 +105,7 @@ def _seed(db, company, case: dict) -> None:
                 company_id=company.id,
                 metric=row["metric"],
                 value=Decimal(repr(row["value"])),
-                unit=_unit(row["value"]),
+                unit=row["unit"],
                 period=row["period"],
                 fiscal_year=row["fiscal_year"],
                 fiscal_quarter=row["fiscal_quarter"],

@@ -10,7 +10,8 @@
     "bank / insurer / reit / commodity no tienen camino de status=partial por construccion: sus motores no emiten publication_blockers. La puerta engine_publishable_status se cubre en esos motores con la mitad positiva (ok + publishable + blockers=[]), y el camino partial/blocked se cubre donde existe: standard_dcf (traceable_wacc, forecast_is_not_the_driver), sotp y holding_company (segmentos sin valorar) y pre_revenue (funding gap incompleto).",
     "Los casos de clamp (P/B suelo/techo, flujo de commodity a 0, NAV de REIT a 0, cap rate de REITs) no usan sensitivity_covers_base: al saturar el clamp la tabla de sensibilidad colapsa a 1-2 valores distintos, y eso es la lectura honesta, no un fallo. El caso lo declara en su nota.",
     "Los motores bank/insurer/reit/commodity NO aplican el anclaje de periodo del snapshot: leen el ultimo fact por metric (fiscal_year desc) sin comprobar que todos los insumos sean del mismo ejercicio. Ver INTEGRACION PENDIENTE C2-4.",
-    "scenario (4-nov-2026): clones de los casos standard_dcf con modelo declarado de escenarios. Sin escenarios en datos corre el juego por defecto 25/50/25 (closed_form a mano en hand_calculation); sin DCF base válido vuelve al motor de clasificación con el motivo en trace.engine_fallback."
+    "scenario (4-nov-2026): clones de los casos standard_dcf con modelo declarado de escenarios. Sin escenarios en datos corre el juego por defecto 25/50/25 (closed_form a mano en hand_calculation); sin DCF base válido vuelve al motor de clasificación con el motivo en trace.engine_fallback.",
+    "Casos evb7_* (bateria de 7, 4-nov-2026): precio justo de forma cerrada para CHTR (equity negativo -> N/D por escenario), UNH (DCF normal, industry Health Care: no es motor insurer) y BFIT.AS (EUR: sin tipo de cambio la banda de WACC no adivina la conversion y manda el WACC trazable), mas rechazos N/D sin inputs. Los facts de BFIT.AS declaran unit explicita (soporte anadido al runner en el mismo commit)."
   ],
   "cases": [
     {
@@ -7457,6 +7458,273 @@
       ],
       "price": 80,
       "hand_calculation": "NAV ordinary unchanged; ADR80/8=10 comparable ordinary price; margin=expected/10-1."
+    },
+    {
+      "id": "evb7_chtr_equity_negativo_nd",
+      "engine": "standard_dcf",
+      "category": "honesty",
+      "company": {
+        "ticker": "CHTR",
+        "name": "Charter Communications (eval bateria de 7)",
+        "exchange": "NASDAQ",
+        "currency": "USD",
+        "sector": "Communication Services",
+        "industry": "Cable & Broadband",
+        "company_type": "research_candidate",
+        "valuation_model": "unassigned",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 55000,
+        "free_cash_flow": 3900,
+        "revenue_growth": 0.01,
+        "shares_diluted": 145,
+        "net_debt": 93000
+      },
+      "expected": {
+        "engine_key": "standard_dcf",
+        "status": "ok",
+        "publishable": true,
+        "missing_inputs": [],
+        "publication_blockers": [],
+        "adr_ratio": null,
+        "trace_engine": "standard_dcf",
+        "closed_form": {
+          "bear_value": null,
+          "base_value": null,
+          "bull_value": 233.8527016237,
+          "expected_value": null
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "value_matches_closed_form",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "gate_does_not_omit_itself",
+        "adr_ratio_basis"
+      ],
+      "price": 260,
+      "wacc": 0.09,
+      "hand_calculation": "CHTR (bateria de 7): revenue 55.000 M$, FCF 3.900 M$ -> margen 0,0709; crecimiento 0,01; deuda neta 93.000 M$; 145 M acciones; precio 260 $. Banda de WACC por tamano: 260 x 145 = 37.700 (< 10.000 M$) -> 11,5 % (el CalculatedMetric 0,09 queda como wacc_capm, solo informacion); terminal 0,03. DCF de 5 anos + Gordon por escenario. bear = (g min(0,01, max(-0,07, -0,05)) = -0,05; m 0,0709 - 0,06 = 0,0109; wacc 0,135) -> equity 33.217 - 93.000 -> vps bruto -612,18: N/D (deuda y obligaciones superan el valor del negocio; el bruto queda en la traza). base = (g 0,01; m 0,0709; wacc 0,115) -> EV 43.457 - 93.000 -> vps bruto -341,68: N/D. bull = (g 0,09; m 0,1309; wacc max(0,105, 0,04) = 0,105) -> vps 233,8527016237, unico publicable. Probabilidades (confianza 0,90): direccion = (0,01-0,115)*3 + (0,0709-0,10)*2 = -0,3732 -> upside 0,4254; base 0,616; bull 0,384 x 0,4254 = 0,1633; bear 0,2207. Esperado BRUTO = sum(p*v) = -307,36 <= 0 -> N/D: el bear y el base negativos SI cuentan en el ponderado (excluirlos inflaria el esperado). Puertas de banda/esperado/probabilidades no aplican: con escenarios N/D no hay banda completa que ordenar (convencion d2656966: una cifra <= 0 no es una valoracion publicable; se publica N/D explicado, nunca el negativo)."
+    },
+    {
+      "id": "evb7_chtr_sin_net_debt_nd",
+      "engine": "standard_dcf",
+      "category": "insufficient",
+      "company": {
+        "ticker": "CHTRND",
+        "name": "Charter Communications (eval bateria de 7, sin net_debt)",
+        "exchange": "NASDAQ",
+        "currency": "USD",
+        "sector": "Communication Services",
+        "industry": "Cable & Broadband",
+        "company_type": "research_candidate",
+        "valuation_model": "unassigned",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 55000,
+        "free_cash_flow": 3900,
+        "revenue_growth": 0.01,
+        "shares_diluted": 145
+      },
+      "expected": {
+        "engine_key": "standard_dcf",
+        "status": "insufficient_data",
+        "publishable": false,
+        "missing_inputs": [
+          "net_debt"
+        ],
+        "publication_blockers": [],
+        "trace_engine": "standard_dcf",
+        "closed_form": {
+          "bear_value": null,
+          "base_value": null,
+          "bull_value": null,
+          "expected_value": null
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "value_matches_closed_form",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "gate_does_not_omit_itself"
+      ],
+      "price": 260,
+      "wacc": 0.09,
+      "hand_calculation": "CHTR sin hecho de deuda neta: el puente de equity es EV - net_debt, asi que sin el dato no hay valoracion honesta posible; 0,0 inventaria equity por net_debt/acciones (en CHTR, ~93.000 M$ / 145 M = ~641 $ por accion inventado). El motor se niega declarando net_debt: N/D honesto en la empresa mas apalancada de la bateria."
+    },
+    {
+      "id": "evb7_unh_dcf_normal",
+      "engine": "standard_dcf",
+      "category": "happy_path",
+      "company": {
+        "ticker": "UNH",
+        "name": "UnitedHealth (eval bateria de 7)",
+        "exchange": "NYSE",
+        "currency": "USD",
+        "sector": "Health Care",
+        "industry": "Health Care",
+        "company_type": "research_candidate",
+        "valuation_model": "unassigned",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 400000,
+        "free_cash_flow": 30000,
+        "revenue_growth": 0.06,
+        "shares_diluted": 920,
+        "net_debt": 45000
+      },
+      "expected": {
+        "engine_key": "standard_dcf",
+        "status": "ok",
+        "publishable": true,
+        "missing_inputs": [],
+        "publication_blockers": [],
+        "adr_ratio": null,
+        "trace_engine": "standard_dcf",
+        "closed_form": {
+          "bear_value": 3.2345602574,
+          "base_value": 398.3685131545,
+          "bull_value": 1215.7534942526,
+          "expected_value": 459.419597931
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "bear_le_base_le_bull",
+        "expected_value_within_band",
+        "value_matches_closed_form",
+        "probabilities_sum_to_one",
+        "sensitivity_covers_base",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "trace_records_evidence",
+        "gate_does_not_omit_itself",
+        "adr_ratio_basis"
+      ],
+      "price": 310,
+      "wacc": 0.09,
+      "hand_calculation": "UNH (bateria de 7): revenue 400.000 M$, FCF 30.000 M$ -> margen 0,075; crecimiento 0,06; deuda neta 45.000 M$; 920 M acciones; precio 310 $. industry = Health Care (managed care, no aseguradora de riesgo): el routing NO lleva al motor insurer. Banda de WACC: 310 x 920 = 285.200 (< 10.000 M$ en las unidades toy del dataset) -> 11,5 % (CalculatedMetric 0,09 = wacc_capm informativo); terminal 0,03. DCF 5 anos + Gordon: bear = (g -0,02; m 0,015; wacc 0,135) -> 3,2345602574; base = (g 0,06; m 0,075; wacc 0,115) -> 398,3685131545; bull = (g 0,14; m 0,135; wacc 0,105) -> 1.215,7534942526. Probabilidades (confianza 0,90): direccion = (0,06-0,115)*3 + (0,075-0,10)*2 = -0,215 -> upside 0,457; base 0,616; bull 0,1755; bear 0,2085. Esperado = sum(p*v) = 459,4195979310, dentro de la banda. Margen de seguridad vs 310 $: (459,42-310)/459,42 = 32,5 %."
+    },
+    {
+      "id": "evb7_unh_sin_fcf_nd",
+      "engine": "standard_dcf",
+      "category": "insufficient",
+      "company": {
+        "ticker": "UNHND",
+        "name": "UnitedHealth (eval bateria de 7, sin FCF)",
+        "exchange": "NYSE",
+        "currency": "USD",
+        "sector": "Health Care",
+        "industry": "Health Care",
+        "company_type": "research_candidate",
+        "valuation_model": "unassigned",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 400000,
+        "revenue_growth": 0.06,
+        "shares_diluted": 920,
+        "net_debt": 45000
+      },
+      "expected": {
+        "engine_key": "standard_dcf",
+        "status": "insufficient_data",
+        "publishable": false,
+        "missing_inputs": [
+          "normalized_fcf_or_fcf_margin"
+        ],
+        "publication_blockers": [],
+        "trace_engine": "standard_dcf",
+        "closed_form": {
+          "bear_value": null,
+          "base_value": null,
+          "bull_value": null,
+          "expected_value": null
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "value_matches_closed_form",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "gate_does_not_omit_itself"
+      ],
+      "price": 310,
+      "wacc": 0.09,
+      "hand_calculation": "UNH sin FCF ni margen FCF: el snapshot es coherente (revenue y shares_diluted bastan), pero el margen del DCF no se puede derivar: sin fcf_margin declarado ni free_cash_flow del que sacar FCF/ventas, el motor declara normalized_fcf_or_fcf_margin y se niega. No inventa un margen: N/D honesto."
+    },
+    {
+      "id": "evb7_bfit_eur_sin_fx_fallback_wacc",
+      "engine": "standard_dcf",
+      "category": "policy",
+      "company": {
+        "ticker": "BFIT.AS",
+        "name": "Basic-Fit (eval bateria de 7)",
+        "exchange": "EURONEXT AMSTERDAM",
+        "currency": "EUR",
+        "sector": "Consumer Cyclical",
+        "industry": "Leisure",
+        "company_type": "research_candidate",
+        "valuation_model": "unassigned",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": {
+          "value": 1420,
+          "unit": "EUR"
+        },
+        "free_cash_flow": {
+          "value": 100,
+          "unit": "EUR"
+        },
+        "revenue_growth": 0.1,
+        "shares_diluted": {
+          "value": 66,
+          "unit": "shares"
+        },
+        "net_debt": {
+          "value": 900,
+          "unit": "EUR"
+        }
+      },
+      "expected": {
+        "engine_key": "standard_dcf",
+        "status": "ok",
+        "publishable": true,
+        "missing_inputs": [],
+        "publication_blockers": [],
+        "adr_ratio": null,
+        "trace_engine": "standard_dcf",
+        "closed_form": {
+          "bear_value": null,
+          "base_value": 19.2069505645,
+          "bull_value": 97.632953986,
+          "expected_value": 27.9316010017
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "value_matches_closed_form",
+        "sensitivity_covers_base",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "trace_records_evidence",
+        "gate_does_not_omit_itself",
+        "adr_ratio_basis"
+      ],
+      "price": 25,
+      "wacc": 0.1,
+      "hand_calculation": "BFIT.AS (bateria de 7, Euronext Amsterdam): facts en EUR (unit explicita; el runner antes derivaba USD de cualquier valor >= 1, lo que habria etiquetado euros como dolares en silencio). revenue 1.420 M€, FCF 100 M€ -> margen 0,0704; crecimiento 0,10 DE HECHOS; deuda neta 900 M€; 66 M acciones; precio 25 €. Banda de WACC: capitalizacion en EUR y sin tipo de cambio EUR/USD en la BD hermetica NO se adivina la conversion -> la banda no aplica (fallback_reason en la traza) y manda el CalculatedMetric trazable 0,10 (wacc_source=calculated_metric, publicable). Terminal 0,03. MULTIETAPA (crecimiento de hechos >= 10 %): anos 1-5 al crecimiento de la etapa 1, anos 6-10 bajando linealmente hasta el terminal (paso = (g1-0,03)/5); margen constante (sin normalizacion de capex); terminal sobre el FCF del ano 10. Escenarios: misma trayectoria desplazada. bear = (g1 0,02, fade 0,022/0,024/0,026/0,028/0,030; m 0,0104; wacc 0,12) -> vps bruto -11,20: N/D (la deuda supera el valor del negocio en el bajista); base = (g1 0,10, fade 0,086/0,072/0,058/0,044/0,030; m 0,0704; wacc 0,10) -> 19,20695056 €; bull = (g1 0,18, fade 0,15/0,12/0,09/0,06/0,03; m 0,1304; wacc 0,09) -> 97,63295399 €. Probabilidades (confianza 0,90): direccion = (0,10-0,10)*3 + (0,0704-0,10)*2 = -0,0592 -> upside 0,4882; base 0,616; bull 0,1875; bear 0,1965. Esperado = sum(p*v) con el bruto del bear = 27,93160100 €. La puerta de banda completa no aplica: el bear es N/D."
     }
   ]
 }
