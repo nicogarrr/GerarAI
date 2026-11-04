@@ -4,7 +4,7 @@ from pathlib import Path
 
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import MetaData, Table, create_engine, func, inspect, select, text
 
 
 def test_upgrade_and_downgrade_touch_only_new_public_tables():
@@ -25,7 +25,7 @@ def test_upgrade_and_downgrade_touch_only_new_public_tables():
         assert tables == {'companies', 'financial_facts', 'public_source_documents',
                           'public_financial_facts', 'public_financial_statements', 'public_analyst_targets'}
         for table in sorted(tables - {'companies', 'financial_facts'}):
-            assert conn.execute(text(f'SELECT count(*) FROM {table}')).scalar() == 0
+            assert conn.scalar(select(func.count()).select_from(Table(table, MetaData(), autoload_with=conn))) == 0
         mod.downgrade()
         assert set(inspect(conn).get_table_names()) == {'companies', 'financial_facts'}
         assert conn.execute(text('SELECT * FROM financial_facts')).all() == [(1, 2, 'private unchanged')]
