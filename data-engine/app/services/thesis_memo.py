@@ -206,6 +206,7 @@ def build_memo_markdown(
     draft: bool = False,
     isolated: bool = False,
     language: str = "es",
+    engine_stale: bool = False,
 ) -> str:
     """``draft=True``: memo de un borrador sin publicar, por lista blanca.
 
@@ -292,6 +293,9 @@ def build_memo_markdown(
         when = day(latest_data_at) if latest_data_at else tr("desconocida", "unknown")
         lines.append(tr(f"\n> AVISO: tesis potencialmente DESACTUALIZADA: hay datos mas nuevos (hasta {when}).",
                         f"\n> WARNING: thesis possibly OUT OF DATE: there is newer data (up to {when})."))
+    if engine_stale:
+        lines.append(tr("\n> AVISO: el motor de valoracion cambio desde que se genero esta version; los numeros pueden no coincidir con la ficha actual. Regenera la tesis para recalcularla.",
+                        "\n> WARNING: the valuation engine changed after this version was generated; figures may not match the current company page. Regenerate the thesis to recompute."))
     lines.append("")
 
     if not draft and thesis.margin_of_safety is not None:
