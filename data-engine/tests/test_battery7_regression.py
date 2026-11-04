@@ -106,6 +106,8 @@ def load_fixture_into_session(db: Session, fixture: dict) -> Company:
             confidence=Decimal(str(row.get("confidence", "0.80"))),
             accession_number=row.get("accession_number"),
             filed=date.fromisoformat(row["filed"]) if row.get("filed") else None,
+            # Desempate fiel a prod (financial_snapshot ordena created_at DESC).
+            created_at=(datetime.fromisoformat(row["created_at"]) if row.get("created_at") else None),
         )
         db.add(fact)
         db.flush()
@@ -144,6 +146,8 @@ def load_fixture_into_session(db: Session, fixture: dict) -> Company:
                 source_fact_ids=[fact_ids.get(i, i) for i in row.get("source_fact_ids", [])],
                 calculation_trace=row.get("calculation_trace", {}),
                 confidence=Decimal(str(row.get("confidence", "0.70"))),
+                # El WACC trazable desempata por created_at DESC (engines/base).
+                created_at=(datetime.fromisoformat(row["created_at"]) if row.get("created_at") else None),
             )
         )
     db.commit()
