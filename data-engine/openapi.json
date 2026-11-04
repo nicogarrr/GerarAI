@@ -496,6 +496,17 @@
             "title": "Fetched At",
             "type": "integer"
           },
+          "instrument_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Type"
+          },
           "note": {
             "anyOf": [
               {
@@ -506,6 +517,23 @@
               }
             ],
             "title": "Note"
+          },
+          "note_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "fetch_failed",
+                  "not_equity",
+                  "consensus_only",
+                  "no_targets"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note Code"
           },
           "reference_price": {
             "anyOf": [
@@ -528,6 +556,18 @@
               }
             ],
             "title": "Reference Price Source"
+          },
+          "reference_price_source_code": {
+            "anyOf": [
+              {
+                "const": "market_at_fetch",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Price Source Code"
           },
           "rows": {
             "default": [],
