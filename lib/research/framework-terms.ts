@@ -4,6 +4,7 @@
  * Las claves van en minúsculas con guiones bajos; las fórmulas
  * («ARR × retention × expansion») se traducen término a término.
  */
+import type { TranslationKey } from '../i18n/t';
 // @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
 import { FRAMEWORK_TERMS_EN } from './framework-terms-en.ts';
 // @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
@@ -13,8 +14,22 @@ import { createTranslator } from '../i18n/translate.ts';
  *  Las entradas NUEVAS van aquí: FRAMEWORK_TERMS está en su techo de check:i18n
  *  y no puede crecer. seed/ingesta dejan el stub sin motor («unassigned»):
  *  la ficha mostraba el slug crudo. */
-const FRAMEWORK_TERMS_I18N: Record<string, string> = {
+const FRAMEWORK_TERMS_I18N: Record<string, TranslationKey> = {
     unassigned: 'research.frameworkTerms.unassigned',
+};
+
+/** Métodos de trace.method de las valoraciones persistidas (data-engine
+ *  valuation/*): la ficha mostraba el slug crudo («unassigned», «median_
+ *  last_n_fiscal_years»). Las etiquetas ES viven en el catálogo i18n. */
+const METHOD_TERMS_I18N: Record<string, TranslationKey> = {
+    unassigned: 'research.frameworkTerms.unassigned',
+    median_last_n_fiscal_years: 'research.frameworkTerms.method.medianLastNYears',
+    cyclical_midcycle_mean_last_n_fiscal_years: 'research.frameworkTerms.method.cyclicalMidcycleMean',
+    fcff_dcf: 'research.frameworkTerms.method.fcffDcf',
+    fcff_dcf_margin_convergence: 'research.frameworkTerms.method.fcffDcfMarginConvergence',
+    fcff_dcf_multistage: 'research.frameworkTerms.method.fcffDcfMultistage',
+    probability_weighted_scenario: 'research.frameworkTerms.method.probabilityWeightedScenario',
+    explicit_driver_fcff_dcf: 'research.frameworkTerms.method.explicitDriverFcffDcf',
 };
 
 function esFrameworkLabel(key: string): string | null {
@@ -136,6 +151,18 @@ export function frameworkTerm(raw: string, locale: 'es' | 'en' = 'es'): string |
         out.push(t);
     }
     return out.join(' ');
+}
+
+/** Rótulo del método de una valoración persistida (trace.method). Método
+ *  conocido: etiqueta del catálogo i18n; desconocido: slug humanizado
+ *  («binary_search_reverse_dcf» → «binary search reverse dcf»), nunca el
+ *  snake_case crudo. */
+export function methodLabel(raw: string, locale: 'es' | 'en' = 'es'): string {
+    const key = normalise(raw);
+    const i18nKey = METHOD_TERMS_I18N[key];
+    if (locale === 'en') return key.replaceAll('_', ' ');
+    if (i18nKey) return createTranslator('es')(i18nKey);
+    return raw.trim().replaceAll('_', ' ');
 }
 
 /** «price per launch» -> «precio por lanzamiento»: palabra a palabra con «per» -> «por». */

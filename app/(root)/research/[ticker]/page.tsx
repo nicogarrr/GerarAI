@@ -89,6 +89,7 @@ import { ChatIntentLinks } from '@/components/research/ChatIntentLinks';
 import { NextStepLink } from '@/components/research/NextStepLink';
 import { missingLayerAction, missingLayerLabel } from '@/lib/research/missing-layer-guidance';
 import { metricLabel } from '@/lib/research/metric-labels';
+import { methodLabel } from '@/lib/research/framework-terms';
 import { MoatPanel, MoatClassificationPanel, MoatChecklistPanel } from '@/components/research/MoatPanel';
 import { AstOrbitPanel } from '@/components/research/AstOrbitPanel';
 import { ThesisScenariosPanel } from '@/components/research/ThesisScenariosPanel';
@@ -463,7 +464,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
         {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
         {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
         <p className="text-xs leading-5 text-gray-500">
-          {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type, locale), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
+          {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type, locale), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${methodLabel(method, locale)}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
           {t('research.ficha.persistedNoteGuidance')}{' '}
           {t('research.ficha.inputPeriods', { periods: periods ? periods : fmt.na })}
         </p>
@@ -500,7 +501,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
       {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
       {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
       <p className="text-xs leading-5 text-gray-500">
-        {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type, locale), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
+        {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type, locale), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${methodLabel(method, locale)}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
         {t('research.ficha.persistedNote')}{' '}
         {t('research.ficha.inputPeriods', { periods: periods ? periods : fmt.na })}
       </p>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { frameworkLabel, frameworkTerm } from '@/lib/research/framework-terms';
+import { frameworkLabel, frameworkTerm, methodLabel } from '@/lib/research/framework-terms';
 
 describe('frameworkTerm', () => {
     it('término simple, sin importar mayúsculas ni espacios (se normaliza a snake_case)', () => {
@@ -32,5 +32,19 @@ describe('frameworkLabel', () => {
     it('traduce etiqueta conocida y deja la desconocida tal cual', () => {
         expect(frameworkLabel('Space network / connectivity')).toBe('Red espacial / conectividad');
         expect(frameworkLabel('Algo nuevo')).toBe('Algo nuevo');
+    });
+});
+
+describe('methodLabel · método de valoración persistida', () => {
+    it('métodos conocidos llevan etiqueta, nunca el slug', () => {
+        expect(methodLabel('unassigned')).toBe('sin asignar');
+        expect(methodLabel('median_last_n_fiscal_years')).toBe('mediana de los últimos ejercicios');
+        expect(methodLabel('fcff_dcf_multistage')).toBe('DCF multietapa');
+        expect(methodLabel('median_last_n_fiscal_years', 'en')).toBe('median last n fiscal years');
+    });
+
+    it('método desconocido se humaniza, no se muestra el snake_case crudo', () => {
+        expect(methodLabel('binary_search_reverse_dcf')).toBe('binary search reverse dcf');
+        expect(methodLabel('binary_search_reverse_dcf', 'en')).toBe('binary search reverse dcf');
     });
 });
