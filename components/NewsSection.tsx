@@ -75,7 +75,7 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                             const age =
                                 typeof article.datetime === 'number' && Number.isFinite(article.datetime) && article.datetime > 0
                                     ? (formatAgeShort(article.datetime, Date.now(), locale) ??
-                                      formatMarketDate(new Date(article.datetime * 1000), { day: 'numeric', month: 'short' }))
+                                      formatMarketDate(new Date(article.datetime * 1000), { day: 'numeric', month: 'short' }, undefined, locale))
                                     : t('home.news.noDate');
                             return (
                                 <li key={`${article.id}-${index}`} className="flex items-start gap-3 py-3">

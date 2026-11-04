@@ -93,16 +93,16 @@ void test('la página usa el helper y declara el contador honesto de lo visible'
     assert.ok(!page.includes('pendiente'), 'desaparece el estado «pendiente»: ninguna tarjeta visible sale sin detalle por recorte');
     // Los textos van por t(); el ES verbatim historico se fija contra el dict.
     const es = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8'));
-    assert.match(page, /t\('research\.showingAll', \{ from: formatNumber\(slice\.from\), to: formatNumber\(slice\.to\), total: formatNumber\(slice\.total\) \}\)/, 'contador de lo visible');
+    assert.match(page, /t\('research\.showingAll', \{ from: (?:fmt\.)?formatNumber\(slice\.from\), to: (?:fmt\.)?formatNumber\(slice\.to\), total: (?:fmt\.)?formatNumber\(slice\.total\) \}\)/, 'contador de lo visible');
     assert.equal(es.showingAll, 'Mostrando {from}-{to} de {total} empresas');
-    assert.match(page, /t\('research\.showingMatches', \{ from: formatNumber\(slice\.from\), to: formatNumber\(slice\.to\), total: formatNumber\(slice\.total\), query, companies: formatNumber\(ordered\.length\) \}\)/, 'bajo filtro también se declara el rango visible contra el total real');
+    assert.match(page, /t\('research\.showingMatches', \{ from: (?:fmt\.)?formatNumber\(slice\.from\), to: (?:fmt\.)?formatNumber\(slice\.to\), total: (?:fmt\.)?formatNumber\(slice\.total\), query, companies: (?:fmt\.)?formatNumber\(ordered\.length\) \}\)/, 'bajo filtro también se declara el rango visible contra el total real');
     assert.equal(es.showingMatches, 'Mostrando {from}-{to} de {total} coincidencias para «{query}» (de {companies} empresas en el registro)');
-    assert.match(page, /t\('research\.zeroMatches', \{ query, companies: formatNumber\(ordered\.length\) \}\)/, 'filtro sin coincidencias no pinta un rango 0-0');
+    assert.match(page, /t\('research\.zeroMatches', \{ query, companies: (?:fmt\.)?formatNumber\(ordered\.length\) \}\)/, 'filtro sin coincidencias no pinta un rango 0-0');
     assert.equal(es.zeroMatches, '0 coincidencias para «{query}» (de {companies} empresas en el registro)');
     assert.match(page, /\{ordered\.length\s*\?/, 'el estado vacío depende del registro, no del filtro');
     assert.match(page, /title=\{t\('research\.emptyTitle'\)\}/, 'el estado sin empresas se conserva');
     assert.equal(es.emptyTitle, 'Todavía no hay ninguna empresa con research.');
-    assert.match(page, /t\('researchShared\.pageOf', \{ current: formatNumber\(slice\.page\), total: formatNumber\(slice\.pages\) \}\)/, 'posición de página declarada');
+    assert.match(page, /t\('researchShared\.pageOf', \{ current: (?:fmt\.)?formatNumber\(slice\.page\), total: (?:fmt\.)?formatNumber\(slice\.pages\) \}\)/, 'posición de página declarada');
     assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/researchShared.json', 'utf8')).pageOf, 'Página {current} de {total}');
 });
 

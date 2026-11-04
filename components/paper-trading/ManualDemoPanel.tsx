@@ -69,7 +69,7 @@ function ValuationSummary({ valuation, asOf, onRefresh, pending, error }: {
     const asofFormat = new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'es-ES', ASOF_OPTIONS);
     const countText = locale === 'en'
         ? (valuation.coverage.total === 1 ? '1 position' : `${valuation.coverage.total} positions`)
-        : formatCountEs(valuation.coverage.total, 'posición', 'posiciones');
+        : formatCountEs(valuation.coverage.total, 'posición', 'posiciones', locale);
     return (
         <div className="mb-3 space-y-2 rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-sm text-gray-300">
             <p>

@@ -1,4 +1,4 @@
-import { getLocale, getT } from '@/lib/i18n/server';
+import { getFormat, getLocale, getT } from '@/lib/i18n/server';
 import { RATING_LABELS_EN, STATUS_LABELS_EN } from '@/lib/research/status-labels-en';
 import type { TranslationKey } from '@/lib/i18n/t';
 import type { Locale } from '@/lib/i18n/locale';
@@ -156,7 +156,7 @@ import { dedupeNewsEvents, newsDisplayTitle } from '@/lib/news-display';
 import ThesisApproveButton from '@/components/research/ThesisApproveButton';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
-import { createFormatters, formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, formatPrice, isValidCurrencyCode, NA } from '@/lib/format';
+import { createFormatters, formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, formatPrice, isValidCurrencyCode, naFor } from '@/lib/format';
 import { getInsiderFilings, getOwnershipSignals } from '@/lib/actions/insider.actions';
 import { OwnershipSignalsPanel } from '@/components/research/OwnershipSignalsPanel';
 import { insiderName, insiderRole } from '@/lib/insider/format';
@@ -306,7 +306,7 @@ export async function generateMetadata({ params }: Pick<PageProps, 'params'>): P
 }
 
 function label(value: string | null | undefined, locale: Locale = 'es'): string {
-  if (value === null || value === undefined || value === '') return NA;
+  if (value === null || value === undefined || value === '') return naFor(locale);
   if (locale === 'en') return STATUS_LABELS_EN[value] ?? RATING_LABELS_EN[value] ?? etiquetaValor(value, 'en');
   return STATUS_LABELS[value] ?? RATING_LABELS[value] ?? etiquetaValor(value);
 }
@@ -380,6 +380,7 @@ async function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] })
 
 async function ValuationView({ valuation, currency, ticker }: { valuation: ResearchValuation | null; currency: string; ticker: string }) {
   const t = await getT();
+  const fmt = await getFormat();
   const locale = await getLocale();
   if (!valuation) {
     return (
@@ -433,7 +434,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
     return (
       <div className="space-y-3">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat label={modelPriceLabel} value={formatMoney(valuation.current_price, currency)} />
+          <Stat label={modelPriceLabel} value={fmt.formatMoney(valuation.current_price, currency)} />
         </div>
         <div className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-4 text-sm text-amber-200">
           <p className="font-semibold">{t('research.ficha.engineGuidanceTitle')}</p>
@@ -445,9 +446,9 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
           {engineNotice ? <p className="mt-2 text-xs text-amber-200/70">{t('research.ficha.engineNote', { note: engineNotice })}</p> : null}
         </div>
         <div className="grid grid-cols-1 gap-4 opacity-60 sm:grid-cols-3">
-          <Stat label={`${t('research.ficha.bearGuidance')}${basisLabel}`} value={formatMoney(scenarios.values.bear as number | null, currency)} />
-          <Stat label={`${t('research.ficha.baseGuidance')}${basisLabel}`} value={formatMoney(scenarios.values.base as number | null, currency)} />
-          <Stat label={`${t('research.ficha.bullGuidance')}${basisLabel}`} value={formatMoney(scenarios.values.bull as number | null, currency)} />
+          <Stat label={`${t('research.ficha.bearGuidance')}${basisLabel}`} value={fmt.formatMoney(scenarios.values.bear as number | null, currency)} />
+          <Stat label={`${t('research.ficha.baseGuidance')}${basisLabel}`} value={fmt.formatMoney(scenarios.values.base as number | null, currency)} />
+          <Stat label={`${t('research.ficha.bullGuidance')}${basisLabel}`} value={fmt.formatMoney(scenarios.values.bull as number | null, currency)} />
         </div>
         {scenarioNotes.length ? (
           <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-amber-300/80">
@@ -459,7 +460,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
         <p className="text-xs leading-5 text-gray-500">
           {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type, locale), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
           {t('research.ficha.persistedNoteGuidance')}{' '}
-          {t('research.ficha.inputPeriods', { periods: periods ? periods : NA })}
+          {t('research.ficha.inputPeriods', { periods: periods ? periods : fmt.na })}
         </p>
       </div>
     );
@@ -467,10 +468,10 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label={modelPriceLabel} value={formatMoney(valuation.current_price, currency)} />
-        <Stat label={`${t('research.ficha.bear')}${basisLabel}`} value={formatMoney(scenarios.values.bear as number | null, currency)} />
-        <Stat label={`${t('research.ficha.base')}${basisLabel}`} value={formatMoney(scenarios.values.base as number | null, currency)} />
-        <Stat label={`${t('research.ficha.bull')}${basisLabel}`} value={formatMoney(scenarios.values.bull as number | null, currency)} />
+        <Stat label={modelPriceLabel} value={fmt.formatMoney(valuation.current_price, currency)} />
+        <Stat label={`${t('research.ficha.bear')}${basisLabel}`} value={fmt.formatMoney(scenarios.values.bear as number | null, currency)} />
+        <Stat label={`${t('research.ficha.base')}${basisLabel}`} value={fmt.formatMoney(scenarios.values.base as number | null, currency)} />
+        <Stat label={`${t('research.ficha.bull')}${basisLabel}`} value={fmt.formatMoney(scenarios.values.bull as number | null, currency)} />
       </div>
       {scenarioNotes.length ? (
         <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-amber-300/80">
@@ -484,8 +485,8 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
           {methodView.warning ? <p className="text-amber-200">{t('research.ficha.methodWarning', { text: methodView.warning })}</p> : null}
           {methodView.range ? (
             <p>
-              {t('research.ficha.methodRange', { low: formatMoney(methodView.range.low, currency), high: formatMoney(methodView.range.high, currency) })}{' '}
-              {methodView.range.components.map((item) => `${item.label}: ${formatMoney(item.value, currency)}`).join(' · ')}
+              {t('research.ficha.methodRange', { low: fmt.formatMoney(methodView.range.low, currency), high: fmt.formatMoney(methodView.range.high, currency) })}{' '}
+              {methodView.range.components.map((item) => `${item.label}: ${fmt.formatMoney(item.value, currency)}`).join(' · ')}
             </p>
           ) : null}
           {methodView.priceImplies ? <p className="text-sky-200/80">{t('research.ficha.methodPriceImplies', { text: methodView.priceImplies })}</p> : null}
@@ -496,7 +497,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
       <p className="text-xs leading-5 text-gray-500">
         {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type, locale), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
         {t('research.ficha.persistedNote')}{' '}
-        {t('research.ficha.inputPeriods', { periods: periods ? periods : NA })}
+        {t('research.ficha.inputPeriods', { periods: periods ? periods : fmt.na })}
       </p>
     </div>
   );
@@ -997,6 +998,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   // secciones seguidas con título claro («Una fila, no tres menús», 29-oct-2026).
   const buildOverviewContent = async (): Promise<React.ReactNode> => {
     const t = await getT();
+    const fmt = await getFormat();
     // marketPromise ya se lanzó en paralelo al snapshot más arriba.
     try {
       // headerMarket ya guarda esta misma promesa resuelta (se esperó en la
@@ -1107,7 +1109,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               <ThesisGenerateButton ticker={ticker} label={t('research.fichaGenerateFirstThesis')} emptyCopy={t('research.fichaNoThesisYet')} />
             )}
           <dl className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
-            <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">{t('research.fichaPerTtm')}</dt><dd className="font-semibold text-gray-100">{per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}</dd></div>
+            <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">{t('research.fichaPerTtm')}</dt><dd className="font-semibold text-gray-100">{per.value !== null ? `${fmt.formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : fmt.na}</dd></div>
             {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">{t('research.fichaModel')}</dt><dd className="font-semibold text-gray-100"><Link className="inline-flex min-h-11 min-w-11 items-center underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>{snapshot.model_summary.publishable ? t('research.fichaModelPublishable') : t('research.fichaModelBlocked')}</Link></dd></div> : null}
           </dl>
           {per.note ? <p className="mt-1 text-xs text-gray-500">{per.note}</p> : null}
@@ -1175,7 +1177,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                   <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                     <Badge variant="outline">{label(change.impact_direction, locale)}</Badge>
                     <span className="text-xs text-gray-500">
-                      {t('research.fichaMaterialityScore', { score: change.materiality_score })} · {formatDate(change.created_at)}
+                      {t('research.fichaMaterialityScore', { score: change.materiality_score })} · {fmt.formatDate(change.created_at)}
                     </span>
                   </div>
                   <p className="break-words leading-6 [overflow-wrap:anywhere]">{changeSummaryText(change.summary, locale)}</p>
@@ -1308,6 +1310,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
 
   const buildThesisContent = async (): Promise<React.ReactNode> => {
     const t = await getT();
+    const fmt = await getFormat();
     const data = await viewData('thesis');
     return (
       <div className="min-w-0 max-w-full space-y-6 [overflow-wrap:anywhere]">
@@ -1369,7 +1372,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                           </Badge>
                         ))}
                         <span className="ml-auto text-xs text-gray-500">
-                          {formatUserDateTime(entry.updated_at)}
+                          {fmt.formatUserDateTime(entry.updated_at)}
                         </span>
                       </div>
                       {entry.diff ? (
@@ -1485,6 +1488,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
 
   const buildHoldersSection = async (): Promise<React.ReactNode> => {
     const t = await getT();
+    const fmt = await getFormat();
     const holders = await viewData('holders');
     // Propietarios = 13F (gestores) + insiders (Form 4, SEC EDGAR, gratis).
     // Los Form 4 persistidos se leen del backend; sin red ni proveedor de
@@ -1510,10 +1514,10 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                   <li className="rounded-lg border border-gray-800 p-3 text-sm" key={holder.slug}>
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <Link className="font-medium text-teal-300 hover:text-teal-200" href={`/inversores/${holder.slug}`}>{holder.name}</Link>
-                      <span className="text-gray-200">{holder.value_usd !== null ? formatMarketCapUsd(holder.value_usd) : NA}</span>
+                      <span className="text-gray-200">{holder.value_usd !== null ? fmt.formatMarketCapUsd(holder.value_usd) : fmt.na}</span>
                     </div>
                     <p className="mt-1 text-xs text-gray-500">
-                      {t('research.fichaPortfolioAt', { date: holder.report_date ? formatDate(holder.report_date) : t('research.fichaUnknownDate') })}
+                      {t('research.fichaPortfolioAt', { date: holder.report_date ? fmt.formatDate(holder.report_date) : t('research.fichaUnknownDate') })}
                       {holder.coverage === 'partial' ? ` · ${t('research.fichaPartialData')}` : ''}
                       {holder.filing_url ? (
                         <>
@@ -1550,7 +1554,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 <li className="rounded-lg border border-gray-800 p-3 text-sm" key={filing.accession_number}>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span className="text-gray-300">
-                      {filing.form}{filing.is_amendment ? t('research.fichaAmendmentSuffix') : ''} · {filing.filing_date ? formatDate(filing.filing_date) : t('research.fichaUnknownDate')}
+                      {filing.form}{filing.is_amendment ? t('research.fichaAmendmentSuffix') : ''} · {filing.filing_date ? fmt.formatDate(filing.filing_date) : t('research.fichaUnknownDate')}
                     </span>
                     {safeHttpUrl(filing.source_url) ? (
                       <a className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={safeHttpUrl(filing.source_url) ?? undefined} rel="noopener noreferrer" target="_blank">{t('research.fichaOriginalForm4')}</a>
@@ -1560,15 +1564,15 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                     {filing.transactions.slice(0, 6).map((tx, index) => (
                       <li key={`${filing.accession_number}-${index}`}>
                         {insiderName(tx.insider)} · {insiderRole(tx.role, tx.officer_title, locale)} · {tx.code === 'P' ? t('research.fichaTxBuy') : tx.code === 'S' ? t('research.fichaTxSell') : tx.code ?? '—'}
-                        {typeof tx.shares === 'number' ? t('research.fichaTxSharesSuffix', { count: formatNumber(tx.shares) }) : ''}
-                        {typeof tx.value === 'number' && Number.isFinite(tx.value) ? ` · ${tx.currency && isValidCurrencyCode(tx.currency) ? formatPrice(tx.value, tx.currency, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : formatNumber(tx.value, { maximumFractionDigits: 0 })}` : ''}
+                        {typeof tx.shares === 'number' ? t('research.fichaTxSharesSuffix', { count: fmt.formatNumber(tx.shares) }) : ''}
+                        {typeof tx.value === 'number' && Number.isFinite(tx.value) ? ` · ${tx.currency && isValidCurrencyCode(tx.currency) ? fmt.formatPrice(tx.value, tx.currency, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : fmt.formatNumber(tx.value, { maximumFractionDigits: 0 })}` : ''}
                         {tx.currency == null && typeof tx.value === 'number' ? t('research.fichaTxNoCurrencySuffix') : ''}
-                        {tx.tx_date ? ` · ${formatDate(tx.tx_date)}` : ''}
+                        {tx.tx_date ? ` · ${fmt.formatDate(tx.tx_date)}` : ''}
                       </li>
                     ))}
                   </ul>
                   {filing.transactions.length > 6 ? (
-                    <p className="mt-1 text-xs text-gray-500">{t('research.fichaTxShown', { total: formatNumber(filing.transactions.length, { maximumFractionDigits: 0 }) })}</p>
+                    <p className="mt-1 text-xs text-gray-500">{t('research.fichaTxShown', { total: fmt.formatNumber(filing.transactions.length, { maximumFractionDigits: 0 }) })}</p>
                   ) : null}
                 </li>
               ))}
@@ -1684,6 +1688,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
 
   const buildDocumentsContent = async (): Promise<React.ReactNode> => {
     const t = await getT();
+    const fmt = await getFormat();
     // Conexión 10a: las lecturas de la biblioteca enlazadas a este ticker se
     // piden en paralelo; si la biblioteca falla, la vista sigue sin ellas.
     const [documents, libraryReadings] = await Promise.all([
@@ -1714,7 +1719,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 tier: etiquetaTierFuente(document.source_tier, locale),
                 tierRank: tierRankFuente(document.source_tier),
                 type: label(document.source_type, locale),
-                published: document.published_at ? formatDate(document.published_at) : t('research.fichaUnknownDate'),
+                published: document.published_at ? fmt.formatDate(document.published_at) : t('research.fichaUnknownDate'),
                 publishedTs: document.published_at ?? null,
               }))}
             />
@@ -1736,7 +1741,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                     <FileText className="h-4 w-4 text-teal-300" />
                     <Link className="font-medium text-gray-200 underline decoration-gray-700 underline-offset-4 transition hover:text-teal-200" href={libraryDocumentHref(reading.id)}>{reading.title}</Link>
                   </div>
-                  <p className="mt-2 text-xs text-gray-500">{reading.author ?? t('research.fichaUnknownAuthor')}{reading.publication_date ? ` · ${formatDate(reading.publication_date)}` : ''}</p>
+                  <p className="mt-2 text-xs text-gray-500">{reading.author ?? t('research.fichaUnknownAuthor')}{reading.publication_date ? ` · ${fmt.formatDate(reading.publication_date)}` : ''}</p>
                 </li>
               ))}
             </ul>
@@ -1753,12 +1758,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
 
   const buildSourcesSection = async (): Promise<React.ReactNode> => {
     const t = await getT();
+    const fmt = await getFormat();
     const audits = await viewData('sources');
     return (
       <Panel title={t('research.fichaSourceAudits')}>
         {audits.length ? (
           <div className="space-y-3">
-            {audits.length > 100 ? <p className="text-xs text-gray-500">{t('research.fichaAuditsShown', { total: formatNumber(audits.length, { maximumFractionDigits: 0 }) })}</p> : null}
+            {audits.length > 100 ? <p className="text-xs text-gray-500">{t('research.fichaAuditsShown', { total: fmt.formatNumber(audits.length, { maximumFractionDigits: 0 }) })}</p> : null}
             {/* Solo la auditoría más reciente a la vista; el historial de
                 versiones viejas queda plegado (era un muro de tarjetas casi
                 idénticas que se leía como bug). */}
@@ -1770,7 +1776,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 {renderAudit(ordered[0])}
                 {previous.length ? (
                   <details className="rounded-lg border border-gray-800 p-4">
-                    <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-gray-400">{formatNumber(previous.length, { maximumFractionDigits: 0 })} {previous.length === 1 ? t('research.fichaAuditPreviousSingular') : t('research.fichaAuditPreviousPlural')} {t('research.fichaAuditsOldVersions')}</summary>
+                    <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-gray-400">{fmt.formatNumber(previous.length, { maximumFractionDigits: 0 })} {previous.length === 1 ? t('research.fichaAuditPreviousSingular') : t('research.fichaAuditPreviousPlural')} {t('research.fichaAuditsOldVersions')}</summary>
                     <div className="mt-3 space-y-3">{previous.map(renderAudit)}</div>
                   </details>
                 ) : null}
