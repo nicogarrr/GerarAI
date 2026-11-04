@@ -40,6 +40,7 @@ from app.valuation.normalized_fcf import (
     plausibility_warning,
     run_planned,
 )
+from app.valuation.revenue_base import resolve_revenue_base
 from app.valuation.reverse_dcf import ReverseDCFInputs, solve_required_growth
 from app.valuation.scenario_definitions import mechanical_dcf_scenarios
 from app.valuation.scenario_model import Scenario, probability_weighted_value
@@ -284,6 +285,22 @@ class StandardDCFEngine(ValuationEngine):
                     reason="FCF margin cannot be derived from the coherent snapshot.",
                 )
             margin = fcf / revenue
+
+        # Ventas de partida: TTM cuando hay >= 2 trimestres presentados tras el
+        # FY ancla; si no, el FY (ver app/valuation/revenue_base.py). Va DESPUÉS
+        # del margen: el margen es un ratio (ciclo medio o FCF/ventas del mismo
+        # ejercicio) y se aplica tal cual sobre la base elegida.
+        # getattr: contextos/snapshots duck-typed (tests, llamadas directas)
+        # sin ancla fechada se quedan en la base anual sin tocar la BD.
+        revenue_base = resolve_revenue_base(
+            getattr(context, "db", None),
+            company.id,
+            (getattr(snapshot, "facts", None) or {}).get("revenue"),
+            revenue,
+            period_type=getattr(snapshot, "period_type", None),
+            as_of=getattr(context, "as_of", None),
+        )
+        revenue = revenue_base.value
 
         # Forma de la proyección (capex normalizado / DCF multietapa): ver
         # app/valuation/normalized_fcf.py. Con capex de crecimiento material
@@ -618,6 +635,7 @@ class StandardDCFEngine(ValuationEngine):
                 "publishable": True,
                 "status": "ok",
                 "model_version": MODEL_VERSION,
+                "revenue_base": revenue_base.trace(),
                 "growth_source": growth_source,
                 "growth_clamped_from": raw_growth if growth_after_clamp != raw_growth else None,
                 "fcf_margin_source": "financial_facts",
