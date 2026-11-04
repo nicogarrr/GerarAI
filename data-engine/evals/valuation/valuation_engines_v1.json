@@ -1,15 +1,16 @@
 {
   "version": "valuation_engines_v1",
   "model_version": "valuation-engines-v2",
-  "description": "Evals deterministas de los 8 motores de valoracion (C2).",
+  "description": "Evals deterministas de los 9 motores de valoracion (C2).",
   "notes": [
-    "Dataset congelado de los 8 motores de valoracion (C2). Cada caso siembra Company + FinancialFact (+ CalculatedMetric de WACC y MarketPrice cuando los declara), resuelve el motor con app.valuation.engines.resolve y ejecuta engine.value().",
+    "Dataset congelado de los 9 motores de valoracion (C2). Cada caso siembra Company + FinancialFact (+ CalculatedMetric de WACC y MarketPrice cuando los declara), resuelve el motor con app.valuation.engines.resolve y ejecuta engine.value().",
     "expected.closed_form es la FORMA CERRADA calculada a mano desde la formula documentada del motor, no la salida del motor. La puerta value_matches_closed_form compara contra eso con tolerancia 1e-6 relativa: si el codigo se aparta de la formula, el eval tiene que FALLAR.",
     "expected.hand_calculation deja la derivacion escrita en el propio caso, para que revisar un numero no exija reejecutar el motor.",
     "applies_to es opt-out explicito: un caso solo ejercita las puertas que declara. expect_gate_failure marca los controles negativos (la puerta nombrada TIENE que fallar; las demas tienen que pasar).",
     "bank / insurer / reit / commodity no tienen camino de status=partial por construccion: sus motores no emiten publication_blockers. La puerta engine_publishable_status se cubre en esos motores con la mitad positiva (ok + publishable + blockers=[]), y el camino partial/blocked se cubre donde existe: standard_dcf (traceable_wacc, forecast_is_not_the_driver), sotp y holding_company (segmentos sin valorar) y pre_revenue (funding gap incompleto).",
     "Los casos de clamp (P/B suelo/techo, flujo de commodity a 0, NAV de REIT a 0, cap rate de REITs) no usan sensitivity_covers_base: al saturar el clamp la tabla de sensibilidad colapsa a 1-2 valores distintos, y eso es la lectura honesta, no un fallo. El caso lo declara en su nota.",
-    "Los motores bank/insurer/reit/commodity NO aplican el anclaje de periodo del snapshot: leen el ultimo fact por metric (fiscal_year desc) sin comprobar que todos los insumos sean del mismo ejercicio. Ver INTEGRACION PENDIENTE C2-4."
+    "Los motores bank/insurer/reit/commodity NO aplican el anclaje de periodo del snapshot: leen el ultimo fact por metric (fiscal_year desc) sin comprobar que todos los insumos sean del mismo ejercicio. Ver INTEGRACION PENDIENTE C2-4.",
+    "scenario (4-nov-2026): clones de los casos standard_dcf con modelo declarado de escenarios. Sin escenarios en datos corre el juego por defecto 25/50/25 (closed_form a mano en hand_calculation); sin DCF base válido vuelve al motor de clasificación con el motivo en trace.engine_fallback."
   ],
   "cases": [
     {
@@ -5634,8 +5635,8 @@
       "note": "routing de COMPANY_MASTER: UBER -> standard_dcf."
     },
     {
-      "id": "evrte_tsla_routes_to_standard_dcf",
-      "engine": "standard_dcf",
+      "id": "evrte_tsla_routes_to_scenario",
+      "engine": "scenario",
       "category": "routing",
       "company": {
         "ticker": "TSLA",
@@ -5651,14 +5652,14 @@
       },
       "facts": {},
       "expected": {
-        "engine_key": "standard_dcf",
+        "engine_key": "scenario",
         "trace_engine": "standard_dcf"
       },
       "applies_to": [
         "routing_expected",
         "gate_does_not_omit_itself"
       ],
-      "note": "routing de COMPANY_MASTER: TSLA -> standard_dcf."
+      "note": "routing de COMPANY_MASTER: TSLA -> scenario (método declarado de escenarios/capacidad)."
     },
     {
       "id": "evrte_meta_routes_to_standard_dcf",
@@ -5845,8 +5846,8 @@
       "note": "routing de COMPANY_MASTER: AMD -> standard_dcf."
     },
     {
-      "id": "evrte_nbis_routes_to_pre_revenue",
-      "engine": "pre_revenue",
+      "id": "evrte_nbis_routes_to_scenario",
+      "engine": "scenario",
       "category": "routing",
       "company": {
         "ticker": "NBIS",
@@ -5861,14 +5862,14 @@
       },
       "facts": {},
       "expected": {
-        "engine_key": "pre_revenue",
+        "engine_key": "scenario",
         "trace_engine": "pre_revenue"
       },
       "applies_to": [
         "routing_expected",
         "gate_does_not_omit_itself"
       ],
-      "note": "routing de COMPANY_MASTER: NBIS -> pre_revenue. tag speculative -> pre_revenue."
+      "note": "routing de COMPANY_MASTER: NBIS -> scenario (método declarado de escenarios/capacidad)."
     },
     {
       "id": "evrte_hims_routes_to_standard_dcf",
@@ -6080,8 +6081,8 @@
       "note": "routing de COMPANY_MASTER: CCJ -> commodity. 'commodity' en valuation_model y company_type uranium_mining -> commodity."
     },
     {
-      "id": "evrte_krknf_routes_to_standard_dcf",
-      "engine": "standard_dcf",
+      "id": "evrte_krknf_routes_to_scenario",
+      "engine": "scenario",
       "category": "routing",
       "company": {
         "ticker": "KRKNF",
@@ -6096,14 +6097,14 @@
       },
       "facts": {},
       "expected": {
-        "engine_key": "standard_dcf",
+        "engine_key": "scenario",
         "trace_engine": "standard_dcf"
       },
       "applies_to": [
         "routing_expected",
         "gate_does_not_omit_itself"
       ],
-      "note": "routing de COMPANY_MASTER: KRKNF -> standard_dcf. defense/backlog no es un marcador de ningun motor: standard_dcf."
+      "note": "routing de COMPANY_MASTER: KRKNF -> scenario (método declarado de escenarios/capacidad)."
     },
     {
       "id": "evrte_evrtb01_routes_to_bank",
@@ -6197,6 +6198,671 @@
       ],
       "expect_gate_failure": "routing_expected",
       "note": "CONTROL NEGATIVO: la ficha de ASTS enruta a pre_revenue por el tag pre_fcf. El caso declara standard_dcf; si el if-chain de resolve_engine_key cambiara de orden, este caso lo detectaria."
+    },
+    {
+      "id": "evscn01_happy_path_traceable_wacc",
+      "engine": "scenario",
+      "category": "happy_path",
+      "company": {
+        "ticker": "EVSCN01",
+        "name": "eval EVSCN01",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 2000,
+        "free_cash_flow": 300,
+        "revenue_growth": 0.08,
+        "shares_diluted": 200,
+        "net_debt": 400
+      },
+      "expected": {
+        "engine_key": "scenario",
+        "status": "ok",
+        "publishable": true,
+        "missing_inputs": [],
+        "publication_blockers": [],
+        "adr_ratio": null,
+        "trace_engine": "scenario",
+        "closed_form": {
+          "bear_value": 18.167846540590734,
+          "base_value": 29.886368383617572,
+          "bull_value": 45.045682395933184,
+          "expected_value": 30.746566425939765
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "bear_le_base_le_bull",
+        "expected_value_within_band",
+        "value_matches_closed_form",
+        "probabilities_sum_to_one",
+        "sensitivity_covers_base",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "trace_records_evidence",
+        "gate_does_not_omit_itself",
+        "adr_ratio_basis"
+      ],
+      "price": 25,
+      "wacc": 0.09,
+      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf01_happy_path_traceable_wacc: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=18.167847 base=29.886368 bull=45.045682; expected=0.25*bear+0.5*base+0.25*bull.",
+      "note": "Clon de evdcf01_happy_path_traceable_wacc con modelo declarado de escenarios (motor scenario)."
+    },
+    {
+      "id": "evscn02_net_cash_increases_equity",
+      "engine": "scenario",
+      "category": "happy_path",
+      "company": {
+        "ticker": "EVSCN02",
+        "name": "eval EVSCN02",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 2000,
+        "free_cash_flow": 300,
+        "revenue_growth": 0.08,
+        "shares_diluted": 200,
+        "net_debt": -300
+      },
+      "expected": {
+        "engine_key": "scenario",
+        "status": "ok",
+        "publishable": true,
+        "missing_inputs": [],
+        "publication_blockers": [],
+        "adr_ratio": null,
+        "trace_engine": "scenario",
+        "closed_form": {
+          "bear_value": 21.667846540590734,
+          "base_value": 33.38636838361757,
+          "bull_value": 48.545682395933184,
+          "expected_value": 34.24656642593976
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "bear_le_base_le_bull",
+        "expected_value_within_band",
+        "value_matches_closed_form",
+        "probabilities_sum_to_one",
+        "sensitivity_covers_base",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "trace_records_evidence",
+        "gate_does_not_omit_itself",
+        "adr_ratio_basis"
+      ],
+      "price": 25,
+      "wacc": 0.09,
+      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf02_net_cash_increases_equity: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=21.667847 base=33.386368 bull=48.545682; expected=0.25*bear+0.5*base+0.25*bull.",
+      "note": "Clon de evdcf02_net_cash_increases_equity con modelo declarado de escenarios (motor scenario)."
+    },
+    {
+      "id": "evscn03_tag_default_wacc_is_not_publishable",
+      "engine": "scenario",
+      "category": "partial_blockers",
+      "company": {
+        "ticker": "EVSCN03",
+        "name": "eval EVSCN03",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 2000,
+        "free_cash_flow": 300,
+        "revenue_growth": 0.08,
+        "shares_diluted": 200,
+        "net_debt": 400
+      },
+      "expected": {
+        "engine_key": "scenario",
+        "status": "partial",
+        "publishable": false,
+        "missing_inputs": [],
+        "publication_blockers": [
+          "traceable_wacc"
+        ],
+        "adr_ratio": null,
+        "trace_engine": "scenario",
+        "closed_form": {
+          "bear_value": 15.274133117370981,
+          "base_value": 25.237276064281318,
+          "bull_value": 38.08921084625367,
+          "expected_value": 25.959474023046823
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "bear_le_base_le_bull",
+        "expected_value_within_band",
+        "value_matches_closed_form",
+        "probabilities_sum_to_one",
+        "sensitivity_covers_base",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "trace_records_evidence",
+        "gate_does_not_omit_itself"
+      ],
+      "price": 25,
+      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf03_tag_default_wacc_is_not_publishable: base g=0.0800 m=0.1500 WACC=0.1000 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=15.274133 base=25.237276 bull=38.089211; expected=0.25*bear+0.5*base+0.25*bull.",
+      "note": "Clon de evdcf03_tag_default_wacc_is_not_publishable con modelo declarado de escenarios (motor scenario)."
+    },
+    {
+      "id": "evscn04_forecast_is_not_the_driver",
+      "engine": "scenario",
+      "category": "partial_blockers",
+      "company": {
+        "ticker": "EVSCN04",
+        "name": "eval EVSCN04",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 2000,
+        "free_cash_flow": 300,
+        "revenue_growth": 0.08,
+        "shares_diluted": 200,
+        "net_debt": 400
+      },
+      "expected": {
+        "engine_key": "scenario",
+        "status": "partial",
+        "publishable": false,
+        "missing_inputs": [],
+        "publication_blockers": [
+          "forecast_is_not_the_driver"
+        ],
+        "adr_ratio": null,
+        "trace_engine": "scenario",
+        "closed_form": {
+          "bear_value": 119.5,
+          "base_value": 192.99771213367876,
+          "bull_value": 289.5182854241799,
+          "expected_value": 198.75342742288436
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "bear_le_base_le_bull",
+        "expected_value_within_band",
+        "value_matches_closed_form",
+        "probabilities_sum_to_one",
+        "sensitivity_covers_base",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "trace_records_evidence",
+        "gate_does_not_omit_itself",
+        "adr_ratio_basis"
+      ],
+      "price": 100,
+      "wacc": 0.04,
+      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf04_forecast_is_not_the_driver: base g=0.0800 m=0.1500 WACC=0.0400 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=119.500000 base=192.997712 bull=289.518285; expected=0.25*bear+0.5*base+0.25*bull.",
+      "note": "Clon de evdcf04_forecast_is_not_the_driver con modelo declarado de escenarios (motor scenario)."
+    },
+    {
+      "id": "evscn05_no_revenue_anchor",
+      "engine": "scenario",
+      "category": "insufficient",
+      "company": {
+        "ticker": "EVSCN05",
+        "name": "eval EVSCN05",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": []
+      },
+      "facts": {},
+      "expected": {
+        "engine_key": "scenario",
+        "status": "insufficient_data",
+        "publishable": false,
+        "missing_inputs": [
+          "revenue",
+          "shares_diluted",
+          "free_cash_flow_or_fcf_margin"
+        ],
+        "publication_blockers": [],
+        "trace_engine": "standard_dcf",
+        "closed_form": {
+          "bear_value": null,
+          "base_value": null,
+          "bull_value": null,
+          "expected_value": null
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "value_matches_closed_form",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "gate_does_not_omit_itself"
+      ],
+      "note": "Clon de evdcf05_no_revenue_anchor con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback."
+    },
+    {
+      "id": "evscn06_missing_net_debt_refuses",
+      "engine": "scenario",
+      "category": "insufficient",
+      "company": {
+        "ticker": "EVSCN06",
+        "name": "eval EVSCN06",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 2000,
+        "free_cash_flow": 300,
+        "revenue_growth": 0.08,
+        "shares_diluted": 200
+      },
+      "expected": {
+        "engine_key": "scenario",
+        "status": "insufficient_data",
+        "publishable": false,
+        "missing_inputs": [
+          "net_debt"
+        ],
+        "publication_blockers": [],
+        "trace_engine": "standard_dcf",
+        "closed_form": {
+          "bear_value": null,
+          "base_value": null,
+          "bull_value": null,
+          "expected_value": null
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "value_matches_closed_form",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "gate_does_not_omit_itself"
+      ],
+      "note": "Clon de evdcf06_missing_net_debt_refuses con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback."
+    },
+    {
+      "id": "evscn07_adr_without_ratio_refuses",
+      "engine": "scenario",
+      "category": "insufficient",
+      "company": {
+        "ticker": "EVSCN07",
+        "name": "eval EVSCN07",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": [
+          "adr"
+        ]
+      },
+      "facts": {
+        "revenue": 2000,
+        "free_cash_flow": 300,
+        "revenue_growth": 0.08,
+        "shares_diluted": 200,
+        "net_debt": 400
+      },
+      "expected": {
+        "engine_key": "scenario",
+        "status": "insufficient_data",
+        "publishable": false,
+        "missing_inputs": [
+          "adr_ratio"
+        ],
+        "publication_blockers": [],
+        "trace_engine": "standard_dcf",
+        "closed_form": {
+          "bear_value": null,
+          "base_value": null,
+          "bull_value": null,
+          "expected_value": null
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "value_matches_closed_form",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "gate_does_not_omit_itself"
+      ],
+      "note": "Clon de evdcf07_adr_without_ratio_refuses con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback."
+    },
+    {
+      "id": "evscn08_adr_with_ratio_converts_basis",
+      "engine": "scenario",
+      "category": "happy_path",
+      "company": {
+        "ticker": "EVSCN08",
+        "name": "eval EVSCN08",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": [
+          "adr:8"
+        ]
+      },
+      "facts": {
+        "revenue": 2000,
+        "free_cash_flow": 300,
+        "revenue_growth": 0.08,
+        "shares_diluted": 200,
+        "net_debt": 400
+      },
+      "expected": {
+        "engine_key": "scenario",
+        "status": "ok",
+        "publishable": true,
+        "missing_inputs": [],
+        "publication_blockers": [],
+        "adr_ratio": 8,
+        "trace_engine": "scenario",
+        "closed_form": {
+          "bear_value": 18.167846540590734,
+          "base_value": 29.886368383617572,
+          "bull_value": 45.045682395933184,
+          "expected_value": 30.746566425939765
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "bear_le_base_le_bull",
+        "expected_value_within_band",
+        "value_matches_closed_form",
+        "probabilities_sum_to_one",
+        "sensitivity_covers_base",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "trace_records_evidence",
+        "gate_does_not_omit_itself",
+        "adr_ratio_basis"
+      ],
+      "price": 200,
+      "wacc": 0.09,
+      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf08_adr_with_ratio_converts_basis: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=18.167847 base=29.886368 bull=45.045682; expected=0.25*bear+0.5*base+0.25*bull.",
+      "note": "Clon de evdcf08_adr_with_ratio_converts_basis con modelo declarado de escenarios (motor scenario)."
+    },
+    {
+      "id": "evscn09_negative_free_cash_flow_refuses",
+      "engine": "scenario",
+      "category": "honesty",
+      "company": {
+        "ticker": "EVSCN09",
+        "name": "eval EVSCN09",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 1000,
+        "free_cash_flow": -80,
+        "shares_diluted": 100,
+        "net_debt": 100
+      },
+      "expected": {
+        "engine_key": "scenario",
+        "status": "insufficient_data",
+        "publishable": false,
+        "missing_inputs": [
+          "non_negative_fcf_margin"
+        ],
+        "publication_blockers": [],
+        "trace_engine": "standard_dcf",
+        "closed_form": {
+          "bear_value": null,
+          "base_value": null,
+          "bull_value": null,
+          "expected_value": null
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "value_matches_closed_form",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "gate_does_not_omit_itself",
+        "no_sign_flip_on_negative_fcf"
+      ],
+      "note": "Clon de evdcf09_negative_free_cash_flow_refuses con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback."
+    },
+    {
+      "id": "evscn10_negative_fcf_margin_fact_refuses",
+      "engine": "scenario",
+      "category": "honesty",
+      "company": {
+        "ticker": "EVSCN10",
+        "name": "eval EVSCN10",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 1000,
+        "fcf_margin": -0.05,
+        "shares_diluted": 100,
+        "net_debt": 100
+      },
+      "expected": {
+        "engine_key": "scenario",
+        "status": "insufficient_data",
+        "publishable": false,
+        "missing_inputs": [
+          "non_negative_fcf_margin"
+        ],
+        "publication_blockers": [],
+        "trace_engine": "standard_dcf",
+        "closed_form": {
+          "bear_value": null,
+          "base_value": null,
+          "bull_value": null,
+          "expected_value": null
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "value_matches_closed_form",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "gate_does_not_omit_itself",
+        "no_sign_flip_on_negative_fcf"
+      ],
+      "note": "Clon de evdcf10_negative_fcf_margin_fact_refuses con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback."
+    },
+    {
+      "id": "evscn11_fcf_margin_as_sourced_fact",
+      "engine": "scenario",
+      "category": "happy_path",
+      "company": {
+        "ticker": "EVSCN11",
+        "name": "eval EVSCN11",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 2000,
+        "fcf_margin": 0.18,
+        "shares_diluted": 200,
+        "net_debt": 400
+      },
+      "expected": {
+        "engine_key": "scenario",
+        "status": "ok",
+        "publishable": true,
+        "missing_inputs": [],
+        "publication_blockers": [],
+        "adr_ratio": null,
+        "trace_engine": "scenario",
+        "closed_form": {
+          "bear_value": 21.683526750951316,
+          "base_value": 34.683819648939746,
+          "bull_value": 51.0799042900305,
+          "expected_value": 35.53276758471533
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "bear_le_base_le_bull",
+        "expected_value_within_band",
+        "value_matches_closed_form",
+        "probabilities_sum_to_one",
+        "sensitivity_covers_base",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "trace_records_evidence",
+        "gate_does_not_omit_itself",
+        "adr_ratio_basis"
+      ],
+      "price": 30,
+      "wacc": 0.09,
+      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf11_fcf_margin_as_sourced_fact: base g=0.0700 m=0.1800 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=21.683527 base=34.683820 bull=51.079904; expected=0.25*bear+0.5*base+0.25*bull.",
+      "note": "Clon de evdcf11_fcf_margin_as_sourced_fact con modelo declarado de escenarios (motor scenario)."
+    },
+    {
+      "id": "evscn12_fcf_margin_ceiling_clamped",
+      "engine": "scenario",
+      "category": "clamp",
+      "company": {
+        "ticker": "EVSCN12",
+        "name": "eval EVSCN12",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 2000,
+        "fcf_margin": 0.62,
+        "revenue_growth": 0.08,
+        "shares_diluted": 200,
+        "net_debt": 400
+      },
+      "expected": {
+        "engine_key": "scenario",
+        "status": "ok",
+        "publishable": true,
+        "missing_inputs": [],
+        "publication_blockers": [],
+        "adr_ratio": null,
+        "trace_engine": "scenario",
+        "closed_form": {
+          "bear_value": 65.22615513530245,
+          "base_value": 104.2878946120586,
+          "bull_value": 123.4551530558218,
+          "expected_value": 99.31427435381036
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "bear_le_base_le_bull",
+        "expected_value_within_band",
+        "value_matches_closed_form",
+        "probabilities_sum_to_one",
+        "sensitivity_covers_base",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "trace_records_evidence",
+        "gate_does_not_omit_itself",
+        "adr_ratio_basis"
+      ],
+      "price": 60,
+      "wacc": 0.09,
+      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf12_fcf_margin_ceiling_clamped: base g=0.0800 m=0.5000 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=65.226155 base=104.287895 bull=123.455153; expected=0.25*bear+0.5*base+0.25*bull.",
+      "note": "Clon de evdcf12_fcf_margin_ceiling_clamped con modelo declarado de escenarios (motor scenario)."
+    },
+    {
+      "id": "evscn13_negative_control_wrong_status",
+      "engine": "scenario",
+      "category": "negative_control",
+      "company": {
+        "ticker": "EVSCN13",
+        "name": "eval EVSCN13",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 2000,
+        "free_cash_flow": 300,
+        "revenue_growth": 0.08,
+        "shares_diluted": 200,
+        "net_debt": 400
+      },
+      "expected": {
+        "engine_key": "scenario",
+        "status": "partial",
+        "publishable": false,
+        "missing_inputs": [],
+        "publication_blockers": [
+          "traceable_wacc"
+        ],
+        "adr_ratio": null,
+        "trace_engine": "scenario",
+        "closed_form": {
+          "bear_value": 18.167846540590734,
+          "base_value": 29.886368383617572,
+          "bull_value": 45.045682395933184,
+          "expected_value": 30.746566425939765
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status"
+      ],
+      "price": 25,
+      "wacc": 0.09,
+      "expect_gate_failure": "engine_publishable_status",
+      "note": "Clon de evdcf13_negative_control_wrong_status con modelo declarado de escenarios (motor scenario). CONTROL NEGATIVO: los mismos facts de evdcf01 con WACC trazable dan status=ok sin blockers. El caso declara partial/traceable_wacc, que es falso: si la puerta no mirase el estado real pasaria.",
+      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf13_negative_control_wrong_status: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=18.167847 base=29.886368 bull=45.045682; expected=0.25*bear+0.5*base+0.25*bull."
+    },
+    {
+      "id": "evscn14_negative_control_wrong_missing_inputs",
+      "engine": "scenario",
+      "category": "negative_control",
+      "company": {
+        "ticker": "EVSCN14",
+        "name": "eval EVSCN14",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 2000,
+        "free_cash_flow": 300,
+        "revenue_growth": 0.08,
+        "shares_diluted": 200
+      },
+      "expected": {
+        "engine_key": "scenario",
+        "status": "insufficient_data",
+        "publishable": false,
+        "missing_inputs": [],
+        "publication_blockers": [],
+        "trace_engine": "standard_dcf",
+        "closed_form": {
+          "bear_value": null,
+          "base_value": null,
+          "bull_value": null,
+          "expected_value": null
+        }
+      },
+      "applies_to": [
+        "missing_inputs_declared"
+      ],
+      "expect_gate_failure": "missing_inputs_declared",
+      "note": "Clon de evdcf14_negative_control_wrong_missing_inputs con modelo declarado de escenarios (motor scenario). CONTROL NEGATIVO: sin net_debt el motor declara ['net_debt']; el caso declara lista vacia. Sin la puerta, un motor que se calla un input obligatorio pasaria igual que uno que lo confiesa. Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback."
     },
     {
       "id": "evanc01_cross_year_fcf_excluded",

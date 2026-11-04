@@ -32,6 +32,9 @@ EXPECTED_ENGINES = {
     "bank",
     "insurer",
     "reit",
+    # Motor de escenarios (4-nov-2026): cubierto por el routing de TSLA, NBIS
+    # y KRKNF del maestro y por tests/test_scenario_engine.py.
+    "scenario",
 }
 
 # 8 motores x 12 casos = el minimo del encargo.

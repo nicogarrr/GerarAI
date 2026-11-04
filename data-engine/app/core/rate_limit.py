@@ -147,7 +147,12 @@ async def _record_hit(
 
             from app.core.redis_retry import no_retry_async
 
-            client = redis.from_url(redis_url, socket_connect_timeout=0.25, socket_timeout=0.5, retry=no_retry_async())
+            # Cold-start CPU contention can exceed 250/500 ms. Keep a bounded
+            # wait, no retry of an ambiguously committed write, and fail closed.
+            client = redis.from_url(
+                redis_url, socket_connect_timeout=1.0, socket_timeout=1.5,
+                retry=no_retry_async(),
+            )
             member = f"{now:.6f}:{uuid.uuid4().hex}"
             try:
                 async with client.pipeline(transaction=True) as pipe:
@@ -361,7 +366,7 @@ async def _count_hits(key: str, *, use_redis: bool, redis_url: str) -> int:
         from app.core.redis_retry import no_retry_async
 
         client = redis.from_url(
-            redis_url, socket_connect_timeout=0.25, socket_timeout=0.5, retry=no_retry_async()
+            redis_url, socket_connect_timeout=1.0, socket_timeout=1.5, retry=no_retry_async()
         )
         try:
             return int(await client.zcount(key, now - WINDOW_SECONDS, "+inf"))

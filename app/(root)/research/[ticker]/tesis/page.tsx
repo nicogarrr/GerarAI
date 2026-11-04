@@ -34,6 +34,8 @@ import { metricLabel } from '@/lib/research/metric-labels';
 import { publicEditorial } from '@/lib/public-fonts-editorial';
 import { cn } from '@/lib/utils';
 import { thesisCatalystLabel } from '@/lib/research/catalyst-label';
+import { ThesisTrackRecordCard } from '@/components/research/ThesisTrackRecordCard';
+import { getThesisTrackRecord } from '@/lib/actions/thesis-track-record.actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -216,6 +218,8 @@ export default async function ThesisReadingPage({ params, searchParams }: PagePr
   const ticker = rawTicker.toUpperCase();
   const expertRun = parseExpertRun((await searchParams)?.expertRun);
 
+  // «Nuestro acierto» en paralelo; null si falla, sin tumbar la tesis.
+  const trackRecordRead = getThesisTrackRecord(ticker);
   const [snapshotRead, workspace, expertThesis] = await Promise.all([
     // null = 404 «compañía ausente del master» (getResearchCompanySnapshot
     // solo devuelve null ahí); cualquier otro fallo es `failed`. Antes ambos
@@ -238,6 +242,7 @@ export default async function ThesisReadingPage({ params, searchParams }: PagePr
   // no un «todavía no hay tesis». Lo mismo con las versiones.
   const versions = workspace ? await readLatestPublished(ticker) : { published: null, failed: false, missing: false };
   const published = versions.published;
+  const trackRecord = await trackRecordRead;
   // Fuentes por cifra: /versions no las trae; /latest si. Solo se muestran
   // cuando la publicada ES la ultima version: la procedencia de un borrador
   // mas nuevo no describe este documento y afirmarlo seria inventarlo.
@@ -568,6 +573,7 @@ export default async function ThesisReadingPage({ params, searchParams }: PagePr
                   </div>
                 ) : null}
               </dl>
+              <ThesisTrackRecordCard data={trackRecord} />
             </section>
 
             {provenance && provenance.length > 0 ? (

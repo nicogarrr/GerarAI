@@ -13,6 +13,7 @@ crecimiento × WACC; reverse DCF: crecimiento requerido al precio actual.
 
 from __future__ import annotations
 
+from app.valuation.cyclical_midcycle import cyclical_midcycle
 from app.valuation.dcf_fcff import DCFInputs, run_dcf
 from app.valuation.engines.base import (
     MODEL_VERSION,
@@ -40,6 +41,7 @@ from app.valuation.normalized_fcf import (
     plausibility_warning,
     run_planned,
 )
+from app.valuation.revenue_base import resolve_revenue_base
 from app.valuation.reverse_dcf import ReverseDCFInputs, solve_required_growth
 from app.valuation.scenario_definitions import mechanical_dcf_scenarios
 from app.valuation.scenario_model import Scenario, probability_weighted_value
@@ -243,6 +245,8 @@ class StandardDCFEngine(ValuationEngine):
     """
 
     key = "standard_dcf"
+    # Lo rellena ``value`` cuando llega a valorar escenarios (ver allí).
+    resolved_inputs: dict | None = None
 
     def value(self, context: ValuationContext) -> dict:
         company = context.company
@@ -285,22 +289,72 @@ class StandardDCFEngine(ValuationEngine):
                 )
             margin = fcf / revenue
 
+        # Cíclicas por industria (petróleo y gas, minería y metales, acero,
+        # coches): margen FCF de ciclo medio (media de 5 ejercicios),
+        # crecimiento plano = terminal y sin normalización de capex. Ver
+        # app/valuation/cyclical_midcycle.py (backtest 2, decisión de Nico
+        # 4-nov-2026). Con menos de 3 ejercicios sigue el método habitual y la
+        # traza dice por qué.
+        cyclical = cyclical_midcycle(context)
+        cyclical_applied = bool(cyclical and cyclical.get("applied"))
+        if cyclical and cyclical_applied:
+            margin = float(cyclical["margin"])
+            margin_normalization = {
+                "method": "cyclical_midcycle_mean_last_n_fiscal_years",
+                "n": cyclical["years_used"],
+                "periods": cyclical["periods"],
+                "normalized_value": margin,
+            }
+            if margin <= 0:
+                return insufficient_from_context(
+                    context,
+                    missing=["positive_midcycle_fcf_margin"],
+                    reason=(
+                        f"Empresa cíclica ({', '.join(cyclical['industries_matched'])}): el margen "
+                        f"FCF de ciclo medio (media de {cyclical['years_used']} ejercicios) es "
+                        f"{margin:.4f}. Con un margen de ciclo medio <= 0 un DCF de caja libre "
+                        "no es una valoración publicable."
+                    ),
+                    extra_trace={"cyclical_midcycle": cyclical},
+                )
+
+        # Ventas de partida: TTM cuando hay >= 2 trimestres presentados tras el
+        # FY ancla; si no, el FY (ver app/valuation/revenue_base.py). Va DESPUÉS
+        # del margen: el margen es un ratio (ciclo medio o FCF/ventas del mismo
+        # ejercicio) y se aplica tal cual sobre la base elegida.
+        # getattr: contextos/snapshots duck-typed (tests, llamadas directas)
+        # sin ancla fechada se quedan en la base anual sin tocar la BD.
+        revenue_base = resolve_revenue_base(
+            getattr(context, "db", None),
+            company.id,
+            (getattr(snapshot, "facts", None) or {}).get("revenue"),
+            revenue,
+            period_type=getattr(snapshot, "period_type", None),
+            as_of=getattr(context, "as_of", None),
+        )
+        revenue = revenue_base.value
+
         # Forma de la proyección (capex normalizado / DCF multietapa): ver
         # app/valuation/normalized_fcf.py. Con capex de crecimiento material
         # el margen de entrada converge al de ciclo medio con capex de
         # mantenimiento; con crecimiento >= 10 % se añade la etapa 6–10 años.
         growth_fact = snapshot.value("revenue_growth")
-        projection = build_projection(
-            context.db,
-            company.id,
-            context.as_of,
-            margin=margin,
-            growth=max(
-                min(growth_fact if growth_fact is not None else default_growth(company), 0.45),
-                -0.15,
-            ),
-            growth_sourced=growth_fact is not None,
-        )
+        if cyclical_applied:
+            # El margen ya es de ciclo medio: ni capex normalizado ni etapa
+            # de crecimiento alto (el rebote de un año no es tendencia).
+            projection = {"plan": ProjectionPlan(), "margin": margin, "growth": None, "info": None}
+        else:
+            projection = build_projection(
+                context.db,
+                company.id,
+                context.as_of,
+                margin=margin,
+                growth=max(
+                    min(growth_fact if growth_fact is not None else default_growth(company), 0.45),
+                    -0.15,
+                ),
+                growth_sourced=growth_fact is not None,
+            )
         plan = projection["plan"]
 
         if margin <= 0 and plan.margin_start is None:
@@ -361,6 +415,11 @@ class StandardDCFEngine(ValuationEngine):
         )
         if invalid_rates is not None:
             return invalid_rates
+        if cyclical and cyclical_applied:
+            # Crecimiento plano igual al terminal en toda la proyección.
+            cyclical = {**cyclical, "reported_revenue_growth": raw_growth}
+            raw_growth = growth = growth_after_clamp = terminal
+            growth_source = "cyclical_flat_terminal"
 
         net_debt = snapshot.value("net_debt")
         if net_debt is None:
@@ -389,6 +448,21 @@ class StandardDCFEngine(ValuationEngine):
             minority_interest=minority_interest,
             preferred_stock=preferred_stock,
         )
+        # Entradas ya resueltas (plan de proyección, puente y tasas): el motor
+        # de escenarios (scenario_engine.py) valora sus propios escenarios con
+        # esta misma mecánica en vez de recalcularla.
+        self.resolved_inputs = {
+            "plan": plan,
+            "revenue": revenue,
+            "revenue_growth": growth,
+            "fcf_margin": margin,
+            "wacc": wacc,
+            "terminal_growth": terminal,
+            "net_debt": net_debt,
+            "shares": shares,
+            "minority_interest": minority_interest,
+            "preferred_stock": preferred_stock,
+        }
 
         # Only the facts the DCF actually consumes may move the evidence
         # confidence: averaging in balance-sheet rows the model never reads
@@ -618,7 +692,9 @@ class StandardDCFEngine(ValuationEngine):
                 "publishable": True,
                 "status": "ok",
                 "model_version": MODEL_VERSION,
+                "revenue_base": revenue_base.trace(),
                 "growth_source": growth_source,
+                **({"cyclical_midcycle": cyclical} if cyclical else {}),
                 "growth_clamped_from": raw_growth if growth_after_clamp != raw_growth else None,
                 "fcf_margin_source": "financial_facts",
                 "fcf_margin_normalization": margin_normalization,

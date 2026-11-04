@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { X, Send, User, Bot, Loader2, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Send, User, Bot, Loader2, Maximize2, Minimize2, Eye } from 'lucide-react';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
 import { useT } from '@/lib/i18n/client';
 import { chatWithPortfolio } from '@/lib/actions/brain.actions';
@@ -158,6 +158,17 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
     const viewingHref = echo?.ticker
         ? `/research/${encodeURIComponent(echo.ticker)}`
         : page?.path ?? null;
+    // En móvil la pastilla muestra solo un ojo y la etiqueta (sin el "Viendo"),
+    // para que la cabecera quepa en una fila; el texto completo queda para
+    // lectores de pantalla y en el title. En escritorio se ve como siempre.
+    const viewingText = viewing ? t('brain.panel.viewing', { label: viewing }) : undefined;
+    const viewingContent = viewing ? (
+        <>
+            <Eye aria-hidden="true" className="h-3.5 w-3.5 shrink-0 sm:hidden" />
+            <span aria-hidden="true" className="min-w-0 truncate sm:hidden">{viewing}</span>
+            <span className="sr-only sm:not-sr-only">{viewingText}</span>
+        </>
+    ) : null;
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -364,10 +375,16 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
             : 'inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom))] top-20 bg-slate-950/95 backdrop-blur-md md:inset-x-auto md:top-0 md:bottom-0 md:right-0 md:w-[420px] md:h-dvh md:rounded-none md:border-y-0 md:border-r-0'
             }`}
         >
-            <CardHeader className="shrink-0 p-4 border-b border-indigo-500/20 flex flex-row items-center justify-between bg-indigo-900/20">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
+            {/* Móvil (<sm): una sola fila de 60 px con áreas táctiles de 44 px; el
+                título y la pastilla "Viendo" se abrevian a la vista pero conservan
+                el texto completo para lectores de pantalla. Escritorio igual. */}
+            <CardHeader className="shrink-0 gap-2 space-y-0 px-3 py-2 sm:gap-0 sm:space-y-1.5 sm:p-4 border-b border-indigo-500/20 flex flex-row items-center justify-between bg-indigo-900/20">
+                <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 sm:flex-initial sm:flex-wrap sm:gap-2">
                     <BrainGlassesIcon className="h-9 w-9 shrink-0 object-contain" />
-                    <CardTitle as="h2" id="global-brain-title" className="text-sm font-medium">{t('brain.panel.title')}</CardTitle>
+                    <CardTitle as="h2" id="global-brain-title" className="shrink-0 text-sm font-medium">
+                        <span aria-hidden="true" className="sm:hidden">{t('brain.panel.titleShort')}</span>
+                        <span className="sr-only sm:not-sr-only">{t('brain.panel.title')}</span>
+                    </CardTitle>
                     {showGuideInput || guideTicker ? (
                         <TickerSearchInput
                             value={guideTicker}
@@ -384,7 +401,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                             onClick={() => { onClearKnowledge(); setShowGuideInput(true); }}
                             title={t('brain.panel.guideButtonTitle')}
                             aria-label={t('brain.panel.guideButtonAria')}
-                            className="inline-flex min-h-11 items-center rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-400 hover:border-indigo-400 hover:text-slate-200"
+                            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-400 hover:border-indigo-400 hover:text-slate-200"
                         >
                             {t('brain.panel.guideButton')}
                         </button>
@@ -400,23 +417,23 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                             <Link
                                 href={viewingHref}
                                 data-testid="brain-page-context"
-                                title={echo?.company_name ?? undefined}
-                                className="inline-flex min-h-11 items-center max-w-32 truncate rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300 hover:border-indigo-400 hover:text-indigo-200"
+                                title={echo?.company_name ?? viewingText}
+                                className="inline-flex min-h-11 min-w-11 shrink items-center justify-center gap-1 max-w-32 truncate rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300 hover:border-indigo-400 hover:text-indigo-200 sm:justify-start"
                             >
-                                {t('brain.panel.viewing', { label: viewing })}
+                                {viewingContent}
                             </Link>
                         ) : (
                             <span
                                 data-testid="brain-page-context"
-                                title={echo?.company_name ?? undefined}
-                                className="max-w-32 truncate rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300"
+                                title={echo?.company_name ?? viewingText}
+                                className="inline-flex min-w-0 shrink items-center gap-1 max-w-32 truncate rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300 sm:block"
                             >
-                                {t('brain.panel.viewing', { label: viewing })}
+                                {viewingContent}
                             </span>
                         )
                     )}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex shrink-0 items-center gap-1">
                     <Button
                         variant="ghost"
                         size="icon"
@@ -569,7 +586,11 @@ const BrainMessageBubble = memo(function BrainMessageBubble({ message: m, index:
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${m.role === 'user' ? 'bg-blue-600' : 'bg-indigo-600'}`}>
                     {m.role === 'user' ? <User aria-hidden="true" className="h-3 w-3 text-white" /> : <Bot aria-hidden="true" className="h-3 w-3 text-white" />}
                 </div>
-                <div className={`p-3 rounded-lg text-sm overflow-hidden ${m.role === 'user'
+                {/* min-w-0 + overflow-wrap:anywhere: un enlace o token largo se parte en
+                    líneas en vez de quedar oculto por el overflow-hidden de la burbuja
+                    (a 390 px se perdía media URL); los bloques de código se desplazan
+                    dentro de la burbuja, como en ThesisMarkdown. */}
+                <div className={`min-w-0 p-3 rounded-lg text-sm overflow-hidden [overflow-wrap:anywhere] [&_pre]:max-w-full [&_pre]:overflow-x-auto ${m.role === 'user'
                     ? 'bg-blue-600 text-white rounded-tr-none'
                     : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-none'
                     }`}>

@@ -259,9 +259,11 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("shares_diluted",    ["WeightedAverageNumberOfDilutedSharesOutstanding"],                                      "shares"),
     ("shares_outstanding", ["CommonStockSharesOutstanding"],                                                         "shares"),
     # Fallback (WWW, 25/9): el tag combinado incluye caja
-    # restringida -> deuda neta fresca pero algo optimista. Va el ULTIMO: por
-    # periodo gana el `filed` mas reciente, y los periodos donde se uso quedan
-    # anotados en document.metadata_["cash_includes_restricted_periods"].
+    # restringida -> deuda neta fresca pero algo optimista. Va el ULTIMO y es
+    # prioridad por alcance (SCOPE_PRIORITY_METRICS): solo cubre los periodos
+    # sin caja estricta, aunque el estado de flujos lo repita en un 10-K
+    # posterior; esos periodos quedan anotados en
+    # document.metadata_["cash_includes_restricted_periods"].
     ("cash_and_equivalents", ["CashAndCashEquivalentsAtCarryingValue",
                               "CashCashEquivalentsAndShortTermInvestments",
                               "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"], "USD"),
@@ -288,7 +290,8 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # StockholdersEquity = patrimonio atribuible a la matriz; la variante
     # "IncludingPortionAttributableToNoncontrollingInterest" consolida los
     # intereses minoritarios. Son MAGNITUDES DISTINTAS: mezclarlas hacia que el
-    # balance cuadre por la diferencia de NCI. Se usa la de la matriz.
+    # balance cuadre por la diferencia de NCI. Se usa la de la matriz; la otra
+    # solo rellena huecos (SCOPE_PRIORITY_METRICS), aunque se presente despues.
     ("total_equity",      ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"], "USD"),
     ("goodwill",          ["Goodwill"],                                                                              "USD"),
     # Componentes del NOI de un REIT (net operating income = ingresos por
@@ -611,7 +614,37 @@ def _sum_disjoint_components(
 # lista, que es el más amplio, aunque otro se presentara después. En la D&A,
 # tratar ``Depreciation`` como alias de ``DepreciationAndAmortization`` dejaba
 # ganar a la de PP&E sola cuando ambas venían en el mismo 10-K.
-SCOPE_PRIORITY_METRICS = {"total_debt", "depreciation_amortization"}
+# El mismo defecto en cuatro métricas más, cuyos conceptos son magnitudes
+# distintas ordenadas por preferencia: los estados repiten saldos de años
+# previos (el de flujos, la caja con restringida; el de patrimonio, el total con
+# minoritarios), así que para esos años ganaba el concepto de otro alcance por
+# venir en un 10-K posterior y la serie cambiaba de significado entre años
+# (FCX FY2023: patrimonio 27.310 M con minoritarios frente a 16.693 M de la
+# matriz; ABNB FY2023: caja 12.667 M con fondos de clientes frente a 6.874 M;
+# AAPL: arrendamiento no corriente en vez del total). Aquí el orden declarado
+# es la prioridad y el resto solo rellena los periodos sin el preferido.
+SCOPE_PRIORITY_METRICS = {
+    "total_debt",
+    "depreciation_amortization",
+    "total_equity",
+    "net_income",
+    "cash_and_equivalents",
+    "operating_lease_liabilities",
+}
+
+# Métricas cuyos conceptos están ANIDADOS (cada uno es parte del siguiente:
+# ``Depreciation`` ⊂ ``DepreciationAndAmortization`` ⊂ ``…DepletionAnd…``).
+# El orden por alcance no basta: hay emisores que etiquetan el concepto
+# «amplio» en una línea parcial del mismo 10-K (Salesforce FY2025: DDA 1.000 M
+# frente a 3.477 M de D&A en el estado de flujos; McDonald's 457 frente a
+# 2.199 M). En UNA misma presentación el total de mayor alcance no puede ser
+# menor que uno más estrecho, así que ahí gana el mayor importe. Entre
+# presentaciones distintas sigue mandando el orden (un recast posterior más
+# pequeño, p. ej. tras una escisión, no se cambia por la cifra vieja mayor).
+NESTED_SCOPE_METRICS = frozenset({"depreciation_amortization"})
+# Tolerancia para cifras redondeadas del texto («unos 2.500 M» frente a los
+# 2.474 M exactos de la tabla): por debajo de ella no se cambia de concepto.
+NESTED_SCOPE_TOLERANCE = Decimal("0.02")
 
 # Tags us-gaap de deuda financiera (lado PASIVO) usados como evidencia para la
 # derivada "net_debt = -caja" (EXEL, 19/10/2026): solo si NINGUNO tiene valor
@@ -695,6 +728,37 @@ def _collapse_by_scope(
         for end, entry in entries.items():
             by_end.setdefault(end, entry)
     return by_end
+
+
+def widest_in_same_filing(
+    by_concept: dict[str, dict[str, dict[str, Any]]],
+    by_end: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Por periodo, el mayor importe entre los conceptos de la MISMA presentación.
+
+    Parte del ganador por alcance (``by_end``) y solo lo cambia por otro
+    concepto del mismo filing (mismo ``accn``; sin ``accn``, mismo ``filed``)
+    cuyo valor absoluto lo supere en más de ``NESTED_SCOPE_TOLERANCE``.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    for end, winner in by_end.items():
+        best = winner
+        best_val = _decimal(best.get("val"))
+        for entries in by_concept.values():
+            other = entries.get(end)
+            if other is None or other is best:
+                continue
+            if winner.get("accn") and other.get("accn"):
+                same = other.get("accn") == winner.get("accn")
+            else:
+                same = str(other.get("filed") or "") == str(winner.get("filed") or "")
+            other_val = _decimal(other.get("val"))
+            if not same or other_val is None or best_val is None:
+                continue
+            if abs(other_val) > abs(best_val) * (1 + NESTED_SCOPE_TOLERANCE):
+                best, best_val = other, other_val
+        out[end] = best
+    return out
 
 
 def _compose_total_debt(
@@ -785,6 +849,8 @@ def _merge_for_metric(
         return _sum_disjoint_components(by_concept)
     if metric == "total_debt":
         return _compose_total_debt(by_concept)
+    if metric in NESTED_SCOPE_METRICS:
+        return widest_in_same_filing(by_concept, _collapse_by_scope(by_concept))
     if metric in SCOPE_PRIORITY_METRICS:
         return _collapse_by_scope(by_concept)
     return _collapse_aliases(by_concept)

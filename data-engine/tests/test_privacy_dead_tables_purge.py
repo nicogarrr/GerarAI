@@ -2,7 +2,8 @@
 
 Migraciones viejas crearon tablas cuyo modelo desaparecio (p. ej.
 thesis_backtest_runs); delete_account enumeraba solo Base.metadata y sus
-filas sobrevivian al borrado. MEDIDO en la cadena 0001->0115: 7 tablas asi.
+filas sobrevivian al borrado. MEDIDO en la cadena 0001->0115: 7 tablas asi (thesis_realized_returns
+volvio a tener modelo con «Nuestro acierto»: quedan 6).
 
 Corre en el job Postgres (crea y destruye su BD scratch migrada a head);
 en sqlite/local hace skip salvo el test de cobertura sin tablas muertas.
@@ -24,7 +25,6 @@ _TABLAS_MUERTAS = {
     "thesis_backtest_results",
     "thesis_backtest_runs",
     "thesis_hit_rate_cells",
-    "thesis_realized_returns",
 }
 
 

@@ -41,9 +41,11 @@ from app.services.connectors.edgartools_concepts import (
     xbrl_unit_key,
 )
 from app.services.financial_ingestion_service import (
+    NESTED_SCOPE_METRICS,
     SCOPE_PRIORITY_METRICS,
     SEC_METRIC_MAP,
     is_summed_component,
+    widest_in_same_filing,
 )
 from app.services.number_parsing import parse_machine_decimal as _decimal
 
@@ -253,6 +255,8 @@ def merge_entries(by_concept: dict[str, dict[str, dict[str, Any]]], metric: str)
     """Fusion por periodo: replica ``_merge_for_metric`` (misma prioridad)."""
     if is_summed_component(metric):
         return _sum_disjoint(by_concept)
+    if metric in NESTED_SCOPE_METRICS:
+        return widest_in_same_filing(by_concept, _collapse_by_scope(by_concept))
     if metric in SCOPE_PRIORITY_METRICS:
         return _collapse_by_scope(by_concept)
     return _collapse_aliases(by_concept)

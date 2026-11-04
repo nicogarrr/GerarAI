@@ -397,6 +397,164 @@
         "title": "AnalystConsensus",
         "type": "object"
       },
+      "AnalystHistory": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "best_horizon": {
+            "anyOf": [
+              {
+                "enum": [
+                  "6m",
+                  "12m"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Horizon"
+          },
+          "consensus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SimpleConsensus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "fetched_at": {
+            "title": "Fetched At",
+            "type": "integer"
+          },
+          "first_target_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Target Date"
+          },
+          "horizons": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/HorizonSummary"
+            },
+            "title": "Horizons",
+            "type": "array"
+          },
+          "min_samples": {
+            "default": 5,
+            "title": "Min Samples",
+            "type": "integer"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "note_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "fetch_failed",
+                  "not_equity",
+                  "no_history",
+                  "no_matured"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note Code"
+          },
+          "rating_changes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RatingChanges"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "default": "Yahoo Finance (no oficial): hist\u00f3rico de recomendaciones y cierres diarios",
+            "title": "Source",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "status": {
+            "default": "unavailable",
+            "enum": [
+              "available",
+              "empty",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "targets_total": {
+            "default": 0,
+            "title": "Targets Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "symbol",
+          "fetched_at"
+        ],
+        "title": "AnalystHistory",
+        "type": "object"
+      },
       "AnalystTargetRow": {
         "properties": {
           "action": {
@@ -2610,6 +2768,86 @@
           "source"
         ],
         "title": "CompanyTimelineEventsOut",
+        "type": "object"
+      },
+      "CompanyTrackRecordOut": {
+        "properties": {
+          "best_horizon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Horizon"
+          },
+          "best_horizon_reason": {
+            "title": "Best Horizon Reason",
+            "type": "string"
+          },
+          "first_maturity_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Maturity Date"
+          },
+          "horizons": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TrackRecordHorizonOut"
+            },
+            "title": "Horizons",
+            "type": "object"
+          },
+          "last_computed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Computed At"
+          },
+          "min_samples_best_horizon": {
+            "title": "Min Samples Best Horizon",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "pending",
+              "no_data"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "versions_tracked": {
+            "title": "Versions Tracked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "horizons",
+          "best_horizon_reason",
+          "min_samples_best_horizon",
+          "versions_tracked",
+          "ticker"
+        ],
+        "title": "CompanyTrackRecordOut",
         "type": "object"
       },
       "CompanyTtmOut": {
@@ -6496,6 +6734,56 @@
         "title": "EventHistoryItemOut",
         "type": "object"
       },
+      "ExitMultipleContrast": {
+        "properties": {
+          "gordon_value_per_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gordon Value Per Share"
+          },
+          "implied_multiple_for_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implied Multiple For Price"
+          },
+          "metric": {
+            "const": "terminal_year_fcf",
+            "default": "terminal_year_fcf",
+            "title": "Metric",
+            "type": "string"
+          },
+          "multiple": {
+            "default": 25.0,
+            "title": "Multiple",
+            "type": "number"
+          },
+          "value_per_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Per Share"
+          }
+        },
+        "title": "ExitMultipleContrast",
+        "type": "object"
+      },
       "ExpertThesisClaimOut": {
         "properties": {
           "refs": {
@@ -7413,6 +7701,70 @@
           "valuation_input_ready"
         ],
         "title": "FinancialRefreshResponse",
+        "type": "object"
+      },
+      "FirmScore": {
+        "properties": {
+          "direction_hit_rate": {
+            "title": "Direction Hit Rate",
+            "type": "number"
+          },
+          "firm": {
+            "title": "Firm",
+            "type": "string"
+          },
+          "last_date": {
+            "title": "Last Date",
+            "type": "string"
+          },
+          "last_target": {
+            "title": "Last Target",
+            "type": "number"
+          },
+          "median_abs_error_pct": {
+            "title": "Median Abs Error Pct",
+            "type": "number"
+          },
+          "median_bias_pct": {
+            "title": "Median Bias Pct",
+            "type": "number"
+          },
+          "peer_scored_samples": {
+            "default": 0,
+            "title": "Peer Scored Samples",
+            "type": "integer"
+          },
+          "relative_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relative Error"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "small_sample": {
+            "default": false,
+            "title": "Small Sample",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "firm",
+          "samples",
+          "median_abs_error_pct",
+          "median_bias_pct",
+          "direction_hit_rate",
+          "last_date",
+          "last_target"
+        ],
+        "title": "FirmScore",
         "type": "object"
       },
       "FlowDestinationOut": {
@@ -8352,6 +8704,92 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HorizonSummary": {
+        "properties": {
+          "bottom": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/FirmScore"
+            },
+            "title": "Bottom",
+            "type": "array"
+          },
+          "direction_hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction Hit Rate"
+          },
+          "horizon": {
+            "enum": [
+              "6m",
+              "12m"
+            ],
+            "title": "Horizon",
+            "type": "string"
+          },
+          "matured_targets": {
+            "title": "Matured Targets",
+            "type": "integer"
+          },
+          "median_abs_error_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Abs Error Pct"
+          },
+          "median_bias_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Bias Pct"
+          },
+          "months": {
+            "title": "Months",
+            "type": "integer"
+          },
+          "ranked_firms": {
+            "default": 0,
+            "title": "Ranked Firms",
+            "type": "integer"
+          },
+          "small_sample_firms": {
+            "default": 0,
+            "title": "Small Sample Firms",
+            "type": "integer"
+          },
+          "top": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/FirmScore"
+            },
+            "title": "Top",
+            "type": "array"
+          }
+        },
+        "required": [
+          "horizon",
+          "months",
+          "matured_targets"
+        ],
+        "title": "HorizonSummary",
+        "type": "object"
+      },
       "IBKRConnectRequest": {
         "additionalProperties": false,
         "properties": {
@@ -8510,6 +8948,110 @@
           "image_base64"
         ],
         "title": "ImageInput",
+        "type": "object"
+      },
+      "ImpliedGrowth": {
+        "description": "Crecimiento de la etapa 1 que justifica el precio (DCF inverso del motor).",
+        "properties": {
+          "current_revenue_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Revenue Growth"
+          },
+          "method": {
+            "default": "reverse_dcf_stage1_growth",
+            "title": "Method",
+            "type": "string"
+          },
+          "required_revenue_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Revenue Growth"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ImpliedGrowth",
+        "type": "object"
+      },
+      "ImpliedWacc": {
+        "properties": {
+          "bounds": {
+            "default": [],
+            "items": {
+              "type": "number"
+            },
+            "title": "Bounds",
+            "type": "array"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "enum": [
+                  "below_min",
+                  "above_max"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "out_of_range",
+              "not_available"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "target_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Price"
+          },
+          "wacc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wacc"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ImpliedWacc",
         "type": "object"
       },
       "InferredInputCreate": {
@@ -17397,6 +17939,27 @@
         "title": "Range52w",
         "type": "object"
       },
+      "RatingChanges": {
+        "properties": {
+          "downgrades": {
+            "default": 0,
+            "title": "Downgrades",
+            "type": "integer"
+          },
+          "upgrades": {
+            "default": 0,
+            "title": "Upgrades",
+            "type": "integer"
+          },
+          "window_days": {
+            "default": 90,
+            "title": "Window Days",
+            "type": "integer"
+          }
+        },
+        "title": "RatingChanges",
+        "type": "object"
+      },
       "RefreshMarketStageOut": {
         "properties": {
           "alert_rules": {
@@ -19550,6 +20113,57 @@
         "title": "ScreenerSavedScreenOut",
         "type": "object"
       },
+      "SimpleConsensus": {
+        "properties": {
+          "firms": {
+            "title": "Firms",
+            "type": "integer"
+          },
+          "mean": {
+            "title": "Mean",
+            "type": "number"
+          },
+          "median": {
+            "title": "Median",
+            "type": "number"
+          },
+          "method": {
+            "const": "simple_mean",
+            "default": "simple_mean",
+            "title": "Method",
+            "type": "string"
+          },
+          "reference_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Price"
+          },
+          "upside_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upside Percent"
+          }
+        },
+        "required": [
+          "mean",
+          "median",
+          "firms"
+        ],
+        "title": "SimpleConsensus",
+        "type": "object"
+      },
       "SnapshotCountsOut": {
         "properties": {
           "calculated_metrics": {
@@ -20694,6 +21308,89 @@
           "enabled"
         ],
         "title": "TelegramSubscriptionOut",
+        "type": "object"
+      },
+      "TenantTrackRecordOut": {
+        "properties": {
+          "best_horizon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Horizon"
+          },
+          "best_horizon_reason": {
+            "title": "Best Horizon Reason",
+            "type": "string"
+          },
+          "first_maturity_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Maturity Date"
+          },
+          "horizons": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TrackRecordHorizonOut"
+            },
+            "title": "Horizons",
+            "type": "object"
+          },
+          "last_computed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Computed At"
+          },
+          "min_samples_best_horizon": {
+            "title": "Min Samples Best Horizon",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "pending",
+              "no_data"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tickers": {
+            "items": {
+              "$ref": "#/components/schemas/TickerTrackRecordOut"
+            },
+            "title": "Tickers",
+            "type": "array"
+          },
+          "versions_tracked": {
+            "title": "Versions Tracked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "horizons",
+          "best_horizon_reason",
+          "min_samples_best_horizon",
+          "versions_tracked",
+          "tickers"
+        ],
+        "title": "TenantTrackRecordOut",
         "type": "object"
       },
       "ThesisApproveRequest": {
@@ -22033,6 +22730,43 @@
         "title": "ThesisTickersOut",
         "type": "object"
       },
+      "TickerTrackRecordOut": {
+        "properties": {
+          "best_horizon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Horizon"
+          },
+          "best_horizon_reason": {
+            "title": "Best Horizon Reason",
+            "type": "string"
+          },
+          "horizons": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TrackRecordHorizonOut"
+            },
+            "title": "Horizons",
+            "type": "object"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "horizons",
+          "best_horizon_reason"
+        ],
+        "title": "TickerTrackRecordOut",
+        "type": "object"
+      },
       "TimelineEventOut": {
         "properties": {
           "date": {
@@ -22114,6 +22848,68 @@
           }
         },
         "title": "TimelineHoldingOut",
+        "type": "object"
+      },
+      "TrackRecordHorizonOut": {
+        "properties": {
+          "hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hit Rate"
+          },
+          "hits": {
+            "title": "Hits",
+            "type": "integer"
+          },
+          "median_abs_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Abs Error"
+          },
+          "median_signed_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Signed Error"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "touched_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Touched Rate"
+          }
+        },
+        "required": [
+          "samples",
+          "hits"
+        ],
+        "title": "TrackRecordHorizonOut",
         "type": "object"
       },
       "TransactionImportCommitRequest": {
@@ -23208,6 +24004,184 @@
           "earnings_status"
         ],
         "title": "WatchlistMonitorOut",
+        "type": "object"
+      },
+      "WhatToBelieve": {
+        "properties": {
+          "base_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Value"
+          },
+          "consensus_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consensus Price"
+          },
+          "consensus_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consensus Source"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "current_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Price"
+          },
+          "engine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine"
+          },
+          "exit_multiple": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExitMultipleContrast"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "implied_growth": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImpliedGrowth"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "implied_wacc_consensus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImpliedWacc"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "implied_wacc_price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImpliedWacc"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "engine_not_dcf",
+                  "no_base_value",
+                  "no_price",
+                  "valuation_unavailable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "not_applicable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "terminal_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminal Growth"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "wacc_used": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wacc Used"
+          }
+        },
+        "required": [
+          "ticker",
+          "status"
+        ],
+        "title": "WhatToBelieve",
         "type": "object"
       },
       "WorkProductRequest": {
@@ -34377,6 +35351,209 @@
           }
         },
         "summary": "Get Company",
+        "tags": [
+          "companies"
+        ]
+      }
+    },
+    "/api/companies/{ticker}/analyst-history": {
+      "get": {
+        "description": "How each analyst firm's past price targets fared for this ticker (Yahoo\nFinance via yfinance, free and unofficial): matured 6- and 12-month\ntargets vs the realized close, absolute and peer-relative error,\ndirection hit rate, Bayesian shrinkage and a minimum sample to rank.\nThe consensus is the SIMPLE mean of live targets. Public market data\nonly: no tenant data is read or returned here. No coverage -> status\n`empty` with its reason; a source failure -> `unavailable`.",
+        "operationId": "company_analyst_history_api_companies__ticker__analyst_history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalystHistory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Company Analyst History",
         "tags": [
           "companies"
         ]
@@ -46030,6 +47207,209 @@
         "summary": "Get Thesis Scenarios",
         "tags": [
           "companies"
+        ]
+      }
+    },
+    "/api/companies/{ticker}/track-record": {
+      "get": {
+        "description": "Acierto de nuestros valores razonables para una empresa (6 y 12 meses).",
+        "operationId": "get_company_track_record_api_companies__ticker__track_record_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyTrackRecordOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Company Track Record",
+        "tags": [
+          "thesis"
         ]
       }
     },
@@ -92506,6 +93886,200 @@
         "summary": "Relay"
       }
     },
+    "/api/thesis-track-record": {
+      "get": {
+        "description": "Acierto agregado del tenant y por ticker, con el mejor horizonte de cada uno.",
+        "operationId": "get_tenant_track_record_api_thesis_track_record_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantTrackRecordOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Tenant Track Record",
+        "tags": [
+          "thesis"
+        ]
+      }
+    },
     "/api/thesis/generate": {
       "post": {
         "operationId": "generate_thesis_api_thesis_generate_post",
@@ -97954,6 +99528,209 @@
           }
         },
         "summary": "Historical Valuation",
+        "tags": [
+          "valuation"
+        ]
+      }
+    },
+    "/api/valuation/{ticker}/what-to-believe": {
+      "get": {
+        "description": "\u00abQu\u00e9 hace falta creer\u00bb para justificar el precio con el DCF de la empresa.\n\nSolo lee: la valoraci\u00f3n vigente (misma que /api/valuation/{ticker}, con su\nWACC tal y como lo resolvi\u00f3 el motor), el WACC impl\u00edcito al precio y al\nconsenso simple de analistas (si est\u00e1 en la misma divisa), el crecimiento\ndel DCF inverso del motor y el contraste con un m\u00faltiplo de salida. Los\nm\u00e9todos que no son un DCF FCFF responden \u00abno aplica\u00bb con el motivo.",
+        "operationId": "what_to_believe_api_valuation__ticker__what_to_believe_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatToBelieve"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "What To Believe",
         "tags": [
           "valuation"
         ]

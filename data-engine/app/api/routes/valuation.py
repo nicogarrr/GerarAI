@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.models import Company
@@ -14,6 +15,7 @@ from app.services.fair_value_service import (
 from app.services.historical_valuation_service import HistoricalValuationService
 from app.services.valuation_service import ValuationService
 from app.services.valuation_summary import build_summaries
+from app.valuation.what_to_believe import WhatToBelieve, build_what_to_believe
 
 router = APIRouter()
 
@@ -68,6 +70,40 @@ def valuation(ticker: str, db: Session = Depends(get_db)) -> dict:
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     return ValuationService().value_company(db, company)
+
+
+@router.get("/{ticker}/what-to-believe", response_model=WhatToBelieve)
+async def what_to_believe(ticker: str, db: Session = Depends(get_db)) -> WhatToBelieve:
+    """«Qué hace falta creer» para justificar el precio con el DCF de la empresa.
+
+    Solo lee: la valoración vigente (misma que /api/valuation/{ticker}, con su
+    WACC tal y como lo resolvió el motor), el WACC implícito al precio y al
+    consenso simple de analistas (si está en la misma divisa), el crecimiento
+    del DCF inverso del motor y el contraste con un múltiplo de salida. Los
+    métodos que no son un DCF FCFF responden «no aplica» con el motivo.
+    """
+    company = await run_in_threadpool(resolve_company, db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    valuation_result = await run_in_threadpool(ValuationService().value_company, db, company)
+    consensus_price = None
+    consensus_currency = None
+    consensus_source = None
+    if valuation_result.get("status") in ("ok", "partial"):
+        from app.services.analyst_targets_service import analyst_targets_service
+
+        targets = await analyst_targets_service.get(company.ticker)
+        if targets.status == "available" and targets.consensus is not None:
+            consensus_price = targets.consensus.mean
+            consensus_currency = targets.currency
+            consensus_source = targets.source
+    return build_what_to_believe(
+        company.ticker,
+        valuation_result,
+        consensus_price=consensus_price,
+        consensus_currency=consensus_currency,
+        consensus_source=consensus_source,
+    )
 
 
 @router.get("/{ticker}/history")

@@ -84,6 +84,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/ui/name-avatar.tsx': 'useT lee locale para el texto alternativo de la foto',
   'components/proPicks/WalkForwardResults.tsx': 'importa MethodologyDisclosure client, que ahora consume contexto React de locale',
   'components/proPicks/StrategyFactsheet.tsx': 'useT/useLocale/useFormat: textos y números en el idioma elegido (contexto React de locale)',
+  'components/research/ThesisTrackRecordCard.tsx': 'useT/useFormat: tarjeta «Nuestro acierto» en el idioma elegido (contexto React de locale)',
 
   'components/settings/LlmUsagePanel.tsx':
     'useT/useLocale: copy y formato de fechas del panel de uso LLM en el idioma elegido (contexto React de locale)',
@@ -97,6 +98,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/ChangesFeed.tsx': 'useState y useMemo para filtros y paginación interactiva de sucesos',
   'components/research/DcaPreparingRefresh.tsx': 'useEffect y useRouter: refresca la ficha cada 15 s mientras la señal DCA o las noticias recién pedidas se preparan',
   'components/research/AnalystTargetsView.tsx': 'useState para la paginación de firmas (5 por página) sin recargar la ficha',
+  'components/research/AnalystHistoryView.tsx': 'useState para alternar el horizonte del backtest (6/12 meses) sin recargar la ficha',
   'components/research/DocumentsList.tsx': 'useState y useMemo, onChange para búsqueda y página actual',
   'components/research/ExpectationsList.tsx': 'useState para paginación de comparaciones y previsiones',
   'components/research/Pager.tsx': 'jsx-onClick para avanzar y retroceder páginas',
