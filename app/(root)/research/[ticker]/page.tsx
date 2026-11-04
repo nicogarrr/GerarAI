@@ -70,6 +70,8 @@ import { ChangesSinceVisit } from '@/components/research/ChangesSinceVisit';
 import { DocumentsList } from '@/components/research/DocumentsList';
 import { ChangesFeed } from '@/components/research/ChangesFeed';
 import { AnalystTargetsSection } from '@/components/research/AnalystTargetsSection';
+import { AnalystHistorySection } from '@/components/research/AnalystHistorySection';
+import { AnalystHistorySkeleton } from '@/components/research/AnalystHistoryView';
 import { DcaHitRatesSection } from '@/components/research/DcaHitRatesSection';
 import { NewsPreparingNotice } from '@/components/research/NewsPreparingNotice';
 import { getNewsPreparing } from '@/lib/research/news-preparing';
@@ -1925,6 +1927,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton />}><CompanyHeaderQuote compact={activeView !== 'overview'} snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
           <ChangesSinceVisit ticker={ticker} />
           <div className="scroll-mt-6" id="analistas"><MobileCollapse title={t('research.fichaAnalystTargetsTitle')}><Suspense fallback={null}><AnalystTargetsSection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></Suspense></MobileCollapse></div>
+          <div className="scroll-mt-6" id="historial-analistas"><MobileCollapse title={t('research.fichaAnalystHistoryTitle')}><Suspense fallback={<AnalystHistorySkeleton />}><AnalystHistorySection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} /></Suspense></MobileCollapse></div>
           <MobileCollapse title={t('research.fichaDcaSignalsTitle')}><Suspense fallback={null}><DcaHitRatesSection ticker={ticker} /></Suspense></MobileCollapse>
         </header>
         {sections.filter((section) => section.id && section.title).length > 1 ? (
