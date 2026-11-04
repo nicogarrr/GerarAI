@@ -1790,5 +1790,35 @@
     "noData": "No data",
     "insufficient": "insufficient sample",
     "insufficientThreshold": "insufficient sample (n<{threshold})"
+  },
+  "whatToBelieve": {
+    "title": "What you need to believe",
+    "subtitle": "What today's price requires from our DCF, with the same inputs.",
+    "loading": "Working out what you need to believe…",
+    "unavailable": "Couldn't calculate it right now. Try again in a few minutes.",
+    "notApplicable": "Not applicable: {reason}",
+    "reasons": {
+      "engine_not_dcf": "this company's valuation method isn't a free-cash-flow DCF.",
+      "no_base_value": "the base DCF doesn't give a positive value per share.",
+      "no_price": "without a market price we can't say what the price requires.",
+      "valuation_unavailable": "there's no DCF valuation calculated for this company."
+    },
+    "waccPrice": "To justify {price} you need a WACC of {implied} (we use {used}).",
+    "waccPriceNoUsed": "To justify {price} you need a WACC of {implied}.",
+    "waccBelow": "To justify {price} you'd need a WACC below {min}: the price is beyond what this DCF can give.",
+    "waccAbove": "Even at a WACC of {max} the DCF gives more than {price}: the price asks very little.",
+    "waccNotAvailable": "With negative cash flows there's no meaningful implied WACC.",
+    "waccConsensus": "The analyst consensus ({price}) requires a WACC of {implied}.",
+    "waccConsensusBelow": "The analyst consensus ({price}) would require a WACC below {min}.",
+    "waccConsensusAbove": "The analyst consensus ({price}) sits below the DCF even at a WACC of {max}.",
+    "growth": "Or, at our WACC, revenue growth of {required} a year in the first stage (we project {current}).",
+    "growthNoCurrent": "Or, at our WACC, revenue growth of {required} a year in the first stage.",
+    "growthOut": "At our WACC, not even the model's maximum growth reaches the price.",
+    "exitTitle": "Terminal value with an exit multiple",
+    "gordonLabel": "Our DCF (perpetual growth)",
+    "exitLabel": "With a {multiple}x exit",
+    "exitExplain": "Same DCF, but the terminal value is {multiple} times the last projected year's free cash flow instead of perpetual growth. It's a cross-check, not our fair value.",
+    "exitImplied": "Reaching {price} would take a {implied}x exit on that cash flow.",
+    "explain": "WACC is the return required from the investment: the lower it is, the more the future is worth. If the price needs a WACC far below ours, it's pricing in less risk or more growth than we project."
   }
 }
