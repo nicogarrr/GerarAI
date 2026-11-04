@@ -33,9 +33,9 @@ def test_engine_moves_only_verified_tickers():
     assert resolve_engine_key(_co_ind(ticker="KKR")) == "holding_company"
     assert resolve_engine_key(_co_ind(ticker="CPT", industry="Residential REITs")) == "reit"
     assert resolve_engine_key(_co_ind(ticker="BN")) == "holding_company"
-    assert resolve_company_framework(_co_ind(ticker="CB")).key == "insurer"
+    assert resolve_company_framework(_co_ind(ticker="CB", industry="Insurance")).key == "insurer"
     assert resolve_company_framework(_co_ind(ticker="KKR")).key == "holding_asset_manager"
-    assert resolve_company_framework(_co_ind(ticker="CPT")).key == "reit"
+    assert resolve_company_framework(_co_ind(ticker="CPT", industry="Residential REITs")).key == "reit"
 
 
 def test_engine_counterexamples_auditor():
