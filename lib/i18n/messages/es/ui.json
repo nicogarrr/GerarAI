@@ -111,5 +111,20 @@
     "unexpected": "Se produjo un error inesperado. Inténtalo de nuevo.",
     "reference": "Referencia: {digest}",
     "retry": "Reintentar"
+  },
+  "thesisTrackRecord": {
+    "title": "Nuestro acierto",
+    "description": "Comparamos cada valor razonable de la tesis con el precio real a 6 y 12 meses.",
+    "firstResult": "Primer resultado el {date}.",
+    "noMatured": "Aún no ha vencido ningún horizonte.",
+    "months6": "A 6 meses",
+    "months12": "A 12 meses",
+    "bestBadge": "Mejor",
+    "hitRate": "de acierto en la dirección ({hits} de {samples})",
+    "medianError": "error mediano del valor razonable",
+    "touched": "tocó el valor razonable",
+    "horizonPending": "Pendiente de vencer.",
+    "best": "Mejor horizonte para esta acción: {horizon}, por acierto.",
+    "bestInsufficient": "Faltan muestras para elegir horizonte (mínimo {min} por horizonte)."
   }
 }
