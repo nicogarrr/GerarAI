@@ -310,8 +310,11 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Leases financieros nuevos del periodo (adiciones de RoU): complemento del capex en
     # efectivo para flujos de inversión tipo hyperscalers (distinción cash capex vs leases).
     ("finance_lease_additions", ["RightOfUseAssetObtainedInExchangeForFinanceLeaseLiability"], "USD"),
+    # Orden = alcance, de más amplio a más estrecho (SCOPE_PRIORITY_METRICS):
+    # ``Depreciation`` es solo la del inmovilizado material y únicamente
+    # rellena un ejercicio sin D&A completa (UNH: 1.000 M frente a 4.361 M).
     ("depreciation_amortization", ["DepreciationDepletionAndAmortization", "DepreciationAmortizationAndAccretionNet",
-                                   "Depreciation", "DepreciationAndAmortization"],                                                                  "USD"),
+                                   "DepreciationAndAmortization", "Depreciation"],                                                                  "USD"),
     # Signo CONTRARIO al del flujo de caja (+ = el circulante sube y consume
     # caja): _merge_for_metric lo niega para guardar el signo de FMP
     # changeInWorkingCapital (ver SEC_CASH_FLOW_SIGN_FLIPPED_METRICS).
@@ -604,7 +607,11 @@ def _sum_disjoint_components(
 # different scope (combined short+long debt vs long-term only). For these the
 # declared order is the scope priority, and `filed` only breaks ties inside one
 # concept (a recast), never across concepts.
-SCOPE_PRIORITY_METRICS = {"total_debt"}
+# Conceptos de DISTINTO alcance (no alias): por periodo gana el primero de la
+# lista, que es el más amplio, aunque otro se presentara después. En la D&A,
+# tratar ``Depreciation`` como alias de ``DepreciationAndAmortization`` dejaba
+# ganar a la de PP&E sola cuando ambas venían en el mismo 10-K.
+SCOPE_PRIORITY_METRICS = {"total_debt", "depreciation_amortization"}
 
 # Tags us-gaap de deuda financiera (lado PASIVO) usados como evidencia para la
 # derivada "net_debt = -caja" (EXEL, 19/10/2026): solo si NINGUNO tiene valor

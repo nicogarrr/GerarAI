@@ -36,13 +36,13 @@ VALUATION_ENGINES: dict[str, type[ValuationEngine]] = {
 _REIT_RE = re.compile(r"\breits?\b|real estate investment trust", re.IGNORECASE)
 
 
-def _is_equity_reit_industry(industry: str | None) -> bool:
+def is_equity_reit_industry(industry: str | None) -> bool:
     """«REIT» como palabra (o «real estate investment trust»), sin hipotecarios."""
     value = (industry or "").lower()
     return bool(_REIT_RE.search(value)) and "mortgage" not in value
 
 
-def _reference_industry(company: Company) -> str | None:
+def reference_industry(company: Company) -> str | None:
     """Industria de la referencia del instrumento (financedatabase), o None.
 
     Solo con una empresa ligada a una sesión (los dobles de test no la
@@ -133,8 +133,8 @@ def resolve_engine_key(company: Company) -> str:
     # (NOI / cap rate); si al motor reit le faltan datos, valuation_service
     # pasa al respaldo orientativo por múltiplos o deja N/D. Los REITs
     # hipotecarios no van aquí: su activo son préstamos, no inmuebles con NOI.
-    if _is_equity_reit_industry(industry) or _is_equity_reit_industry(
-        _reference_industry(company)
+    if is_equity_reit_industry(industry) or is_equity_reit_industry(
+        reference_industry(company)
     ):
         return "reit"
     # Residuo sin regla general todavía: gestoras alternativas y holdings de
