@@ -248,7 +248,7 @@ def test_fichero_de_alias_valido():
         assert ticker == ticker.upper()
         for alias in entry.get("aliases", []):
             assert alias["termino"].strip()
-            assert set(alias) <= {"termino", "tipo", "mayusculas", "requiere", "excluye"}
+            assert set(alias) <= {"termino", "tipo", "mayusculas", "requiere", "excluye", "sin_contexto", "otras_empresas"}
             owners.setdefault(alias["termino"].casefold(), set()).add(ticker)
     # Un alias curado pertenece a una sola empresa (si no, es ambiguo).
     assert {term: tks for term, tks in owners.items() if len(tks) > 1} == {}

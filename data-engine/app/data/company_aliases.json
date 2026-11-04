@@ -1,6 +1,6 @@
 {
  "version": 1,
- "nota": "Alias y relaciones por empresa para vincular noticias que no citan el ticker. Clave = ticker del catálogo. Se carga una vez por proceso (app/services/company_aliases.py). 'aliases' => la noticia es SOBRE la empresa; 'relaciones' => la noticia queda RELACIONADA con la empresa, con su tipo (socio, cliente, proveedor, competidor, regulador, espectro, inversor, sector). 'pendiente_revisar' = lo que no se siembra por ambiguo. 'requiere' = al menos uno de esos términos en el texto; 'excluye' = ninguno. Términos en palabra completa; sin 'mayusculas': true se ignoran mayúsculas/minúsculas. Revisado a mano: nada de términos de sector sueltos como alias.",
+ "nota": "Alias y relaciones por empresa para vincular noticias que no citan el ticker. Clave = ticker del catálogo. Se carga una vez por proceso (app/services/company_aliases.py). 'aliases' => la noticia es SOBRE la empresa; 'relaciones' => la noticia queda RELACIONADA con la empresa, con su tipo (socio, cliente, proveedor, competidor, regulador, espectro, inversor, sector). 'sin_contexto' (persona) = tipo de relación si la persona sale sin contexto de la empresa ('requiere') ni de otra ('otras_empresas'). 'pendiente_revisar' = lo que no se siembra por ambiguo. 'requiere' = al menos uno de esos términos en el texto; 'excluye' = ninguno. Términos en palabra completa; sin 'mayusculas': true se ignoran mayúsculas/minúsculas. Revisado a mano: nada de términos de sector sueltos como alias.",
  "empresas": {
   "ASTS": {
    "revisado": "2026-11-03",
@@ -547,6 +547,144 @@
       "humanoid",
       "Tesla"
      ]
+    },
+    {
+     "termino": "Elon Musk",
+     "tipo": "persona",
+     "requiere": [
+      "Tesla",
+      "car",
+      "cars",
+      "coche",
+      "coches",
+      "EV",
+      "EVs",
+      "electric vehicle",
+      "electric vehicles",
+      "eléctrico",
+      "eléctricos",
+      "Model 3",
+      "Model Y",
+      "Model S",
+      "Model X",
+      "Cybertruck",
+      "FSD",
+      "Full Self-Driving",
+      "Autopilot",
+      "robotaxi",
+      "robotaxis",
+      "Optimus",
+      "Gigafactory",
+      "deliveries",
+      "entregas",
+      "Cybercab",
+      "Megapack",
+      "Powerwall"
+     ],
+     "sin_contexto": "ceo",
+     "otras_empresas": [
+      "SpaceX",
+      "Starship",
+      "Starlink",
+      "Falcon 9",
+      "xAI",
+      "Grok",
+      "X Corp",
+      "on X",
+      "X platform",
+      "Twitter",
+      "Neuralink",
+      "Boring Company",
+      "The Boring Company",
+      "DOGE",
+      "Department of Government Efficiency",
+      "Trump",
+      "White House",
+      "Casa Blanca",
+      "election",
+      "elections",
+      "elecciones",
+      "America Party",
+      "Congress",
+      "Senate",
+      "campaign",
+      "Mars",
+      "Marte"
+     ]
+    },
+    {
+     "termino": "Musk",
+     "tipo": "persona",
+     "mayusculas": true,
+     "requiere": [
+      "Tesla",
+      "car",
+      "cars",
+      "coche",
+      "coches",
+      "EV",
+      "EVs",
+      "electric vehicle",
+      "electric vehicles",
+      "eléctrico",
+      "eléctricos",
+      "Model 3",
+      "Model Y",
+      "Model S",
+      "Model X",
+      "Cybertruck",
+      "FSD",
+      "Full Self-Driving",
+      "Autopilot",
+      "robotaxi",
+      "robotaxis",
+      "Optimus",
+      "Gigafactory",
+      "deliveries",
+      "entregas",
+      "Cybercab",
+      "Megapack",
+      "Powerwall"
+     ],
+     "sin_contexto": "ceo",
+     "otras_empresas": [
+      "SpaceX",
+      "Starship",
+      "Starlink",
+      "Falcon 9",
+      "xAI",
+      "Grok",
+      "X Corp",
+      "on X",
+      "X platform",
+      "Twitter",
+      "Neuralink",
+      "Boring Company",
+      "The Boring Company",
+      "DOGE",
+      "Department of Government Efficiency",
+      "Trump",
+      "White House",
+      "Casa Blanca",
+      "election",
+      "elections",
+      "elecciones",
+      "America Party",
+      "Congress",
+      "Senate",
+      "campaign",
+      "Mars",
+      "Marte"
+     ],
+     "excluye": [
+      "musk ox",
+      "Musk ox",
+      "white musk",
+      "White Musk",
+      "musk deer",
+      "perfume",
+      "fragrance"
+     ]
     }
    ],
    "relaciones": [
@@ -584,7 +722,7 @@
      ]
     }
    ],
-   "pendiente_revisar": "«Elon Musk» NO es alias de Tesla: también dirige SpaceX, X y xAI (ambiguo)."
+   "pendiente_revisar": "«Elon Musk»/«Musk»: con contexto de Tesla (coche, EV, Model Y, FSD, robotaxi, Optimus, entregas…) es «sobre» TSLA; sin contexto de ninguna empresa, «relacionada» (ceo); con contexto de SpaceX, xAI, X, Neuralink, Boring o política (DOGE, Trump…), nada. Regla general: cualquier persona con 'sin_contexto' recibe el mismo trato (decisión de Nico, 3 nov 15:00)."
   },
   "RKLB": {
    "revisado": "2026-11-03",
@@ -1168,6 +1306,29 @@
     }
    ],
    "pendiente_revisar": "Westinghouse es participada de Brookfield y Cameco: sus noticias nucleares quedan anotadas en las dos."
+  },
+  "SPCX": {
+   "revisado": "2026-11-03",
+   "aliases": [
+    {
+     "termino": "Starship",
+     "mayusculas": true,
+     "requiere": [
+      "SpaceX",
+      "rocket",
+      "launch",
+      "flight",
+      "test flight",
+      "Super Heavy",
+      "booster",
+      "Mars",
+      "Marte",
+      "orbit",
+      "órbita"
+     ]
+    }
+   ],
+   "relaciones": []
   }
  }
 }
