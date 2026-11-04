@@ -4,8 +4,10 @@ Los lee el motor de escenarios (``app/valuation/engines/scenario_engine.py``)
 para las empresas cuyo modelo declarado es de la familia de escenarios,
 capacidad o cartera de pedidos (p. ej. «scenario_auto_energy_fsd»). Es un
 fichero de DATOS, como ``company_master.py`` o la tabla de ratios ADR: ningún
-código decide nada por ticker. Sin entrada, el motor usa su juego por defecto
-(bajista/base/alcista derivado de las entradas de la propia empresa).
+código decide nada por ticker. Sin entrada (o sin fuente) no hay valor por
+escenarios: no existe juego por defecto (Nico, 4-nov-2026: «Que tengan
+escenarios reales, no hardcodeo»). El motor vuelve al que correría sin él y la
+traza dice «escenarios pendientes: sin escenarios con fuente».
 
 Formato de cada entrada (clave = ticker en mayúsculas)::
 
@@ -26,7 +28,7 @@ Formato de cada entrada (clave = ticker en mayúsculas)::
     }
 
 Reglas que valida el motor (si falla una, respaldo al motor actual con el
-motivo en ``trace.engine_fallback``): probabilidades en (0, 1] que suman 1
+motivo en ``trace.engine_fallback``): ``source`` no vacío, probabilidades en (0, 1] que suman 1
 (±0,01), nombres únicos, método ``dcf`` o ``forward_multiple``, múltiplo > 0,
 año entre 1 y 10, y ningún escenario toca el WACC ni la g terminal.
 

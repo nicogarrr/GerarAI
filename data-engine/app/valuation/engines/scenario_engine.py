@@ -10,8 +10,9 @@ Cómo valora:
 1. Corre el DCF estándar completo (mismo snapshot, ventas, WACC, g terminal,
    plan de proyección y puente EV -> equity). Este motor NO cambia ninguna de
    esas reglas: las reutiliza (``StandardDCFEngine.resolved_inputs``).
-2. Toma los escenarios declarados EN DATOS (``app/data/valuation_scenarios.py``)
-   o, si la empresa no tiene, el juego por defecto (abajo).
+2. Toma los escenarios declarados EN DATOS, con su fuente
+   (``app/data/valuation_scenarios.py``). Sin juego con fuente no hay valor
+   por escenarios (abajo).
 3. Valora cada escenario con su método:
    - ``dcf``: el mismo DCF (plano o con plan) con el crecimiento y/o el margen
      del escenario;
@@ -21,14 +22,16 @@ Cómo valora:
    escenario negativo cuenta, como en el DCF estándar). Cada escenario, su
    peso, su método y sus supuestos van a la traza (``trace.scenario_set``).
 
-Juego por defecto (PROPUESTA, conservador y simétrico, 25/50/25): bajista con
-la mitad del crecimiento (al menos -3 pp) y tres cuartos del margen (al menos
--2 pp); base = entradas del DCF; alcista con el desplazamiento simétrico (topes
-del DCF: crecimiento 45 %, margen 50 %). El WACC y la g terminal no se tocan en
-ningún escenario: los escenarios describen el negocio, no la tasa.
+Sin juego por defecto (Nico, 4-nov-2026: «Que tengan escenarios reales, no
+hardcodeo»): ningún juego genérico de bajista/base/alcista se fabrica a partir
+de las entradas de la empresa. Los escenarios con fuente llegarán como datos
+declarados (etapa de expertos de la tesis). El WACC y la g terminal no se tocan
+en ningún escenario: los escenarios describen el negocio, no la tasa.
 
 Respaldo (al motor que resolvería la clasificación sin esta ruta, con el
-motivo en ``trace.engine_fallback``): sin ingresos positivos
+motivo en ``trace.engine_fallback``): sin escenarios con fuente
+(``scenario_set_missing``, detalle «escenarios pendientes: sin escenarios con
+fuente»), sin ingresos positivos
 (``scenario_requires_revenue``), sin DCF base válido, p. ej. una empresa que
 quema caja, también cuando solo el margen normalizado de ciclo medio la haría
 rentable (``scenario_base_dcf_unavailable``), o escenarios declarados
@@ -60,8 +63,15 @@ SCENARIO_ENGINE_KEY = "scenario"
 
 # Motivos de respaldo que escribe este motor en ``trace.engine_fallback``.
 SCENARIO_FALLBACK_REASONS = frozenset(
-    {"scenario_requires_revenue", "scenario_base_dcf_unavailable", "scenario_inputs_invalid"}
+    {
+        "scenario_set_missing",
+        "scenario_requires_revenue",
+        "scenario_base_dcf_unavailable",
+        "scenario_inputs_invalid",
+    }
 )
+# Sin juego de escenarios con fuente: no se publica valor por escenarios.
+SCENARIO_SET_MISSING_DETAIL = "escenarios pendientes: sin escenarios con fuente"
 
 PROBABILITY_TOLERANCE = 0.01
 METHODS = frozenset({"dcf", "forward_multiple"})
@@ -75,14 +85,6 @@ ALLOWED_FIELDS = frozenset(
     {"name", "probability", "method", "revenue_growth", "fcf_margin", "metric", "multiple",
      "year", "description"}
 )
-
-# Juego por defecto (propuesta documentada en el PR).
-DEFAULT_PROBABILITIES = {"bear": 0.25, "base": 0.50, "bull": 0.25}
-DEFAULT_GROWTH_SHIFT_SHARE = 0.5
-DEFAULT_GROWTH_SHIFT_FLOOR = 0.03
-DEFAULT_MARGIN_SHIFT_SHARE = 0.25
-DEFAULT_MARGIN_SHIFT_FLOOR = 0.02
-
 
 class ScenarioInputsError(ValueError):
     """Escenarios declarados inválidos (el mensaje es el detalle)."""
@@ -179,38 +181,6 @@ def parse_scenarios(raw: Any, *, base_growth: float, base_margin: float) -> list
     return specs
 
 
-def default_scenarios(*, base_growth: float, base_margin: float) -> list[ScenarioSpec]:
-    """Bajista/base/alcista simétricos alrededor de las entradas del DCF base."""
-    g_shift = max(DEFAULT_GROWTH_SHIFT_SHARE * abs(base_growth), DEFAULT_GROWTH_SHIFT_FLOOR)
-    m_shift = max(DEFAULT_MARGIN_SHIFT_SHARE * abs(base_margin), DEFAULT_MARGIN_SHIFT_FLOOR)
-    return [
-        ScenarioSpec(
-            name="bear",
-            probability=DEFAULT_PROBABILITIES["bear"],
-            method="dcf",
-            revenue_growth=max(base_growth - g_shift, GROWTH_FLOOR),
-            fcf_margin=base_margin - m_shift,
-            description="Por defecto: mitad del crecimiento (mín. -3 pp) y 3/4 del margen (mín. -2 pp).",
-        ),
-        ScenarioSpec(
-            name="base",
-            probability=DEFAULT_PROBABILITIES["base"],
-            method="dcf",
-            revenue_growth=base_growth,
-            fcf_margin=base_margin,
-            description="Por defecto: entradas del DCF base.",
-        ),
-        ScenarioSpec(
-            name="bull",
-            probability=DEFAULT_PROBABILITIES["bull"],
-            method="dcf",
-            revenue_growth=min(base_growth + g_shift, GROWTH_CEILING),
-            fcf_margin=min(base_margin + m_shift, max(MARGIN_CEILING, base_margin)),
-            description="Por defecto: desplazamiento simétrico al bajista (topes del DCF).",
-        ),
-    ]
-
-
 def forward_multiple_value(spec: ScenarioSpec, inputs: dict) -> ForwardMultipleResult:
     """FCF de los años 1..N + múltiplo x métrica del año N, al WACC del base."""
     assert spec.year is not None and spec.multiple is not None and spec.metric is not None
@@ -262,6 +232,9 @@ class ScenarioValuationEngine(ValuationEngine):
         revenue = context.snapshot.value("revenue")
         dcf_engine = StandardDCFEngine()
         dcf_context = dataclasses.replace(context, engine_key=dcf_engine.key)
+        entry = declared_scenario_entry(company)
+        if entry is None:
+            return self._fallback(context, None, "scenario_set_missing", SCENARIO_SET_MISSING_DETAIL)
         if revenue is None or revenue <= 0:
             return self._fallback(
                 context, None, "scenario_requires_revenue",
@@ -290,24 +263,18 @@ class ScenarioValuationEngine(ValuationEngine):
             )
         base_growth = float(inputs["revenue_growth"])
         base_margin = float(inputs["fcf_margin"])
-        entry = declared_scenario_entry(company)
-        if entry is not None:
-            try:
-                specs = parse_scenarios(entry.get("scenarios"), base_growth=base_growth, base_margin=base_margin)
-            except ScenarioInputsError as exc:
-                return self._fallback(context, base, "scenario_inputs_invalid", str(exc))
-            source = "declared"
-        else:
-            specs = default_scenarios(base_growth=base_growth, base_margin=base_margin)
-            source = "default_derived"
         try:
-            return self._weighted_result(base, inputs, specs, source=source, entry=entry)
+            if not str(entry.get("source") or "").strip():
+                raise ScenarioInputsError("el juego de escenarios no declara su fuente")
+            specs = parse_scenarios(entry.get("scenarios"), base_growth=base_growth, base_margin=base_margin)
+        except ScenarioInputsError as exc:
+            return self._fallback(context, base, "scenario_inputs_invalid", str(exc))
+        try:
+            return self._weighted_result(base, inputs, specs, entry=entry)
         except (WaccNotAboveTerminalGrowthError, ValueError, ZeroDivisionError) as exc:
             return self._fallback(context, base, "scenario_inputs_invalid", f"{type(exc).__name__}: {exc}")
 
-    def _weighted_result(
-        self, base: dict, inputs: dict, specs: list[ScenarioSpec], *, source: str, entry: dict | None
-    ) -> dict:
+    def _weighted_result(self, base: dict, inputs: dict, specs: list[ScenarioSpec], *, entry: dict) -> dict:
         result = dict(base)
         trace = dict(base.get("trace") or {})
         scenario_results: dict[str, dict] = {}
@@ -416,17 +383,15 @@ class ScenarioValuationEngine(ValuationEngine):
         trace.update(
             {
                 "engine": self.key,
-                "scenario_style": "declared_scenarios" if source == "declared" else "default_scenarios",
-                "probability_method": (
-                    "declared_in_data" if source == "declared" else "default_fixed_25_50_25"
-                ),
+                "scenario_style": "declared_scenarios",
+                "probability_method": "declared_in_data",
                 "scenarios": scenario_results,
                 "weighted": weighted["trace"],
                 "expected_value_raw": expected_raw,
                 "scenario_notes": scenario_notes,
                 "scenario_set": {
-                    "source": source,
-                    "data_source": (entry or {}).get("source") if source == "declared" else None,
+                    "source": "declared",
+                    "data_source": entry.get("source"),
                     "probability_sum": weighted["trace"]["probability_sum"],
                     "base_dcf": {
                         "expected_value": base.get("expected_value"),

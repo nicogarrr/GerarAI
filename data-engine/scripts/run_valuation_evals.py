@@ -163,6 +163,7 @@ def _make_company(db, case: dict):
 
 def _value_case(db, case: dict) -> dict:
     """Run the real engine for one case and return the case enriched with it."""
+    from app.data.valuation_scenarios import VALUATION_SCENARIOS
     from app.valuation.engines import resolve, resolve_engine_key
     from app.valuation.engines.base import MODEL_VERSION, apply_publication_blockers
 
@@ -171,7 +172,17 @@ def _value_case(db, case: dict) -> dict:
     price = case.get("price")
     engine = resolve(company)
     context = engine.build_context(db, company, float(price) if price is not None else None)
-    result = apply_publication_blockers(engine.value(context))
+    # Escenarios declarados del caso (datos, como en app/data/valuation_scenarios.py):
+    # solo durante su valoración, para no filtrarse a otros casos.
+    declared = case.get("declared_scenarios")
+    key = company.ticker.strip().upper()
+    if declared is not None:
+        VALUATION_SCENARIOS[key] = declared
+    try:
+        result = apply_publication_blockers(engine.value(context))
+    finally:
+        if declared is not None:
+            VALUATION_SCENARIOS.pop(key, None)
     trace = result.get("trace")
     if not isinstance(trace, dict):
         trace = {}
