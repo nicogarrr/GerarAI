@@ -1790,5 +1790,35 @@
     "noData": "Sin datos",
     "insufficient": "muestra insuficiente",
     "insufficientThreshold": "muestra insuficiente (n<{threshold})"
+  },
+  "whatToBelieve": {
+    "title": "Qué hace falta creer",
+    "subtitle": "Lo que el precio de hoy exige a nuestro DCF, con sus mismos datos.",
+    "loading": "Calculando qué hace falta creer…",
+    "unavailable": "No se pudo calcular ahora. Reintenta en unos minutos.",
+    "notApplicable": "No aplica: {reason}",
+    "reasons": {
+      "engine_not_dcf": "el método de valoración de esta empresa no es un DCF de flujos de caja libres.",
+      "no_base_value": "el DCF base no da un valor positivo por acción.",
+      "no_price": "sin precio de mercado no se puede decir qué exige el precio.",
+      "valuation_unavailable": "no hay una valoración DCF calculada para esta empresa."
+    },
+    "waccPrice": "Para justificar {price} hace falta un WACC del {implied} (usamos {used}).",
+    "waccPriceNoUsed": "Para justificar {price} hace falta un WACC del {implied}.",
+    "waccBelow": "Para justificar {price} haría falta un WACC por debajo del {min}: el precio queda fuera de lo que este DCF puede dar.",
+    "waccAbove": "Incluso con un WACC del {max} el DCF da más de {price}: el precio exige muy poco.",
+    "waccNotAvailable": "Con flujos de caja negativos no hay un WACC implícito con sentido.",
+    "waccConsensus": "El consenso de analistas ({price}) exige un WACC del {implied}.",
+    "waccConsensusBelow": "El consenso de analistas ({price}) exigiría un WACC por debajo del {min}.",
+    "waccConsensusAbove": "El consenso de analistas ({price}) queda por debajo del DCF incluso con un WACC del {max}.",
+    "growth": "O, con nuestro WACC, crecer las ventas un {required} al año en la primera etapa (proyectamos {current}).",
+    "growthNoCurrent": "O, con nuestro WACC, crecer las ventas un {required} al año en la primera etapa.",
+    "growthOut": "Con nuestro WACC, ni el crecimiento máximo del modelo llega al precio.",
+    "exitTitle": "Valor terminal por múltiplo de salida",
+    "gordonLabel": "Nuestro DCF (crecimiento perpetuo)",
+    "exitLabel": "Con salida a {multiple}x",
+    "exitExplain": "Mismo DCF, pero el valor final es {multiple} veces el flujo de caja libre del último año proyectado en vez de un crecimiento perpetuo. Es un contraste, no nuestro valor razonable.",
+    "exitImplied": "Para llegar a {price} haría falta salir a {implied}x ese flujo de caja.",
+    "explain": "El WACC es la rentabilidad que se exige a la inversión: cuanto más bajo, más vale el futuro. Si el precio pide un WACC muy por debajo del nuestro, está descontando menos riesgo o más crecimiento del que proyectamos."
   }
 }
