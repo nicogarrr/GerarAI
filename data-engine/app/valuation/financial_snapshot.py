@@ -21,6 +21,7 @@ from app.models import Company, FinancialFact
 from app.services.esef_fact_quarantine import fact_quarantine_reason
 from app.services.reviewed_eps_adjustments import eligible_fact
 from app.services.split_adjustment import split_factor_for_fact
+from app.valuation.call_cache import cached
 
 # Income-statement style metrics: flows over a period. They must share the
 # anchor's period, otherwise a 12-month revenue gets divided by a 9-month OCF.
@@ -134,6 +135,12 @@ _PRIMARY_SOURCE_TYPES = ("SEC", "ESEF", "CNMV")
 
 
 def _facts_for_metric(db: Session, company_id: int, metric: str) -> list[FinancialFact]:
+    # Misma consulta repetida por puentes/cross-checks en una misma valoracion:
+    # cache acotada a la llamada (ver app/valuation/call_cache.py).
+    return cached(db, "facts_for_metric", (company_id, metric), lambda: _facts_for_metric_uncached(db, company_id, metric))
+
+
+def _facts_for_metric_uncached(db: Session, company_id: int, metric: str) -> list[FinancialFact]:
     return [fact for fact in db.scalars(
             select(FinancialFact).options(selectinload(FinancialFact.source))
             .where(FinancialFact.company_id == company_id, FinancialFact.metric == metric)
