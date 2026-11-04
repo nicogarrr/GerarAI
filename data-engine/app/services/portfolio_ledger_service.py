@@ -71,6 +71,44 @@ BUY_ACTIONS = frozenset({"buy", "bot", "b"})
 SELL_ACTIONS = frozenset({"sell", "sold"})
 
 
+def _replay_order(transactions: list[Transaction]) -> list[Transaction]:
+    """Orden de reproducción compra/venta para ``rebuild_position``.
+
+    La consulta ordena por (trade_date, created_at, id); dentro de un mismo día
+    eso es el orden de ALTA, no el de ejecución. Una venta que con ese orden no
+    cabe (se dio de alta antes que la compra del mismo día que la cubre) se
+    aplaza hasta las compras posteriores de ESE día, conservando el orden entre
+    ventas. Nunca cruza de día y no toca un ledger que ya era válido: si nada
+    falta, el orden es exactamente el de la consulta. Una venta que ni así cabe
+    queda al final del día y la reproducción la rechaza como siempre.
+    """
+    ordered: list[Transaction] = []
+    held = Decimal("0")
+    index = 0
+    while index < len(transactions):
+        day = transactions[index].trade_date
+        deferred: list[Transaction] = []
+        while index < len(transactions) and transactions[index].trade_date == day:
+            transaction = transactions[index]
+            index += 1
+            if transaction.action == "buy":
+                ordered.append(transaction)
+                held += transaction.quantity
+                while deferred and deferred[0].quantity <= held:
+                    sale = deferred.pop(0)
+                    ordered.append(sale)
+                    held -= sale.quantity
+            elif not deferred and transaction.quantity <= held:
+                ordered.append(transaction)
+                held -= transaction.quantity
+            else:
+                deferred.append(transaction)
+        ordered.extend(deferred)
+        for sale in deferred:
+            held -= sale.quantity
+    return ordered
+
+
 class PortfolioOversellError(ValueError):
     """Venta sin acciones suficientes. La ruta la mapea a 409."""
 
@@ -364,7 +402,7 @@ class PortfolioLedgerService:
         if valuation_date is None:
             return None
 
-        for transaction in transactions:
+        for transaction in _replay_order(transactions):
             last_price = transaction.price
             currency = transaction.currency
             if transaction.action == "buy":
