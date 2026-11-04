@@ -259,9 +259,11 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("shares_diluted",    ["WeightedAverageNumberOfDilutedSharesOutstanding"],                                      "shares"),
     ("shares_outstanding", ["CommonStockSharesOutstanding"],                                                         "shares"),
     # Fallback (WWW, 25/9): el tag combinado incluye caja
-    # restringida -> deuda neta fresca pero algo optimista. Va el ULTIMO: por
-    # periodo gana el `filed` mas reciente, y los periodos donde se uso quedan
-    # anotados en document.metadata_["cash_includes_restricted_periods"].
+    # restringida -> deuda neta fresca pero algo optimista. Va el ULTIMO y es
+    # prioridad por alcance (SCOPE_PRIORITY_METRICS): solo cubre los periodos
+    # sin caja estricta, aunque el estado de flujos lo repita en un 10-K
+    # posterior; esos periodos quedan anotados en
+    # document.metadata_["cash_includes_restricted_periods"].
     ("cash_and_equivalents", ["CashAndCashEquivalentsAtCarryingValue",
                               "CashCashEquivalentsAndShortTermInvestments",
                               "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"], "USD"),
@@ -288,7 +290,8 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # StockholdersEquity = patrimonio atribuible a la matriz; la variante
     # "IncludingPortionAttributableToNoncontrollingInterest" consolida los
     # intereses minoritarios. Son MAGNITUDES DISTINTAS: mezclarlas hacia que el
-    # balance cuadre por la diferencia de NCI. Se usa la de la matriz.
+    # balance cuadre por la diferencia de NCI. Se usa la de la matriz; la otra
+    # solo rellena huecos (SCOPE_PRIORITY_METRICS), aunque se presente despues.
     ("total_equity",      ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"], "USD"),
     ("goodwill",          ["Goodwill"],                                                                              "USD"),
     # Componentes del NOI de un REIT (net operating income = ingresos por
@@ -611,7 +614,23 @@ def _sum_disjoint_components(
 # lista, que es el más amplio, aunque otro se presentara después. En la D&A,
 # tratar ``Depreciation`` como alias de ``DepreciationAndAmortization`` dejaba
 # ganar a la de PP&E sola cuando ambas venían en el mismo 10-K.
-SCOPE_PRIORITY_METRICS = {"total_debt", "depreciation_amortization"}
+# El mismo defecto en cuatro métricas más, cuyos conceptos son magnitudes
+# distintas ordenadas por preferencia: los estados repiten saldos de años
+# previos (el de flujos, la caja con restringida; el de patrimonio, el total con
+# minoritarios), así que para esos años ganaba el concepto de otro alcance por
+# venir en un 10-K posterior y la serie cambiaba de significado entre años
+# (FCX FY2023: patrimonio 27.310 M con minoritarios frente a 16.693 M de la
+# matriz; ABNB FY2023: caja 12.667 M con fondos de clientes frente a 6.874 M;
+# AAPL: arrendamiento no corriente en vez del total). Aquí el orden declarado
+# es la prioridad y el resto solo rellena los periodos sin el preferido.
+SCOPE_PRIORITY_METRICS = {
+    "total_debt",
+    "depreciation_amortization",
+    "total_equity",
+    "net_income",
+    "cash_and_equivalents",
+    "operating_lease_liabilities",
+}
 
 # Tags us-gaap de deuda financiera (lado PASIVO) usados como evidencia para la
 # derivada "net_debt = -caja" (EXEL, 19/10/2026): solo si NINGUNO tiene valor
