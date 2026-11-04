@@ -29,8 +29,10 @@ export function PriceEventsPanel({ events, hiddenKinds, onToggleKind, onFocus, h
                 </button>)}
             </div>
             <h3 className="text-xs font-semibold text-gray-200">{t('research.chart.eventsTitle')}</h3>
+            {/* Lista con scroll propio: el degradado pegado abajo avisa de que sigue (antes el último evento
+                salía cortado a media línea y parecía un solape). Al final del scroll queda como margen. */}
             {shown.length === 0 ? <p className="text-xs text-gray-500">{t('research.chart.eventsEmpty')}</p> : (
-                <ol className="max-h-80 space-y-1 overflow-y-auto pr-1">
+                <ol className="max-h-80 space-y-1 overflow-y-auto overscroll-contain pr-1 after:pointer-events-none after:sticky after:bottom-0 after:block after:h-6 after:bg-linear-to-t after:from-surface-1 after:to-transparent after:content-['']" data-testid="price-events-list">
                     {shown.map((event) => (
                         <li key={event.id} className="rounded-md border border-gray-800 px-2 py-1.5 text-xs">
                             <div className="flex flex-wrap items-baseline gap-2">
