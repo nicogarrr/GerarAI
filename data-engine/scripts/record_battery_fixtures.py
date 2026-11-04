@@ -32,7 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sqlalchemy import select
+from sqlalchemy import event, select
 
 from app.core.database import SessionLocal
 from app.models.entities import (
@@ -50,6 +50,20 @@ from tests.test_battery7_regression import (
 BATTERY7 = ["UBER", "CHTR", "UNH", "BFIT.AS", "ASTS", "PLTR", "TSLA"]
 
 
+def _prod_session_readonly():
+    """Sesión prod blindada: autoflush fuera, flush prohibido por evento y,
+    en Postgres, transacción READ ONLY real. El recorder nunca escribe."""
+    session = SessionLocal(autoflush=False, expire_on_commit=False)
+
+    @event.listens_for(session, "before_flush")
+    def _no_flush(sess, _flush_context, _instances):
+        raise RuntimeError("recorder solo-lectura: flush prohibido en prod")
+
+    if session.get_bind().dialect.name == "postgresql":
+        session.connection(execution_options={"postgresql_readonly": True})
+    return session
+
+
 def _git_sha() -> str:
     try:
         return subprocess.run(
@@ -61,10 +75,12 @@ def _git_sha() -> str:
 
 def _dump_facts(db, company: Company, tenant: Tenant) -> list[dict]:
     rows = db.scalars(
-        select(FinancialFact).where(
+        select(FinancialFact)
+        .where(
             FinancialFact.company_id == company.id,
             FinancialFact.tenant_id == tenant.id,
         )
+        .order_by(FinancialFact.id)
     ).all()
     return [
         {
@@ -81,6 +97,9 @@ def _dump_facts(db, company: Company, tenant: Tenant) -> list[dict]:
             "confidence": str(r.confidence),
             "accession_number": r.accession_number,
             "filed": r.filed.isoformat() if r.filed else None,
+            # El orden del snapshot desempata por created_at DESC: se graba
+            # para que el replay desempate EXACTAMENTE como prod.
+            "created_at": r.created_at.isoformat() if r.created_at else None,
         }
         for r in rows
     ]
@@ -110,10 +129,12 @@ def _dump_price(db, company: Company) -> dict | None:
 
 def _dump_calculated(db, company: Company, tenant: Tenant) -> list[dict]:
     rows = db.scalars(
-        select(CalculatedMetric).where(
+        select(CalculatedMetric)
+        .where(
             CalculatedMetric.company_id == company.id,
             CalculatedMetric.tenant_id == tenant.id,
         )
+        .order_by(CalculatedMetric.id)
     ).all()
     return [
         {
@@ -131,6 +152,9 @@ def _dump_calculated(db, company: Company, tenant: Tenant) -> list[dict]:
             "source_fact_ids": list(r.source_fact_ids or []),
             "calculation_trace": r.calculation_trace or {},
             "confidence": str(r.confidence),
+            # Mismo motivo que en facts: el WACC trazable desempata por
+            # created_at DESC (engines/base.py).
+            "created_at": r.created_at.isoformat() if r.created_at else None,
         }
         for r in rows
     ]
@@ -144,7 +168,7 @@ def record_ticker(ticker: str, tenant: Tenant, out_dir: Path, sha: str) -> dict:
     from app.valuation.engines.registry import resolve_engine_key
     from tests.test_battery7_regression import run_fixture
 
-    prod = SessionLocal()
+    prod = _prod_session_readonly()
     try:
         company = prod.scalar(select(Company).where(Company.ticker == ticker).order_by(Company.id))
         if company is None:
@@ -155,7 +179,11 @@ def record_ticker(ticker: str, tenant: Tenant, out_dir: Path, sha: str) -> dict:
                 "recorded_sha": sha,
                 "recorded_at": date.today().isoformat(),
                 "engine_key": resolve_engine_key(company),
-                "note": "grabado aislado, sin inputs privados del tenant",
+                "note": (
+                    "corrida aislada: facts/metrics del tenant del recorder, "
+                    "created_at preservado (desempates de prod), documents "
+                    "no incluidos (source_id NULL en el replay)"
+                ),
             },
             "company": company_to_dict(company),
             "facts": _dump_facts(prod, company, tenant),
@@ -202,7 +230,7 @@ def main() -> int:
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     sha = _git_sha()
-    prod = SessionLocal()
+    prod = _prod_session_readonly()
     try:
         tenant = prod.scalar(select(Tenant).where(Tenant.external_id == args.tenant_external_id))
         if tenant is None:
