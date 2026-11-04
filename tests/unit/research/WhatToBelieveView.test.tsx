@@ -54,6 +54,15 @@ describe('WhatToBelieveView', () => {
     expect(screen.queryByTestId('what-to-believe-wacc')).not.toBeInTheDocument();
   });
 
+  it.each(['engine_not_dcf', 'no_base_value', 'no_price', 'valuation_unavailable', 'future_reason'])('reason %s never renders a translation key in either locale', (reason) => {
+    const data = { ticker: 'JPM', status: 'not_applicable', reason_code: reason } as WhatToBelieve;
+    const first = es(<WhatToBelieveView data={data} />);
+    expect(screen.getByTestId('what-to-believe-na')).not.toHaveTextContent('research.whatToBelieve');
+    first.unmount();
+    en(<WhatToBelieveView data={data} />);
+    expect(screen.getByTestId('what-to-believe-na')).not.toHaveTextContent('research.whatToBelieve');
+  });
+
   it('unavailable and loading states', () => {
     const { unmount } = es(<WhatToBelieveView data={null} />);
     expect(screen.getByTestId('what-to-believe-unavailable')).toBeInTheDocument();
