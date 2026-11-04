@@ -150,3 +150,100 @@ def test_bear_margin_keeps_sign_and_is_below_base_for_negative_margin():
     specs = dict(service._scenario_specs(assumptions, framework=fake, missing_mandatory_drivers=[]))
     assert specs["bear"]["fcf_margin"] < specs["base"]["fcf_margin"] < specs["bull"]["fcf_margin"]
     assert specs["bear"]["fcf_margin"] < 0
+
+
+def test_dcf_skipped_without_terminal_shares_reports_cause():
+    payload = LongTermModelService()._scenario_payload(
+        name="base",
+        spec=_spec(wacc=0.09, terminal=0.02),
+        forecast=[_forecast_point(2026, 1050, 210, shares=None)],
+        assumptions=ASSUMPTIONS,
+        fact_cache=FACT_CACHE,
+        latest_year=2025,
+    )
+    assert payload["valuation"] is None
+    assert payload["valuation_blockers"] == ["terminal_shares_missing"]
+    assert "diluted share count" in payload["valuation_note"]
+
+
+def test_dcf_skipped_without_net_debt_reports_cause():
+    cache = dict(FACT_CACHE, net_debt=[])
+    payload = LongTermModelService()._scenario_payload(
+        name="base",
+        spec=_spec(wacc=0.09, terminal=0.02),
+        forecast=[_forecast_point(2026, 1050, 210)],
+        assumptions=ASSUMPTIONS,
+        fact_cache=cache,
+        latest_year=2025,
+    )
+    assert payload["valuation"] is None
+    assert payload["valuation_blockers"] == ["current_net_debt_missing"]
+    assert "current net debt" in payload["valuation_note"]
+
+
+def test_dcf_skipped_without_shares_and_net_debt_lists_both_causes():
+    cache = dict(FACT_CACHE, net_debt=[])
+    payload = LongTermModelService()._scenario_payload(
+        name="base",
+        spec=_spec(wacc=0.09, terminal=0.02),
+        forecast=[_forecast_point(2026, 1050, 210, shares=None)],
+        assumptions=ASSUMPTIONS,
+        fact_cache=cache,
+        latest_year=2025,
+    )
+    assert payload["valuation"] is None
+    assert payload["valuation_blockers"] == [
+        "current_net_debt_missing",
+        "terminal_shares_missing",
+    ]
+    assert "current net debt" in payload["valuation_note"]
+    assert "diluted share count" in payload["valuation_note"]
+
+
+def test_dcf_skipped_without_forecast_reports_cause():
+    payload = LongTermModelService()._scenario_payload(
+        name="base",
+        spec=_spec(wacc=0.09, terminal=0.02),
+        forecast=[],
+        assumptions=ASSUMPTIONS,
+        fact_cache=FACT_CACHE,
+        latest_year=2025,
+    )
+    assert payload["valuation"] is None
+    assert "forecast_missing" in payload["valuation_blockers"]
+    assert "driver forecast" in payload["valuation_note"]
+
+
+def test_dcf_skipped_blockers_cover_wacc_and_fcf_guards():
+    wacc_payload = LongTermModelService()._scenario_payload(
+        name="base",
+        spec=_spec(wacc=0.02, terminal=0.025),
+        forecast=[_forecast_point(2026, 1050, 210)],
+        assumptions=ASSUMPTIONS,
+        fact_cache=FACT_CACHE,
+        latest_year=2025,
+    )
+    assert wacc_payload["valuation_blockers"] == ["wacc_not_above_terminal_growth"]
+    fcf_payload = LongTermModelService()._scenario_payload(
+        name="bear",
+        spec=_spec(wacc=0.09, terminal=0.02),
+        forecast=[_forecast_point(2026, 1000, -100)],
+        assumptions=ASSUMPTIONS,
+        fact_cache=FACT_CACHE,
+        latest_year=2025,
+    )
+    assert fcf_payload["valuation_blockers"] == ["terminal_fcf_not_positive"]
+
+
+def test_dcf_computed_has_no_blockers():
+    payload = LongTermModelService()._scenario_payload(
+        name="base",
+        spec=_spec(wacc=0.09, terminal=0.02),
+        forecast=[_forecast_point(2026, 1050, 210)],
+        assumptions=ASSUMPTIONS,
+        fact_cache=FACT_CACHE,
+        latest_year=2025,
+    )
+    assert payload["valuation"] is not None
+    assert payload["valuation_blockers"] == []
+    assert payload["valuation_note"] is None

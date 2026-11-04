@@ -540,6 +540,10 @@ type ResearchLongTermScenario = {
   revenue_bridge: { status: string; items?: Array<{ label: string; value: number | null; source_fact_ids: number[]; note?: string }>; unavailable_drivers?: string[] };
   fcf_bridge: { status: string; items?: Array<{ label: string; value: number | null; source_fact_ids: number[] }>; unavailable_drivers?: string[] };
   valuation: { value_per_share: number; enterprise_value: number; equity_value: number } | null;
+  /** Prosa EN de auditoría cuando no hay DCF (la UI prefiere valuation_blockers). */
+  valuation_note?: string | null;
+  /** Causas máquina del «sin DCF» (catálogo cerrado de long_term_model_service). */
+  valuation_blockers?: string[] | null;
 };
 
 export type ResearchLongTermModel = {
