@@ -19,14 +19,19 @@ export type AnalystTargetsCopyInput = {
   reference_price_source_code?: 'market_at_fetch' | null;
 };
 
-const INSTRUMENTS = ['ETF', 'MUTUALFUND', 'INDEX', 'CURRENCY', 'CRYPTOCURRENCY', 'FUTURE', 'OPTION'] as const;
-type Instrument = (typeof INSTRUMENTS)[number];
-
 function instrumentText(type: string | null | undefined, t: TranslateFn): string {
   const normalized = (type ?? '').trim().toUpperCase();
-  if (!normalized) return t('ui.analystTargets.instrument.unknown');
-  if ((INSTRUMENTS as readonly string[]).includes(normalized)) return t(`ui.analystTargets.instrument.${normalized as Instrument}`);
-  return t('ui.analystTargets.instrument.other', { type: normalized });
+  switch (normalized) {
+    case '': return t('ui.analystTargets.instrument.unknown');
+    case 'ETF': return t('ui.analystTargets.instrument.ETF');
+    case 'MUTUALFUND': return t('ui.analystTargets.instrument.MUTUALFUND');
+    case 'INDEX': return t('ui.analystTargets.instrument.INDEX');
+    case 'CURRENCY': return t('ui.analystTargets.instrument.CURRENCY');
+    case 'CRYPTOCURRENCY': return t('ui.analystTargets.instrument.CRYPTOCURRENCY');
+    case 'FUTURE': return t('ui.analystTargets.instrument.FUTURE');
+    case 'OPTION': return t('ui.analystTargets.instrument.OPTION');
+    default: return t('ui.analystTargets.instrument.other', { type: normalized });
+  }
 }
 
 /** Nota del panel traducida; null si el backend no mandó nota. */
