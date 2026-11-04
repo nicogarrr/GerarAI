@@ -24,13 +24,17 @@ from app.valuation.currency import (
     scale_per_share_outputs,
     to_major_units,
 )
+from app.valuation.dcf_fcff import WaccNotAboveTerminalGrowthError
 from app.valuation.engines import resolve, resolve_engine_key
 from app.valuation.engines.base import (
     MODEL_VERSION,
+    WACC_ABOVE_TERMINAL_GROWTH,
     ValuationContext,
     ValuationEngine,
     apply_publication_blockers,
+    insufficient_from_context,
     insufficient_result,
+    wacc_terminal_growth_reason,
 )
 from app.valuation.margin_convention import MARGIN_OF_SAFETY_CONVENTION
 from app.valuation.point_in_time import (
@@ -673,7 +677,23 @@ class ValuationService:
             # function every consumer goes through (thesis, red team, snapshot,
             # persistence), and a result that carries publication blockers must
             # never reach them labelled as a final valuation.
-            result = apply_publication_blockers(engine.value(context))
+            try:
+                result = apply_publication_blockers(engine.value(context))
+            except WaccNotAboveTerminalGrowthError:
+                # Red de seguridad para CUALQUIER motor: WACC <= g es una
+                # condición de los datos, no un fallo. El camino DCF queda
+                # «no válido» con su motivo y la valoración sigue (respaldo
+                # sectorial / múltiplos) en vez de tumbar la tesis entera.
+                logger.warning(
+                    "DCF no valido (wacc <= g) company_id=%s engine=%s",
+                    getattr(company, "id", None),
+                    context.engine_key,
+                )
+                result = insufficient_from_context(
+                    context,
+                    missing=[WACC_ABOVE_TERMINAL_GROWTH],
+                    reason=wacc_terminal_growth_reason(None, None),
+                )
             to_listing = currency_gate.get("reporting_to_listing")
             if to_listing is not None:
                 # Valores por accion de vuelta a la divisa del listado (misma

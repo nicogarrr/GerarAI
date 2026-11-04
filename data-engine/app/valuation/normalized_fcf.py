@@ -34,7 +34,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.valuation.dcf_fcff import DCFResult
+from app.valuation.dcf_fcff import DCFResult, WaccNotAboveTerminalGrowthError
 
 HIGH_GROWTH_THRESHOLD = 0.10
 STAGE1_YEARS = 5
@@ -293,7 +293,7 @@ def run_path_dcf(
     if shares_outstanding <= 0:
         raise ValueError("shares_outstanding must be positive")
     if wacc <= terminal_growth:
-        raise ValueError("wacc must be greater than terminal_growth")
+        raise WaccNotAboveTerminalGrowthError()
     if not growth_path or len(growth_path) != len(margin_path):
         raise ValueError("growth and margin paths must have the same positive length")
     if 1 + wacc <= 0:

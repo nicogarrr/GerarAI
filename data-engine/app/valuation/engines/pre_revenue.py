@@ -42,6 +42,7 @@ from app.valuation.engines.base import (
     resolve_rates,
     scenario_definition_trace,
     snapshot_trace,
+    wacc_not_above_terminal_result,
 )
 from app.valuation.funding_gap import estimate_funding_gap
 from app.valuation.moat_framework import empty_moat_framework
@@ -385,6 +386,15 @@ class PreRevenueScenarioEngine(ValuationEngine):
         # Solo se limita el extremo alto para los escenarios especulativos.
         margin = min(margin, 0.40)
         wacc, wacc_source, terminal, terminal_source, dropped_inferred = resolve_rates(context.db, company, as_of=context.as_of)
+        invalid_rates = wacc_not_above_terminal_result(
+            context,
+            wacc=wacc,
+            terminal=terminal,
+            wacc_source=wacc_source,
+            terminal_source=terminal_source,
+        )
+        if invalid_rates is not None:
+            return invalid_rates
         net_debt = snapshot.value("net_debt")
         if net_debt is None:
             # El puente de equity es EV - net_debt. Heredarlo como 0.0 no dice
