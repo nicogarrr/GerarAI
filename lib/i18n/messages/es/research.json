@@ -1787,6 +1787,9 @@
       "calculated_metric": "calculado con insumos trazables",
       "inferred_input": "inferido, con fuentes",
       "tag_default": "tipo por defecto del modelo, sin fuente trazable"
+    },
+    "blockers": {
+      "scenarioSetMissing": "escenarios pendientes: el modelo declarado valora por escenarios y aún no hay un juego con fuente; el número es la orientación del juego por defecto, no una valoración final"
     }
   },
   "peerFormat": {

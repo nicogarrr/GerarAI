@@ -1787,6 +1787,9 @@
       "calculated_metric": "calculated from traceable inputs",
       "inferred_input": "inferred, with sources",
       "tag_default": "the model's default rate, without a traceable source"
+    },
+    "blockers": {
+      "scenarioSetMissing": "scenarios pending: the declared model values by scenarios and no sourced set exists yet; the figure is the default-set guidance, not a final valuation"
     }
   },
   "peerFormat": {
