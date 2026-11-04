@@ -7,6 +7,7 @@ import { batchedSymbol } from '@/lib/cache/batch-symbols';
 import { requestCache } from '@/lib/cache/requestCache';
 import { convertWithPortfolioFx, sameTargetUnit, unconvertedTargetLabel, type TargetFxRate } from '@/lib/analyst-target-currency';
 import { useFormat, useLocale, useT } from '@/lib/i18n/client';
+import { analystTargetsNote } from '@/lib/research/analyst-targets-copy';
 
 /**
  * Consenso de precios objetivo de analistas para las listas (watchlist y
@@ -95,7 +96,7 @@ export default function AnalystTargetLine({
     }
     if (!data || data.status !== 'available' || data.mean === null) {
         return (
-            <span className="text-gray-500" title={data?.note ?? t('ui.analystTargets.noData')}>
+            <span className="text-gray-500" title={(data ? analystTargetsNote({ symbol, note: data.note, note_code: data.noteCode, instrument_type: data.instrumentType }, t) : null) ?? t('ui.analystTargets.noData')}>
                 {NA}
             </span>
         );

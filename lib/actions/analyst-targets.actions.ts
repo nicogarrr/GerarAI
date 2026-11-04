@@ -24,6 +24,10 @@ export type ListingAnalystTargets = {
     fetchedAt: number | null;
     source: string;
     note: string | null;
+    /** Código estable de la nota (el front la traduce; `note` va en castellano). */
+    noteCode?: 'fetch_failed' | 'not_equity' | 'consensus_only' | 'no_targets' | null;
+    /** Tipo de instrumento declarado por Yahoo cuando no es una acción. */
+    instrumentType?: string | null;
 };
 
 interface BackendAnalystTargets {
@@ -34,6 +38,8 @@ interface BackendAnalystTargets {
     consensus?: { mean?: number | null } | null;
     rows?: unknown[];
     note?: string | null;
+    note_code?: ListingAnalystTargets['noteCode'];
+    instrument_type?: string | null;
 }
 
 /**
@@ -72,6 +78,8 @@ export async function getListingAnalystTargets(
             fetchedAt: typeof data.fetched_at === 'number' ? data.fetched_at : null,
             source: data.source ?? 'Yahoo Finance (no oficial), agregado de analistas',
             note: data.note ?? null,
+            noteCode: data.note_code ?? null,
+            instrumentType: data.instrument_type ?? null,
         };
     } catch {
         return null;
