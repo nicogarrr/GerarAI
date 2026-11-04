@@ -58,6 +58,39 @@ from app.valuation.reverse_dcf import (
     value_split,
 )
 
+
+def _servable_latest_metric(
+    db: Session, company_id: int, metric: str
+) -> CalculatedMetric | None:
+    """El ultimo run por (empresa, metrica) manda, sea cual sea su status.
+
+    Si el run mas reciente declaro la metrica no creible (unavailable, valor
+    NULL; p. ej. capital_amounts_scale_mismatch por un market_cap sin
+    divisa), un run viejo con status ok NO la resucita: rescatarlo deshace
+    en silencio los gates de honestidad del motor (CHTR, prod 4-nov-2026:
+    el run 92011 unavailable era ignorado y el lector servia el 49549,
+    WACC 1,72 % < g). Sin run servible se devuelve None y el llamador cae
+    en sus ramas inferred/preview, ya etiquetadas como tales. Regla
+    simetrica a la de frescura del coste de deuda: ausencia honesta antes
+    que cifra stale.
+    """
+    latest = db.scalar(
+        select(CalculatedMetric)
+        .where(
+            CalculatedMetric.company_id == company_id,
+            CalculatedMetric.metric == metric,
+        )
+        .order_by(
+            desc(CalculatedMetric.fiscal_year),
+            desc(CalculatedMetric.created_at),
+        )
+        .limit(1)
+    )
+    if latest is None or latest.status != "ok" or latest.value is None:
+        return None
+    return latest
+
+
 MODEL_VERSION = "long-term-fundamental-model-v2"
 ALGORITHM_VERSION = "driver-formulas-funding-rollforward-v2"
 ANNUAL_METRICS = (
@@ -1286,19 +1319,7 @@ class LongTermModelService:
             None if _has_unexplained_share_jump(shares_series) else self._cagr(shares_series)
         )
         shares_ids = [fact_id for item in shares_series for fact_id in item["fact_ids"]]
-        wacc_metric = db.scalar(
-            select(CalculatedMetric)
-            .where(
-                CalculatedMetric.company_id == company.id,
-                CalculatedMetric.metric == "wacc",
-                CalculatedMetric.value.is_not(None),
-            )
-            .order_by(
-                desc(CalculatedMetric.fiscal_year),
-                desc(CalculatedMetric.created_at),
-            )
-            .limit(1)
-        )
+        wacc_metric = _servable_latest_metric(db, company.id, "wacc")
         if wacc_metric is not None:
             wacc = Assumption(
                 value=_float(wacc_metric.value),
