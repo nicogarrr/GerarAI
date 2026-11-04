@@ -33,7 +33,7 @@ void test('RecordList aplica formatColumns antes del fallback genérico', () => 
 void test('TaxesView cablea las tres columnas monetarias con la divisa de la fila', () => {
     const taxes = readFileSync('components/taxes/TaxesView.tsx', 'utf8');
     assert.match(taxes, /TAX_HOLDING_MONEY_COLUMNS\.map/);
-    assert.match(taxes, /formatHoldingCell\(column, value, record\)/);
+    assert.match(taxes, /formatHoldingCell\(column, value, record, f\.locale\)/);
     assert.match(taxes, /formatColumns=\{Object\.fromEntries/);
 });
 
@@ -49,4 +49,14 @@ void test('B9: base de coste 0 con cantidad > 0 es N/D (no coste real), y la plu
     assert.equal(formatHoldingCell('unrealized_pnl', 500, conCoste), '500,00\u00a0€');
     // cantidad 0 con coste 0: no se afirma ausencia
     assert.equal(formatHoldingCell('cost_basis', 0, { quantity: 0, cost_basis: 0 }), '0,00\u00a0€');
+});
+
+void test('inglés (Ajustes → Idioma): importes y «N/A» en inglés; castellano sin cambios', () => {
+    const sinCoste = { quantity: 10, cost_basis: 0, currency: 'EUR' };
+    assert.equal(formatHoldingCell('cost_basis', 0, sinCoste, 'en'), 'N/A');
+    assert.equal(formatHoldingMoney(null, 'USD', 'en'), 'N/A');
+    const enText = formatHoldingCell('market_value', 4100, { quantity: 1, cost_basis: 1, currency: 'EUR' }, 'en');
+    assert.match(enText, /4,100\.00/);
+    assert.doesNotMatch(enText, /4\.100,00/);
+    assert.equal(formatHoldingCell('market_value', 1500, sinCoste, 'es'), '1.500,00\u00a0€');
 });

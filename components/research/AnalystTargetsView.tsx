@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { analystRatingEs } from '@/lib/research/analyst-rating-es';
+import { analystTargetsNote, referencePriceSourceText } from '@/lib/research/analyst-targets-copy';
 import type { components } from '@/lib/research/openapi.generated';
 import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 type AnalystTargets = components['schemas']['AnalystTargets'];
@@ -16,6 +17,7 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
     const current = Math.min(page, pages - 1);
     const rows = data?.rows.slice(current * 5, (current + 1) * 5) ?? [];
     const cur = data?.currency?.trim() || null;
+    const note = analystTargetsNote(data, t);
     const fmtTarget = (value: number | null | undefined) =>
         value === null || value === undefined
             ? fmt.na
@@ -26,9 +28,9 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
         <section aria-labelledby="analyst-targets-title" className="rounded-xl border border-gray-800 bg-surface-1 p-4" data-testid="analyst-targets">
             <h2 className="sr-only text-base font-semibold text-gray-100 md:not-sr-only" id="analyst-targets-title">{t('research.analystTargets.title')}</h2>
             {!data || data.status === 'unavailable' ? (
-                <p className="mt-2 text-sm text-gray-400" role="status">{data?.note ?? t('research.analystTargets.unavailable')}</p>
+                <p className="mt-2 text-sm text-gray-400" role="status">{note ?? t('research.analystTargets.unavailable')}</p>
             ) : data.rows.length === 0 && !data.consensus ? (
-                <p className="mt-2 text-sm text-gray-400" role="status">{data.note ?? t('research.analystTargets.empty')}</p>
+                <p className="mt-2 text-sm text-gray-400" role="status">{note ?? t('research.analystTargets.empty')}</p>
             ) : (
                 <>
                     {!cur ? <p className="mt-2 text-xs text-gray-400">{t('research.analystTargets.currencyUndeclared')}</p> : null}
@@ -46,7 +48,7 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
                         </div>
                     ) : null}
                     {data.rows.length === 0 ? (
-                        <p className="mt-2 text-sm text-gray-400" role="status">{data.note ?? t('research.analystTargets.consensusOnly')}</p>
+                        <p className="mt-2 text-sm text-gray-400" role="status">{note ?? t('research.analystTargets.consensusOnly')}</p>
                     ) : null}
                     {data.rows.length > 0 ? (
                     <>
@@ -100,7 +102,7 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
                     ) : null}
                     <p className="mt-2 text-xs text-gray-500">
                         {t('research.analystTargets.fetched', { date: fmt.formatUserDateTime(data.fetched_at * 1000) })}
-                        {cur && data.reference_price ? t('research.analystTargets.upsideVs', { price: fmtTarget(data.reference_price), source: data.reference_price_source ?? t('research.analystTargets.referencePrice') }) : t('research.analystTargets.noReference')}
+                        {cur && data.reference_price ? t('research.analystTargets.upsideVs', { price: fmtTarget(data.reference_price), source: referencePriceSourceText(data, t) ?? t('research.analystTargets.referencePrice') }) : t('research.analystTargets.noReference')}
                         {t('research.analystTargets.thirdParty')}
                     </p>
                 </>

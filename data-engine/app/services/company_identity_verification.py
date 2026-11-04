@@ -141,3 +141,49 @@ def compare_identities(
         sec=sec_evidence,
         provider=provider_evidence,
     )
+
+
+# Bolsas de EE. UU. donde el ticker de la SEC identifica al emisor. Más amplio
+# que _US_EXCHANGE_MARKERS (que decide si se ABRE una ficha nueva): aquí solo
+# se decide si hace falta contrastar la razón social, y un OTC/AMEX de EE. UU.
+# sigue siendo un ticker de la SEC.
+_SEC_TICKER_EXCHANGE_MARKERS = (*_US_EXCHANGE_MARKERS, "OTC", "AMEX", "NYSE MKT")
+
+
+def is_foreign_listing(exchange: str | None) -> bool:
+    """La ficha cotiza en una bolsa CONOCIDA que no es de EE. UU.
+
+    Sin bolsa declarada no se presume nada (False): el comportamiento previo
+    sigue intacto para fichas sin ese dato.
+    """
+    listing = (exchange or "").strip().upper()
+    if not listing:
+        return False
+    return not any(marker in listing for marker in _SEC_TICKER_EXCHANGE_MARKERS)
+
+
+def sec_identity_mismatch(
+    *,
+    company_name: str | None,
+    exchange: str | None,
+    sec_entity_name: str | None,
+) -> str | None:
+    """Motivo por el que una entidad de la SEC NO es el emisor de la ficha, o None.
+
+    El ticker de EDGAR es un símbolo de EE. UU.: fuera de su bolsa un mismo
+    ticker es OTRO emisor (PRIM en BME vs Perimeter Solutions en NYSE, ambos
+    «PRM»). Con listado no estadounidense la razón social de la SEC tiene que
+    casar con la de la ficha (``names_compatible``); un foreign private issuer
+    que sí presenta ante la SEC (20-F) casa por nombre. En una bolsa de EE. UU.,
+    o sin bolsa o sin razón social que contrastar, no hay nada que objetar y
+    el comportamiento no cambia.
+    """
+    sec_name = (sec_entity_name or "").strip()
+    if not sec_name or not is_foreign_listing(exchange):
+        return None
+    if names_compatible(sec_name, company_name or ""):
+        return None
+    return (
+        f"la entidad de la SEC «{sec_name}» no es el emisor de la ficha "
+        f"«{company_name or ''}» (cotiza en {exchange}): mismo ticker, otro emisor"
+    )

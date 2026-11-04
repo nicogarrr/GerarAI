@@ -495,7 +495,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
                     ['quantity', (value: unknown) => f.formatNumber(value as number | string, { maximumFractionDigits: 6 })],
                     ...TAX_HOLDING_MONEY_COLUMNS.map((column) => [
                         column,
-                        (value: unknown, record: DataRecord) => formatHoldingCell(column, value, record),
+                        (value: unknown, record: DataRecord) => formatHoldingCell(column, value, record, f.locale),
                     ]),
                 ])}
                 linkColumns={{ ticker: (record) => researchHrefFor(record) }}

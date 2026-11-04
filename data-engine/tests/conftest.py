@@ -250,6 +250,18 @@ def _reset_historical_stress_failure_cache():
     historical_stress_service._FAILED_UNTIL.clear()
 
 
+@pytest.fixture(autouse=True)
+def _reset_data_source_health_registry(monkeypatch):
+    """El registry de salud de fuentes es un singleton de proceso: los fallos
+    y circuitos abiertos que deja un test los heredaba el siguiente del mismo
+    worker de xdist (p. ej. ``yahoo_finance`` con fallos previos hacía fallar
+    test_yahoo_ticker_desconocido_no_degrada_la_fuente según el orden). Cada
+    test parte de un registry nuevo y al acabar se devuelve el anterior."""
+    from app.services.data_source_health import DataSourceHealthRegistry
+
+    monkeypatch.setattr(DataSourceHealthRegistry, "_instance", None)
+
+
 # ---------------------------------------------------------------------------
 # Aislamiento del Redis compartido del job de CI
 # ---------------------------------------------------------------------------

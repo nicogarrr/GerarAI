@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import re
+from typing import Any
+
+from sqlalchemy.orm import object_session
+
 from app.models import Company
 from app.services.company_types import is_holding_company_type
 from app.valuation.engines.base import ValuationEngine
@@ -26,6 +31,51 @@ VALUATION_ENGINES: dict[str, type[ValuationEngine]] = {
     "insurer": InsurerValuationEngine,
     "reit": ReitValuationEngine,
 }
+
+
+_REIT_RE = re.compile(r"\breits?\b|real estate investment trust", re.IGNORECASE)
+
+
+def _is_equity_reit_industry(industry: str | None) -> bool:
+    """«REIT» como palabra (o «real estate investment trust»), sin hipotecarios."""
+    value = (industry or "").lower()
+    return bool(_REIT_RE.search(value)) and "mortgage" not in value
+
+
+def _reference_industry(company: Company) -> str | None:
+    """Industria de la referencia del instrumento (financedatabase), o None.
+
+    Solo con una empresa ligada a una sesión (los dobles de test no la
+    tienen) y solo si la divisa coincide: el mismo símbolo en otra bolsa es
+    otro instrumento. Se guarda en la instancia para no repetir la consulta
+    en cada llamada del mismo cálculo.
+    """
+    try:
+        instance_dict: dict[str, Any] = vars(company)
+    except TypeError:
+        instance_dict = {}
+    if "_engine_reference_industry" in instance_dict:
+        return instance_dict["_engine_reference_industry"]
+    industry: str | None = None
+    try:
+        db = object_session(company)
+    except Exception:
+        db = None
+    ticker = getattr(company, "ticker", None)
+    if db is not None and ticker:
+        from app.services.instrument_reference import get_by_ticker
+
+        # Sin autoflush: resolver el motor no debe volcar cambios pendientes
+        # de quien llama (p. ej. a mitad de una ingesta).
+        with db.no_autoflush:
+            row = get_by_ticker(db, ticker)
+        if row is not None and row.industry:
+            ref_currency = (row.currency or "").upper()
+            own_currency = (getattr(company, "currency", None) or "").upper()
+            if not ref_currency or not own_currency or ref_currency == own_currency:
+                industry = row.industry
+        instance_dict["_engine_reference_industry"] = industry
+    return industry
 
 
 def resolve_engine_key(company: Company) -> str:
@@ -75,23 +125,34 @@ def resolve_engine_key(company: Company) -> str:
     # un DCF de caja libre.
     if "bank" in industry:
         return "bank"
-    # Este mapa por ticker complementa las reglas de tipo e industria de arriba
-    # para identidades verificadas a mano (19 oct 2026 en prod). Bancos y
-    # aseguradoras ya se encaminan por industria: si faltan datos del motor
-    # sectorial, se usa el respaldo no publicable o N/D, nunca un FCFF DCF.
-    # Gestoras y REITs sin clasificacion siguen necesitando identidad verificada.
+    # REITs de renta por industria: la de la ficha (FMP/Yahoo «REIT -
+    # Residential», GICS «... (REITs)») o, cuando esa es la taxonomía gruesa
+    # de Finnhub («Real Estate», la que hay en prod para CPT, O, PLD), la de
+    # la referencia del instrumento («Residential REITs»). Un FCFF DCF sobre
+    # un REIT ignora que reparte casi todo su beneficio y se valora por NAV
+    # (NOI / cap rate); si al motor reit le faltan datos, valuation_service
+    # pasa al respaldo orientativo por múltiplos o deja N/D. Los REITs
+    # hipotecarios no van aquí: su activo son préstamos, no inmuebles con NOI.
+    if _is_equity_reit_industry(industry) or _is_equity_reit_industry(
+        _reference_industry(company)
+    ):
+        return "reit"
+    # Residuo sin regla general todavía: gestoras alternativas y holdings de
+    # inversión. Su industria en los perfiles guardados es la misma que la de
+    # bolsas, brokers o pagos («Financial Services» / «Capital Markets»), así
+    # que una regla por industria movería también a V, MA o CME. Se quedan
+    # aquí hasta que exista una señal de datos (company_type clasificado o
+    # NAV/AUM ingeridos). Aseguradoras (CB) y REITs (CPT) ya salen por reglas.
     ticker = (getattr(company, "ticker", "") or "").upper()
-    verified_engines = {
-        "CB": "insurer",  # Chubb: aseguradora (combined ratio, book value)
-        "KKR": "holding_company",  # gestora: AUM/NAV, no FCF generico
-        "CPT": "reit",  # Camden Property Trust: FFO/AFFO
-        "BN": "holding_company",  # Brookfield (ya entraba por company_type)
-        # Georgia Capital: entidad de inversion NIIF 10 (NAV = patrimonio).
-        # Un DCF sobre su flujo de explotacion (-5,8 M GEL) no tiene sentido.
+    pending_general_rule = {
+        "KKR": "holding_company",  # gestora alternativa: AUM/NAV, no FCF genérico
+        "BN": "holding_company",  # Brookfield: holding + gestora
+        # Georgia Capital: entidad de inversión NIIF 10 (NAV = patrimonio).
+        # Un DCF sobre su flujo de explotación (-5,8 M GEL) no tiene sentido.
         "CGEO.L": "holding_company",
     }
-    if ticker in verified_engines:
-        return verified_engines[ticker]
+    if ticker in pending_general_rule:
+        return pending_general_rule[ticker]
     if "reit" in company_type:
         return "reit"
     return "standard_dcf"
