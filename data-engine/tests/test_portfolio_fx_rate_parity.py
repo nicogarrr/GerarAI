@@ -58,11 +58,18 @@ def test_inverse_is_reciprocal_with_source(db):
     assert (p["source"], p["direction"]) == ("inv", "inverse")
 
 
-def test_direct_preferred_over_inverse(db):
+def test_newer_inverse_beats_older_direct_and_tie_keeps_direct(db):
+    # Entre directa e inversa gana la fecha mas reciente; en empate, la directa
+    # (tests/test_fx_directa_vieja_inversa_fresca.py cubre todas las rutas).
     _add(db, "EUR", "USD", "0.9", date(2026, 1, 1), "direct")
     _add(db, "USD", "EUR", "2", date(2026, 1, 3), "inv")
     r, p = _both(db, "USD", "EUR", date(2026, 1, 5))
+    assert r == Decimal("0.5") and p["source"] == "inv"
+    r, p = _both(db, "USD", "EUR", date(2026, 1, 2))
     assert r == Decimal("0.9") and p["source"] == "direct"
+    _add(db, "EUR", "USD", "0.8", date(2026, 1, 3), "direct-same-day")
+    r, p = _both(db, "USD", "EUR", date(2026, 1, 5))
+    assert r == Decimal("0.8") and p["source"] == "direct-same-day"
 
 
 # Desempate por created_at: inalcanzable, uq_fx_rate_tenant_pair_date impide dos
