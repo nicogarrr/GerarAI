@@ -7215,10 +7215,12 @@
       },
       "expected": {
         "engine_key": "scenario",
-        "status": "ok",
-        "publishable": true,
+        "status": "partial",
+        "publishable": false,
         "missing_inputs": [],
-        "publication_blockers": [],
+        "publication_blockers": [
+          "scenario_set_missing"
+        ],
         "adr_ratio": null,
         "trace_engine": "standard_dcf",
         "closed_form": {
@@ -7245,7 +7247,7 @@
       "price": 25,
       "wacc": 0.09,
       "hand_calculation": "Sin declared_scenarios: respaldo al DCF estándar (motivo scenario_set_missing, «escenarios pendientes: sin escenarios con fuente»). Los valores son los de evdcf01_happy_path_traceable_wacc (mismos hechos, precio y WACC).",
-      "note": "Sin escenarios con fuente (Nico, 4-nov-2026: «Que tengan escenarios reales, no hardcodeo»): el motor de escenarios no publica valor y corre el DCF estándar, con trace.engine_fallback.reason=scenario_set_missing. Mismas cifras que evdcf01."
+      "note": "Sin escenarios con fuente el respaldo corre, pero NO es publicable: el modelo declarado (escenarios) no ha corrido (dato ausente = N/D). La ficha lo muestra como orientacion degradada con el motivo; los numeros son los del DCF base (evdcf01)."
     },
     {
       "id": "evanc01_cross_year_fcf_excluded",

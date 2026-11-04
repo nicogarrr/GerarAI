@@ -425,4 +425,14 @@ class ScenarioValuationEngine(ValuationEngine):
             "reason": reason,
             "detail": detail[:500],
         }
+        if reason == "scenario_set_missing":
+            # El modelo declarado (escenarios) no ha corrido por falta de un
+            # juego con fuente: el numero del respaldo es una orientacion, no
+            # el valor del motor (dato ausente = N/D). Los numeros se quedan,
+            # degradados con el motivo; la ficha los muestra como orientacion.
+            blockers = [str(b) for b in (result.get("publication_blockers") or []) if str(b).strip()]
+            if reason not in blockers:
+                blockers.append(reason)
+            result["publication_blockers"] = blockers
+            result = apply_publication_blockers(result)
         return result
