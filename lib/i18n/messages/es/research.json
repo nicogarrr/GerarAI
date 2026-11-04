@@ -1785,6 +1785,12 @@
       "inferred_input": "inferido, con fuentes",
       "tag_default": "tipo por defecto del modelo, sin fuente trazable",
       "market_cap_band": "banda por capitalización en dólares (8,5 % desde 200.000 M$; 9,5 % desde 50.000 M$; 10,5 % desde 10.000 M$; 11,5 % por debajo)"
+    },
+    "blockers": {
+      "traceableWacc": "WACC sin cálculo trazable",
+      "forecastIsNotTheDriver": "el valor terminal es más del 95 % del valor: la previsión a 5 años no es el motor de esta valoración",
+      "inferredFcfMarginTarget": "margen FCF objetivo inferido (con fuentes): convergencia de margen orientativa para una empresa en crecimiento, no una valoración final",
+      "scenarioSetMissing": "escenarios pendientes: el modelo declarado valora por escenarios y aún no hay un juego con fuente; el número es la orientación del motor de respaldo, no una valoración final"
     }
   },
   "peerFormat": {

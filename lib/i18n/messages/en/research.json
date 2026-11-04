@@ -1785,6 +1785,12 @@
       "inferred_input": "inferred, with sources",
       "tag_default": "the model's default rate, without a traceable source",
       "market_cap_band": "market-cap band in US dollars (8.5% from $200bn; 9.5% from $50bn; 10.5% from $10bn; 11.5% below)"
+    },
+    "blockers": {
+      "traceableWacc": "WACC without a traceable calculation",
+      "forecastIsNotTheDriver": "terminal value is over 95 % of the value: the 5-year forecast is not what drives this valuation",
+      "inferredFcfMarginTarget": "inferred FCF margin target (with sources): indicative margin convergence for a growing company, not a final valuation",
+      "scenarioSetMissing": "scenarios pending: the declared model values by scenarios and no sourced set exists yet; the figure is the fallback engine guidance, not a final valuation"
     }
   },
   "peerFormat": {

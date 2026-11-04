@@ -7,25 +7,19 @@ import { formatPercent } from '@/lib/format';
 import type { Locale } from '@/lib/i18n/locale';
 import { createTranslator } from '@/lib/i18n/translate';
 
-/** Motivos de no publicación en español claro. «traceable_wacc» como blocker
- *  significa que FALTA (el token suelto se leía como «WACC con fuente
- *  trazable», justo lo contrario). */
-const BLOCKER_LABELS: Record<string, string> = {
-  traceable_wacc: 'WACC sin cálculo trazable',
-  forecast_is_not_the_driver: 'el valor terminal es más del 95 % del valor: la previsión a 5 años no es el motor de esta valoración',
-  inferred_fcf_margin_target: 'margen FCF objetivo inferido (con fuentes): convergencia de margen orientativa para una empresa en crecimiento, no una valoración final',
-  scenario_set_missing: 'escenarios pendientes: el modelo declarado valora por escenarios y aún no hay un juego con fuente; el número es la orientación del motor de respaldo, no una valoración final',
-};
-
-const BLOCKER_LABELS_EN: Record<string, string> = {
-  traceable_wacc: 'WACC without a traceable calculation',
-  forecast_is_not_the_driver: 'terminal value is over 95 % of the value: the 5-year forecast is not what drives this valuation',
-  inferred_fcf_margin_target: 'inferred FCF margin target (with sources): indicative margin convergence for a growing company, not a final valuation',
-  scenario_set_missing: 'scenarios pending: the declared model values by scenarios and no sourced set exists yet; the number is the fallback engine guidance, not a final valuation',
+/** Motivos de no publicación: claves i18n (research.valuationText.blockers.*).
+ *  «traceable_wacc» como blocker significa que FALTA (el token suelto se leía
+ *  como «WACC con fuente trazable», justo lo contrario). */
+const BLOCKER_LABEL_KEYS: Record<string, string> = {
+  traceable_wacc: 'research.valuationText.blockers.traceableWacc',
+  forecast_is_not_the_driver: 'research.valuationText.blockers.forecastIsNotTheDriver',
+  inferred_fcf_margin_target: 'research.valuationText.blockers.inferredFcfMarginTarget',
+  scenario_set_missing: 'research.valuationText.blockers.scenarioSetMissing',
 };
 
 export function blockerLabel(id: string, locale: 'es' | 'en' = 'es'): string {
-  return (locale === 'en' ? BLOCKER_LABELS_EN : BLOCKER_LABELS)[id] ?? id;
+  const key = BLOCKER_LABEL_KEYS[id];
+  return key ? createTranslator(locale)(key) : id;
 }
 
 /** Procedencia del WACC usado por el motor (resolve_rates del backend). */
