@@ -59,7 +59,10 @@ from app.valuation.fact_reference import SourcedFact, latest_facts
 from app.valuation.moat_framework import empty_moat_framework
 from app.valuation.relative_multiples import (
     MIN_PEER_SET_SIZE,
+    MIN_VALID_PEERS,
     MULTIPLE_KINDS,
+    PEER_MULTIPLE_PLAUSIBLE_RANGE,
+    PEER_OUTLIER_K,
     MultipleReading,
     PeerMultiple,
     RelativeMultipleError,
@@ -68,6 +71,7 @@ from app.valuation.relative_multiples import (
     divergence_report,
     implied_value,
     relative_diagnostics,
+    screen_peer_outliers,
 )
 from app.valuation.scenario_definitions import evidence_weighted_probabilities
 from app.valuation.scenario_model import Scenario, probability_weighted_value
@@ -263,14 +267,24 @@ def _peer_set(context: ValuationContext) -> tuple[list[Company], dict]:
         for row in comparison.get("companies", [])
         if not row.get("is_target")
     }
+    basis = comparison.get("basis")
+    # Sin ``PeerRelationship`` curadas el grupo es el respaldo multifactor
+    # (sector / tipo / divisa / tamaño): se etiqueta para que nadie lo lea
+    # como un grupo de comparables elegido.
+    fallback_only = basis != "manual_then_multifactor"
     if not ids:
-        return [], {"basis": comparison.get("basis"), "trace": comparison.get("selection_trace", {})}
+        return [], {
+            "basis": basis,
+            "fallback_only": fallback_only,
+            "trace": comparison.get("selection_trace", {}),
+        }
     rows = list(
         context.db.scalars(select(Company).where(Company.ticker.in_(list(ids)))).all()
     )
     rows.sort(key=lambda company: company.ticker)
     return rows, {
-        "basis": comparison.get("basis"),
+        "basis": basis,
+        "fallback_only": fallback_only,
         "method": (comparison.get("selection_trace") or {}).get("method"),
         "trace": comparison.get("selection_trace", {}),
         "limit": PEER_LIMIT,
@@ -359,11 +373,47 @@ class RelativeMultiplesEngine(ValuationEngine):
         peer_blocks: list[dict] = []
         small_samples: list[str] = []
         undeclared: list[str] = []
+        outlier_screen_short: list[str] = []
         for kind in MULTIPLE_PREFERENCE:
             own_reading = self._own_reading(kind, context, own_fundamentals)
             usable, rejected = self._peer_multiples(kind, bundles)
+            usable, outliers = screen_peer_outliers(kind, usable)
+            rejected = [*rejected, *outliers]
             stats = describe_peer_sample(usable)
+            if usable and len(usable) < MIN_VALID_PEERS:
+                # Tras quitar los atípicos quedan 1-2 nombres: su "mediana" es
+                # el múltiplo de una empresa, no del grupo. Sin cifra.
+                screens[kind] = {
+                    "multiple": kind,
+                    "status": "insufficient_valid_peers",
+                    "own": own_reading.as_trace(),
+                    "peer_stats": stats,
+                    "implied_value_per_share": {"p25": None, "median": None, "p75": None},
+                    "rejected_peers": rejected,
+                    "caveats": [
+                        f"Only {len(usable)} valid peer(s) after the outlier screen; "
+                        f"{MIN_VALID_PEERS} are needed for a figure."
+                    ],
+                }
+                peer_blocks.append(
+                    {
+                        "multiple": kind,
+                        "status": "insufficient_valid_peers",
+                        "peer_set_size": stats["peer_set_size"],
+                        "median": stats["median"],
+                        "p25": stats["p25"],
+                        "p75": stats["p75"],
+                        "peers": stats["peers"],
+                        "rejected_peers": rejected,
+                        "sample_note": stats["sample_note"],
+                    }
+                )
+                undeclared.extend(peer.ticker for peer in usable if peer.source == UNDECLARED_SOURCE)
+                outlier_screen_short.append(kind)
+                continue
             if not usable:
+                if outliers:
+                    outlier_screen_short.append(kind)
                 screens[kind] = {
                     "multiple": kind,
                     "status": "no_peer_multiple",
@@ -412,20 +462,35 @@ class RelativeMultiplesEngine(ValuationEngine):
                 small_samples.append(kind)
             undeclared.extend(peer.ticker for peer in usable if peer.source == UNDECLARED_SOURCE)
 
+        outlier_filter = {
+            "plausible_range": {key: list(band) for key, band in PEER_MULTIPLE_PLAUSIBLE_RANGE.items()},
+            "outlier_k": PEER_OUTLIER_K,
+            "min_valid_peers": MIN_VALID_PEERS,
+            "kinds_short_after_filter": outlier_screen_short,
+        }
         headline = self._headline(screens)
         if headline is None:
+            reason = (
+                "Peers exist but none of the six multiples can be applied: "
+                "either no peer has the fundamentals it needs or the "
+                "subject's own denominator is unusable. A screen with an "
+                "empty result set is not a cheap stock."
+            )
+            if outlier_screen_short:
+                reason = (
+                    "pares insuficientes tras filtrar atípicos: menos de "
+                    f"{MIN_VALID_PEERS} comparables válidos en "
+                    f"{', '.join(outlier_screen_short)}; sin valor orientativo. " + reason
+                )
             return _insufficient(
                 context,
                 missing=["peer_multiples"],
-                reason=(
-                    "Peers exist but none of the six multiples can be applied: "
-                    "either no peer has the fundamentals it needs or the "
-                    "subject's own denominator is unusable. A screen with an "
-                    "empty result set is not a cheap stock."
-                ),
+                reason=reason,
                 extra_trace={
                     "peer_set": peer_provenance,
                     "peer_multiples": peer_blocks,
+                    "peers_without_declared_source": sorted(set(undeclared)),
+                    "peer_outlier_filter": outlier_filter,
                     "screens": screens,
                 },
             )
@@ -544,6 +609,7 @@ class RelativeMultiplesEngine(ValuationEngine):
                         "reading and at least one peer multiple."
                     ),
                     "peer_set": peer_provenance,
+                    "peer_outlier_filter": outlier_filter,
                     "peer_set_size": headline["peer_stats"]["peer_set_size"],
                     "peer_set_minimum": MIN_PEER_SET_SIZE,
                     "small_peer_sets": small_samples,

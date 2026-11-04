@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
 from datetime import date
@@ -363,6 +364,27 @@ def _engine_that_ran(result: dict, company: Company) -> str:
     return resolve_engine_key(company)
 
 
+#: Un valor orientativo del respaldo por múltiplos más de estas veces por encima
+#: del precio no se publica: con los pares bien elegidos un holding sin SOTP no
+#: vale 3x lo que cotiza; cuando sale así es el grupo de comparables (BABA:
+#: mediana de PER de 369x) y la traza lo cuenta en vez de enseñarlo.
+INDICATIVE_MAX_PRICE_RATIO = 3.0
+
+
+def _indicative_value_to_price_ratio(margin: object) -> float | None:
+    """Valor / precio a partir del margen de seguridad del motor relativo.
+
+    El margen ya está en la base comparable (acción ordinaria frente a precio
+    por ordinaria en ADR), ``margen = (valor - precio) / valor``, así que
+    ``valor / precio = 1 / (1 - margen)`` sin volver a convertir divisas.
+    """
+    if not isinstance(margin, (int, float)) or isinstance(margin, bool) or not math.isfinite(margin):
+        return None
+    if margin >= 1:
+        return math.inf
+    return 1.0 / (1.0 - float(margin))
+
+
 def _sector_fallback(
     db: Session,
     company: Company,
@@ -395,6 +417,24 @@ def _sector_fallback(
         return insufficient
     if not any(cross.get(key) is not None for key in ("expected_value", "base_value")):
         return insufficient
+    ratio = _indicative_value_to_price_ratio(cross.get("margin_of_safety"))
+    if ratio is not None and ratio > INDICATIVE_MAX_PRICE_RATIO:
+        withheld = dict(insufficient)
+        withheld_trace = dict(insufficient.get("trace") or {})
+        withheld_trace["sector_engine_fallback_withheld"] = {
+            "value_to_price_ratio": ratio,
+            "max_price_ratio": INDICATIVE_MAX_PRICE_RATIO,
+            "headline_multiple": cross.get("headline_multiple"),
+            "peer_median": cross.get("peer_median"),
+            "peer_set_fallback_only": cross.get("peer_set_fallback_only"),
+            "reason": (
+                f"Valor orientativo por múltiplos retenido: {ratio:.1f}x el precio "
+                f"(máximo {INDICATIVE_MAX_PRICE_RATIO:g}x). Un respaldo por comparables "
+                "tan lejos del precio es un fallo de los pares, no una valoración."
+            ),
+        }
+        withheld["trace"] = withheld_trace
+        return withheld
     sector_engine = (insufficient.get("trace") or {}).get("engine") or resolve_engine_key(company)
     missing = list(insufficient.get("missing_inputs") or [])
     result = dict(insufficient)
@@ -418,6 +458,7 @@ def _sector_fallback(
             "sector_reason": (insufficient.get("trace") or {}).get("reason"),
             "headline_multiple": cross.get("headline_multiple"),
             "peer_median": cross.get("peer_median"),
+            "peer_set_fallback_only": cross.get("peer_set_fallback_only"),
         },
         "notice": (
             "Valoración orientativa por múltiplos de comparables: el motor "
@@ -508,6 +549,8 @@ def _relative_multiples_cross_check(
         "margin_of_safety": relative.get("margin_of_safety"),
         "peer_set_size": rel.get("peer_set_size"),
         "peer_median": rel.get("peer_median"),
+        # Grupo de respaldo (sin PeerRelationship curadas): se etiqueta.
+        "peer_set_fallback_only": (trace.get("peer_set") or {}).get("fallback_only"),
         # Moneda y base de cada cifra: los valores bear/base/bull/expected
         # van por accion ordinaria en la divisa del listado (tras UN unico
         # reescalado); listed_share_values van por ADR/unidad listada.

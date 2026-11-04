@@ -496,7 +496,8 @@ def test_relative_engine_uses_a_stored_provider_multiple_with_its_source(db):
 
 def test_relative_engine_marks_an_undeclared_source_as_nd(db):
     company = _subject(db)
-    _peers(db, count=2)
+    # 3 pares: con menos de MIN_VALID_PEERS válidos el motor ya no da cifra.
+    _peers(db, count=3)
     metric = PROVIDER_MULTIPLE_TEMPLATE.format(kind="pe", ticker="RELP0")
     db.add(
         FinancialFact(

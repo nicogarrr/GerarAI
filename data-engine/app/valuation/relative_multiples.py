@@ -58,6 +58,34 @@ MIN_PEER_SET_SIZE = 5
 # Below this, even the 25th/75th percentile is a rounding artifact of one name.
 MIN_MEANINGFUL_PEER_SET_SIZE = 3
 
+#: Fewer valid peers than this AFTER the outlier screen and the engine gives no
+#: figure at all (``pares insuficientes tras filtrar atípicos``): with one or two
+#: names the "median" is a single company's multiple, and a fallback valuation
+#: published on it is that company's price, not a sector's (BABA, Nov 2026).
+MIN_VALID_PEERS = MIN_MEANINGFUL_PEER_SET_SIZE
+
+#: Plausible band per multiple kind, ``(low, high)`` inclusive. A peer outside
+#: it is a data accident (a price not adjusted for a split, a per-share figure in
+#: thousands, a near-zero denominator), not a valuation: a P/E of 0.94 or of
+#: 369x, an EV/Sales of 0.0003. The bands are deliberately wide — they only drop
+#: what no analyst would use as an anchor — and the relative screen below
+#: (``PEER_OUTLIER_K``) catches the rest.
+PEER_MULTIPLE_PLAUSIBLE_RANGE: dict[str, tuple[float, float]] = {
+    "pe": (2.0, 200.0),
+    "pb": (0.05, 100.0),
+    "p_to_fcf": (2.0, 200.0),
+    "ev_to_ebitda": (1.0, 150.0),
+    "ev_to_sales": (0.05, 50.0),
+    "ev_to_fcf": (2.0, 200.0),
+}
+
+#: A peer whose multiple is more than ``PEER_OUTLIER_K`` times the median of the
+#: in-band set (or less than the median divided by it) is not a comparable: 4x
+#: is wide enough to keep a genuine growth premium or a cyclical trough inside
+#: the set and tight enough to drop one name that would move the median alone.
+PEER_OUTLIER_K = 4.0
+
+
 #: The multiple kinds this engine knows how to derive, with the fundamentals
 #: each one needs. ``side`` marks the numerator side (price x shares or
 #: price) versus the ``enterprise`` side (EV), so a derived multiple can never
@@ -309,6 +337,63 @@ def median(values: list[float]) -> float:
     if len(ordered) % 2:
         return ordered[midpoint]
     return (ordered[midpoint - 1] + ordered[midpoint]) / 2
+
+
+def screen_peer_outliers(
+    kind: str, peers: list[PeerMultiple]
+) -> tuple[list[PeerMultiple], list[dict]]:
+    """Drop implausible and outlying peer multiples, naming each one and why.
+
+    Two passes, both general (no ticker lists):
+
+    1. outside ``PEER_MULTIPLE_PLAUSIBLE_RANGE[kind]``, non-finite or not
+       positive -> ``outside_plausible_range``;
+    2. more than ``PEER_OUTLIER_K`` x the median of what survived pass 1, or
+       below that median / ``PEER_OUTLIER_K`` -> ``outlier_vs_peer_median``.
+
+    The order of ``peers`` is kept; a normal set comes back unchanged.
+    """
+    low, high = PEER_MULTIPLE_PLAUSIBLE_RANGE.get(kind, (0.0, math.inf))
+    in_band: list[PeerMultiple] = []
+    rejected: list[dict] = []
+    for peer in peers:
+        value = peer.value
+        if value is None or not math.isfinite(value) or value <= 0 or not (low <= value <= high):
+            rejected.append(
+                {
+                    "ticker": peer.ticker,
+                    "multiple": kind,
+                    "value": value,
+                    "status": "outside_plausible_range",
+                    "reason": (
+                        f"{kind} {value} outside the plausible range [{low}, {high}]: "
+                        "a data accident, not a comparable."
+                    ),
+                }
+            )
+            continue
+        in_band.append(peer)
+    if not in_band:
+        return [], rejected
+    centre = median([peer.value for peer in in_band])
+    kept: list[PeerMultiple] = []
+    for peer in in_band:
+        if peer.value > centre * PEER_OUTLIER_K or peer.value < centre / PEER_OUTLIER_K:
+            rejected.append(
+                {
+                    "ticker": peer.ticker,
+                    "multiple": kind,
+                    "value": peer.value,
+                    "status": "outlier_vs_peer_median",
+                    "reason": (
+                        f"{kind} {peer.value:.4g} is more than {PEER_OUTLIER_K:g}x away from "
+                        f"the peer median {centre:.4g}: an outlier, not a comparable."
+                    ),
+                }
+            )
+            continue
+        kept.append(peer)
+    return kept, rejected
 
 
 def describe_peer_sample(peers: list[PeerMultiple]) -> dict:
