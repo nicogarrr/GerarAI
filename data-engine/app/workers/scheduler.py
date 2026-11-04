@@ -72,6 +72,7 @@ from app.workers.dramatiq_app import (
     sync_tenant_ibkr_connections_dedicated,
     tenant_contexts,
 )
+from app.workers.thesis_track_record_actors import refresh_thesis_track_record
 
 JOB_DEFAULTS = {
     "replace_existing": True,
@@ -403,6 +404,16 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         job_id="thesis_review",
         hour=7,
         minute=0,
+    )
+    # «Nuestro acierto» (owner 4-nov): puntúa los valores razonables cuyo
+    # horizonte de 6/12 meses ya venció, con los cierres de la noche ya dentro.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, refresh_thesis_track_record),
+        "cron",
+        job_id="thesis_track_record",
+        hour=7,
+        minute=40,
     )
     # Tesis de la watchlist que faltan o se quedaron sin datos (owner 3-nov):
     # despues del refresco nocturno de fundamentales, antes de abrir mercado.

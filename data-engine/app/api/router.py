@@ -50,6 +50,7 @@ from app.api.routes import (
     thesis,
     thesis_projection,
     thesis_scenarios,
+    thesis_track_record,
     valuation,
     watchlist,
     work_products,
@@ -133,3 +134,5 @@ api_router.include_router(filing_intelligence.router, prefix="/companies", tags=
 api_router.include_router(
     thesis_scenarios.router, prefix="/companies", tags=["companies"]
 )
+# «Nuestro acierto»: /companies/{ticker}/track-record y /thesis-track-record.
+api_router.include_router(thesis_track_record.router, tags=["thesis"])

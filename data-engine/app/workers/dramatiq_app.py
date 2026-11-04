@@ -4883,6 +4883,9 @@ def sync_paper_dividends(tenant_id: int | None = None, user_id: str | None = Non
 # RAG de conocimiento: registra el actor de ingesta (cola "knowledge").
 import app.workers.knowledge_rag_actors  # noqa: E402,F401
 
+# «Nuestro acierto»: registra el actor diario que puntúa los valores razonables.
+import app.workers.thesis_track_record_actors  # noqa: E402,F401
+
 
 @dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=600_000)
 @_coalesce_on_success("sync_tenant_ibkr_connections", 20 * 3600, stale_after_seconds=None)

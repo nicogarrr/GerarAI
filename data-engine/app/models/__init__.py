@@ -261,6 +261,10 @@ from app.models.thesis_projection import ThesisProjectionYear as ThesisProjectio
 
 __all__.append("ThesisProjectionYear")
 
+from app.models.thesis_realized_return import ThesisRealizedReturn as ThesisRealizedReturn  # noqa: E402
+
+__all__.append("ThesisRealizedReturn")
+
 from app.models.benchmark_price import BenchmarkPrice as BenchmarkPrice  # noqa: E402
 
 __all__.append("BenchmarkPrice")
