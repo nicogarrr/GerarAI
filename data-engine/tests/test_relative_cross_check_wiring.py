@@ -114,8 +114,11 @@ def _subject(db, ticker="SUBJ"):
         {
             "eps": 2.0,
             "revenue": 1000.0,
-            "free_cash_flow": 100.0,
-            "fcf_margin": 0.1,
+            # FCF 125 (margen 12,5 %): con la banda de WACC por capitalización
+            # (11,5 % a 2.000) el DCF queda dentro del umbral de divergencia
+            # con los múltiplos y el caso sigue probando solo el cableado.
+            "free_cash_flow": 125.0,
+            "fcf_margin": 0.125,
             "total_debt": 200.0,
             "cash_and_equivalents": 50.0,
             "shares_diluted": 100.0,
@@ -212,8 +215,11 @@ def _subject_ccy(db, ticker, currency, price, *, factor_tags=None):
         {
             "eps": 2.0,
             "revenue": 1000.0,
-            "free_cash_flow": 100.0,
-            "fcf_margin": 0.1,
+            # FCF 125 (margen 12,5 %): con la banda de WACC por capitalización
+            # (11,5 % a 2.000) el DCF queda dentro del umbral de divergencia
+            # con los múltiplos y el caso sigue probando solo el cableado.
+            "free_cash_flow": 125.0,
+            "fcf_margin": 0.125,
             "total_debt": 200.0,
             "cash_and_equivalents": 50.0,
             "shares_diluted": 100.0,
@@ -274,8 +280,11 @@ def test_cross_check_adr_scales_once_and_publishes_listed_values(db):
         {
             "eps": 2.0,
             "revenue": 1000.0,
-            "free_cash_flow": 100.0,
-            "fcf_margin": 0.1,
+            # FCF 125 (margen 12,5 %): con la banda de WACC por capitalización
+            # (11,5 % a 2.000) el DCF queda dentro del umbral de divergencia
+            # con los múltiplos y el caso sigue probando solo el cableado.
+            "free_cash_flow": 125.0,
+            "fcf_margin": 0.125,
             "total_debt": 200.0,
             "cash_and_equivalents": 50.0,
             "shares_diluted": 100.0,

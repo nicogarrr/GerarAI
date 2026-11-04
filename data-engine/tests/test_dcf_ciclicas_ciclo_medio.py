@@ -241,7 +241,9 @@ def test_oil_company_uses_five_year_midcycle_margin_flat_growth_no_capex_norm(db
             revenue=OIL[2025]["revenue"] * M,
             revenue_growth=0.03,
             fcf_margin=midcycle,
-            wacc=WACC,
+            # El WACC usado (banda por capitalización, wacc_band.py); el de
+            # resolve_rates queda en la traza como información.
+            wacc=trace["wacc"],
             terminal_growth=0.03,
             net_debt=NET_DEBT,
             shares_outstanding=SHARES,
