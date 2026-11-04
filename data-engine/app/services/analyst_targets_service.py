@@ -221,6 +221,59 @@ def _fetch_currency_and_type(symbol: str) -> dict[str, str | None]:
     return {"currency": currency, "quote_type": quote_type}
 
 
+def _first_trade_date(raw: Any) -> date | None:
+    """Fecha de la primera sesión del listado tal y como la declara Yahoo.
+
+    Según la versión de yfinance llega como ``datetime``/``Timestamp`` con zona,
+    como segundos epoch o como texto ISO. Cualquier otra cosa es ``None``.
+    """
+    if raw is None or isinstance(raw, bool):
+        return None
+    if isinstance(raw, datetime):
+        return raw.date()
+    if isinstance(raw, date):
+        return raw
+    if hasattr(raw, "date") and callable(raw.date):
+        try:
+            value = raw.date()
+        except Exception:  # noqa: BLE001 - tipo raro: sin fecha
+            return None
+        return value if isinstance(value, date) else None
+    if isinstance(raw, (int, float)):
+        if not math.isfinite(raw) or raw <= 0:
+            return None
+        try:
+            return datetime.fromtimestamp(raw, tz=UTC).date()
+        except (OverflowError, OSError, ValueError):
+            return None
+    if isinstance(raw, str):
+        try:
+            return date.fromisoformat(raw.strip()[:10])
+        except ValueError:
+            return None
+    return None
+
+
+def _fetch_first_trade_date(symbol: str) -> date | None:
+    """Primera sesión del listado actual (``firstTradeDate`` del chart de Yahoo).
+
+    Un ticker puede haber sido de otro instrumento antes (SPCX fue un ETF hasta
+    que SpaceX empezó a cotizar con ese símbolo el 2026-06-12, Nasdaq
+    DTN2026-8). Las filas de analistas anteriores a la primera sesión del
+    listado actual no pueden ser de esta empresa. Sin dato, ``None`` y no se
+    filtra nada (comportamiento anterior).
+    """
+    import yfinance as yf
+
+    try:
+        metadata = yf.Ticker(symbol).get_history_metadata() or {}
+    except Exception:  # noqa: BLE001 - metadato accesorio; sin él no se filtra
+        return None
+    if not isinstance(metadata, dict):
+        return None
+    return _first_trade_date(metadata.get("firstTradeDate"))
+
+
 def _fetch_sync(symbol: str) -> dict[str, Any]:
     # Las tres lecturas de Yahoo son independientes y cada una paga sus
     # propios round-trips (cookie/crumb + endpoint): en serie la celda
@@ -228,16 +281,18 @@ def _fetch_sync(symbol: str) -> dict[str, Any]:
     # prod con CGEO.L, 19 oct 2026). En paralelo el total es el maximo de
     # las tres, no la suma. Tickers separados: una sola instancia comparte
     # estado de sesion y no es segura entre hilos.
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    with ThreadPoolExecutor(max_workers=4) as pool:
         records = pool.submit(_fetch_records, symbol)
         consensus = pool.submit(_fetch_consensus, symbol)
         instrument = pool.submit(_fetch_currency_and_type, symbol)
+        first_trade = pool.submit(_fetch_first_trade_date, symbol)
         declared = instrument.result()
         return {
             "records": records.result(),
             "consensus": consensus.result(),
             "currency": declared["currency"],
             "quote_type": declared["quote_type"],
+            "first_trade_date": first_trade.result(),
         }
 
 
@@ -284,11 +339,14 @@ class AnalystTargetsService:
             return result
         consensus_raw = data["consensus"]
         reference = _positive(consensus_raw.get("current"))
-        # Nasdaq DTN2026-8 explicitly forbids mixing the former ETF history
-        # with this new listing. Never remap the old records to SPCK here.
+        # Filas anteriores a la primera sesión del listado actual son de otro
+        # instrumento que usó el mismo ticker (p. ej. el ETF que era SPCX antes
+        # de SpaceX, Nasdaq DTN2026-8): fuera, para todos los tickers, con la
+        # fecha que declara Yahoo. Nunca se reasignan al ticker nuevo del ETF.
+        first_trade = data.get("first_trade_date")
         rows = normalize_rows(
             data["records"], reference_price=reference,
-            listed_from=date(2026, 6, 12) if key == "SPCX" else None,
+            listed_from=first_trade if isinstance(first_trade, date) else None,
         )
         consensus = AnalystConsensus(
             low=_positive(consensus_raw.get("low")),
