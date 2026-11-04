@@ -26,6 +26,9 @@ describe('waccSourceLabel', () => {
     expect(waccSourceLabel('calculated_metric')).toContain('trazables');
     expect(waccSourceLabel('tag_default')).toContain('sin fuente trazable');
     expect(waccSourceLabel('inferred_input')).toContain('inferido');
+    // DCF estándar: banda de WACC por capitalización (#4557).
+    expect(waccSourceLabel('market_cap_band')).toContain('banda por capitalización');
+    expect(waccSourceLabel('market_cap_band', 'en')).toContain('market-cap band');
   });
   it('null sin fuente', () => {
     expect(waccSourceLabel(null)).toBeNull();
