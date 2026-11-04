@@ -11,8 +11,9 @@ nunca por ticker) corre el motor ``scenario``:
 - escenarios declarados EN DATOS (``app/data/valuation_scenarios.py``) con
   probabilidad y método por escenario (DCF con las mismas piezas del DCF
   estándar, o múltiplo sobre una métrica futura);
-- sin datos, un juego por defecto bajista/base/alcista derivado de las
-  entradas de la propia empresa (25/50/25, WACC y g terminal intactos);
+- sin escenarios con fuente NO hay valor por escenarios (Nico, 4-nov-2026:
+  «Que tengan escenarios reales, no hardcodeo»): corre el motor que habría
+  corrido sin esta ruta y la traza dice «escenarios pendientes»;
 - con datos inválidos o sin ingresos/DCF base, respaldo al motor actual con
   el motivo en ``trace.engine_fallback``.
 """
@@ -27,7 +28,7 @@ from sqlalchemy.orm import Session
 
 from app.data import valuation_scenarios
 from app.models.entities import Base
-from app.services.valuation_service import ValuationService
+from app.services.valuation_service import ValuationService, _engine_that_ran
 from app.valuation.engines.registry import declared_engine_fallback, resolve_engine_key
 from tests.test_valgrandes_normalized_fcf import M, _seed
 
@@ -100,31 +101,92 @@ def test_other_methods_keep_their_engine(model, kw, engine):
     assert resolve_engine_key(_co(model, **kw)) == engine
 
 
-def test_scenario_model_runs_default_scenarios_and_weights_them(db):
+SCENARIOS_PENDING = "escenarios pendientes: sin escenarios con fuente"
+
+# Un juego declarado con fuente cualquiera (para probar las salvaguardas del
+# motor, que solo corren cuando hay escenarios con fuente).
+SOURCED_SET = {
+    "source": "test",
+    "scenarios": [
+        {"name": "bear", "probability": 0.3, "method": "dcf", "revenue_growth": 0.02, "fcf_margin": 0.10},
+        {"name": "base", "probability": 0.5, "method": "dcf"},
+        {"name": "bull", "probability": 0.2, "method": "dcf", "revenue_growth": 0.09, "fcf_margin": 0.17},
+    ],
+}
+
+
+def test_without_sourced_scenarios_no_scenario_value_is_published(db):
+    """Nico (4-nov-2026): «Que tengan escenarios reales, no hardcodeo». Sin un
+    juego de escenarios con fuente, el motor de escenarios no publica valor:
+    corre el motor que habría corrido sin él y la traza dice por qué."""
+    company = _company(db, "scenario_auto_energy_fsd")
+    result = ValuationService().value_company(db, company)
+    trace = result["trace"]
+    assert trace["engine"] == "standard_dcf"
+    assert "scenario_set" not in trace
+    assert trace.get("scenario_style") != "default_scenarios"
+    fallback = trace["engine_fallback"]
+    assert fallback["reason"] == "scenario_set_missing"
+    assert fallback["detail"] == SCENARIOS_PENDING
+    assert fallback["resolved_engine"] == "standard_dcf"
+    assert fallback["declared_model"] == "scenario_auto_energy_fsd"
+    # El valor es exactamente el del DCF estándar con las mismas entradas.
+    plain = ValuationService().value_company(db, _company(db, "dcf+reverse_dcf", ticker="XDCF"))
+    assert plain["trace"]["engine"] == "standard_dcf"
+    for key in ("bear_value", "base_value", "bull_value", "expected_value"):
+        assert result[key] == pytest.approx(plain[key])
+    # El servicio cuenta el motor que de verdad corrió.
+    assert _engine_that_ran(result, company) == "standard_dcf"
+
+
+def test_without_sourced_scenarios_a_cash_burner_takes_the_classification_engine(db):
+    burner = {
+        2023: dict(revenue=1000, operating_cash_flow=-300, capital_expenditure=-500, depreciation_amortization=50),
+        2024: dict(revenue=1500, operating_cash_flow=-200, capital_expenditure=-700, depreciation_amortization=80),
+        2025: dict(revenue=2200, operating_cash_flow=-100, capital_expenditure=-900, depreciation_amortization=120),
+    }
+    company = _seed(db, "XBRP", burner, shares=SHARES, net_debt=-500 * M, price=20.0, wacc=0.11)
+    company.valuation_model = "capacity_capex_utilization_model"
+    company.company_type = "ai_infra_capacity"
+    company.factor_tags = ["ai", "infra", "speculative"]
+    db.commit()
+    trace = ValuationService().value_company(db, company)["trace"]
+    assert trace["engine"] == "pre_revenue"
+    assert trace["engine_fallback"]["reason"] == "scenario_set_missing"
+    assert trace["engine_fallback"]["detail"] == SCENARIOS_PENDING
+    assert trace["engine_fallback"]["resolved_engine"] == "pre_revenue"
+
+
+def test_no_default_scenario_set_left_in_the_engine():
+    """Ni constantes ni constructor de un juego genérico por defecto."""
+    from pathlib import Path
+
+    from app.valuation.engines import scenario_engine
+
+    leftovers = [name for name in dir(scenario_engine) if name.startswith("DEFAULT_") or "default_scenario" in name]
+    assert leftovers == []
+    source = Path(scenario_engine.__file__).read_text(encoding="utf-8")
+    for needle in ("default_scenarios", "default_derived", "default_fixed_25_50_25", "SHIFT_SHARE", "SHIFT_FLOOR"):
+        assert needle not in source, needle
+
+
+def test_sourced_set_named_base_keeps_the_dcf_base(db, monkeypatch):
+    monkeypatch.setitem(valuation_scenarios.VALUATION_SCENARIOS, "XSCN", SOURCED_SET)
     company = _company(db, "scenario_auto_energy_fsd")
     result = ValuationService().value_company(db, company)
     trace = result["trace"]
     assert trace["engine"] == "scenario"
-    assert trace["resolved_engine"] == "scenario"
     assert "engine_fallback" not in trace
-    scenario_set = trace["scenario_set"]
-    assert scenario_set["source"] == "default_derived"
-    names = [s["name"] for s in scenario_set["scenarios"]]
-    assert names == ["bear", "base", "bull"]
-    probs = [s["probability"] for s in scenario_set["scenarios"]]
-    assert probs == pytest.approx([0.25, 0.50, 0.25])
-    values = [s["value_per_share"] for s in scenario_set["scenarios"]]
-    assert values[0] < values[1] < values[2]
-    assert result["expected_value"] == pytest.approx(sum(p * v for p, v in zip(probs, values, strict=True)))
-    assert result["bear_value"] == pytest.approx(values[0])
-    assert result["base_value"] == pytest.approx(values[1])
-    assert result["bull_value"] == pytest.approx(values[2])
-    # El base es exactamente el base del DCF estándar (mismas entradas).
+    assert trace["scenario_set"]["source"] == "declared"
+    assert trace["scenario_set"]["data_source"] == "test"
+    assert trace["probability_method"] == "declared_in_data"
+    by_name = {s["name"]: s for s in trace["scenario_set"]["scenarios"]}
     plain = ValuationService().value_company(db, _company(db, "dcf+reverse_dcf", ticker="XDCF"))
-    assert plain["trace"]["engine"] == "standard_dcf"
-    assert result["base_value"] == pytest.approx(plain["base_value"])
-    # WACC y g terminal intactos en los tres escenarios.
-    for item in scenario_set["scenarios"]:
+    # «base» sin crecimiento ni margen = las entradas del DCF base.
+    assert by_name["base"]["value_per_share"] == pytest.approx(plain["base_value"])
+    expected = sum(s["probability"] * s["value_per_share"] for s in by_name.values())
+    assert result["expected_value"] == pytest.approx(expected)
+    for item in by_name.values():
         assert item["assumptions"]["wacc"] == pytest.approx(plain["trace"]["wacc"])
 
 
@@ -183,10 +245,13 @@ def test_declared_scenarios_weighted_value_equals_hand_sum(db, monkeypatch):
         [{"name": "a", "probability": 1.0, "method": "forward_multiple", "metric": "revenue", "multiple": 0, "year": 5}],
         # Un escenario no puede tocar el WACC (lo decide otro carril).
         [{"name": "a", "probability": 1.0, "method": "dcf", "wacc": 0.05}],
+        # Sin fuente no es un juego con fuente.
+        {"source": "  ", "scenarios": [{"name": "a", "probability": 1.0, "method": "dcf"}]},
     ],
 )
 def test_invalid_declared_scenarios_fall_back_with_reason(db, monkeypatch, bad):
-    monkeypatch.setitem(valuation_scenarios.VALUATION_SCENARIOS, "XSCN", {"source": "test", "scenarios": bad})
+    entry = bad if isinstance(bad, dict) else {"source": "test", "scenarios": bad}
+    monkeypatch.setitem(valuation_scenarios.VALUATION_SCENARIOS, "XSCN", entry)
     company = _company(db, "scenario_auto_energy_fsd")
     result = ValuationService().value_company(db, company)
     trace = result["trace"]
@@ -201,7 +266,8 @@ def test_invalid_declared_scenarios_fall_back_with_reason(db, monkeypatch, bad):
     assert result["expected_value"] == pytest.approx(plain["expected_value"])
 
 
-def test_cash_burner_falls_back_to_classification_engine_with_reason(db):
+def test_cash_burner_falls_back_to_classification_engine_with_reason(db, monkeypatch):
+    monkeypatch.setitem(valuation_scenarios.VALUATION_SCENARIOS, "XBRN", SOURCED_SET)
     burner = {
         2023: dict(revenue=1000, operating_cash_flow=-300, capital_expenditure=-500, depreciation_amortization=50),
         2024: dict(revenue=1500, operating_cash_flow=-200, capital_expenditure=-700, depreciation_amortization=80),
@@ -220,7 +286,7 @@ def test_cash_burner_falls_back_to_classification_engine_with_reason(db):
     assert fallback["resolved_engine"] == "pre_revenue"
 
 
-def test_normalized_margin_does_not_turn_a_cash_burner_into_scenarios(db):
+def test_normalized_margin_does_not_turn_a_cash_burner_into_scenarios(db, monkeypatch):
     """NBIS en prod: FCF reportado negativo por capex de crecimiento; solo el
     margen normalizado (capex de mantenimiento) lo haría positivo. pre_revenue
     se niega a sustituir el margen reportado; los escenarios tampoco lo hacen."""
@@ -230,6 +296,7 @@ def test_normalized_margin_does_not_turn_a_cash_burner_into_scenarios(db):
         2024: dict(revenue=1690, operating_cash_flow=338, capital_expenditure=-592, depreciation_amortization=135),
         2025: dict(revenue=2197, operating_cash_flow=439, capital_expenditure=-769, depreciation_amortization=176),
     }
+    monkeypatch.setitem(valuation_scenarios.VALUATION_SCENARIOS, "XCPX", SOURCED_SET)
     company = _seed(db, "XCPX", capex_heavy, shares=SHARES, net_debt=-500 * M, price=20.0, wacc=0.10)
     company.valuation_model = "capacity_capex_utilization_model"
     company.company_type = "ai_infra_capacity"

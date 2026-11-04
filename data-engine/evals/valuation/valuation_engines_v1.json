@@ -6245,8 +6245,32 @@
       ],
       "price": 25,
       "wacc": 0.09,
-      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf01_happy_path_traceable_wacc: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=18.167847 base=29.886368 bull=45.045682; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.040, m 0.112, wacc 0.115) → 12.210881; base=(g 0.080, m 0.150, wacc 0.115) → 20.319822; bull=(g 0.120, m 0.188, wacc 0.115) → 30.736486; expected=Σp·v con las probabilidades de la traza → 20.896753.",
-      "note": "Clon de evdcf01_happy_path_traceable_wacc con modelo declarado de escenarios (motor scenario)."
+      "hand_calculation": "Motor de escenarios, juego declarado del caso (declared_scenarios: 25/50/25 con las cifras del antiguo juego por defecto, ya fijas como datos) sobre el DCF de 5 años + Gordon del caso evdcf01_happy_path_traceable_wacc: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=18.167847 base=29.886368 bull=45.045682; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.040, m 0.112, wacc 0.115) → 12.210881; base=(g 0.080, m 0.150, wacc 0.115) → 20.319822; bull=(g 0.120, m 0.188, wacc 0.115) → 30.736486; expected=Σp·v con las probabilidades de la traza → 20.896753.",
+      "note": "Clon de evdcf01_happy_path_traceable_wacc con modelo declarado de escenarios (motor scenario).",
+      "declared_scenarios": {
+        "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
+        "scenarios": [
+          {
+            "name": "bear",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.04,
+            "fcf_margin": 0.11249999999999999
+          },
+          {
+            "name": "base",
+            "probability": 0.5,
+            "method": "dcf"
+          },
+          {
+            "name": "bull",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.12,
+            "fcf_margin": 0.1875
+          }
+        ]
+      }
     },
     {
       "id": "evscn02_net_cash_increases_equity",
@@ -6297,8 +6321,32 @@
       ],
       "price": 25,
       "wacc": 0.09,
-      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf02_net_cash_increases_equity: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=21.667847 base=33.386368 bull=48.545682; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.040, m 0.112, wacc 0.115) → 15.710881; base=(g 0.080, m 0.150, wacc 0.115) → 23.819822; bull=(g 0.120, m 0.188, wacc 0.115) → 34.236486; expected=Σp·v con las probabilidades de la traza → 24.396753.",
-      "note": "Clon de evdcf02_net_cash_increases_equity con modelo declarado de escenarios (motor scenario)."
+      "hand_calculation": "Motor de escenarios, juego declarado del caso (declared_scenarios: 25/50/25 con las cifras del antiguo juego por defecto, ya fijas como datos) sobre el DCF de 5 años + Gordon del caso evdcf02_net_cash_increases_equity: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=21.667847 base=33.386368 bull=48.545682; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.040, m 0.112, wacc 0.115) → 15.710881; base=(g 0.080, m 0.150, wacc 0.115) → 23.819822; bull=(g 0.120, m 0.188, wacc 0.115) → 34.236486; expected=Σp·v con las probabilidades de la traza → 24.396753.",
+      "note": "Clon de evdcf02_net_cash_increases_equity con modelo declarado de escenarios (motor scenario).",
+      "declared_scenarios": {
+        "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
+        "scenarios": [
+          {
+            "name": "bear",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.04,
+            "fcf_margin": 0.11249999999999999
+          },
+          {
+            "name": "base",
+            "probability": 0.5,
+            "method": "dcf"
+          },
+          {
+            "name": "bull",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.12,
+            "fcf_margin": 0.1875
+          }
+        ]
+      }
     },
     {
       "id": "evscn03_tag_default_wacc_is_not_publishable",
@@ -6348,8 +6396,32 @@
         "trace_records_evidence",
         "gate_does_not_omit_itself"
       ],
-      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf03_tag_default_wacc_is_not_publishable: base g=0.0800 m=0.1500 WACC=0.1000 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=15.274133 base=25.237276 bull=38.089211; expected=0.25*bear+0.5*base+0.25*bull. Sin precio a propósito (4-nov-2026): sin capitalización la banda de WACC por tamaño no aplica y manda el WACC de resolve_rates, que es lo que este caso prueba.",
-      "note": "Clon de evdcf03_tag_default_wacc_is_not_publishable con modelo declarado de escenarios (motor scenario)."
+      "hand_calculation": "Motor de escenarios, juego declarado del caso (declared_scenarios: 25/50/25 con las cifras del antiguo juego por defecto, ya fijas como datos) sobre el DCF de 5 años + Gordon del caso evdcf03_tag_default_wacc_is_not_publishable: base g=0.0800 m=0.1500 WACC=0.1000 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=15.274133 base=25.237276 bull=38.089211; expected=0.25*bear+0.5*base+0.25*bull. Sin precio a propósito (4-nov-2026): sin capitalización la banda de WACC por tamaño no aplica y manda el WACC de resolve_rates, que es lo que este caso prueba.",
+      "note": "Clon de evdcf03_tag_default_wacc_is_not_publishable con modelo declarado de escenarios (motor scenario).",
+      "declared_scenarios": {
+        "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
+        "scenarios": [
+          {
+            "name": "bear",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.04,
+            "fcf_margin": 0.11249999999999999
+          },
+          {
+            "name": "base",
+            "probability": 0.5,
+            "method": "dcf"
+          },
+          {
+            "name": "bull",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.12,
+            "fcf_margin": 0.1875
+          }
+        ]
+      }
     },
     {
       "id": "evscn04_forecast_is_not_the_driver",
@@ -6401,8 +6473,32 @@
         "adr_ratio_basis"
       ],
       "wacc": 0.04,
-      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf04_forecast_is_not_the_driver: base g=0.0800 m=0.1500 WACC=0.0400 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=119.500000 base=192.997712 bull=289.518285; expected=0.25*bear+0.5*base+0.25*bull. Sin precio a propósito (4-nov-2026): sin capitalización la banda de WACC por tamaño no aplica y manda el WACC de resolve_rates, que es lo que este caso prueba.",
-      "note": "Clon de evdcf04_forecast_is_not_the_driver con modelo declarado de escenarios (motor scenario)."
+      "hand_calculation": "Motor de escenarios, juego declarado del caso (declared_scenarios: 25/50/25 con las cifras del antiguo juego por defecto, ya fijas como datos) sobre el DCF de 5 años + Gordon del caso evdcf04_forecast_is_not_the_driver: base g=0.0800 m=0.1500 WACC=0.0400 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=119.500000 base=192.997712 bull=289.518285; expected=0.25*bear+0.5*base+0.25*bull. Sin precio a propósito (4-nov-2026): sin capitalización la banda de WACC por tamaño no aplica y manda el WACC de resolve_rates, que es lo que este caso prueba.",
+      "note": "Clon de evdcf04_forecast_is_not_the_driver con modelo declarado de escenarios (motor scenario).",
+      "declared_scenarios": {
+        "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
+        "scenarios": [
+          {
+            "name": "bear",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.04,
+            "fcf_margin": 0.11249999999999999
+          },
+          {
+            "name": "base",
+            "probability": 0.5,
+            "method": "dcf"
+          },
+          {
+            "name": "bull",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.12,
+            "fcf_margin": 0.1875
+          }
+        ]
+      }
     },
     {
       "id": "evscn05_no_revenue_anchor",
@@ -6442,7 +6538,31 @@
         "routing_expected",
         "gate_does_not_omit_itself"
       ],
-      "note": "Clon de evdcf05_no_revenue_anchor con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback."
+      "note": "Clon de evdcf05_no_revenue_anchor con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback.",
+      "declared_scenarios": {
+        "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
+        "scenarios": [
+          {
+            "name": "bear",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.04,
+            "fcf_margin": 0.11249999999999999
+          },
+          {
+            "name": "base",
+            "probability": 0.5,
+            "method": "dcf"
+          },
+          {
+            "name": "bull",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.12,
+            "fcf_margin": 0.1875
+          }
+        ]
+      }
     },
     {
       "id": "evscn06_missing_net_debt_refuses",
@@ -6485,7 +6605,31 @@
         "routing_expected",
         "gate_does_not_omit_itself"
       ],
-      "note": "Clon de evdcf06_missing_net_debt_refuses con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback."
+      "note": "Clon de evdcf06_missing_net_debt_refuses con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback.",
+      "declared_scenarios": {
+        "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
+        "scenarios": [
+          {
+            "name": "bear",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.04,
+            "fcf_margin": 0.11249999999999999
+          },
+          {
+            "name": "base",
+            "probability": 0.5,
+            "method": "dcf"
+          },
+          {
+            "name": "bull",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.12,
+            "fcf_margin": 0.1875
+          }
+        ]
+      }
     },
     {
       "id": "evscn07_adr_without_ratio_refuses",
@@ -6531,7 +6675,31 @@
         "routing_expected",
         "gate_does_not_omit_itself"
       ],
-      "note": "Clon de evdcf07_adr_without_ratio_refuses con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback."
+      "note": "Clon de evdcf07_adr_without_ratio_refuses con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback.",
+      "declared_scenarios": {
+        "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
+        "scenarios": [
+          {
+            "name": "bear",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.04,
+            "fcf_margin": 0.11249999999999999
+          },
+          {
+            "name": "base",
+            "probability": 0.5,
+            "method": "dcf"
+          },
+          {
+            "name": "bull",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.12,
+            "fcf_margin": 0.1875
+          }
+        ]
+      }
     },
     {
       "id": "evscn08_adr_with_ratio_converts_basis",
@@ -6584,8 +6752,32 @@
       ],
       "price": 200,
       "wacc": 0.09,
-      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf08_adr_with_ratio_converts_basis: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=18.167847 base=29.886368 bull=45.045682; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.040, m 0.112, wacc 0.115) → 12.210881; base=(g 0.080, m 0.150, wacc 0.115) → 20.319822; bull=(g 0.120, m 0.188, wacc 0.115) → 30.736486; expected=Σp·v con las probabilidades de la traza → 20.896753.",
-      "note": "Clon de evdcf08_adr_with_ratio_converts_basis con modelo declarado de escenarios (motor scenario)."
+      "hand_calculation": "Motor de escenarios, juego declarado del caso (declared_scenarios: 25/50/25 con las cifras fijas como datos; ya no existe juego por defecto) sobre el DCF de 5 años + Gordon del caso evdcf08_adr_with_ratio_converts_basis: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=18.167847 base=29.886368 bull=45.045682; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.040, m 0.112, wacc 0.115) → 12.210881; base=(g 0.080, m 0.150, wacc 0.115) → 20.319822; bull=(g 0.120, m 0.188, wacc 0.115) → 30.736486; expected=Σp·v con las probabilidades de la traza → 20.896753.",
+      "note": "Clon de evdcf08_adr_with_ratio_converts_basis con modelo declarado de escenarios (motor scenario).",
+      "declared_scenarios": {
+        "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
+        "scenarios": [
+          {
+            "name": "bear",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.04,
+            "fcf_margin": 0.11249999999999999
+          },
+          {
+            "name": "base",
+            "probability": 0.5,
+            "method": "dcf"
+          },
+          {
+            "name": "bull",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.12,
+            "fcf_margin": 0.1875
+          }
+        ]
+      }
     },
     {
       "id": "evscn09_negative_free_cash_flow_refuses",
@@ -6629,7 +6821,31 @@
         "gate_does_not_omit_itself",
         "no_sign_flip_on_negative_fcf"
       ],
-      "note": "Clon de evdcf09_negative_free_cash_flow_refuses con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback."
+      "note": "Clon de evdcf09_negative_free_cash_flow_refuses con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback.",
+      "declared_scenarios": {
+        "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
+        "scenarios": [
+          {
+            "name": "bear",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.04,
+            "fcf_margin": 0.11249999999999999
+          },
+          {
+            "name": "base",
+            "probability": 0.5,
+            "method": "dcf"
+          },
+          {
+            "name": "bull",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.12,
+            "fcf_margin": 0.1875
+          }
+        ]
+      }
     },
     {
       "id": "evscn10_negative_fcf_margin_fact_refuses",
@@ -6673,7 +6889,31 @@
         "gate_does_not_omit_itself",
         "no_sign_flip_on_negative_fcf"
       ],
-      "note": "Clon de evdcf10_negative_fcf_margin_fact_refuses con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback."
+      "note": "Clon de evdcf10_negative_fcf_margin_fact_refuses con modelo declarado de escenarios (motor scenario).  Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback.",
+      "declared_scenarios": {
+        "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
+        "scenarios": [
+          {
+            "name": "bear",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.04,
+            "fcf_margin": 0.11249999999999999
+          },
+          {
+            "name": "base",
+            "probability": 0.5,
+            "method": "dcf"
+          },
+          {
+            "name": "bull",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.12,
+            "fcf_margin": 0.1875
+          }
+        ]
+      }
     },
     {
       "id": "evscn11_fcf_margin_as_sourced_fact",
@@ -6723,8 +6963,32 @@
       ],
       "price": 30,
       "wacc": 0.09,
-      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf11_fcf_margin_as_sourced_fact: base g=0.0700 m=0.1800 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=21.683527 base=34.683820 bull=51.079904; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.035, m 0.135, wacc 0.115) → 14.702849; base=(g 0.070, m 0.180, wacc 0.115) → 23.718717; bull=(g 0.105, m 0.225, wacc 0.115) → 35.014713; expected=Σp·v con las probabilidades de la traza → 24.288749.",
-      "note": "Clon de evdcf11_fcf_margin_as_sourced_fact con modelo declarado de escenarios (motor scenario)."
+      "hand_calculation": "Motor de escenarios, juego declarado del caso (declared_scenarios: 25/50/25 con las cifras fijas como datos; ya no existe juego por defecto) sobre el DCF de 5 años + Gordon del caso evdcf11_fcf_margin_as_sourced_fact: base g=0.0700 m=0.1800 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=21.683527 base=34.683820 bull=51.079904; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.035, m 0.135, wacc 0.115) → 14.702849; base=(g 0.070, m 0.180, wacc 0.115) → 23.718717; bull=(g 0.105, m 0.225, wacc 0.115) → 35.014713; expected=Σp·v con las probabilidades de la traza → 24.288749.",
+      "note": "Clon de evdcf11_fcf_margin_as_sourced_fact con modelo declarado de escenarios (motor scenario).",
+      "declared_scenarios": {
+        "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
+        "scenarios": [
+          {
+            "name": "bear",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.035,
+            "fcf_margin": 0.135
+          },
+          {
+            "name": "base",
+            "probability": 0.5,
+            "method": "dcf"
+          },
+          {
+            "name": "bull",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.10500000000000001,
+            "fcf_margin": 0.22499999999999998
+          }
+        ]
+      }
     },
     {
       "id": "evscn12_fcf_margin_ceiling_clamped",
@@ -6775,8 +7039,32 @@
       ],
       "price": 60,
       "wacc": 0.09,
-      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf12_fcf_margin_ceiling_clamped: base g=0.0800 m=0.5000 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=65.226155 base=104.287895 bull=123.455153; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.040, m 0.375, wacc 0.115) → 45.369602; base=(g 0.080, m 0.500, wacc 0.115) → 72.399407; bull=(g 0.120, m 0.500, wacc 0.115) → 85.297295; expected=Σp·v con las probabilidades de la traza → 68.866428.",
-      "note": "Clon de evdcf12_fcf_margin_ceiling_clamped con modelo declarado de escenarios (motor scenario)."
+      "hand_calculation": "Motor de escenarios, juego declarado del caso (declared_scenarios: 25/50/25 con las cifras fijas como datos; ya no existe juego por defecto) sobre el DCF de 5 años + Gordon del caso evdcf12_fcf_margin_ceiling_clamped: base g=0.0800 m=0.5000 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=65.226155 base=104.287895 bull=123.455153; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.040, m 0.375, wacc 0.115) → 45.369602; base=(g 0.080, m 0.500, wacc 0.115) → 72.399407; bull=(g 0.120, m 0.500, wacc 0.115) → 85.297295; expected=Σp·v con las probabilidades de la traza → 68.866428.",
+      "note": "Clon de evdcf12_fcf_margin_ceiling_clamped con modelo declarado de escenarios (motor scenario).",
+      "declared_scenarios": {
+        "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
+        "scenarios": [
+          {
+            "name": "bear",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.04,
+            "fcf_margin": 0.375
+          },
+          {
+            "name": "base",
+            "probability": 0.5,
+            "method": "dcf"
+          },
+          {
+            "name": "bull",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.12,
+            "fcf_margin": 0.5
+          }
+        ]
+      }
     },
     {
       "id": "evscn13_negative_control_wrong_status",
@@ -6820,7 +7108,31 @@
       "wacc": 0.09,
       "expect_gate_failure": "engine_publishable_status",
       "note": "Clon de evdcf13_negative_control_wrong_status con modelo declarado de escenarios (motor scenario). CONTROL NEGATIVO: los mismos facts de evdcf01 con WACC trazable dan status=ok sin blockers. El caso declara partial/traceable_wacc, que es falso: si la puerta no mirase el estado real pasaria.",
-      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf13_negative_control_wrong_status: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=18.167847 base=29.886368 bull=45.045682; expected=0.25*bear+0.5*base+0.25*bull."
+      "hand_calculation": "Motor de escenarios, juego declarado del caso (declared_scenarios: 25/50/25 con las cifras fijas como datos; ya no existe juego por defecto) sobre el DCF de 5 años + Gordon del caso evdcf13_negative_control_wrong_status: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=18.167847 base=29.886368 bull=45.045682; expected=0.25*bear+0.5*base+0.25*bull.",
+      "declared_scenarios": {
+        "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
+        "scenarios": [
+          {
+            "name": "bear",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.04,
+            "fcf_margin": 0.11249999999999999
+          },
+          {
+            "name": "base",
+            "probability": 0.5,
+            "method": "dcf"
+          },
+          {
+            "name": "bull",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.12,
+            "fcf_margin": 0.1875
+          }
+        ]
+      }
     },
     {
       "id": "evscn14_negative_control_wrong_missing_inputs",
@@ -6857,7 +7169,83 @@
         "missing_inputs_declared"
       ],
       "expect_gate_failure": "missing_inputs_declared",
-      "note": "Clon de evdcf14_negative_control_wrong_missing_inputs con modelo declarado de escenarios (motor scenario). CONTROL NEGATIVO: sin net_debt el motor declara ['net_debt']; el caso declara lista vacia. Sin la puerta, un motor que se calla un input obligatorio pasaria igual que uno que lo confiesa. Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback."
+      "note": "Clon de evdcf14_negative_control_wrong_missing_inputs con modelo declarado de escenarios (motor scenario). CONTROL NEGATIVO: sin net_debt el motor declara ['net_debt']; el caso declara lista vacia. Sin la puerta, un motor que se calla un input obligatorio pasaria igual que uno que lo confiesa. Motor de escenarios: sin DCF base válido vuelve al motor standard_dcf con el motivo en engine_fallback.",
+      "declared_scenarios": {
+        "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
+        "scenarios": [
+          {
+            "name": "bear",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.04,
+            "fcf_margin": 0.11249999999999999
+          },
+          {
+            "name": "base",
+            "probability": 0.5,
+            "method": "dcf"
+          },
+          {
+            "name": "bull",
+            "probability": 0.25,
+            "method": "dcf",
+            "revenue_growth": 0.12,
+            "fcf_margin": 0.1875
+          }
+        ]
+      }
+    },
+    {
+      "id": "evscn15_without_sourced_scenarios_falls_back",
+      "engine": "scenario",
+      "category": "happy_path",
+      "company": {
+        "ticker": "EVSCN15",
+        "name": "eval EVSCN15",
+        "company_type": "standard",
+        "valuation_model": "scenario_auto_energy_fsd",
+        "factor_tags": []
+      },
+      "facts": {
+        "revenue": 2000,
+        "free_cash_flow": 300,
+        "revenue_growth": 0.08,
+        "shares_diluted": 200,
+        "net_debt": 400
+      },
+      "expected": {
+        "engine_key": "scenario",
+        "status": "ok",
+        "publishable": true,
+        "missing_inputs": [],
+        "publication_blockers": [],
+        "adr_ratio": null,
+        "trace_engine": "standard_dcf",
+        "closed_form": {
+          "bear_value": 5.8144429602,
+          "base_value": 20.3198221011,
+          "bull_value": 46.9442096379,
+          "expected_value": 22.6308778827
+        }
+      },
+      "applies_to": [
+        "engine_publishable_status",
+        "bear_le_base_le_bull",
+        "expected_value_within_band",
+        "value_matches_closed_form",
+        "probabilities_sum_to_one",
+        "sensitivity_covers_base",
+        "missing_inputs_declared",
+        "no_silent_zero_net_debt",
+        "routing_expected",
+        "trace_records_evidence",
+        "gate_does_not_omit_itself",
+        "adr_ratio_basis"
+      ],
+      "price": 25,
+      "wacc": 0.09,
+      "hand_calculation": "Sin declared_scenarios: respaldo al DCF estándar (motivo scenario_set_missing, «escenarios pendientes: sin escenarios con fuente»). Los valores son los de evdcf01_happy_path_traceable_wacc (mismos hechos, precio y WACC).",
+      "note": "Sin escenarios con fuente (Nico, 4-nov-2026: «Que tengan escenarios reales, no hardcodeo»): el motor de escenarios no publica valor y corre el DCF estándar, con trace.engine_fallback.reason=scenario_set_missing. Mismas cifras que evdcf01."
     },
     {
       "id": "evanc01_cross_year_fcf_excluded",
