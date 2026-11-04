@@ -19,8 +19,9 @@ Reglas de fusion (las mismas que la via actual, sin duplicar semantica):
 - alias (la mayoria): un ganador por periodo, el ``filed`` mas reciente.
 - partes disjuntas (``SUMMED_COMPONENT_METRICS``, hoy ``intangible_assets``):
   se suman por periodo.
-- alcance (``SCOPE_PRIORITY_METRICS``, hoy ``total_debt``): gana el concepto
-  de mayor alcance declarado primero, ``filed`` solo desempata recasts.
+- alcance/preferencia (``SCOPE_PRIORITY_METRICS``: deuda total, D&A,
+  patrimonio, beneficio neto, caja, arrendamientos operativos): gana el
+  concepto declarado primero, ``filed`` solo desempata recasts.
 - bancos (``bank_like``): sin tag agregado el revenue es
   ``InterestIncomeExpenseNet+NoninterestIncome`` (fail closed: faltando una
   parte no hay revenue); los subtotales de comisiones salen de candidatos.
