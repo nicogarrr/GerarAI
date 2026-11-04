@@ -36,6 +36,9 @@ _OPERATORS = frozenset({">", "<", ">=", "<=", "==", "!="})
 
 _NUMERIC_RULE_TYPES = frozenset({"price_above", "price_below", "price_change"})
 _PRICE_KINDS = frozenset({"market_price", "price_change_percent"})
+# Noticias recientes que mira una regla de noticias en cada pasada (desde su
+# cursor, de la más nueva a la más vieja) para encontrar una que se pueda citar.
+_NEWS_CANDIDATES = 50
 
 
 def _numeric_threshold(value: Any) -> float | None:
@@ -550,30 +553,36 @@ class AlertRuleService:
             or self._aware(rule.created_at)
         )
         if kind == "news_event":
+            from app.services.news_identity import equivalent_news_alert
+
             statement = (
                 select(NewsEvent)
                 .where(NewsEvent.company_id == rule.company_id,
                        NewsEvent.event_type != "ownership_disclosure")
-                .order_by(desc(NewsEvent.created_at))
-                .limit(1)
+                .order_by(desc(NewsEvent.created_at), desc(NewsEvent.id))
+                .limit(_NEWS_CANDIDATES)
             )
             if since:
                 statement = statement.where(NewsEvent.created_at > since)
-            event = db.scalar(statement)
-            # Sin titular verificable no hay nada que citar: no dispara.
-            has_title = bool(event and (event.title or "").strip())
-            if has_title:
-                from app.services.news_identity import equivalent_news_alert
-
+            # La más reciente que se pueda citar. Antes solo se miraba la última:
+            # si esa venía sin titular o ya la había avisado otra vía, no saltaba
+            # nada, el cursor avanzaba igual y una noticia anterior, nueva y con
+            # titular, se perdía para siempre.
+            suppressed = False
+            for event in db.scalars(statement):
+                # Sin titular verificable no hay nada que citar.
+                if not (event.title or "").strip():
+                    continue
                 if equivalent_news_alert(
                     db, company_id=rule.company_id, url=event.url, title=event.title
                 ) is not None:
                     # Otra vía ya avisó de esta noticia: no se duplica el aviso.
-                    return 0, {"kind": kind, "news_event_id": None, "suppressed": "duplicate_news"}
-            return (1 if has_title else 0), {
-                "kind": kind,
-                "news_event_id": event.id if has_title else None,
-            }
+                    suppressed = True
+                    continue
+                return 1, {"kind": kind, "news_event_id": event.id}
+            if suppressed:
+                return 0, {"kind": kind, "news_event_id": None, "suppressed": "duplicate_news"}
+            return 0, {"kind": kind, "news_event_id": None}
         if kind == "earnings_run":
             statement = (
                 select(EarningsRun)
