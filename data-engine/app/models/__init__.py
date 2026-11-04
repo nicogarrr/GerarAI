@@ -297,3 +297,11 @@ from app.core.cache_invalidation import (  # noqa: E402
 _install_cache_invalidation()
 del _install_cache_invalidation
 
+
+# Additive public-data foundation; no tenant-owned class changes.
+from app.models.public_market_data import (  # noqa: F401
+    PublicAnalystTargets,
+    PublicFinancialFact,
+    PublicFinancialStatement,
+    PublicSourceDocument,
+)
