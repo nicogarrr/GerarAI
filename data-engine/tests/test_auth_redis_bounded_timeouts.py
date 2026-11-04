@@ -56,8 +56,9 @@ async def test_ambiguous_nonce_write_times_out_once_and_stays_fail_closed(monkey
 
 @pytest.mark.asyncio
 async def test_ambiguous_counter_transaction_is_not_retried(monkeypatch):
-    import redis.asyncio
     from unittest.mock import Mock
+
+    import redis.asyncio
 
     client = AsyncMock()
     pipe = AsyncMock()
