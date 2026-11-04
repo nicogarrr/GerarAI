@@ -27,9 +27,11 @@ def _co_ind(ticker="X", company_type="research_candidate", model="unassigned", i
 
 def test_engine_moves_only_verified_tickers():
     from app.services.company_framework import resolve_company_framework
-    assert resolve_engine_key(_co_ind(ticker="CB")) == "insurer"
+    # CB y CPT ya no van por ticker: salen por industria (aseguradora / REIT,
+    # ver tests/test_engine_routing_por_industria.py).
+    assert resolve_engine_key(_co_ind(ticker="CB", industry="Insurance")) == "insurer"
     assert resolve_engine_key(_co_ind(ticker="KKR")) == "holding_company"
-    assert resolve_engine_key(_co_ind(ticker="CPT")) == "reit"
+    assert resolve_engine_key(_co_ind(ticker="CPT", industry="Residential REITs")) == "reit"
     assert resolve_engine_key(_co_ind(ticker="BN")) == "holding_company"
     assert resolve_company_framework(_co_ind(ticker="CB")).key == "insurer"
     assert resolve_company_framework(_co_ind(ticker="KKR")).key == "holding_asset_manager"

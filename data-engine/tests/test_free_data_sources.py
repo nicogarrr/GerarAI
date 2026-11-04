@@ -74,7 +74,10 @@ def test_engine_registry_sin_tickers_magicos_y_dirigido_por_master():
     # Allowlist de identidad verificada a mano (e03954e9): BN es el unico ticker
     # literal admitido; BABA/RKLB se deciden solo por company_master.
     assert '"BABA"' not in source and '"RKLB"' not in source
-    assert source.count('"BN"') == 1 and "verified_engines" in source
+    assert source.count('"BN"') == 1 and "pending_general_rule" in source
+    # Aseguradoras y REITs salen por industria: sus antiguas entradas (CB, CPT)
+    # no pueden volver al registro como tickers literales.
+    assert '"CB"' not in source and '"CPT"' not in source
     assert "company.ticker" not in source, "el engine jamás se decide por ticker"
 
     from app.data.company_master import COMPANY_MASTER
