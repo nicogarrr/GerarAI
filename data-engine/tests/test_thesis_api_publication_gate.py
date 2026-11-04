@@ -93,3 +93,18 @@ def test_publishable_api_and_snapshot_preserve_prose(saved, monkeypatch):
     monkeypatch.setattr(ThesisService, "data_freshness", lambda *_, **__: None)
     assert "ARCHIVED_PROSE" in latest_thesis(company.ticker, db)["executive_summary"]
     assert "ARCHIVED_PROSE" in CompanySnapshotService().build(db, company).latest_thesis.executive_summary
+
+
+@pytest.mark.parametrize('status', ['draft', 'draft_failed_audit', 'partial', 'insufficient_data'])
+def test_snapshot_nonfinal_known_margin_is_indicative_and_keeps_figures(saved, status):
+    db, company, thesis, _ = saved
+    thesis.status = status
+    thesis.valuation_basis = {'margin_of_safety_convention': 'discount_to_value_v1'}
+    db.commit()
+    for snapshot in (CompanySnapshotService().build(db, company),
+                     CompanySnapshotService().build_many(db, [company])[company.id]):
+        assert snapshot.latest_thesis.margin_of_safety_status == 'indicative'
+        assert snapshot.valuation_summary.margin_of_safety_status == 'indicative'
+        assert snapshot.latest_thesis.margin_of_safety == Decimal('-0.651')
+        assert snapshot.valuation_summary.margin_of_safety == Decimal('-0.651')
+        assert snapshot.latest_thesis.expected_value == Decimal('119.92')

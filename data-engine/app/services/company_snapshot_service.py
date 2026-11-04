@@ -25,7 +25,7 @@ from app.services.document_visibility import without_archive_duplicates
 from app.services.news_headline_translation import display_translation, original_headline
 from app.services.thesis_change_identity import ChangeItem, group_change_items
 from app.services.thesis_publication_gate import model_withheld_reason, withhold_thesis_payload
-from app.valuation.margin_convention import margin_convention_known
+from app.valuation.margin_convention import known_margin_status, margin_convention_known
 
 
 class CompanySnapshotService:
@@ -415,7 +415,7 @@ class CompanySnapshotService:
         }
         if thesis and thesis.margin_of_safety is not None and margin_convention_known(thesis.valuation_basis):
             margin_fields["margin_of_safety"] = thesis.margin_of_safety
-            margin_fields["margin_of_safety_status"] = "verified"
+            margin_fields["margin_of_safety_status"] = known_margin_status(thesis.status)
         thesis_summary = None
         if thesis is not None:
             thesis_summary = {
