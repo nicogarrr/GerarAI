@@ -40,6 +40,7 @@ from app.models.entities import (
     WatchItem,
 )
 from app.services import insider_persistence, monitor_common
+from app.services.company_identity_verification import is_foreign_listing
 from app.services.connectors import form4 as form4_connector
 from app.services.insider_persistence import PARSER_VERSION as INSIDER_PARSER_VERSION
 from app.services.insider_service import _cik_for_ticker
@@ -86,6 +87,13 @@ def resolve_ciks(
     for ticker in tickers:
         company = db.scalar(select(Company).where(Company.ticker == ticker))
         cik = (company.cik or "").strip() if company else ""
+        if not cik and company is not None and is_foreign_listing(company.exchange):
+            # El ticker de EDGAR es un símbolo de EE. UU.: para un listado
+            # extranjero sin CIK propio resolvería a un homónimo (PRIM en BME
+            # → Perimeter Solutions, «PRM») y ese CIK quedaba en la ficha,
+            # donde lo reutilizan la ingesta SEC y la tesis. Un emisor
+            # extranjero no presenta Form 4 / 13D-G con ese ticker.
+            continue
         if not cik:
             cik = _cik_for_ticker(ticker, client) or ""
             if cik and company is not None:
