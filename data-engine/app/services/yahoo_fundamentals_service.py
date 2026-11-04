@@ -277,13 +277,15 @@ def _has_official_facts(db: Session, company: Company) -> bool:
 
 
 def refresh_full_from_yahoo(
-    db: Session, company: Company, *, fetcher: Any = _fetch_yahoo, commit: bool = True
+    db: Session, company: Company, *, fetcher: Any = None, commit: bool = True
 ) -> dict[str, Any]:
     """Estados anuales completos de Yahoo para cualquier emisor sin mapa revisado.
 
     Cada hecho queda como fuente NO oficial y de una sola fuente
     (``SINGLE_SOURCE_NOTE``); los del mapa revisado siguen por
     ``refresh_from_yahoo``."""
+    if fetcher is None:
+        fetcher = _fetch_yahoo
     if company.ticker.upper() in REVIEWED_MAP:
         return refresh_from_yahoo(db, company, fetcher=fetcher, commit=commit)
     entry = full_entry(db, company)

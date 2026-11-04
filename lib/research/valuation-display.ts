@@ -108,6 +108,43 @@ export function baseAssumptionsText(trace: TraceLike | null | undefined, locale:
   return t('research.valuationText.assumptions', { parts: parts.join(' · ') });
 }
 
+type ScenarioWarning = {
+  id?: string;
+  value?: number;
+  reference?: number;
+  reference_low?: number;
+  reference_high?: number;
+};
+
+/** Avisos de supuestos de escenarios declarados fuera de la referencia general
+ *  (decisión 4-nov-2026: con fuente no se rechaza ni se oculta; se avisa). */
+export function scenarioWarningLines(trace: unknown, locale: Locale = 'es'): string[] {
+  const set = (trace as { scenario_set?: { scenarios?: unknown } } | null | undefined)?.scenario_set;
+  const scenarios = set?.scenarios;
+  if (!Array.isArray(scenarios)) return [];
+  const t = createTranslator(locale);
+  const lines: string[] = [];
+  for (const scenario of scenarios as { name?: unknown; warnings?: ScenarioWarning[] }[]) {
+    const name = typeof scenario.name === 'string' ? scenario.name : '?';
+    for (const warning of scenario.warnings ?? []) {
+      const value = pct(warning.value, locale);
+      if (warning.id === 'growth_outside_reference' && value) {
+        lines.push(t('research.valuationText.scenarioWarnings.growthOutsideReference', {
+          name, value,
+          low: pct(warning.reference_low, locale) ?? 'N/D',
+          high: pct(warning.reference_high, locale) ?? 'N/D',
+        }));
+      } else if (warning.id === 'margin_above_reference' && value) {
+        lines.push(t('research.valuationText.scenarioWarnings.marginAboveReference', {
+          name, value,
+          reference: pct(warning.reference, locale) ?? 'N/D',
+        }));
+      }
+    }
+  }
+  return lines;
+}
+
 /** Notas N/D de escenarios (bear/base/bull/expected) en orden estable. */
 export function scenarioNotesList(notes: Record<string, string> | null | undefined): string[] {
   if (!notes || typeof notes !== 'object') return [];
