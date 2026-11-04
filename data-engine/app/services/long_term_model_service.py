@@ -438,6 +438,13 @@ def _adjust_share_facts(
     return adjusted
 
 
+_VALUATION_BLOCKER_PHRASES = {
+    "forecast_missing": "driver forecast",
+    "current_net_debt_missing": "current net debt",
+    "terminal_shares_missing": "diluted share count",
+}
+
+
 class LongTermModelService:
     """Build the evidence-aware long-term model for one company."""
 
@@ -1851,8 +1858,25 @@ class LongTermModelService:
         dcf = None
         valuation_note = None
         terminal_shares = forecast[-1].get("shares_diluted") if forecast else None
-        if forecast and net_debt is not None and terminal_shares not in (None, 0):
+        # Causas máquina del «sin DCF»: la UI las traduce y las muestra bajo el
+        # N/D (valuation_blockers es el contrato; valuation_note la prosa EN de
+        # auditoría). Un escenario sin valoración NUNCA es un N/D silencioso.
+        valuation_blockers: list[str] = []
+        if not forecast:
+            valuation_blockers.append("forecast_missing")
+        if net_debt is None:
+            valuation_blockers.append("current_net_debt_missing")
+        if terminal_shares in (None, 0):
+            valuation_blockers.append("terminal_shares_missing")
+        if valuation_blockers:
+            valuation_note = (
+                "DCF skipped: missing "
+                + ", ".join(_VALUATION_BLOCKER_PHRASES[b] for b in valuation_blockers)
+                + "."
+            )
+        else:
             if spec["wacc"] <= spec["terminal_growth"]:
+                valuation_blockers.append("wacc_not_above_terminal_growth")
                 # Gordon growth needs wacc > g: never divide by zero or emit a
                 # negative/nonsense terminal value as if it were a valuation.
                 valuation_note = (
@@ -1860,6 +1884,7 @@ class LongTermModelService:
                     f"(wacc={spec['wacc']}, terminal_growth={spec['terminal_growth']})."
                 )
             elif forecast[-1]["free_cash_flow"] <= 0:
+                valuation_blockers.append("terminal_fcf_not_positive")
                 # A perpetuity on non-positive terminal FCFF is not a valuation;
                 # never present it (or a floored 0% margin) as one.
                 valuation_note = (
@@ -1970,6 +1995,7 @@ class LongTermModelService:
             "fcf_bridge": self._fcf_bridge(fact_cache, latest_year, first),
             "valuation": dcf,
             "valuation_note": valuation_note,
+            "valuation_blockers": valuation_blockers,
         }
 
     def _revenue_bridge(self, latest_year: int, first: dict[str, Any] | None, current_revenue: float | None) -> dict[str, Any]:
