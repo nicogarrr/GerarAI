@@ -569,7 +569,11 @@ const BrainMessageBubble = memo(function BrainMessageBubble({ message: m, index:
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${m.role === 'user' ? 'bg-blue-600' : 'bg-indigo-600'}`}>
                     {m.role === 'user' ? <User aria-hidden="true" className="h-3 w-3 text-white" /> : <Bot aria-hidden="true" className="h-3 w-3 text-white" />}
                 </div>
-                <div className={`p-3 rounded-lg text-sm overflow-hidden ${m.role === 'user'
+                {/* min-w-0 + overflow-wrap:anywhere: un enlace o token largo se parte en
+                    líneas en vez de quedar oculto por el overflow-hidden de la burbuja
+                    (a 390 px se perdía media URL); los bloques de código se desplazan
+                    dentro de la burbuja, como en ThesisMarkdown. */}
+                <div className={`min-w-0 p-3 rounded-lg text-sm overflow-hidden [overflow-wrap:anywhere] [&_pre]:max-w-full [&_pre]:overflow-x-auto ${m.role === 'user'
                     ? 'bg-blue-600 text-white rounded-tr-none'
                     : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-none'
                     }`}>
