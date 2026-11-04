@@ -75,10 +75,11 @@ def resolve_engine_key(company: Company) -> str:
     # un DCF de caja libre.
     if "bank" in industry:
         return "bank"
-    # El cambio de motor por identidad SOLO entra para tickers verificados a
-    # mano (identidad comprobada 19 oct 2026 en prod). Mover por industria a
-    # bancos/gestoras/REITs haria que motores fail-closed reemplazaran un DCF
-    # que hoy da valor: se amplia solo cuando el motor tenga datos suficientes.
+    # Este mapa por ticker complementa las reglas de tipo e industria de arriba
+    # para identidades verificadas a mano (19 oct 2026 en prod). Bancos y
+    # aseguradoras ya se encaminan por industria: si faltan datos del motor
+    # sectorial, se usa el respaldo no publicable o N/D, nunca un FCFF DCF.
+    # Gestoras y REITs sin clasificacion siguen necesitando identidad verificada.
     ticker = (getattr(company, "ticker", "") or "").upper()
     verified_engines = {
         "CB": "insurer",  # Chubb: aseguradora (combined ratio, book value)
