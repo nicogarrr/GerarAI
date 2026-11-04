@@ -137,7 +137,7 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                         formatMarketDate={formatMarketDate}
                     />
                 </div>
-                <MobileCollapse title={t('research.chart.reading')}><aside className="min-w-0 border-t border-gray-800 p-4 xl:border-l xl:border-t-0" data-testid="technical-reading">
+                <MobileCollapse inset title={t('research.chart.reading')}><aside className="min-w-0 border-t border-gray-800 p-4 xl:border-l xl:border-t-0" data-testid="technical-reading">
                     <h2 className="hidden text-base font-semibold text-gray-100 md:block">{t('research.chart.reading')}</h2>
                     <div id={`technical-panel-${snapshot.ticker}`} className="mt-3 space-y-4 text-xs text-gray-400">
                         {last ? <p className="text-[11px] text-gray-500">{t('research.chart.observedUntil', { date: formatMarketDate(last.date) })}</p> : null}
