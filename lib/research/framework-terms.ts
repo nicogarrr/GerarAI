@@ -6,6 +6,22 @@
  */
 // @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
 import { FRAMEWORK_TERMS_EN } from './framework-terms-en.ts';
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { createTranslator } from '../i18n/translate.ts';
+
+/** Términos cuyo rótulo ES vive en el catálogo i18n (research.frameworkTerms.*).
+ *  Las entradas NUEVAS van aquí: FRAMEWORK_TERMS está en su techo de check:i18n
+ *  y no puede crecer. seed/ingesta dejan el stub sin motor («unassigned»):
+ *  la ficha mostraba el slug crudo. */
+const FRAMEWORK_TERMS_I18N: Record<string, string> = {
+    unassigned: 'research.frameworkTerms.unassigned',
+};
+
+function esFrameworkLabel(key: string): string | null {
+    const i18nKey = FRAMEWORK_TERMS_I18N[key];
+    if (i18nKey) return createTranslator('es')(i18nKey);
+    return Object.hasOwn(FRAMEWORK_TERMS, key) ? FRAMEWORK_TERMS[key] : null;
+}
 
 export const FRAMEWORK_TERMS: Record<string, string> = {
     non_negative_fcf_margin: 'margen de flujo de caja libre no negativo',
@@ -105,7 +121,7 @@ function normalise(term: string): string {
 /** Traduce un término simple o una fórmula con × / ÷; null si algún término no tiene etiqueta. */
 export function frameworkTerm(raw: string, locale: 'es' | 'en' = 'es'): string | null {
     if (locale === 'en') return frameworkTermEn(raw);
-    const direct = (Object.hasOwn(FRAMEWORK_TERMS, normalise(raw)) ? FRAMEWORK_TERMS[normalise(raw)] : null);
+    const direct = esFrameworkLabel(normalise(raw));
     if (direct) return direct;
     if (!/[×÷]/.test(raw)) return null;
     const parts = raw.split(/\s*([×÷])\s*/);
@@ -115,7 +131,7 @@ export function frameworkTerm(raw: string, locale: 'es' | 'en' = 'es'): string |
             out.push(part);
             continue;
         }
-        const t = (Object.hasOwn(FRAMEWORK_TERMS, normalise(part)) ? FRAMEWORK_TERMS[normalise(part)] : null) ?? translateWords(part);
+        const t = esFrameworkLabel(normalise(part)) ?? translateWords(part);
         if (!t) return null;
         out.push(t);
     }
@@ -124,11 +140,11 @@ export function frameworkTerm(raw: string, locale: 'es' | 'en' = 'es'): string |
 
 /** «price per launch» -> «precio por lanzamiento»: palabra a palabra con «per» -> «por». */
 function translateWords(part: string): string | null {
-    const direct = (Object.hasOwn(FRAMEWORK_TERMS, normalise(part)) ? FRAMEWORK_TERMS[normalise(part)] : null);
+    const direct = esFrameworkLabel(normalise(part));
     if (direct) return direct;
     const chunks = part.trim().split(/\s+per\s+/i);
     if (chunks.length > 1) {
-        const tr = chunks.map((c) => (Object.hasOwn(FRAMEWORK_TERMS, normalise(c)) ? FRAMEWORK_TERMS[normalise(c)] : null) ?? null);
+        const tr = chunks.map((c) => esFrameworkLabel(normalise(c)) ?? null);
         return tr.every(Boolean) ? tr.join(' por ') : null;
     }
     return null;
@@ -143,7 +159,7 @@ function frameworkTermEn(raw: string): string | null {
     const one = (part: string): string | null => {
         const key = normalise(part);
         if (Object.hasOwn(FRAMEWORK_TERMS_EN, key)) return FRAMEWORK_TERMS_EN[key];
-        return Object.hasOwn(FRAMEWORK_TERMS, key) ? key.replaceAll('_', ' ') : null;
+        return Object.hasOwn(FRAMEWORK_TERMS, key) || Object.hasOwn(FRAMEWORK_TERMS_I18N, key) ? key.replaceAll('_', ' ') : null;
     };
     const direct = one(raw);
     if (direct) return direct;

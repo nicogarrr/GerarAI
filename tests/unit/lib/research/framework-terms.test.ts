@@ -7,6 +7,10 @@ describe('frameworkTerm', () => {
         expect(frameworkTerm('  Book Value ')).toBe('valor contable');
         expect(frameworkTerm('book_value_per_share')).toBe('valor contable por acción');
     });
+    it('modelo de valoración sin asignar: etiqueta ES, EN humaniza el slug', () => {
+        expect(frameworkTerm('unassigned')).toBe('sin asignar');
+        expect(frameworkTerm('unassigned', 'en')).toBe('unassigned');
+    });
     it('término desconocido: null, no se inventa traducción', () => {
         expect(frameworkTerm('termino_inventado')).toBeNull();
         expect(frameworkTerm('')).toBeNull();
