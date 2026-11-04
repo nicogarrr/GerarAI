@@ -1325,6 +1325,8 @@ def extract_knowledge_principles(
     user_id: str | None = None,
 ) -> dict[str, Any]:
     """Extract, deduplicate and consolidate one knowledge document in bounded batches."""
+    from dramatiq.middleware.time_limit import TimeLimitExceeded
+
     from app.models import KnowledgeDocument, ProcessingJob
     from app.services.knowledge_library_service import KnowledgeLibraryService
 
@@ -1359,6 +1361,23 @@ def extract_knowledge_principles(
         job.completed_at = datetime.now(UTC)
         db.commit()
         return {"status": "ok", "processing_job_id": job.id, **job.result}
+    except TimeLimitExceeded as exc:
+        # Interrupt de dramatiq hereda de BaseException: el `except Exception`
+        # de abajo no lo ve y el job se quedaba en "running" para siempre (la
+        # ruta lo devuelve como activo y nunca vuelve a encolar el documento).
+        # Se marca el fallo y se re-lanza: Retries decide el reintento igual
+        # que antes, y el reintento vuelve a ponerlo en "running".
+        _rollback(db)
+        if job is not None:
+            job.status = "failed"
+            job.error = (
+                "La extracción superó el tiempo máximo de una ejecución. "
+                "Vuelve a intentarlo o divide el documento."
+            )
+            job.completed_at = datetime.now(UTC)
+            db.commit()
+        logger.warning("extract_knowledge_principles: %s en el job %s", type(exc).__name__, processing_job_id)
+        raise
     except Exception as exc:
         _rollback(db)
         if job is not None:
