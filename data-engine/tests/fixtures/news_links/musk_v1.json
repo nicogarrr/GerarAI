@@ -1,0 +1,95 @@
+{
+ "dataset": "news_links_musk_v1",
+ "fecha": "2026-11-03",
+ "nota": "Titulares con Elon Musk y sin ticker; 'espera' para TSLA: sobre | relacionada | null (no vincular a TSLA).",
+ "casos": [
+  {
+   "texto": "Elon Musk says FSD will be unsupervised by year-end",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Musk promises Cybertruck price cut",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Musk says Optimus robots will go on sale next year",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Musk touts record deliveries for the quarter",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Elon Musk unveils a cheaper Model Y",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Musk dice que las entregas de coches eléctricos crecerán en 2027",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Elon Musk bets the company's future on robotaxis",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Elon Musk visits Gigafactory Berlin amid protests",
+   "espera": "sobre"
+  },
+  {
+   "texto": "Elon Musk's $1 trillion pay package approved by shareholders",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Elon Musk becomes the first person worth $500 billion",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Musk to testify in court next month",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Elon Musk responds to critics in a long interview",
+   "espera": "relacionada"
+  },
+  {
+   "texto": "Elon Musk says Starship will reach Mars by 2028",
+   "espera": null
+  },
+  {
+   "texto": "Musk's xAI raises $20 billion",
+   "espera": null
+  },
+  {
+   "texto": "Elon Musk's Grok chatbot under scrutiny in Europe",
+   "espera": null
+  },
+  {
+   "texto": "Musk says Starlink could be spun off",
+   "espera": null
+  },
+  {
+   "texto": "Elon Musk's Neuralink implants third patient",
+   "espera": null
+  },
+  {
+   "texto": "Musk leaves DOGE role at the White House",
+   "espera": null
+  },
+  {
+   "texto": "Elon Musk feuds with Trump over spending bill",
+   "espera": null
+  },
+  {
+   "texto": "Elon Musk posts on X about free speech",
+   "espera": null
+  },
+  {
+   "texto": "White musk perfume sales soar this winter",
+   "espera": null
+  },
+  {
+   "texto": "Musk ox herds return to the Arctic tundra",
+   "espera": null
+  }
+ ]
+}
