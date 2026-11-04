@@ -1,0 +1,50 @@
+{
+  "uber": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1543151/000154315126000039/uberq326earningspressrelea.htm",
+    "sha256": "7c9d47c48823789b34e4c79a4d702e3413ffe6765eb3ebe8998dbeb30205a6b1",
+    "retrieved": "2026-11-04",
+    "bytes": 452122
+  },
+  "chtr": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1091667/000109166726000051/chtrex991earningsrelease63.htm",
+    "sha256": "a901e2471720c6903ee719a354d8ea0442cec4120995dab6fcd1f3efa94692f9",
+    "bytes": 546655,
+    "retrieved": "2026-11-04"
+  },
+  "msft": {
+    "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526436122/msft-ex99_1.htm",
+    "sha256": "28c877ab1cfe7a06741f28d217574efd2cc508b071d5fb527530d51496d4349a",
+    "retrieved": "2026-11-04",
+    "bytes": 597468
+  },
+  "unh": {
+    "url": "https://www.sec.gov/Archives/edgar/data/731766/000073176626000255/earningsrelease3q26unh.htm",
+    "sha256": "f40c7ee28f8e8be3983574f61802db73914999c0ddfa91de742c9f0d5421c4b2",
+    "retrieved": "2026-11-04",
+    "bytes": 53659
+  },
+  "pltr": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1321655/000132165526000045/a2026q3ex991pressrelease.htm",
+    "sha256": "1eeddd04ec39377f9dfe7373cebe955676218ef01dab90abb795c913522e40c8",
+    "bytes": 234278,
+    "retrieved": "2026-11-04"
+  },
+  "tsla": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1318605/000162828026066738/exhibit9914.htm",
+    "sha256": "307d4cc5c059d7098d87e0cef3c6294b54b70cc148ee717d27a993e38a377bd1",
+    "bytes": 49458,
+    "retrieved": "2026-11-04"
+  },
+  "asts": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1780312/000119312526342540/asts-ex99_1.htm",
+    "sha256": "4828065c9a9d2a79e2481b16b54b2c5c84a4a649e549cdfec34a431a7234c27e",
+    "bytes": 825054,
+    "retrieved": "2026-11-04"
+  },
+  "jpm": {
+    "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026065582/a3q26erfexhibit991narrative.htm",
+    "sha256": "aa40139753ace0d88ab377bb1eee2d318ac614367c27c981ed004bd46f74517e",
+    "bytes": 206169,
+    "retrieved": "2026-11-04"
+  }
+}
