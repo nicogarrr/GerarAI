@@ -387,6 +387,9 @@
     "methodRange": "Rango de contraste {low}–{high}:",
     "methodPriceImplies": "Qué descuenta el precio: {text}"
   },
+  "frameworkTerms": {
+    "unassigned": "sin asignar"
+  },
   "identity": {
     "metaDescription": "Research de {subject}: tesis versionada, financieros canónicos, modelo a largo plazo, valoración y evidencia con fuentes trazables.",
     "feature": "Research de {ticker}",

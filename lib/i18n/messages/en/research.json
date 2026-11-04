@@ -387,6 +387,9 @@
     "methodRange": "Cross-check range {low}–{high}:",
     "methodPriceImplies": "What the price implies: {text}"
   },
+  "frameworkTerms": {
+    "unassigned": "unassigned"
+  },
   "identity": {
     "metaDescription": "Research on {subject}: versioned thesis, canonical financials, long-term model, valuation and evidence with traceable sources.",
     "feature": "Research on {ticker}",
