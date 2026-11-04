@@ -37,6 +37,7 @@ from app.services.dca_signal_engine import (
     hit_rates,
     monthly_closes,
 )
+from app.services.sharpe_inference import sharpe_inference
 
 FIXED_BUDGET_UNIT = 0.5  # fraccion de la aportacion base que compra un mes 1X
 
@@ -240,7 +241,32 @@ def backtest_dca(
         for lvl in sorted(counts, reverse=True)
     ]
     hits = hit_rates(bars, params=params, today=today, start=plan[0][0], end=plan[-1][0])
+    # Read-only reference, never a strategy validation: cash/flow-adjusted
+    # net NAV is absent. Do not turn TIRs or overlapping hit-rate windows into
+    # monthly observations. Exclude an unfinished month and refuse gaps.
+    complete_months = [p for p in sorted(month_close) if
+                       0 <= _month_index(p)-origin <= final_offset
+                       and _month_index(p) < _month_index(_period_of(today or date.today()))]
+    reference_returns = [
+        month_close[current]/month_close[previous]-1
+        if _month_index(current)-_month_index(previous) == 1 else None
+        for previous, current in zip(complete_months, complete_months[1:])
+    ]
+    reference = sharpe_inference(
+        reference_returns, frequency="monthly", periods_per_year=12,
+        risk_free_per_period=0.0,
+        horizon={"start": month_close_day[complete_months[0]].isoformat() if complete_months else None,
+                 "end": month_close_day[complete_months[-1]].isoformat() if complete_months else None},
+    )
+    reference.update(basis="underlying_month_end_price_returns_not_strategy_total_return",
+                     risk_free_source="explicit_zero_assumption_not_market_rate")
     return {
+        "sharpe_diagnostics": {
+            "params_version": params.version,
+            "strategy": {"status": "unavailable", "reason": "missing_flow_adjusted_nav_series",
+                         "t_statistic": None, "confidence_interval": None, "validation_claim": False},
+            "underlying_reference": reference,
+        },
         "available": True,
         "params_version": params.version,
         "first_signal": plan[0][0],
