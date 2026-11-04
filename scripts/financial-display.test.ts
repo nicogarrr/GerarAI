@@ -7,6 +7,8 @@ test('periodos mantienen el cierre fiscal y no inventan fechas para unknown', ()
   assert.equal(financialPeriod('2025-09-27:FY'), 'Ejercicio al 27/09/2025');
   assert.equal(financialPeriod('2026-06-30:Q2'), 'T2 al 30/06/2026');
   assert.equal(financialPeriod('unknown'), 'Periodo no informado por la fuente');
+  assert.equal(financialPeriod('TTM-2026-09-30'), 'TTM al 30/09/2026');
+  assert.equal(financialPeriod('TTM-2026-09-30', 'en'), 'TTM ended 2026-09-30');
   assert.equal(financialPeriod('FY2021-FY2025'), 'Ejercicio 2021-Ejercicio 2025');
   assert.equal(financialPeriod('custom period'), 'custom period');
 });

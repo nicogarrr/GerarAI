@@ -5,11 +5,15 @@ import { METRIC_LABELS } from './metric-labels.ts';
 export function financialPeriod(value: string, locale: 'es' | 'en' = 'es'): string {
   if (locale === 'en') {
     if (value === 'unknown') return 'Period not reported';
+    const ttmEn = /^TTM-(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (ttmEn) return `TTM ended ${ttmEn[1]}-${ttmEn[2]}-${ttmEn[3]}`;
     const datedEn = /^(\d{4})-(\d{2})-(\d{2}):(FY|Q[1-4])$/.exec(value);
     if (datedEn) return `${datedEn[4] === 'FY' ? 'Fiscal year' : datedEn[4]} ended ${datedEn[1]}-${datedEn[2]}-${datedEn[3]}`;
     return value.replace(/\bFY(?=\d)/g, 'FY ');
   }
   if (value === 'unknown') return 'Periodo no informado por la fuente';
+  const ttm = /^TTM-(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (ttm) return `TTM al ${ttm[3]}/${ttm[2]}/${ttm[1]}`;
   const dated = /^(\d{4})-(\d{2})-(\d{2}):(FY|Q[1-4])$/.exec(value);
   if (dated) return `${dated[4] === 'FY' ? 'Ejercicio' : `T${dated[4][1]}`} al ${dated[3]}/${dated[2]}/${dated[1]}`;
   return value.replace(/\bFY(?=\d)/g, 'Ejercicio ').replace(/\bQ([1-4])\b/g, 'T$1');
