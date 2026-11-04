@@ -42,7 +42,7 @@ from app.services.brain_service import (
 from app.services.chat_synthesis_service import ChatSynthesisService
 from app.services.claim_scope import latest_thesis_version, live_claims
 from app.services.company_catalog import all_companies
-from app.services.company_resolver import resolve_company
+from app.services.company_resolver import KNOWN_MARKET_SUFFIXES, resolve_company
 from app.services.library_context import company_library_context, retrieve_library_context
 from app.services.memory_service import MemoryService, remember_note
 from app.services.portfolio_fx_service import PortfolioFXService
@@ -1362,6 +1362,14 @@ class ChatService:
         """
         companies = list(all_companies(db))
         by_ticker = {company.ticker.upper(): company for company in companies}
+        # «SAN» escrito en mayúsculas con solo «SAN.MC» guardado: el ticker base
+        # de un único listado con sufijo de bolsa conocido. Con dos listados de
+        # la misma base (SAN.MC y SAN.PA) no se adivina.
+        by_base: dict[str, list[Company]] = {}
+        for company in companies:
+            base, dot, suffix = company.ticker.upper().rpartition(".")
+            if dot and base and suffix in KNOWN_MARKET_SUFFIXES:
+                by_base.setdefault(base, []).append(company)
         found: dict[str, Company] = {}
         has_cue = bool(_COMPANY_CUE_RE.search(question))
         all_caps = not any(ch.islower() for ch in question)
@@ -1375,6 +1383,9 @@ class ChatService:
             token = raw.upper()
             company = by_ticker.get(token)
             if company is None:
+                listings = by_base.get(token, [])
+                if len(listings) == 1 and raw.isupper() and not all_caps and len(token) >= 2:
+                    found[listings[0].ticker.upper()] = listings[0]
                 continue
             if token in _COMMON_WORD_TICKERS:
                 # Palabra corriente: siempre exige pista de empresa y que no
