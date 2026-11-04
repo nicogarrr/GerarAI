@@ -537,7 +537,8 @@ class FinancialSnapshotBuilder:
                 cash = next(
                     (
                         c for c in bs.newest_per_source(
-                            [f for f in cash_all if bs._period_end(f) == debt.period_end]
+                            [f for f in cash_all if bs._period_end(f) == debt.period_end
+                             and (f.unit or "") == (debt.fact.unit or "")]
                         )
                         if c.source == debt.source
                     ),
@@ -545,7 +546,8 @@ class FinancialSnapshotBuilder:
                 ) or next(
                     iter(
                         bs.newest_per_source(
-                            [f for f in cash_all if bs._period_end(f) == debt.period_end]
+                            [f for f in cash_all if bs._period_end(f) == debt.period_end
+                             and (f.unit or "") == (debt.fact.unit or "")]
                         )
                     ),
                     None,
