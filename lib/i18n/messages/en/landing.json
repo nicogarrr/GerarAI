@@ -114,7 +114,7 @@
         "title": "Standard DCF (default)",
         "textPre": "5-year FCFF DCF on revenue and FCF margin from the latest coherent snapshot: if the margin is missing it is derived as FCF/revenue (bounded to 1%-50%) and growth comes from the facts or a default (bounded to -15%/+45%). The",
         "textWacc": "WACC",
-        "textMid": "and terminal growth use a default value labelled as such; the snapshot's net debt is subtracted from equity (net cash adds). Bear/base/bull scenarios, a 3x3 growth x WACC sensitivity and a",
+        "textMid": "comes from a market-cap band in US dollars (8.5% from $200bn; 9.5% from $50bn; 10.5% from $10bn; 11.5% below; without a price or an FX rate, the calculated WACC with its reason) and terminal growth uses a default value labelled as such; the snapshot's net debt is subtracted from equity (net cash adds). Bear/base/bull scenarios, a 3x3 growth x WACC sensitivity and a",
         "textReverseDcf": "reverse DCF",
         "textPost": "are included."
       },

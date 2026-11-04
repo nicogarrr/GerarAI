@@ -35,8 +35,8 @@ describe('valuation-display en inglés', () => {
     );
   });
 
-  it('las tres fuentes del WACC tienen texto en inglés; una desconocida pasa tal cual', () => {
-    for (const source of ['calculated_metric', 'inferred_input', 'tag_default']) {
+  it('las fuentes del WACC tienen texto en inglés; una desconocida pasa tal cual', () => {
+    for (const source of ['calculated_metric', 'inferred_input', 'tag_default', 'market_cap_band']) {
       const text = waccSourceLabel(source, 'en');
       expect(text).not.toBe(source);
       expect(text).not.toMatch(SPANISH);

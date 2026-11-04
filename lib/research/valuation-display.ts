@@ -34,6 +34,7 @@ export function waccSourceLabel(source: string | null | undefined, locale: Local
     case 'calculated_metric': return t('research.valuationText.waccSource.calculated_metric');
     case 'inferred_input': return t('research.valuationText.waccSource.inferred_input');
     case 'tag_default': return t('research.valuationText.waccSource.tag_default');
+    case 'market_cap_band': return t('research.valuationText.waccSource.market_cap_band');
     default: return source;
   }
 }
