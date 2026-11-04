@@ -20,19 +20,24 @@ from __future__ import annotations
 import dataclasses
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 from urllib.parse import quote_plus
 
 from app.core.errors import redact_secrets
+from app.services.company_alias_sources import MAX_SEARCH_TERMS, SEARCH_WINDOW, AliasTerm, alias_hit
 from app.services.connectors.base import ConnectorItem, ConnectorResult
 
 US_EXCHANGE_RE = re.compile(r"NASDAQ|NYSE|AMEX|ARCA|BATS|CBOE", re.IGNORECASE)
 # Empresas seguidas de cerca: siempre entran en el carril rapido.
 PRIORITY_TICKERS = frozenset({"ASTS", "SPCX"})
-# Alias verificados a mano por empresa: las noticias reales citan la marca y no
-# el ticker ("SpaceX compra espectro..."). Solo marcas propias de esa empresa;
-# nada de terminos de sector ("satelite", "espacio") ni de competidores.
+# SEMILLA (respaldo) de alias por empresa, de antes de los alias por datos:
+# las noticias citan la marca y no el ticker ("SpaceX compra espectro...").
+# Los alias de TODAS las empresas salen ahora de datos
+# (company_alias_sources: Wikidata con QID y el informe anual, en caché por
+# tenant); esta lista solo cubre a estas empresas cuando sus datos aún no se
+# han leído o la fuente está caída. No ampliarla: los alias nuevos van por
+# datos.
 VERIFIED_ALIASES: dict[str, tuple[str, ...]] = {
     "SPCX": ("SpaceX", "Space Exploration Technologies", "Starlink"),
     "ASTS": ("AST SpaceMobile", "SpaceMobile", "BlueBird"),
@@ -228,29 +233,27 @@ def google_feed_url(company, *, lang: str = "en") -> str:
     )
 
 
-# Marcas que se buscan en un feed propio de Google News, además del nombre
-# legal. La consulta por nombre («"Space Exploration Technologies" OR SPCX»)
-# no trae lo que la prensa publica con la marca: el estudio de Ookla del
-# 3-nov-2026 sobre el directo al móvil de Starlink («Testing the limits of
-# Starlink's D2D text and data performance in the U.S.») no llegó nunca a la
-# app. Solo marcas propias, distintivas y ya verificadas en VERIFIED_ALIASES:
-# nada de palabras corrientes («BlueBird» también es una marca de autobuses)
-# ni marcas tan amplias que llenarían el feed («Google», «Facebook»).
-QUERY_ALIASES: dict[str, tuple[str, ...]] = {
-    "SPCX": ("SpaceX", "Starlink"),
-}
-# El feed de marca es amplio: solo lo reciente, para no rellenar con archivo.
-ALIAS_QUERY_WINDOW = "when:7d"
+# Feed de Google News por las marcas de la empresa, además del nombre legal:
+# la consulta por nombre («"Space Exploration Technologies" OR SPCX») no trae
+# lo que la prensa publica con la marca (el estudio de Ookla del 3-nov-2026
+# sobre Starlink no llegó nunca). Los términos salen de DATOS para cada
+# empresa (company_alias_sources: Wikidata con QID, sin ambiguos, con peso
+# propio, como mucho MAX_SEARCH_TERMS); aquí no hay ninguna lista por ticker.
+# El feed de marca es amplio: solo lo reciente (SEARCH_WINDOW, 7 días).
+ALIAS_QUERY_WINDOW = SEARCH_WINDOW
 
 
-def google_alias_feed_url(company, *, lang: str = "en") -> str | None:
+def google_alias_feed_url(company, *, lang: str = "en", terms: Sequence[str] = ()) -> str | None:
     """Feed de Google News por las marcas de la empresa, o None si no tiene."""
-    ticker = (getattr(company, "ticker", "") or "").upper()
-    verified = {a.casefold() for a in VERIFIED_ALIASES.get(ticker, ())}
-    aliases = [a for a in QUERY_ALIASES.get(ticker, ()) if a.casefold() in verified]
-    if not aliases:
+    picked: list[str] = []
+    for term in terms:
+        term = (term or "").strip().replace('"', "")
+        if term and term.casefold() not in {t.casefold() for t in picked}:
+            picked.append(term)
+    picked = picked[:MAX_SEARCH_TERMS]
+    if not picked:
         return None
-    query = " OR ".join(f'"{alias}"' for alias in aliases) + f" {ALIAS_QUERY_WINDOW}"
+    query = " OR ".join(f'"{alias}"' for alias in picked) + f" {ALIAS_QUERY_WINDOW}"
     hl, gl, ceid = ("es", "ES", "ES:es") if lang == "es" else ("en-US", "US", "US:en")
     return (
         f"https://news.google.com/rss/search?q={quote_plus(query)}"
@@ -258,13 +261,14 @@ def google_alias_feed_url(company, *, lang: str = "en") -> str | None:
     )
 
 
-def google_lanes(company, *, priority: bool) -> list[tuple[str, str]]:
+def google_lanes(company, *, priority: bool, brand_terms: Sequence[str] = ()) -> list[tuple[str, str]]:
     """Feeds de Google News de una empresa en el barrido por ticker: nombre
-    en inglés, nombre en español (solo prioritarias) y marcas (si tiene)."""
+    en inglés, nombre en español (solo prioritarias) y marcas (si sus datos
+    dan alguna: ``company_alias_sources.search_terms``)."""
     lanes = [("google-en", google_feed_url(company, lang="en"))]
     if priority:
         lanes.append(("google-es", google_feed_url(company, lang="es")))
-    alias_url = google_alias_feed_url(company, lang="en")
+    alias_url = google_alias_feed_url(company, lang="en", terms=brand_terms)
     if alias_url:
         lanes.append(("google-en-marca", alias_url))
     return lanes
@@ -384,12 +388,15 @@ def _name_phrase(name: str | None) -> str | None:
     return " ".join(kept) if len(kept) >= 2 else None
 
 
-def company_mentioned(company, text: str, evidence_level) -> bool:
-    """True si el texto cita a la empresa: ticker con evidencia, alias verificado
-    o nombre completo (>= 2 palabras distintivas). Sin inferir nada mas."""
+def company_mentioned(company, text: str, evidence_level, aliases: Sequence[AliasTerm] = ()) -> bool:
+    """True si el texto cita a la empresa: ticker con evidencia, alias de sus
+    datos (con su contexto obligatorio si es ambiguo), alias de la semilla o
+    nombre completo (>= 2 palabras distintivas). Sin inferir nada mas."""
     if fails_strict_name(company, text):
         return False
     if evidence_level(company.ticker, company.name, text) > 0:
+        return True
+    if aliases and alias_hit(text, aliases) is not None:
         return True
     terms = list(VERIFIED_ALIASES.get(company.ticker.upper(), ()))
     phrase = _name_phrase(getattr(company, "name", None))
@@ -401,7 +408,9 @@ def company_mentioned(company, text: str, evidence_level) -> bool:
     )
 
 
-def label_google(result: ConnectorResult, company, evidence_level) -> ConnectorResult:
+def label_google(
+    result: ConnectorResult, company, evidence_level, aliases: Sequence[AliasTerm] = ()
+) -> ConnectorResult:
     """Fuente = medio real (sufijo ' - Medio' del titular) y filtro de evidencia."""
     kept: list[ConnectorItem] = []
     for item in result.items:
@@ -410,7 +419,7 @@ def label_google(result: ConnectorResult, company, evidence_level) -> ConnectorR
         # que trata de otra (Tieto -> MSFT, 19 oct 2026).
         if is_data_page_headline(item.title) or is_law_firm_solicitation(item.title, item.summary):
             continue
-        if not company_mentioned(company, item.title, evidence_level):
+        if not company_mentioned(company, item.title, evidence_level, aliases):
             continue
         match = _PUBLISHER_RE.match(item.title)
         if match:
