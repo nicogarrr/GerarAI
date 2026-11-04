@@ -2770,6 +2770,86 @@
         "title": "CompanyTimelineEventsOut",
         "type": "object"
       },
+      "CompanyTrackRecordOut": {
+        "properties": {
+          "best_horizon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Horizon"
+          },
+          "best_horizon_reason": {
+            "title": "Best Horizon Reason",
+            "type": "string"
+          },
+          "first_maturity_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Maturity Date"
+          },
+          "horizons": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TrackRecordHorizonOut"
+            },
+            "title": "Horizons",
+            "type": "object"
+          },
+          "last_computed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Computed At"
+          },
+          "min_samples_best_horizon": {
+            "title": "Min Samples Best Horizon",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "pending",
+              "no_data"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "versions_tracked": {
+            "title": "Versions Tracked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "horizons",
+          "best_horizon_reason",
+          "min_samples_best_horizon",
+          "versions_tracked",
+          "ticker"
+        ],
+        "title": "CompanyTrackRecordOut",
+        "type": "object"
+      },
       "CompanyTtmOut": {
         "properties": {
           "as_of": {
@@ -21076,6 +21156,89 @@
         "title": "TelegramSubscriptionOut",
         "type": "object"
       },
+      "TenantTrackRecordOut": {
+        "properties": {
+          "best_horizon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Horizon"
+          },
+          "best_horizon_reason": {
+            "title": "Best Horizon Reason",
+            "type": "string"
+          },
+          "first_maturity_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Maturity Date"
+          },
+          "horizons": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TrackRecordHorizonOut"
+            },
+            "title": "Horizons",
+            "type": "object"
+          },
+          "last_computed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Computed At"
+          },
+          "min_samples_best_horizon": {
+            "title": "Min Samples Best Horizon",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "pending",
+              "no_data"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tickers": {
+            "items": {
+              "$ref": "#/components/schemas/TickerTrackRecordOut"
+            },
+            "title": "Tickers",
+            "type": "array"
+          },
+          "versions_tracked": {
+            "title": "Versions Tracked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "horizons",
+          "best_horizon_reason",
+          "min_samples_best_horizon",
+          "versions_tracked",
+          "tickers"
+        ],
+        "title": "TenantTrackRecordOut",
+        "type": "object"
+      },
       "ThesisApproveRequest": {
         "properties": {
           "actor": {
@@ -22413,6 +22576,43 @@
         "title": "ThesisTickersOut",
         "type": "object"
       },
+      "TickerTrackRecordOut": {
+        "properties": {
+          "best_horizon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Horizon"
+          },
+          "best_horizon_reason": {
+            "title": "Best Horizon Reason",
+            "type": "string"
+          },
+          "horizons": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TrackRecordHorizonOut"
+            },
+            "title": "Horizons",
+            "type": "object"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "horizons",
+          "best_horizon_reason"
+        ],
+        "title": "TickerTrackRecordOut",
+        "type": "object"
+      },
       "TimelineEventOut": {
         "properties": {
           "date": {
@@ -22494,6 +22694,68 @@
           }
         },
         "title": "TimelineHoldingOut",
+        "type": "object"
+      },
+      "TrackRecordHorizonOut": {
+        "properties": {
+          "hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hit Rate"
+          },
+          "hits": {
+            "title": "Hits",
+            "type": "integer"
+          },
+          "median_abs_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Abs Error"
+          },
+          "median_signed_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Signed Error"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "touched_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Touched Rate"
+          }
+        },
+        "required": [
+          "samples",
+          "hits"
+        ],
+        "title": "TrackRecordHorizonOut",
         "type": "object"
       },
       "TransactionImportCommitRequest": {
@@ -46613,6 +46875,209 @@
         "summary": "Get Thesis Scenarios",
         "tags": [
           "companies"
+        ]
+      }
+    },
+    "/api/companies/{ticker}/track-record": {
+      "get": {
+        "description": "Acierto de nuestros valores razonables para una empresa (6 y 12 meses).",
+        "operationId": "get_company_track_record_api_companies__ticker__track_record_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyTrackRecordOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Company Track Record",
+        "tags": [
+          "thesis"
         ]
       }
     },
@@ -93087,6 +93552,200 @@
           }
         },
         "summary": "Relay"
+      }
+    },
+    "/api/thesis-track-record": {
+      "get": {
+        "description": "Acierto agregado del tenant y por ticker, con el mejor horizonte de cada uno.",
+        "operationId": "get_tenant_track_record_api_thesis_track_record_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantTrackRecordOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Tenant Track Record",
+        "tags": [
+          "thesis"
+        ]
       }
     },
     "/api/thesis/generate": {

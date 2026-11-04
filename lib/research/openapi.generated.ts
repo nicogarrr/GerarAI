@@ -2038,6 +2038,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/track-record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Company Track Record
+         * @description Acierto de nuestros valores razonables para una empresa (6 y 12 meses).
+         */
+        get: operations["get_company_track_record_api_companies__ticker__track_record_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{ticker}/ttm": {
         parameters: {
             query?: never;
@@ -5800,6 +5820,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/thesis-track-record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Tenant Track Record
+         * @description Acierto agregado del tenant y por ticker, con el mejor horizonte de cada uno.
+         */
+        get: operations["get_tenant_track_record_api_thesis_track_record_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/thesis/generate": {
         parameters: {
             query?: never;
@@ -7686,6 +7726,32 @@ export interface components {
             source: string;
             /** Ticker */
             ticker: string;
+        };
+        /** CompanyTrackRecordOut */
+        CompanyTrackRecordOut: {
+            /** Best Horizon */
+            best_horizon?: string | null;
+            /** Best Horizon Reason */
+            best_horizon_reason: string;
+            /** First Maturity Date */
+            first_maturity_date?: string | null;
+            /** Horizons */
+            horizons: {
+                [key: string]: components["schemas"]["TrackRecordHorizonOut"];
+            };
+            /** Last Computed At */
+            last_computed_at?: string | null;
+            /** Min Samples Best Horizon */
+            min_samples_best_horizon: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "pending" | "no_data";
+            /** Ticker */
+            ticker: string;
+            /** Versions Tracked */
+            versions_tracked: number;
         };
         /** CompanyTtmOut */
         CompanyTtmOut: {
@@ -13521,6 +13587,32 @@ export interface components {
              */
             event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest" | "dca_levels" | "macro_event" | "earnings";
         };
+        /** TenantTrackRecordOut */
+        TenantTrackRecordOut: {
+            /** Best Horizon */
+            best_horizon?: string | null;
+            /** Best Horizon Reason */
+            best_horizon_reason: string;
+            /** First Maturity Date */
+            first_maturity_date?: string | null;
+            /** Horizons */
+            horizons: {
+                [key: string]: components["schemas"]["TrackRecordHorizonOut"];
+            };
+            /** Last Computed At */
+            last_computed_at?: string | null;
+            /** Min Samples Best Horizon */
+            min_samples_best_horizon: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "pending" | "no_data";
+            /** Tickers */
+            tickers: components["schemas"]["TickerTrackRecordOut"][];
+            /** Versions Tracked */
+            versions_tracked: number;
+        };
         /** ThesisApproveRequest */
         ThesisApproveRequest: {
             /**
@@ -13961,6 +14053,19 @@ export interface components {
             /** Tickers */
             tickers: string[];
         };
+        /** TickerTrackRecordOut */
+        TickerTrackRecordOut: {
+            /** Best Horizon */
+            best_horizon?: string | null;
+            /** Best Horizon Reason */
+            best_horizon_reason: string;
+            /** Horizons */
+            horizons: {
+                [key: string]: components["schemas"]["TrackRecordHorizonOut"];
+            };
+            /** Ticker */
+            ticker: string;
+        };
         /** TimelineEventOut */
         TimelineEventOut: {
             /** Date */
@@ -13984,6 +14089,21 @@ export interface components {
             average_cost?: number | null;
             /** First Buy Date */
             first_buy_date?: string | null;
+        };
+        /** TrackRecordHorizonOut */
+        TrackRecordHorizonOut: {
+            /** Hit Rate */
+            hit_rate?: number | null;
+            /** Hits */
+            hits: number;
+            /** Median Abs Error */
+            median_abs_error?: number | null;
+            /** Median Signed Error */
+            median_signed_error?: number | null;
+            /** Samples */
+            samples: number;
+            /** Touched Rate */
+            touched_rate?: number | null;
         };
         /** TransactionImportCommitRequest */
         TransactionImportCommitRequest: {
@@ -19192,6 +19312,48 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_company_track_record_api_companies__ticker__track_record_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyTrackRecordOut"];
                 };
             };
             /** @description Validation Error */
@@ -28992,6 +29154,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_tenant_track_record_api_thesis_track_record_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantTrackRecordOut"];
                 };
             };
             /** @description Validation Error */
