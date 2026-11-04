@@ -43,9 +43,10 @@ def test_engine_counterexamples_auditor():
     # CBRE/Zillow: "Real Estate Services/Development" NO son REITs.
     assert resolve_engine_key(_co_ind(ticker="CBRE", industry="Real Estate Services")) == "standard_dcf"
     assert resolve_engine_key(_co_ind(ticker="Z", industry="Real Estate - Development")) == "standard_dcf"
-    # Bancos y gestoras por industria NO cambian de motor (siguen standard_dcf
-    # hasta que su motor tenga datos suficientes).
-    assert resolve_engine_key(_co_ind(ticker="XYZ", industry="Banks - Regional")) == "standard_dcf"
+    # Bancos por industria van al motor bank (un FCFF DCF sobre un banco no
+    # tiene sentido; sin datos del motor, respaldo orientativo por múltiplos).
+    # Las gestoras por industria siguen en standard_dcf.
+    assert resolve_engine_key(_co_ind(ticker="XYZ", industry="Banks - Regional")) == "bank"
     assert resolve_engine_key(_co_ind(ticker="XYZ", industry="Asset Management")) == "standard_dcf"
     # La regla insurer por industria de main sigue viva para aseguradoras puras.
     assert resolve_engine_key(_co_ind(ticker="XYZ", industry="Insurance - Property & Casualty")) == "insurer"
