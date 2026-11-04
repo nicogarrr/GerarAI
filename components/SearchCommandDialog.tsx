@@ -331,7 +331,7 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                                         >
                                             <TrendingUp aria-hidden="true" className="h-4 w-4 text-gray-500" />
                                             <div className="min-w-0 flex-1">
-                                                <div className="search-item-name line-clamp-2 break-words" title={formatCompanyName(stock.name)}>{formatCompanyName(stock.name)}</div>
+                                                <div className="search-item-name line-clamp-2 break-words" title={formatCompanyName(stock.name, locale)}>{formatCompanyName(stock.name, locale)}</div>
                                                 <div className="text-sm text-gray-500">{stock.symbol} | {stock.exchange} | {etiquetaTipoInstrumento(stock.type, locale)}</div>
                                                 {stock.fichaCoverage === 'unknown' ? (
                                                     <div className="mt-0.5 text-xs text-gray-500">{t('ui.command.unverifiedCoverage')}</div>

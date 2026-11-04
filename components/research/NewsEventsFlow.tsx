@@ -7,7 +7,7 @@ import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { TickerContextBadges } from '@/components/common/TickerContextBadges';
 import type { ResearchNewsEvent } from '@/lib/actions/research.actions';
 import type { NewsLane } from '@/lib/news-paging';
-import { formatPercent, formatTimeAgo, formatUserDate, formatUserDateTime, NA } from '@/lib/format';
+import { formatPercent, formatTimeAgo, formatUserDate, formatUserDateTime, naFor } from '@/lib/format';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
 import { NewsSummary } from './NewsSummary';
 import { NewsSecondOrder } from '@/components/research/NewsSecondOrder';
@@ -85,7 +85,9 @@ export function eventDateText(value: string, locale: Locale = 'es'): string {
   const match = /T(\d{2}:\d{2})/.exec(value);
   if (!match || match[1] === '00:00') return formatUserDate(day, undefined, undefined, locale);
   const formatted = formatUserDateTime(value, undefined, undefined, locale);
-  return formatted === NA ? formatUserDate(day, undefined, undefined, locale) : formatted;
+  // Comparar con el «N/D»/«N/A» DEL LOCALE: con el NA fijo en castellano, en
+  // inglés un fallo de hora devolvía «N/A» en vez de caer al día.
+  return formatted === naFor(locale) ? formatUserDate(day, undefined, undefined, locale) : formatted;
 }
 
 /** Materialidad como indicador visual: barra proporcional + número, color por impacto. */
@@ -205,13 +207,14 @@ function DateNotes({ event, t, inline = false }: { event: ResearchNewsEvent; t: 
 
 /** Detalle de contexto de la fila; va dentro del único desplegable (NewsSecondOrder). */
 function ContextDetail({ event, t, locale }: { event: ResearchNewsEvent; t: TranslateFn; locale: Locale }) {
+  const NA = naFor(locale);
   return (
     <dl className="mt-1 max-w-xs space-y-1 break-words rounded-md border border-gray-800 p-2">
       <div><dt className="inline font-medium">{t('research.flow.ctxType')}</dt><dd className="inline">{etiquetaTipoEvento(event.event_type, locale)}</dd></div>
       {/* Datos decisionales reubicados (SERIE 1, auditoria): nunca crudos, nulos etiquetados "sin datos". */}
       <div><dt className="inline font-medium">{t('research.flow.ctxTier')}</dt><dd className="inline">{event.source_tier ? etiquetaTierFuente(event.source_tier, locale) : NA}</dd></div>
       <div><dt className="inline font-medium">{t('research.flow.ctxImpact')}</dt><dd className="inline">{event.impact_direction ? etiquetaDireccionImpacto(event.impact_direction, locale) : NA}</dd></div>
-      <div><dt className="inline font-medium">{t('research.flow.ctxWeight')}</dt><dd className="inline">{event.portfolio_weight != null ? formatPercent(event.portfolio_weight, { digits: 1 }) : NA}</dd></div>
+      <div><dt className="inline font-medium">{t('research.flow.ctxWeight')}</dt><dd className="inline">{event.portfolio_weight != null ? formatPercent(event.portfolio_weight, { digits: 1 }, undefined, locale) : NA}</dd></div>
       {event.news_lane === 'macro' && event.macro_theme ? <div><dt className="inline font-medium">{t('research.flow.ctxTheme')}</dt><dd className="inline">{etiquetaTemaMacro(event.macro_theme, locale)}</dd></div> : null}
     </dl>
   );
@@ -334,7 +337,7 @@ export async function NewsEventsFlow({
               <div className="mt-2 text-sm text-gray-200"><NewsHeadline event={event} /></div>
               <NewsSummary event={event} />
               <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
-                <span className="min-w-0 break-words">{event.source || NA}</span>
+                <span className="min-w-0 break-words">{event.source || naFor(locale)}</span>
                 <span aria-hidden="true">·</span>
                 <span>{formatTimeAgo(event.date, Date.now(), locale)}</span>
                 <DateNotes event={event} t={t} inline />
@@ -398,7 +401,7 @@ export async function NewsEventsFlow({
                   <td className="max-w-[420px] px-3 py-2.5 text-gray-300">
                     <NewsHeadline event={event} />
                     <NewsSummary event={event} />
-                    <div className="mt-1 text-xs text-gray-500">{event.source || NA}</div>
+                    <div className="mt-1 text-xs text-gray-500">{event.source || naFor(locale)}</div>
                   </td>
                   <td className="px-3 py-2.5 text-center">
                     <MaterialityIndicator score={event.materiality_score} t={t} />

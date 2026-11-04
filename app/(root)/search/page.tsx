@@ -111,7 +111,7 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
       {response ? (
         <section className="grid min-w-0 grid-cols-1 gap-4">
           <div className="flex min-w-0 flex-col gap-3 rounded-xl border border-gray-800 bg-surface-1 p-4 md:flex-row md:items-center">
-            <div><div className="text-sm font-semibold text-gray-100">{t('search.resultsFor', { count: formatNumber(response.total, { maximumFractionDigits: 0 }), query: response.query })}</div><div className="mt-1 text-xs text-gray-500">{t('search.rankingNote')}</div></div>
+            <div><div className="text-sm font-semibold text-gray-100">{t('search.resultsFor', { count: formatNumber(response.total, { maximumFractionDigits: 0 }, undefined, locale), query: response.query })}</div><div className="mt-1 text-xs text-gray-500">{t('search.rankingNote')}</div></div>
             {/* F322: los pares crudos de `retrieval` son diagnóstico interno
                 del motor (fusiones, umbrales): visibles bajo demanda, no como
                 badges primarios que parecen estado de la app. */}
@@ -134,10 +134,10 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
                   <div className="flex flex-wrap items-center gap-2"><Badge>{entityTypeDisplay(result.entity_type, locale)}</Badge>{result.ticker ? <Badge variant="outline">{result.ticker}</Badge> : null}<Badge variant="outline">{sourceTierDisplay(result.source_tier, locale)}</Badge><Badge variant="outline">{evidenceStatusDisplay(result.status, locale)}</Badge></div>
                   <h2 className="mt-3 break-words text-lg font-semibold text-gray-100">{result.title}</h2>
                   <p className="mt-2 line-clamp-5 whitespace-pre-wrap text-sm leading-6 text-gray-300">{result.text}</p>
-                  <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500"><span>{result.collection ?? sourceDisplay(result.source_type, locale)}</span><span>{formatDate(result.as_of, undefined, t('research.notAvailable'))}</span><span>{t('search.confidence', { value: formatPercent(result.source_trust, { digits: 0 }) })}</span></div>
+                  <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500"><span>{result.collection ?? sourceDisplay(result.source_type, locale)}</span><span>{formatDate(result.as_of, undefined, t('research.notAvailable'), locale)}</span><span>{t('search.confidence', { value: formatPercent(result.source_trust, { digits: 0 }, undefined, locale) })}</span></div>
                   <details className="mt-2">
                     <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-300">{t('search.techDetails')}</summary>
-                    <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500"><span>{t('search.reference', { value: result.citation })}</span><span>{t('search.score', { value: formatNumber(result.scores.reranker, { minimumFractionDigits: 4, maximumFractionDigits: 4 }) })}</span></div>
+                    <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500"><span>{t('search.reference', { value: result.citation })}</span><span>{t('search.score', { value: formatNumber(result.scores.reranker, { minimumFractionDigits: 4, maximumFractionDigits: 4 }, undefined, locale) })}</span></div>
                   </details>
                 </div>
               </div>

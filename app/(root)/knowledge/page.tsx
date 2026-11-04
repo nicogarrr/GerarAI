@@ -329,7 +329,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                 const busy = job?.status === 'queued' || job?.status === 'running';
                 return (
                 <tr className="border-b border-gray-900" key={document.id}>
-                  <th className="py-3 pr-4 text-left text-sm font-normal" scope="row"><Link className="font-medium text-gray-200 hover:text-teal-200 hover:underline" href={documentReaderHref(document.id, documentOffset, searchQuery)}>{document.title}</Link><div className="text-xs text-gray-500">{document.author ?? t('knowledge.unknownAuthor')}{document.publication_date && formatDate(document.publication_date, undefined, '') ? ` · ${formatDate(document.publication_date, undefined, undefined, locale)}` : ''}</div>{document.ticker ? <Link className="mt-1 inline-block text-xs font-medium text-teal-300 hover:text-teal-200" href={`/research/${encodeURIComponent(document.ticker)}?view=documents`}>{document.ticker}</Link> : null}</th>
+                  <th className="py-3 pr-4 text-left text-sm font-normal" scope="row"><Link className="font-medium text-gray-200 hover:text-teal-200 hover:underline" href={documentReaderHref(document.id, documentOffset, searchQuery)}>{document.title}</Link><div className="text-xs text-gray-500">{document.author ?? t('knowledge.unknownAuthor')}{document.publication_date && formatDate(document.publication_date, undefined, '', locale) ? ` · ${formatDate(document.publication_date, undefined, undefined, locale)}` : ''}</div>{document.ticker ? <Link className="mt-1 inline-block text-xs font-medium text-teal-300 hover:text-teal-200" href={`/research/${encodeURIComponent(document.ticker)}?view=documents`}>{document.ticker}</Link> : null}</th>
                   <td className="py-3 pr-4 text-gray-400">{document.collection_id ? collectionNames.get(document.collection_id) : t('knowledge.noCollection')}</td>
                   <td className="py-3 pr-4 text-gray-400">{documentTypeLabel(document.document_type, t)}</td>
                   <td className="py-3 pr-4 text-gray-500">{parserLabel(document.metadata.parser, t)}</td>
@@ -348,7 +348,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
             return (
               <article className="min-w-0 rounded-lg border border-gray-800 bg-black/30 p-4 break-words" key={document.id}>
                 <Link className="flex min-h-[44px] min-w-0 items-center font-medium text-gray-200 hover:text-teal-200 hover:underline" href={documentReaderHref(document.id, documentOffset, searchQuery)}>{document.title}</Link>
-                <div className="mt-1 text-xs text-gray-500">{document.author ?? t('knowledge.unknownAuthor')}{document.publication_date && formatDate(document.publication_date, undefined, '') ? ` · ${formatDate(document.publication_date, undefined, undefined, locale)}` : ''}</div>
+                <div className="mt-1 text-xs text-gray-500">{document.author ?? t('knowledge.unknownAuthor')}{document.publication_date && formatDate(document.publication_date, undefined, '', locale) ? ` · ${formatDate(document.publication_date, undefined, undefined, locale)}` : ''}</div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Badge variant="outline">{document.collection_id ? collectionNames.get(document.collection_id) : t('knowledge.noCollection')}</Badge>
                   <Badge variant="outline">{documentTypeLabel(document.document_type, t)}</Badge>

@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { getFollowedEarnings } from '@/lib/actions/catalysts.actions';
 import type { FollowedEarningsEvent } from '@/lib/actions/catalysts.actions';
-import { formatMarketDate } from '@/lib/format';
 import { getT, getFormat } from '@/lib/i18n/server';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import type { Formatters } from '@/lib/format';
@@ -21,10 +20,11 @@ function addUtcDays(isoDate: string, days: number): string {
     return date.toISOString().slice(0, 10);
 }
 
-function dayLabel(isoDate: string, todayIso: string, ti: TFunction): string {
+function dayLabel(isoDate: string, todayIso: string, ti: TFunction, f: Formatters): string {
     if (isoDate === todayIso) return ti('calendar.strip.today');
     if (isoDate === addUtcDays(todayIso, 1)) return ti('calendar.strip.tomorrow');
-    return formatMarketDate(isoDate, { weekday: 'short' }).replace('.', '');
+    // Día de la semana con el idioma activo (antes «mié» también en inglés).
+    return f.formatMarketDate(isoDate, { weekday: 'short' }).replace('.', '');
 }
 
 function DayCard({ isoDate, todayIso, events, ti, f }: { isoDate: string; todayIso: string; events: FollowedEarningsEvent[]; ti: TFunction; f: Formatters }) {
@@ -43,7 +43,7 @@ function DayCard({ isoDate, todayIso, events, ti, f }: { isoDate: string; todayI
                 <span className="sr-only">{ti('calendar.strip.monthSr', { month: f.formatMarketDate(isoDate, { month: 'long' }) })}</span>
             </span>
             <span className="text-xs text-gray-400 first-letter:uppercase">
-                {dayLabel(isoDate, todayIso, ti)}
+                {dayLabel(isoDate, todayIso, ti, f)}
                 <span className="sr-only">:</span>
             </span>
             {events.length === 0 ? (

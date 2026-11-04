@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type ComponentPropsWithoutRef } from 'react';
 import { toast } from 'sonner';
-import { useT } from '@/lib/i18n/client';
-import { formatNumber } from '@/lib/format';
+import { useFormat, useT } from '@/lib/i18n/client';
 import { cn } from '@/lib/utils';
 
 // Límite real de subida: next.config.ts → experimental.serverActions.bodySizeLimit = 4mb.
@@ -18,6 +17,7 @@ type FileUploadInputProps = Omit<ComponentPropsWithoutRef<'input'>, 'type' | 'on
 
 export function FileUploadInput({ maxMB = MAX_UPLOAD_MB, className, id, name, ...props }: FileUploadInputProps) {
   const t = useT();
+  const { formatNumber } = useFormat();
   const rootRef = useRef<HTMLDivElement>(null);
   const [warning, setWarning] = useState<string | null>(null);
   // F142: el texto del input file nativo («Choose File / No file chosen»)

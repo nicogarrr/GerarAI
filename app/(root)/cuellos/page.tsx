@@ -14,7 +14,7 @@ import {
 } from '@/lib/actions/bottlenecks.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { BOTTLENECK_TO_THEMES, basketName, bottleneckThemeName } from '@/lib/market/theme-bottleneck-map';
-import { NA, type Formatters } from '@/lib/format';
+import type { Formatters } from '@/lib/format';
 import { getFormat, getLocale, getT } from '@/lib/i18n/server';
 import type { Locale } from '@/lib/i18n/locale';
 import { bottleneckReasoningText, bottleneckText } from '@/lib/research/bottleneck-text';
@@ -90,8 +90,13 @@ function SignalCard({ signal, minSources, t, fmt }: { signal: Awaited<ReturnType
   );
 }
 
+/** Centinela del contrato del backend (bottleneck_discovery_service.NO_DATA):
+ *  ticker sin identificar. Es un valor de datos, no el «N/D» visible (que va
+ *  por fmt.na con el idioma activo). */
+const BACKEND_UNKNOWN_TICKER = 'N/D';
+
 function DiscoveryCard({ item, t, fmt, locale }: { item: DiscoveryView; t: TranslateFn; fmt: Formatters; locale: Locale }) {
-  const known = item.ticker !== NA;
+  const known = item.ticker !== BACKEND_UNKNOWN_TICKER;
   return (
     <li className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
       <div className="flex flex-wrap items-center gap-2">

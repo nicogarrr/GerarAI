@@ -38,10 +38,10 @@ export default function HomeAttention() {
     const items = [
         ...(data?.thesis.items ?? []).map(item => ({ key: `thesis-${item.id}`, symbol: item.symbol,
             title: t(DIRECTION_KEYS[item.direction as keyof typeof DIRECTION_KEYS] ?? 'home.attention.direction.neutral'), detail: changeHeadlineCopy(item.summary, locale).text, detailNote: changeHeadlineCopy(item.summary, locale).note,
-            note: t('home.attention.reviewPending', { date: formatMarketDate(item.createdAt) }), href: `/research/${encodeURIComponent(item.symbol)}?view=changes#thesis-change-${item.id}`, cta: t('home.attention.ctaReviewChange') })),
+            note: t('home.attention.reviewPending', { date: formatMarketDate(item.createdAt, undefined, undefined, locale) }), href: `/research/${encodeURIComponent(item.symbol)}?view=changes#thesis-change-${item.id}`, cta: t('home.attention.ctaReviewChange') })),
         ...(data?.dca.items ?? []).map(item => ({ key: item.id, symbol: item.symbol, title: t('home.attention.dcaTitle', { level: item.level }),
             detailNote: null, detail: item.inPortfolio ? t('home.attention.dcaInPortfolio') : t('home.attention.dcaNotInPortfolio'),
-            note: `${t('home.attention.dcaNote', { threshold: item.threshold, date: formatMarketDate(item.signalDate) })}${item.forming ? t('home.attention.dcaForming') : t('home.attention.dcaConfirmed')}`,
+            note: `${t('home.attention.dcaNote', { threshold: item.threshold, date: formatMarketDate(item.signalDate, undefined, undefined, locale) })}${item.forming ? t('home.attention.dcaForming') : t('home.attention.dcaConfirmed')}`,
             href: `/research/${encodeURIComponent(item.symbol)}?view=thesis`, cta: t('home.attention.ctaReviewThesis') })),
     ];
     const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));

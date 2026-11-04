@@ -57,10 +57,11 @@ interface TickerSearchInputProps {
  *  (F215), debounce de 300 ms y deadline de 6 s (patrón de la watchlist).
  *  El dropdown usa el Popover existente con portal y colisiones: se superpone
  *  al contenido sin quedar recortado por el scroll de un diálogo. */
-import { useT } from '@/lib/i18n/client';
+import { useLocale, useT } from '@/lib/i18n/client';
 
 export function TickerSearchInput({ value: controlledValue, defaultValue = '', name, required, options, disabled = false, disabledSymbols = [], onValueChange, onSelect, onEnterWithoutResults, onBlur, placeholder, id, className = 'h-11 w-full bg-gray-900 text-base text-gray-100', maxLength, ariaLabel, dropdownSide, initialSelectedValue }: TickerSearchInputProps) {
     const ti = useT();
+    const locale = useLocale();
     const resolvedPlaceholder = placeholder ?? ti('search.tickerPlaceholder');
     const [localValue, setLocalValue] = useState(defaultValue);
     const value = controlledValue ?? localValue;
@@ -293,7 +294,7 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
                             <TrendingUp aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-400" />
                             <span className="min-w-0">
                                 <span className="block font-medium text-white">{stock.symbol}{disabledSymbols.includes(stock.symbol.toUpperCase()) ? ` · ${ti('search.following')}` : ''}</span>
-                                <span className="block break-words text-sm text-gray-400 line-clamp-2">{formatCompanyName(stock.name)}</span>
+                                <span className="block break-words text-sm text-gray-400 line-clamp-2">{formatCompanyName(stock.name, locale)}</span>
                             </span>
                         </button>
                     ))}

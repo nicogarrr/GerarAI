@@ -3,8 +3,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Panel } from '@/components/ui/panel';
 import { safeAssistantSourceUrl, type GuideContext } from '@/lib/research/assistant-contract';
-import { useT } from '@/lib/i18n/client';
-import { formatUserDateTime } from '@/lib/format';
+import { useFormat, useT } from '@/lib/i18n/client';
 
 /**
  * Contexto de guía en la pestaña Seguir de la ficha: las revisiones abiertas
@@ -14,6 +13,7 @@ import { formatUserDateTime } from '@/lib/format';
  */
 export function GuideContextPanel({ ticker, context, hideReviews = false }: { ticker: string; context: GuideContext | null; hideReviews?: boolean }) {
     const t = useT();
+    const { formatUserDateTime } = useFormat();
     function askWithReview(reviewId: number) {
         window.dispatchEvent(new CustomEvent('gerarai:open-brain', { detail: { ticker, review_id: reviewId } }));
     }

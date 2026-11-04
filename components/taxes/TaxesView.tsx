@@ -17,7 +17,7 @@ import { getTaxHoldings, getTaxReport, regenerateTaxReport } from '@/lib/actions
 import { FilingSection, Modelo720Section } from '@/components/taxes/FilingSections';
 import { recordDetailKey } from '@/components/taxes/record-detail-key';
 import { reportForYear, type ReportOverride } from '@/lib/taxes/report-state';
-import { formatMoney, formatNumber, isValidCurrencyCode, USER_TZ } from '@/lib/format';
+import { isValidCurrencyCode, USER_TZ } from '@/lib/format';
 import { useT, useFormat } from '@/lib/i18n/client';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import type { Formatters } from '@/lib/format';
@@ -220,9 +220,10 @@ function humanizeTaxReport(summary: DataRecord, i18n: TaxI18n): DataRecord {
                 computed: tFn('taxes.ledger.computed'),
             } as Record<string, string>)[String(value)] ?? String(value);
         } else if (key === 'currency_ledger_gain_base' || key === 'currency_ledger_blocked_loss_base') {
-            // Importe fiscal en EUR: formateado es-ES como el resto de
-            // importes; un float crudo («1234.5678») no es una cifra legible.
-            display[label] = value === null || value === undefined ? tFn('taxes.ledger.notComputed') : formatMoney(value as number | string, currency);
+            // Importe fiscal en EUR con el idioma activo, como el resto de
+            // importes; un float crudo («1234.5678») no es una cifra legible
+            // (antes, en inglés, salía «4.100,00 €» con el formateador suelto).
+            display[label] = value === null || value === undefined ? tFn('taxes.ledger.notComputed') : i18n.f.formatMoney(value as number | string, currency);
         } else if (key === 'currency_ledger_by_currency') {
             const byCurrency = (value ?? {}) as Record<string, { status?: string; gain_base?: number | null; unconverted?: number | null }>;
             const names: Record<string, string> = {
@@ -230,7 +231,7 @@ function humanizeTaxReport(summary: DataRecord, i18n: TaxI18n): DataRecord {
                 incomplete: tFn('taxes.ledger.incomplete'),
                 computed: tFn('taxes.ledger.computed'),
             };
-            const parts = Object.entries(byCurrency).map(([cur, v]) => `${cur}: ${v.gain_base === null || v.gain_base === undefined ? tFn('taxes.ledger.notComputed') : formatMoney(v.gain_base, 'EUR')} (${names[String(v.status)] ?? String(v.status)}${v.unconverted === null || v.unconverted === undefined ? '' : `, ${tFn('taxes.ledger.unconverted', { amount: formatNumber(v.unconverted, { maximumFractionDigits: 2 }), currency: cur })}`})`);
+            const parts = Object.entries(byCurrency).map(([cur, v]) => `${cur}: ${v.gain_base === null || v.gain_base === undefined ? tFn('taxes.ledger.notComputed') : i18n.f.formatMoney(v.gain_base, 'EUR')} (${names[String(v.status)] ?? String(v.status)}${v.unconverted === null || v.unconverted === undefined ? '' : `, ${tFn('taxes.ledger.unconverted', { amount: i18n.f.formatNumber(v.unconverted, { maximumFractionDigits: 2 }), currency: cur })}`})`);
             display[label] = parts.length > 0 ? parts.join(' · ') : tFn('taxes.ledger.noConversions');
         } else if (key === 'currency_ledger_reason') {
             display[label] = typeof value === 'string' && value ? summaryText(value, i18n) : tFn('taxes.values.noneM');

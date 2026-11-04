@@ -124,7 +124,7 @@ async function MoversVista({ vista }: { vista: Exclude<Vista, 'empresas'> }) {
         <h1 className="text-2xl font-semibold break-words text-gray-100">{t('nav.screener')}</h1>
         {movers.session_date ? (
           <p className="mt-1 text-sm text-gray-400">
-            {t('screener.sessionLine', { date: formatMarketDate(movers.session_date, undefined, locale) })}
+            {t('screener.sessionLine', { date: formatMarketDate(movers.session_date, undefined, undefined, locale) })}
             {movers.last_registered_at
               ? ` ${t('screener.lastData', { datetime: formatUserDateTime(movers.last_registered_at, { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }, undefined, locale) })}`
               : ''}

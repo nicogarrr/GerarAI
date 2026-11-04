@@ -14,7 +14,7 @@ import { isBackendUnavailableError } from '@/lib/backend-offline';
 import WorkProductButton from '@/components/work-products/WorkProductButton';
 import { formatDate, formatNumber } from '@/lib/format';
 import type { Locale } from '@/lib/i18n/locale';
-import { getLocale, getT } from '@/lib/i18n/server';
+import { getFormat, getLocale, getT } from '@/lib/i18n/server';
 import type { TranslateFn } from '@/lib/i18n/translate';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -134,14 +134,14 @@ function CompanyCard({ row, t, locale }: { row: CompanyRow; t: TranslateFn; loca
                                     {thesis && visibleThesisRating(thesis.rating, snapshot) ? <Badge>{ratingLabel(thesis.rating, t)}</Badge> : null}
                                     {thesis ? (
                                         <span className="text-xs text-gray-500">
-                                            v{formatNumber(thesis.version)} · {formatDate(thesis.created_at)}
+                                            v{formatNumber(thesis.version, undefined, undefined, locale)} · {formatDate(thesis.created_at, undefined, undefined, locale)}
                                         </span>
                                     ) : null}
                                     <span
                                         className="text-xs text-gray-500"
                                         title={t('research.layersTitle')}
                                     >
-                                        {t('research.layersAvailable', { score: formatNumber(health?.score) })}
+                                        {t('research.layersAvailable', { score: formatNumber(health?.score, undefined, undefined, locale) })}
                                     </span>
                                 </>
                             ) : (
@@ -150,7 +150,7 @@ function CompanyCard({ row, t, locale }: { row: CompanyRow; t: TranslateFn; loca
                                         className="text-xs text-gray-500"
                                         title={t('research.layersTitle')}
                                     >
-                                        {t('research.layersAvailable', { score: formatNumber(health?.score) })}
+                                        {t('research.layersAvailable', { score: formatNumber(health?.score, undefined, undefined, locale) })}
                                     </span>
                                     <span
                                         className="text-xs text-gray-500"
@@ -170,6 +170,7 @@ function CompanyCard({ row, t, locale }: { row: CompanyRow; t: TranslateFn; loca
 
 async function ResearchIndexSection({ query, requestedPage }: { query: string; requestedPage: number }) {
     const t = await getT();
+    const fmt = await getFormat();
     const locale = await getLocale();
     // Las lecturas de contexto del usuario (cartera, watchlist) no dependen del
     // dashboard: se lanzan a la vez en vez de esperar a que termine el
@@ -292,9 +293,9 @@ async function ResearchIndexSection({ query, requestedPage }: { query: string; r
                         <p className="mb-3 text-xs text-gray-500">
                             {query
                                 ? slice.total
-                                    ? t('research.showingMatches', { from: formatNumber(slice.from), to: formatNumber(slice.to), total: formatNumber(slice.total), query, companies: formatNumber(ordered.length) })
-                                    : t('research.zeroMatches', { query, companies: formatNumber(ordered.length) })
-                                : t('research.showingAll', { from: formatNumber(slice.from), to: formatNumber(slice.to), total: formatNumber(slice.total) })}
+                                    ? t('research.showingMatches', { from: fmt.formatNumber(slice.from), to: fmt.formatNumber(slice.to), total: fmt.formatNumber(slice.total), query, companies: fmt.formatNumber(ordered.length) })
+                                    : t('research.zeroMatches', { query, companies: fmt.formatNumber(ordered.length) })
+                                : t('research.showingAll', { from: fmt.formatNumber(slice.from), to: fmt.formatNumber(slice.to), total: fmt.formatNumber(slice.total) })}
                         </p>
                         {rows.length ? (
                             <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -321,7 +322,7 @@ async function ResearchIndexSection({ query, requestedPage }: { query: string; r
                                     </Link>
                                 ) : null}
                                 <span className="text-xs whitespace-nowrap text-gray-500">
-                                    {t('researchShared.pageOf', { current: formatNumber(slice.page), total: formatNumber(slice.pages) })}
+                                    {t('researchShared.pageOf', { current: fmt.formatNumber(slice.page), total: fmt.formatNumber(slice.pages) })}
                                 </span>
                                 {slice.page < slice.pages ? (
                                     <Link
