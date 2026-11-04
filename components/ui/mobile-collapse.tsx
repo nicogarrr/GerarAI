@@ -3,23 +3,55 @@
 import * as React from 'react';
 import { ChevronDown } from 'lucide-react';
 
-/** Bloque plegado en móvil (cerrado por defecto) y siempre visible desde `md`. */
-export default function MobileCollapse({ title, children }: { title: string; children: React.ReactNode }) {
+import { cn } from '@/lib/utils';
+
+/**
+ * Bloque plegado en móvil (cerrado por defecto) y siempre visible desde `md`.
+ *
+ * En móvil cabecera y contenido son UNA sola tarjeta: el título va arriba y,
+ * al abrir, el contenido se despliega dentro, debajo de una línea, sin hueco
+ * ni segundo borde. La tarjeta propia del hijo (borde y radio) se neutraliza
+ * solo por debajo de `md`; desde `md` el hijo se pinta tal cual y la cabecera
+ * no existe.
+ *
+ * `inset`: el bloque ya vive dentro de otra tarjeta (p. ej. «Lectura técnica»
+ * dentro del gráfico); entonces no pinta marco propio, solo la línea superior,
+ * para no anidar una tarjeta dentro de otra.
+ */
+export default function MobileCollapse({ title, children, inset = false }: { title: string; children: React.ReactNode; inset?: boolean }) {
     const [open, setOpen] = React.useState(false);
     const id = React.useId();
     return (
-        <div>
+        <div
+            className={cn(
+                inset
+                    ? 'max-md:border-t max-md:border-gray-800'
+                    : 'max-md:overflow-hidden max-md:rounded-xl max-md:border max-md:border-gray-800 max-md:bg-surface-1',
+            )}
+            data-open={open ? 'true' : 'false'}
+            data-testid="mobile-collapse"
+        >
             <button
                 aria-controls={id}
                 aria-expanded={open}
-                className="flex min-h-[44px] w-full items-center justify-between rounded-xl border border-gray-800 bg-surface-1 px-4 text-left text-sm font-semibold text-gray-100 md:hidden"
+                className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 text-left text-sm font-semibold text-gray-100 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-400 md:hidden"
                 onClick={() => setOpen((value) => !value)}
                 type="button"
             >
                 {title}
-                <ChevronDown aria-hidden="true" className={`h-5 w-5 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+                <ChevronDown aria-hidden="true" className={cn('h-5 w-5 shrink-0 text-gray-500 transition-transform', open && 'rotate-180')} />
             </button>
-            <div className={open ? 'mt-3 block' : 'hidden md:block'} id={id}>{children}</div>
+            <div
+                className={cn(
+                    open ? 'block' : 'hidden md:block',
+                    'max-md:border-t max-md:border-gray-800',
+                    // Una sola tarjeta en móvil: fuera el borde/radio/sombra de la tarjeta del hijo.
+                    'max-md:*:rounded-none! max-md:*:border-0! max-md:*:shadow-none!',
+                )}
+                id={id}
+            >
+                {children}
+            </div>
         </div>
     );
 }
