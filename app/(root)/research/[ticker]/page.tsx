@@ -1,4 +1,5 @@
 import { getFormat, getLocale, getT } from '@/lib/i18n/server';
+import { engineNoticeText } from '@/lib/research/engine-notice';
 import { RATING_LABELS_EN, STATUS_LABELS_EN } from '@/lib/research/status-labels-en';
 import type { TranslationKey } from '@/lib/i18n/t';
 import type { Locale } from '@/lib/i18n/locale';
@@ -447,7 +448,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
           </p>
           {blockers.length ? <p className="mt-2 text-xs">{t('research.ficha.blockers', { list: blockers.map((id) => blockerLabel(id, locale)).join('; ') })}</p> : null}
           {missingInputs.length ? <p className="mt-2 text-xs">{t('research.ficha.missingInputs', { list: missingInputs.map((item) => termLabel(item, locale)).join(', ') })}</p> : null}
-          {engineNotice ? <p className="mt-2 text-xs text-amber-200/70">{t('research.ficha.engineNote', { note: engineNotice })}</p> : null}
+          {engineNotice ? <p className="mt-2 text-xs text-amber-200/70">{t('research.ficha.engineNote', { note: engineNoticeText(engineNotice, locale) })}</p> : null}
         </div>
         <div className="grid grid-cols-1 gap-4 opacity-60 sm:grid-cols-3">
           <Stat label={`${t('research.ficha.bearGuidance')}${basisLabel}`} value={fmt.formatMoney(scenarios.values.bear as number | null, currency)} />
