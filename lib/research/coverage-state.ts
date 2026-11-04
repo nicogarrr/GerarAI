@@ -51,14 +51,22 @@ export function modelConditionState(item: {
 /** Ratings del motor de tesis que son un veredicto de valoración. */
 const VALUATION_VERDICTS = new Set(['attractive', 'expensive', 'fair', 'cheap', 'incomplete_price']);
 
+/** Estados de tesis cuya cifra afirma una valoración publicable. */
+const PUBLIC_THESIS_STATUSES = new Set(['final', 'published']);
+
 /** Un veredicto de valoración (atractiva/cara) no puede convivir con un estado
  *  «no valorable»: si la valoración no es válida, el veredicto se omite
- *  (null). Los demás ratings (compra, mantener, datos insuficientes...) pasan. */
+ *  (null). Y ningún rating luce badge fuera de una tesis pública: un borrador
+ *  con valoración parcial (p. ej. respaldo orientativo por múltiplos, no
+ *  publicable) pintaría un veredicto sin la etiqueta «orientativo» que el
+ *  texto sí lleva. */
 export function visibleThesisRating(
   rating: string | null | undefined,
   snapshot: Parameters<typeof researchValuability>[0],
 ): string | null {
   if (!rating) return null;
+  const status = snapshot.latest_thesis?.status;
+  if (!status || !PUBLIC_THESIS_STATUSES.has(status)) return null;
   if (VALUATION_VERDICTS.has(rating) && researchValuability(snapshot) === NOT_VALUABLE) return null;
   return rating;
 }
