@@ -682,7 +682,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                             {alerts.slice(0, 3).map((alert) => (
                                 <Link
                                     href="/alerts"
-                                    className="block min-w-0 break-words rounded px-1 -mx-1 py-0.5 text-sm text-gray-300 transition-colors hover:text-amber-300"
+                                    className="flex min-h-11 min-w-0 items-center break-words rounded px-1 -mx-1 py-0.5 text-sm text-gray-300 transition-colors hover:text-amber-300"
                                     key={alert._id}
                                 >
                                     {alertRuleLabel(alert, t, locale)}

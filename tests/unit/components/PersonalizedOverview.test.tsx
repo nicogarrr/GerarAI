@@ -290,6 +290,8 @@ describe('PersonalizedOverview', () => {
         expect(links).toHaveLength(3);
         expect(links[0]).toHaveTextContent(/^AAPL: .*200$/);
         expect(links[1].textContent).toMatch(/^MSFT: /);
+        // Área táctil de 44 px en móvil: antes eran enlaces de ~24 px (py-0.5).
+        for (const l of links) expect(l).toHaveClass('min-h-11');
         expect(screen.getByText('4 reglas activas · ninguna se ha disparado todavía.')).toBeInTheDocument();
     });
 
