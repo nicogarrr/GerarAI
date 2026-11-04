@@ -15,3 +15,12 @@ def historical_margin_note(basis: dict | None) -> str:
         "Cifra archivada con fórmula no verificada; no es un margen comparable "
         "con el actual (V - P) / V. Se conserva el texto original."
     )
+
+
+def known_margin_status(thesis_status: str | None) -> str:
+    """A known formula is indicative until its thesis claims final publication.
+
+    This does not certify the economic assumptions. Publication gates still
+    withhold archived or unpublishable final models independently.
+    """
+    return "verified" if thesis_status in {"final", "published"} else "indicative"

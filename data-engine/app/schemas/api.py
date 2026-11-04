@@ -177,6 +177,7 @@ class SnapshotThesisSummaryOut(BaseModel):
     margin_of_safety: Decimal | None
     archived_margin_of_safety: Decimal | None = None
     margin_of_safety_convention: str | None = None
+    # Known formula: verified only for final/published thesis; otherwise indicative.
     margin_of_safety_status: str = "unknown_convention"
     data_confidence_score: int
     source_coverage_score: int
@@ -201,6 +202,7 @@ class SnapshotValuationSummaryOut(BaseModel):
     margin_of_safety: Decimal | None = None
     archived_margin_of_safety: Decimal | None = None
     margin_of_safety_convention: str | None = None
+    # Known formula: verified only for final/published thesis; otherwise indicative.
     margin_of_safety_status: str = "unknown_convention"
     updated_at: datetime | None = None
 
@@ -373,6 +375,7 @@ class ThesisOut(BaseModel):
     margin_of_safety: Decimal | None
     archived_margin_of_safety: Decimal | None = None
     margin_of_safety_convention: str | None = None
+    # Known formula: verified only for final/published thesis; otherwise indicative.
     margin_of_safety_status: str = "unknown_convention"
     data_confidence_score: int
     source_coverage_score: int
@@ -403,7 +406,7 @@ class ThesisOut(BaseModel):
 
     @model_validator(mode="after")
     def _separate_archived_margin(self) -> "ThesisOut":
-        from app.valuation.margin_convention import margin_convention_known
+        from app.valuation.margin_convention import known_margin_status, margin_convention_known
 
         if self.valuation_withheld_reason and self.margin_of_safety_status == "withheld":
             return self
@@ -413,7 +416,7 @@ class ThesisOut(BaseModel):
         if self.archived_margin_of_safety is None:
             self.margin_of_safety_status = "missing"
         elif margin_convention_known(self.valuation_basis):
-            self.margin_of_safety_status = "verified"
+            self.margin_of_safety_status = known_margin_status(self.status)
         else:
             self.margin_of_safety = None
             self.margin_of_safety_status = "unknown_convention"

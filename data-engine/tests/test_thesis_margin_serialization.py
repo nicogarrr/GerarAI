@@ -52,3 +52,21 @@ def test_inferred_valuation_does_not_reappear_via_archive():
     out = ThesisOut.model_validate(row)
     assert out.margin_of_safety is out.archived_margin_of_safety is None
     assert out.margin_of_safety_status == 'withheld'
+
+
+@pytest.mark.parametrize('status', ['draft', 'draft_failed_audit', 'partial', 'insufficient_data'])
+def test_known_convention_on_nonfinal_thesis_is_indicative_after_double_serialization(status):
+    row = thesis('discount_to_value_v1')
+    row.status = status
+    out = ThesisOut.model_validate(row)
+    for payload in (out, ThesisOut.model_validate(out.model_dump())):
+        assert payload.margin_of_safety == payload.archived_margin_of_safety == Decimal('-0.649')
+        assert payload.margin_of_safety_status == 'indicative'
+
+
+@pytest.mark.parametrize('status', ['final', 'published'])
+def test_known_convention_on_final_thesis_stays_verified_after_double_serialization(status):
+    row = thesis('discount_to_value_v1')
+    row.status = status
+    out = ThesisOut.model_validate(row)
+    assert ThesisOut.model_validate(out.model_dump()).margin_of_safety_status == 'verified'
