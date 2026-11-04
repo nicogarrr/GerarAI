@@ -111,5 +111,20 @@
     "unexpected": "Something unexpected went wrong. Please try again.",
     "reference": "Reference: {digest}",
     "retry": "Retry"
+  },
+  "thesisTrackRecord": {
+    "title": "Our track record",
+    "description": "We compare each thesis fair value with the actual price 6 and 12 months later.",
+    "firstResult": "First result on {date}.",
+    "noMatured": "No horizon has matured yet.",
+    "months6": "At 6 months",
+    "months12": "At 12 months",
+    "bestBadge": "Best",
+    "hitRate": "direction hit rate ({hits} of {samples})",
+    "medianError": "median fair value error",
+    "touched": "reached the fair value",
+    "horizonPending": "Not matured yet.",
+    "best": "Best horizon for this stock: {horizon}, by hit rate.",
+    "bestInsufficient": "Not enough samples to pick a horizon (at least {min} per horizon)."
   }
 }
