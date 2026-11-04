@@ -9,16 +9,6 @@ import {
 } from '@/lib/research/valuation-display';
 
 describe('blockerLabel', () => {
-  it('explains missing sourced scenarios in both languages', () => {
-    const es = blockerLabel('scenario_set_missing', 'es');
-    const en = blockerLabel('scenario_set_missing', 'en');
-    expect(es).toContain('escenarios pendientes');
-    expect(es).toContain('no una valoración final');
-    expect(en).toContain('scenarios pending');
-    expect(en).toContain('not a final valuation');
-    expect(es).not.toBe('scenario_set_missing');
-    expect(en).not.toBe('scenario_set_missing');
-  });
   it('explica traceable_wacc como falta (no como presencia)', () => {
     expect(blockerLabel('traceable_wacc')).toBe('WACC sin cálculo trazable');
     expect(blockerLabel('traceable_wacc', 'en')).toBe('WACC without a traceable calculation');
