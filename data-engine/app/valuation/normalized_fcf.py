@@ -49,6 +49,12 @@ MIN_MARGIN_UPLIFT = 0.01
 MIDCYCLE_MAX_YEARS = 7
 MIDCYCLE_MIN_YEARS = 5
 MIDCYCLE_SHORT_MIN_YEARS = 3
+# Tope del objetivo normalizado: nunca por encima del mejor margen FCF REAL
+# (flujo operativo − capex total) de los últimos N ejercicios. Owner
+# 4-nov-2026; backtest 2 point-in-time (work/gerarai-backtest2, prueba t3):
+# error a 12 m 48 % → 41 % en 2021–26 y casi igual en 2015–20 (META 42,5 % →
+# 33,1 %). Con menos ejercicios se usan los que haya y la traza lo dice.
+CAPEX_NORM_MAX_REAL_MARGIN_YEARS = 5
 GROWTH_CEILING = 0.45
 GROWTH_FLOOR = -0.15
 MARGIN_CEILING = 0.50
@@ -189,19 +195,42 @@ def capex_normalization(history: dict[int, dict], reported_margin: float | None)
     target = sum(item["normalized_fcf_margin"] for item in rows) / len(rows)
     reported_avg = sum(item["reported_fcf_margin"] for item in rows) / len(rows)
     initial = reported_margin if reported_margin is not None else latest["reported_fcf_margin"]
+    # Tope: el margen de llegada no puede superar el mejor margen FCF real
+    # (con el capex total) de los últimos CAPEX_NORM_MAX_REAL_MARGIN_YEARS
+    # ejercicios: un margen que la empresa nunca ha tenido no es «ciclo medio».
+    window = rows[:CAPEX_NORM_MAX_REAL_MARGIN_YEARS]
+    best = max(window, key=lambda item: item["reported_fcf_margin"])
+    capped_from_real = target if target > best["reported_fcf_margin"] else None
+    real_cap = {
+        "applied": capped_from_real is not None,
+        "value": best["reported_fcf_margin"],
+        "fiscal_year": best["fiscal_year"],
+        "years": [item["fiscal_year"] for item in window],
+        "years_wanted": CAPEX_NORM_MAX_REAL_MARGIN_YEARS,
+        "short_history": len(window) < CAPEX_NORM_MAX_REAL_MARGIN_YEARS,
+        "uncapped_target": target,
+    }
+    if capped_from_real is not None:
+        target = best["reported_fcf_margin"]
     if target <= 0:
         return {
             "applied": False,
             "reason": "el margen de ciclo medio con capex de mantenimiento no es positivo",
             "latest": latest,
             "midcycle_margin": target,
+            "max_real_margin_cap": real_cap,
         }
     if target < initial + MIN_MARGIN_UPLIFT:
         return {
             "applied": False,
-            "reason": "el capex no deprime el margen: el de ciclo medio no supera al reportado en 1 pp",
+            "reason": (
+                "el capex no deprime el margen: el de ciclo medio"
+                + (" (acotado al mejor margen real)" if capped_from_real is not None else "")
+                + " no supera al reportado en 1 pp"
+            ),
             "latest": latest,
             "midcycle_margin": target,
+            "max_real_margin_cap": real_cap,
         }
     clamped_from = None
     if target > MARGIN_CEILING:
@@ -217,6 +246,14 @@ def capex_normalization(history: dict[int, dict], reported_margin: float | None)
         f"medio (media FY{min(years)}–FY{max(years)}, {len(rows)} ejercicios"
         + (", historial corto" if short else "")
         + f"; con el capex total la media habría sido {_pct_es(reported_avg)})."
+        + (
+            f" Objetivo acotado al mejor margen FCF real de los últimos {len(window)} ejercicios "
+            f"({_pct_es(best['reported_fcf_margin'])} en el FY{best['fiscal_year']}"
+            + (", historial corto" if real_cap["short_history"] else "")
+            + f"); sin el tope habría sido {_pct_es(capped_from_real)}."
+            if capped_from_real is not None
+            else ""
+        )
     )
     return {
         "applied": True,
@@ -225,6 +262,8 @@ def capex_normalization(history: dict[int, dict], reported_margin: float | None)
         "initial_margin": initial,
         "target_margin": target,
         "target_margin_clamped_from": clamped_from,
+        "target_margin_capped_from": capped_from_real,
+        "max_real_margin_cap": real_cap,
         "fade_years": CAPEX_FADE_YEARS,
         "midcycle_years": years,
         "midcycle_short_history": short,
