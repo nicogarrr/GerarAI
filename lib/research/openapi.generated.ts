@@ -6367,6 +6367,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/valuation/{ticker}/what-to-believe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What To Believe
+         * @description «Qué hace falta creer» para justificar el precio con el DCF de la empresa.
+         *
+         *     Solo lee: la valoración vigente (misma que /api/valuation/{ticker}, con su
+         *     WACC tal y como lo resolvió el motor), el WACC implícito al precio y al
+         *     consenso simple de analistas (si está en la misma divisa), el crecimiento
+         *     del DCF inverso del motor y el contraste con un múltiplo de salida. Los
+         *     métodos que no son un DCF FCFF responden «no aplica» con el motivo.
+         */
+        get: operations["what_to_believe_api_valuation__ticker__what_to_believe_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist": {
         parameters: {
             query?: never;
@@ -9045,6 +9071,26 @@ export interface components {
             /** Year */
             year?: number | null;
         };
+        /** ExitMultipleContrast */
+        ExitMultipleContrast: {
+            /** Gordon Value Per Share */
+            gordon_value_per_share?: number | null;
+            /** Implied Multiple For Price */
+            implied_multiple_for_price?: number | null;
+            /**
+             * Metric
+             * @default terminal_year_fcf
+             * @constant
+             */
+            metric: "terminal_year_fcf";
+            /**
+             * Multiple
+             * @default 25
+             */
+            multiple: number;
+            /** Value Per Share */
+            value_per_share?: number | null;
+        };
         /** ExpertThesisClaimOut */
         ExpertThesisClaimOut: {
             /** Refs */
@@ -9770,6 +9816,42 @@ export interface components {
         ImageInput: {
             /** Image Base64 */
             image_base64: string;
+        };
+        /**
+         * ImpliedGrowth
+         * @description Crecimiento de la etapa 1 que justifica el precio (DCF inverso del motor).
+         */
+        ImpliedGrowth: {
+            /** Current Revenue Growth */
+            current_revenue_growth?: number | null;
+            /**
+             * Method
+             * @default reverse_dcf_stage1_growth
+             */
+            method: string;
+            /** Required Revenue Growth */
+            required_revenue_growth?: number | null;
+            /** Status */
+            status: string;
+        };
+        /** ImpliedWacc */
+        ImpliedWacc: {
+            /**
+             * Bounds
+             * @default []
+             */
+            bounds: number[];
+            /** Direction */
+            direction?: ("below_min" | "above_max") | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "out_of_range" | "not_available";
+            /** Target Price */
+            target_price?: number | null;
+            /** Wacc */
+            wacc?: number | null;
         };
         /**
          * InferredInputCreate
@@ -14445,6 +14527,40 @@ export interface components {
             items: {
                 [key: string]: components["schemas"]["WatchlistMonitorItemOut"];
             };
+        };
+        /** WhatToBelieve */
+        WhatToBelieve: {
+            /** Base Value */
+            base_value?: number | null;
+            /** Consensus Price */
+            consensus_price?: number | null;
+            /** Consensus Source */
+            consensus_source?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Current Price */
+            current_price?: number | null;
+            /** Engine */
+            engine?: string | null;
+            exit_multiple?: components["schemas"]["ExitMultipleContrast"] | null;
+            implied_growth?: components["schemas"]["ImpliedGrowth"] | null;
+            implied_wacc_consensus?: components["schemas"]["ImpliedWacc"] | null;
+            implied_wacc_price?: components["schemas"]["ImpliedWacc"] | null;
+            /** Reason */
+            reason?: string | null;
+            /** Reason Code */
+            reason_code?: ("engine_not_dcf" | "no_base_value" | "no_price" | "valuation_unavailable") | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "not_applicable";
+            /** Terminal Growth */
+            terminal_growth?: number | null;
+            /** Ticker */
+            ticker: string;
+            /** Wacc Used */
+            wacc_used?: number | null;
         };
         /** WorkProductRequest */
         WorkProductRequest: {
@@ -30340,6 +30456,48 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    what_to_believe_api_valuation__ticker__what_to_believe_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatToBelieve"];
                 };
             };
             /** @description Validation Error */
