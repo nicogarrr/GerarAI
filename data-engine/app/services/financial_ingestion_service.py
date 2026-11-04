@@ -248,7 +248,17 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("operating_income",  ["OperatingIncomeLoss"],                                                                  "USD"),
     ("income_before_tax", ["IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomesticAndForeign"], "USD"),
     ("income_tax_expense", ["IncomeTaxExpenseBenefit"],                                                             "USD"),
-    ("interest_expense",   ["InterestExpenseNonoperating", "InterestExpenseNonOperating", "InterestExpense", "InterestExpenseDebt", "InterestExpenseLongTermDebt", "InterestAndDebtExpense"],                                      "USD"),
+    ("interest_expense",   ["InterestExpenseNonoperating", "InterestExpenseNonOperating", "InterestExpense", "InterestExpenseDebt", "InterestExpenseLongTermDebt", "InterestAndDebtExpense",
+                            # Tag NETO no operativo: ULTIMO alias. CHTR dejo de
+                            # usar InterestExpense en 2015 y el gasto viaja aqui
+                            # en negativo (-2.532 M$ H1-2026); la puerta
+                            # NET_EXPENSE_GATE_CONCEPTS solo lo admite como
+                            # gasto (valor negativo) y lo guarda en positivo.
+                            "InterestIncomeExpenseNonoperatingNet"],            "USD"),
+    # Coste de la deuda REPORTADO por el emisor en el 10-K (unidad "pure" =
+    # fraccion; CHTR 0,051 FY2025). El motor lo toma como
+    # "reported_cost_of_debt" antes de derivarlo de gasto/deuda.
+    ("cost_of_debt",       ["DebtWeightedAverageInterestRate"],                 "pure"),
     ("net_income",        ["NetIncomeLoss", "ProfitLoss"],                                                          "USD"),
     ("eps_diluted",       ["EarningsPerShareDiluted"],                                                              "USD/share"),
     # PROMEDIO ponderado de acciones (un denominador de duracion). El saldo
@@ -1000,6 +1010,31 @@ def _quarters_from_ytd(
     return derived
 
 
+# Tags netos con puerta de signo en la recogida: el SIGNO decide si el hecho
+# es la metrica. ``InterestIncomeExpenseNonoperatingNet`` NEGATIVO es gasto
+# financiero no operativo (se guarda en positivo, convencion de
+# ``interest_expense``); POSITIVO es ingreso financiero neto y no es gasto:
+# se descarta (sin dato = N/D; jamas se convierte un ingreso en gasto).
+NET_EXPENSE_GATE_CONCEPTS = frozenset({"InterestIncomeExpenseNonoperatingNet"})
+
+
+def _interest_expense_concepts_for(concepts: list[str], bank_like: bool) -> list[str]:
+    """Candidatos a interest_expense de un emisor.
+
+    En bancos el gasto por intereses es OPERATIVO (intereses de depositos,
+    lado revenue): el tag neto NO operativo es un residuo marginal de otro
+    alcance (MS: InterestExpense 42.051 M$ FY2023 frente a 109 M$ netos
+    FY2025). Si entrara como alias ganaria los periodos recientes por
+    `filed` con una cifra que no es el gasto financiero del banco, asi que
+    para ``bank_like`` se excluye ANTES de la recoleccion (mismo motivo que
+    los subtotales de comisiones en revenue): sus anos sin tag estricto
+    quedan N/D, no se rellenan con el residuo.
+    """
+    if not bank_like:
+        return concepts
+    return [c for c in concepts if c not in NET_EXPENSE_GATE_CONCEPTS]
+
+
 def _collect_by_concept(
     us_gaap: dict[str, Any],
     concepts: list[str],
@@ -1073,6 +1108,11 @@ def _collect_by_concept(
                     continue
                 if not min_span <= span <= max_span:
                     continue
+            if concept in NET_EXPENSE_GATE_CONCEPTS:
+                value = _decimal(entry.get("val"))
+                if value is None or value >= 0:
+                    continue
+                entry = {**entry, "val": -value}
             end = str(entry.get("end") or "")
             if not end:
                 continue
@@ -1775,11 +1815,14 @@ class FinancialIngestionService:
             if unit_keys is None:
                 continue
             unit, xbrl_unit_key = unit_keys
-            metric_concepts = (
-                _revenue_concepts_for(concepts, bank_like)
-                if metric == "revenue"
-                else concepts
-            )
+            if metric == "revenue":
+                metric_concepts = _revenue_concepts_for(concepts, bank_like)
+            elif metric == "interest_expense":
+                metric_concepts = _interest_expense_concepts_for(
+                    concepts, bank_like
+                )
+            else:
+                metric_concepts = concepts
             by_end = _merge_for_metric(
                 _collect_by_concept(
                     us_gaap,
@@ -1847,11 +1890,14 @@ class FinancialIngestionService:
             # de ejercicio: el fp de companyfacts es el periodo fiscal DE LA
             # PRESENTACION (las comparativas heredan el fp del 10-Q que las
             # trae), no el del dato. Fallback a fp sin ancla modal.
-            metric_concepts_q = (
-                _revenue_concepts_for(concepts, bank_like)
-                if metric == "revenue"
-                else concepts
-            )
+            if metric == "revenue":
+                metric_concepts_q = _revenue_concepts_for(concepts, bank_like)
+            elif metric == "interest_expense":
+                metric_concepts_q = _interest_expense_concepts_for(
+                    concepts, bank_like
+                )
+            else:
+                metric_concepts_q = concepts
             by_end_q = _merge_for_metric(
                 _collect_by_concept(
                     us_gaap,
