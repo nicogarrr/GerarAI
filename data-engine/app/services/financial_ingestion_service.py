@@ -632,6 +632,20 @@ SCOPE_PRIORITY_METRICS = {
     "operating_lease_liabilities",
 }
 
+# Métricas cuyos conceptos están ANIDADOS (cada uno es parte del siguiente:
+# ``Depreciation`` ⊂ ``DepreciationAndAmortization`` ⊂ ``…DepletionAnd…``).
+# El orden por alcance no basta: hay emisores que etiquetan el concepto
+# «amplio» en una línea parcial del mismo 10-K (Salesforce FY2025: DDA 1.000 M
+# frente a 3.477 M de D&A en el estado de flujos; McDonald's 457 frente a
+# 2.199 M). En UNA misma presentación el total de mayor alcance no puede ser
+# menor que uno más estrecho, así que ahí gana el mayor importe. Entre
+# presentaciones distintas sigue mandando el orden (un recast posterior más
+# pequeño, p. ej. tras una escisión, no se cambia por la cifra vieja mayor).
+NESTED_SCOPE_METRICS = frozenset({"depreciation_amortization"})
+# Tolerancia para cifras redondeadas del texto («unos 2.500 M» frente a los
+# 2.474 M exactos de la tabla): por debajo de ella no se cambia de concepto.
+NESTED_SCOPE_TOLERANCE = Decimal("0.02")
+
 # Tags us-gaap de deuda financiera (lado PASIVO) usados como evidencia para la
 # derivada "net_debt = -caja" (EXEL, 19/10/2026): solo si NINGUNO tiene valor
 # en los ultimos 5 ejercicios la ausencia de total_debt es probatoria ("sin
@@ -714,6 +728,37 @@ def _collapse_by_scope(
         for end, entry in entries.items():
             by_end.setdefault(end, entry)
     return by_end
+
+
+def widest_in_same_filing(
+    by_concept: dict[str, dict[str, dict[str, Any]]],
+    by_end: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Por periodo, el mayor importe entre los conceptos de la MISMA presentación.
+
+    Parte del ganador por alcance (``by_end``) y solo lo cambia por otro
+    concepto del mismo filing (mismo ``accn``; sin ``accn``, mismo ``filed``)
+    cuyo valor absoluto lo supere en más de ``NESTED_SCOPE_TOLERANCE``.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    for end, winner in by_end.items():
+        best = winner
+        best_val = _decimal(best.get("val"))
+        for entries in by_concept.values():
+            other = entries.get(end)
+            if other is None or other is best:
+                continue
+            if winner.get("accn") and other.get("accn"):
+                same = other.get("accn") == winner.get("accn")
+            else:
+                same = str(other.get("filed") or "") == str(winner.get("filed") or "")
+            other_val = _decimal(other.get("val"))
+            if not same or other_val is None or best_val is None:
+                continue
+            if abs(other_val) > abs(best_val) * (1 + NESTED_SCOPE_TOLERANCE):
+                best, best_val = other, other_val
+        out[end] = best
+    return out
 
 
 def _compose_total_debt(
@@ -804,6 +849,8 @@ def _merge_for_metric(
         return _sum_disjoint_components(by_concept)
     if metric == "total_debt":
         return _compose_total_debt(by_concept)
+    if metric in NESTED_SCOPE_METRICS:
+        return widest_in_same_filing(by_concept, _collapse_by_scope(by_concept))
     if metric in SCOPE_PRIORITY_METRICS:
         return _collapse_by_scope(by_concept)
     return _collapse_aliases(by_concept)
