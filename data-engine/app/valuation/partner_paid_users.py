@@ -6,6 +6,11 @@ A comparable paid-penetration assumption must identify payer/eligible line
 counts for the SAME period/population and a source for transferring that
 rate to the partner. Unique connections, compatible devices, beta activations
 and free included service cannot establish a paid attach rate.
+When the comparable denominator's measurement date is declared, it must sit
+inside the comparable period: a numerator from one period cannot be divided
+by a denominator from another. When a disjoint pool declares a sourced total,
+the partner rows must reconcile with it exactly: components measured under
+different scopes must not be summed.
 """
 from dataclasses import asdict, dataclass
 from datetime import date
@@ -30,6 +35,9 @@ class PartnerPaidInput:
     transfer_rationale: str
     transfer_source: str
     published: date
+    comparable_eligible_as_of: date | None = None
+    declared_pool_total_lines: Decimal | None = None
+    declared_pool_total_source: str = ""
 
 
 def partner_paid_users(rows: list[PartnerPaidInput], *, as_of: date, scenario: str,
@@ -53,8 +61,24 @@ def partner_paid_users(rows: list[PartnerPaidInput], *, as_of: date, scenario: s
     partners = [r.partner for r in rows]
     if len(set(pools)) != len(pools) or len(set(partners)) != len(partners):
         return {**out, "status": "invalid", "reason": "overlapping_partner_pools"}
+    declared = next((r for r in rows if r.declared_pool_total_lines is not None), None)
+    if declared is not None:
+        if any(r.declared_pool_total_lines != declared.declared_pool_total_lines
+               for r in rows if r.declared_pool_total_lines is not None):
+            return {**out, "status": "invalid",
+                    "reason": "declared_pool_total_disagreement"}
+        if (not declared.declared_pool_total_source.startswith("https://")
+                or sum(r.eligible_lines for r in rows) != declared.declared_pool_total_lines):
+            return {**out, "status": "invalid",
+                    "reason": "pool_components_do_not_reconcile_declared_total"}
     total = Decimal(0)
     for r in rows:
+        if (r.comparable_eligible_as_of is not None
+                and not (r.comparable_period_start
+                         <= r.comparable_eligible_as_of
+                         <= r.comparable_period_end)):
+            return {**out, "status": "invalid",
+                    "reason": "comparable_denominator_period_mismatch"}
         vals = (r.eligible_lines, r.paid_comparable_lines, r.comparable_eligible_lines)
         if (not all(v.is_finite() for v in vals) or r.eligible_lines < 0
                 or r.paid_comparable_lines < 0 or r.comparable_eligible_lines <= 0
