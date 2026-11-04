@@ -1072,6 +1072,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/analyst-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Company Analyst History
+         * @description How each analyst firm's past price targets fared for this ticker (Yahoo
+         *     Finance via yfinance, free and unofficial): matured 6- and 12-month
+         *     targets vs the realized close, absolute and peer-relative error,
+         *     direction hit rate, Bayesian shrinkage and a minimum sample to rank.
+         *     The consensus is the SIMPLE mean of live targets. Public market data
+         *     only: no tenant data is read or returned here. No coverage -> status
+         *     `empty` with its reason; a source failure -> `unavailable`.
+         */
+        get: operations["company_analyst_history_api_companies__ticker__analyst_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{ticker}/analyst-targets": {
         parameters: {
             query?: never;
@@ -6866,6 +6892,55 @@ export interface components {
             /** Median */
             median?: number | null;
         };
+        /** AnalystHistory */
+        AnalystHistory: {
+            /** As Of */
+            as_of?: string | null;
+            /** Best Horizon */
+            best_horizon?: ("6m" | "12m") | null;
+            consensus?: components["schemas"]["SimpleConsensus"] | null;
+            /** Currency */
+            currency?: string | null;
+            /** Fetched At */
+            fetched_at: number;
+            /** First Target Date */
+            first_target_date?: string | null;
+            /**
+             * Horizons
+             * @default []
+             */
+            horizons: components["schemas"]["HorizonSummary"][];
+            /**
+             * Min Samples
+             * @default 5
+             */
+            min_samples: number;
+            /** Note */
+            note?: string | null;
+            /** Note Code */
+            note_code?: ("fetch_failed" | "not_equity" | "no_history" | "no_matured") | null;
+            rating_changes?: components["schemas"]["RatingChanges"] | null;
+            /**
+             * Source
+             * @default Yahoo Finance (no oficial): histórico de recomendaciones y cierres diarios
+             */
+            source: string;
+            /** Source Url */
+            source_url?: string | null;
+            /**
+             * Status
+             * @default unavailable
+             * @enum {string}
+             */
+            status: "available" | "empty" | "unavailable";
+            /** Symbol */
+            symbol: string;
+            /**
+             * Targets Total
+             * @default 0
+             */
+            targets_total: number;
+        };
         /** AnalystTargetRow */
         AnalystTargetRow: {
             /** Action */
@@ -9201,6 +9276,35 @@ export interface components {
             /** Valuation Input Ready */
             valuation_input_ready: boolean;
         };
+        /** FirmScore */
+        FirmScore: {
+            /** Direction Hit Rate */
+            direction_hit_rate: number;
+            /** Firm */
+            firm: string;
+            /** Last Date */
+            last_date: string;
+            /** Last Target */
+            last_target: number;
+            /** Median Abs Error Pct */
+            median_abs_error_pct: number;
+            /** Median Bias Pct */
+            median_bias_pct: number;
+            /**
+             * Peer Scored Samples
+             * @default 0
+             */
+            peer_scored_samples: number;
+            /** Relative Error */
+            relative_error?: number | null;
+            /** Samples */
+            samples: number;
+            /**
+             * Small Sample
+             * @default false
+             */
+            small_sample: boolean;
+        };
         /** FlowDestinationOut */
         FlowDestinationOut: {
             /** Amount */
@@ -9502,6 +9606,44 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HorizonSummary */
+        HorizonSummary: {
+            /**
+             * Bottom
+             * @default []
+             */
+            bottom: components["schemas"]["FirmScore"][];
+            /** Direction Hit Rate */
+            direction_hit_rate?: number | null;
+            /**
+             * Horizon
+             * @enum {string}
+             */
+            horizon: "6m" | "12m";
+            /** Matured Targets */
+            matured_targets: number;
+            /** Median Abs Error Pct */
+            median_abs_error_pct?: number | null;
+            /** Median Bias Pct */
+            median_bias_pct?: number | null;
+            /** Months */
+            months: number;
+            /**
+             * Ranked Firms
+             * @default 0
+             */
+            ranked_firms: number;
+            /**
+             * Small Sample Firms
+             * @default 0
+             */
+            small_sample_firms: number;
+            /**
+             * Top
+             * @default []
+             */
+            top: components["schemas"]["FirmScore"][];
         };
         /** IBKRConnectRequest */
         IBKRConnectRequest: {
@@ -12327,6 +12469,24 @@ export interface components {
             /** Source */
             source: string;
         };
+        /** RatingChanges */
+        RatingChanges: {
+            /**
+             * Downgrades
+             * @default 0
+             */
+            downgrades: number;
+            /**
+             * Upgrades
+             * @default 0
+             */
+            upgrades: number;
+            /**
+             * Window Days
+             * @default 90
+             */
+            window_days: number;
+        };
         /** RefreshMarketStageOut */
         RefreshMarketStageOut: {
             /** Alert Rules */
@@ -12987,6 +13147,25 @@ export interface components {
             ranking_direction: string;
             /** Ranking Formula */
             ranking_formula: string | null;
+        };
+        /** SimpleConsensus */
+        SimpleConsensus: {
+            /** Firms */
+            firms: number;
+            /** Mean */
+            mean: number;
+            /** Median */
+            median: number;
+            /**
+             * Method
+             * @default simple_mean
+             * @constant
+             */
+            method: "simple_mean";
+            /** Reference Price */
+            reference_price?: number | null;
+            /** Upside Percent */
+            upside_percent?: number | null;
         };
         /** SnapshotCountsOut */
         SnapshotCountsOut: {
@@ -16510,6 +16689,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CompanyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    company_analyst_history_api_companies__ticker__analyst_history_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalystHistory"];
                 };
             };
             /** @description Validation Error */
