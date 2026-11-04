@@ -24,6 +24,8 @@ from functools import lru_cache
 
 from sqlalchemy.orm import Session
 
+from app.valuation.call_cache import cached
+
 # Codigo de subunidad -> (divisa ISO principal, divisor). Las claves en
 # minusculas mixtas (``GBp``) se comparan SIN pasar a mayusculas: ``GBP`` en
 # mayusculas son libras, ``GBp`` son peniques.
@@ -289,6 +291,26 @@ def resolve_fx(
     pivote (la tabla del BCE es EUR->X, asi que CNY->USD = CNY->EUR->USD).
     Nunca se inventa un tipo.
     """
+    # Misma consulta repetida dentro de una valoracion (14 SELECTs a fx_rates
+    # medidos por llamada): cache acotada a la llamada; la clave es la peticion
+    # completa (par, fecha, edad maxima y pivotes).
+    return cached(
+        db,
+        "resolve_fx",
+        (from_currency, to_currency, on.isoformat(), max_age_days, tuple(p.upper() for p in pivots)),
+        lambda: _resolve_fx_uncached(db, from_currency, to_currency, on, max_age_days=max_age_days, pivots=pivots),
+    )
+
+
+def _resolve_fx_uncached(
+    db: Session,
+    from_currency: str,
+    to_currency: str,
+    on: date,
+    *,
+    max_age_days: int = FX_MAX_AGE_DAYS,
+    pivots: Iterable[str] = ("EUR", "USD"),
+) -> FxQuote | None:
     # ``.upper()`` a secas convertiria ``GBp`` (peniques) en ``GBP`` (libras):
     # tipo x100. La subunidad se conserva y el servicio FX aplica su divisor.
     src = canonical_currency_code(from_currency)
