@@ -8,6 +8,10 @@ así que el DCF estándar es el respaldo correcto; pero la traza, el modelo
 guardado y la tesis seguían diciendo «scenario_auto_energy_fsd» como si ese
 método hubiera corrido. Lo mismo KRKNF («defense_backlog_scenario_model»).
 Ahora el resultado lo declara: modelo declarado, motor resuelto y motivo.
+
+Desde el motor de escenarios (test_scenario_engine.py) TSLA, KRKNF y NBIS
+corren el método que declaran; el respaldo sigue para cualquier método sin
+motor propio.
 """
 
 from __future__ import annotations
@@ -40,18 +44,18 @@ def _co(model: str, **kw) -> SimpleNamespace:
     return SimpleNamespace(**base)
 
 
-def test_scenario_model_without_engine_runs_dcf_and_says_why(db):
+def test_declared_method_without_engine_runs_dcf_and_says_why(db):
     company = _seed(db, "XSCN", AMZN, shares=10_000 * M, net_debt=-5_000 * M, price=150.0, wacc=0.09)
-    company.valuation_model = "scenario_auto_energy_fsd"
-    company.company_type = "auto_energy_optionality"
+    company.valuation_model = "unit_economics_model"
+    company.company_type = "platform_fcf_compounder"
     db.commit()
     result = ValuationService().value_company(db, company)
     trace = result["trace"]
     assert trace["resolved_engine"] == "standard_dcf"
-    assert trace["declared_model"] == "scenario_auto_energy_fsd"
+    assert trace["declared_model"] == "unit_economics_model"
     fallback = trace["engine_fallback"]
     assert fallback["reason"] == "declared_method_without_engine"
-    assert fallback["declared_method"] == "scenario_auto_energy_fsd"
+    assert fallback["declared_method"] == "unit_economics_model"
     assert fallback["resolved_engine"] == "standard_dcf"
 
 
@@ -64,6 +68,8 @@ def test_scenario_model_without_engine_runs_dcf_and_says_why(db):
         ("probability_weighted_scenarios+dilution", {"factor_tags": ["pre_fcf"]}),  # ASTS
         ("commodity_sensitivity+dcf", {"company_type": "uranium_mining"}),  # CCJ
         ("nav_rough+dilution_risk", {"company_type": "mining_pre_revenue"}),  # HYMC → commodity
+        ("scenario_auto_energy_fsd", {}),  # TSLA → motor de escenarios
+        ("defense_backlog_scenario_model", {}),  # KRKNF → motor de escenarios
         ("unassigned", {}),  # stub: no hay modelo declarado
         ("", {}),
     ],
@@ -75,8 +81,9 @@ def test_declared_model_served_by_its_engine_records_no_fallback(model, kw):
 @pytest.mark.parametrize(
     ("model", "kw", "reason", "engine"),
     [
-        ("scenario_auto_energy_fsd", {}, "declared_method_without_engine", "standard_dcf"),
-        ("defense_backlog_scenario_model", {}, "declared_method_without_engine", "standard_dcf"),
+        ("unit_economics_model", {}, "declared_method_without_engine", "standard_dcf"),
+        # Escenarios declarados sobre un banco: manda el motor bancario.
+        ("scenario_auto_energy_fsd", {"industry": "Banks - Regional"}, "overridden_by_classification", "bank"),
         # Declara un DCF pero la industria lo manda al motor bancario: corre
         # otro motor por clasificación, y queda dicho.
         ("dcf+reverse_dcf", {"industry": "Banks - Regional"}, "overridden_by_classification", "bank"),

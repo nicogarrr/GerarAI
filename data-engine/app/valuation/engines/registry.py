@@ -13,6 +13,7 @@ from app.valuation.engines.base import ValuationEngine
 from app.valuation.engines.commodity import CommodityCycleEngine
 from app.valuation.engines.holding_company import HoldingCompanyEngine
 from app.valuation.engines.pre_revenue import PreRevenueScenarioEngine
+from app.valuation.engines.scenario_engine import ScenarioValuationEngine
 from app.valuation.engines.sector_specific import (
     BankValuationEngine,
     InsurerValuationEngine,
@@ -30,6 +31,7 @@ VALUATION_ENGINES: dict[str, type[ValuationEngine]] = {
     "bank": BankValuationEngine,
     "insurer": InsurerValuationEngine,
     "reit": ReitValuationEngine,
+    "scenario": ScenarioValuationEngine,
 }
 
 
@@ -78,7 +80,71 @@ def reference_industry(company: Company) -> str | None:
     return industry
 
 
+# Métodos que el modelo declarado (company.valuation_model, p. ej.
+# «sotp+asset_management_multiple») puede nombrar como principal (su primer
+# componente) y los motores que los implementan. Un método fuera de esta tabla
+# sin motor propio corre el que resuelve resolve_engine_key y queda dicho. El
+# orden importa: gana el primer marcador contenido en el método, así
+# «speculative_scenario_model» sigue en pre_revenue y solo la familia de
+# escenarios/capacidad/cartera de pedidos con ingresos va al motor scenario
+# (TSLA «scenario_auto_energy_fsd», KRKNF «defense_backlog_scenario_model»,
+# NBIS «capacity_capex_utilization_model»).
+_DECLARED_METHOD_ENGINES: tuple[tuple[str, frozenset[str]], ...] = (
+    ("sotp", frozenset({"sotp", "holding_company"})),
+    ("commodity", frozenset({"commodity"})),
+    ("probability_weighted_scenarios", frozenset({"pre_revenue"})),
+    ("speculative", frozenset({"pre_revenue"})),
+    # NAV aproximado: el de una minera es el del motor de materias primas.
+    ("nav_rough", frozenset({"pre_revenue", "commodity"})),
+    ("bank", frozenset({"bank"})),
+    ("insur", frozenset({"insurer"})),
+    ("reit", frozenset({"reit"})),
+    ("scenario", frozenset({"scenario"})),
+    ("capacity", frozenset({"scenario"})),
+    ("backlog", frozenset({"scenario"})),
+    ("dcf", frozenset({"standard_dcf"})),
+)
+_UNDECLARED_MODELS = frozenset({"", "unassigned"})
+
+
+def declared_method(company: Company) -> str:
+    """Método principal declarado: el primer componente antes de «+»."""
+    declared = (getattr(company, "valuation_model", None) or "").strip().lower()
+    return declared.split("+", 1)[0].strip()
+
+
+def declared_method_engines(method: str) -> frozenset[str] | None:
+    """Motores que implementan el método declarado, o None si ninguno."""
+    return next(
+        (allowed for marker, allowed in _DECLARED_METHOD_ENGINES if marker in method),
+        None,
+    )
+
+
+# La ruta de escenarios solo sustituye a estos motores: un banco, una
+# aseguradora, un REIT, un holding o una minera siguen con el suyo aunque
+# declaren escenarios (queda dicho como overridden_by_classification).
+_SCENARIO_REPLACES = frozenset({"standard_dcf", "pre_revenue"})
+
+
 def resolve_engine_key(company: Company) -> str:
+    """Motor que corre: la familia de escenarios declarada o la clasificación."""
+    key = classification_engine_key(company)
+    company_type = (getattr(company, "company_type", None) or "").lower()
+    if (
+        key in _SCENARIO_REPLACES
+        and declared_method_engines(declared_method(company)) == frozenset({"scenario"})
+        and "pre_revenue" not in company_type
+    ):
+        return "scenario"
+    return key
+
+
+def classification_engine_key(company: Company) -> str:
+    """Motor por clasificación (tipo, etiquetas, industria), sin la ruta de escenarios.
+
+    Es también el respaldo del motor de escenarios cuando le faltan entradas.
+    """
     model = (company.valuation_model or "").lower()
     tags = set(company.factor_tags or [])
     company_type = (company.company_type or "").lower()
@@ -158,24 +224,6 @@ def resolve_engine_key(company: Company) -> str:
     return "standard_dcf"
 
 
-# Métodos que el modelo declarado (company.valuation_model, p. ej.
-# «sotp+asset_management_multiple») puede nombrar como principal (su primer
-# componente) y los motores que los implementan. Un método fuera de esta tabla
-# («scenario_auto_energy_fsd», «defense_backlog_scenario_model») no tiene
-# motor propio: corre el que resuelve resolve_engine_key y queda dicho.
-_DECLARED_METHOD_ENGINES: tuple[tuple[str, frozenset[str]], ...] = (
-    ("sotp", frozenset({"sotp", "holding_company"})),
-    ("commodity", frozenset({"commodity"})),
-    ("probability_weighted_scenarios", frozenset({"pre_revenue"})),
-    ("speculative", frozenset({"pre_revenue"})),
-    # NAV aproximado: el de una minera es el del motor de materias primas.
-    ("nav_rough", frozenset({"pre_revenue", "commodity"})),
-    ("bank", frozenset({"bank"})),
-    ("insur", frozenset({"insurer"})),
-    ("reit", frozenset({"reit"})),
-    ("dcf", frozenset({"standard_dcf"})),
-)
-_UNDECLARED_MODELS = frozenset({"", "unassigned"})
 
 
 def declared_engine_fallback(
@@ -195,12 +243,9 @@ def declared_engine_fallback(
     declared = (getattr(company, "valuation_model", None) or "").strip()
     if declared.lower() in _UNDECLARED_MODELS:
         return None
-    method = declared.lower().split("+", 1)[0].strip()
+    method = declared_method(company)
     resolved = resolved_engine or resolve_engine_key(company)
-    engines = next(
-        (allowed for marker, allowed in _DECLARED_METHOD_ENGINES if marker in method),
-        None,
-    )
+    engines = declared_method_engines(method)
     if engines is None:
         reason = "declared_method_without_engine"
     elif resolved in engines:

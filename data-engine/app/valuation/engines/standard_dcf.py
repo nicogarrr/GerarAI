@@ -244,6 +244,8 @@ class StandardDCFEngine(ValuationEngine):
     """
 
     key = "standard_dcf"
+    # Lo rellena ``value`` cuando llega a valorar escenarios (ver allí).
+    resolved_inputs: dict | None = None
 
     def value(self, context: ValuationContext) -> dict:
         company = context.company
@@ -406,6 +408,21 @@ class StandardDCFEngine(ValuationEngine):
             minority_interest=minority_interest,
             preferred_stock=preferred_stock,
         )
+        # Entradas ya resueltas (plan de proyección, puente y tasas): el motor
+        # de escenarios (scenario_engine.py) valora sus propios escenarios con
+        # esta misma mecánica en vez de recalcularla.
+        self.resolved_inputs = {
+            "plan": plan,
+            "revenue": revenue,
+            "revenue_growth": growth,
+            "fcf_margin": margin,
+            "wacc": wacc,
+            "terminal_growth": terminal,
+            "net_debt": net_debt,
+            "shares": shares,
+            "minority_interest": minority_interest,
+            "preferred_stock": preferred_stock,
+        }
 
         # Only the facts the DCF actually consumes may move the evidence
         # confidence: averaging in balance-sheet rows the model never reads
