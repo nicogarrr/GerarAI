@@ -183,6 +183,12 @@ def test_declared_scenarios_weighted_value_equals_hand_sum(db, monkeypatch):
         [{"name": "a", "probability": 1.0, "method": "forward_multiple", "metric": "revenue", "multiple": 0, "year": 5}],
         # Un escenario no puede tocar el WACC (lo decide otro carril).
         [{"name": "a", "probability": 1.0, "method": "dcf", "wacc": 0.05}],
+        # Crecimiento por encima del techo general (0.45): los escenarios
+        # hipercrecimiento publicados (p. ej. ARK TSLA 2031, CAGR 52-60 %) no
+        # entran sin cambiar el tope, que es decisión general, no de un ticker.
+        [{"name": "a", "probability": 1.0, "method": "dcf", "revenue_growth": 0.60, "fcf_margin": 0.1}],
+        # Margen por encima del techo general (0.50).
+        [{"name": "a", "probability": 1.0, "method": "dcf", "revenue_growth": 0.05, "fcf_margin": 0.55}],
     ],
 )
 def test_invalid_declared_scenarios_fall_back_with_reason(db, monkeypatch, bad):
