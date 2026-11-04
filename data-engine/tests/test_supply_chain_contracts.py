@@ -862,3 +862,21 @@ def test_todo_dockerfile_con_npm_ci_copia_antes_el_prepare():
                 if "scripts/install-hooks.mjs" not in antes:
                     rotos.append(f"{dockerfile.name}: `RUN npm ci` (linea {i + 1}) sin copiar antes scripts/install-hooks.mjs")
     assert not rotos, "\n".join(rotos)
+
+
+def test_trivy_install_is_pinned_verified_and_shared_by_all_scanners():
+    steps = _steps("scan")
+    installer = next(s for s in steps if s.get("name") == "Install pinned Trivy from official GitHub release")
+    assert 'bash scripts/security/install-trivy.sh' in installer["run"]
+    assert '$GITHUB_PATH' in installer["run"]
+    script = (REPO / "scripts/security/install-trivy.sh").read_text()
+    assert 'set -euo pipefail' in script
+    assert 'version=0.70.0' in script
+    assert 'sha256=8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9' in script
+    assert 'sha256sum --check --status' in script
+    assert 'https://github.com/aquasecurity/trivy/releases/download/' in script
+    assert 'https://get.trivy.dev' not in script
+    scanners = _using(steps, "aquasecurity/trivy-action")
+    assert len(scanners) == 3
+    assert all(s["with"]["skip-setup-trivy"] is True for s in scanners)
+    assert steps.index(installer) < min(steps.index(s) for s in scanners)
