@@ -93,13 +93,40 @@ def test_refresh_ticker_news_all_is_yahoo_us_only(env, monkeypatch):
 
 
 def test_refresh_ticker_news_single_ticker_adds_google(env, monkeypatch):
+    from app.services import company_alias_sources as cas
+
     monkeypatch.setattr(
         dramatiq_app, "_companies", lambda db, ticker=None: [_co(1, "SPCX")]
     )
+    # Los términos de marca salen de los datos de la empresa (caché por
+    # tenant), no de una lista por ticker.
+    record = cas.AliasRecord(
+        ticker="SPCX", qid="Q193701",
+        aliases=[cas.AliasTerm("SpaceX", "nombre", "wikidata", peso=1000),
+                 cas.AliasTerm("Starlink", "marca", "wikidata", peso=80)],
+    )
+    monkeypatch.setattr(cas, "ensure_aliases", lambda db, companies, **kw: {"SPCX": record})
     out = _fn("refresh_ticker_news")(tenant_id=1, user_id="u", ticker="SPCX")
     # yahoo + google en + google es + google marca («SpaceX» / «Starlink»)
     assert len(env.polled) == 4
+    assert "Starlink" in env.polled[-1][1] and "when%3A7d" in env.polled[-1][1]
     assert out["feeds_processed"] == 4
+    assert out["status"] == "ok"
+
+
+def test_refresh_ticker_news_alias_source_down_keeps_name_feeds(env, monkeypatch):
+    from app.services import company_alias_sources as cas
+
+    monkeypatch.setattr(
+        dramatiq_app, "_companies", lambda db, ticker=None: [_co(1, "SPCX")]
+    )
+
+    def boom(db, companies, **kw):
+        raise RuntimeError("wikidata caído")
+
+    monkeypatch.setattr(cas, "ensure_aliases", boom)
+    out = _fn("refresh_ticker_news")(tenant_id=1, user_id="u", ticker="SPCX")
+    assert len(env.polled) == 3  # sin feed de marca, el resto igual
     assert out["status"] == "ok"
 
 

@@ -8,7 +8,9 @@ no encontró evidencia alguna (así nada de lo que ya se vinculaba cambia):
 
 1. Alias («sobre»): nombre comercial, marcas, productos, filiales y personas
    de la empresa, de ``app/data/company_aliases.json`` y de
-   ``ticker_news_lane.VERIFIED_ALIASES``, más el nombre de la empresa sin
+   ``ticker_news_lane.VERIFIED_ALIASES`` (semilla), los alias que salen de
+   los DATOS de cada empresa (``company_alias_sources``: Wikidata con QID e
+   informe anual «inferido», en caché por tenant), más el nombre de la empresa sin
    sufijos legales cuando tiene 2+ palabras y es único en el catálogo
    (mayúsculas como en el nombre). Un nombre de una sola palabra («Apple»,
    «Target») o repetido entre empresas no se adivina: queda en
@@ -34,6 +36,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company
+from app.services.company_alias_sources import AliasRecord, load_cached
 from app.services.company_catalog import all_companies
 
 DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "company_aliases.json"
@@ -224,7 +227,14 @@ def _curated_aliases(data: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
 
 
 class _Matcher:
-    def __init__(self, companies: list[Company], data: dict[str, Any], *, relations: bool) -> None:
+    def __init__(
+        self,
+        companies: list[Company],
+        data: dict[str, Any],
+        *,
+        relations: bool,
+        data_records: dict[str, AliasRecord] | None = None,
+    ) -> None:
         self.by_ticker = {c.ticker: c for c in companies if c.ticker}
         self.index: dict[str, list[_Rule]] = {}
         about_terms: dict[str, set[str]] = {}
@@ -270,6 +280,7 @@ class _Matcher:
                         ),
                     )
                 about_terms.setdefault(term.casefold(), set()).add(ticker)
+        self._add_data_aliases(data_records or {}, about_terms)
         usable, _ambiguous = generated_names(companies)
         for ticker, phrase in usable.items():
             owners = about_terms.get(phrase.casefold(), set())
@@ -306,6 +317,38 @@ class _Matcher:
                             ),
                         )
 
+    def _add_data_aliases(self, records: dict[str, AliasRecord], about_terms: dict[str, set[str]]) -> None:
+        """Alias de cada empresa sacados de datos (company_alias_sources:
+        Wikidata con QID, informe anual «inferido»). El fichero curado manda
+        sobre un término que ya tiene; un término que los datos dan a dos
+        empresas es ambiguo y no vincula a ninguna."""
+        owners: dict[str, set[str]] = {}
+        for ticker, record in records.items():
+            if ticker not in self.by_ticker:
+                continue
+            for alias in record.aliases:
+                owners.setdefault(alias.termino.casefold(), set()).add(ticker)
+        for ticker, record in records.items():
+            if ticker not in self.by_ticker:
+                continue
+            for alias in record.aliases:
+                key = alias.termino.casefold()
+                if key in about_terms or len(owners.get(key, ())) > 1:
+                    continue
+                source = alias.qid if alias.qid else alias.etiqueta
+                self._add(
+                    alias.termino,
+                    _Rule(
+                        ticker=ticker,
+                        via=f"{alias.tipo}:{alias.termino} ({alias.fuente} {source})",
+                        link_type=LINK_ABOUT,
+                        pattern=_term_regex(alias.termino, case_sensitive=len(alias.termino.split()) == 1),
+                        requires=_any_regex(list(alias.requiere)) if alias.requiere else None,
+                        excludes=None,
+                    ),
+                )
+                about_terms.setdefault(key, set()).add(ticker)
+
     def _add(self, term: str, rule: _Rule) -> None:
         key = _first_key(term)
         if key:
@@ -340,15 +383,23 @@ class _Matcher:
 _MATCHER_KEY = "_company_alias_matcher"
 
 
+def _data_records(db: Session) -> dict[str, AliasRecord]:
+    try:
+        return load_cached(db)
+    except Exception:  # noqa: BLE001 - sin caché legible: solo fichero y nombre
+        return {}
+
+
 def _matcher(db: Session, *, relations: bool) -> _Matcher:
     companies = all_companies(db)
     data = load_alias_file()
+    records = _data_records(db)
     cache_key = (_MATCHER_KEY, relations)
     cached = db.info.get(cache_key)
-    if cached is not None and cached[0] is companies and cached[1] is data:
-        return cached[2]
-    matcher = _Matcher(companies, data, relations=relations)
-    db.info[cache_key] = (companies, data, matcher)
+    if cached is not None and cached[0] is companies and cached[1] is data and cached[2] is records:
+        return cached[3]
+    matcher = _Matcher(companies, data, relations=relations, data_records=records)
+    db.info[cache_key] = (companies, data, records, matcher)
     return matcher
 
 
