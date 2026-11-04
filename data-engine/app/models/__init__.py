@@ -273,6 +273,10 @@ from app.models.declared_input_value import DeclaredInputValue as DeclaredInputV
 
 __all__.append("DeclaredInputValue")
 
+from app.models.value_driver import ValueDriver as ValueDriver  # noqa: E402
+
+__all__.append("ValueDriver")
+
 from app.models.knowledge_rag import (  # noqa: E402
     KnowledgeRagParent as KnowledgeRagParent,
 )
