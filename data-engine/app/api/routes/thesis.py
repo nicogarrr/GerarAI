@@ -528,6 +528,7 @@ def _audio_context(db: Session, ticker: str, version: int | None = None) -> tupl
     key = thesis_audio_service.audio_key(
         company.ticker,
         thesis.version,
+        tenant_id=thesis.tenant_id,
         draft=is_draft,
         data_day=thesis_audio_service.data_day(latest_data_at),
     )

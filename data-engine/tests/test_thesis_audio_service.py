@@ -14,12 +14,21 @@ def test_memo_to_speech_text_strips_markdown_and_tables():
 
 
 def test_audio_key_is_stable_per_version_state_and_data_day():
-    a = svc.audio_key("BRK.B", 1, "texto A", data_day="20261019")
-    assert a == svc.audio_key("BRK.B", 1, "texto B distinto", data_day="20261019")
-    assert a != svc.audio_key("BRK.B", 2, data_day="20261019")
-    assert a != svc.audio_key("BRK.B", 1, draft=True, data_day="20261019")
-    assert a != svc.audio_key("BRK.B", 1, data_day="20261020")
+    a = svc.audio_key("BRK.B", 1, "texto A", tenant_id=7, data_day="20261019")
+    assert a == svc.audio_key("BRK.B", 1, "texto B distinto", tenant_id=7, data_day="20261019")
+    assert a != svc.audio_key("BRK.B", 2, tenant_id=7, data_day="20261019")
+    assert a != svc.audio_key("BRK.B", 1, tenant_id=7, draft=True, data_day="20261019")
+    assert a != svc.audio_key("BRK.B", 1, tenant_id=7, data_day="20261020")
     assert a.startswith("BRKB-v1-p-20261019-")
+
+
+def test_audio_key_is_per_tenant():
+    a = svc.audio_key("BRK.B", 1, tenant_id=7, data_day="20261019")
+    assert a != svc.audio_key("BRK.B", 1, tenant_id=8, data_day="20261019")
+    assert a != svc.audio_key("BRK.B", 1, tenant_id=None, data_day="20261019")
+    # Cabe en el KEY_RE del sidecar incluso con el sufijo de withheld y ids largos.
+    worst = svc.audio_key("X" * 40, 9999, tenant_id=10**12, draft=True, data_day="20261019")
+    assert len(worst + "-withheld-v1") <= svc.KEY_MAX_LEN
 
 
 def test_data_day_truncates_to_the_day():
@@ -114,7 +123,7 @@ def test_audio_context_default_uses_latest_published_not_newer_draft(monkeypatch
         def latest_published(self, db, ticker):
             seen["latest_published"] = ticker
             # nosemgrep: gerarai-orm-fake-simplenamespace -- FakeService devuelve la tesis; el servicio de audio solo lee status/version/updated_at
-            return SimpleNamespace(status="published", version=11, company_id=1, updated_at=0)
+            return SimpleNamespace(tenant_id=1, status="published", version=11, company_id=1, updated_at=0)
 
         def by_version(self, db, ticker, version):
             raise AssertionError("por defecto no se pide por version")
@@ -187,7 +196,7 @@ def test_audio_context_explicit_draft_version_keeps_draft_memo(monkeypatch):
         def by_version(self, db, ticker, version):
             assert version == 13
             # nosemgrep: gerarai-orm-fake-simplenamespace -- FakeService devuelve la tesis; el servicio de audio solo lee status/version/updated_at
-            return SimpleNamespace(status="draft", version=13, company_id=1, updated_at=0)
+            return SimpleNamespace(tenant_id=1, status="draft", version=13, company_id=1, updated_at=0)
 
         def latest_published(self, db, ticker):
             raise AssertionError("version explicita no consulta la publicada")
