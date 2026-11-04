@@ -78,4 +78,3 @@ def test_ambiguous_counter_transaction_is_not_retried(monkeypatch):
         client.aclose.assert_awaited_once()
 
     asyncio.run(scenario())
-
