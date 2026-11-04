@@ -136,7 +136,9 @@ def _db_mt():
 
 def test_endpoint_contrato_y_rotulo():
     db = _db_mt()
-    _seed(db, "EP", pb="0.7", yld="0.08", yield_status=STATUS_DISAGREE,
+    # This endpoint uses the real clock; keep its contract fixture fresh.
+    # Other tests pass TODAY explicitly to exercise freshness deterministically.
+    _seed(db, "EP", pb="0.7", yld="0.08", period=date.today().isoformat(), yield_status=STATUS_DISAGREE,
           y_trace={"desacuerdo_fuentes": True, "finnhub_yield_indicated": "0.20"})
 
     app = FastAPI()

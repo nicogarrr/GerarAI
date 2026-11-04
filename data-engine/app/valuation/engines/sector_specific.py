@@ -266,9 +266,14 @@ def _rate(fact: FinancialFact) -> float:
 
 
 def _latest_usable(context: ValuationContext, metric: str) -> FinancialFact | None:
+    conditions = [FinancialFact.company_id == context.company.id, FinancialFact.metric == metric]
+    if context.as_of is not None:
+        # Igual que el snapshot: sin fecha de publicación no se demuestra
+        # disponibilidad; filtrar ANTES del LIMIT evita ocultar hechos antiguos.
+        conditions.append(FinancialFact.filed <= context.as_of)
     rows = context.db.scalars(
         select(FinancialFact)
-        .where(FinancialFact.company_id == context.company.id, FinancialFact.metric == metric)
+        .where(*conditions)
         .order_by(FinancialFact.fiscal_year.desc().nullslast(), desc(FinancialFact.created_at))
         .limit(5)
     ).all()
