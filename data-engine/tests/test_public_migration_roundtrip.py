@@ -39,5 +39,7 @@ def test_public_revision_extends_declared_inputs_and_is_the_only_head():
     config = Config(str(root / 'alembic.ini'))
     config.set_main_option('script_location', str(root / 'alembic'))
     scripts = ScriptDirectory.from_config(config)
-    assert scripts.get_heads() == ['0128_public_market_data']
+    # Un solo head; las migraciones posteriores (0129_value_drivers…) cuelgan de esta.
+    assert len(scripts.get_heads()) == 1
+    assert '0128_public_market_data' in {rev.revision for rev in scripts.walk_revisions()}
     assert scripts.get_revision('0128_public_market_data').down_revision == '0127_declared_input_values'
