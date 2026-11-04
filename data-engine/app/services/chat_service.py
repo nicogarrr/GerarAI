@@ -541,6 +541,131 @@ def _news_headline_line(news: list[NewsEvent]) -> str | None:
     return "Últimas noticias guardadas: " + "; ".join(headlines) + "."
 
 
+_MOS_SANE_RATIO = 10.0  # misma regla de cordura que el bloque de watchlist
+
+
+def _company_margin_answer(db: Session, company: Company) -> str:
+    """Respuesta directa a «¿está barata X?» / «¿margen de seguridad de X?».
+
+    Margen = (valor justo − precio) / valor justo con el valor justo guardado
+    (tesis publicada o lectura persistida del motor: la misma base que el
+    ranking de la watchlist) y el último cierre guardado, en la unidad que
+    declara la fuente (Londres: peniques → libras). Sin base verificable se
+    explica el porqué (N/D): nunca un número sin respaldo ni un cruce de
+    divisas sin tipo de cambio verificado.
+    """
+    from sqlalchemy.exc import SQLAlchemyError
+
+    from app.services.fair_value_service import resolve_fair_values
+    from app.services.price_units import listing_price
+    from app.services.user_context import margin_of_safety, pct_es
+    from app.valuation.currency import normalize_currency
+
+    en = _english()
+    today = date.today()
+    ticker = company.ticker
+    try:
+        reading = resolve_fair_values(db, [company], today=today).get(int(company.id)) or {}
+    except SQLAlchemyError:
+        db.rollback()
+        reading = {}
+    try:
+        value = float(reading["value"]) if reading.get("value") is not None else None
+    except (TypeError, ValueError):
+        value = None
+    label_es = str(reading.get("label") or "valor justo")
+    source = reading.get("source")
+    if source == "tesis":
+        label_en = f"published thesis v{reading.get('thesis_version')}" + (
+            " (old)" if reading.get("stale") else ""
+        )
+    elif source == "motor":
+        label_en = "valuation engine"
+    elif source == "motor_orientativo":
+        label_en = "valuation engine (indicative)"
+    else:
+        label_en = "fair value"
+    if value is None:
+        return (
+            f"I can't measure {ticker}'s margin of safety: there is no saved fair value "
+            "(no published thesis, no engine reading)."
+            if en
+            else f"No puedo medir el margen de seguridad de {ticker}: no hay valor justo "
+            "guardado (ni tesis publicada ni lectura del motor)."
+        )
+    latest = db.scalars(
+        select(MarketPrice)
+        .where(MarketPrice.company_id == company.id)
+        .where(MarketPrice.date <= today)
+        .order_by(desc(MarketPrice.date))
+        .limit(1)
+    ).first()
+    if latest is None:
+        return (
+            f"I can't measure {ticker}'s margin of safety: there is no saved price."
+            if en
+            else f"No puedo medir el margen de seguridad de {ticker}: no hay precio guardado."
+        )
+    listed = listing_price(
+        Decimal(str(latest.close)), quote_currency=latest.quote_currency, company=company
+    )
+    if listed is None:
+        return (
+            f"I can't measure {ticker}'s margin of safety: the saved price has no verifiable "
+            "unit (the source did not declare the quote's currency unit), so I won't cross it "
+            "with the fair value."
+            if en
+            else f"No puedo medir el margen de seguridad de {ticker}: el precio guardado no "
+            "tiene una unidad verificable (la fuente no declara la unidad de la cotización); "
+            "no lo cruzo con el valor justo."
+        )
+    price = float(listed[0])
+    quote_major = listed[1]
+    fair_major = normalize_currency(company.currency)[0]
+    if fair_major is None or quote_major != fair_major:
+        return (
+            f"I won't cross {ticker}'s saved fair value ({fair_major or 'unverified currency'}) "
+            f"with a quote in {quote_major} without a verified FX rate; margin of safety not "
+            "calculated."
+            if en
+            else f"No calculo el margen de seguridad de {ticker}: el valor justo guardado está "
+            f"en {fair_major or 'divisa sin verificar'} y la cotización en {quote_major}; "
+            "no los cruzo sin un tipo de cambio verificado."
+        )
+    ratio = (value / price) if price > 0 else None
+    if ratio is None or ratio > _MOS_SANE_RATIO or ratio < 1 / _MOS_SANE_RATIO:
+        return (
+            f"I won't calculate {ticker}'s margin of safety: the saved fair value and the last "
+            "close differ by more than 10x, a possible unit or currency mismatch between price "
+            "and value."
+            if en
+            else f"No calculo el margen de seguridad de {ticker}: el valor justo guardado y el "
+            "último cierre difieren en más de 10x, posible desajuste de unidades o divisa "
+            "entre precio y valor."
+        )
+    mos = margin_of_safety(value, price)
+    if mos is None:
+        return (
+            f"I can't measure {ticker}'s margin of safety with the saved data."
+            if en
+            else f"No puedo medir el margen de seguridad de {ticker} con los datos guardados."
+        )
+    if en:
+        return (
+            f"With the saved fair value ({label_en}: {_price_display(value, fair_major)}) and "
+            f"the last saved close ({_price_display(price, quote_major)} on "
+            f"{latest.date.isoformat()}), the margin of safety is {mos * 100:+.1f} % "
+            "((value − price) / value). These are saved figures, not a live quote."
+        )
+    return (
+        f"Con el valor justo guardado ({label_es}: {_price_display(value, fair_major)}) y el "
+        f"último cierre guardado ({_price_display(price, quote_major)} del "
+        f"{_fmt_date_es(latest.date.isoformat())}), el margen de seguridad es "
+        f"{pct_es(mos, signed=True)} ((valor − precio) / valor). Son datos guardados, no una "
+        "cotización en directo."
+    )
+
+
 def _natural_company_answer(
     *,
     company: Company,
@@ -555,6 +680,7 @@ def _natural_company_answer(
     market_cap_fact: FinancialFact | None = None,
     question: str = "",
     thesis_withheld: str | None = None,
+    margin_line: str | None = None,
 ) -> str:
     """Respuesta visible: prosa natural en castellano.
 
@@ -570,7 +696,7 @@ def _natural_company_answer(
             company=company, facts=facts, thesis=thesis, news=news, missing_metrics=missing_metrics,
             claims=claims, contradiction_claims=contradiction_claims, price_line=price_line,
             memory_notes=memory_notes, market_cap_fact=market_cap_fact, question=question,
-            thesis_withheld=thesis_withheld, sec=files_with_sec(company),
+            thesis_withheld=thesis_withheld, sec=files_with_sec(company), margin_line=margin_line,
         )
     parts: list[str] = []
     thesis_line: str | None = None
@@ -646,6 +772,8 @@ def _natural_company_answer(
     )
     if lead:
         parts = [lead, *[p for p in parts if not lead.startswith(p)]]
+    if margin_line:
+        parts.insert(0, margin_line)
     if re.search(r"comp[aá]r|\bvs\.?\b|versus|frente a|respecto a", (question or "").lower()):
         parts.insert(
             1 if lead else 0,
@@ -1349,6 +1477,21 @@ class ChatService:
             return True
         return bool(ticker) and bool(_SUBJECTLESS_CHEAP_RE.search(question))
 
+    def _mentions_unknown_ticker(self, db: Session, question: str, ticker: str | None) -> bool:
+        """«¿Está barata PLTR?» sin ficha de PLTR: no es el resumen personal de
+        qué comprar; lo contesta la ruta de ticker desconocido, que dice que
+        no existe en GerarAI en vez de volcar la watchlist sin mencionarlo."""
+        if ticker:
+            return False
+        from app.services.chat_unknown_ticker import unknown_ticker_mentions
+        from app.services.company_names import companies_named_in
+
+        named = companies_named_in(question, all_companies(db))
+        if named.companies:
+            return False
+        known_tickers = list(db.scalars(select(Company.ticker)).all())
+        return bool(unknown_ticker_mentions(question, known_tickers, ignore_spans=named.spans))
+
     def _explicit_mention(self, db: Session, question: str) -> Company | None:
         """Empresa nombrada por su ticker en el texto, para el scope global.
 
@@ -1895,6 +2038,7 @@ class ChatService:
             purchase_intent is not None
             and purchase_intent.kind == "barato"
             and not self._company_cheap_question(db, question or "", ticker)
+            and not self._mentions_unknown_ticker(db, question or "", ticker)
         ):
             history_text = "\n".join(
                 f"{turn.role}: {turn.content[:300]}" for turn in (history or [])[-4:] if turn.content
@@ -4123,27 +4267,60 @@ class ChatService:
                 adjusted = latest_price.adj_close is not None
                 value = latest_price.adj_close if adjusted else latest_price.close
                 kind = "cierre ajustado" if adjusted else "spot"
-                price_line = (
-                    f"{company.ticker} cotiza a "
-                    f"{_price_display(value, company.currency)} "
-                    f"({kind} del {_fmt_date_es(latest_price.date.isoformat())}, "
-                    f"fuente {latest_price.source})."
-                )
-                if _english():
-                    from app.services.chat_company_en import price_line_en
+                # La unidad del precio la declara la fuente (quote_currency):
+                # Londres cotiza en peniques (GBX) y rotular 4.200 peniques
+                # como "GBP" inflaba x100 el precio visible. Sin unidad
+                # verificable no se muestra cifra con una divisa supuesta
+                # (misma regla que el bloque de watchlist).
+                from app.services.price_units import listing_price
 
-                    price_line = price_line_en(
-                        company.ticker, value, company.currency, adjusted=adjusted,
-                        day=latest_price.date.isoformat(), source=latest_price.source,
+                listed = listing_price(
+                    Decimal(str(value)),
+                    quote_currency=latest_price.quote_currency,
+                    company=company,
+                )
+                shown_value: Decimal | None = listed[0] if listed is not None else None
+                shown_ccy: str | None = listed[1] if listed is not None else None
+                if shown_value is not None:
+                    price_line = (
+                        f"{company.ticker} cotiza a "
+                        f"{_price_display(shown_value, shown_ccy)} "
+                        f"({kind} del {_fmt_date_es(latest_price.date.isoformat())}, "
+                        f"fuente {latest_price.source})."
                     )
+                    if _english():
+                        from app.services.chat_company_en import price_line_en
+
+                        price_line = price_line_en(
+                            company.ticker, shown_value, shown_ccy, adjusted=adjusted,
+                            day=latest_price.date.isoformat(), source=latest_price.source,
+                        )
+                else:
+                    price_line = (
+                        f"{company.ticker} tiene un precio guardado sin unidad verificable "
+                        f"({kind} del {_fmt_date_es(latest_price.date.isoformat())}, "
+                        f"fuente {latest_price.source}); no lo muestro con una divisa supuesta."
+                    )
+                    if _english():
+                        price_line = (
+                            f"{company.ticker} has a saved price without a verifiable unit "
+                            f"(quote {kind} from {latest_price.date.isoformat()}, "
+                            f"source {latest_price.source}); I will not show it with an assumed currency."
+                        )
                 sources.append(
                     self._source_entry(
                         "market_price",
                         latest_price.id,
-                        f"{company.ticker} {_price_display(value, company.currency)} ({kind} {latest_price.date.isoformat()}, {latest_price.source})",
+                        (
+                            f"{company.ticker} {_price_display(shown_value, shown_ccy)} "
+                            f"({kind} {latest_price.date.isoformat()}, {latest_price.source})"
+                            if shown_value is not None
+                            else f"{company.ticker} precio sin unidad verificable "
+                            f"({kind} {latest_price.date.isoformat()}, {latest_price.source})"
+                        ),
                         date=latest_price.date.isoformat(),
                         price=str(value),
-                        currency=company.currency,
+                        currency=shown_ccy,
                         adjusted=adjusted,
                     )
                 )
@@ -4322,6 +4499,11 @@ class ChatService:
             # volcado estructurado con citas no desaparece: sigue en
             # `sections`, que el frontend muestra plegado, y es el contexto
             # que verifica la sintesis LLM.
+            margin_line = None
+            if _COMPANY_CHEAP_RE.search(question or "") and not _PURCHASE_PICK_RE.search(
+                question or ""
+            ):
+                margin_line = _company_margin_answer(db, company)
             answer = _natural_company_answer(
                 company=company,
                 facts=facts,
@@ -4335,6 +4517,7 @@ class ChatService:
                 market_cap_fact=market_cap_fact,
                 question=question,
                 thesis_withheld=withheld_reason,
+                margin_line=margin_line,
             )
 
             holding_sources, holding_lines, holding_citations = self._holding_context(db, company)
