@@ -55,7 +55,7 @@ from app.valuation.engines.base import (
     insufficient_from_context as _insufficient,
 )
 from app.valuation.engines.standard_dcf import StandardDCFEngine
-from app.valuation.fact_reference import SourcedFact, latest_facts
+from app.valuation.fact_reference import SourcedFact, latest_facts, latest_facts_multi
 from app.valuation.moat_framework import empty_moat_framework
 from app.valuation.relative_multiples import (
     MIN_PEER_SET_SIZE,
@@ -222,14 +222,17 @@ def _fundamentals(db, company_id: int, *, cutoff: date | None = None) -> dict[st
     order prefers, and only that one, so a multiple is never built from a
     mixture of two definitions of the same number.
     """
+    # Una consulta por compañia en vez de una por alias (misma eleccion por
+    # alias; ver latest_facts_multi): 8 peers pasan de ~150 SELECTs a 9.
+    all_aliases = sorted({alias for aliases in FUNDAMENTAL_ALIASES.values() for alias in aliases})
+    found = latest_facts_multi(db, company_id, all_aliases, cutoff=cutoff)
     resolved: dict[str, float] = {}
     for canonical, aliases in FUNDAMENTAL_ALIASES.items():
         if canonical in resolved:
             continue
         for alias in aliases:
-            found = latest_facts(db, company_id, [alias], cutoff=cutoff).get(alias)
-            if found is not None:
-                resolved[canonical] = found.value
+            if alias in found:
+                resolved[canonical] = found[alias].value
                 break
     return resolved
 
