@@ -641,6 +641,18 @@ def _ensure_price_history(db, company, tenant_id=None, user_id=None) -> None:
     enqueue_price_backfills(db, [company.id], tenant_id=int(tenant_id), user_id=str(user_id))
 
 
+def _current_delivery_id() -> str | None:
+    """message_id de la entrega de dramatiq en curso (None fuera de un actor)."""
+    try:
+        from dramatiq.middleware import CurrentMessage
+
+        message = CurrentMessage.get_current_message()
+    except Exception:  # pragma: no cover - dramatiq siempre esta instalado
+        return None
+    message_id = getattr(message, "message_id", None) if message is not None else None
+    return str(message_id) if message_id else None
+
+
 def run_thesis_job(run_id: int) -> None:
     """Run a thesis delivery with tenant context and recoverable retries."""
     import contextlib
@@ -666,10 +678,23 @@ def run_thesis_job(run_id: int) -> None:
 
         now = datetime.now(UTC)
         lease_recovered = False
+        delivery_id = _current_delivery_id()
         if run.status == "running":
             started = _utc(run.started_at)
-            if started is not None and now - started < RUNNING_LEASE:
+            same_delivery = (
+                delivery_id is not None
+                and (run.input_payload or {}).get("delivery_message_id") == delivery_id
+            )
+            if started is not None and now - started < RUNNING_LEASE and not same_delivery:
                 return
+            # same_delivery: el broker devuelve a la cola un mensaje sin ack
+            # solo cuando el worker que lo tenia deja de dar latido (reinicio
+            # del contenedor en un despliegue, OOM, SIGKILL). Si llega OTRA
+            # VEZ el mismo mensaje que reclamo este intento, ese worker ya no
+            # existe: antes esta re-entrega se descartaba por lease fresco y
+            # el run quedaba en "running" bloqueando nuevas generaciones del
+            # ticker hasta que caducaba el lease (6 h). El fence por attempt
+            # sigue protegiendo el caso patologico de un hilo vivo sin latido.
             # Lease expirado: el worker anterior murio a mitad del intento.
             # Cada recuperacion consume un intento; sin tope, un ticker que
             # tumba al worker (p. ej. OOM) re-botaria cada 6 h para siempre
@@ -695,7 +720,10 @@ def run_thesis_job(run_id: int) -> None:
             run.error_message = "A previous worker lease expired; retrying"
 
         settings = get_settings()
-        payload = run.input_payload or {}
+        # Copia, no el mismo dict: reasignar el MISMO objeto a una columna
+        # JSON no la marca como modificada y el reclamo (attempt, mensaje de
+        # la entrega) se perdia sin error.
+        payload = dict(run.input_payload or {})
         tenant_id = payload.get("tenant_id")
         user_id = payload.get("user_id")
         tenant = None
@@ -729,6 +757,10 @@ def run_thesis_job(run_id: int) -> None:
         else:
             run.attempt = max(int(run.attempt or 1), 1)
         payload["attempt"] = run.attempt
+        if delivery_id is not None:
+            payload["delivery_message_id"] = delivery_id
+        else:
+            payload.pop("delivery_message_id", None)
         run.input_payload = payload
         run.status = "running"
         # Cada intento arranca con su propio started_at: conservar el del
