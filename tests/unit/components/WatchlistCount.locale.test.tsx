@@ -17,3 +17,10 @@ describe('Watchlist count follows the selected language', () => {
         expect(container.querySelector('[aria-live="polite"]')).toHaveTextContent(zero);
     });
 });
+
+it('keeps the complete translated page label inside the no-wrap span', () => {
+    const { container } = render(<LocaleProvider locale="en"><WatchlistMembership><WatchlistCount symbols={['MSFT']} page={120} totalPages={240} /></WatchlistMembership></LocaleProvider>);
+    const label = screen.getByText('Page 120 of 240');
+    expect(label).toHaveClass('whitespace-nowrap');
+    expect(container.querySelectorAll('.whitespace-nowrap')).toHaveLength(1);
+});

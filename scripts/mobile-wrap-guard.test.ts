@@ -24,7 +24,11 @@ test('«Página x de y» nunca se parte en dos líneas', () => {
         // El indice de research pinta la posicion por t('researchShared.pageOf'): el texto ES verbatim se comprueba en el dict.
         const migrated = path === 'app/(root)/research/page.tsx' || path === 'components/research/Pager.tsx' || path === 'app/(root)/research/sources/page.tsx' || path === 'components/research/AnalystTargetsView.tsx';
         if (migrated) assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/researchShared.json', 'utf8')).pageOf, 'Página {current} de {total}');
-        const i = src.indexOf(migrated ? 'researchShared.pageOf' : 'Página');
+        // WatchlistCount now renders the same translated page label as DCA.
+        // Keep the Spanish contract and require the key itself beside nowrap.
+        const watchlistCount = path === 'components/watchlist/WatchlistMembership.tsx';
+        if (watchlistCount) assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/watchlist.json', 'utf8')).dca.list.page, 'Página {page} de {pages}');
+        const i = src.indexOf(watchlistCount ? 'watchlist.dca.list.page' : migrated ? 'researchShared.pageOf' : 'Página');
         assert.ok(i > 0 && (src.slice(Math.max(0, i - 260), i).includes(NOWRAP) || src.slice(i, i + 400).includes(NOWRAP)), `${path}: «Página» sin nowrap`);
     }
 });
