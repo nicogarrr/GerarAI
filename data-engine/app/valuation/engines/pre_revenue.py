@@ -684,7 +684,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
             and (bool(observed_burn) or not cash_facts)
         )
         inferred = (
-            InferredInputService().latest_valid(db, company.id, "fcf_margin")
+            InferredInputService().latest_valid(db, company.id, "fcf_margin", as_of=as_of)
             if needs_inference and db is not None and company.id is not None
             else None
         )
