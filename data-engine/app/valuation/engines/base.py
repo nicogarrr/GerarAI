@@ -627,8 +627,8 @@ def resolve_rates(db, company, *, as_of: date | None = None) -> tuple[float, str
         return wacc_default, "tag_default", terminal_default, "tag_default", []
     service = InferredInputService()
     traceable = traceable_wacc(db, company, as_of=as_of)
-    inferred_w = service.latest_valid(db, company.id, "wacc") if traceable is None else None
-    inferred_g = service.latest_valid(db, company.id, "terminal_growth")
+    inferred_w = service.latest_valid(db, company.id, "wacc", as_of=as_of) if traceable is None else None
+    inferred_g = service.latest_valid(db, company.id, "terminal_growth", as_of=as_of)
     if traceable is not None:
         wacc, wacc_source = traceable, "calculated_metric"
     elif inferred_w is not None:

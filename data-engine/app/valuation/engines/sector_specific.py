@@ -336,7 +336,7 @@ def inferred_sourced(context: ValuationContext, key: str) -> SourcedValue | None
     """
     from app.services.inferred_input_service import InferredInputService
 
-    row = InferredInputService().latest_valid(context.db, context.company.id, key)
+    row = InferredInputService().latest_valid(context.db, context.company.id, key, as_of=context.as_of)
     if row is None:
         return None
     created = row.created_at.date().isoformat() if row.created_at else None
