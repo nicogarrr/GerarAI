@@ -5,9 +5,8 @@ import { useEffect, useState } from 'react';
 import { getListingAnalystTargetsBatch, type ListingAnalystTargets } from '@/lib/actions/analyst-targets.actions';
 import { batchedSymbol } from '@/lib/cache/batch-symbols';
 import { requestCache } from '@/lib/cache/requestCache';
-import { formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
 import { convertWithPortfolioFx, sameTargetUnit, unconvertedTargetLabel, type TargetFxRate } from '@/lib/analyst-target-currency';
-import { useLocale, useT } from '@/lib/i18n/client';
+import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 
 /**
  * Consenso de precios objetivo de analistas para las listas (watchlist y
@@ -51,6 +50,9 @@ export default function AnalystTargetLine({
 }) {
     const t = useT();
     const locale = useLocale();
+    // Objetivo, % y «N/D»/«N/A» con el idioma activo (antes, en inglés:
+    // «633,13 US$ +26,6 %» en la watchlist y la cartera).
+    const { formatNumber, formatPercent, formatPrice, na: NA } = useFormat();
     const [settled, setSettled] = useState(false);
     const [data, setData] = useState<ListingAnalystTargets | null>(null);
 
