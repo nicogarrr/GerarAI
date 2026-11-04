@@ -20,7 +20,9 @@ from tests.test_valuation_engines_refined import (
 )
 
 # Margen FCF 1,1 %: el bear (margen − 6 pp) queda en −4,9 % y quema caja.
-FACTS = {"revenue": 1000, "free_cash_flow": 11, "revenue_growth": 0.07, "shares_diluted": 100, "net_debt": 200}
+# Deuda neta 100: con la banda de WACC por capitalización (11,5 % para una
+# empresa de este tamaño) el base sigue positivo y solo el bear sale N/D.
+FACTS = {"revenue": 1000, "free_cash_flow": 11, "revenue_growth": 0.07, "shares_diluted": 100, "net_debt": 100}
 
 
 def _value(db, ticker, facts=FACTS, tags=(), price=2.7):

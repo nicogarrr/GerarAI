@@ -90,10 +90,20 @@ def test_snapshot_uses_the_price_date_as_split_cutoff():
     assert fresh.value("shares_diluted") == pytest.approx(400.0)
 
 
-def test_valuation_with_a_pre_split_close_does_not_compare_the_price():
+def test_valuation_with_a_pre_split_close_does_not_compare_the_price(monkeypatch):
     """Cierre del 30-05, split 4:1 del 02-06: ese cierre puede estar en la base
     vieja (sin refresco) o ya ajustado (refresco antes de la primera sesion
-    nueva). Valor por accion en la base actual (400 acciones) y MOS N/D."""
+    nueva). Valor por accion en la base actual (400 acciones) y MOS N/D.
+
+    Sin precio comparable tampoco hay capitalización para la banda de WACC
+    (cae al WACC de siempre con el motivo); el caso fija el mismo WACC antes
+    y después para medir solo el cambio de base de acciones."""
+    from app.valuation.engines import standard_dcf
+    from app.valuation.wacc_band import BandWacc
+
+    monkeypatch.setattr(
+        standard_dcf, "_resolve_band", lambda *_a, **_k: BandWacc(None, reason="fijado en el test")
+    )
     db, company = _db()
     try:
         before = ValuationService().value_company(db, company)

@@ -28,6 +28,7 @@ from app.models import Company, FinancialFact, MarketPrice
 from app.models.entities import Base
 from app.valuation.engines import standard_dcf
 from app.valuation.engines.standard_dcf import StandardDCFEngine
+from app.valuation.wacc_band import BandWacc
 
 
 @pytest.fixture
@@ -92,6 +93,16 @@ def _facts(db: Session, company: Company, *, growth: float) -> None:
     db.commit()
 
 
+def _no_band(monkeypatch) -> None:
+    """Sin banda de capitalización (p. ej. sin tipo de cambio): manda el WACC
+    de ``resolve_rates``, que es el que estos casos ponen por debajo de g."""
+    monkeypatch.setattr(
+        standard_dcf,
+        "_resolve_band",
+        lambda *_args, **_kwargs: BandWacc(None, reason="sin banda en este test"),
+    )
+
+
 def _rates(wacc: float, terminal: float):
     def fake(_db, _company, *, as_of=None):
         return wacc, "calculated_metric", terminal, "tag_default", []
@@ -105,6 +116,7 @@ def test_motor_dcf_se_declara_no_valido_en_vez_de_lanzar(db, monkeypatch, growth
     company = _company(db)
     _facts(db, company, growth=growth)
     monkeypatch.setattr(standard_dcf, "resolve_rates", _rates(wacc, 0.03))
+    _no_band(monkeypatch)
 
     engine = StandardDCFEngine()
     result = engine.value(engine.build_context(db, company, 230.0))
@@ -137,6 +149,7 @@ def test_valuation_service_no_lanza_y_sigue_por_otros_caminos(db, monkeypatch):
     company = _company(db)
     _facts(db, company, growth=0.15)
     monkeypatch.setattr(standard_dcf, "resolve_rates", _rates(0.025, 0.03))
+    _no_band(monkeypatch)
 
     result = ValuationService().value_company(db, company)
 

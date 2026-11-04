@@ -422,8 +422,12 @@ def test_relative_engine_applies_the_peer_median_to_the_own_eps(db):
       base = 13   * 2.00 = 26.00
       bear = 10.5 * 2.00 = 21.00
       bull = 15.5 * 2.00 = 31.00
+
+    FCF 125 (no 100): el contraste con el DCF (banda de WACC por
+    capitalización, 11,5 % a 2.000) queda dentro del umbral del 40 % y el
+    caso sigue aislando la cuenta de múltiplos.
     """
-    company = _subject(db)
+    company = _subject(db, free_cash_flow=125.0)
     _peers(db)
     result = _value(db, company)
 
@@ -707,8 +711,9 @@ def test_relative_engine_own_multiple_of_an_adr_uses_price_per_ordinary(db):
 
     PER propio = 20 / 2 = 10 (en main 40 / 2 = 20, el más caro del grupo);
     base = mediana 13 x 2 = 26 por ordinaria, 52 por ADR; margen con 20.
+    FCF 125: el contraste con el DCF queda dentro del umbral (ver arriba).
     """
-    company = _subject(db, ticker="RELADR2")
+    company = _subject(db, ticker="RELADR2", free_cash_flow=125.0)
     company.factor_tags = ["software", "adr:2"]
     db.commit()
     _peers(db)
