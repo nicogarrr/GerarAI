@@ -16,12 +16,11 @@ Reglas generales que fijan estos tests (cualquier emisor):
 """
 
 import asyncio
-from datetime import date
 from decimal import Decimal
 
 import pytest
 from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from app.models.entities import Base, Company, FinancialFact
 from app.services import financial_ingestion_service as ingestion
