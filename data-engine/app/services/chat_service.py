@@ -1295,6 +1295,16 @@ def _empty_portfolio_response(path: str) -> ChatResponse:
     )
 
 
+def _tenant_without_open_positions(db: Session) -> bool:
+    """Tenant válido y sin ninguna posición abierta (cantidad > 0)."""
+    tenant_id = db.info.get("tenant_id")
+    if type(tenant_id) is not int or tenant_id <= 0:
+        return False
+    return db.execute(
+        select(Position.id).where(Position.quantity > 0, Position.tenant_id == tenant_id).limit(1)
+    ).first() is None
+
+
 def _asks_purchase_cost(question: str) -> bool:
     if _PURCHASE_COST_RE.search(question):
         return True
@@ -2119,6 +2129,15 @@ class ChatService:
             and not doctrine_question
         ):
             portfolio_answer = self._portfolio_overview(db)
+            if portfolio_answer is None and _tenant_without_open_positions(db):
+                # «¿cuántas posiciones tengo?» / «how many positions do I have?»
+                # con la cartera vacía caían al modelo general («No puedo
+                # responderte…»). Si el contexto personal no la toma (él ya
+                # contesta «¿cómo va mi cartera?»), se dice que no hay posiciones.
+                from app.services.personal_answer import detect_personal_intent
+
+                if detect_personal_intent(question or "") is None:
+                    portfolio_answer = _empty_portfolio_response("portfolio_overview")
             if portfolio_answer is not None:
                 portfolio_answer.context = context_echo
                 return portfolio_answer
@@ -3114,8 +3133,9 @@ class ChatService:
     def _position_answer(self, db: Session, company: Company, question: str) -> ChatResponse | None:
         """Posicion guardada de un ticker: cantidad, coste, valor y peso.
 
-        Determinista y sin recomendacion; sin posiciones del tenant devuelve
-        None y la pregunta sigue por la ruta de empresa.
+        Determinista y sin recomendacion. Con la cartera vacía dice que no hay
+        posición abierta en ese ticker (antes devolvía None y la pregunta caía
+        al volcado de datos de la empresa); sin tenant válido devuelve None.
         """
         tenant_id = db.info.get("tenant_id")
         if type(tenant_id) is not int or tenant_id <= 0:
@@ -3127,14 +3147,29 @@ class ChatService:
                 .where(Position.quantity > 0, Position.tenant_id == tenant_id)
             ).all()
         )
+        english = _english()
         if not rows:
-            return None
+            return ChatResponse(
+                answer=(
+                    f"You have no open position in {company.ticker}: your saved portfolio (/portfolio) "
+                    "has no open positions."
+                    if english
+                    else f"No tienes ninguna posición abierta en {company.ticker}: tu cartera guardada "
+                    "(/portfolio) no tiene posiciones abiertas."
+                ),
+                sources=[],
+                model="deterministic",
+                prompt_version="portfolio-position-v1",
+                confidence=0.9,
+                llm_trace={
+                    "path": "portfolio_position", "generated": False, "provider_calls": 0, "empty_portfolio": True,
+                },
+            )
 
         def _value(pos: Position) -> float | None:
             raw = position_base_value(pos)
             return float(raw) if raw is not None else None
 
-        english = _english()
         found = [(pos, comp) for pos, comp in rows if comp.id == company.id]
         if not found:
             answer = (
