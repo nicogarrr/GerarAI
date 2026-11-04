@@ -6,8 +6,7 @@ import type { KeyStats } from '@/lib/research/key-stats';
 import type { ResearchLongTermModel, MoatScoreMetric } from '@/lib/actions/research.actions';
 import type { ShareCapital } from '@/lib/actions/share-capital.actions';
 import type { ManagementCredibility } from '@/components/research/sections/ManagementCredibilitySection';
-import { formatMarketDate, formatNumber, formatPrice, formatPercent } from '@/lib/format';
-import { getT } from '@/lib/i18n/server';
+import { getFormat, getT } from '@/lib/i18n/server';
 
 const GRADE_KEYS = {
   high: 'research.credibility.grade.high',
@@ -63,7 +62,9 @@ export async function QuickGlancePanel({ ticker, currency, model, analysts, live
   moatScore: MoatScoreMetric | null;
   keyStats?: KeyStats | null;
 }) {
-  const t = await getT();
+  // Cifras y fechas con el idioma activo: con los formateadores sueltos de
+  // lib/format la ficha en inglés salía «+87,2 %», «630,00 US$», «19 nov 2026».
+  const [t, { formatMarketDate, formatNumber, formatPrice, formatPercent }] = await Promise.all([getT(), getFormat()]);
   const tk = encodeURIComponent(ticker);
   const rows: React.ReactNode[] = [];
 

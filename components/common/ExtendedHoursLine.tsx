@@ -6,7 +6,7 @@ import { getExtendedQuotes } from '@/lib/actions/watchlist.actions';
 import { batchedSymbol } from '@/lib/cache/batch-symbols';
 import { requestCache } from '@/lib/cache/requestCache';
 import { extendedQuoteLabel, type ExtendedQuote } from '@/lib/market/extended-quote';
-import { formatNumber, formatPercent, formatPrice } from '@/lib/format';
+import { useFormat, useLocale } from '@/lib/i18n/client';
 
 /**
  * Línea pre/post-mercado (decorativa). Antes el render de servidor esperaba
@@ -35,6 +35,10 @@ export default function ExtendedHoursLine({
     as?: 'div' | 'dd';
 }) {
     const [quote, setQuote] = useState<ExtendedQuote | null>(null);
+    // Etiqueta, precio y % con el idioma activo (antes, en inglés: «Último
+    // post-cierre · 4 nov, 01:59 CET: 206,15 US$»).
+    const locale = useLocale();
+    const { formatNumber, formatPercent, formatPrice } = useFormat();
 
     useEffect(() => {
         let cancelled = false;
@@ -61,7 +65,7 @@ export default function ExtendedHoursLine({
             : '';
     return (
         <Tag className="text-[10px] font-normal text-gray-500">
-            {extendedQuoteLabel(quote)}: {priceText}
+            {extendedQuoteLabel(quote, locale)}: {priceText}
             {changeText}
         </Tag>
     );
