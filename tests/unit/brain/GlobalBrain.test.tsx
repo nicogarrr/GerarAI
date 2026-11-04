@@ -174,6 +174,16 @@ describe('GlobalBrain: pastilla "Viendo"', () => {
         expect(pill).toHaveTextContent('Viendo Cartera');
         expect(pill).toHaveAttribute('href', '/portfolio');
     });
+    it('en móvil se abrevian título y pastilla, pero el nombre accesible sigue completo', async () => {
+        render(<GlobalBrain userId="u1" />);
+        await open();
+        // El diálogo se nombra con el título completo, no con la versión corta.
+        expect(screen.getByRole('dialog', { name: 'Cerebro GerarAI' })).toBeInTheDocument();
+        // La pastilla del enlace se anuncia como «Viendo Cartera»: la etiqueta
+        // corta de móvil va con aria-hidden y no se repite.
+        expect(screen.getByRole('link', { name: 'Viendo Cartera' })).toHaveAttribute('href', '/portfolio');
+        expect(screen.getByTestId('brain-page-context')).toHaveAttribute('title', 'Viendo Cartera');
+    });
     it('en una página no identificable no hay pastilla', async () => {
         pathname = '/pagina-rara';
         render(<GlobalBrain userId="u1" />);
