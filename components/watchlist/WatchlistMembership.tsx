@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/lib/i18n/client';
 import { createContext, useContext, useState, type ReactNode } from 'react';
 
 const Membership = createContext({ removed: new Set<string>(), confirmRemoval: (_symbol: string) => {} });
@@ -22,6 +23,7 @@ export function WatchlistEntry({ symbol, as: Tag, children, className }: { symbo
 
 export function WatchlistCount({ symbols, page, totalPages }: { symbols: string[]; page: number; totalPages: number }) {
     const { removed } = useContext(Membership);
+    const t = useT();
     const count = symbols.filter((symbol) => !removed.has(normalize(symbol))).length;
-    return <span aria-live="polite">{count} {count === 1 ? 'empresa' : 'empresas'} · <span className="whitespace-nowrap">Página {page} de {totalPages}</span></span>;
+    return <span aria-live="polite">{count} {t(count === 1 ? 'watchlist.dca.panel.companyOne' : 'watchlist.dca.panel.companyOther')} · <span className="whitespace-nowrap">{t('watchlist.dca.list.page', { page, pages: totalPages })}</span></span>;
 }
