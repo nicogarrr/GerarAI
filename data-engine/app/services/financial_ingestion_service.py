@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
 
@@ -1035,6 +1035,44 @@ def _esef_period(entry: dict[str, Any]) -> str | None:
     return None
 
 
+def _esef_annual_ends(facts_data: dict[str, Any]) -> frozenset[str]:
+    """Cierres de ejercicio del filing: fin de cada hecho de duracion anual."""
+    ends: set[str] = set()
+    for units in facts_data.values():
+        if not isinstance(units, dict):
+            continue
+        for entries in units.values():
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if isinstance(entry, dict) and "end" in entry and "start" in entry:
+                    if _esef_period(entry) is not None:
+                        ends.add(str(entry["end"]))
+    return frozenset(ends)
+
+
+def _opening_instant_as_closing(
+    entry: dict[str, Any], period: str, annual_ends: frozenset[str]
+) -> str | None:
+    """Fecha de cierre para un instante de apertura puesto el dia siguiente al cierre.
+
+    Algunos emisores ESEF etiquetan el saldo de apertura en el primer dia del
+    ejercicio (contexto instant 2023-01-01, que xBRL-JSON serializa como
+    «2023-01-02T00:00:00»). Es el MISMO saldo que el cierre del dia anterior,
+    pero se guardaba como «2023-01-01:FY» junto al «2022-12-31:FY»: un balance
+    duplicado con otra fecha que no empareja con la deuda o la caja del cierre.
+    Devuelve el cierre (dia anterior) solo cuando ese dia es el fin de una
+    duracion anual del propio filing y el instante no lo es; si no, None.
+    """
+    if "instant" not in entry or "end" in entry or period in annual_ends:
+        return None
+    try:
+        previous = (date.fromisoformat(period) - timedelta(days=1)).isoformat()
+    except ValueError:
+        return None
+    return previous if previous in annual_ends else None
+
+
 def _merge_esef_periods(
     facts_data: dict[str, Any], concepts: list[str], unit: str, metric: str
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
@@ -1068,21 +1106,41 @@ def _merge_esef_periods(
     by_period: dict[str, dict[str, Any]] = {}
     part_facts: dict[str, dict[str, set[Decimal]]] = {}
     concepts_with_data: set[str] = set()
+    annual_ends = _esef_annual_ends(facts_data)
+    direct: list[tuple[str, str, dict[str, Any]]] = []
+    shifted: list[tuple[str, str, dict[str, Any]]] = []
     for concept in concepts:
         for entry in facts_data.get(concept, {}).get(unit, []):
             period = _esef_period(entry)
             if period is None:
                 continue
-            if concept in superset:
-                by_period.setdefault(period, entry)
-            elif concept in parts:
-                value = _decimal(entry.get("val"))
-                if value is None:
-                    continue
-                concepts_with_data.add(concept)
-                part_facts.setdefault(period, {}).setdefault(concept, set()).add(value)
-            elif period not in by_period:
-                by_period[period] = entry
+            closing = _opening_instant_as_closing(entry, period, annual_ends)
+            if closing is None:
+                direct.append((concept, period, entry))
+            else:
+                shifted.append((concept, closing, entry))
+    # Un saldo de apertura etiquetado el dia SIGUIENTE al cierre (AENA FY2023:
+    # caja en «2023-01-02T00:00:00» -> instante 2023-01-01) es el cierre del
+    # ejercicio anterior: se publica con la fecha de ese cierre y solo si el
+    # emisor no da el cierre directamente para ese concepto (el cierre manda).
+    seen_direct = {(concept, period) for concept, period, _entry in direct}
+    items = direct + [item for item in shifted if (item[0], item[1]) not in seen_direct]
+    seen_shifted: set[tuple[str, str]] = set()
+    for concept, period, entry in items:
+        if (concept, period) not in seen_direct:
+            if (concept, period) in seen_shifted:
+                continue
+            seen_shifted.add((concept, period))
+        if concept in superset:
+            by_period.setdefault(period, entry)
+        elif concept in parts:
+            value = _decimal(entry.get("val"))
+            if value is None:
+                continue
+            concepts_with_data.add(concept)
+            part_facts.setdefault(period, {}).setdefault(concept, set()).add(value)
+        elif period not in by_period:
+            by_period[period] = entry
     coverage: dict[str, Any] = {"ambiguous": {}, "partial": {}}
     for period, by_concept in part_facts.items():
         # A disclosed total always beats the sum of its parts: it is the only
