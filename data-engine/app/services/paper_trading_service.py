@@ -220,7 +220,13 @@ def scoreboard(rows: list[PaperTrade], now: datetime | None = None) -> dict:
                   and low <= float(r.conviction) < high and pnl(r, r.exit_price) is not None]
         bins.append({"conviction_min": low, "conviction_max": min(high, 1), "closed": len(sample),
                      "hit_rate": sum((pnl(r, r.exit_price) or Decimal(0)) > 0 for r in sample) / len(sample) if sample else None})
-    return {"groups": cells, "conviction_bins": bins, "hit_rate": "positive_gross_return_on_closed_positions",
+    return {"sharpe_diagnostics": {
+                "status": "unavailable", "reason": "missing_periodic_net_nav_series",
+                "n_observations": 0, "frequency": None, "periods_per_year": None,
+                "risk_free_per_period": None, "horizon": None, "t_statistic": None,
+                "confidence_interval": None, "validation_claim": False,
+                "basis": "trade_closures_are_overlapping_variable_horizon_not_periodic_portfolio_returns",
+            }, "groups": cells, "conviction_bins": bins, "hit_rate": "positive_gross_return_on_closed_positions",
             "basis": "spot_gross_no_fees_dividends_fx_or_corporate_actions", "mode": "paper"}
 
 
