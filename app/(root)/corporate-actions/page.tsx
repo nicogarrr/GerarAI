@@ -50,7 +50,7 @@ export default async function CorporateActionsPage({ searchParams }: PageProps) 
     const emptyMessage = visibleCount === 0
         ? (ticker
             ? t('corporateActions.emptyForTicker', { ticker })
-            : corporateActionsEmptyMessage(syncStatus, f.locale))
+            : corporateActionsEmptyMessage(syncStatus, f.locale, t))
         : undefined;
 
     return (

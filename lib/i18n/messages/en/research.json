@@ -1755,5 +1755,10 @@
       "inferred_input": "inferred, with sources",
       "tag_default": "the model's default rate, without a traceable source"
     }
+  },
+  "peerFormat": {
+    "noData": "No data",
+    "insufficient": "insufficient sample",
+    "insufficientThreshold": "insufficient sample (n<{threshold})"
   }
 }
