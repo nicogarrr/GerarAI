@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import re
 import threading
+from datetime import UTC, date, datetime, time
 from decimal import Decimal
 from urllib.parse import urlparse
 
@@ -202,15 +203,18 @@ class InferredInputService:
                 db.rollback()
                 raise
 
-    def latest_valid(self, db: Session, company_id: int, input_key: str) -> InferredInput | None:
+    def latest_valid(self, db: Session, company_id: int, input_key: str, *, as_of: date | None = None) -> InferredInput | None:
         """Ultimo input vigente que sigue siendo valido; el resto se ignora."""
         tenant_id = db.info.get("tenant_id")
         if tenant_id is None:
             return None
+        conditions = [InferredInput.tenant_id == tenant_id,
+                      InferredInput.company_id == company_id, InferredInput.input_key == input_key]
+        if as_of is not None:
+            conditions.append(InferredInput.created_at <= datetime.combine(as_of, time.max, tzinfo=UTC))
         row = db.scalar(
             select(InferredInput)
-            .where(InferredInput.tenant_id == tenant_id,
-                   InferredInput.company_id == company_id, InferredInput.input_key == input_key)
+            .where(*conditions)
             .order_by(desc(InferredInput.id))
             .limit(1)
         )

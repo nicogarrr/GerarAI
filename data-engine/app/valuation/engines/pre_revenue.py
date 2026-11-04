@@ -126,7 +126,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
         company = context.company
         if context.db is None or company.id is None:
             return None
-        target_input = InferredInputService().latest_valid(context.db, company.id, "fcf_margin")
+        target_input = InferredInputService().latest_valid(context.db, company.id, "fcf_margin", as_of=context.as_of)
         if target_input is None:
             return None
         target_margin = float(target_input.value)
@@ -331,7 +331,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
                 # URLs https (validado) permite escenarios. Nunca es un fact y el
                 # resultado queda marcado como no publicable.
                 inferred_margin = InferredInputService().latest_valid(
-                    context.db, company.id, "fcf_margin"
+                    context.db, company.id, "fcf_margin", as_of=context.as_of
                 )
                 if inferred_margin is not None:
                     margin = float(inferred_margin.value)
