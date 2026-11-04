@@ -37,6 +37,7 @@ from app.valuation.engines.base import (
     wacc_terminal_growth_reason,
 )
 from app.valuation.engines.registry import declared_engine_fallback
+from app.valuation.engines.scenario_engine import SCENARIO_FALLBACK_REASONS
 from app.valuation.margin_convention import MARGIN_OF_SAFETY_CONVENTION
 from app.valuation.point_in_time import (
     PRECISION_UNKNOWN,
@@ -340,7 +341,26 @@ logger = logging.getLogger(__name__)
 
 
 # Motores con su propio N/D honesto o ya genericos: sin respaldo por multiplos.
-_NO_SECTOR_FALLBACK = frozenset({"standard_dcf", "pre_revenue", "relative_multiples"})
+_NO_SECTOR_FALLBACK = frozenset({"standard_dcf", "pre_revenue", "relative_multiples", "scenario"})
+# Motores sobre flujo de caja libre con ingresos: llevan el contraste por
+# múltiplos de comparables (el de escenarios parte del mismo DCF).
+_RELATIVE_CROSS_CHECK_ENGINES = frozenset({"standard_dcf", "scenario"})
+
+
+def _scenario_engine_fallback(result: dict) -> dict | None:
+    """El respaldo que declaró el motor de escenarios, si volvió a otro motor."""
+    fallback = (result.get("trace") or {}).get("engine_fallback")
+    if isinstance(fallback, dict) and fallback.get("reason") in SCENARIO_FALLBACK_REASONS:
+        return fallback
+    return None
+
+
+def _engine_that_ran(result: dict, company: Company) -> str:
+    """Motor que de verdad corrió: el resuelto, o el respaldo del de escenarios."""
+    fallback = _scenario_engine_fallback(result)
+    if fallback is not None and fallback.get("resolved_engine"):
+        return str(fallback["resolved_engine"])
+    return resolve_engine_key(company)
 
 
 def _sector_fallback(
@@ -438,7 +458,7 @@ def _relative_multiples_cross_check(
     ese caso se adjunta solo el estado, nunca una cifra inventada. Nunca rompe
     la valoracion principal: cualquier error interno se registra y se omite.
     """
-    if resolved_engine != "standard_dcf":
+    if resolved_engine not in _RELATIVE_CROSS_CHECK_ENGINES:
         return None
     try:
         from app.valuation.engines.relative_multiples import RelativeMultiplesEngine
@@ -705,7 +725,7 @@ class ValuationService:
                 db,
                 company,
                 context,
-                resolved_engine=resolve_engine_key(company),
+                resolved_engine=_engine_that_ran(result, company),
                 to_listing=to_listing if currency_gate["status"] != "blocked" else None,
                 price_currency=price_currency,
                 reporting_currency=currency_gate.get("reporting_currency"),
@@ -727,7 +747,7 @@ class ValuationService:
         if (
             currency_gate["status"] != "blocked"
             and result.get("status") == "insufficient_data"
-            and resolve_engine_key(company) not in _NO_SECTOR_FALLBACK
+            and _engine_that_ran(result, company) not in _NO_SECTOR_FALLBACK
         ):
             result = _sector_fallback(
                 db,
@@ -778,12 +798,16 @@ class ValuationService:
         result["trace"].setdefault("model_version", MODEL_VERSION)
         # Written only by a fresh computation, never added when reading history.
         result["trace"]["margin_of_safety_convention"] = MARGIN_OF_SAFETY_CONVENTION
-        result["trace"]["resolved_engine"] = resolve_engine_key(company)
+        scenario_fallback = _scenario_engine_fallback(result)
+        result["trace"]["resolved_engine"] = _engine_that_ran(result, company)
         # El método declarado viaja con el motor que corrió: si no coinciden,
         # el motivo queda en la traza (y en el modelo guardado) en vez de
-        # presentar el declarado como si hubiera corrido (TSLA, KRKNF).
+        # presentar el declarado como si hubiera corrido (TSLA, KRKNF). Si el
+        # motor de escenarios volvió a otro, su motivo es el que vale.
         result["trace"]["declared_model"] = getattr(company, "valuation_model", None)
-        fallback = declared_engine_fallback(company, result["trace"]["resolved_engine"])
+        fallback = scenario_fallback or declared_engine_fallback(
+            company, result["trace"]["resolved_engine"]
+        )
         if fallback is not None:
             result["trace"]["engine_fallback"] = fallback
         else:
