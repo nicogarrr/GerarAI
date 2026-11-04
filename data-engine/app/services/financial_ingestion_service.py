@@ -154,6 +154,9 @@ BALANCE_METRICS: list[MetricSpec] = [
     ("cash_and_equivalents", "cashAndCashEquivalents", "USD"),
     ("total_debt", "totalDebt", "USD"),
     ("net_debt", "netDebt", "USD"),
+    # Valores negociables / inversiones a corto plazo (fuera de la caja de FMP):
+    # el puente de la deuda neta los resta cuando netDebt es solo deuda - caja.
+    ("short_term_investments", "shortTermInvestments", "USD"),
     ("total_assets", "totalAssets", "USD"),
     ("total_liabilities", "totalLiabilities", "USD"),
     ("total_equity", "totalStockholdersEquity", "USD"),
@@ -261,6 +264,13 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("cash_and_equivalents", ["CashAndCashEquivalentsAtCarryingValue",
                               "CashCashEquivalentsAndShortTermInvestments",
                               "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"], "USD"),
+    # Inversiones financieras a corto plazo presentadas FUERA de la caja (PLTR:
+    # MarketableSecuritiesCurrent 5.753 M frente a 1.424 M de caja, FY2025).
+    # Alias de un mismo total, por orden de alcance. Va DETRAS de la caja: en
+    # los periodos cuya caja salio del tag combinado
+    # CashCashEquivalentsAndShortTermInvestments no se emite (ya va dentro).
+    ("short_term_investments", ["ShortTermInvestments", "MarketableSecuritiesCurrent",
+                                "AvailableForSaleSecuritiesDebtSecuritiesCurrent"], "USD"),
     # Orden por alcance, NO por antiguedad: el tag combinado (largo + corto) es
     # el que representa "deuda total", y se coloco antes detras de
     # LongTermDebt, asi que la deuda neta salia sin la parte corriente. El
@@ -357,6 +367,7 @@ SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("total_liabilities", ["Liabilities"],                                                             "USD"),
     ("total_equity",      ["EquityAttributableToOwnersOfParent"],                                      "USD"),
     ("cash_and_equivalents", ["CashAndCashEquivalents"],                                               "USD"),
+    ("short_term_investments", ["ShorttermDepositsNotClassifiedAsCashEquivalents"],                     "USD"),
     ("operating_cash_flow", ["CashFlowsFromUsedInOperatingActivities"],                                "USD"),
     ("capital_expenditure", ["PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"],    "USD"),
     ("depreciation_amortization", ["DepreciationAndAmortisationExpense"],                              "USD"),
@@ -384,6 +395,9 @@ ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("total_liabilities", ["ifrs-full:Liabilities"],                                                     "iso4217:EUR"),
     ("total_equity",      ["ifrs-full:EquityAttributableToOwnersOfParent", "ifrs-full:Equity"],          "iso4217:EUR"),
     ("cash_and_equivalents", ["ifrs-full:CashAndCashEquivalents"],                                       "iso4217:EUR"),
+    # Depositos a plazo fuera de equivalentes de caja (IAS 7): el puente de la
+    # deuda neta los resta solo si la deuda neta resuelta es deuda - caja.
+    ("short_term_investments", ["ifrs-full:ShorttermDepositsNotClassifiedAsCashEquivalents"],          "iso4217:EUR"),
     # Componentes de deuda financiera (no alias: partes disjuntas del pasivo
     # financiero). total_debt se DERIVE como suma declarada en _derive_esef_metrics.
     # Prestamos/bonos como alias de los pasivos financieros: muchos emisores no
@@ -487,6 +501,22 @@ DERIVED_PAIR_METRICS: tuple[str, ...] = (
     "net_debt",
     "revenue_growth",
 )
+
+
+def _cash_includes_investments(concept_usage: dict[str, dict[str, Any]], end: str) -> bool:
+    """True si la caja de ese cierre salio del tag combinado caja + inversiones.
+
+    ``concept_usage["cash_and_equivalents"]`` guarda el concepto ganador por
+    cierre (clave ``<end>`` anual o ``<end>:<fp>`` trimestral). Si fue
+    CashCashEquivalentsAndShortTermInvestments, emitir ademas las inversiones a
+    corto plazo de ese cierre haria que el puente de la deuda neta las restara
+    dos veces.
+    """
+    combined = "CashCashEquivalentsAndShortTermInvestments"
+    for key, concept in (concept_usage.get("cash_and_equivalents") or {}).items():
+        if concept == combined and (key == end or str(key).startswith(f"{end}:")):
+            return True
+    return False
 
 
 def is_summed_component(metric: str) -> bool:
@@ -1730,6 +1760,10 @@ class FinancialIngestionService:
                     val = _decimal(entry.get("val"))
                     if val is None:
                         continue
+                    if metric == "short_term_investments" and _cash_includes_investments(
+                        concept_usage, str(entry["end"])
+                    ):
+                        continue
                     if metric == "capital_expenditure":
                         val = -val
                     fp = _fiscal_quarter_from_end(
@@ -1789,6 +1823,10 @@ class FinancialIngestionService:
                 for entry in annual_sorted:
                     val = _decimal(entry.get("val"))
                     if val is None:
+                        continue
+                    if metric == "short_term_investments" and _cash_includes_investments(
+                        concept_usage, str(entry["end"])
+                    ):
                         continue
                     if metric == "capital_expenditure":
                         val = -val
