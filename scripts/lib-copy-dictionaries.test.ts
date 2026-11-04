@@ -12,7 +12,7 @@ import { createTranslator } from '../lib/i18n/translate.ts';
 
 test('helpers use the supplied request translator, not hardcoded copy', () => {
   const t = createTranslator('en');
-  assert.equal(corporateActionsEmptyMessage(null, 'es', t), t('corporateActions.empty.noStatus'));
+  assert.equal(corporateActionsEmptyMessage(null, 'es', t), t('corporateActions.emptyState.noStatus'));
   assert.equal(formatPeerValue(null, 'roe', 'es', t), t('research.peerFormat.noData'));
   assert.equal(peerMedianText({ peer_median: null, insufficient_sample: true, note: 'n<7' }, 'roe', 'en', t), t('research.peerFormat.insufficientThreshold', { threshold: '7' }));
   for (const file of ['corporate-actions-empty', 'peer-format']) {

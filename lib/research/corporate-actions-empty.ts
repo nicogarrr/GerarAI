@@ -15,16 +15,16 @@ export function corporateActionsEmptyMessage(
 ): string {
     const en = locale === 'en';
     if (!status) {
-        return t('corporateActions.empty.noStatus');
+        return t('corporateActions.emptyState.noStatus');
     }
     const dates = [status.dividends_last_import, status.splits_last_import]
         .filter((value): value is string => Boolean(value))
         .map((value) => new Date(value))
         .filter((value) => !Number.isNaN(value.getTime()));
     if (dates.length === 0) {
-        return t('corporateActions.empty.noImports');
+        return t('corporateActions.emptyState.noImports');
     }
     const last = new Date(Math.max(...dates.map((value) => value.getTime())));
     const day = last.toLocaleDateString(en ? 'en-US' : 'es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Madrid' });
-    return t('corporateActions.empty.lastImport', { day });
+    return t('corporateActions.emptyState.lastImport', { day });
 }
