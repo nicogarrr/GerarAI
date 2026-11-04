@@ -135,6 +135,10 @@ def _checks(kind, data):
             cost = _find(data, r"__total_costs_and_expenses")
         if rev is not None and cost is not None:
             equation("revenue_to_operating_income", op, rev-cost)
+            revenue_index = next(i for i, (label, _) in enumerate(data) if re.fullmatch(r"(?:total )?revenues?", label, re.I))
+            cost_index = next(i for i, (label, _) in enumerate(data) if re.fullmatch(r"(?:total costs and expenses|__total_costs_and_expenses)", label, re.I))
+            equation("operating_cost_components", cost,
+                     sum((v for _, v in data[revenue_index+1:cost_index]), Decimal(0)))
         else:
             cost = _find(data, r"(?:total )?cost of revenues?(?: \(\d+\))?")
             gross = _find(data, r"gross (?:margin|profit)")

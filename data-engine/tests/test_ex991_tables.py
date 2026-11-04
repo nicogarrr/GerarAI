@@ -170,8 +170,8 @@ def test_year_like_amount_does_not_change_later_period_headers():
     cell.clear()
     cell.text = '2026'
     result = parse("uber", html.tostring(root, encoding='unicode'))
-    # Changed D&A is not independently checked, but must not become a new year.
-    assert fact(result, 'revenue', date(2025, 7, 1), date(2025, 9, 30))['value'] == 13467
+    # A year-like amount cannot rewrite headers or evade cost-component checks.
+    assert any(t['status'] == 'rejected' for t in result['tables'])
     assert not any(t['end'].year == 212 for t in result['tables'])
 
 
