@@ -119,6 +119,9 @@ def _driver(model: dict, key: str) -> dict:
 def test_cb_primas_devengadas_se_ingieren_y_el_driver_deja_de_faltar(db, monkeypatch):
     monkeypatch.setattr(ingestion, "SECClient", _FakeSECChubb)
     company = _company(db, "CB", "Chubb Ltd")
+    # Su industria real de prod: el marco de aseguradora sale de ahí, no del ticker.
+    company.industry = "Insurance"
+    db.commit()
     asyncio.run(FinancialIngestionService().refresh_from_sec(db=db, company=company))
 
     assert _annual(db, company, "earned_premiums") == {2024: 49_846_000_000.0, 2025: 53_014_000_000.0}

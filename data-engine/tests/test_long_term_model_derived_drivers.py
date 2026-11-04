@@ -13,13 +13,14 @@ Cada derivado se marca «derivado» con su formula y sus fact_ids.
 """
 
 import asyncio
+from datetime import date
 from decimal import Decimal
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.models.entities import Base, Company, FinancialFact
+from app.models.entities import Base, Company, FinancialFact, InstrumentReference
 from app.services import financial_ingestion_service as ingestion
 from app.services.financial_ingestion_service import FinancialIngestionService
 from app.services.long_term_model_service import LongTermModelService
@@ -49,6 +50,16 @@ def _company(db, ticker: str, name: str) -> Company:
     db.add(company)
     db.commit()
     return company
+
+
+def _camden(db) -> Company:
+    """CPT con sus datos de prod: ficha «Real Estate» (Finnhub) y referencia
+    del instrumento «Residential REITs» (de ahí sale su marco reit)."""
+    db.add(InstrumentReference(
+        ticker_normalized="CPT", name="Camden Property Trust", industry="Residential REITs",
+        currency="USD", as_of=date(2026, 10, 1), source="financedatabase",
+    ))
+    return _company(db, "CPT", "Camden Property Trust")
 
 
 def _flow(val, year, accn, filed):
@@ -86,7 +97,7 @@ def _driver(model: dict, key: str) -> dict:
 
 def test_cpt_noi_derivado_de_tres_hechos_del_10k(db, monkeypatch):
     monkeypatch.setattr(ingestion, "SECClient", _FakeSECCamden)
-    company = _company(db, "CPT", "Camden Property Trust")
+    company = _camden(db)
     asyncio.run(FinancialIngestionService().refresh_from_sec(db=db, company=company))
 
     model = LongTermModelService().build(db, company, commit=False)
@@ -105,7 +116,7 @@ def test_cpt_noi_derivado_de_tres_hechos_del_10k(db, monkeypatch):
 
 
 def test_noi_sin_todas_las_entradas_sigue_sin_dato(db):
-    company = _company(db, "CPT", "Camden Property Trust")
+    company = _camden(db)
     db.add(FinancialFact(
         company_id=company.id, metric="lease_income", value=Decimal(1_573_544_000), unit="USD",
         period="2025-12-31:FY", fiscal_year=2025, fiscal_quarter="FY",
