@@ -234,17 +234,41 @@ class _Matcher:
             for alias in aliases:
                 term = alias["termino"]
                 kind = alias.get("tipo", "alias")
+                pattern = _term_regex(term, case_sensitive=bool(alias.get("mayusculas")))
                 self._add(
                     term,
                     _Rule(
                         ticker=ticker,
                         via=f"{kind}:{term}",
                         link_type=LINK_ABOUT,
-                        pattern=_term_regex(term, case_sensitive=bool(alias.get("mayusculas"))),
+                        pattern=pattern,
                         requires=_any_regex(alias.get("requiere")),
                         excludes=_any_regex(alias.get("excluye")),
                     ),
                 )
+                # Persona con varias empresas (Elon Musk): con contexto de la
+                # empresa es «sobre»; sin contexto de ninguna, «relacionada»
+                # con el tipo dado (ceo); con contexto de OTRA empresa
+                # («otras_empresas»: SpaceX, xAI...), nada.
+                fallback = alias.get("sin_contexto")
+                if relations and fallback and alias.get("requiere"):
+                    self._add(
+                        term,
+                        _Rule(
+                            ticker=ticker,
+                            via=f"{fallback}:{term}",
+                            link_type=LINK_RELATED,
+                            pattern=pattern,
+                            requires=None,
+                            excludes=_any_regex(
+                                [
+                                    *alias["requiere"],
+                                    *alias.get("otras_empresas", []),
+                                    *alias.get("excluye", []),
+                                ]
+                            ),
+                        ),
+                    )
                 about_terms.setdefault(term.casefold(), set()).add(ticker)
         usable, _ambiguous = generated_names(companies)
         for ticker, phrase in usable.items():
