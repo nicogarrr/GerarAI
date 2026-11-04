@@ -1,21 +1,24 @@
 // @ts-expect-error TS5097
-import { formatMoney, NA } from '../format.ts';
+import { formatMoney, naFor } from '../format.ts';
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { DEFAULT_LOCALE, type Locale } from '../i18n/locale.ts';
 
 /**
  * F311: los importes de «Posiciones fiscales» llegaban crudos a la tabla
  * («3589.265983») porque RecordList renderiza con String(value). Las tres
  * columnas monetarias se formatean en es-ES con la divisa de la PROPIA fila
  * (una cartera puede mezclar EUR y USD); sin divisa válida se asume EUR,
- * que es la base del informe fiscal.
+ * que es la base del informe fiscal. Con la app en inglés, cifras y «N/A» en
+ * inglés (el locale llega del componente).
  */
 export const TAX_HOLDING_MONEY_COLUMNS = ['cost_basis', 'market_value', 'unrealized_pnl'] as const;
 
-export function formatHoldingMoney(value: unknown, currency: unknown): string {
-    if (value === null || value === undefined || value === '') return NA;
+export function formatHoldingMoney(value: unknown, currency: unknown, locale: Locale = DEFAULT_LOCALE): string {
+    if (value === null || value === undefined || value === '') return naFor(locale);
     const cur = typeof currency === 'string' && /^[A-Za-z]{3}$/.test(currency.trim())
         ? currency.trim().toUpperCase()
         : 'EUR';
-    return formatMoney(value as number | string, cur);
+    return formatMoney(value as number | string, cur, undefined, undefined, locale);
 }
 
 /**
@@ -28,6 +31,7 @@ export function formatHoldingCell(
     column: (typeof TAX_HOLDING_MONEY_COLUMNS)[number],
     value: unknown,
     record: { quantity?: unknown; cost_basis?: unknown; currency?: unknown },
+    locale: Locale = DEFAULT_LOCALE,
 ): string {
     if (column === 'cost_basis' || column === 'unrealized_pnl') {
         const quantity = Number(record.quantity);
@@ -35,7 +39,7 @@ export function formatHoldingCell(
             ? null
             : Number(record.cost_basis);
         const costUnknown = cost === null || Number.isNaN(cost) || (cost === 0 && quantity > 0);
-        if (costUnknown) return NA;
+        if (costUnknown) return naFor(locale);
     }
-    return formatHoldingMoney(value, record.currency);
+    return formatHoldingMoney(value, record.currency, locale);
 }
