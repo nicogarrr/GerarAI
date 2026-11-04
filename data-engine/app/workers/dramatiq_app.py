@@ -3475,6 +3475,12 @@ def _clears_news_on_add_mark(fn):
     return wrapper
 
 
+# Empresas cuyos alias por datos se leen o refrescan como mucho en cada
+# barrido de noticias por ticker (cada una son unas pocas consultas a
+# Wikidata; la caché dura 30 días).
+ALIAS_REFRESH_PER_SWEEP = 4
+
+
 @dramatiq.actor(max_retries=2, min_backoff=15_000, time_limit=2 * 3600 * 1000,
               queue_name=YAHOO_QUEUE_NAME)
 @_clears_news_on_add_mark
@@ -3547,12 +3553,33 @@ def refresh_ticker_news(
             else:
                 companies = [c for c in _companies(db) if is_us_listed(c)]
             deadline = Deadline(6600)  # margen de 10 min bajo el time_limit de 2 h
+            # Alias de cada empresa sacados de datos (Wikidata con QID e
+            # informe anual), en caché por tenant: unas pocas por barrido
+            # se leen o refrescan; si la fuente cae, el barrido sigue igual.
+            alias_records: dict = {}
+            if scope == "tracked" or ticker:
+                try:
+                    from app.services.company_alias_sources import ensure_aliases
+
+                    alias_records = ensure_aliases(db, companies, max_fetch=ALIAS_REFRESH_PER_SWEEP)
+                except Exception:  # noqa: BLE001 - fail-open: sin alias de datos
+                    _rollback(db)
+                    alias_records = {}
+
+            def _record(company):
+                return alias_records.get((company.ticker or "").upper())
 
             def _lanes(company):
                 lanes = [("yahoo", yahoo_feed_url(company.ticker))] if is_us_listed(company) else []
                 if scope == "tracked" or ticker:
+                    from app.services.company_alias_sources import search_terms
+
                     lanes.extend(
-                        google_lanes(company, priority=company.ticker.upper() in PRIORITY_TICKERS)
+                        google_lanes(
+                            company,
+                            priority=company.ticker.upper() in PRIORITY_TICKERS,
+                            brand_terms=search_terms(_record(company), company_name=company.name),
+                        )
                     )
                 # Freno por proveedor: el carril pausado (429) ni se intenta.
                 return [
@@ -3573,7 +3600,10 @@ def refresh_ticker_news(
                     record_success(brake_client, provider)
                 if lane == "yahoo":
                     return label_yahoo(result, company, _ticker_evidence_level)
-                return label_google(result, company, _ticker_evidence_level)
+                record = _record(company)
+                return label_google(
+                    result, company, _ticker_evidence_level, record.aliases if record is not None else ()
+                )
 
             def _ingest(company, part):
                 return service.ingest_news_result(

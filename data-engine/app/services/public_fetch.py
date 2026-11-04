@@ -269,11 +269,14 @@ def fetch_public_url(
     max_bytes: int = DEFAULT_MAX_BYTES,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     allowed_url: Callable[[str], bool] | None = None,
+    user_agent: str | None = None,
 ) -> tuple[bytes, str | None, str]:
+    # ``user_agent``: fuentes que exigen un agente con contacto (Wikidata
+    # limita a 1 petición/min el genérico); por defecto, el de siempre.
     if allowed_url is not None and not allowed_url(url):
         raise ValueError("Public fetch URL denied by source policy")
     target = _resolve_public_url(url)
-    headers = {"User-Agent": USER_AGENT, "Accept": "*/*"}
+    headers = {"User-Agent": user_agent or USER_AGENT, "Accept": "*/*"}
     with httpx.Client(
         timeout=timeout,
         follow_redirects=False,
