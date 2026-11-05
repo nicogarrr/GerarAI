@@ -49,6 +49,10 @@ cleanup() {
   # los borra. Sin esto, el drill siguiente hereda la base restaurada (WAL
   # recovery larga) y postgres no responde dentro de la espera del restore.
   docker volume rm ${VERIFY_DATA_VOLUMES} cavaai-verify-freshduck >/dev/null 2>&1 || true
+  # La imagen del drill es un artefacto regenerable (mismo build en cada
+  # corrida): sin este borrado cada verify deja ~4,4 GB de imagen mas las
+  # capas <none> del build anterior.
+  docker image rm cavaai-backend:verify >/dev/null 2>&1 || true
   rm -f "${VERIFY_COMPOSE}"
 }
 trap cleanup EXIT
@@ -67,6 +71,15 @@ echo "[verify] volumen nuevo escribible por el usuario de la app: OK"
 echo "[verify] 2/5 proyecto compose aislado (nombres, puertos y volumenes propios)…"
 # Arranque siempre desde volumenes vacios: los name: explicitos sobreviven
 # a down -v y un drill anterior dejaria la base restaurada a medias.
+# Un drill anterior interrumpido a la fuerza (kill -9 no ejecuta el trap)
+# puede dejar contenedores cavaai-verify-* vivos: mientras existan RETIENEN
+# sus volumenes y el rm de abajo falla en silencio, y este drill mediria
+# sobre la base restaurada a medias de aquel. Primero se barren.
+STALE_VERIFY=$(docker ps -aq --filter "name=cavaai-verify-" 2>/dev/null || true)
+if [ -n "${STALE_VERIFY}" ]; then
+  echo "[verify] restos de un drill anterior interrumpido: bajando contenedores aislados…"
+  docker rm -f ${STALE_VERIFY} >/dev/null 2>&1 || true
+fi
 docker volume rm ${VERIFY_DATA_VOLUMES} >/dev/null 2>&1 || true
 # Copia del compose de prod con identidad propia. sed deterministico, sin
 # depender de la semantica de merge de overrides de compose.
