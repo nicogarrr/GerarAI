@@ -48,6 +48,7 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
     const { formatMarketDate, formatNumber } = fmt;
     const [retry, setRetry] = useState(0);
     const [range, setRange] = useState<CompanyChartRange>('1M');
+    const [chartType, setChartType] = useState<'line' | 'candles'>('line');
     const daily = useMemo(() => normalizeChartPriceUnits(cleanBars(snapshot.history), { ticker: snapshot.ticker, currency: snapshot.currency, candleCurrency: snapshot.historyCurrency }), [snapshot.history, snapshot.ticker, snapshot.currency, snapshot.historyCurrency]);
     const bars = daily.bars;
     const [remote, setRemote] = useState<{ range: CompanyChartRange; data: CompanyChartHistory } | null>(null);
@@ -69,6 +70,7 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
     const visible = useMemo(() => sinceBuy ? barsSince(rangeVisible, chartEvents?.data.firstBuyDate) : rangeVisible, [rangeVisible, sinceBuy, chartEvents]);
     const visibleCurrency = needsRemote ? remotePrices.currency : daily.currency;
     const hourly = range === '1D' || range === '5D';
+    const candlesAvailable = preferCandlesticks(visible, hourly);
     // «Precio y eventos»: eventos guardados del tramo visible (solo base de datos) sobre las mismas velas.
     const firstDay = visible[0]?.date.slice(0, 10);
     const lastDay = visible.at(-1)?.date.slice(0, 10);
@@ -118,7 +120,13 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                         <h2 className="text-sm font-semibold text-gray-200">{t('research.chart.price')}</h2>
                         <span className="text-xs text-gray-500">{hourly ? t('research.chart.hourlyUtc') : t('research.chart.daily')}{visible.at(-1) ? ` · ${formatMarketDate(visible.at(-1)!.date)}` : ''}</span>
                     </div>
-                    {needsRemote && requestState === 'loading' ? <div className="grid h-[280px] place-items-center text-xs text-gray-500 sm:h-[360px]" role="status">{t('research.chart.loadingRange', { range: t(RANGE_KEYS[range]) })}</div> : needsRemote && requestState === 'error' ? <div className="grid h-[280px] place-items-center text-sm text-gray-500 sm:h-[360px]" role="alert">{t('research.chart.rangeError')}</div> : <PriceCanvas bars={visible} levels={chartLevels} currency={visibleCurrency} hourly={hourly} spikes={spikes} markers={markers} priceLines={priceLines} focusDate={focusDate} />}
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                        <div className="inline-flex rounded-lg border border-gray-800 p-1" role="group" aria-label={t('research.chart.chartType')}>
+                            {(['line', 'candles'] as const).map((mode) => <button key={mode} type="button" aria-pressed={(chartType === 'candles' && candlesAvailable ? 'candles' : 'line') === mode} disabled={mode === 'candles' && !candlesAvailable} onClick={() => setChartType(mode)} className={`min-h-11 min-w-20 rounded-md px-3 text-xs transition disabled:cursor-not-allowed disabled:opacity-40 ${(chartType === 'candles' && candlesAvailable ? 'candles' : 'line') === mode ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'}`}>{t(mode === 'line' ? 'research.chart.lineMode' : 'research.chart.candlesMode')}</button>)}
+                        </div>
+                        {!candlesAvailable ? <span className="text-[11px] text-gray-500">{t('research.chart.candlesUnavailable')}</span> : null}
+                    </div>
+                    {needsRemote && requestState === 'loading' ? <div className="grid h-[280px] place-items-center text-xs text-gray-500 sm:h-[360px]" role="status">{t('research.chart.loadingRange', { range: t(RANGE_KEYS[range]) })}</div> : needsRemote && requestState === 'error' ? <div className="grid h-[280px] place-items-center text-sm text-gray-500 sm:h-[360px]" role="alert">{t('research.chart.rangeError')}</div> : <PriceCanvas candleMode={chartType === 'candles' && candlesAvailable} bars={visible} levels={chartLevels} currency={visibleCurrency} hourly={hourly} spikes={spikes} markers={markers} priceLines={priceLines} focusDate={focusDate} />}
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                         <div className="flex w-full flex-wrap gap-1 sm:w-auto" aria-label={t('research.chart.rangeAria')}>
                             {CHART_RANGES.map((value) => <button type="button" key={value} disabled={range === value && requestState !== 'error'} aria-pressed={range === value} className={`min-h-11 min-w-11 rounded-md px-1 text-[11px] transition sm:px-3 sm:text-xs ${range === value ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { if (range === value) setRetry((count) => count + 1); setRequestState(value === '1D' || value === '5D' || value === '5A' || value === 'Máx' ? 'loading' : 'ready'); setSinceBuy(false); setRange(value); }}>{t(RANGE_KEYS[value])}</button>)}
@@ -194,8 +202,9 @@ export function targetPriceLine(target: number, distance: number | null, t: Tran
     };
 }
 
-function PriceCanvas({ bars, levels, currency, hourly = false, spikes = [], markers = [], priceLines = [], focusDate = null }: {
+function PriceCanvas({ bars, levels, currency, candleMode = false, hourly = false, spikes = [], markers = [], priceLines = [], focusDate = null }: {
     bars: CompanyChartBar[];
+    candleMode?: boolean;
     hourly?: boolean;
     levels: { label: string; price: number; kind: string }[];
     currency: string | null;
@@ -264,7 +273,6 @@ function PriceCanvas({ bars, levels, currency, hourly = false, spikes = [], mark
         const current = engine.current;
         if (!ready || !current) return;
         current.chart.timeScale().applyOptions({ timeVisible: hourly });
-        const candleMode = preferCandlesticks(bars, hourly);
         const priceSeries = candleMode ? current.candles : current.line;
         const extra = [...levels.map((level) => level.price), ...priceLines.map((line) => line.price)];
         priceSeries.applyOptions({ autoscaleInfoProvider: (original: () => AutoscaleInfo | null) => {
@@ -291,14 +299,14 @@ function PriceCanvas({ bars, levels, currency, hourly = false, spikes = [], mark
         for (const dashed of current.dashed) { current.line.removePriceLine(dashed); current.candles.removePriceLine(dashed); }
         current.dashed = priceLines.map((line) => priceSeries.createPriceLine({ price: line.price, title: line.label, color: line.color, ...(line.axisLabelColor ? { axisLabelColor: line.axisLabelColor } : {}), lineWidth: 1, lineStyle: current.dashedStyle, axisLabelVisible: true }));
         current.chart.timeScale().fitContent();
-    }, [ready, bars, levels, hourly, spikes, markers, priceLines]);
+    }, [ready, bars, levels, hourly, spikes, markers, priceLines, candleMode]);
     useEffect(() => {
         const current = engine.current;
         if (!ready || !current || !focusDate) return;
         const bar = bars.find((item) => item.date.slice(0, 10) === focusDate);
-        const priceSeries = preferCandlesticks(bars, hourly) ? current.candles : current.line;
+        const priceSeries = candleMode ? current.candles : current.line;
         if (bar) current.chart.setCrosshairPosition(bar.close, (bar.timestamp ? bar.timestamp as UTCTimestamp : bar.date) as Time, priceSeries);
-    }, [ready, focusDate, bars, hourly]);
+    }, [ready, focusDate, bars, hourly, candleMode]);
     return <div className="relative">
         <div ref={container} className="h-[380px] w-full sm:h-[480px]" role="figure" aria-label={bars.length ? t('research.chart.canvasAria', { from: fmt.formatMarketDate(bars[0].date), to: fmt.formatMarketDate(bars.at(-1)!.date) }) : t('research.chart.canvasAriaEmpty')} data-testid="technical-price-canvas" />
         {error || bars.length < 2 ? <p role="status" className="absolute inset-0 grid place-items-center bg-surface-1 text-sm text-gray-500">{error ? t('research.chart.chartError') : t('research.chart.notEnoughData')}</p> : !ready ? <p role="status" className="absolute inset-0 grid animate-pulse place-items-center text-xs text-gray-500">{t('research.chart.loadingChart')}</p> : null}

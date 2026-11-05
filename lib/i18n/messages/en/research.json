@@ -817,7 +817,11 @@
       "insiderBuys": "{name} buys shares",
       "insiderSells": "{name} sells shares",
       "insiderDetail": "${value} trade (form {form})"
-    }
+    },
+    "chartType": "Chart type",
+    "lineMode": "Line",
+    "candlesMode": "Candles",
+    "candlesUnavailable": "Candles require complete daily OHLC data."
   },
   "memo": {
     "catalystNextEarnings": "Upcoming earnings",
