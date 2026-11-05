@@ -43,6 +43,20 @@ class PortfolioFXService:
     def ensure_portfolio(self, db: Session) -> Portfolio:
         portfolio = self.portfolio(db)
         if portfolio is None:
+            # Un usuario pudo crear una cartera llamada «Main» antes de que
+            # existiera la predeterminada. La unicidad (tenant, name) hacía que
+            # cada escritura posterior fallara al insertar otra «Main». Se
+            # reutiliza y se promociona a predeterminada.
+            existing = db.scalar(
+                select(Portfolio)
+                .where(Portfolio.name == "Main")
+                .order_by(Portfolio.id)
+                .limit(1)
+            )
+            if existing is not None:
+                existing.is_default = True
+                db.flush()
+                return existing
             portfolio = Portfolio(name="Main", base_currency="EUR", is_default=True)
             db.add(portfolio)
             db.flush()

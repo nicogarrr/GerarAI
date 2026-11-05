@@ -16,7 +16,9 @@ bootstrap). ``net_debt`` ausente nunca es 0: se declara como input faltante.
 from __future__ import annotations
 
 from dataclasses import replace
+from types import SimpleNamespace
 
+from app.services.declared_input_service import DeclaredInputService
 from app.services.inferred_input_service import InferredInputService
 from app.valuation.dcf_fcff import (
     ConvergenceDCFInputs,
@@ -107,6 +109,50 @@ class PreRevenueScenarioEngine(ValuationEngine):
         )
         return result
 
+    def _declared_margin_target(self, context: ValuationContext):
+        """Margen FCF objetivo declarado por analista (estimado con fuente).
+
+        Fallback del ``InferredInput``: usa la fila ``declared_input_values``
+        vigente, validada y solo si es un supuesto de analista. Devuelve una
+        vista con la misma forma que ``InferredInput`` para que el resto del
+        motor no cambie; el id es negativo y trazable a la fila original.
+        """
+        db = context.db
+        company = context.company
+        if db is None or company.id is None:
+            return None
+        info = getattr(db, "info", {}) or {}
+        tenant_id = info.get("tenant_id") if isinstance(info, dict) else None
+        if type(tenant_id) is not int or tenant_id <= 0:
+            return None
+        service = DeclaredInputService()
+        try:
+            row = service.current(
+                db, company_id=company.id, tenant_id=tenant_id, keys=["fcf_margin"]
+            ).get(("fcf_margin", ""))
+            if row is None or row.method != "analyst" or not service.row_is_valid(row):
+                return None
+            if context.as_of is not None and row.as_of is not None and row.as_of > context.as_of:
+                return None
+            value = float(row.base)
+        except Exception:  # noqa: BLE001 - un input opcional nunca rompe el motor
+            return None
+        unit = str(getattr(row, "unit", "") or "").lower()
+        if unit in {"percent", "%", "pct"} or "percent" in unit or abs(value) > 1.5:
+            value = value / 100.0
+        if value <= 0:
+            return None
+        firm = str(getattr(row, "analyst_firm", "") or "").strip() or "analista"
+        source_url = str(getattr(row, "source_url", "") or "").strip()
+        return SimpleNamespace(
+            id=-int(row.id) if row.id else -1,
+            input_key="fcf_margin",
+            value=value,
+            base=f"supuesto de {firm} con fuente",
+            source_urls=[source_url] if source_url else [],
+            origin="analyst",
+        )
+
     def _margin_convergence_orientation(
         self,
         context: ValuationContext,
@@ -117,16 +163,20 @@ class PreRevenueScenarioEngine(ValuationEngine):
     ) -> dict | None:
         """Orientación por convergencia de margen para growth con margen inmaduro.
 
-        Solo si existe un margen FCF OBJETIVO inferido y validado (base
-        explícita + URLs https, positivo). Resultado SIEMPRE orientativo
-        (blocker ``inferred_fcf_margin_target``): los supuestos son el margen
-        reportado (hecho) y el objetivo (inferencia marcada); nada se inventa.
-        None = sin base para converger: el llamador mantiene el N/D explicado.
+        Solo si existe un margen FCF OBJETIVO inferido (base explícita + URLs
+        https, positivo) o declarado por un analista con fuente. Resultado
+        SIEMPRE orientativo (blocker ``inferred_fcf_margin_target``): los
+        supuestos son el margen reportado (hecho) y el objetivo (estimado
+        marcado); nada se inventa. None = sin base para converger.
         """
         company = context.company
         if context.db is None or company.id is None:
             return None
         target_input = InferredInputService().latest_valid(context.db, company.id, "fcf_margin", as_of=context.as_of)
+        declared_target = False
+        if target_input is None:
+            target_input = self._declared_margin_target(context)
+            declared_target = target_input is not None
         if target_input is None:
             return None
         target_margin = float(target_input.value)
@@ -238,12 +288,17 @@ class PreRevenueScenarioEngine(ValuationEngine):
                 "trace": {
                     "method": "fcff_dcf_margin_convergence",
                     "engine": self.key,
-                    "input_source": "financial_facts+inferred_target",
+                    "input_source": (
+                        "financial_facts+analyst_target"
+                        if declared_target
+                        else "financial_facts+inferred_target"
+                    ),
                     "publishable": False,
                     "status": "ok",
                     "model_version": MODEL_VERSION,
                     "reported_fcf_margin": reported_margin,
                     "target_fcf_margin": target_margin,
+                    "target_fcf_margin_origin": "analyst" if declared_target else "inferred",
                     "target_fcf_margin_input_id": target_input.id,
                     "target_fcf_margin_base": target_input.base,
                     "target_fcf_margin_source_urls": list(target_input.source_urls or []),
