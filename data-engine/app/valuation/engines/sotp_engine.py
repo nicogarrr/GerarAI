@@ -45,9 +45,14 @@ REPORTED_NAV_COMPANY_TYPE_MARKERS = ("investment_trust", "investment_entity")
 
 def _latest_facts_by_metric(context: ValuationContext) -> dict[str, FinancialFact]:
     """Ultimo hecho de cada metrica (ejercicio mas reciente, luego el mas nuevo)."""
+    conditions = [FinancialFact.company_id == context.company.id]
+    if context.as_of is not None:
+        # Sin este corte una proyeccion histórica usaría hechos presentados
+        # después de la fecha pedida (lookahead).
+        conditions.append(FinancialFact.filed <= context.as_of)
     facts = context.db.scalars(
         select(FinancialFact)
-        .where(FinancialFact.company_id == context.company.id)
+        .where(*conditions)
         .order_by(FinancialFact.fiscal_year.desc().nullslast(), desc(FinancialFact.created_at))
     ).all()
     latest_by_metric: dict[str, FinancialFact] = {}
@@ -507,12 +512,14 @@ class SOTPEngine(ValuationEngine):
             ]
         )
         expected = weighted["expected_value"]
+        nav_blockers = ["inferred_sector_input"] if discount_estimate else []
+        nav_status = "partial" if discount_estimate else "ok"
         return _with_estimates(apply_publication_blockers(
             {
                 "ticker": company.ticker,
                 "model_type": company.valuation_model,
-                "status": "ok",
-                "publishable": True,
+                "status": nav_status,
+                "publishable": not discount_estimate,
                 "current_price": current_price,
                 "bear_value": scenario_results["bear"]["value_per_share"],
                 "base_value": scenario_results["base"]["value_per_share"],
@@ -529,7 +536,7 @@ class SOTPEngine(ValuationEngine):
                 "value_per_share_basis": "ordinary_share",
                 "comparable_price_basis": "ordinary_share" if ratio else "listed_share",
                 "missing_inputs": [],
-                "publication_blockers": [],
+                "publication_blockers": nav_blockers,
                 "reverse_dcf": {},
                 "sensitivity": sotp_discount_sensitivity(
                     nav_per_share=nav_per_share, base_discount=discount
@@ -541,9 +548,14 @@ class SOTPEngine(ValuationEngine):
                     "comparable_price": comparable_price,
                     "method": "reported_nav",
                     "engine": self.key,
-                    "input_source": "financial_facts",
-                    "publishable": True,
-                    "status": "ok",
+                    "input_source": (
+                        "financial_facts+inferred_sector"
+                        if discount_estimate
+                        else "financial_facts"
+                    ),
+                    "publishable": not discount_estimate,
+                    "status": nav_status,
+                    "publication_blockers": nav_blockers,
                     "model_version": MODEL_VERSION,
                     "scenario_style": "holding_discount_on_reported_nav",
                     "fact_ids": {

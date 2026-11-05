@@ -103,25 +103,29 @@ class ThesisGraphApprovalService:
         )
         config = {"configurable": {"thread_id": thread_id}}
 
-        with self._checkpointer() as saver:
-            graph = build_thesis_graph(
-                checkpointer=saver, session_factory=lambda: _session_scope(db)
-            )
-            snapshot = graph.get_state(config)
-            pending = self._pending_approval(snapshot)
-            if pending is None and not snapshot.next and not snapshot.values:
-                # Fresh thread: run until the approval gate interrupt.
-                graph.invoke(
-                    {
-                        "ticker": company.ticker,
-                        "tenant_id": tenant_external_id,
-                        "company_id": str(company.id),
-                        "input_fingerprint": f"approval-{company.ticker}",
-                    },
-                    config=config,
+        try:
+            with self._checkpointer() as saver:
+                graph = build_thesis_graph(
+                    checkpointer=saver, session_factory=lambda: _session_scope(db)
                 )
                 snapshot = graph.get_state(config)
                 pending = self._pending_approval(snapshot)
+                if pending is None and not snapshot.next and not snapshot.values:
+                    # Fresh thread: run until the approval gate interrupt.
+                    graph.invoke(
+                        {
+                            "ticker": company.ticker,
+                            "tenant_id": tenant_external_id,
+                            "company_id": str(company.id),
+                            "input_fingerprint": f"approval-{company.ticker}",
+                        },
+                        config=config,
+                    )
+                    snapshot = graph.get_state(config)
+                    pending = self._pending_approval(snapshot)
+        except Exception as exc:
+            envelope.fail(exc)
+            raise
 
         if pending is not None:
             result: dict[str, Any] = {
@@ -173,34 +177,38 @@ class ThesisGraphApprovalService:
             return {**dict(envelope.run.result_payload or {}), "idempotent_replay": True}
 
         config = {"configurable": {"thread_id": thread_id}}
-        with self._checkpointer() as saver:
-            graph = build_thesis_graph(
-                checkpointer=saver, session_factory=lambda: _session_scope(db)
-            )
-            snapshot = graph.get_state(config)
-            if self._pending_approval(snapshot) is None:
-                status = (snapshot.values or {}).get("status")
-                if status in DECIDED_STATUSES:
-                    result = {
-                        "thread_id": thread_id,
-                        "status": status,
-                        "already_decided": True,
-                    }
-                elif snapshot.values:
-                    result = {
-                        "thread_id": thread_id,
-                        "status": "not_awaiting_approval",
-                        "pending_nodes": list(snapshot.next),
-                    }
-                else:
-                    result = {"thread_id": thread_id, "status": "unknown_thread"}
-                envelope.finish(result)
-                return result
-            graph.invoke(
-                Command(resume={"decision": decision, "notes": notes, "actor": actor}),
-                config=config,
-            )
-            snapshot = graph.get_state(config)
+        try:
+            with self._checkpointer() as saver:
+                graph = build_thesis_graph(
+                    checkpointer=saver, session_factory=lambda: _session_scope(db)
+                )
+                snapshot = graph.get_state(config)
+                if self._pending_approval(snapshot) is None:
+                    status = (snapshot.values or {}).get("status")
+                    if status in DECIDED_STATUSES:
+                        result = {
+                            "thread_id": thread_id,
+                            "status": status,
+                            "already_decided": True,
+                        }
+                    elif snapshot.values:
+                        result = {
+                            "thread_id": thread_id,
+                            "status": "not_awaiting_approval",
+                            "pending_nodes": list(snapshot.next),
+                        }
+                    else:
+                        result = {"thread_id": thread_id, "status": "unknown_thread"}
+                    envelope.finish(result)
+                    return result
+                graph.invoke(
+                    Command(resume={"decision": decision, "notes": notes, "actor": actor}),
+                    config=config,
+                )
+                snapshot = graph.get_state(config)
+        except Exception as exc:
+            envelope.fail(exc)
+            raise
 
         final = snapshot.values
         result = {
