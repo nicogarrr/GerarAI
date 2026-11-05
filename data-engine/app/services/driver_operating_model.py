@@ -15,7 +15,7 @@ from typing import Any
 
 from app.models import FinancialFact
 from app.services.company_framework import CompanyFramework
-from app.services.driver_dimensions import DriverDimensionValidator
+from app.services.driver_dimensions import FORMULA_TERMS, DriverDimensionValidator
 
 RATE_DRIVERS = {
     "penetration",
@@ -202,6 +202,13 @@ FORMULAS: dict[str, FormulaDefinition] = {
         # drivers vive en los KPIs del marco (extraccion desde resultados).
         "reported_revenue projected from its sourced historical series; ad impression and price-per-ad absolutes are not disclosed",
     ),
+    "auto_energy_optionality": FormulaDefinition(
+        "reported_revenue_bridge",
+        ("revenue",),
+        "revenue",
+        _single("reported_business", lambda v: v["revenue"]),
+        "reported_revenue projected from its sourced historical series; energy, autonomy and optionality are inventoried separately",
+    ),
     "generic_fcf": FormulaDefinition(
         "reported_revenue_bridge",
         ("revenue",),
@@ -210,6 +217,8 @@ FORMULAS: dict[str, FormulaDefinition] = {
         "reported_revenue projected from its sourced historical series",
     ),
 }
+
+FORMULA_TERMS.setdefault("auto_energy_optionality", (("revenue",),))
 
 
 class DriverOperatingModel:

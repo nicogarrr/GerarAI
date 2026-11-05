@@ -330,6 +330,7 @@ def industry_es(value: object) -> str:
 
 # Pregunta primaria de cada marco (company_framework.py, en ingles) en espanol.
 PRIMARY_QUESTION_ES: dict[str, str] = {
+    "can vehicle deliveries, energy storage deployment, autonomy and optionality monetization compound into durable revenue and cash flow": "¿Pueden las entregas de vehículos, el despliegue de almacenamiento energético, la autonomía y la monetización de la opcionalidad generar ingresos y flujo de caja duraderos?",
     "can physical network capacity, monetization and funding support the revenue ramp": "¿Pueden la capacidad física de la red, la monetización y la financiación sostener el aumento de ingresos?",
     "does backlog convert into a profitable, scalable space systems and launch business": "¿La cartera de pedidos se convierte en un negocio rentable y escalable de sistemas espaciales y lanzamientos?",
     "can engagement, volume and take rate compound without losing quality or share": "¿Pueden el engagement, el volumen y la comisión por transacción crecer de forma compuesta sin perder calidad ni cuota?",
