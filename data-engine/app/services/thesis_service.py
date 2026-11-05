@@ -495,6 +495,26 @@ def _excluded_reason_es(item: dict) -> str:
     )
 
 
+def engine_stale(valuation_basis: dict | None) -> bool | None:
+    """True si el motor de valoracion cambio desde que se genero la tesis.
+
+    Compara la version del motor persistida en ``valuation_basis
+    ["engine_version"]`` (la estampa ``_valuation_basis`` desde el trace del
+    motor) con la ``MODEL_VERSION`` actual del codigo. Sin ruido del
+    scheduler: no mira timestamps ni recálculos, solo la version del motor,
+    que cambia unicamente cuando cambia el codigo del motor.
+
+    None (honesto) para tesis generadas antes de esta senal, que no llevan
+    version persistida: no se afirma ni vigente ni desactualizado.
+    """
+    version = (valuation_basis or {}).get("engine_version")
+    if not version:
+        return None
+    from app.valuation.engines.base import MODEL_VERSION
+
+    return version != MODEL_VERSION
+
+
 def _last_official_close_date(as_of: datetime | None):
     """Última fecha de sesión US con cierre oficial que ``as_of`` pudo conocer.
 
@@ -1457,6 +1477,7 @@ class ThesisService:
         # como "precio del modelo al <fecha>". None honesto si el motor no la
         # informó: la fecha no se inventa (auditoría v1.0, 2026-10-27).
         price_as_of = (valuation.get("trace") or {}).get("price_as_of")
+        engine_version = (valuation.get("trace") or {}).get("model_version")
         if not basis and not used and not convention and price_as_of is None:
             return None
         listed = valuation.get("listed_share_values")
@@ -1472,6 +1493,12 @@ class ThesisService:
         return {
             **extra,
             **({"model_input_fingerprint": model_fp} if model_fp else {}),
+            # Version del motor de valoracion con la que se genero ESTA tesis
+            # (trace["model_version"] la estampa cada motor desde
+            # engines/base.MODEL_VERSION): permite avisar cuando el motor
+            # cambia aunque no haya datos nuevos (engine_stale). Solo cuando el
+            # motor la informo: la clave ausente es «desconocido», no None.
+            **({"engine_version": engine_version} if engine_version else {}),
             "price_as_of": price_as_of,
             "value_per_share_basis": str(basis) if basis else None,
             "adr_ratio": valuation.get("adr_ratio"),

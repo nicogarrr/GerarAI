@@ -46,7 +46,7 @@ from app.services.thesis_publication_gate import (
     thesis_withheld_reasons,
     withhold_thesis_payload,
 )
-from app.services.thesis_service import ThesisService, latest_inputs_provenance, latest_missing_inputs
+from app.services.thesis_service import ThesisService, engine_stale, latest_inputs_provenance, latest_missing_inputs
 
 router = APIRouter()
 
@@ -258,6 +258,10 @@ def latest_thesis(ticker: str, db: Session = Depends(get_db)) -> dict:
     payload = withhold_thesis_payload(ThesisOut.model_validate(thesis).model_dump(), thesis, thesis_withheld_reason(db, thesis))
     payload["stale"] = stale
     payload["latest_data_at"] = latest_data_at
+    # Motor de valoracion: avisa si el codigo del motor cambio desde que se
+    # genero esta version (None = tesis anterior a esta señal, sin afirmar).
+    payload["engine_stale"] = engine_stale(thesis.valuation_basis)
+    payload["engine_version"] = (thesis.valuation_basis or {}).get("engine_version")
     payload["missing_inputs"] = latest_missing_inputs(db, thesis.company_id)
     payload["inputs_provenance"] = latest_inputs_provenance(
         db, thesis.company_id, thesis.valuation_basis
@@ -485,7 +489,7 @@ def thesis_memo(
     language = generation_language(db)
     markdown = build_memo_markdown(
         db, company, thesis, stale=stale, latest_data_at=latest_data_at, draft=draft,
-        language=language,
+        language=language, engine_stale=engine_stale(getattr(thesis, "valuation_basis", None)),
     )
     prefix = "thesis" if language == "en" else "tesis"
     return PlainTextResponse(
@@ -522,7 +526,8 @@ def _audio_context(db: Session, ticker: str, version: int | None = None) -> tupl
     # mismo modo borrador que memo.md?draft=1.
     is_draft = (thesis.status or "draft") != "published"
     markdown = build_memo_markdown(
-        db, company, thesis, stale=stale, latest_data_at=latest_data_at, draft=is_draft
+        db, company, thesis, stale=stale, latest_data_at=latest_data_at, draft=is_draft,
+        engine_stale=engine_stale(getattr(thesis, "valuation_basis", None)),
     )
     text = thesis_audio_service.memo_to_speech_text(markdown, ticker=company.ticker, version=thesis.version)
     key = thesis_audio_service.audio_key(

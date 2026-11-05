@@ -52,10 +52,18 @@ from app.services.thesis_publication_gate import thesis_withheld_reasons
 logger = logging.getLogger(__name__)
 
 THESIS_MAX_AGE_DAYS = 180
-PRECEDENCE = ("tesis_vigente", "motor_publicable", "tesis_antigua", "motor_orientativo")
+PRECEDENCE = (
+    "tesis_vigente",
+    "motor_publicable",
+    "tesis_inputs_nuevas",
+    "tesis_modelo_anterior",
+    "tesis_antigua",
+    "motor_orientativo",
+)
 PRECEDENCE_TEXT = (
-    "Tesis publicada (< 180 días) > motor publicable > tesis publicada antigua "
-    "> motor orientativo"
+    "Tesis publicada (< 180 días, con inputs y motor vigentes) > motor publicable "
+    "> tesis desplazada (inputs más nuevos / motor de otra versión, servida marcada) "
+    "> tesis publicada antigua > motor orientativo"
 )
 
 
@@ -71,6 +79,13 @@ class Candidate:
     # Valor con método (capex normalizado / DCF multietapa): la etiqueta del
     # motor viaja con la cifra para que nunca se lea como un dato reportado.
     method_label: str | None = None
+    # Vigencia de la tesis frente a sus insumos y al motor (solo candidatos
+    # tesis). None = sin evidencia en ningún sentido (no desplaza: la cifra
+    # revisada no se esconde por no poder comprobar); False = desactualizada
+    # (inputs más nuevos que la tesis / motor de otra versión) y la tesis ya
+    # no gana limpia: el motor publicable la desplaza con el motivo visible.
+    inputs_fresh: bool | None = None
+    model_current: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -125,10 +140,38 @@ def choose(
         engine is not None and engine_age is not None and engine_age <= max_age_days
     )
 
+    # Una tesis vigente por antigüedad aún puede estar DESPLAZADA: hay inputs
+    # más recientes que ella (``inputs_fresh is False``) o su valoración salió
+    # de otra versión del motor (``model_current is False``). Sin evidencia en
+    # ningún sentido (None) la tesis no se desplaza: la cifra revisada no se
+    # esconde por no poder comprobar. Si la tesis pierde, el motivo viaja en
+    # la lectura (``reason`` / ``thesis_displaced``): nunca se oculta por qué.
+    thesis_displaced_cause: str | None = None
     if thesis is not None and thesis_fresh:
+        if thesis.inputs_fresh is False:
+            thesis_displaced_cause = "inputs_nuevos"
+        elif thesis.model_current is False:
+            thesis_displaced_cause = "modelo_anterior"
+    if thesis is not None and thesis_fresh and thesis_displaced_cause is None:
         return _reading("tesis", thesis, stale=False, rule="tesis_vigente")
     if engine is not None and engine.publishable:
-        return _reading("motor", engine, stale=False, rule="motor_publicable")
+        reading = _reading("motor", engine, stale=False, rule="motor_publicable")
+        if thesis is not None and thesis_displaced_cause is not None:
+            reading["thesis_displaced"] = {
+                "version": thesis.thesis_version,
+                "cause": thesis_displaced_cause,
+            }
+            reading["reason"] = _displaced_reason(thesis, thesis_displaced_cause)
+        return reading
+    if thesis is not None and thesis_displaced_cause is not None:
+        rule = (
+            "tesis_inputs_nuevas"
+            if thesis_displaced_cause == "inputs_nuevos"
+            else "tesis_modelo_anterior"
+        )
+        reading = _reading("tesis", thesis, stale=True, rule=rule)
+        reading["reason"] = _displaced_reason(thesis, thesis_displaced_cause)
+        return reading
     if thesis is not None:
         return _reading("tesis", thesis, stale=True, rule="tesis_antigua")
     if engine is not None and engine_orientative_fresh:
@@ -204,6 +247,78 @@ def _reading(source: str, candidate: Candidate, *, stale: bool, rule: str) -> di
     }
 
 
+def _displaced_reason(thesis: Candidate, cause: str) -> str:
+    """Por que la tesis no se sirve como cifra vigente (visible en la ficha)."""
+    if current_language() == "en":
+        if cause == "inputs_nuevos":
+            return (
+                f"Published thesis v{thesis.thesis_version} is still the reviewed figure, "
+                "but newer data (filings, news or an official close) arrived after it."
+            )
+        return (
+            f"Published thesis v{thesis.thesis_version} is still the reviewed figure, "
+            "but it was valued with a previous version of the valuation engine."
+        )
+    if cause == "inputs_nuevos":
+        return (
+            f"La tesis publicada v{thesis.thesis_version} sigue siendo la cifra revisada, "
+            "pero hay datos más recientes que ella (filing, noticias o un cierre oficial)."
+        )
+    return (
+        f"La tesis publicada v{thesis.thesis_version} sigue siendo la cifra revisada, "
+        "pero se valoró con una versión anterior del motor de valoración."
+    )
+
+
+def _thesis_input_freshness(
+    db: Session, rows: list[ThesisVersion]
+) -> dict[int, bool]:
+    """¿Los inputs de cada tesis son anteriores o iguales a su fecha? (por lotes)
+
+    Misma frontera que ``ThesisService.data_freshness``: hechos, noticias y
+    documentos con ``updated_at`` posterior a la versión la desactualizan, y en
+    precios solo cuenta una barra de CIERRE oficial posterior a la última
+    sesión que la versión pudo conocer (un tick intradía no). True = vigente.
+    """
+    from app.models import Document, FinancialFact, MarketPrice, NewsEvent
+    from app.services.thesis_service import _last_official_close_date
+
+    anchors = {int(row.company_id): row.updated_at for row in rows}
+    ids = list(anchors)
+    stale: set[int] = set()
+    tenant_id = db.info.get("tenant_id")
+    for model in (FinancialFact, NewsEvent, Document):
+        stmt = (
+            select(model.company_id, func.max(model.updated_at))
+            .where(model.company_id.in_(ids))
+            .group_by(model.company_id)
+        )
+        if tenant_id is not None:
+            stmt = stmt.where(model.tenant_id == tenant_id)
+        for company_id, stamp in db.execute(stmt):
+            anchor = anchors.get(int(company_id))
+            if stamp is not None and anchor is not None and stamp > anchor:
+                stale.add(int(company_id))
+    pending = [row for row in rows if int(row.company_id) not in stale]
+    if pending:
+        price_dates = dict(
+            db.execute(
+                select(MarketPrice.company_id, func.max(MarketPrice.date))
+                .where(
+                    MarketPrice.company_id.in_([int(row.company_id) for row in pending]),
+                    MarketPrice.source == "yfinance",
+                )
+                .group_by(MarketPrice.company_id)
+            ).all()
+        )
+        for row in pending:
+            anchor = _last_official_close_date(row.updated_at)
+            official = price_dates.get(int(row.company_id))
+            if anchor is not None and official is not None and official > anchor:
+                stale.add(int(row.company_id))
+    return {int(row.company_id): int(row.company_id) not in stale for row in rows}
+
+
 def thesis_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Candidate]:
     """Última tesis publicada con valor y modelo actual publicable (fail-closed)."""
     ids = list(company_ids)
@@ -226,6 +341,17 @@ def thesis_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Cand
         .where(ranked.c.rank == 1)
     ).all()
     reasons = thesis_withheld_reasons(db, list(rows))
+    from app.services.thesis_service import engine_stale
+
+    freshness = _thesis_input_freshness(db, list(rows)) if rows else {}
+    # engine_stale: None = versión no registrada (tesis anterior a la señal):
+    # no se afirma vigente ni desactualizado y NO desplaza la cifra revisada.
+    model_current: dict[int, bool | None] = {}
+    for row in rows:
+        basis = row.valuation_basis if isinstance(row.valuation_basis, dict) else None
+        stale_flag = engine_stale(basis)
+        # None = versión no registrada (tesis anterior a la señal): neutro.
+        model_current[int(row.company_id)] = None if stale_flag is None else not stale_flag
     out: dict[int, Candidate] = {}
     for row in rows:
         if reasons[row.id]:
@@ -239,6 +365,8 @@ def thesis_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Cand
             as_of=_as_date(row.updated_at) or _as_date(row.created_at),
             publishable=True,
             thesis_version=int(row.version),
+            inputs_fresh=freshness.get(int(row.company_id)),
+            model_current=model_current.get(int(row.company_id)),
         )
     return out
 
@@ -498,7 +626,12 @@ def resolve_fair_value(
         and thesis.as_of is not None
         and (today - thesis.as_of).days <= THESIS_MAX_AGE_DAYS
     )
-    if not thesis_fresh:
+    # Tesis vigente por antigüedad pero desplazada (inputs más nuevos o motor
+    # de otra versión): el motor se recalcula en vivo para disputarle la cifra.
+    thesis_displaced = thesis_fresh and (
+        thesis.inputs_fresh is False or thesis.model_current is False
+    )
+    if not thesis_fresh or thesis_displaced:
         if live:
             from app.services.valuation_service import ValuationService
 
