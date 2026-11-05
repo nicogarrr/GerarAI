@@ -1,3 +1,5 @@
+// @ts-expect-error Node strip-types requires the explicit TS extension.
+import { thesisIsPublic } from './thesis-publication.ts';
 // @ts-expect-error TS5097: node --test (--experimental-strip-types) necesita la extensión.
 import { t as esT, type TranslationKey, type TranslationVars } from '../i18n/t.ts';
 
@@ -51,9 +53,6 @@ export function modelConditionState(item: {
 /** Ratings del motor de tesis que son un veredicto de valoración. */
 const VALUATION_VERDICTS = new Set(['attractive', 'expensive', 'fair', 'cheap', 'incomplete_price']);
 
-/** Estados de tesis cuya cifra afirma una valoración publicable. */
-const PUBLIC_THESIS_STATUSES = new Set(['final', 'published']);
-
 /** Un veredicto de valoración (atractiva/cara) no puede convivir con un estado
  *  «no valorable»: si la valoración no es válida, el veredicto se omite
  *  (null). Y ningún rating luce badge fuera de una tesis pública: un borrador
@@ -66,7 +65,7 @@ export function visibleThesisRating(
 ): string | null {
   if (!rating) return null;
   const status = snapshot.latest_thesis?.status;
-  if (!status || !PUBLIC_THESIS_STATUSES.has(status)) return null;
+  if (!thesisIsPublic(status)) return null;
   if (VALUATION_VERDICTS.has(rating) && researchValuability(snapshot) === NOT_VALUABLE) return null;
   return rating;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { NOT_VALUABLE, modelConditionState, researchValuability, visibleThesisRating } from '@/lib/research/coverage-state';
 
-const good = { latest_thesis: { status: 'final' }, model_summary: { status: 'ok', publishable: true }, valuation_summary: { status: 'ok' } };
+const good = { latest_thesis: { status: 'published' }, model_summary: { status: 'ok', publishable: true }, valuation_summary: { status: 'ok' } };
 
 describe('researchValuability', () => {
     it('todo en orden: revisar', () => {
@@ -51,10 +51,10 @@ describe('visibleThesisRating', () => {
         expect(visibleThesisRating('cheap', blocked)).toBeNull();
         expect(visibleThesisRating('attractive', good)).toBe('attractive');
     });
-    it('un rating solo se mantiene en tesis final o publicada', () => {
+    it('un rating solo se mantiene en tesis publicada', () => {
         expect(visibleThesisRating('hold', good)).toBe('hold');
         expect(visibleThesisRating('hold', { ...good, latest_thesis: { status: 'published' } })).toBe('hold');
-        for (const status of ['ok', 'draft', 'preview_only', 'blocked']) {
+        for (const status of ['approved', 'final', 'ok', 'draft', 'preview_only', 'blocked']) {
             expect(visibleThesisRating('hold', { ...good, latest_thesis: { status } })).toBeNull();
             expect(visibleThesisRating('attractive', { ...good, latest_thesis: { status } })).toBeNull();
         }
