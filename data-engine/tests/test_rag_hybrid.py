@@ -93,6 +93,8 @@ class FakeQdrant:
 
 @pytest.fixture()
 def index(monkeypatch):
+    # Each test starts a fresh breaker state; production keeps it per process.
+    monkeypatch.setattr(RAGIndex, "_fastembed_error", None)
     idx = RAGIndex()
     monkeypatch.setattr(idx.settings, "rag_hybrid_enabled", False)
     monkeypatch.setattr(idx.settings, "rag_embedding_backend", "fastembed")
