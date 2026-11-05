@@ -97,6 +97,7 @@ function AlertsManager() {
     });
 
     const loadAlerts = async () => {
+        setLoading(true);
         setLoadError(null);
         try {
             // getUserAlertsResult resuelve la causa en servidor, donde el
