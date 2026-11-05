@@ -31,6 +31,7 @@ from __future__ import annotations
 import calendar
 import hashlib
 import json
+import math
 import statistics
 from collections import defaultdict
 from dataclasses import dataclass
@@ -89,6 +90,22 @@ def _round(value: float | None, digits: int = 6) -> float | None:
     return None if value is None else round(value, digits)
 
 
+def _consensus_mean(value: Any) -> float | None:
+    """Media positiva y finita del consenso; acepta ``{"mean": x}`` o ``x``."""
+    if isinstance(value, dict):
+        value = value.get("mean")
+    out = _f(value)
+    return out if out is not None and math.isfinite(out) else None
+
+
+def _consensus_from_version(version: Any) -> Any:
+    """``consensus_check`` congelado en la versión (dict con ``mean`` o número)."""
+    basis = getattr(version, "valuation_basis", None)
+    if not isinstance(basis, dict):
+        return None
+    return basis.get("consensus_check")
+
+
 def fair_value_of(version: Any) -> tuple[float | None, str]:
     base = _f(getattr(version, "base_value", None))
     if base is not None:
@@ -128,13 +145,17 @@ def score_version(
     stored_price: float | None,
     prices: list[PriceRow],
     today: date,
+    consensus_at_issue: dict | float | None = None,
 ) -> dict[str, Any]:
     """Puntúa una versión. Función pura: no lee nada fuera de sus argumentos.
 
     ``prices`` puede traer cierres posteriores a cualquier horizonte; cada
     horizonte solo mira los cierres hasta su propio cierre de vencimiento.
+    ``consensus_at_issue`` es el consenso congelado al emitir (dict con
+    ``mean`` o un número): nunca se consulta en vivo para una versión pasada.
     """
     prices = sorted((p for p in prices if p.close and p.close > 0 and p.day <= today), key=lambda p: p.day)
+    consensus = _consensus_mean(consensus_at_issue)
     result: dict[str, Any] = {
         "entry_date": None,
         "entry_price": None,
@@ -188,6 +209,10 @@ def score_version(
             p0, p1, fv = entry.adj_close, end.adj_close, fair_value * factor
         else:
             p0, p1, fv = entry.close, end.close, fair_value
+        # El consenso congelado se expresa en la base del precio de emisión:
+        # si la serie está ajustada por split/dividendo, se escala igual que el
+        # valor razonable. Sin esto un split de 10:1 parece un error del 900 %.
+        consensus_scored = consensus * factor if (adjusted and consensus is not None) else consensus
         assert p0 is not None and p1 is not None
         touched = False
         predicted_up = fv > p0
@@ -220,6 +245,19 @@ def score_version(
             direction_hit=direction_hit,
             touched=touched,
         )
+        if consensus_scored is not None:
+            consensus_signed = (fv - consensus_scored) / consensus_scored
+            consensus_vs_realized = (consensus_scored - p1) / p1
+            closer = abs(fv - p1) < abs(consensus_scored - p1)
+            h.update(
+                consensus_at_issue=_round(consensus_scored),
+                consensus_signed_error=_round(consensus_signed),
+                consensus_abs_error=_round(abs(consensus_signed)),
+                consensus_error_vs_realized=_round(consensus_vs_realized),
+                consensus_abs_error_vs_realized=_round(abs(consensus_vs_realized)),
+                closer_than_consensus=closer,
+                beat_consensus=closer,
+            )
     return result
 
 
@@ -266,7 +304,18 @@ def _eligible_versions(db: Session) -> list[ThesisVersion]:
         .where(ThesisVersion.status.not_in(EXCLUDED_STATUSES), *tenant_filters(db, ThesisVersion))
         .order_by(ThesisVersion.company_id, ThesisVersion.created_at, ThesisVersion.id)
     )
-    return [v for v in db.scalars(stmt).all() if fair_value_of(v)[0] is not None]
+    out: list[ThesisVersion] = []
+    for version in db.scalars(stmt).all():
+        if fair_value_of(version)[0] is None:
+            continue
+        basis = version.valuation_basis if isinstance(version.valuation_basis, dict) else {}
+        # Un borrador con valoración NO publicable es una orientación, no una
+        # llamada: no entra en el acierto. Las versiones antiguas sin el flag
+        # conservan el comportamiento anterior.
+        if version.status == "draft" and basis.get("valuation_publishable") is False:
+            continue
+        out.append(version)
+    return out
 
 
 def refresh_track_record(db: Session, *, today: date | None = None) -> dict[str, Any]:
@@ -297,12 +346,15 @@ def refresh_track_record(db: Session, *, today: date | None = None) -> dict[str,
         for v in items:
             fv, fv_source = fair_value_of(v)
             issue = issue_day(v)
+            consensus_check = _consensus_from_version(v)
             scored = score_version(issue=issue, fair_value=fv, stored_price=_f(v.current_price),
-                                   prices=prices, today=today)
+                                   prices=prices, today=today, consensus_at_issue=consensus_check)
             horizons = scored["horizons"]
             judgement, j_horizon, outcome, counts, reason = _judgement(horizons)
             payload = {"entry": [scored["entry_date"], scored["entry_price"], scored["entry_status"]],
                        "horizons": horizons, "outcome": outcome}
+            if _consensus_mean(consensus_check) is not None:
+                payload["consensus_at_issue"] = consensus_check
             fp = _fingerprint(payload)
             row = existing.get(v.id)
             if row is not None and row.price_fingerprint == fp:
@@ -362,6 +414,12 @@ def _summary(samples: list[dict[str, Any]]) -> dict[str, Any]:
     n_hits = sum(1 for s in hits if s["direction_hit"])
     abs_errors = [s["abs_error"] for s in samples if s.get("abs_error") is not None]
     signed = [s["signed_error"] for s in samples if s.get("signed_error") is not None]
+    consensus_abs = [s["consensus_abs_error"] for s in samples if s.get("consensus_abs_error") is not None]
+    consensus_vs_realized = [s["consensus_abs_error_vs_realized"] for s in samples
+                             if s.get("consensus_abs_error_vs_realized") is not None]
+    consensus_signed = [s["consensus_signed_error"] for s in samples
+                        if s.get("consensus_signed_error") is not None]
+    closer = [s for s in samples if s.get("closer_than_consensus") is not None]
     return {
         "samples": len(samples),
         "hits": n_hits,
@@ -370,6 +428,15 @@ def _summary(samples: list[dict[str, Any]]) -> dict[str, Any]:
         "median_signed_error": round(statistics.median(signed), 4) if signed else None,
         "touched_rate": (round(sum(1 for s in samples if s.get("touched")) / len(samples), 4)
                          if samples else None),
+        "consensus_samples": len(consensus_abs),
+        "beat_consensus_rate": (round(sum(1 for s in closer if s["closer_than_consensus"]) / len(closer), 4)
+                                if closer else None),
+        "median_abs_error_vs_consensus": (round(statistics.median(consensus_abs), 4)
+                                          if consensus_abs else None),
+        "median_consensus_abs_error_vs_realized": (round(statistics.median(consensus_vs_realized), 4)
+                                                    if consensus_vs_realized else None),
+        "median_signed_error_vs_consensus": (round(statistics.median(consensus_signed), 4)
+                                             if consensus_signed else None),
     }
 
 
