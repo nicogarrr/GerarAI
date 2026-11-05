@@ -12,8 +12,8 @@ worker. No reordena ni descarta trabajo: el resto espera su turno en el hilo.
 from __future__ import annotations
 
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 
 class DocumentIngestSlot:

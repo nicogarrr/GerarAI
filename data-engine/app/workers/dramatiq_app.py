@@ -865,6 +865,8 @@ def _document_url_ingested(db, url: str) -> bool:
     estuvieran ingeridos, y cada tarea descargaba el documento antes de
     deduplicar por checksum (5-nov-2026, KRKNF).
     """
+    from sqlalchemy import select
+
     from app.core.tenancy import tenant_filters
     from app.models import Document
 
