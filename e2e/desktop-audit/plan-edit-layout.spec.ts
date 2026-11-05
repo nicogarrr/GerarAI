@@ -1,10 +1,13 @@
 import { expect, test } from "@playwright/test";
+import { waitForHydration } from "../fixtures/wait-for-hydration";
 test.skip(!process.env.E2E_UI_RUN, "Set E2E_UI_RUN=1");
 test.use({ viewport: { width: 1440, height: 900 } });
 
 test("editar plan: select de categoría sin truncar y primera fila alineada", async ({ page }) => {
   await page.goto("/plan", { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(4000);
+  // Mismo motivo que plan-edit-prefill: espera real a la hidratación en vez
+  // de un sleep ciego que en CI lento (chunks de i18n bajando) no basta.
+  await waitForHydration(page);
   // Sin plan sembrado en la BD e2e el disparador es «Configurar plan»; con
   // plan existente, «Editar plan». El diálogo es el mismo PlanSetupDialog.
   await page.getByRole("button", { name: /Editar plan|Configurar plan/ }).click();
