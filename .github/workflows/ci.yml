@@ -283,6 +283,14 @@ jobs:
             echo "RAG activation tests skipped: Qdrant service not reachable" >&2
             exit 1
           fi
+      - name: Real Redis quota contracts (no skips)
+        run: |
+          set -o pipefail
+          uv run --frozen python -m pytest tests/test_second_order_quota_redis.py -v -rs | tee /tmp/quota_redis.log
+          if grep -Eq "[0-9]+ skipped" /tmp/quota_redis.log; then
+            echo "Redis quota tests skipped: redis-server must be available" >&2
+            exit 1
+          fi
       - run: uv run --frozen python -m pytest -n 2 -m "not services"
       - run: uv run --frozen python scripts/run_financial_evals.py
 
