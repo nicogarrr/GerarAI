@@ -24,6 +24,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.errors import redact_secrets
 from app.core.tenancy import tenant_filters
 from app.models.entities import Company, FinancialFact
 from app.services.connectors import esef as esef_connector
@@ -104,18 +105,60 @@ def seed_company_fundamentals(db: Session, company: Company) -> dict[str, Any]:
         return {"status": "ya_tiene_hechos", "ticker": company.ticker, "bridge_gaps": gaps}
     lane = fundamentals_lane(company)
     service = FinancialIngestionService()
-    if lane == "esef":
-        result = run_from_any_context(service.refresh_from_esef(db=db, company=company))
-    else:
-        result = run_from_any_context(service.refresh_from_sec(db=db, company=company))
-    db.commit()
+    # Cascada (nov 2026, BFIT.AS con 0 hechos): la via primaria segun el
+    # mercado y, si no deja hechos, la otra primaria; al final los estados
+    # completos de Yahoo como UNICA fuente no oficial (etiquetados). Cada
+    # intento queda en ``intentos`` con su motivo; nunca se inventa un hecho.
+    order = ["esef", "sec"] if lane == "esef" else ["sec", "esef"]
+    attempts: list[dict[str, Any]] = []
+    result: dict[str, Any] = {}
+    via_ok: str | None = None
+    for via in order:
+        if via == "sec" and not company.cik:
+            attempts.append({"via": "sec", "status": "no_aplica", "detail": "sin CIK"})
+            continue
+        try:
+            coro = (
+                service.refresh_from_esef(db=db, company=company)
+                if via == "esef"
+                else service.refresh_from_sec(db=db, company=company)
+            )
+            result = run_from_any_context(coro)
+            db.commit()
+        except Exception as exc:  # noqa: BLE001 - se prueba la siguiente fuente
+            db.rollback()
+            attempts.append({"via": via, "status": "error", "detail": redact_secrets(str(exc))[:200]})
+            continue
+        attempts.append({"via": via, "status": "ok", "facts_imported": result.get("facts_imported")})
+        if (result.get("facts_imported") or 0) > 0 or tenant_has_facts(db, company):
+            via_ok = via
+            break
+    from app.services.fundamentals_fallback import _non_sec_fallback_enabled
+
+    if via_ok is None and _non_sec_fallback_enabled():
+        from app.services.yahoo_fundamentals_service import refresh_full_from_yahoo
+
+        try:
+            result = refresh_full_from_yahoo(db, company, commit=True)
+            via_ok = "yahoo_no_oficial"
+            attempts.append({
+                "via": via_ok,
+                "status": "ok",
+                "facts_imported": result.get("facts_imported"),
+                "note": result.get("note"),
+            })
+        except Exception as exc:  # noqa: BLE001
+            db.rollback()
+            attempts.append({"via": "yahoo_no_oficial", "status": "error", "detail": redact_secrets(str(exc))[:200]})
+            logger.info("sin fundamentales para %s: %s", company.ticker, attempts)
     gaps = fill_bridge_gaps(db, company)
     db.commit()
     return {
-        "status": "sembrado",
+        "status": "sembrado" if via_ok else "sin_fuente",
         "ticker": company.ticker,
-        "via": lane,
-        "facts_imported": result.get("facts_imported"),
+        "via": via_ok or lane,
+        "facts_imported": result.get("facts_imported") if via_ok else 0,
+        "intentos": attempts,
         "bridge_gaps": gaps,
     }
 

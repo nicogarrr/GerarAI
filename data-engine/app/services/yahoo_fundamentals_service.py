@@ -149,6 +149,9 @@ def _fetch_yahoo(symbol: str) -> dict[str, Any]:
     return {
         "name": info.get("longName") or info.get("shortName"),
         "currency": info.get("financialCurrency") or info.get("currency"),
+        # Divisa de los ESTADOS (no la de cotizacion): el modo completo sin
+        # mapa revisado solo acepta esta.
+        "financial_currency": info.get("financialCurrency"),
         "income": ticker.income_stmt,
         "balance": ticker.balance_sheet,
         "cashflow": ticker.cashflow,
@@ -229,6 +232,66 @@ def refresh_gaps_from_yahoo(
     return _refresh(db, company, entry, fetcher=fetcher, commit=commit)
 
 
+# Modo COMPLETO sin mapa revisado (nov 2026, BFIT.AS): para un emisor sin
+# SEC ni ESEF (Alemania, Suiza, Canada, Asia, un ESEF que no esta en el
+# indice...), los estados anuales enteros de Yahoo como UNICA fuente, con las
+# MISMAS guardas que el modo huecos: nombre real que acredite identidad, divisa
+# declarada por Yahoo, documento propio y metadata single_source. Nunca toca
+# un par (metrica, ejercicio) con hecho oficial.
+FULL_TITLE_PREFIX = "Yahoo Finance estados completos (una sola fuente, no oficial)"
+
+
+def full_entry(db: Session, company: Company) -> dict[str, Any] | None:
+    """Entrada sintetica del modo completo, o None si no hay listado Yahoo seguro."""
+    entry = gap_entry(db, company)
+    if entry is None:
+        return None
+    names = [company.name]
+    from app.services.listing_identity import reviewed_listing_for_ticker
+
+    listing = reviewed_listing_for_ticker(company.ticker)
+    if listing is not None and listing.yahoo == entry["symbol"]:
+        names.append(listing.name)
+    return {
+        **entry,
+        "names": names,
+        "metrics": None,
+        "gap_only": False,
+        "single_source": True,
+        # Sin hechos oficiales la divisa de los estados es la que DECLARA
+        # Yahoo (financialCurrency: CGEO.L cotiza en GBp y presenta en GEL);
+        # con hechos oficiales manda la de esos hechos y debe coincidir.
+        "currency_from_declared": entry["currency"] is None or not _has_official_facts(db, company),
+        "title": f"{FULL_TITLE_PREFIX} - {entry['symbol']}",
+    }
+
+
+def _has_official_facts(db: Session, company: Company) -> bool:
+    return db.scalar(
+        select(FinancialFact.id).where(
+            FinancialFact.company_id == company.id,
+            FinancialFact.source_type.in_(OFFICIAL_SOURCE_TYPES),
+            *tenant_filters(db, FinancialFact),
+        ).limit(1)
+    ) is not None
+
+
+def refresh_full_from_yahoo(
+    db: Session, company: Company, *, fetcher: Any = _fetch_yahoo, commit: bool = True
+) -> dict[str, Any]:
+    """Estados anuales completos de Yahoo para cualquier emisor sin mapa revisado.
+
+    Cada hecho queda como fuente NO oficial y de una sola fuente
+    (``SINGLE_SOURCE_NOTE``); los del mapa revisado siguen por
+    ``refresh_from_yahoo``."""
+    if company.ticker.upper() in REVIEWED_MAP:
+        return refresh_from_yahoo(db, company, fetcher=fetcher, commit=commit)
+    entry = full_entry(db, company)
+    if entry is None:
+        raise RuntimeError(f"Sin listado Yahoo seguro para {company.ticker}")
+    return _refresh(db, company, entry, fetcher=fetcher, commit=commit)
+
+
 def refresh_from_yahoo(
     db: Session, company: Company, *, fetcher: Any = _fetch_yahoo, commit: bool = True
 ) -> dict[str, Any]:
@@ -248,6 +311,9 @@ def _refresh(
 ) -> dict[str, Any]:
     ticker = company.ticker.upper()
     gap_only = bool(entry.get("gap_only"))
+    # Guardas estrictas (nombre real, divisa declarada, metadata de una sola
+    # fuente): modo huecos y modo completo sin mapa revisado.
+    strict = gap_only or bool(entry.get("single_source"))
 
     # Pares (metrica, ejercicio) con hecho OFICIAL anual: Yahoo no los toca.
     official_pairs = {
@@ -268,7 +334,7 @@ def _refresh(
     # sin enriquecer): no aporta identidad, asi que manda la prueba contra los
     # nombres REVISADOS del mapa. Un nombre real distinto sigue bloqueando.
     placeholder_name = (company.name or "").strip().upper() in {"", ticker}
-    if gap_only and placeholder_name:
+    if strict and placeholder_name:
         raise RuntimeError(
             f"company_mismatch: la Company {ticker} no tiene nombre real con el que "
             "acreditar identidad frente a Yahoo"
@@ -283,7 +349,9 @@ def _refresh(
         )
     currency = entry["currency"]
     declared = (data.get("currency") or "").upper()
-    if gap_only and not (declared and currency):
+    if entry.get("currency_from_declared"):
+        currency = (data.get("financial_currency") or "").upper() or None
+    if strict and not (declared and currency):
         raise RuntimeError("currency_unknown: sin divisa declarada con la que comparar")
     if declared and declared != currency:
         raise RuntimeError(
@@ -292,7 +360,7 @@ def _refresh(
 
     symbol = entry["symbol"]
     retrieved_at = datetime.now(UTC).isoformat()
-    title = (
+    title = entry.get("title") or (
         f"{GAP_TITLE_PREFIX} - {symbol}"
         if gap_only
         else f"Yahoo Finance fundamentals (fuente no oficial) - {symbol}"
@@ -407,6 +475,11 @@ def _refresh(
         "last_refreshed_at": retrieved_at,
         "verified_against": list(entry.get("verified_against") or []),
         **({"gap_only": True, "single_source": True, "note": SINGLE_SOURCE_NOTE} if gap_only else {}),
+        **(
+            {"mode": "full_unreviewed", "single_source": True, "note": SINGLE_SOURCE_NOTE}
+            if strict and not gap_only
+            else {}
+        ),
     }
     drop_shadowed_facts(db, company.id, document.id, tenant_condition(db))
     sync_company_fact_chunks(db, company)
@@ -428,4 +501,5 @@ def _refresh(
         "retrieved_at": retrieved_at,
         "source_url": document.source_url,
         "verified_against": list(entry.get("verified_against") or []),
+        **({"single_source": True, "note": SINGLE_SOURCE_NOTE} if strict else {}),
     }

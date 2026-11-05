@@ -365,7 +365,12 @@ SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
 
 
 ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
-    ("revenue",           ["ifrs-full:Revenue", "ifrs-full:RevenueFromInterest"],                        "iso4217:EUR"),
+    # RevenueFromContractsWithCustomers: emisores que solo etiquetan la cifra
+    # IFRS 15 (Basic-Fit FY2025: 1.420,5 M, sin ifrs-full:Revenue ese ano).
+    # Va DETRAS: si el filing da Revenue, manda Revenue; si ambos discrepan en
+    # un periodo, _merge_esef_periods lo rechaza como ambiguo.
+    ("revenue",           ["ifrs-full:Revenue", "ifrs-full:RevenueFromInterest",
+                           "ifrs-full:RevenueFromContractsWithCustomers"],                               "iso4217:EUR"),
     ("net_income",        ["ifrs-full:ProfitLoss"],                                                      "iso4217:EUR"),
     ("operating_income",  ["ifrs-full:ProfitLossFromOperatingActivities"],                               "iso4217:EUR"),
     ("gross_profit",      ["ifrs-full:GrossProfit"],                                                     "iso4217:EUR"),
@@ -381,8 +386,16 @@ ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("cash_and_equivalents", ["ifrs-full:CashAndCashEquivalents"],                                       "iso4217:EUR"),
     # Componentes de deuda financiera (no alias: partes disjuntas del pasivo
     # financiero). total_debt se DERIVE como suma declarada en _derive_esef_metrics.
-    ("financial_liabilities_current", ["ifrs-full:CurrentFinancialLiabilities"],                          "iso4217:EUR"),
-    ("financial_liabilities_noncurrent", ["ifrs-full:NoncurrentFinancialLiabilities"],                    "iso4217:EUR"),
+    # Prestamos/bonos como alias de los pasivos financieros: muchos emisores no
+    # etiquetan Current/NoncurrentFinancialLiabilities y si sus prestamos
+    # (Basic-Fit FY2025: 294,2 M corriente + 932,6 M no corriente). Solo los
+    # conceptos TOTALES de cada plazo; nunca partes sueltas.
+    ("financial_liabilities_current", ["ifrs-full:CurrentFinancialLiabilities",
+                                       "ifrs-full:CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings"],
+                                                                                                        "iso4217:EUR"),
+    ("financial_liabilities_noncurrent", ["ifrs-full:NoncurrentFinancialLiabilities",
+                                          "ifrs-full:NoncurrentPortionOfNoncurrentBorrowings",
+                                          "ifrs-full:LongtermBorrowings"],                              "iso4217:EUR"),
     ("lease_liabilities_current", ["ifrs-full:CurrentLeaseLiabilities"],                                  "iso4217:EUR"),
     ("lease_liabilities_noncurrent", ["ifrs-full:NoncurrentLeaseLiabilities"],                            "iso4217:EUR"),
     ("operating_cash_flow", ["ifrs-full:CashFlowsFromUsedInOperatingActivities"],                        "iso4217:EUR"),
@@ -2033,7 +2046,9 @@ class FinancialIngestionService:
             "mirror": mirror_info,
         }
 
-    async def refresh_from_esef(self, db: Session, company: Company) -> dict[str, Any]:
+    async def refresh_from_esef(
+        self, db: Session, company: Company, *, commit: bool = True
+    ) -> dict[str, Any]:
         """Fundamentales anuales IFRS desde el snapshot ESEF local (build_esef_snapshots).
 
         Solo hechos consolidados (entry["dims"] == []: los desgloses por miembro
@@ -2048,11 +2063,30 @@ class FinancialIngestionService:
         el entity_name del snapshot no comparten ningun token significativo, se
         rechaza la escritura (company_mismatch): N/D honesto, nunca hechos
         cruzados.
+
+        Sin snapshot local (cualquier emisor fuera del IBEX revisado: BFIT.AS,
+        nov 2026) se consulta filings.xbrl.org en vivo por LEI
+        (``app.services.esef_live``): mismo snapshot, misma ruta de mapeo. La
+        identidad la prueba el ISIN via GLEIF (o el nombre legal, acotado a la
+        jurisdiccion, si no hay ISIN). La divisa de los hechos es la de
+        presentacion del filing, no EUR fijo.
+
+        ``commit=False`` deja la escritura en la transaccion del caller (la
+        tesis corre en un SAVEPOINT): solo flush.
         """
         ticker = company.ticker.upper()
         snapshot = esef_connector.read_esef_snapshot(ticker)
         if snapshot is None:
-            raise RuntimeError(f"Sin snapshot ESEF local para {ticker}: por ahora solo hay cobertura de emisores IBEX revisados")
+            from app.services import esef_live
+
+            if not esef_live.live_lookup_enabled():
+                raise RuntimeError(
+                    f"Sin snapshot ESEF local para {ticker} (consulta en vivo a filings.xbrl.org desactivada)"
+                )
+            snapshot, reason = await esef_live.fetch_live_snapshot(company)
+            if snapshot is None:
+                raise RuntimeError(f"Sin ESEF para {ticker}: {reason}")
+        live_identity = snapshot.get("identity") if snapshot.get("origin") == "live" else None
         # Multi-package snapshots now preserve incompatible presentations in
         # an archive instead of silently blending them. Their current facts
         # may be narrower; reject BEFORE source creation/deletion/commit.
@@ -2070,7 +2104,16 @@ class FinancialIngestionService:
         # IBKR; si ambos lados lo tienen, manda el ISIN sobre el nombre.
         reviewed_isins = reviewed_isins_for_ticker(ticker)
         company_isin = (company.isin or "").strip().upper()
-        if company_isin and reviewed_isins:
+        if isinstance(live_identity, dict) and live_identity.get("method") == "isin_gleif":
+            # El LEI salio del ISIN de la Company (o de su listado revisado)
+            # en GLEIF: la identidad ya esta probada por el registro ISIN->LEI.
+            if company_isin and company_isin != str(live_identity.get("isin") or "").upper():
+                raise RuntimeError(
+                    "company_mismatch: el ISIN de la Company "
+                    f"{company_isin} no es el usado para resolver el LEI "
+                    f"{snapshot.get('lei')}: no se escriben hechos de una entidad bajo otra"
+                )
+        elif company_isin and reviewed_isins:
             if company_isin not in reviewed_isins:
                 raise RuntimeError(
                     "company_mismatch: ISIN de la Company "
@@ -2110,8 +2153,12 @@ class FinancialIngestionService:
         self._replace_esef_data(db, company, document)
         facts_imported = 0
 
+        from app.services.esef_live import reporting_currency
+
+        ccy = reporting_currency(facts_data)
         esef_coverage: dict[str, Any] = {}
-        for metric, concepts, unit in ESEF_METRIC_MAP:
+        for metric, concepts, map_unit in ESEF_METRIC_MAP:
+            unit = map_unit.replace("iso4217:EUR", f"iso4217:{ccy}")
             by_period, coverage = _merge_esef_periods(facts_data, concepts, unit, metric)
             if coverage["ambiguous"] or coverage["partial"]:
                 esef_coverage[metric] = coverage
@@ -2126,7 +2173,7 @@ class FinancialIngestionService:
                         company_id=company.id,
                         metric=metric,
                         value=val,
-                        unit="EUR/share" if unit.endswith("/xbrli:shares") else "EUR",
+                        unit=f"{ccy}/share" if unit.endswith("/xbrli:shares") else ccy,
                         period=f"{period_date}:FY",
                         fiscal_year=_annual_fiscal_year(period_date, None),
                         fiscal_quarter="FY",
@@ -2141,7 +2188,7 @@ class FinancialIngestionService:
         # la sesion de ingestion usa autoflush=False: drop_shadowed_facts hace flush antes de derivar
         drop_shadowed_facts(db, company.id, document.id, tenant_condition(db))
         facts_imported += self._derive_esef_metrics(db, company, document)
-        facts_imported += self._import_esef_shares(db, company, document, facts_data)
+        facts_imported += self._import_esef_shares(db, company, document, facts_data, currency=ccy)
 
         document.metadata_ = {
             **(document.metadata_ or {}),
@@ -2152,12 +2199,19 @@ class FinancialIngestionService:
             "fxo_id": snapshot.get("fxo_id"),
             "snapshot_fetched_at": snapshot.get("fetched_at"),
             "esef_coverage": esef_coverage,
+            "reporting_currency": ccy,
+            "origin": snapshot.get("origin") or "local_snapshot",
+            **({"source": snapshot["source"]} if snapshot.get("source") else {}),
+            **({"identity": live_identity} if live_identity else {}),
             "last_refreshed_at": datetime.now(UTC).isoformat(),
         }
         # Chunks RAG desde los hechos persistidos (documento parseado no existe:
         # el snapshot es XBRL, no texto). Sin esto rebuild_tenant no indexa nada.
         sync_company_fact_chunks(db, company)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
 
         return {
             "status": "ingested",
@@ -2501,7 +2555,13 @@ class FinancialIngestionService:
         return derived
 
     def _import_esef_shares(
-        self, db: Session, company: Company, document: Document, facts_data: dict[str, Any]
+        self,
+        db: Session,
+        company: Company,
+        document: Document,
+        facts_data: dict[str, Any],
+        *,
+        currency: str = "EUR",
     ) -> int:
         """Acciones medias derivadas del propio filing ESEF (app.services.esef_shares).
 
@@ -2523,15 +2583,15 @@ class FinancialIngestionService:
 
         profit_periods, _ = _merge_esef_periods(
             facts_data, [esef_shares.ATTRIBUTABLE_PROFIT_CONCEPT],
-            esef_shares.PROFIT_UNIT, "net_income_attributable",
+            esef_shares.PROFIT_UNIT.replace("EUR", currency), "net_income_attributable",
         )
         diluted_periods, _ = _merge_esef_periods(
             facts_data, [esef_shares.DILUTED_EPS_CONCEPT],
-            esef_shares.EPS_UNIT, "eps_diluted",
+            esef_shares.EPS_UNIT.replace("EUR", currency), "eps_diluted",
         )
         basic_periods, _ = _merge_esef_periods(
             facts_data, [esef_shares.BASIC_EPS_CONCEPT],
-            esef_shares.EPS_UNIT, "eps_basic",
+            esef_shares.EPS_UNIT.replace("EUR", currency), "eps_basic",
         )
         diluted, basic, skipped = esef_shares.derive_shares(
             profit_periods, diluted_periods, basic_periods
@@ -2665,7 +2725,7 @@ class FinancialIngestionService:
                         company_id=company.id,
                         metric="total_debt",
                         value=fl_current.value + fl_noncurrent.value,
-                        unit="EUR",
+                        unit=fl_current.unit or "EUR",
                         period=fl_current.period,
                         fiscal_year=year,
                         fiscal_quarter="FY",
@@ -2683,7 +2743,7 @@ class FinancialIngestionService:
                     company_id=company.id,
                     metric="free_cash_flow",
                     value=ocf.value + capex.value,
-                    unit="EUR",
+                    unit=ocf.unit or "EUR",
                     period=ocf.period,
                     fiscal_year=year,
                     fiscal_quarter="FY",
@@ -2737,7 +2797,7 @@ class FinancialIngestionService:
                         company_id=company.id,
                         metric="ebitda",
                         value=operating_income.value + depreciation.value,
-                        unit="EUR",
+                        unit=operating_income.unit or "EUR",
                         period=operating_income.period,
                         fiscal_year=year,
                         fiscal_quarter="FY",

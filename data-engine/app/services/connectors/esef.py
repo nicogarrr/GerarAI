@@ -326,6 +326,40 @@ class EsefClient:
             filings.extend(rows)
         return filings
 
+    async def list_filings_for_lei(self, lei: str, page_size: int = DEFAULT_PAGE_SIZE) -> list[EsefFiling]:
+        """Filings de UN emisor (cualquier pais ESEF/UKSEF) por su LEI.
+
+        /api/entities/{lei}/filings (verificado 2026-11-03 con Basic-Fit N.V.,
+        LEI 724500HUXGTQC07CAZ61: 5 filings 2021-2025 con json_url). Un LEI
+        sin filings responde 404: lista vacia, no error de fuente.
+        """
+        try:
+            payload = await self._get_json(
+                f"{ENTITIES_API}/{lei}/filings",
+                params={"page[size]": page_size},
+            )
+        except EsefRateLimited:
+            raise
+        except EsefError as exc:
+            if "404" in str(exc):
+                return []
+            raise
+        filings, _ = parse_filings_page(payload)
+        return [f for f in filings if f.lei == lei]
+
+    async def search_entities_by_name(self, name: str) -> list[tuple[str, str]]:
+        """[(lei, nombre legal)] de las entidades con ese nombre exacto en el indice."""
+        payload = await self._get_json(ENTITIES_API, params={"filter[name]": name})
+        out: list[tuple[str, str]] = []
+        rows = payload.get("data") if isinstance(payload, dict) else None
+        for row in rows if isinstance(rows, list) else []:
+            try:
+                attrs = row["attributes"]
+                out.append((str(attrs["identifier"]), str(attrs["name"])))
+            except (KeyError, TypeError):
+                continue
+        return out
+
     async def get_entity_name(self, lei: str) -> str:
         payload = await self._get_json(f"{ENTITIES_API}/{lei}")
         _, name = parse_entity(payload)
@@ -338,6 +372,79 @@ class EsefClient:
             raise EsefError(f"filing {filing.fxo_id} has no xBRL-JSON render (json_url null)")
         # The document endpoint 406s the JSON:API media type; ask for plain JSON.
         return await self._get_json(filing.json_url, accept="application/json")
+
+
+def filings_per_lei(filings: list[EsefFiling], max_filings: int = 5) -> dict[str, list[EsefFiling]]:
+    """Hasta max_filings filings por LEI: period_end distintos, mas reciente
+    primero, solo con json_url. La historia de 5y de las metricas windowed
+    sale de aqui; sin filings antiguos esas metricas quedan honestamente
+    insufficient_history."""
+    selected: dict[str, list[EsefFiling]] = {}
+    for f in sorted(filings, key=lambda x: x.period_end or "", reverse=True):
+        if not f.json_url:
+            continue
+        chosen = selected.setdefault(f.lei, [])
+        if len(chosen) >= max_filings or any(c.period_end == f.period_end for c in chosen):
+            continue
+        chosen.append(f)
+    return selected
+
+
+def merge_facts(normalized_docs: list[dict]) -> dict:
+    """Fusiona facts normalizados de varios filings (mas reciente primero).
+    Dedup por (concepto, unidad, start, end|instant): el filing mas reciente
+    gana porque recoge las reexpresiones.
+
+    OJO con los instantes (balance): su periodo es solo "instant", sin
+    start/end. Si la clave no lo incluye, TODOS los instantes de un concepto
+    colapsan en uno solo y el balance queda con un unico ejercicio (bug
+    detectado 2026-09-25: total_assets/total_equity con 1 solo ano en BD
+    pese a tener 6 anos de filings).
+
+    La clave incluye las dimensiones (dims). Un desglose por miembro
+    (ifrs-full:SegmentAxis) comparte concepto, unidad y periodo con el
+    consolidado, asi que sin `dims` en la clave un miembro podia ocupar el
+    sitio del consolidado segun el orden del JSON. `refresh_from_esef` descarta
+    las entradas con dims, de modo que el consolidado se perdia y el ejercicio
+    desaparecia entero de la serie, sin aviso."""
+    merged: dict = {}
+    seen: set = set()
+    for facts in normalized_docs:
+        for concept, units in facts.items():
+            for unit, entries in units.items():
+                bucket = merged.setdefault(concept, {}).setdefault(unit, [])
+                for entry in entries:
+                    key = (
+                        concept,
+                        unit,
+                        entry.get("start"),
+                        entry.get("end") or entry.get("instant"),
+                        tuple(entry.get("dims") or ()),
+                    )
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    bucket.append(entry)
+    return merged
+
+
+# GLEIF (registro global de LEI, API publica sin clave, host fijo): une el
+# ISIN de una ficha con el LEI con el que filings.xbrl.org indexa al emisor.
+# Verificado 2026-11-03: filter[isin]=NL0011872650 -> 724500HUXGTQC07CAZ61
+# (Basic-Fit N.V.).
+GLEIF_API = "https://api.gleif.org/api/v1/lei-records"
+
+
+def gleif_http_client() -> httpx.AsyncClient:
+    return httpx.AsyncClient(timeout=30.0, headers={"User-Agent": USER_AGENT})
+
+
+async def gleif_lei_records(http: httpx.AsyncClient, params: dict[str, Any]) -> list[dict[str, Any]]:
+    """Filas ``lei-records`` de GLEIF para ``params`` (filter[isin] / filter[fulltext])."""
+    resp = await http.get(GLEIF_API, params=params, headers={"Accept": "application/vnd.api+json"})
+    resp.raise_for_status()
+    data = resp.json().get("data")
+    return data if isinstance(data, list) else []
 
 
 def _esef_snapshot_base() -> Path | None:
