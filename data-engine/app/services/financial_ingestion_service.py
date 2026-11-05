@@ -1873,7 +1873,10 @@ class FinancialIngestionService:
             "note": getattr(annual_anchors, "note", None),
             "index_accessions": sorted(index_accessions) if index_accessions is not None else None,
         })
-        if as_of is None and (document.metadata_ or {}).get(
+        # Transport provenance is part of shortcut eligibility, even when
+        # mirror bytes and anchors match the last direct SEC refresh exactly.
+        mirror_serves = drain_mirror_serves()
+        if as_of is None and not mirror_serves and (document.metadata_ or {}).get(
             "sec_payload_fingerprint"
         ) == payload_fingerprint and (document.metadata_ or {}).get(
             "sec_anchor_fingerprint"
@@ -2375,7 +2378,7 @@ class FinancialIngestionService:
         fy_periods = sorted({period for _m, period in restated_fy_keys}, reverse=True)
         # Procedencia de transporte: si algo se sirvio del mirror HF (ban de
         # IP), queda declarado con la fecha de sync del mirror.
-        mirror_serves = drain_mirror_serves()
+        mirror_serves.extend(drain_mirror_serves())
         mirror_info = None
         if mirror_serves:
             mirror_info = {

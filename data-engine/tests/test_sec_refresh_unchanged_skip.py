@@ -248,3 +248,47 @@ def test_as_of_nunca_salta_e_invalida_la_huella(db_engine, monkeypatch):
     # refresh completo tiene que reingerir, no saltar.
     after = _refresh(db, company)
     assert after["status"] == "ingested"
+
+
+@pytest.mark.parametrize("mirror_method", ["company_facts", "annual_report_anchors", "index_accessions"])
+def test_identical_mirror_payload_does_not_skip_or_keep_direct_fingerprint(
+    db_engine, monkeypatch, mirror_method,
+):
+    from app.models.entities import Document
+    from app.services.connectors import sec_edgar
+
+    _FakeSECMini.reset()
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECMini)
+    db, _ = db_engine
+    company = _company(db)
+    first = _refresh(db, company)
+    document = db.get(Document, first["source_document_id"])
+    assert document.metadata_["sec_payload_fingerprint"]
+    assert document.metadata_["sec_anchor_fingerprint"]
+    before = sorted(
+        (row.metric, row.period, row.value, row.unit)
+        for row in db.scalars(select(FinancialFact))
+    )
+    original = getattr(_FakeSECMini, mirror_method)
+
+    async def served_by_mirror(self, cik):
+        result = await original(self, cik)
+        sec_edgar._record_mirror_serve({"synced_at": "2026-11-05T10:00:00Z"})
+        return result
+
+    monkeypatch.setattr(_FakeSECMini, mirror_method, served_by_mirror)
+    second = _refresh(db, company)
+    assert second["status"] == "ingested"
+    assert second["mirror"]["documents"] >= 1
+    assert second["mirror"]["synced_at"] == "2026-11-05T10:00:00Z"
+    assert document.metadata_["mirror"] == second["mirror"]
+    assert "sec_payload_fingerprint" not in document.metadata_
+    assert "sec_anchor_fingerprint" not in document.metadata_
+    assert sorted(
+        (row.metric, row.period, row.value, row.unit)
+        for row in db.scalars(select(FinancialFact))
+    ) == before
+    monkeypatch.setattr(_FakeSECMini, mirror_method, original)
+    assert _refresh(db, company)["status"] == "ingested"
+    assert document.metadata_["mirror"] is None
+    assert _refresh(db, company)["status"] == "unchanged"
