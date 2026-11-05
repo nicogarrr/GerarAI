@@ -69,3 +69,15 @@ def test_ir_soft404_never_reaches_parser(monkeypatch):
     result = service.ingest_bytes(None, ticker="TEST", title="error", content=b'<title>Page not found</title>',
         filename="error.html", source_type="IR", source_url="https://ir.test/any", content_type="text/html")
     assert result == {"status": "skipped", "reason": "ir_soft_404", "ticker": "TEST"}
+
+
+def test_daily_quota_fails_closed_without_tenant(monkeypatch):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from app.services import kpi_call_quota
+
+    monkeypatch.setattr(kpi_call_quota, "get_settings", lambda: SimpleNamespace(is_production=False, redis_url=""))
+    with pytest.raises(RuntimeError, match="KPI extraction requires tenant"):
+        kpi_call_quota.reserve(None)

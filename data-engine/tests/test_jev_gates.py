@@ -233,6 +233,7 @@ _KPI_TEXT = "Penetration reached 12.5% in FY2025."
 def _kpi_db(chunk_text: str):
     engine = _memdb()
     with Session(engine) as db:
+        db.info["tenant_id"] = "jev-kpi-fixture"
         company = _company("ASTS")
         company.company_type = "space_telecom_pre_fcf"
         company.factor_tags = ["space", "telecom"]
@@ -284,6 +285,7 @@ def test_2_prefiltro_con_senal_llama_llm(monkeypatch):
     engine, (_, document_id, chunk_id) = _kpi_db(_KPI_TEXT)
     provider = CountingJsonProvider(lambda req: _kpi_payload(chunk_id))
     with Session(engine) as db:
+        db.info["tenant_id"] = "jev-kpi-fixture"
         document = db.get(Document, document_id)
         result = asyncio.run(KPIExtractionService(provider).extract_document(db, document))
     assert len(result) == 1
@@ -294,6 +296,7 @@ def test_2_sin_key_extraccion_igual_que_antes():
     engine, (_, document_id, chunk_id) = _kpi_db(_KPI_TEXT)
     provider = CountingJsonProvider(lambda req: _kpi_payload(chunk_id))
     with Session(engine) as db:
+        db.info["tenant_id"] = "jev-kpi-fixture"
         document = db.get(Document, document_id)
         result = asyncio.run(KPIExtractionService(provider).extract_document(db, document))
     assert len(result) == 1
