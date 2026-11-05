@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from math import isfinite, sqrt
 from statistics import median
@@ -30,9 +30,10 @@ from app.models import (
     ThesisChange,
 )
 from app.services.company_framework import CompanyFramework, resolve_company_framework
+from app.services.declared_input_service import DeclaredInputService
 from app.services.driver_assumption_service import DriverAssumptionService
 from app.services.driver_dimensions import driver_metadata
-from app.services.driver_operating_model import DriverOperatingModel
+from app.services.driver_operating_model import FORMULAS, DriverOperatingModel
 from app.services.fundamental_model_repository import FundamentalModelRepository
 from app.services.inferred_input_service import MIN_WACC_TERMINAL_SPREAD, InferredInputService
 from app.services.market_opportunity_service import MarketOpportunityEngine
@@ -338,6 +339,31 @@ class _SplitAdjustedFact:
         return getattr(self.fact, name)
 
 
+@dataclass(frozen=True)
+class _DeclaredInputFact:
+    """Vista de hecho de un input declarado (analista/inferido/derivado).
+
+    El modelo de drivers solo necesita la forma de un ``FinancialFact`` anual.
+    El id es negativo y trazable a la fila de ``declared_input_values`` que lo
+    origina (``-row.id``); nunca se confunde con un hecho reportado.
+    """
+
+    id: int
+    metric: str
+    value: Decimal
+    unit: str
+    period: str
+    fiscal_year: int
+    fiscal_quarter: str
+    confidence: float
+    source_type: str
+    source_id: int | None
+    is_reported: bool
+    is_adjusted: bool
+    filed: date | None
+    created_at: datetime
+
+
 def _driver_gap_reason(key: str, *, formula_input: bool) -> str:
     """Motivo legible de un driver del marco sin dato (sin jerga interna)."""
     if key == "traceable_wacc":
@@ -518,6 +544,7 @@ class LongTermModelService:
             }
             | {metric for _f, inputs, _s in DERIVED_DRIVERS.values() for metric in inputs}
         }
+        declared_inputs = self._apply_declared_inputs(db, company, framework, fact_cache)
         current_price, market_as_of, market_price_source = self._model_price(db, company)
         splits = _split_events(db, company.id)
         # Ultimo cierre anterior a un split ya efectivo: base desconocida (vieja
@@ -773,6 +800,15 @@ class LongTermModelService:
             publication_blockers.append("traceable_wacc")
             if status == "ok":
                 status = "preview_only"
+        default_declared = [
+            item["input_key"]
+            for item in declared_inputs
+            if item.get("blocks_publication")
+        ]
+        if default_declared:
+            publication_blockers.append("declared_input_default")
+            if status == "ok":
+                status = "preview_only"
         limitations = self._limitations(
             fact_cache=fact_cache,
             years=years,
@@ -821,6 +857,7 @@ class LongTermModelService:
                 "active_modules": list(framework.active_modules),
             },
             "driver_model": driver_model,
+            "declared_inputs": declared_inputs,
             "driver_assumptions": driver_assumptions,
             "driver_formula": {
                 "status": driver_preview.get("status"),
@@ -926,6 +963,101 @@ class LongTermModelService:
             .replace("-", "_")
             .replace(" ", "_")
         )
+
+    def _apply_declared_inputs(
+        self,
+        db: Session,
+        company: Company,
+        framework: CompanyFramework,
+        fact_cache: dict[str, list[FinancialFact]],
+    ) -> list[dict[str, Any]]:
+        """Completa inputs de la fórmula con filas declaradas (analista/estimado).
+
+        Solo rellena claves que la fórmula operativa necesita y que no tienen
+        ningún hecho anual. Nunca sustituye un dato reportado ni sintetiza las
+        métricas nucleares del DCF (ingresos, FCF, deuda o acciones): esas
+        siguen teniendo su propio camino y sus puertas de honestidad.
+        """
+        definition = FORMULAS.get(framework.key)
+        if definition is None:
+            return []
+        keys = [key for key in definition.inputs if key not in ANNUAL_METRICS]
+        if not keys:
+            return []
+        info = getattr(db, "info", {}) or {}
+        tenant_id = info.get("tenant_id") if isinstance(info, dict) else None
+        if type(tenant_id) is not int or tenant_id <= 0 or company.id is None:
+            return []
+        service = DeclaredInputService()
+        try:
+            rows = service.current(db, company_id=company.id, tenant_id=tenant_id, keys=keys)
+        except Exception:  # noqa: BLE001 - un input opcional nunca rompe el modelo
+            return []
+        confidence_by_status = {
+            "oficial": 0.9,
+            "manual": 0.8,
+            "derivado": 0.6,
+            "estimado": 0.5,
+            "supuesto_por_defecto": 0.3,
+        }
+        out: list[dict[str, Any]] = []
+        for (key, segment_key), row in sorted(rows.items()):
+            if segment_key not in (None, "") or key not in keys:
+                continue
+            existing = fact_cache.get(key) or []
+            if DriverOperatingModel._annual_points(existing):
+                continue
+            if not service.row_is_valid(row):
+                continue
+            base = _float(getattr(row, "base", None))
+            if base is None:
+                continue
+            raw_unit = str(getattr(row, "unit", "") or "unknown").strip()
+            unit = raw_unit
+            value = base
+            if raw_unit.lower() in {"percent", "%", "pct"} or "percent" in raw_unit.lower():
+                value = base / 100.0
+                unit = "decimal"
+            as_of = getattr(row, "as_of", None)
+            year = as_of.year if isinstance(as_of, date) else date.today().year - 1
+            status = str(getattr(row, "status", "") or "estimado")
+            method = str(getattr(row, "method", "") or "")
+            row_id = getattr(row, "id", None)
+            synthetic_id = -int(row_id) if row_id else -(len(out) + 1)
+            fact = _DeclaredInputFact(
+                id=synthetic_id,
+                metric=key,
+                value=Decimal(str(value)),
+                unit=unit,
+                period=f"FY{year}",
+                fiscal_year=year,
+                fiscal_quarter="FY",
+                confidence=confidence_by_status.get(status, 0.4),
+                source_type="analyst_input" if method == "analyst" else "declared_input",
+                source_id=getattr(row, "document_id", None),
+                is_reported=False,
+                is_adjusted=False,
+                filed=as_of if isinstance(as_of, date) else None,
+                created_at=datetime.now(UTC),
+            )
+            fact_cache.setdefault(key, []).append(fact)
+            out.append(
+                {
+                    "input_key": key,
+                    "value": value,
+                    "unit": unit,
+                    "status": status,
+                    "method": method,
+                    "analyst_firm": getattr(row, "analyst_firm", None),
+                    "source_url": getattr(row, "source_url", None),
+                    "source_quote": getattr(row, "source_quote", None),
+                    "as_of": as_of.isoformat() if isinstance(as_of, date) else None,
+                    "row_id": row_id,
+                    "synthetic_fact_id": synthetic_id,
+                    "blocks_publication": status == "supuesto_por_defecto",
+                }
+            )
+        return out
 
     def _driver_model(
         self,
