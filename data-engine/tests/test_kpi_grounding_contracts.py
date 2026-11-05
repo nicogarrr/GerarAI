@@ -223,6 +223,7 @@ def _extraction(chunk_text: str, raw_value: str, raw_unit: str = "percent") -> K
         )
         db.add(company)
         db.flush()
+        db.info["tenant_id"] = "grounding-fixture"
         document = Document(
             company_id=company.id, title="FY2025 update", source_type="company_ir"
         )
