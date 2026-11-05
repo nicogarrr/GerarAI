@@ -1,7 +1,10 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+const localeState = vi.hoisted(() => ({ value: 'es' as 'es' | 'en' }));
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => ({ value: localeState.value }) }) }));
+vi.mock('next/navigation', () => ({ redirect: (url: string) => { throw new Error(`redirect:${url}`); } }));
+afterEach(() => { cleanup(); localeState.value = 'es'; });
 vi.mock('@/components/forms/MutationForm', () => ({ MutationForm: ({ children, className }: {children: React.ReactNode; className?: string}) => <form className={className}>{children}</form> }));
 vi.mock('@/lib/actions/finnhub.actions', () => ({ searchStocksWithStatus: vi.fn(async () => ({status: 'ok', stocks: []})) }));
 vi.mock('@/components/knowledge/ExtractionRefresh', () => ({ ExtractionRefresh: () => null }));
@@ -36,19 +39,33 @@ const cases = [
  ['search', () => Search({searchParams}), {'Buscar en el research':'q', 'Tipos de entidad':'entity_types','Tipos de fuente':'source_types','Estados':'statuses','ID de colección':'collection_id','Fecha desde':'date_from','Fecha hasta':'date_to','Tipo de búsqueda':'vector'}],
  // Terminal, directiva y drivers son secciones de la ficha desde el
  // 29-oct-2026 («Una fila, no tres menús»): se renderizan con sus datos.
- ['terminal', async () => <FinancialTerminalSection metrics={undefined} periodicity="annual" terminal={await getFinancialTerminal('DEMO')} years={10} />, {'Métricas':'metrics','Años de historial (1-20)':'years','Periodicidad':'periodicity'}],
- ['management', async () => <ManagementCredibilitySection dashboard={await getManagementCredibility('DEMO')} ticker="DEMO" />, {'Promesa de la directiva':'promise','Fecha de la promesa':'promise_date','Periodo esperado':'expected_period','Métrica canónica (opcional)':'metric','Comparación con el objetivo':'operator','Valor objetivo (opcional)':'target_value','Unidad (opcional)':'unit','ID del documento fuente (opcional)':'source_document_id','Explicación de la directiva o contexto del analista':'explanation'}],
- ['drivers', async () => <DriverAssumptionsSection assumptions={await getDriverAssumptions('DEMO')} ticker="DEMO" />, {'Clave del driver':'driver_key','Año fiscal':'fiscal_year','Escenario':'scenario','Valor':'value','Confianza (0-1)':'confidence','Fuente o ajuste del analista':'source','Justificación':'rationale'}],
+ ['terminal', async () => <FinancialTerminalSection locale={localeState.value} metrics={undefined} periodicity="annual" terminal={await getFinancialTerminal('DEMO')} years={10} />, {'Métricas':'metrics','Años de historial (1-20)':'years','Periodicidad':'periodicity'}],
+ ['management', async () => <ManagementCredibilitySection locale={localeState.value} dashboard={await getManagementCredibility('DEMO')} ticker="DEMO" />, {'Promesa de la directiva':'promise','Fecha de la promesa':'promise_date','Periodo esperado':'expected_period','Métrica canónica (opcional)':'metric','Comparación con el objetivo':'operator','Valor objetivo (opcional)':'target_value','Unidad (opcional)':'unit','ID del documento fuente (opcional)':'source_document_id','Explicación de la directiva o contexto del analista':'explanation'}],
+ ['drivers', async () => <DriverAssumptionsSection locale={localeState.value} assumptions={await getDriverAssumptions('DEMO')} ticker="DEMO" />, {'Clave del driver':'driver_key','Año fiscal':'fiscal_year','Escenario':'scenario','Valor':'value','Confianza (0-1)':'confidence','Fuente o ajuste del analista':'source','Justificación':'rationale'}],
  // «Nueva colección» vive en la pestaña Subir desde #3080.
  ['knowledge', () => Knowledge({searchParams: Promise.resolve({tab: 'subir'})}), {'Nombre de la colección':'name','Tipo de colección':'collection_type','Descripción (opcional)':'description'}],
  ['graph', () => Graph({searchParams}), {'Tipos de nodo':'node_types'}],
  ['news', () => News({searchParams}), {'Noticias del lote (JSON)':'items'}],
 ] as const;
 
-describe('persistent visible labels in research forms', () => {
+const englishLabels: Record<string, string> = {
+ q: 'Search research', entity_types: 'Entity types', source_types: 'Source types', statuses: 'Statuses',
+ collection_id: 'Collection ID', date_from: 'Date from', date_to: 'Date to', vector: 'Search type',
+ metrics: 'Metrics', years: 'Years of history (1-20)', periodicity: 'Periodicity',
+ promise: 'Management promise', promise_date: 'Promise date', expected_period: 'Expected period',
+ metric: 'Canonical metric (optional)', operator: 'Comparison with the target', target_value: 'Target value (optional)',
+ unit: 'Unit (optional)', source_document_id: 'Source document ID (optional)', explanation: 'Management explanation or analyst context',
+ driver_key: 'Driver key', fiscal_year: 'Fiscal year', scenario: 'Scenario', value: 'Value', confidence: 'Confidence (0-1)',
+ source: 'Source or analyst adjustment', rationale: 'Rationale', name: 'Collection name', collection_type: 'Collection type',
+ description: 'Description (optional)', node_types: 'Node types', items: 'Batch news (JSON)',
+};
+
+describe.each(['es', 'en'] as const)('persistent visible labels in research forms (%s)', (locale) => {
  for (const [name, page, labels] of cases) it(`${name}: associates labels and preserves form field names`, async () => {
+   localeState.value = locale;
    render(await page());
-   for (const [label, field] of Object.entries(labels)) {
+   for (const [spanish, field] of Object.entries(labels)) {
+     const label = locale === 'en' ? englishLabels[field] : spanish;
      const control = screen.getByLabelText(label, {exact: true});
      expect(control).toHaveAttribute('name', field);
      expect(control.closest('label')).not.toHaveClass('sr-only');
@@ -56,5 +73,22 @@ describe('persistent visible labels in research forms', () => {
    }
    // Visual QA uses rendered real forms with mocked reads; no production writes.
 
+ });
+});
+
+
+describe('historical form URLs retain the redesigned redirects', () => {
+ it('drivers and management redirect rather than restoring old forms', async () => {
+   const Drivers = (await import('@/app/(root)/research/[ticker]/driver-assumptions/page')).default;
+   const Management = (await import('@/app/(root)/research/[ticker]/management-credibility/page')).default;
+   const params = Promise.resolve({ ticker: 'msft' });
+   await expect(Drivers({ params })).rejects.toThrow('redirect:/research/MSFT?view=valoracion#supuestos');
+   await expect(Management({ params })).rejects.toThrow('redirect:/research/MSFT?view=seguimiento#directiva');
+ });
+ it('terminal redirect preserves filter controls', async () => {
+   const Terminal = (await import('@/app/(root)/research/[ticker]/financial-terminal/page')).default;
+   await expect(Terminal({ params: Promise.resolve({ ticker: 'msft' }), searchParams: Promise.resolve({
+     metrics: 'revenue,cash', years: '7', periodicity: 'quarterly',
+   }) })).rejects.toThrow('redirect:/research/MSFT?view=finanzas&metrics=revenue%2Ccash&years=7&periodicity=quarterly#terminal');
  });
 });
