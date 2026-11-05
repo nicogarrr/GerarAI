@@ -40,11 +40,16 @@ describe('methodLabel · método de valoración persistida', () => {
         expect(methodLabel('unassigned')).toBe('sin asignar');
         expect(methodLabel('median_last_n_fiscal_years')).toBe('mediana de los últimos ejercicios');
         expect(methodLabel('fcff_dcf_multistage')).toBe('DCF multietapa');
-        expect(methodLabel('median_last_n_fiscal_years', 'en')).toBe('median last n fiscal years');
+        expect(methodLabel('median_last_n_fiscal_years', 'en')).toBe('median of recent fiscal years');
     });
 
     it('método desconocido se humaniza, no se muestra el snake_case crudo', () => {
         expect(methodLabel('binary_search_reverse_dcf')).toBe('binary search reverse dcf');
         expect(methodLabel('binary_search_reverse_dcf', 'en')).toBe('binary search reverse dcf');
     });
+});
+
+it("uses the English method catalog instead of a humanized slug", () => {
+    expect(methodLabel("fcff_dcf", "en")).toBe("FCFF DCF");
+    expect(methodLabel("binary_search_reverse_dcf", "en")).toBe("binary search reverse dcf");
 });
