@@ -294,12 +294,12 @@ export default async function ThesisReadingPage({ params, searchParams }: PagePr
   // Sin valores de escenario (p. ej. insufficient_data) la tabla no se
   // pinta: serian tres filas de «N/D» aparentando una valoracion que el
   // modelo no produjo.
-  const hasScenarioValues = scenarioDisplay
+  const hasScenarioValues = published
     ? [
-        scenarioDisplay.values.bear,
-        scenarioDisplay.values.base,
-        scenarioDisplay.values.bull,
-      ].some((v) => v !== null && v !== undefined)
+        scenarioDisplay?.values.bear ?? null,
+        scenarioDisplay?.values.base ?? null,
+        scenarioDisplay?.values.bull ?? null,
+      ].some((v) => v !== null)
     : false;
 
   // Retain all persisted free text and numeric values together. A missing
