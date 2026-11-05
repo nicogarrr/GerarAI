@@ -21,6 +21,15 @@ export function rangeBars(bars: readonly TechnicalBar[], range: ChartRange): Tec
     return bars.filter((bar) => bar.date >= start.toISOString().slice(0, 10));
 }
 
+/** Velas japonesas solo cuando TODAS las barras visibles traen OHLC real
+ * (hasOHLC ya rechaza OHLC fabricado o incoherente) y el rango no es
+ * intradía: la línea de cierres diaria muestra velas cuando existen OHLC
+ * (5-nov-2026). Si una sola barra carece de OHLC, se conserva la línea de
+ * cierres para todo el tramo (nunca una mezcla vela/línea a mitad). */
+export function preferCandlesticks(bars: readonly TechnicalBar[], hourly: boolean): boolean {
+    return !hourly && bars.length > 1 && bars.every(hasOHLC);
+}
+
 export function hasOHLC(bar: TechnicalBar): boolean {
     const { open, high, low, close } = bar;
     return [open, high, low].every((v) => typeof v === 'number' && Number.isFinite(v) && v > 0) && high! >= Math.max(open!, close) && low! <= Math.min(open!, close) && high! >= low!;
