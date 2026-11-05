@@ -727,6 +727,19 @@ class Document(TenantOwnedMixin, Base, TimestampMixin):
             "tenant_id", "source_type", "updated_at",
             postgresql_where=text("source_type NOT IN ('seed', 'manual', 'test', 'dummy', 'placeholder') AND company_id IS NOT NULL"),
         ),
+        # 0131: dedup del camino caliente de ingesta (URL exacta pre-descarga
+        # y archive_url); sin el, cada process_document hacia seq scan.
+        Index(
+            "ix_documents_tenant_source_url",
+            "tenant_id", "source_url",
+            postgresql_where=text("source_url IS NOT NULL"),
+        ),
+        # 0131: dedup por contenido (company_id, checksum) de ingest_bytes.
+        Index(
+            "ix_documents_company_checksum",
+            "company_id", "checksum",
+            postgresql_where=text("checksum IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

@@ -11,7 +11,7 @@ from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -262,19 +262,19 @@ class DocumentIngestionService:
                 if duplicate_reason == "archive_url"
                 else "Document with same checksum already exists for this company."
             )
-            chunk_count = db.scalar(
-                select(DocumentChunk.id)
-                .where(
+            # COUNT en SQL: len(duplicate.chunks) hidrataba TODOS los chunks
+            # (texto completo) del duplicado solo para contarlos (5-nov-2026).
+            chunk_total = db.scalar(
+                select(func.count(DocumentChunk.id)).where(
                     DocumentChunk.document_id == duplicate.id,
                     *tenant_filters(db, DocumentChunk),
                 )
-                .limit(1)
-            )
+            ) or 0
             return {
                 "status": "duplicate",
                 "ticker": company.ticker,
                 "document_id": duplicate.id,
-                "chunks": 0 if chunk_count is None else len(duplicate.chunks),
+                "chunks": chunk_total,
                 "checksum": checksum,
                 "parser": duplicate.metadata_.get("parser", "unknown"),
                 "storage_uri": duplicate.storage_uri,
