@@ -44,6 +44,14 @@ from app.services.esef_fact_quarantine import fact_quarantine_reason
 from app.services.reviewed_eps_adjustments import eligible_fact
 from app.services.split_adjustment import split_factor_for_fact
 from app.valuation.call_cache import cached
+from app.valuation.share_scale import (
+    PER_SHARE_REFERENCE_MAX_DAYS,
+    SHARE_SCALE_REFERENCE_MAX_DAYS,
+    ShareScale,
+    per_share_scale_is_wrong,
+    period_end,
+    share_scale_factor,
+)
 
 
 @dataclass(frozen=True)
@@ -63,6 +71,9 @@ class SourcedFact:
     unit: str | None = None
     fiscal_year: int | None = None
     fiscal_quarter: str | None = None
+    # Recuento declarado en miles/millones y corregido (``share_scale``):
+    # referencia y factor van a la traza. None = escala tal cual se declaro.
+    share_scale: ShareScale | None = None
 
     def as_trace(self) -> dict:
         trace = {
@@ -78,6 +89,8 @@ class SourcedFact:
             trace["split_factor"] = self.split_factor
         if self.unit is not None:
             trace["unit"] = self.unit
+        if self.share_scale is not None:
+            trace["share_scale"] = self.share_scale.as_trace()
         if self.fiscal_year is not None:
             trace["fiscal_year"] = self.fiscal_year
             trace["fiscal_quarter"] = self.fiscal_quarter
@@ -203,6 +216,8 @@ def latest_facts(
     for metric in metrics:
         # Sin LIMIT 1: la fila mas reciente puede estar en cuarentena y la
         # usable es la anterior; el orden ya es "ultimo primero".
+        # Un importe por accion con la escala rota (BPA x acciones = cientos
+        # de veces el beneficio) tampoco es "el ultimo": se cae al anterior.
         # La eleccion de fila no depende de ``cutoff`` (eso es el ajuste por
         # split de despues): se cachea por llamada (app/valuation/call_cache.py).
         row = cached(
@@ -221,6 +236,7 @@ def latest_facts(
                         )
                     ).all()
                     if usable_fact(candidate)
+                    and not per_share_fact_scale_is_wrong(db, company_id, candidate, cutoff=cutoff)
                 ),
                 None,
             ),
@@ -229,13 +245,191 @@ def latest_facts(
             continue
         sourced = _to_sourced(row)
         if sourced is not None:
-            resolved[metric] = _split_adjusted(db, company_id, row, sourced, cutoff=cutoff)
+            resolved[metric] = _scale_adjusted(
+                db, company_id, row, _split_adjusted(db, company_id, row, sourced, cutoff=cutoff),
+                cutoff=cutoff,
+            )
     return resolved
+
+
+def _share_count_rows(db: Session, company_id: int) -> list[FinancialFact]:
+    return cached(
+        db,
+        "share_scale_share_rows",
+        company_id,
+        lambda: list(
+            db.scalars(
+                select(FinancialFact).where(
+                    FinancialFact.company_id == company_id,
+                    FinancialFact.metric.in_(sorted(SHARE_COUNT_METRICS)),
+                )
+            ).all()
+        ),
+    )
+
+
+def _nearest_reference(
+    rows: Iterable[FinancialFact],
+    end: date,
+    *,
+    max_days: int,
+    exclude_id: int | None = None,
+    prefer: str | None = None,
+) -> FinancialFact | None:
+    """Hecho usable de cierre mas cercano a ``end`` (``prefer`` primero)."""
+    best: tuple[int, int, int] | None = None
+    chosen: FinancialFact | None = None
+    for row in rows:
+        if exclude_id is not None and row.id == exclude_id:
+            continue
+        if row.value is None or not usable_fact(row):
+            continue
+        try:
+            value = float(row.value)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(value) or value <= 0:
+            continue
+        row_end = period_end(row.period)
+        if row_end is None:
+            continue
+        days = abs((row_end - end).days)
+        if days > max_days:
+            continue
+        key = (0 if prefer is not None and row.metric == prefer else 1, days, -(row.id or 0))
+        if best is None or key < best:
+            best, chosen = key, row
+    return chosen
+
+
+def detect_share_scale(
+    db: Session,
+    company_id: int,
+    row: FinancialFact,
+    *,
+    cutoff: date | None = None,
+    filed_not_after: date | None = None,
+) -> ShareScale | None:
+    """Escala de un recuento de acciones frente al recuento de cierre mas cercano.
+
+    Referencia: ``shares_outstanding`` (portada dei / balance) del cierre mas
+    cercano; si no hay, el recuento mas cercano de otra metrica de acciones.
+    Ambos en la base de splits del precio. ``filed_not_after``: corte
+    point-in-time (no se contrasta con un filing posterior). None = escala
+    correcta o sin referencia (no se adivina).
+    """
+    if row.metric not in SHARE_COUNT_METRICS or row.value is None:
+        return None
+    end = period_end(row.period)
+    if end is None:
+        return None
+    rows = [
+        r for r in _share_count_rows(db, company_id)
+        if filed_not_after is None or r.filed is None or r.filed <= filed_not_after
+    ]
+    reference = _nearest_reference(
+        rows, end, max_days=SHARE_SCALE_REFERENCE_MAX_DAYS, exclude_id=row.id, prefer="shares_outstanding"
+    )
+    if reference is None:
+        return None
+    value = split_scaled_value(db, company_id, row, cutoff=cutoff)
+    ref_value = split_scaled_value(db, company_id, reference, cutoff=cutoff)
+    factor = share_scale_factor(value, ref_value)
+    if factor == 1.0:
+        return None
+    return ShareScale(
+        factor=factor,
+        reference_metric=reference.metric,
+        reference_value=ref_value,
+        reference_period=reference.period,
+        reference_fact_id=reference.id,
+    )
+
+
+def _scale_adjusted(
+    db: Session,
+    company_id: int,
+    row: FinancialFact,
+    sourced: SourcedFact,
+    *,
+    cutoff: date | None = None,
+) -> SourcedFact:
+    """Recuento declarado en miles/millones -> acciones (``detect_share_scale``)."""
+    scale = detect_share_scale(db, company_id, row, cutoff=cutoff)
+    if scale is None:
+        return sourced
+    return replace(sourced, value=sourced.value * scale.factor, share_scale=scale)
+
+
+def per_share_fact_scale_is_wrong(
+    db: Session, company_id: int, row: FinancialFact, *, cutoff: date | None = None
+) -> bool:
+    """BPA (o importe por accion de beneficio) con la escala rota.
+
+    Beneficio implicito = |BPA| x acciones del cierre mas cercano; si es
+    cientos de veces el beneficio neto declarado mas cercano, el BPA no se
+    usa. Sin beneficio o sin acciones de referencia no se juzga.
+    """
+    if row.metric not in EARNINGS_PER_SHARE_METRICS or row.value is None:
+        return False
+    end = period_end(row.period)
+    if end is None:
+        return False
+    income_rows = cached(
+        db,
+        "share_scale_income_rows",
+        company_id,
+        lambda: list(
+            db.scalars(
+                select(FinancialFact).where(
+                    FinancialFact.company_id == company_id, FinancialFact.metric == "net_income"
+                )
+            ).all()
+        ),
+    )
+    income = _nearest_income(income_rows, end)
+    if income is None:
+        return False
+    shares_row = _nearest_reference(
+        _share_count_rows(db, company_id), end, max_days=PER_SHARE_REFERENCE_MAX_DAYS, prefer="shares_diluted"
+    )
+    if shares_row is None:
+        return False
+    shares = split_scaled_value(db, company_id, shares_row, cutoff=cutoff)
+    scale = detect_share_scale(db, company_id, shares_row, cutoff=cutoff)
+    if scale is not None:
+        shares *= scale.factor
+    per_share = split_scaled_value(db, company_id, row, cutoff=cutoff)
+    return per_share_scale_is_wrong(per_share, income, shares)
+
+
+def _nearest_income(rows: Iterable[FinancialFact], end: date) -> float | None:
+    best: tuple[int, int] | None = None
+    value: float | None = None
+    for row in rows:
+        if row.value is None or not usable_fact(row):
+            continue
+        row_end = period_end(row.period)
+        if row_end is None:
+            continue
+        current = float(row.value)
+        if not math.isfinite(current) or current == 0:
+            continue
+        days = abs((row_end - end).days)
+        if days > PER_SHARE_REFERENCE_MAX_DAYS:
+            continue
+        key = (days, -(row.id or 0))
+        if best is None or key < best:
+            best, value = key, current
+    return value
 
 
 # Recuentos de acciones y magnitudes POR ACCION: un split posterior al hecho
 # cambia su escala frente al precio de hoy (el precio ya esta dividido).
 SHARE_COUNT_METRICS = frozenset({"shares_diluted", "shares_outstanding", "shares_basic"})
+# Importes por accion que son beneficio / accion: los unicos que se contrastan
+# con beneficio neto / acciones (un dividendo o un VC por accion no).
+EARNINGS_PER_SHARE_METRICS = frozenset({"eps", "eps_diluted", "eps_basic"})
 PER_SHARE_METRICS = frozenset(
     {
         "eps",

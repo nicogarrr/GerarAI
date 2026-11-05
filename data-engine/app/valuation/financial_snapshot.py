@@ -88,6 +88,10 @@ class FinancialSnapshot:
     # precio es de hoy (o del as_of); sin esto un 4:1 tras el cierre dejaba el
     # valor por accion x4 frente a un precio ya dividido entre 4.
     split_factors: dict[str, float] = field(default_factory=dict)
+    # metric -> correccion de escala de un recuento declarado en miles o
+    # millones (fact_reference.detect_share_scale), con su referencia. El
+    # factor se aplica en ``value`` igual que el de splits.
+    share_scale: dict[str, dict] = field(default_factory=dict)
     # metric -> procedencia multi-fuente (bridge_sources) de las piezas del
     # puente que el camino estricto no encontro y se resolvieron cruzando
     # fuentes / cierres cercanos. Todo lo que hay aqui se muestra ETIQUETADO
@@ -111,7 +115,9 @@ class FinancialSnapshot:
         value = float(fact.value)
         if not math.isfinite(value):
             return None
-        return value * self.split_factors.get(metric, 1.0)
+        scale = self.share_scale.get(metric)
+        factor = float(scale["factor"]) if scale else 1.0
+        return value * self.split_factors.get(metric, 1.0) * factor
 
     def fact_ids(self) -> dict[str, int | None]:
         return {metric: fact.id for metric, fact in self.facts.items()}
@@ -903,6 +909,40 @@ class FinancialSnapshotBuilder:
                 snapshot.warnings.append(
                     _filed_cutoff_warning(as_of, excluded_future, excluded_unknown)
                 )
+        self._apply_share_scale(db, company, snapshot, as_of=as_of, price_as_of=price_as_of)
         snapshot.missing_inputs = missing
         snapshot.coherent = not missing
         return snapshot
+
+    @staticmethod
+    def _apply_share_scale(
+        db: Session,
+        company: Company,
+        snapshot: FinancialSnapshot,
+        *,
+        as_of: date | None,
+        price_as_of: date | None,
+    ) -> None:
+        """Acciones diluidas declaradas en miles/millones -> acciones.
+
+        Mismo contraste que el resto de lecturas (``detect_share_scale``):
+        recuento de cierre cercano de la misma empresa, en la base de splits
+        del precio y sin mirar filings posteriores al corte.
+        """
+        from app.valuation.fact_reference import detect_share_scale
+
+        fact = snapshot.facts.get("shares_diluted")
+        if fact is None or getattr(fact, "metric", None) is None:
+            return
+        scale = detect_share_scale(
+            db,
+            company.id,
+            fact,
+            cutoff=price_as_of or as_of or date.today(),
+            filed_not_after=as_of,
+        )
+        if scale is None:
+            return
+        trace = scale.as_trace()
+        snapshot.share_scale["shares_diluted"] = trace
+        snapshot.warnings.append(f"shares_diluted {fact.period}: {trace['method']}.")
