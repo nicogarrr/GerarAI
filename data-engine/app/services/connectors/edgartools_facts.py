@@ -480,9 +480,20 @@ def facts_from_edgartools_entity(
     facts: list[dict[str, Any]] = []
     concept_usage: dict[str, dict[str, Any]] = {}
     annual_by_metric: dict[str, dict[str, dict[str, Any]]] = {}
+    # EntityFacts puede materializar todo el historial en get_all_facts(). Leerlo
+    # una sola vez por corrida, no por metrica y periodo (82/83 escaneos antes).
+    # Indice local: sin cache global ni referencias retenidas entre emisores.
+    wanted = {concept for _metric, concepts, _unit in SEC_METRIC_MAP for concept in concepts}
+    if bank_like:
+        wanted.update(bank_revenue_components())
+    normalized = entries_from_edgartools_facts(entity_facts, list(wanted))
+
+    def collected_for(concepts):
+        return {concept: normalized[concept] for concept in concepts if concept in normalized}
+
     for metric, concepts, unit in SEC_METRIC_MAP:
         metric_concepts = revenue_concepts_for(concepts, bank_like) if metric == "revenue" else concepts
-        collected = entries_from_edgartools_facts(entity_facts, metric_concepts)
+        collected = collected_for(metric_concepts)
         annual_raw = {
             concept: {
                 end: entry for end, entry in entries.items()
@@ -511,7 +522,7 @@ def facts_from_edgartools_entity(
             }
         by_end = merge_entries({c: e for c, e in annual_raw.items() if e}, metric)
         if metric == "revenue" and bank_like:
-            bank_collected = entries_from_edgartools_facts(entity_facts, list(bank_revenue_components()))
+            bank_collected = collected_for(bank_revenue_components())
             for end, entry in _compose_bank_revenue_entries(bank_collected).items():
                 by_end.setdefault(end, entry)
         if by_end:
@@ -519,7 +530,7 @@ def facts_from_edgartools_entity(
     modal_month = _modal_month([end for by_end in annual_by_metric.values() for end in by_end])
     for metric, concepts, unit in SEC_METRIC_MAP:
         metric_concepts = revenue_concepts_for(concepts, bank_like) if metric == "revenue" else concepts
-        collected = entries_from_edgartools_facts(entity_facts, metric_concepts)
+        collected = collected_for(metric_concepts)
         quarterly_raw = {
             concept: {
                 end: entry for end, entry in entries.items()

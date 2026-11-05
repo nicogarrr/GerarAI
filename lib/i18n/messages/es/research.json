@@ -608,7 +608,9 @@
       "terminalSharesMissing": "falta el número de acciones diluidas",
       "waccNotAboveTerminalGrowth": "el WACC no supera el crecimiento terminal",
       "terminalFcfNotPositive": "el FCF terminal no es positivo"
-    }
+    },
+    "marginOutOfRange": "N/D: margen fuera de rango interpretable (más del ±100 % de los ingresos); con ingresos casi nulos el porcentaje no es una proporción usable.",
+    "fcfOutOfRange": "N/D: FCF derivado de un margen fuera de rango interpretable; la cifra no es usable."
   },
   "journal": {
     "title": "Diario de decisiones",
@@ -901,7 +903,9 @@
     "invalidationPending": "Pendiente: genera una nueva versión para registrar criterios de invalidación.",
     "debate": "Debate bull/bear",
     "debateNoTicker": "Debate no disponible sin ticker: recarga la ficha para contrastar la tesis.",
-    "fullMemo": "Memorando completo"
+    "fullMemo": "Memorando completo",
+    "scaleHigherBetter": "Mayor = mejor",
+    "scaleHigherWorse": "Mayor = más riesgo"
   },
   "thesisDoc": {
     "metaTitle": "Tesis de inversión",
