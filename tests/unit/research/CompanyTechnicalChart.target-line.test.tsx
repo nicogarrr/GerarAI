@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import CompanyTechnicalChart from '@/components/research/CompanyTechnicalChart';
 import type { CompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
@@ -12,6 +12,7 @@ const captured = vi.hoisted(() => ({
     chart: null as null | Record<string, unknown>,
     series: [] as Array<{ kind: string; opts: Record<string, unknown>; pane?: number }>,
     priceLines: [] as PriceLineOpts[],
+    data: {} as Record<string, unknown[]>,
     target: 241.5 as number | null,
 }));
 vi.mock('@/lib/actions/company-chart.actions', () => ({ getCompanyChartHistory: vi.fn() }));
@@ -20,18 +21,19 @@ vi.mock('@/lib/actions/price-events.actions', () => ({
 }));
 vi.mock('lightweight-charts', () => {
     const stub = (): unknown => new Proxy({}, { get: (_t, key) => (key === 'then' ? undefined : vi.fn(() => stub())) });
-    const seriesStub = (): unknown => new Proxy({}, { get: (_t, key) => {
+    const seriesStub = (kind: string): unknown => new Proxy({}, { get: (_t, key) => {
         if (key === 'then') return undefined;
+        if (key === 'setData') return (rows: unknown[]) => { captured.data[kind] = rows; };
         if (key === 'createPriceLine') return (opts: PriceLineOpts) => { captured.priceLines.push(opts); return stub(); };
         return vi.fn(() => stub());
     } });
     return {
-        AreaSeries: 'Area', LineSeries: 'Line', HistogramSeries: 'Histogram', LineStyle: { Dashed: 2 }, ColorType: { Solid: 'solid' },
+        AreaSeries: 'Area', LineSeries: 'Line', CandlestickSeries: 'Candlestick', HistogramSeries: 'Histogram', LineStyle: { Dashed: 2 }, ColorType: { Solid: 'solid' },
         createSeriesMarkers: () => stub(),
         createChart: (_el: unknown, opts: Record<string, unknown>) => {
             captured.chart = opts;
             return new Proxy({}, { get: (_t, key) => {
-                if (key === 'addSeries') return (kind: string, o: Record<string, unknown>, pane?: number) => { captured.series.push({ kind, opts: o, pane }); return seriesStub(); };
+                if (key === 'addSeries') return (kind: string, o: Record<string, unknown>, pane?: number) => { captured.series.push({ kind, opts: o, pane }); return seriesStub(kind); };
                 if (key === 'panes') return () => [stub(), stub()];
                 if (key === 'then') return undefined;
                 return vi.fn(() => stub());
@@ -63,22 +65,49 @@ describe('CompanyTechnicalChart: línea del objetivo con su % y sin panel del in
             window.matchMedia = ((query: string) => ({ matches: false, media: query, onchange: null, addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false })) as typeof window.matchMedia;
         }
     });
-    beforeEach(() => { captured.series = []; captured.priceLines = []; captured.chart = null; });
+    beforeEach(() => { captured.series = []; captured.priceLines = []; captured.chart = null; captured.data = {}; });
 
     it('solo dos paneles (precio y volumen); ningún formato global pisa el de cada serie', async () => {
         captured.target = 241.5;
         render(<CompanyTechnicalChart snapshot={snapshot} />);
-        await waitFor(() => expect(captured.series.length).toBe(2));
+        // Tres series desde el 5-nov-2026: Area (línea) + Candlestick (velas
+        // cuando TODAS las barras traen OHLC) + volumen; solo una serie de
+        // precio lleva datos en cada render.
+        await waitFor(() => expect(captured.series.length).toBe(3));
         const localization = captured.chart?.localization as Record<string, unknown>;
         expect(localization.priceFormatter).toBeUndefined();
-        const [price, volume] = captured.series;
-        expect(captured.series.map((s) => s.kind)).toEqual(['Area', 'Histogram']);
+        const [price, , volume] = captured.series;
+        expect(captured.series.map((s) => s.kind)).toEqual(['Area', 'Candlestick', 'Histogram']);
         expect(captured.series.some((s) => s.kind === 'Line')).toBe(false);
         expect(volume.pane).toBe(1);
         expect((volume.opts.priceFormat as Fmt).type).toBe('volume');
         const main = price.opts.priceFormat as Fmt;
         expect(main.type).toBe('custom');
         expect(nb(main.formatter!(40))).toMatch(/40,00\s?US\$/);
+    });
+
+    it('empieza en línea y permite alternar a velas y volver sin duplicar precios', async () => {
+        render(<CompanyTechnicalChart snapshot={snapshot} />);
+        await waitFor(() => expect(captured.data.Area?.length).toBeGreaterThan(0));
+        const line = screen.getByRole('button', { name: /^Línea$/ });
+        const candles = screen.getByRole('button', { name: /^Velas$/ });
+        expect(line.getAttribute('aria-pressed')).toBe('true');
+        expect(captured.data.Candlestick).toEqual([]);
+        fireEvent.click(candles);
+        await waitFor(() => expect(captured.data.Candlestick?.length).toBeGreaterThan(0));
+        expect(captured.data.Area).toEqual([]);
+        expect(candles.getAttribute('aria-pressed')).toBe('true');
+        fireEvent.click(line);
+        await waitFor(() => expect(captured.data.Area?.length).toBeGreaterThan(0));
+        expect(captured.data.Candlestick).toEqual([]);
+    });
+
+    it('sin OHLC completo mantiene línea y no ofrece velas falsas', async () => {
+        render(<CompanyTechnicalChart snapshot={{ ...snapshot, history: history.map((row) => ({ ...row, open: null })) }} />);
+        const candles = screen.getByRole('button', { name: /^Velas$/ });
+        expect(candles.hasAttribute('disabled')).toBe(true);
+        await waitFor(() => expect(captured.data.Area?.length).toBeGreaterThan(0));
+        expect(captured.data.Candlestick).toEqual([]);
     });
 
     it('con potencial: «Objetivo analistas · +50,00 %» en verde, línea violeta y precio en el eje', async () => {

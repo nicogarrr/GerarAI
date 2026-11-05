@@ -819,7 +819,11 @@
       "insiderBuys": "{name} compra acciones",
       "insiderSells": "{name} vende acciones",
       "insiderDetail": "Operación de {value} $ (formulario {form})"
-    }
+    },
+    "chartType": "Tipo de gráfico",
+    "lineMode": "Línea",
+    "candlesMode": "Velas",
+    "candlesUnavailable": "Velas disponibles con datos OHLC diarios completos."
   },
   "memo": {
     "catalystNextEarnings": "Próximos resultados",
