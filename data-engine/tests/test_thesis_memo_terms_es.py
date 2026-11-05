@@ -21,6 +21,16 @@ def test_term_es_traduce_claves_compuestas_con_mas():
     assert term_es("sotp+buyback adjusted dcf") == "suma de partes (SOTP) + DCF ajustado por recompras"
 
 
+def test_term_es_inputs_pendientes_de_marcos():
+    """Vistos en la tarjeta de TSLA/PLTR (2026-11-04): las claves de inputs
+    pendientes de los marcos SaaS/consumo salian en ingles en la prosa ES."""
+    assert term_es("arpu") == "ARPU"
+    assert term_es("arr") == "ARR"
+    assert term_es("cloud_cost") == "coste de nube"
+    assert term_es("customers") == "clientes"
+    assert term_es("retention") == "retención"
+
+
 def test_term_es_motores_y_riesgos_frecuentes():
     assert term_es("holding company") == "holding"
     assert term_es("china adr holding") == "holding china cotizada como ADR"
