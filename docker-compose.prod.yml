@@ -491,13 +491,10 @@ services:
       # Opt-in (#726): top_ten_sp500 se calcula en refresh_macro_context (cola default).
       SP500_FACTSHEET_SNAPSHOT_DIR: ${SP500_FACTSHEET_SNAPSHOT_DIR:-/data/sp500-factsheet-snapshots}
       RSS_FEEDS: ${RSS_FEEDS:-}
-      # Pesos de embeddings/Docling/HF en el volumen /data, no en la capa
-      # efimera del contenedor: sin cache persistente, cada lote de embeddings
-      # reintentaba la descarga del modelo ONNX y caia al fallback
-      # sentence-transformers (worker a 103 % CPU y 2,27 GiB, host al 95 %,
-      # 5-nov-2026). Mismo patron que worker-knowledge.
-      FASTEMBED_CACHE_PATH: /data/fastembed-cache
-      HF_HOME: /data/hf-home
+      # Los modelos de embeddings (ST + fastembed MiniLM denso/bm25 sparse)
+      # van horneados en la imagen (/opt/hf, HF_HUB_OFFLINE=1): sin descarga
+      # en runtime ni fallback permanente a torch (worker a 103 % CPU y
+      # 2,13 GiB RSS, medido por el piloto 5-nov-2026). Docling sigue en /data.
       DOCLING_ARTIFACTS_PATH: /data/docling-artifacts
     volumes:
       - duckdb_data:/data
@@ -979,9 +976,11 @@ services:
       # Un job pesado en curso como mucho: sin prefetch extra.
       dramatiq_queue_prefetch: "1"
       dramatiq_delay_queue_prefetch: "1"
-      FASTEMBED_CACHE_PATH: /data/fastembed-cache
       # Pesos Docling/HF fuera de la imagen, en el volumen con espacio.
+      # e5-large (knowledge_rag_v2) NO va horneado: su cache persistente vive
+      # aqui (solo lo usa este carril).
       DOCLING_ARTIFACTS_PATH: /data/docling-artifacts
+      FASTEMBED_CACHE_PATH: /data/fastembed-cache
       HF_HOME: /data/hf-home
       # Con el flag a 0 el actor rechaza el trabajo (apagado por defecto).
       KNOWLEDGE_RAG_ENABLED: ${KNOWLEDGE_RAG_ENABLED:-0}
@@ -1037,8 +1036,6 @@ services:
       # Un job pesado en curso como mucho: sin prefetch extra.
       dramatiq_queue_prefetch: "1"
       dramatiq_delay_queue_prefetch: "1"
-      FASTEMBED_CACHE_PATH: /data/fastembed-cache
-      HF_HOME: /data/hf-home
       DOCLING_ARTIFACTS_PATH: /data/docling-artifacts
     volumes:
       - duckdb_data:/data
