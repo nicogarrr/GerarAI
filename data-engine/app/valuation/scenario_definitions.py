@@ -6,7 +6,63 @@ should prefer named causal scenarios when company-specific drivers exist.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+
+# Amplitud mecánica de los escenarios del DCF estándar: es el TECHO. Si el
+# historial propio de la empresa (sus FY reportados) se ha movido menos, manda
+# el historial (owner 4-nov-2026: «escenarios reales, no hardcodeo»). Un ±6 pp
+# de margen sobre una aseguradora con margen FCF del 3,6 % era casi triplicar
+# el margen en el optimista (UNH: 2.708 $ frente a un base de 469 $).
+MECHANICAL_GROWTH_SHIFT = 0.08
+MECHANICAL_MARGIN_SHIFT = 0.06
+OWN_HISTORY_YEARS = 7
+OWN_HISTORY_MIN_POINTS = 4
+
+
+def own_history_ranges(rows: Mapping[int, Mapping[str, float | None]]) -> dict:
+    """Rango recorrido por la propia empresa en sus últimos ejercicios.
+
+    ``rows``: ``{año: {"revenue", "operating_cash_flow", "capital_expenditure"}}``
+    con valores de hechos FY (misma unidad). Devuelve, para ``fcf_margin``
+    (OCF − capex sobre ingresos) y ``revenue_growth`` (interanual), los años,
+    los valores y la mitad del rango (máx − mín) / 2; ``None`` con menos de
+    ``OWN_HISTORY_MIN_POINTS`` observaciones.
+    """
+    years = sorted((y for y in rows if (rows[y].get("revenue") or 0) > 0), reverse=True)
+    years = years[: OWN_HISTORY_YEARS + 1]
+    margins: list[tuple[int, float]] = []
+    for year in years[:OWN_HISTORY_YEARS]:
+        row = rows[year]
+        ocf, capex = row.get("operating_cash_flow"), row.get("capital_expenditure")
+        if ocf is None or capex is None:
+            continue
+        margins.append((year, (float(ocf) - abs(float(capex))) / float(row["revenue"] or 0)))
+    growths: list[tuple[int, float]] = []
+    for year in years[:OWN_HISTORY_YEARS]:
+        previous = rows.get(year - 1)
+        if not previous or (previous.get("revenue") or 0) <= 0:
+            continue
+        growths.append((year, float(rows[year]["revenue"] or 0) / float(previous["revenue"] or 0) - 1))
+
+    def summary(points: list[tuple[int, float]]) -> dict | None:
+        if len(points) < OWN_HISTORY_MIN_POINTS:
+            return None
+        values = [v for _, v in points]
+        return {
+            "years": [y for y, _ in points],
+            "values": values,
+            "min": min(values),
+            "max": max(values),
+            "half_range": (max(values) - min(values)) / 2,
+        }
+
+    return {"fcf_margin": summary(margins), "revenue_growth": summary(growths)}
+
+
+def _pp(value: float) -> str:
+    text = f"{value * 100:.1f}".rstrip("0").rstrip(".")
+    return text
 
 
 @dataclass(frozen=True)
@@ -41,8 +97,13 @@ def mechanical_dcf_scenarios(
     wacc: float,
     terminal: float,
     evidence_confidence: float,
+    history: Mapping[str, Mapping | None] | None = None,
 ) -> list[ScenarioDefinition]:
     """Fact-anchored mechanical sensitivities with evidence-weighted probabilities.
+
+    ``history`` (salida de ``own_history_ranges``): la amplitud de crecimiento
+    y de margen es la mitad del rango que ha recorrido la propia empresa,
+    con ``MECHANICAL_*_SHIFT`` como techo. Sin historial suficiente, el techo.
 
     El margen bear NO tiene suelo positivo: con un margen base negativo
     (quema de caja), subir el bear a positivo lo colocaba POR ENCIMA del
@@ -60,6 +121,21 @@ def mechanical_dcf_scenarios(
     # bear saldría mejor que el base). Con margen negativo la dispersión
     # honesta viene solo del margen.
     burn = margin < 0
+    growth_shift, margin_shift = MECHANICAL_GROWTH_SHIFT, MECHANICAL_MARGIN_SHIFT
+    own_drivers: list[str] = []
+    growth_range = (history or {}).get("revenue_growth")
+    margin_range = (history or {}).get("fcf_margin")
+    if growth_range and growth_range["half_range"] < growth_shift:
+        growth_shift = max(0.0, float(growth_range["half_range"]))
+        own_drivers.append("own_history_growth_range")
+    if margin_range and margin_range["half_range"] < margin_shift:
+        margin_shift = max(0.0, float(margin_range["half_range"]))
+        own_drivers.append("own_history_margin_range")
+    suffix = (
+        " Amplitud acotada por el historial propio (mitad del rango de los últimos ejercicios)."
+        if own_drivers
+        else ""
+    )
     return [
         ScenarioDefinition(
             name="bear",
@@ -69,15 +145,18 @@ def mechanical_dcf_scenarios(
                 # crece; si el base ya cae más del 5%, el suelo quedaba POR
                 # ENCIMA del base (bear con más crecimiento que el base y,
                 # con márgenes altos, valor bear > base). Nunca sobre el base.
-                "revenue_growth": growth if burn else min(growth, max(growth - 0.08, -0.05)),
+                "revenue_growth": growth if burn else min(growth, max(growth - growth_shift, -0.05)),
                 # Sin suelo positivo: con margen base negativo, clampar el
                 # bear a +0.5% invertía el orden bear <= base.
-                "fcf_margin": margin - 0.06,
+                "fcf_margin": margin - margin_shift,
                 "wacc": wacc if burn else wacc + 0.02,
                 "terminal_growth": terminal,
             },
-            drivers=["mechanical_growth_down", "mechanical_margin_down", "mechanical_wacc_up"],
-            description="Mechanical bear: growth -8pp, margin -6pp, WACC +2pp.",
+            drivers=["mechanical_growth_down", "mechanical_margin_down", "mechanical_wacc_up", *own_drivers],
+            description=(
+                f"Mechanical bear: growth -{_pp(growth_shift)}pp, margin -{_pp(margin_shift)}pp, WACC +2pp."
+                + suffix
+            ),
         ),
         ScenarioDefinition(
             name="base",
@@ -95,13 +174,16 @@ def mechanical_dcf_scenarios(
             name="bull",
             probability=probabilities["bull"],
             assumptions={
-                "revenue_growth": growth if burn else growth + 0.08,
-                "fcf_margin": min(margin + 0.06, max(0.45, margin)),
+                "revenue_growth": growth if burn else growth + growth_shift,
+                "fcf_margin": min(margin + margin_shift, max(0.45, margin)),
                 "wacc": wacc if burn else max(wacc - 0.01, terminal + 0.01),
                 "terminal_growth": terminal,
             },
-            drivers=["mechanical_growth_up", "mechanical_margin_up", "mechanical_wacc_down"],
-            description="Mechanical bull: growth +8pp, margin +6pp, WACC -1pp.",
+            drivers=["mechanical_growth_up", "mechanical_margin_up", "mechanical_wacc_down", *own_drivers],
+            description=(
+                f"Mechanical bull: growth +{_pp(growth_shift)}pp, margin +{_pp(margin_shift)}pp, WACC -1pp."
+                + suffix
+            ),
         ),
     ]
 
