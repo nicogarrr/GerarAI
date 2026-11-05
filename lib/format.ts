@@ -136,7 +136,13 @@ export function formatNumber(
  * NUNCA se sustituye por USD: el dato que la necesita se omite.
  */
 export function isValidCurrencyCode(currency: string | null | undefined): currency is string {
-    if (!currency || !/^[A-Z]{3}$/.test(currency)) return false;
+    if (!currency) return false;
+    // Peniques/centavos de Yahoo (GBp, GBX, GBx...) son unidades válidas de
+    // cotización aunque no sean códigos ISO de tres letras: formatMoney ya las
+    // pinta con su símbolo correcto. Rechazarlas hacía N/D en Movimientos y en
+    // la ficha de valores de Londres.
+    if (PENCE_CODES.has(currency.trim())) return true;
+    if (!/^[A-Z]{3}$/.test(currency)) return false;
     try {
         new Intl.NumberFormat(FORMAT_LOCALE, { style: 'currency', currency });
         return true;

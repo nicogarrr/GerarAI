@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { analystRatingEs } from '@/lib/research/analyst-rating-es';
+import { sameTargetUnit } from '@/lib/analyst-target-currency';
 import { analystTargetsNote, referencePriceSourceText } from '@/lib/research/analyst-targets-copy';
 import type { components } from '@/lib/research/openapi.generated';
 import { useFormat, useLocale, useT } from '@/lib/i18n/client';
@@ -34,7 +35,7 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
             ) : (
                 <>
                     {!cur ? <p className="mt-2 text-xs text-gray-400">{t('research.analystTargets.currencyUndeclared')}</p> : null}
-                    {cur && currency && cur.toUpperCase() !== currency.trim().toUpperCase() ? (
+                    {cur && currency && !sameTargetUnit(cur, currency) ? (
                         <p className="mt-2 text-xs text-gray-400" data-testid="analyst-targets-currency-note">
                             {cur.toUpperCase() === 'USD' ? t('research.analystTargets.currencyAdr', { currency: currency.trim().toUpperCase() }) : t('research.analystTargets.currencyOther', { target: cur.toUpperCase(), currency: currency.trim().toUpperCase() })}
                         </p>

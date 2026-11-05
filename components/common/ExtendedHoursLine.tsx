@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { getExtendedQuotes } from '@/lib/actions/watchlist.actions';
 import { batchedSymbol } from '@/lib/cache/batch-symbols';
 import { requestCache } from '@/lib/cache/requestCache';
+import { sameTargetUnit } from '@/lib/analyst-target-currency';
 import { extendedQuoteLabel, type ExtendedQuote } from '@/lib/market/extended-quote';
 import { useFormat, useLocale } from '@/lib/i18n/client';
 
@@ -56,7 +57,7 @@ export default function ExtendedHoursLine({
     // El ticker pelado puede resolver al gemelo US (ASML -> ADR en USD) mientras
     // la fila es el listado europeo en EUR: otra divisa = otro valor, no se pinta
     // un precio USD con simbolo de euro.
-    if (quote.currency && currency && quote.currency.toUpperCase() !== currency.toUpperCase()) return null;
+    if (quote.currency && currency && !sameTargetUnit(quote.currency, currency)) return null;
     const shownCurrency = currency ?? quote.currency ?? null;
     const priceText = shownCurrency ? formatPrice(quote.price, shownCurrency) : formatNumber(quote.price);
     const changeText =

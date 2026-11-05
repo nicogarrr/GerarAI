@@ -1792,8 +1792,19 @@
     "waccSource": {
       "calculated_metric": "calculated from traceable inputs",
       "inferred_input": "inferred, with sources",
+      "declared_input": "analyst estimate with source (declared input)",
       "tag_default": "the model's default rate, without a traceable source",
       "market_cap_band": "market-cap band in US dollars (8.5% from $200bn; 9.5% from $50bn; 10.5% from $10bn; 11.5% below)"
+    },
+    "blockers": {
+      "traceable_wacc": "WACC without a traceable calculation",
+      "forecast_is_not_the_driver": "terminal value is over 95 % of the value: the 5-year forecast is not what drives this valuation",
+      "inferred_fcf_margin_target": "inferred FCF margin target (with sources): indicative margin convergence for a growing company, not a final valuation",
+      "consenso_sin_conciliar": "the valuation is more than 35 % away from analyst consensus and the gap is not reconciled item by item",
+      "impulsor_material_sin_tratar": "a signed, material value driver has no treatment in the model",
+      "inventario_impulsores_no_verificable": "the value-driver inventory could not be verified",
+      "declared_input_default": "the projection uses a default declared assumption without a source",
+      "inferred_sector_input": "the valuation uses an inferred sector input (with sources), not a reported fact: indicative result"
     },
     "scenarioWarnings": {
       "growthOutsideReference": "Scenario \"{name}\": revenue growth {value}, outside the general reference range ({low} to {high}); shown as declared, with its source.",

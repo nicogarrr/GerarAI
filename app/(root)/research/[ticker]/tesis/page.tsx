@@ -14,7 +14,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { AppError } from '@/lib/types/errors';
-import { createFormatters, naFor } from '@/lib/format';
+import { createFormatters, marginOfSafetyDisplay, naFor } from '@/lib/format';
 import {
   getResearchCompanySnapshot,
   getResearchThesisWorkspace,
@@ -22,6 +22,7 @@ import {
 import { thesisMoney } from '@/lib/research/thesis-number-format';
 import { cleanThesisText } from '@/lib/research/thesis-text';
 import { readingSections } from '@/lib/research/thesis-reading-sections';
+import { thesisScenarioDisplay } from '@/lib/research/listed-share-values';
 import { isValidCurrencyCode } from '@/lib/format';
 import PrintButton from '@/components/research/PrintButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
@@ -68,6 +69,7 @@ const STATUS_LABELS: Record<string, string> = {
   stale: 'desactualizada',
   superseded: 'sustituida',
   insufficient_data: 'datos insuficientes',
+  changes_requested: 'cambios solicitados',
 };
 
 const STATUS_KEYS: Record<string, TranslationKey> = {
@@ -75,6 +77,7 @@ const STATUS_KEYS: Record<string, TranslationKey> = {
   approved: 'research.memo.statusApproved', published: 'research.memo.statusPublished', rejected: 'research.memo.statusRejected',
   stale: 'research.memo.statusStale', draft_failed_audit: 'research.memo.statusDraftFailedAudit',
   superseded: 'research.thesisDoc.statusSuperseded', insufficient_data: 'research.memo.insufficientData',
+  changes_requested: 'research.memo.statusChangesRequested',
 };
 
 const PROVENANCE_GROUP_KEYS: Record<string, TranslationKey> = {
@@ -103,8 +106,8 @@ const RATING_LABELS: Record<string, string> = {
   insufficient_data: 'datos insuficientes',
 };
 
-function money(value: string | null, currency: string | null | undefined, locale: Locale = 'es'): string {
-  if (value === null) return naFor(locale);
+function money(value: string | number | null | undefined, currency: string | null | undefined, locale: Locale = 'es'): string {
+  if (value === null || value === undefined) return naFor(locale);
   const parsed = Number(value);
   if (Number.isNaN(parsed) || !isValidCurrencyCode(currency)) return naFor(locale);
   return thesisMoney(parsed, currency, locale);
@@ -270,13 +273,33 @@ export default async function ThesisReadingPage({ params, searchParams }: PagePr
        published.scenario_probabilities?.base,
        published.scenario_probabilities?.bull].some((p) => typeof p === 'number')
     : false;
+  // La base por acción puede ser ordinaria o ADR: se muestran los valores
+  // listados persistidos y se etiqueta la base. Nunca se multiplica en cliente.
+  const scenarioDisplay = published
+    ? thesisScenarioDisplay(
+        {
+          bear: published.bear_value,
+          base: published.base_value,
+          bull: published.bull_value,
+          expected: published.expected_value,
+        },
+        published.valuation_basis ?? null,
+        locale,
+      )
+    : null;
+  const displayedCurrency =
+    typeof (published?.valuation_basis as Record<string, unknown> | null | undefined)?.value_currency === 'string'
+      ? ((published?.valuation_basis as Record<string, unknown>).value_currency as string)
+      : currency;
   // Sin valores de escenario (p. ej. insufficient_data) la tabla no se
   // pinta: serian tres filas de «N/D» aparentando una valoracion que el
-  // modelo no produjo. Las probabilidades pueden existir aun sin valores
-  // (el motor las persiste aparte), pero sin valores no hay tabla que
-  // acompanar: se dice tal cual.
-  const hasScenarioValues = published
-    ? [published.bear_value, published.base_value, published.bull_value].some((v) => v !== null)
+  // modelo no produjo.
+  const hasScenarioValues = scenarioDisplay
+    ? [
+        scenarioDisplay.values.bear,
+        scenarioDisplay.values.base,
+        scenarioDisplay.values.bull,
+      ].some((v) => v !== null && v !== undefined)
     : false;
 
   // Retain all persisted free text and numeric values together. A missing
@@ -539,13 +562,13 @@ export default async function ThesisReadingPage({ params, searchParams }: PagePr
                   </thead>
                   <tbody className="text-gray-200">
                     {([
-                      [t('research.thesisDoc.bear'), published.bear_value, published.scenario_probabilities?.bear],
-                      [t('research.thesisDoc.base'), published.base_value, published.scenario_probabilities?.base],
-                      [t('research.thesisDoc.bull'), published.bull_value, published.scenario_probabilities?.bull],
+                      [t('research.thesisDoc.bear'), scenarioDisplay?.values.bear, published.scenario_probabilities?.bear],
+                      [t('research.thesisDoc.base'), scenarioDisplay?.values.base, published.scenario_probabilities?.base],
+                      [t('research.thesisDoc.bull'), scenarioDisplay?.values.bull, published.scenario_probabilities?.bull],
                     ] as const).map(([label, value, probability]) => (
                       <tr key={label} className="border-b border-gray-800/70">
                         <th scope="row" className="py-2 pr-4 text-left font-normal text-gray-400">{label}</th>
-                        <td className="py-2 pr-4 text-right font-medium tabular-nums">{money(value, currency, locale)}</td>
+                        <td className="py-2 pr-4 text-right font-medium tabular-nums">{money(value, displayedCurrency, locale)}</td>
                         {hasProbabilities ? (
                           <td className="py-2 text-right tabular-nums">{typeof probability === 'number' ? formatPercent(probability, { digits: 0 }) : naFor(locale)}</td>
                         ) : null}
@@ -557,19 +580,28 @@ export default async function ThesisReadingPage({ params, searchParams }: PagePr
               ) : (
                 <p className="mt-4 text-sm text-gray-400">{t('research.thesisDoc.noFigures')}</p>
               )}
+              {scenarioDisplay?.label ? (
+                <p className="mt-2 text-xs text-gray-500">{scenarioDisplay.label}</p>
+              ) : null}
               <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
                 <div>
                   <dt className="text-xs text-gray-500">{modelPriceLabel}</dt>
-                  <dd className="mt-0.5 font-medium tabular-nums text-gray-100">{money(published.current_price, currency, locale)}</dd>
+                  <dd className="mt-0.5 font-medium tabular-nums text-gray-100">{money(published.current_price, displayedCurrency, locale)}</dd>
                 </div>
                 <div>
                   <dt className="text-xs text-gray-500">{t('research.thesisDoc.expectedValue')}</dt>
-                  <dd className="mt-0.5 font-medium tabular-nums text-gray-100">{money(published.expected_value, currency, locale)}</dd>
+                  <dd className="mt-0.5 font-medium tabular-nums text-gray-100">{money(scenarioDisplay?.values.expected ?? published.expected_value, displayedCurrency, locale)}</dd>
                 </div>
                 {published.margin_of_safety !== null ? (
                   <div>
                     <dt className="text-xs text-gray-500">{t('research.thesisDoc.marginOfSafety')}</dt>
-                    <dd className="mt-0.5 font-medium tabular-nums text-gray-100">{formatPercent(Number(published.margin_of_safety))}</dd>
+                    <dd className="mt-0.5 font-medium tabular-nums text-gray-100">
+                      {marginOfSafetyDisplay(
+                        published.margin_of_safety,
+                        scenarioDisplay?.values.base ?? published.base_value,
+                        locale,
+                      )}
+                    </dd>
                   </div>
                 ) : null}
               </dl>

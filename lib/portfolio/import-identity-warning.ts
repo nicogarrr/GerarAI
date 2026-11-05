@@ -1,5 +1,4 @@
 import type { TranslateFn } from '@/lib/i18n/translate';
-import { t } from '@/lib/i18n/t';
 
 /**
  * Aviso de CSV sin identificador de operación (ibkr_import_service.py,
@@ -8,6 +7,6 @@ import { t } from '@/lib/i18n/t';
  */
 const CSV_WITHOUT_ID_PREFIX = 'CSV sin identificador de operación:';
 
-export function identityWarningText(warning: string, ti: TranslateFn = t): string {
+export function identityWarningText(warning: string, ti: TranslateFn): string {
     return warning.startsWith(CSV_WITHOUT_ID_PREFIX) ? ti('portfolio.importIbk.identityWarning') : warning;
 }
