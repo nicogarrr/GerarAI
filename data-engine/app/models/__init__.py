@@ -311,9 +311,12 @@ del _install_cache_invalidation
 
 
 # Additive public-data foundation; no tenant-owned class changes.
+from app.models.analyst_note import AnalystNote as AnalystNote  # noqa: E402
 from app.models.public_market_data import (  # noqa: F401
     PublicAnalystTargets,
     PublicFinancialFact,
     PublicFinancialStatement,
     PublicSourceDocument,
 )
+
+__all__.append("AnalystNote")
