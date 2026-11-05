@@ -51,3 +51,25 @@ def test_disco_umbral_85_por_defecto_y_sale_1_en_alerta():
     assert alerta.returncode == 1 and "ALERTA" in alerta.stdout
     mal = subprocess.run(["bash", str(DISK), "abc"], capture_output=True, text=True)
     assert mal.returncode == 2
+
+
+def test_rotacion_valida_keep_numerico_y_no_lo_interpola_en_sh():
+    import os
+    src = ROTATE.read_text(encoding="utf-8")
+    # KEEP=30 por defecto (cada deploy escribe 3 JSON; 10 archivos serian
+    # solo 3-4 deploys) y validacion numerica antes de tocar docker.
+    assert 'KEEP="${KEEP:-30}"' in src
+    assert "*[!0-9]*" in src
+    # KEEP viaja como argumento posicional del sh -c, nunca interpolado en
+    # el script que corre como root en el contenedor (hallazgo auditoria).
+    assert "' -- \"${KEEP}\"" in src
+    cuerpo = src.split("alpine sh -c '", 1)[1].split("' -- \"${KEEP}\"", 1)[0]
+    assert '"'"'"'"${KEEP}"'"'"'' not in cuerpo, "KEEP interpolado dentro del sh -c"
+    # Validacion funcional sin docker: valores no numericos o < 1 salen con 2.
+    for valor in ("abc", "10; rm -rf /", "0", "-3"):
+        env = dict(os.environ, KEEP=valor)
+        r = subprocess.run(
+            ["bash", str(ROTATE), "--confirm-rotate"],
+            capture_output=True, text=True, env=env,
+        )
+        assert r.returncode == 2, f"KEEP={valor!r} no rechazado: {r}"
