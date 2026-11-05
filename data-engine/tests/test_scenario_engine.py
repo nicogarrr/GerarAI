@@ -209,6 +209,40 @@ def test_sourced_set_named_base_keeps_the_dcf_base(db, monkeypatch):
         assert item["assumptions"]["wacc"] == pytest.approx(plain["trace"]["wacc"])
 
 
+def test_fallback_result_without_sourced_set_is_not_publishable(db, monkeypatch):
+    """Sin juego de escenarios con fuente el valor lo da el motor de respaldo
+    (trace.engine_fallback): ese número es una orientación degradada con el
+    motivo, nunca una valoración final (dato ausente = N/D; la ficha ya tiene
+    la rama degradada)."""
+    company = _company(db, "scenario_auto_energy_fsd")
+    result = ValuationService().value_company(db, company)
+    assert result["trace"]["engine_fallback"]["reason"] == "scenario_set_missing"
+    assert result["publishable"] is False
+    assert result["status"] == "partial"
+    assert "scenario_set_missing" in result["publication_blockers"]
+    assert "scenario_set_missing" in result["trace"]["publication_blockers"]
+    # Los números se quedan: mismo valor del motor de respaldo, solo cambia la etiqueta.
+    assert result["expected_value"] is not None
+
+    # Con juego declarado en datos sí publica: la degradación viene de que el
+    # juego no tiene fuente, no del motor de escenarios en sí.
+    monkeypatch.setitem(
+        valuation_scenarios.VALUATION_SCENARIOS,
+        "XDCL",
+        {
+            "source": "test",
+            "scenarios": [
+                {"name": "bear", "probability": 0.25, "method": "dcf", "revenue_growth": 0.02, "fcf_margin": 0.09},
+                {"name": "base", "probability": 0.50, "method": "dcf", "revenue_growth": 0.05, "fcf_margin": 0.11},
+                {"name": "bull", "probability": 0.25, "method": "dcf", "revenue_growth": 0.08, "fcf_margin": 0.13},
+            ],
+        },
+    )
+    declared = ValuationService().value_company(db, _company(db, "scenario_auto_energy_fsd", ticker="XDCL"))
+    assert declared["trace"]["scenario_set"]["source"] == "declared"
+    assert "scenario_set_missing" not in (declared.get("publication_blockers") or [])
+
+
 def test_declared_scenarios_weighted_value_equals_hand_sum(db, monkeypatch):
     monkeypatch.setitem(
         valuation_scenarios.VALUATION_SCENARIOS,
