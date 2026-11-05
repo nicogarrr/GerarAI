@@ -49,6 +49,12 @@ PREFETCH_MINIMUM = 30
 # un cambio de implementacion (p. ej. un mock en tests) no devuelva una
 # instancia vieja. Cargar el ONNX en cada llamada costaba ~13 s en frio.
 _MODEL_CACHE: dict[tuple, object] = {}
+# Los FALLOS tambien se cachean: sin esto, un modelo sin pesos locales
+# reintentaba la descarga en CADA lote de embeddings y cada lote caia luego
+# al fallback sentence-transformers (worker a 103 % CPU, 5-nov-2026). El
+# fallo se relanza como la MISMA excepcion (comportamiento deterministico,
+# mismo patron que RAGIndex.warm_fallback); clear_model_cache() lo resetea.
+_MODEL_FAILURES: dict[tuple, BaseException] = {}
 _MODEL_LOCK = threading.Lock()
 
 
@@ -57,17 +63,29 @@ def _cached_model(kind: str, cls: type, model: str):
     cached = _MODEL_CACHE.get(key)
     if cached is not None:
         return cached
+    failure = _MODEL_FAILURES.get(key)
+    if failure is not None:
+        raise failure
     with _MODEL_LOCK:
         cached = _MODEL_CACHE.get(key)
-        if cached is None:
+        if cached is not None:
+            return cached
+        failure = _MODEL_FAILURES.get(key)
+        if failure is not None:
+            raise failure
+        try:
             cached = cls(model)
-            _MODEL_CACHE[key] = cached
+        except Exception as exc:
+            _MODEL_FAILURES[key] = exc
+            raise
+        _MODEL_CACHE[key] = cached
         return cached
 
 
 def clear_model_cache() -> None:
     with _MODEL_LOCK:
         _MODEL_CACHE.clear()
+        _MODEL_FAILURES.clear()
 
 
 class FastembedUnavailable(RuntimeError):
