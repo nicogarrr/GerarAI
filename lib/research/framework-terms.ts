@@ -160,8 +160,8 @@ export function frameworkTerm(raw: string, locale: 'es' | 'en' = 'es'): string |
 export function methodLabel(raw: string, locale: 'es' | 'en' = 'es'): string {
     const key = normalise(raw);
     const i18nKey = Object.hasOwn(METHOD_TERMS_I18N, key) ? METHOD_TERMS_I18N[key] : null;
+    if (i18nKey) return createTranslator(locale)(i18nKey);
     if (locale === 'en') return key.replaceAll('_', ' ');
-    if (i18nKey) return createTranslator('es')(i18nKey);
     return raw.trim().replaceAll('_', ' ');
 }
 
