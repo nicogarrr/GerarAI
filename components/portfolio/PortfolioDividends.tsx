@@ -7,6 +7,15 @@ import { intlLocale } from '@/lib/i18n/locale';
 
 const esT: TFunction = t;
 const esF = createFormatters('es');
+
+/** Hostname para mostrar la fuente; una URL malformada no debe tumbar la pestaña. */
+function sourceHost(url: string): string {
+    try {
+        return new URL(url).hostname.replace(/^www\d*\./, '');
+    } catch {
+        return url;
+    }
+}
 import SyncDividendsButton from '@/components/portfolio/SyncDividendsButton';
 import { Panel } from '@/components/ui/panel';
 import {
@@ -411,7 +420,7 @@ export default function PortfolioDividends({ projection, userId, ti = esT, f = e
                                 rel="noopener noreferrer"
                                 target="_blank"
                             >
-                                {new URL(url).hostname.replace(/^www\d*\./, '')}
+                                {sourceHost(url)}
                             </a>
                         ))}
                     </p>
