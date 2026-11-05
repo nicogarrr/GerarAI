@@ -504,6 +504,11 @@ class Settings(BaseSettings):
     # Equipo de expertos con coordinador (app/services/expert_team). Apagado:
     # tesis y chat siguen exactamente igual. Env: EXPERT_TEAM_ENABLED.
     expert_team_enabled: bool = False
+    # Control de la valoración frente al consenso de analistas (>35 % exige
+    # conciliación dato a dato). Independiente del equipo de expertos: sin
+    # consenso se publica con la salvedad, con desviación no conciliada no.
+    # Env: CONSENSUS_CONTROL_ENABLED.
+    consensus_control_enabled: bool = True
 
     # Invalidación GLOBAL de la caché de mercado (compartida entre tenants).
     # Las rutas POST /api/cache/invalidate/market-data e /invalidate/all la
