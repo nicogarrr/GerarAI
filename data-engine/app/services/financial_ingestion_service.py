@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections import Counter
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
 
-from sqlalchemy import delete, or_, select, tuple_
+from sqlalchemy import delete, insert, or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
@@ -242,6 +244,14 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
     + [TOTAL_DEBT_LAST_RESORT]
 ))
 
+# Version de las REGLAS de ingesta SEC; forma parte de la huella del payload
+# (sec_payload_fingerprint). Hay que subirla cuando cambie cualquier regla que
+# altere el resultado de reingerir el MISMO payload (aliases de
+# SEC_METRIC_MAP, puertas de signo, prioridades de alcance, derivadas...):
+# sin subirla, una empresa cuyo payload no cambia nunca recogeria la regla
+# nueva.
+SEC_INGESTION_RULES_VERSION = 2
+
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("revenue",           ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax", "RegulatedAndUnregulatedOperatingRevenue"],  "USD"),
     ("gross_profit",      ["GrossProfit"],                                                                          "USD"),
@@ -391,6 +401,13 @@ SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("dividends_paid",    ["DividendsPaidClassifiedAsFinancingActivities", "DividendsPaid"],          "USD"),
 ]
 
+
+# Version de las REGLAS de ingesta ESEF; forma parte de la huella del
+# snapshot (esef_snapshot_fingerprint). Hay que subirla cuando cambie
+# cualquier regla que altere el resultado de reingerir el MISMO snapshot
+# (ESEF_METRIC_MAP, fusion de alias, cuarentena, derivadas): sin subirla,
+# un emisor cuyo snapshot no cambia nunca recogeria la regla nueva.
+ESEF_INGESTION_RULES_VERSION = 1
 
 ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # RevenueFromContractsWithCustomers: emisores que solo etiquetan la cifra
@@ -1562,6 +1579,72 @@ def _recent_fiscal_mode(pairs: list[tuple[str, str]]) -> str:
 
 
 
+def _esef_snapshot_fingerprint(snapshot: dict[str, Any]) -> str:
+    """Huella de contenido de los hechos del snapshot ESEF (solo "facts":
+    la envoltura - fetched_at, origen, fxo_id - cambia en cada lectura sin
+    cambiar un solo hecho)."""
+    canonical = json.dumps(
+        snapshot.get("facts", {}), sort_keys=True, separators=(",", ":"), default=str
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _sec_payload_fingerprint(facts_data: dict[str, Any]) -> str:
+    """Huella de contenido del payload companyfacts (canonico, no bytes:
+    el orden de claves del JSON no cambia la huella)."""
+    canonical = json.dumps(
+        facts_data, sort_keys=True, separators=(",", ":"), default=str
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _queue_fact(
+    db: Session, fact: FinancialFact | None = None, **fields: Any
+) -> None:
+    """Acumula un hecho para insercion EN LOTE (una executemany por tanda en
+    vez de una sentencia por fila: medido con companyfacts reales, CHTR
+    5-nov-2026, 765 INSERT por refresh). La tanda se vuelca con
+    ``_flush_fact_buffer`` antes de cualquier lectura de hechos. Sin tenant
+    en la sesion cae al ORM: el guardia de tenancy de database.py
+    (before_flush) manda ahi y esta via no lo esquiva.
+
+    Acepta los campos como kwargs o una instancia TRANSITORIA (p.ej. si el
+    llamador aun la consulta en memoria): de la instancia solo se encolan
+    las columnas con valor no None, igual que al pasar campos sueltos."""
+    tenant_id = db.info.get("tenant_id")
+    if tenant_id is None:
+        db.add(fact if fact is not None else FinancialFact(**fields))
+        return
+    if fact is not None:
+        fields = {
+            attr.key: getattr(fact, attr.key)
+            for attr in FinancialFact.__mapper__.column_attrs
+            if getattr(fact, attr.key) is not None
+        }
+    buffer = db.info.setdefault("_fact_bulk_buffer", [])
+    fields["tenant_id"] = tenant_id
+    buffer.append(fields)
+
+
+def _flush_fact_buffer(db: Session) -> None:
+    """Vuelca la tanda acumulada en UNA insercion en lote. Los defaults de
+    columna (created_at/updated_at) se aplican por fila igual que en ORM;
+    no hay listeners por fila de FinancialFact que puedan saltarse."""
+    rows = db.info.pop("_fact_bulk_buffer", None)
+    if rows:
+        db.execute(insert(FinancialFact), rows)
+        # La tanda Core no pasa por la sesion: las filas viejas borradas con
+        # DML Core (_replace_*_data) pueden seguir en el identity map y
+        # sqlite REUSA rowids, asi que un SELECT ORM posterior podria
+        # materializar el objeto viejo con el id reciclado (fantasma). Se
+        # caducan los FinancialFact cacheados: la proxima lectura los trae
+        # frescos de la base. En postgres (secuencias) no ocurre, pero la
+        # caducidad es correcta en ambos.
+        for instance in db.identity_map.values():
+            if isinstance(instance, FinancialFact):
+                db.expire(instance)
+
+
 def _latest_filed_date(us_gaap: dict[str, Any]):
     """Fecha `filed` mas reciente de los hechos companyfacts, o None."""
     latest = None
@@ -1748,19 +1831,23 @@ class FinancialIngestionService:
                 "hechos (usa la fuente de su mercado local, p. ej. ESEF)"
             )
 
-        us_gaap = facts_data.get("facts", {}).get("us-gaap", {})
-        # 40-F/20-F en IFRS (BN): sin us-gaap, la misma lectura va sobre
-        # ifrs-full con su mapa de conceptos; el resto de reglas no cambia.
-        metric_map = SEC_METRIC_MAP
-        taxonomy = "us-gaap"
-        if not us_gaap and facts_data.get("facts", {}).get("ifrs-full"):
-            us_gaap = facts_data["facts"]["ifrs-full"]
-            metric_map = SEC_IFRS_METRIC_MAP
-            taxonomy = "ifrs-full"
-        # Divisa de reporte del filer (10-K: USD; 20-F en US GAAP: CNY, TWD...).
-        # Cada hecho monetario se guarda con ELLA como unidad.
-        reporting_currency = _sec_reporting_currency(us_gaap)
-
+        # Huella del payload + version de reglas: si nada cambio desde la
+        # ultima ingesta completa, el recomputo seria identico (F353: la
+        # misma importacion dos veces es idempotente) y se omite ENTERO: sin
+        # pasadas de recoleccion, sin borrado/reescritura de hechos, sin
+        # resync de chunks. Anclas/indice se verifican siempre: pueden cambiar
+        # aunque companyfacts sea identico. Medido con
+        # companyfacts reales (CHTR/TSLA/MSFT, 5-nov-2026): un refresh sin
+        # cambios costaba ~800 sentencias (765 INSERT identicos) y ~21-33k
+        # entradas XBRL reescaneadas por empresa; con la huella son 2 SELECT.
+        # Un corte as_of NUNCA salta ni ESCRIBE la huella: su resultado es un
+        # recorte deliberado de la historia, no el estado vigente, y ademas
+        # INVALIDA la huella guardada (ver mas abajo) para que el siguiente
+        # refresh completo reingiera.
+        document = self._source_document_sec(db, company, ticker)
+        payload_fingerprint = (
+            f"{SEC_INGESTION_RULES_VERSION}:{_sec_payload_fingerprint(facts_data)}"
+        )
         # Evidencia de calendario a nivel de filing (submissions). Fail
         # closed: sin anclas no entra NINGUN hecho anual (la cobertura
         # parcial queda visible en el resultado); los trimestres siguen su
@@ -1779,7 +1866,56 @@ class FinancialIngestionService:
         except Exception:  # noqa: BLE001 - fail closed DEI, no romper lo demas
             index_accessions = None
 
-        document = self._source_document_sec(db, company, ticker)
+        anchor_fingerprint = _sec_payload_fingerprint({
+            "anchors": dict(annual_anchors),
+            "partial": bool(getattr(annual_anchors, "partial", False)),
+            "source": getattr(annual_anchors, "source", "sec-submissions"),
+            "note": getattr(annual_anchors, "note", None),
+            "index_accessions": sorted(index_accessions) if index_accessions is not None else None,
+        })
+        if as_of is None and (document.metadata_ or {}).get(
+            "sec_payload_fingerprint"
+        ) == payload_fingerprint and (document.metadata_ or {}).get(
+            "sec_anchor_fingerprint"
+        ) == anchor_fingerprint:
+            # Caller-owned pending rows still need the normal refresh flush.
+            db.flush()
+            return {
+                "status": "unchanged",
+                "ticker": ticker,
+                "provider": "SEC",
+                "source_document_id": document.id,
+                "facts_imported": 0,
+                "cik": cik,
+                "as_of": None,
+                "date_filter_applied": False,
+                "conflicts": None,
+                "free_data": None,
+                "fy_periods": (document.metadata_ or {}).get("fy_periods") or [],
+                "annual_anchored_filings": None,
+                "annual_anchor_source": getattr(annual_anchors, "source", "sec-submissions"),
+                "annual_anchor_partial": bool(getattr(annual_anchors, "partial", False)),
+                "annual_anchor_note": getattr(annual_anchors, "note", None),
+                "mirror": None,
+                "unchanged": True,
+            }
+
+        # Drop a buffer left by a prior rolled-back ingestion.
+        db.info.pop("_fact_bulk_buffer", None)
+
+        us_gaap = facts_data.get("facts", {}).get("us-gaap", {})
+        # 40-F/20-F en IFRS (BN): sin us-gaap, la misma lectura va sobre
+        # ifrs-full con su mapa de conceptos; el resto de reglas no cambia.
+        metric_map = SEC_METRIC_MAP
+        taxonomy = "us-gaap"
+        if not us_gaap and facts_data.get("facts", {}).get("ifrs-full"):
+            us_gaap = facts_data["facts"]["ifrs-full"]
+            metric_map = SEC_IFRS_METRIC_MAP
+            taxonomy = "ifrs-full"
+        # Divisa de reporte del filer (10-K: USD; 20-F en US GAAP: CNY, TWD...).
+        # Cada hecho monetario se guarda con ELLA como unidad.
+        reporting_currency = _sec_reporting_currency(us_gaap)
+
         # published_at = presentacion mas reciente (campo `filed` de companyfacts)
         # para que la procedencia OFICIAL tenga fecha; nunca se inventa.
         latest_filed = _latest_filed_date(us_gaap)
@@ -1967,22 +2103,23 @@ class FinancialIngestionService:
                         str(entry["end"]), modal_fy_month
                     ) or str(entry["fp"])
                     derived_from_ytd = bool(entry.get("_derived_from_ytd"))
-                    db.add(
-                        FinancialFact(
-                            company_id=company.id,
-                            metric=metric,
-                            value=val,
-                            unit=unit,
-                            period=f"{entry['end']}:{fp}",
-                            fiscal_year=None,
-                            fiscal_quarter=fp,
-                            source_id=document.id,
-                            source_type="SEC",
-                            is_reported=not derived_from_ytd,
-                            confidence=Decimal("0.85") if derived_from_ytd else Decimal("0.9"),
-                            accession_number=entry.get("accn"),
-                            filed=_publication_date(entry),
-                        )
+                    _queue_fact(
+                        db,
+                        **{
+                            "company_id": company.id,
+                            "metric": metric,
+                            "value": val,
+                            "unit": unit,
+                            "period": f"{entry['end']}:{fp}",
+                            "fiscal_year": None,
+                            "fiscal_quarter": fp,
+                            "source_id": document.id,
+                            "source_type": "SEC",
+                            "is_reported": not derived_from_ytd,
+                            "confidence": Decimal("0.85") if derived_from_ytd else Decimal("0.9"),
+                            "accession_number": entry.get("accn"),
+                            "filed": _publication_date(entry),
+                        }
                     )
                     # Misma proveniencia por periodo que el bucle anual:
                     # clave "<end>:<fp>" para no colisionar con el FY.
@@ -2033,22 +2170,23 @@ class FinancialIngestionService:
                         == "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"
                     ):
                         cash_restricted_years.add(_annual_fiscal_year(str(entry["end"]), modal_fy_month))
-                    db.add(
-                        FinancialFact(
-                            company_id=company.id,
-                            metric=metric,
-                            value=val,
-                            unit=unit,
-                            period=f"{entry['end']}:FY",
-                            fiscal_year=_annual_fiscal_year(str(entry["end"]), modal_fy_month),
-                            fiscal_quarter="FY",
-                            source_id=document.id,
-                            source_type="SEC",
-                            is_reported=True,
-                            confidence=Decimal("0.95"),
-                            accession_number=entry.get("accn"),
-                            filed=_publication_date(entry),
-                        )
+                    _queue_fact(
+                        db,
+                        **{
+                            "company_id": company.id,
+                            "metric": metric,
+                            "value": val,
+                            "unit": unit,
+                            "period": f"{entry['end']}:FY",
+                            "fiscal_year": _annual_fiscal_year(str(entry["end"]), modal_fy_month),
+                            "fiscal_quarter": "FY",
+                            "source_id": document.id,
+                            "source_type": "SEC",
+                            "is_reported": True,
+                            "confidence": Decimal("0.95"),
+                            "accession_number": entry.get("accn"),
+                            "filed": _publication_date(entry),
+                        }
                     )
                     # Record which XBRL concept produced the value. Several
                     # metrics accept alternative tags with different scopes, so
@@ -2122,22 +2260,23 @@ class FinancialIngestionService:
             existing = annual_by_metric.get("shares_outstanding", {})
             if end in existing:
                 continue
-            db.add(
-                FinancialFact(
-                    company_id=company.id,
-                    metric="shares_outstanding",
-                    value=val,
-                    unit="shares",
-                    period=period,
-                    fiscal_year=None,
-                    fiscal_quarter=None,
-                    source_id=document.id,
-                    source_type="SEC",
-                    is_reported=True,
-                    confidence=Decimal("0.95"),
-                    accession_number=entry.get("accn"),
-                    filed=_publication_date(entry),
-                )
+            _queue_fact(
+                db,
+                **{
+                    "company_id": company.id,
+                    "metric": "shares_outstanding",
+                    "value": val,
+                    "unit": "shares",
+                    "period": period,
+                    "fiscal_year": None,
+                    "fiscal_quarter": None,
+                    "source_id": document.id,
+                    "source_type": "SEC",
+                    "is_reported": True,
+                    "confidence": Decimal("0.95"),
+                    "accession_number": entry.get("accn"),
+                    "filed": _publication_date(entry),
+                }
             )
             concept_usage.setdefault("shares_outstanding", {})[period] = (
                 "dei:EntityCommonStockSharesOutstanding"
@@ -2156,6 +2295,9 @@ class FinancialIngestionService:
             existing_meta["xbrl_taxonomy"] = taxonomy
             document.metadata_ = existing_meta
 
+        # La tanda en lote tiene que estar EN LA BASE antes de cualquier
+        # lectura de hechos (shadows, derivadas, conflictos, chunks).
+        _flush_fact_buffer(db)
         drop_shadowed_facts(db, company.id, document.id, tenant_condition(db))
 
         if cash_restricted_years:
@@ -2243,8 +2385,22 @@ class FinancialIngestionService:
         # "mirror" se escribe SIEMPRE (null cuando esta corrida fue SEC
         # directo): una clave vieja de una corrida con fallback no puede
         # sobrevivir y atribuir al mirror una ingesta directa.
+        # La huella SOLO se gana una ingesta completa y DIRECTA (as_of=None
+        # y sin mirror HF): un corte as_of deja un recorte de la historia en
+        # disco y el mirror puede ir parcial o desfasado; ambos INVALIDAN la
+        # huella previa - el siguiente refresh completo y directo tiene que
+        # reingerir, no saltar (y asi la procedencia "mirror" se reescribe
+        # SIEMPRE, regla FIX: la metadata no puede sobrevivir de una corrida
+        # con fallback).
+        metadata = dict(document.metadata_ or {})
+        if as_of is None and mirror_info is None:
+            metadata["sec_payload_fingerprint"] = payload_fingerprint
+            metadata["sec_anchor_fingerprint"] = anchor_fingerprint
+        else:
+            metadata.pop("sec_payload_fingerprint", None)
+            metadata.pop("sec_anchor_fingerprint", None)
         document.metadata_ = {
-            **(document.metadata_ or {}),
+            **metadata,
             "fy_periods": fy_periods,
             "mirror": mirror_info,
         }
@@ -2369,6 +2525,31 @@ class FinancialIngestionService:
                     "no se escriben hechos de una entidad bajo otra"
                 )
 
+        # Huella de los hechos del snapshot + version de reglas: si nada
+        # cambio desde la ultima ingesta, el recomputo seria identico y se
+        # omite ENTERO: sin borrado/reescritura de hechos, sin derivadas ni
+        # resync de chunks. ESEF no tiene cortes as_of ni mirror: toda
+        # ingesta completada gana la huella.
+        document = self._source_document_esef(db, company, ticker, snapshot)
+        snapshot_fingerprint = (
+            f"{ESEF_INGESTION_RULES_VERSION}:{_esef_snapshot_fingerprint(snapshot)}"
+        )
+        if (document.metadata_ or {}).get("esef_snapshot_fingerprint") == (
+            snapshot_fingerprint
+        ):
+            return {
+                "status": "unchanged",
+                "ticker": ticker,
+                "provider": "ESEF",
+                "source_document_id": document.id,
+                "facts_imported": 0,
+                "lei": snapshot.get("lei"),
+                "period_end": snapshot.get("period_end"),
+                "latest_periods": self.latest_periods(db, company),
+                "valuation_input_ready": self.valuation_input_ready(db, company),
+                "unchanged": True,
+            }
+
         from app.services.esef_fact_quarantine import reviewed_eps_conflict
 
         # Reviewed issuer conflicts stay in the source snapshot, but are not
@@ -2384,7 +2565,6 @@ class FinancialIngestionService:
             }
             for concept, units in snapshot.get("facts", {}).items()
         }
-        document = self._source_document_esef(db, company, ticker, snapshot)
         self._replace_esef_data(db, company, document)
         facts_imported = 0
 
@@ -2403,24 +2583,25 @@ class FinancialIngestionService:
                     continue
                 if metric == "capital_expenditure":
                     val = -val
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric=metric,
-                        value=val,
-                        unit=f"{ccy}/share" if unit.endswith("/xbrli:shares") else ccy,
-                        period=f"{period_date}:FY",
-                        fiscal_year=_annual_fiscal_year(period_date, None),
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="ESEF",
-                        is_reported=True,
-                        confidence=Decimal("0.95"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric=metric,
+                    value=val,
+                    unit=f"{ccy}/share" if unit.endswith("/xbrli:shares") else ccy,
+                    period=f"{period_date}:FY",
+                    fiscal_year=_annual_fiscal_year(period_date, None),
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="ESEF",
+                    is_reported=True,
+                    confidence=Decimal("0.95"),
                 )
                 facts_imported += 1
 
-        # la sesion de ingestion usa autoflush=False: drop_shadowed_facts hace flush antes de derivar
+        # la sesion de ingestion usa autoflush=False y la tanda bulk no la
+        # ve db.flush: se vuelca ANTES de que drop_shadowed_facts lea hechos
+        _flush_fact_buffer(db)
         drop_shadowed_facts(db, company.id, document.id, tenant_condition(db))
         facts_imported += self._derive_esef_metrics(db, company, document)
         facts_imported += self._import_esef_shares(db, company, document, facts_data, currency=ccy)
@@ -2436,6 +2617,7 @@ class FinancialIngestionService:
             "esef_coverage": esef_coverage,
             "reporting_currency": ccy,
             "origin": snapshot.get("origin") or "local_snapshot",
+            "esef_snapshot_fingerprint": snapshot_fingerprint,
             **({"source": snapshot["source"]} if snapshot.get("source") else {}),
             **({"identity": live_identity} if live_identity else {}),
             "last_refreshed_at": datetime.now(UTC).isoformat(),
@@ -2627,28 +2809,11 @@ class FinancialIngestionService:
             if net_income is not None and equity is not None and prev_equity is not None:
                 avg_equity = (equity.value + prev_equity.value) / 2
                 if avg_equity > 0:
-                    db.add(
-                        FinancialFact(
-                            company_id=company.id,
-                            metric="roe",
-                            value=net_income.value / avg_equity,
-                            unit="decimal",
-                            period=equity.period,
-                            fiscal_year=year,
-                            fiscal_quarter="FY",
-                            source_id=document.id,
-                            source_type="SEC",
-                            is_reported=False,
-                            confidence=Decimal("0.85"),
-                        )
-                    )
-                    derived += 1
-            if equity is not None and prev_equity is not None and prev_equity.value > 0:
-                db.add(
-                    FinancialFact(
+                    _queue_fact(
+                        db,
                         company_id=company.id,
-                        metric="book_value_growth",
-                        value=(equity.value / prev_equity.value) - 1,
+                        metric="roe",
+                        value=net_income.value / avg_equity,
                         unit="decimal",
                         period=equity.period,
                         fiscal_year=year,
@@ -2658,15 +2823,32 @@ class FinancialIngestionService:
                         is_reported=False,
                         confidence=Decimal("0.85"),
                     )
+                    derived += 1
+            if equity is not None and prev_equity is not None and prev_equity.value > 0:
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="book_value_growth",
+                    value=(equity.value / prev_equity.value) - 1,
+                    unit="decimal",
+                    period=equity.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="SEC",
+                    is_reported=False,
+                    confidence=Decimal("0.85"),
                 )
                 derived += 1
 
-            fcf: FinancialFact | None = None
+            fcf_value: Any = None
             if ocf is not None and capex is not None:
-                fcf = FinancialFact(
+                fcf_value = ocf.value + capex.value
+                _queue_fact(
+                    db,
                     company_id=company.id,
                     metric="free_cash_flow",
-                    value=ocf.value + capex.value,
+                    value=fcf_value,
                     # Misma divisa que sus componentes (CNY en un 20-F de BABA).
                     unit=ocf.unit,
                     period=ocf.period,
@@ -2679,27 +2861,25 @@ class FinancialIngestionService:
                     # Derivada: conocible cuando lo fueron AMBAS entradas.
                     filed=_latest_known_filed(ocf, capex),
                 )
-                db.add(fcf)
                 derived += 1
             if (
-                fcf is not None
+                fcf_value is not None
                 and revenue is not None
                 and revenue.value > 0
             ):
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric="fcf_margin",
-                        value=fcf.value / revenue.value,
-                        unit="decimal",
-                        period=revenue.period,
-                        fiscal_year=year,
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="SEC",
-                        is_reported=False,
-                        confidence=Decimal("0.85"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="fcf_margin",
+                    value=fcf_value / revenue.value,
+                    unit="decimal",
+                    period=revenue.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="SEC",
+                    is_reported=False,
+                    confidence=Decimal("0.85"),
                 )
                 derived += 1
             previous_revenue = year_fact("revenue", year - 1)
@@ -2708,37 +2888,35 @@ class FinancialIngestionService:
                 and previous_revenue is not None
                 and previous_revenue.value > 0
             ):
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric="revenue_growth",
-                        value=(revenue.value / previous_revenue.value) - 1,
-                        unit="decimal",
-                        period=revenue.period,
-                        fiscal_year=year,
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="SEC",
-                        is_reported=False,
-                        confidence=Decimal("0.85"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="revenue_growth",
+                    value=(revenue.value / previous_revenue.value) - 1,
+                    unit="decimal",
+                    period=revenue.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="SEC",
+                    is_reported=False,
+                    confidence=Decimal("0.85"),
                 )
                 derived += 1
             if debt is not None and cash is not None:
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric="net_debt",
-                        value=debt.value - cash.value,
-                        unit=debt.unit,
-                        period=debt.period,
-                        fiscal_year=year,
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="SEC",
-                        is_reported=False,
-                        confidence=Decimal("0.85"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="net_debt",
+                    value=debt.value - cash.value,
+                    unit=debt.unit,
+                    period=debt.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="SEC",
+                    is_reported=False,
+                    confidence=Decimal("0.85"),
                 )
                 derived += 1
             elif (
@@ -2757,20 +2935,19 @@ class FinancialIngestionService:
                 # lleva is_reported=False, confidence rebajada y la etiqueta
                 # queda en document.metadata_["net_debt_no_financial_debt_periods"].
                 # Sin balance completo no hay inferencia: N/D (no se crea fila).
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric="net_debt",
-                        value=-cash.value,
-                        unit=cash.unit,
-                        period=cash.period,
-                        fiscal_year=year,
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="SEC",
-                        is_reported=False,
-                        confidence=Decimal("0.80"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="net_debt",
+                    value=-cash.value,
+                    unit=cash.unit,
+                    period=cash.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="SEC",
+                    is_reported=False,
+                    confidence=Decimal("0.80"),
                 )
                 derived += 1
                 no_financial_debt_periods[cash.period] = (
@@ -2786,6 +2963,7 @@ class FinancialIngestionService:
                 **(document.metadata_ or {}),
                 "net_debt_no_financial_debt_periods": existing,
             }
+        _flush_fact_buffer(db)
         db.flush()
         return derived
 
@@ -2833,37 +3011,35 @@ class FinancialIngestionService:
         )
         imported = 0
         for item in diluted:
-            db.add(
-                FinancialFact(
-                    company_id=company.id,
-                    metric=esef_shares.DILUTED_METRIC,
-                    value=item.shares,
-                    unit="shares",
-                    period=f"{item.period}:FY",
-                    fiscal_year=_annual_fiscal_year(item.period, None),
-                    fiscal_quarter="FY",
-                    source_id=document.id,
-                    source_type="ESEF",
-                    is_reported=False,
-                    confidence=Decimal("0.6") if item.numerator_adjustment_risk else Decimal("0.7"),
-                )
+            _queue_fact(
+                db,
+                company_id=company.id,
+                metric=esef_shares.DILUTED_METRIC,
+                value=item.shares,
+                unit="shares",
+                period=f"{item.period}:FY",
+                fiscal_year=_annual_fiscal_year(item.period, None),
+                fiscal_quarter="FY",
+                source_id=document.id,
+                source_type="ESEF",
+                is_reported=False,
+                confidence=Decimal("0.6") if item.numerator_adjustment_risk else Decimal("0.7"),
             )
             imported += 1
         for item in basic:
-            db.add(
-                FinancialFact(
-                    company_id=company.id,
-                    metric=esef_shares.BASIC_METRIC,
-                    value=item.shares,
-                    unit="shares",
-                    period=f"{item.period}:FY",
-                    fiscal_year=_annual_fiscal_year(item.period, None),
-                    fiscal_quarter="FY",
-                    source_id=document.id,
-                    source_type="ESEF",
-                    is_reported=False,
-                    confidence=Decimal("0.6"),
-                )
+            _queue_fact(
+                db,
+                company_id=company.id,
+                metric=esef_shares.BASIC_METRIC,
+                value=item.shares,
+                unit="shares",
+                period=f"{item.period}:FY",
+                fiscal_year=_annual_fiscal_year(item.period, None),
+                fiscal_quarter="FY",
+                source_id=document.id,
+                source_type="ESEF",
+                is_reported=False,
+                confidence=Decimal("0.6"),
             )
             imported += 1
         document.metadata_ = {
@@ -2893,6 +3069,7 @@ class FinancialIngestionService:
                 ],
             },
         }
+        _flush_fact_buffer(db)
         db.flush()
         return imported
 
@@ -2922,20 +3099,19 @@ class FinancialIngestionService:
         def add_ratio(metric: str, numerator: FinancialFact, denominator: FinancialFact) -> int:
             if denominator.value is None or denominator.value <= 0:
                 return 0
-            db.add(
-                FinancialFact(
-                    company_id=company.id,
-                    metric=metric,
-                    value=numerator.value / denominator.value,
-                    unit="decimal",
-                    period=numerator.period,
-                    fiscal_year=numerator.fiscal_year,
-                    fiscal_quarter="FY",
-                    source_id=document.id,
-                    source_type="ESEF",
-                    is_reported=False,
-                    confidence=Decimal("0.85"),
-                )
+            _queue_fact(
+                db,
+                company_id=company.id,
+                metric=metric,
+                value=numerator.value / denominator.value,
+                unit="decimal",
+                period=numerator.period,
+                fiscal_year=numerator.fiscal_year,
+                fiscal_quarter="FY",
+                source_id=document.id,
+                source_type="ESEF",
+                is_reported=False,
+                confidence=Decimal("0.85"),
             )
             return 1
 
@@ -2955,20 +3131,19 @@ class FinancialIngestionService:
             fl_noncurrent = year_fact("financial_liabilities_noncurrent", year)
 
             if fl_current is not None and fl_noncurrent is not None:
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric="total_debt",
-                        value=fl_current.value + fl_noncurrent.value,
-                        unit=fl_current.unit or "EUR",
-                        period=fl_current.period,
-                        fiscal_year=year,
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="ESEF",
-                        is_reported=False,
-                        confidence=Decimal("0.85"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="total_debt",
+                    value=fl_current.value + fl_noncurrent.value,
+                    unit=fl_current.unit or "EUR",
+                    period=fl_current.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="ESEF",
+                    is_reported=False,
+                    confidence=Decimal("0.85"),
                 )
                 derived += 1
 
@@ -2987,7 +3162,7 @@ class FinancialIngestionService:
                     is_reported=False,
                     confidence=Decimal("0.85"),
                 )
-                db.add(fcf)
+                _queue_fact(db, fcf)
                 derived += 1
             if fcf is not None and revenue is not None and revenue.value > 0:
                 derived += add_ratio("fcf_margin", fcf, revenue)
@@ -2997,20 +3172,19 @@ class FinancialIngestionService:
                 and previous_revenue is not None
                 and previous_revenue.value > 0
             ):
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric="revenue_growth",
-                        value=(revenue.value / previous_revenue.value) - 1,
-                        unit="decimal",
-                        period=revenue.period,
-                        fiscal_year=year,
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="ESEF",
-                        is_reported=False,
-                        confidence=Decimal("0.85"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="revenue_growth",
+                    value=(revenue.value / previous_revenue.value) - 1,
+                    unit="decimal",
+                    period=revenue.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="ESEF",
+                    is_reported=False,
+                    confidence=Decimal("0.85"),
                 )
                 derived += 1
             if revenue is not None and revenue.value > 0:
@@ -3027,22 +3201,22 @@ class FinancialIngestionService:
             ):
                 derived += add_ratio("effective_tax_rate", income_tax_expense, income_before_tax)
             if operating_income is not None and depreciation is not None:
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric="ebitda",
-                        value=operating_income.value + depreciation.value,
-                        unit=operating_income.unit or "EUR",
-                        period=operating_income.period,
-                        fiscal_year=year,
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="ESEF",
-                        is_reported=False,
-                        confidence=Decimal("0.85"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="ebitda",
+                    value=operating_income.value + depreciation.value,
+                    unit=operating_income.unit or "EUR",
+                    period=operating_income.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="ESEF",
+                    is_reported=False,
+                    confidence=Decimal("0.85"),
                 )
                 derived += 1
+        _flush_fact_buffer(db)
         db.flush()
         return derived
 
