@@ -13,7 +13,7 @@ import MobileCollapse from '@/components/ui/mobile-collapse';
 import { TRADINGVIEW_URL } from '@/lib/market/candles';
 import { CHART_RANGES, type CompanyChartRange } from '@/lib/market/chart-ranges';
 import { normalizeChartPriceUnits } from '@/lib/market/chart-price-units';
-import { adx, cleanBars, dailyPivots, fibonacci, rangeBars, sma, structure } from '@/lib/market/technical';
+import { adx, cleanBars, dailyPivots, fibonacci, preferCandlesticks, rangeBars, sma, structure } from '@/lib/market/technical';
 import { getChartEvents, type ChartEvents } from '@/lib/actions/price-events.actions';
 import { barsSince, detectMovements, eventsInRange, movementEvents, markersByDay, targetDistancePercent, volumeSpikeFlags, type PriceEventKind } from '@/lib/market/price-events';
 import { PriceEventsPanel } from '@/components/research/PriceEventsPanel';
@@ -210,8 +210,10 @@ function PriceCanvas({ bars, levels, currency, hourly = false, spikes = [], mark
     const engine = useRef<{
         chart: IChartApi;
         line: ISeriesApi<'Area', Time>;
+        candles: ISeriesApi<'Candlestick', Time>;
         volume: ISeriesApi<'Histogram', Time>;
         markers: ISeriesMarkersPluginApi<Time>;
+        candleMarkers: ISeriesMarkersPluginApi<Time>;
         levels: IPriceLine[];
         dashed: IPriceLine[];
         dashedStyle: number;
@@ -229,7 +231,7 @@ function PriceCanvas({ bars, levels, currency, hourly = false, spikes = [], mark
         let chart: IChartApi | null = null;
         (async () => {
             try {
-                const { createChart, createSeriesMarkers, AreaSeries, HistogramSeries, LineStyle, ColorType } = await import('lightweight-charts');
+                const { createChart, createSeriesMarkers, AreaSeries, CandlestickSeries, HistogramSeries, LineStyle, ColorType } = await import('lightweight-charts');
                 if (disposed || !container.current) return;
                 chart = createChart(container.current, {
                     autoSize: true,
@@ -242,13 +244,17 @@ function PriceCanvas({ bars, levels, currency, hourly = false, spikes = [], mark
                     localization: { locale: intlLocale(latest.current.fmt.locale) },
                 });
                 const line = chart.addSeries(AreaSeries, { lineColor: '#5eead4', topColor: 'rgba(94,234,212,0.12)', bottomColor: 'rgba(94,234,212,0)', lineWidth: 2, priceLineVisible: false, priceFormat: { type: 'custom', formatter: (value: number) => price(value, latest.current.currency, latest.current.fmt), minMove: 0.01 } });
+                // Velas japonesas cuando TODAS las barras diarias traen OHLC (preferCandlesticks):
+                // la línea de cierres pasa a velas sin perder marcadores ni líneas de precio.
+                const candles = chart.addSeries(CandlestickSeries, { upColor: '#2dd4bf', downColor: '#f87171', wickUpColor: '#2dd4bf', wickDownColor: '#f87171', borderVisible: false, priceLineVisible: false, priceFormat: { type: 'custom', formatter: (value: number) => price(value, latest.current.currency, latest.current.fmt), minMove: 0.01 } });
                 // Dos paneles con el mismo eje de tiempo: precio (con la línea del objetivo y su %) y volumen.
                 const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false }, 1);
                 const panes = chart.panes();
                 panes[0]?.setStretchFactor(4);
                 panes[1]?.setStretchFactor(1);
                 const markerApi = createSeriesMarkers(line, []);
-                engine.current = { chart, line, volume, markers: markerApi, levels: [], dashed: [], dashedStyle: LineStyle.Dashed };
+                const candleMarkerApi = createSeriesMarkers(candles, []);
+                engine.current = { chart, line, candles, volume, markers: markerApi, candleMarkers: candleMarkerApi, levels: [], dashed: [], dashedStyle: LineStyle.Dashed };
                 if (!disposed) setReady(true);
             } catch { if (!disposed) setError(true); }
         })();
@@ -258,34 +264,41 @@ function PriceCanvas({ bars, levels, currency, hourly = false, spikes = [], mark
         const current = engine.current;
         if (!ready || !current) return;
         current.chart.timeScale().applyOptions({ timeVisible: hourly });
+        const candleMode = preferCandlesticks(bars, hourly);
+        const priceSeries = candleMode ? current.candles : current.line;
         const extra = [...levels.map((level) => level.price), ...priceLines.map((line) => line.price)];
-        current.line.applyOptions({ autoscaleInfoProvider: (original: () => AutoscaleInfo | null) => {
+        priceSeries.applyOptions({ autoscaleInfoProvider: (original: () => AutoscaleInfo | null) => {
             const info = original();
             if (!info || !info.priceRange || !extra.length) return info;
             return { ...info, priceRange: { minValue: Math.min(info.priceRange.minValue, ...extra), maxValue: Math.max(info.priceRange.maxValue, ...extra) } };
         } });
         const timeOf = (bar: CompanyChartBar) => (bar.timestamp ? bar.timestamp as UTCTimestamp : bar.date) as Time;
-        current.line.setData(bars.map((bar) => ({ time: timeOf(bar), value: bar.close })));
+        current.line.setData(candleMode ? [] : bars.map((bar) => ({ time: timeOf(bar), value: bar.close })));
+        current.candles.setData(candleMode ? bars.map((bar) => ({ time: timeOf(bar), open: bar.open!, high: bar.high!, low: bar.low!, close: bar.close })) : []);
         current.volume.setData(bars.flatMap((bar, index) => typeof bar.volume === 'number' && Number.isFinite(bar.volume) && bar.volume >= 0
             ? [{ time: timeOf(bar), value: bar.volume, color: spikes[index] ? 'rgba(251,113,133,0.85)' : bar.close >= (bars[index - 1]?.close ?? bar.close) ? 'rgba(45,212,191,0.35)' : 'rgba(248,113,113,0.35)' }]
             : []));
         const known = new Set(bars.map((bar) => bar.date));
         const seriesMarkers: SeriesMarker<Time>[] = hourly ? [] : markers.filter((marker) => known.has(marker.date)).map((marker) => ({ time: marker.date as Time, position: 'aboveBar', shape: 'circle', color: marker.color, text: marker.text, size: marker.count > 1 ? 1.4 : 1 }));
-        current.markers.setMarkers(seriesMarkers);
+        current.markers.setMarkers(candleMode ? [] : seriesMarkers);
+        current.candleMarkers.setMarkers(candleMode ? seriesMarkers : []);
         // En movil las etiquetas de precio de R/S taparian las del eje; los niveles exactos van en la tabla de pivotes.
         const wide = window.matchMedia('(min-width: 640px)').matches;
-        for (const level of current.levels) current.line.removePriceLine(level);
-        current.levels = levels.map((level) => current.line.createPriceLine({ price: level.price, title: level.label, color: level.kind === 'support' ? '#2dd4bf' : level.kind === 'resistance' ? '#fb7185' : '#a78bfa', lineWidth: 1, lineStyle: 2, axisLabelVisible: wide }));
-        for (const dashed of current.dashed) current.line.removePriceLine(dashed);
-        current.dashed = priceLines.map((line) => current.line.createPriceLine({ price: line.price, title: line.label, color: line.color, ...(line.axisLabelColor ? { axisLabelColor: line.axisLabelColor } : {}), lineWidth: 1, lineStyle: current.dashedStyle, axisLabelVisible: true }));
+        // Las líneas viven en la serie ACTIVA (línea o velas); al alternar de
+        // modo hay que retirarlas de ambas (la que no las creó no-op).
+        for (const level of current.levels) { current.line.removePriceLine(level); current.candles.removePriceLine(level); }
+        current.levels = levels.map((level) => priceSeries.createPriceLine({ price: level.price, title: level.label, color: level.kind === 'support' ? '#2dd4bf' : level.kind === 'resistance' ? '#fb7185' : '#a78bfa', lineWidth: 1, lineStyle: 2, axisLabelVisible: wide }));
+        for (const dashed of current.dashed) { current.line.removePriceLine(dashed); current.candles.removePriceLine(dashed); }
+        current.dashed = priceLines.map((line) => priceSeries.createPriceLine({ price: line.price, title: line.label, color: line.color, ...(line.axisLabelColor ? { axisLabelColor: line.axisLabelColor } : {}), lineWidth: 1, lineStyle: current.dashedStyle, axisLabelVisible: true }));
         current.chart.timeScale().fitContent();
     }, [ready, bars, levels, hourly, spikes, markers, priceLines]);
     useEffect(() => {
         const current = engine.current;
         if (!ready || !current || !focusDate) return;
         const bar = bars.find((item) => item.date.slice(0, 10) === focusDate);
-        if (bar) current.chart.setCrosshairPosition(bar.close, (bar.timestamp ? bar.timestamp as UTCTimestamp : bar.date) as Time, current.line);
-    }, [ready, focusDate, bars]);
+        const priceSeries = preferCandlesticks(bars, hourly) ? current.candles : current.line;
+        if (bar) current.chart.setCrosshairPosition(bar.close, (bar.timestamp ? bar.timestamp as UTCTimestamp : bar.date) as Time, priceSeries);
+    }, [ready, focusDate, bars, hourly]);
     return <div className="relative">
         <div ref={container} className="h-[380px] w-full sm:h-[480px]" role="figure" aria-label={bars.length ? t('research.chart.canvasAria', { from: fmt.formatMarketDate(bars[0].date), to: fmt.formatMarketDate(bars.at(-1)!.date) }) : t('research.chart.canvasAriaEmpty')} data-testid="technical-price-canvas" />
         {error || bars.length < 2 ? <p role="status" className="absolute inset-0 grid place-items-center bg-surface-1 text-sm text-gray-500">{error ? t('research.chart.chartError') : t('research.chart.notEnoughData')}</p> : !ready ? <p role="status" className="absolute inset-0 grid animate-pulse place-items-center text-xs text-gray-500">{t('research.chart.loadingChart')}</p> : null}

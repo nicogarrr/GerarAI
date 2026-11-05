@@ -26,7 +26,7 @@ vi.mock('lightweight-charts', () => {
         return vi.fn(() => stub());
     } });
     return {
-        AreaSeries: 'Area', LineSeries: 'Line', HistogramSeries: 'Histogram', LineStyle: { Dashed: 2 }, ColorType: { Solid: 'solid' },
+        AreaSeries: 'Area', LineSeries: 'Line', CandlestickSeries: 'Candlestick', HistogramSeries: 'Histogram', LineStyle: { Dashed: 2 }, ColorType: { Solid: 'solid' },
         createSeriesMarkers: () => stub(),
         createChart: (_el: unknown, opts: Record<string, unknown>) => {
             captured.chart = opts;
@@ -68,11 +68,14 @@ describe('CompanyTechnicalChart: línea del objetivo con su % y sin panel del in
     it('solo dos paneles (precio y volumen); ningún formato global pisa el de cada serie', async () => {
         captured.target = 241.5;
         render(<CompanyTechnicalChart snapshot={snapshot} />);
-        await waitFor(() => expect(captured.series.length).toBe(2));
+        // Tres series desde el 5-nov-2026: Area (línea) + Candlestick (velas
+        // cuando TODAS las barras traen OHLC) + volumen; solo una serie de
+        // precio lleva datos en cada render.
+        await waitFor(() => expect(captured.series.length).toBe(3));
         const localization = captured.chart?.localization as Record<string, unknown>;
         expect(localization.priceFormatter).toBeUndefined();
-        const [price, volume] = captured.series;
-        expect(captured.series.map((s) => s.kind)).toEqual(['Area', 'Histogram']);
+        const [price, , volume] = captured.series;
+        expect(captured.series.map((s) => s.kind)).toEqual(['Area', 'Candlestick', 'Histogram']);
         expect(captured.series.some((s) => s.kind === 'Line')).toBe(false);
         expect(volume.pane).toBe(1);
         expect((volume.opts.priceFormat as Fmt).type).toBe('volume');
