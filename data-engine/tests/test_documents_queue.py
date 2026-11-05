@@ -59,22 +59,28 @@ def test_worker_documents_consume_la_cola_aislada():
     env = servicio["environment"]
     assert env["dramatiq_queue_prefetch"] == "1"
     assert env["dramatiq_delay_queue_prefetch"] == "1"
-    # Modelos en el volumen persistente, no en la capa efimera.
-    assert env["FASTEMBED_CACHE_PATH"] == "/data/fastembed-cache"
-    assert env["HF_HOME"] == "/data/hf-home"
+    # Modelos horneados en la imagen (/opt/hf via ENV del Dockerfile): sin
+    # override a un volumen vacio (con HF_HUB_OFFLINE=1 nunca se poblaria).
+    assert "FASTEMBED_CACHE_PATH" not in env
+    assert "HF_HOME" not in env
     # El worker general NO consume documents: el aislamiento es real.
     general = compose["services"]["worker"]["command"]
     assert "documents" not in general
 
 
-def test_worker_default_tiene_cache_de_modelos_persistente():
+def test_worker_default_usa_los_modelos_horneados_de_la_imagen():
     """El default drena el backlog ya encolado y ejecuta otros actores con
-    embeddings: sin FASTEMBED_CACHE_PATH el modelo ONNX no persistia y cada
-    lote caia al fallback sentence-transformers (103 % CPU, 5-nov-2026)."""
+    embeddings. Primera version: FASTEMBED_CACHE_PATH=/data (volumen vacio).
+    Con HF_HUB_OFFLINE=1 ese volumen nunca se poblaba: fastembed fallaba en
+    el primer lote y el proceso caia PERMANENTEMENTE al fallback torch
+    (103 % CPU, 2,13 GiB RSS + 1,2 GiB swap; medido por el piloto,
+    5-nov-2026 02:22). Los modelos MiniLM/bm25 van horneados en la imagen
+    (/opt/hf/fastembed via ENV del Dockerfile) y el carril NO puede
+    re-apuntar la cache a un volumen."""
     compose = yaml.load(COMPOSE_PATH.read_text(), Loader=_ComposeLoader)
     env = compose["services"]["worker"]["environment"]
-    assert env["FASTEMBED_CACHE_PATH"] == "/data/fastembed-cache"
-    assert env["HF_HOME"] == "/data/hf-home"
+    assert "FASTEMBED_CACHE_PATH" not in env
+    assert "HF_HOME" not in env
 
 
 def test_presupuesto_de_memoria_del_stack_intacto():
