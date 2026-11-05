@@ -638,12 +638,44 @@ def apply_publication_blockers(result: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _declared_rate(db, company_id: int, input_key: str, *, as_of: date | None = None) -> float | None:
+    """Tasa de un input declarado por analista (estimado con fuente).
+
+    Es un fallback DESPUÉS de CalculatedMetric e InferredInput y ANTES del
+    supuesto por tags. Solo acepta ``method='analyst'`` validado; el valor va
+    en decimal y las filas posteriores a ``as_of`` no entran (sin lookahead).
+    """
+    info = getattr(db, "info", {}) or {}
+    tenant_id = info.get("tenant_id") if isinstance(info, dict) else None
+    if type(tenant_id) is not int or tenant_id <= 0:
+        return None
+    try:
+        from app.services.declared_input_service import DeclaredInputService
+
+        service = DeclaredInputService()
+        row = service.current(
+            db, company_id=company_id, tenant_id=tenant_id, keys=[input_key]
+        ).get((input_key, ""))
+        if row is None or row.method != "analyst" or not service.row_is_valid(row):
+            return None
+        if as_of is not None and row.as_of is not None and row.as_of > as_of:
+            return None
+        value = float(row.base)
+    except Exception:  # noqa: BLE001 - un input opcional nunca rompe las tasas
+        return None
+    unit = str(getattr(row, "unit", "") or "").lower()
+    if unit in {"percent", "%", "pct"} or "percent" in unit or abs(value) > 1.5:
+        value = value / 100.0
+    return value if math.isfinite(value) else None
+
+
 def resolve_rates(db, company, *, as_of: date | None = None) -> tuple[float, str, float, str, list[str]]:
     """(wacc, wacc_source, terminal, terminal_source, inferidos_descartados).
 
-    Prioridad: CalculatedMetric trazable > InferredInput (base + URLs) > tags.
-    Un par que no deje spread minimo wacc - g descarta el inferido (nunca
-    llega a run_dcf, que lanzaria ValueError). ``db=None`` solo en unit tests.
+    Prioridad: CalculatedMetric trazable > InferredInput (base + URLs) >
+    input declarado por analista (estimado con fuente) > tags. Un par que no
+    deje spread minimo wacc - g descarta el estimado (nunca llega a run_dcf,
+    que lanzaria ValueError). ``db=None`` solo en unit tests.
     """
     wacc_default = default_wacc(company)
     terminal_default = default_terminal_growth(company)
@@ -653,21 +685,35 @@ def resolve_rates(db, company, *, as_of: date | None = None) -> tuple[float, str
     traceable = traceable_wacc(db, company, as_of=as_of)
     inferred_w = service.latest_valid(db, company.id, "wacc", as_of=as_of) if traceable is None else None
     inferred_g = service.latest_valid(db, company.id, "terminal_growth", as_of=as_of)
+    declared_w = (
+        _declared_rate(db, company.id, "wacc", as_of=as_of)
+        if traceable is None and inferred_w is None
+        else None
+    )
+    declared_g = (
+        _declared_rate(db, company.id, "terminal_growth", as_of=as_of)
+        if inferred_g is None
+        else None
+    )
     if traceable is not None:
         wacc, wacc_source = traceable, "calculated_metric"
     elif inferred_w is not None:
         wacc, wacc_source = float(inferred_w.value), "inferred_input"
+    elif declared_w is not None:
+        wacc, wacc_source = declared_w, "declared_input"
     else:
         wacc, wacc_source = wacc_default, "tag_default"
     if inferred_g is not None:
         terminal, terminal_source = float(inferred_g.value), "inferred_input"
+    elif declared_g is not None:
+        terminal, terminal_source = declared_g, "declared_input"
     else:
         terminal, terminal_source = terminal_default, "tag_default"
     wacc, terminal, dropped = pick_rate_pair(
         wacc=wacc,
-        wacc_inferred=wacc_source == "inferred_input",
+        wacc_inferred=wacc_source in {"inferred_input", "declared_input"},
         terminal=terminal,
-        terminal_inferred=terminal_source == "inferred_input",
+        terminal_inferred=terminal_source in {"inferred_input", "declared_input"},
         default_wacc_value=wacc_default,
         default_terminal_value=terminal_default,
     )
