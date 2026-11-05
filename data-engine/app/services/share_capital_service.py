@@ -6,7 +6,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import Company, CorporateAction, Document, FinancialFact
 
@@ -35,15 +35,20 @@ def _https_url(value: str | None) -> str | None:
 
 def build_share_capital(db: Session, company: Company) -> dict[str, Any]:
     """FY cash flows are kept separate from point-in-time shares and quarterly YTD."""
-    rows = db.execute(
-        select(FinancialFact, Document)
-        .join(Document, Document.id == FinancialFact.source_id)
+    rows = db.scalars(
+        select(FinancialFact)
+        .options(selectinload(FinancialFact.source).load_only(
+            Document.source_url, Document.published_at, Document.metadata_,
+        ))
         .where(FinancialFact.company_id == company.id, FinancialFact.metric.in_(CAPITAL_METRICS))
         .order_by(FinancialFact.id.desc())
     ).all()
     balances: dict[str, dict[str, Any]] = {}
     flows: dict[str, dict[str, Any]] = {}
-    for fact, doc in rows:
+    for fact in rows:
+        doc = fact.source
+        if doc is None:
+            continue
         # Unreported estimates, seeds, wrong units and untraceable values are not evidence.
         url = _https_url(doc.source_url)
         if (not fact.is_reported or fact.source_type not in {"SEC", "ESEF", "CNMV"}
