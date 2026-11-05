@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import Company, FinancialFact, PeerRelationship
+from app.models.entities import InstrumentReference
 from app.services.metric_calculation_service import METRIC_DEFINITIONS, MetricCalculationService, MetricResult
 from app.valuation.currency import resolve_fx
 
@@ -182,6 +183,36 @@ def peer_eligibility(
         return None
     return "sector+" + "+".join(extras)
 
+# Valores que significan «sin clasificar»: una coincidencia entre vacíos no es
+# evidencia de negocio (tenant 5, 4-nov-2026: el 100 % del universo era stub y
+# BFIT.AS salía con la A de la lista alfabética — A3M, ACS, ACX, AENA... — por
+# «mismo company_type/valuation_model» vacíos compartidos).
+_UNKNOWN_TOKENS = frozenset({"", "unknown", "unassigned", "none", "n/a"})
+
+
+def _known(value: object) -> bool:
+    """El valor clasifica de verdad (no es un placeholder de «sin clasificar»)."""
+    return str(value or "").strip().lower() not in _UNKNOWN_TOKENS
+
+
+def _reference_taxonomy(db: Session, tickers: list[str]) -> dict[str, tuple[str | None, str | None]]:
+    """(sector, industria) de la referencia de instrumentos (FinanceDatabase), por ticker.
+
+    Segunda taxonomía independiente de la del enriquecimiento: una sola fuente
+    equivocada (o grosera) no decide sola. Una query para TODO el universo de
+    candidatos; sin tabla (DB anterior a 0047) o sin filas, eje inerte.
+    """
+    wanted = sorted({str(t or "").strip().upper() for t in tickers if str(t or "").strip()})
+    if not wanted:
+        return {}
+    try:
+        rows = db.scalars(
+            select(InstrumentReference).where(InstrumentReference.ticker_normalized.in_(wanted))
+        ).all()
+    except Exception:
+        return {}
+    return {row.ticker_normalized: (row.sector, row.industry) for row in rows}
+
 
 class PeerComparisonService:
     def __init__(self) -> None:
@@ -263,6 +294,9 @@ class PeerComparisonService:
         )
         target_market_cap = market_caps.get(company.id)
         target_is_foreign = _is_foreign_issuer(company)
+        # Eje de referencia (FinanceDatabase): una query para todo el universo.
+        ref_taxonomy = _reference_taxonomy(db, [company.ticker, *(c.ticker for c in candidates)])
+        target_ref = ref_taxonomy.get(str(company.ticker or "").strip().upper())
         scored: list[tuple[float, Company, list[str], dict]] = []
         eligibility_by_id: dict[int, str] = {}
         for candidate in candidates:
@@ -275,6 +309,11 @@ class PeerComparisonService:
                 market_caps.get(candidate.id),
                 target_is_foreign=target_is_foreign,
             )
+            candidate_ref = ref_taxonomy.get(str(candidate.ticker or "").strip().upper())
+            if eligibility is None and target_ref and candidate_ref:
+                target_ref_industry = _label(target_ref[1])
+                if target_ref_industry is not None and target_ref_industry == _label(candidate_ref[1]):
+                    eligibility = "reference_industry"
             if eligibility is None:
                 continue
             if _same_issuer(company, candidate):
@@ -288,6 +327,8 @@ class PeerComparisonService:
                 candidate,
                 target_market_cap,
                 candidate_market_cap=market_caps.get(candidate.id),
+                target_ref=target_ref,
+                candidate_ref=ref_taxonomy.get(str(candidate.ticker or "").strip().upper()),
             )
             if score <= 0:
                 continue
@@ -379,23 +420,68 @@ class PeerComparisonService:
         target_market_cap: Decimal | None,
         *,
         candidate_market_cap: Decimal | None = None,
+        target_ref: tuple[str | None, str | None] | None = None,
+        candidate_ref: tuple[str | None, str | None] | None = None,
     ) -> tuple[float, list[str], dict]:
         score = 0.0
         rationale: list[str] = []
         dimensions: dict[str, float] = {}
-        if target.industry != "Unknown" and candidate.industry == target.industry:
+        same_industry = _known(target.industry) and _known(candidate.industry) and candidate.industry == target.industry
+        same_sector = _known(target.sector) and _known(candidate.sector) and candidate.sector == target.sector
+        industry_conflict = _known(target.industry) and _known(candidate.industry) and candidate.industry != target.industry
+        sector_conflict = _known(target.sector) and _known(candidate.sector) and candidate.sector != target.sector
+        t_ref = target_ref or (None, None)
+        c_ref = candidate_ref or (None, None)
+        ref_same_industry = _known(t_ref[1]) and _known(c_ref[1]) and t_ref[1] == c_ref[1]
+        ref_same_sector = _known(t_ref[0]) and _known(c_ref[0]) and t_ref[0] == c_ref[0]
+        ref_industry_conflict = _known(t_ref[1]) and _known(c_ref[1]) and t_ref[1] != c_ref[1]
+        ref_sector_conflict = _known(t_ref[0]) and _known(c_ref[0]) and t_ref[0] != c_ref[0]
+        # Puerta de negocio conocido incompatible: una constructora (industria y
+        # sector conocidos, distintos) nunca es comparable de un gimnasio, por
+        # mucha divisa/plaza/tamaño que comparta. Misma industria o mismo sector
+        # conocido sí deja pasar (CHTR-CMCSA: industria distinta, sector común).
+        # La referencia (FinanceDatabase) manda sobre la etiqueta del
+        # enriquecimiento cuando declara la MISMA industria para ambos (rescata
+        # pares reales bajo etiquetas groseras) y veta cuando declara conflicto
+        # que la etiqueta principal no ve (universo stub con referencia).
+        if (industry_conflict and not same_sector and not ref_same_industry) or (
+            sector_conflict and not same_industry and not ref_same_industry
+        ):
+            dimensions["excluded"] = 1.0
+            return 0.0, ["excluded: known industry/sector mismatch"], dimensions
+        if (ref_industry_conflict and not (same_sector or ref_same_sector or same_industry)) or (
+            ref_sector_conflict and not (same_industry or ref_same_industry or same_sector)
+        ):
+            dimensions["excluded"] = 1.0
+            return 0.0, ["excluded: reference industry/sector mismatch"], dimensions
+        same_company_type = (
+            _known(target.company_type) and _known(candidate.company_type)
+            and candidate.company_type == target.company_type
+        )
+        if same_industry:
             score += 0.30
             dimensions["industry"] = 1.0
             rationale.append("same industry")
-        elif target.sector != "Unknown" and candidate.sector == target.sector:
+        elif same_sector:
             score += 0.14
             dimensions["sector"] = 1.0
             rationale.append("same sector")
-        if candidate.company_type == target.company_type:
+        if same_company_type:
             score += 0.16
             dimensions["business_model"] = 1.0
             rationale.append("same company type")
-        if candidate.valuation_model == target.valuation_model:
+        if ref_same_industry:
+            score += 0.15
+            dimensions["reference_industry"] = 1.0
+            rationale.append("same reference industry (financedatabase)")
+        elif ref_same_sector:
+            score += 0.07
+            dimensions["reference_sector"] = 1.0
+            rationale.append("same reference sector (financedatabase)")
+        if (
+            _known(target.valuation_model) and _known(candidate.valuation_model)
+            and candidate.valuation_model == target.valuation_model
+        ):
             score += 0.10
             dimensions["capital_profile"] = 1.0
             rationale.append("same valuation/capital profile")
@@ -435,6 +521,16 @@ class PeerComparisonService:
             score += 0.17 * size_score
             dimensions["market_cap"] = round(size_score, 4)
             rationale.append(f"market-cap ratio {float(ratio):.2f}x")
+        # Sin al menos una evidencia de negocio conocida (industria, sector,
+        # tipo conocido o tags compartidos), divisa/plaza/tamaño solos NO
+        # forman cohorte: mejor «sin comparables» (muestra insuficiente, N/D)
+        # que una cohorte fabricada por orden alfabético.
+        if not (
+            same_industry or same_sector or same_company_type
+            or ref_same_industry or ref_same_sector or dimensions.get("factor_tags")
+        ):
+            dimensions["excluded"] = 1.0
+            return 0.0, ["excluded: no known business evidence in common"], dimensions
         return score, rationale, dimensions
 
     def _latest_market_caps_usd(
