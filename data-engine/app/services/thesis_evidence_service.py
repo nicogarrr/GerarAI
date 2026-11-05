@@ -787,7 +787,7 @@ class ThesisEvidenceService:
                         MarketPrice.company_id == company.id, MarketPrice.date == quote_date
                     )
                 )
-                if existing and existing.quote_currency is not None:
+                if existing and existing.quote_currency not in (None, "USD"):
                     result.update({"status": "unknown_price_unit", "detail": "Quote sin unidad verificable para esta barra ajustada."})
                 elif existing:
                     # Barra real ya persistida: se actualiza solo el close y se
