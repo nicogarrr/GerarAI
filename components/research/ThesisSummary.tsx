@@ -2,20 +2,20 @@ import { formatGeneratedDate } from '@/lib/format';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locale';
 import { createTranslator } from '@/lib/i18n/translate';
 import { cleanThesisText } from '@/lib/research/thesis-text';
+import { thesisIsPublic } from '@/lib/research/thesis-publication';
 
 export type ThesisTextVersion = { status: string; version: number; created_at?: string | null; executive_summary?: string | null };
 
 /** Publication alone does not establish that persisted valuation prose is usable.
- * TODO: legacy approved is accepted here; the page uses the stricter
- * thesisIsPublic helper (published only). Align this component separately. */
+ * Uses the shared published-only rule, matching the research page. */
 export function canShowThesisText(thesis: ThesisTextVersion, model: { publishable: boolean } | null | undefined): boolean {
-  return (thesis.status === 'published' || thesis.status === 'approved') && model?.publishable === true;
+  return thesisIsPublic(thesis.status) && model?.publishable === true;
 }
 
 export function WithheldThesisText({ thesis, model, locale = DEFAULT_LOCALE }: { thesis: ThesisTextVersion; model: { publishable: boolean } | null | undefined; locale?: Locale }) {
   const t = createTranslator(locale);
   const generated = formatGeneratedDate(thesis.created_at, undefined, locale);
-  const reason = thesis.status !== 'published' && thesis.status !== 'approved'
+  const reason = !thesisIsPublic(thesis.status)
     ? t('research.thesisWithheld.reasonNotPublic')
     : model?.publishable === false
       ? t('research.thesisWithheld.reasonNotPublishable')

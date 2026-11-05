@@ -858,7 +858,7 @@
     "provAssumption": "Supuestos del modelo",
     "withheldNotPublishable": "el modelo no es publicable",
     "withheldUnverified": "no se pudo verificar que el modelo sea publicable",
-    "withheldNotPublished": "la tesis no está publicada ni aprobada",
+    "withheldNotPublished": "la tesis no está publicada",
     "archivedMarginNote": "Margen histórico con fórmula no verificada: el porcentaje y el texto originales se conservan como archivo. No los compares con el margen actual (V - P) / V ni los uses como señal actual.",
     "generatedOn": "generada el {date}",
     "staleData": "Datos nuevos disponibles — considera regenerar",
@@ -1731,7 +1731,7 @@
   "thesisWithheld": {
     "dated": "Texto archivado de v{version}, generada el {date}: resumen y cifras retenidos porque {reason}. No se presentan como análisis actual; el original se conserva guardado.",
     "undated": "Texto archivado de v{version}, sin fecha de generación verificada: resumen y cifras retenidos porque {reason}. No se presentan como análisis actual; el original se conserva guardado.",
-    "reasonNotPublic": "la tesis no está publicada ni aprobada",
+    "reasonNotPublic": "la tesis no está publicada",
     "reasonNotPublishable": "el modelo no es publicable",
     "reasonUnverified": "no se pudo verificar que el modelo sea publicable"
   },
@@ -1800,6 +1800,7 @@
     "waccSource": {
       "calculated_metric": "calculado con insumos trazables",
       "inferred_input": "inferido, con fuentes",
+      "declared_input": "estimación de analista con fuente (input declarado)",
       "tag_default": "tipo por defecto del modelo, sin fuente trazable",
       "market_cap_band": "banda por capitalización en dólares (8,5 % desde 200.000 M$; 9,5 % desde 50.000 M$; 10,5 % desde 10.000 M$; 11,5 % por debajo)"
     },
@@ -1811,7 +1812,12 @@
       "traceableWacc": "WACC sin cálculo trazable",
       "forecastIsNotTheDriver": "el valor terminal es más del 95 % del valor: la previsión a 5 años no es el motor de esta valoración",
       "inferredFcfMarginTarget": "margen FCF objetivo inferido (con fuentes): convergencia de margen orientativa para una empresa en crecimiento, no una valoración final",
-      "scenarioSetMissing": "escenarios pendientes: el modelo declarado valora por escenarios y aún no hay un juego con fuente; el número es la orientación del motor de respaldo, no una valoración final"
+      "scenarioSetMissing": "escenarios pendientes: el modelo declarado valora por escenarios y aún no hay un juego con fuente; el número es la orientación del motor de respaldo, no una valoración final",
+      "consensusUnreconciled": "la valoración se aleja más del 35 % del consenso de analistas y la diferencia no está conciliada dato a dato",
+      "materialDriverUntreated": "hay un impulsor de valor firmado y material sin tratamiento en el modelo",
+      "driverInventoryUnverified": "no se pudo verificar el inventario de impulsores de valor",
+      "declaredInputDefault": "la proyección usa un supuesto por defecto declarado, sin fuente",
+      "inferredSectorInput": "la valoración usa un input sectorial inferido (con fuentes), no un dato reportado: resultado orientativo"
     }
   },
   "peerFormat": {

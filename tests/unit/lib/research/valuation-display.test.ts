@@ -17,6 +17,12 @@ describe('blockerLabel', () => {
     expect(blockerLabel('otro_motivo', 'en')).toBe('otro_motivo');
     expect(blockerLabel('traceable_wacc')).not.toContain('por defecto');
   });
+  it.each(['consenso_sin_conciliar', 'impulsor_material_sin_tratar', 'inventario_impulsores_no_verificable', 'declared_input_default', 'inferred_sector_input'])('traduce %s en ambos idiomas sin devolver ids', (id) => {
+    expect(blockerLabel(id, 'es')).not.toBe(id);
+    expect(blockerLabel(id, 'en')).not.toBe(id);
+    expect(blockerLabel(id, 'en')).not.toBe(blockerLabel(id, 'es'));
+    expect(blockerLabel(id, 'es')).not.toContain('research.');
+  });
   it('mantiene ids desconocidos tal cual', () => {
     expect(blockerLabel('otro_motivo')).toBe('otro_motivo');
   });

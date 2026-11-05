@@ -16,12 +16,13 @@ describe('ficha: borrador sin veredicto ni cifras en «Última tesis»', () => {
         }
         assert.match(page, /import \{ thesisIsPublic \} from '@\/lib\/research\/thesis-publication'/);
         assert.match(page, /thesisIsPublic\(snapshot\.latest_thesis\.status\)/);
+
     });
     it('rating y resumen condicionados a tesis pública; el borrador dice por qué', () => {
         assert.match(page, /thesisIsPublic\(snapshot\.latest_thesis\.status\) && visibleThesisRating/);
         assert.match(page, /<ThesisSummary thesis=\{snapshot\.latest_thesis\} model=\{snapshot\.model_summary\} locale=\{locale\} \/>/);
         const summary = readFileSync('components/research/ThesisSummary.tsx', 'utf8');
-        assert.match(summary, /thesis.status === 'published' \|\| thesis.status === 'approved'/);
+        assert.match(summary, /thesisIsPublic\(thesis\.status\)/);
         assert.match(summary, /model\?\.publishable === true/);
     });
 });
