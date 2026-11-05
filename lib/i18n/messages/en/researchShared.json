@@ -58,5 +58,17 @@
     "affectsNoClaim": "Doesn't affect any specific claim; touches these areas of the thesis: {areas}",
     "affectsOneClaim": "Affects 1 claim and these areas of the thesis: {areas}"
   },
-  "pageOf": "Page {current} of {total}"
+  "pageOf": "Page {current} of {total}",
+  "frameworkTerms": {
+    "unassigned": "unassigned",
+    "method": {
+      "medianLastNYears": "median of recent fiscal years",
+      "cyclicalMidcycleMean": "mid-cycle mean of recent fiscal years",
+      "fcffDcf": "FCFF DCF",
+      "fcffDcfMarginConvergence": "DCF with margin convergence",
+      "fcffDcfMultistage": "multistage DCF",
+      "probabilityWeightedScenario": "probability-weighted scenarios",
+      "explicitDriverFcffDcf": "explicit driver DCF"
+    }
+  }
 }

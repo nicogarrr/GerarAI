@@ -4,8 +4,39 @@
  * Las claves van en minúsculas con guiones bajos; las fórmulas
  * («ARR × retention × expansion») se traducen término a término.
  */
+import type { TranslationKey } from '../i18n/t';
 // @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
 import { FRAMEWORK_TERMS_EN } from './framework-terms-en.ts';
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { createTranslator } from '../i18n/translate.ts';
+
+/** Términos cuyo rótulo ES vive en el catálogo i18n (researchShared.frameworkTerms.*).
+ *  Las entradas NUEVAS van aquí: FRAMEWORK_TERMS está en su techo de check:i18n
+ *  y no puede crecer. seed/ingesta dejan el stub sin motor («unassigned»):
+ *  la ficha mostraba el slug crudo. */
+const FRAMEWORK_TERMS_I18N: Record<string, TranslationKey> = {
+    unassigned: 'researchShared.frameworkTerms.unassigned',
+};
+
+/** Métodos de trace.method de las valoraciones persistidas (data-engine
+ *  valuation/*): la ficha mostraba el slug crudo («unassigned», «median_
+ *  last_n_fiscal_years»). Las etiquetas ES viven en el catálogo i18n. */
+const METHOD_TERMS_I18N: Record<string, TranslationKey> = {
+    unassigned: 'researchShared.frameworkTerms.unassigned',
+    median_last_n_fiscal_years: 'researchShared.frameworkTerms.method.medianLastNYears',
+    cyclical_midcycle_mean_last_n_fiscal_years: 'researchShared.frameworkTerms.method.cyclicalMidcycleMean',
+    fcff_dcf: 'researchShared.frameworkTerms.method.fcffDcf',
+    fcff_dcf_margin_convergence: 'researchShared.frameworkTerms.method.fcffDcfMarginConvergence',
+    fcff_dcf_multistage: 'researchShared.frameworkTerms.method.fcffDcfMultistage',
+    probability_weighted_scenario: 'researchShared.frameworkTerms.method.probabilityWeightedScenario',
+    explicit_driver_fcff_dcf: 'researchShared.frameworkTerms.method.explicitDriverFcffDcf',
+};
+
+function esFrameworkLabel(key: string): string | null {
+    const i18nKey = Object.hasOwn(FRAMEWORK_TERMS_I18N, key) ? FRAMEWORK_TERMS_I18N[key] : null;
+    if (i18nKey) return createTranslator('es')(i18nKey);
+    return Object.hasOwn(FRAMEWORK_TERMS, key) ? FRAMEWORK_TERMS[key] : null;
+}
 
 export const FRAMEWORK_TERMS: Record<string, string> = {
     non_negative_fcf_margin: 'margen de flujo de caja libre no negativo',
@@ -105,7 +136,7 @@ function normalise(term: string): string {
 /** Traduce un término simple o una fórmula con × / ÷; null si algún término no tiene etiqueta. */
 export function frameworkTerm(raw: string, locale: 'es' | 'en' = 'es'): string | null {
     if (locale === 'en') return frameworkTermEn(raw);
-    const direct = (Object.hasOwn(FRAMEWORK_TERMS, normalise(raw)) ? FRAMEWORK_TERMS[normalise(raw)] : null);
+    const direct = esFrameworkLabel(normalise(raw));
     if (direct) return direct;
     if (!/[×÷]/.test(raw)) return null;
     const parts = raw.split(/\s*([×÷])\s*/);
@@ -115,20 +146,32 @@ export function frameworkTerm(raw: string, locale: 'es' | 'en' = 'es'): string |
             out.push(part);
             continue;
         }
-        const t = (Object.hasOwn(FRAMEWORK_TERMS, normalise(part)) ? FRAMEWORK_TERMS[normalise(part)] : null) ?? translateWords(part);
+        const t = esFrameworkLabel(normalise(part)) ?? translateWords(part);
         if (!t) return null;
         out.push(t);
     }
     return out.join(' ');
 }
 
+/** Rótulo del método de una valoración persistida (trace.method). Método
+ *  conocido: etiqueta del catálogo i18n; desconocido: slug humanizado
+ *  («binary_search_reverse_dcf» → «binary search reverse dcf»), nunca el
+ *  snake_case crudo. */
+export function methodLabel(raw: string, locale: 'es' | 'en' = 'es'): string {
+    const key = normalise(raw);
+    const i18nKey = Object.hasOwn(METHOD_TERMS_I18N, key) ? METHOD_TERMS_I18N[key] : null;
+    if (locale === 'en') return key.replaceAll('_', ' ');
+    if (i18nKey) return createTranslator('es')(i18nKey);
+    return raw.trim().replaceAll('_', ' ');
+}
+
 /** «price per launch» -> «precio por lanzamiento»: palabra a palabra con «per» -> «por». */
 function translateWords(part: string): string | null {
-    const direct = (Object.hasOwn(FRAMEWORK_TERMS, normalise(part)) ? FRAMEWORK_TERMS[normalise(part)] : null);
+    const direct = esFrameworkLabel(normalise(part));
     if (direct) return direct;
     const chunks = part.trim().split(/\s+per\s+/i);
     if (chunks.length > 1) {
-        const tr = chunks.map((c) => (Object.hasOwn(FRAMEWORK_TERMS, normalise(c)) ? FRAMEWORK_TERMS[normalise(c)] : null) ?? null);
+        const tr = chunks.map((c) => esFrameworkLabel(normalise(c)) ?? null);
         return tr.every(Boolean) ? tr.join(' por ') : null;
     }
     return null;
@@ -143,7 +186,7 @@ function frameworkTermEn(raw: string): string | null {
     const one = (part: string): string | null => {
         const key = normalise(part);
         if (Object.hasOwn(FRAMEWORK_TERMS_EN, key)) return FRAMEWORK_TERMS_EN[key];
-        return Object.hasOwn(FRAMEWORK_TERMS, key) ? key.replaceAll('_', ' ') : null;
+        return Object.hasOwn(FRAMEWORK_TERMS, key) || Object.hasOwn(FRAMEWORK_TERMS_I18N, key) ? key.replaceAll('_', ' ') : null;
     };
     const direct = one(raw);
     if (direct) return direct;

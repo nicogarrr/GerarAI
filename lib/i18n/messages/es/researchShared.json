@@ -58,5 +58,17 @@
     "affectsNoClaim": "No afecta a ninguna afirmación concreta; toca estos apartados de la tesis: {areas}",
     "affectsOneClaim": "Afecta a 1 afirmación y a estos apartados de la tesis: {areas}"
   },
-  "pageOf": "Página {current} de {total}"
+  "pageOf": "Página {current} de {total}",
+  "frameworkTerms": {
+    "unassigned": "sin asignar",
+    "method": {
+      "medianLastNYears": "mediana de los últimos ejercicios",
+      "cyclicalMidcycleMean": "media de ciclo medio de los últimos ejercicios",
+      "fcffDcf": "DCF de flujo de caja libre",
+      "fcffDcfMarginConvergence": "DCF con convergencia de margen",
+      "fcffDcfMultistage": "DCF multietapa",
+      "probabilityWeightedScenario": "escenarios ponderados por probabilidad",
+      "explicitDriverFcffDcf": "DCF por drivers explícitos"
+    }
+  }
 }
