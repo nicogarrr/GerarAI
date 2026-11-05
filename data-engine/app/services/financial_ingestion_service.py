@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
 
-from sqlalchemy import delete, or_, select, tuple_
+from sqlalchemy import delete, insert, or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
@@ -1598,6 +1598,41 @@ def _sec_payload_fingerprint(facts_data: dict[str, Any]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _queue_fact(db: Session, **fields: Any) -> None:
+    """Acumula un hecho para insercion EN LOTE (una executemany por tanda en
+    vez de una sentencia por fila: medido con companyfacts reales, CHTR
+    5-nov-2026, 765 INSERT por refresh). La tanda se vuelca con
+    ``_flush_fact_buffer`` antes de cualquier lectura de hechos. Sin tenant
+    en la sesion cae al ORM: el guardia de tenancy de database.py
+    (before_flush) manda ahi y esta via no lo esquiva."""
+    tenant_id = db.info.get("tenant_id")
+    if tenant_id is None:
+        db.add(FinancialFact(**fields))
+        return
+    buffer = db.info.setdefault("_fact_bulk_buffer", [])
+    fields["tenant_id"] = tenant_id
+    buffer.append(fields)
+
+
+def _flush_fact_buffer(db: Session) -> None:
+    """Vuelca la tanda acumulada en UNA insercion en lote. Los defaults de
+    columna (created_at/updated_at) se aplican por fila igual que en ORM;
+    no hay listeners por fila de FinancialFact que puedan saltarse."""
+    rows = db.info.pop("_fact_bulk_buffer", None)
+    if rows:
+        db.execute(insert(FinancialFact), rows)
+        # La tanda Core no pasa por la sesion: las filas viejas borradas con
+        # DML Core (_replace_*_data) pueden seguir en el identity map y
+        # sqlite REUSA rowids, asi que un SELECT ORM posterior podria
+        # materializar el objeto viejo con el id reciclado (fantasma). Se
+        # caducan los FinancialFact cacheados: la proxima lectura los trae
+        # frescos de la base. En postgres (secuencias) no ocurre, pero la
+        # caducidad es correcta en ambos.
+        for instance in db.identity_map.values():
+            if isinstance(instance, FinancialFact):
+                db.expire(instance)
+
+
 def _latest_filed_date(us_gaap: dict[str, Any]):
     """Fecha `filed` mas reciente de los hechos companyfacts, o None."""
     latest = None
@@ -1823,6 +1858,10 @@ class FinancialIngestionService:
                 "unchanged": True,
             }
 
+        # Una tanda abandonada por una corrida anterior que rompio a mitad
+        # (rollback) no puede colarse en ESTA transaccion: se descarta.
+        db.info.pop("_fact_bulk_buffer", None)
+
         us_gaap = facts_data.get("facts", {}).get("us-gaap", {})
         # 40-F/20-F en IFRS (BN): sin us-gaap, la misma lectura va sobre
         # ifrs-full con su mapa de conceptos; el resto de reglas no cambia.
@@ -2041,22 +2080,23 @@ class FinancialIngestionService:
                         str(entry["end"]), modal_fy_month
                     ) or str(entry["fp"])
                     derived_from_ytd = bool(entry.get("_derived_from_ytd"))
-                    db.add(
-                        FinancialFact(
-                            company_id=company.id,
-                            metric=metric,
-                            value=val,
-                            unit=unit,
-                            period=f"{entry['end']}:{fp}",
-                            fiscal_year=None,
-                            fiscal_quarter=fp,
-                            source_id=document.id,
-                            source_type="SEC",
-                            is_reported=not derived_from_ytd,
-                            confidence=Decimal("0.85") if derived_from_ytd else Decimal("0.9"),
-                            accession_number=entry.get("accn"),
-                            filed=_publication_date(entry),
-                        )
+                    _queue_fact(
+                        db,
+                        **{
+                            "company_id": company.id,
+                            "metric": metric,
+                            "value": val,
+                            "unit": unit,
+                            "period": f"{entry['end']}:{fp}",
+                            "fiscal_year": None,
+                            "fiscal_quarter": fp,
+                            "source_id": document.id,
+                            "source_type": "SEC",
+                            "is_reported": not derived_from_ytd,
+                            "confidence": Decimal("0.85") if derived_from_ytd else Decimal("0.9"),
+                            "accession_number": entry.get("accn"),
+                            "filed": _publication_date(entry),
+                        }
                     )
                     # Misma proveniencia por periodo que el bucle anual:
                     # clave "<end>:<fp>" para no colisionar con el FY.
@@ -2107,22 +2147,23 @@ class FinancialIngestionService:
                         == "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"
                     ):
                         cash_restricted_years.add(_annual_fiscal_year(str(entry["end"]), modal_fy_month))
-                    db.add(
-                        FinancialFact(
-                            company_id=company.id,
-                            metric=metric,
-                            value=val,
-                            unit=unit,
-                            period=f"{entry['end']}:FY",
-                            fiscal_year=_annual_fiscal_year(str(entry["end"]), modal_fy_month),
-                            fiscal_quarter="FY",
-                            source_id=document.id,
-                            source_type="SEC",
-                            is_reported=True,
-                            confidence=Decimal("0.95"),
-                            accession_number=entry.get("accn"),
-                            filed=_publication_date(entry),
-                        )
+                    _queue_fact(
+                        db,
+                        **{
+                            "company_id": company.id,
+                            "metric": metric,
+                            "value": val,
+                            "unit": unit,
+                            "period": f"{entry['end']}:FY",
+                            "fiscal_year": _annual_fiscal_year(str(entry["end"]), modal_fy_month),
+                            "fiscal_quarter": "FY",
+                            "source_id": document.id,
+                            "source_type": "SEC",
+                            "is_reported": True,
+                            "confidence": Decimal("0.95"),
+                            "accession_number": entry.get("accn"),
+                            "filed": _publication_date(entry),
+                        }
                     )
                     # Record which XBRL concept produced the value. Several
                     # metrics accept alternative tags with different scopes, so
@@ -2196,22 +2237,23 @@ class FinancialIngestionService:
             existing = annual_by_metric.get("shares_outstanding", {})
             if end in existing:
                 continue
-            db.add(
-                FinancialFact(
-                    company_id=company.id,
-                    metric="shares_outstanding",
-                    value=val,
-                    unit="shares",
-                    period=period,
-                    fiscal_year=None,
-                    fiscal_quarter=None,
-                    source_id=document.id,
-                    source_type="SEC",
-                    is_reported=True,
-                    confidence=Decimal("0.95"),
-                    accession_number=entry.get("accn"),
-                    filed=_publication_date(entry),
-                )
+            _queue_fact(
+                db,
+                **{
+                    "company_id": company.id,
+                    "metric": "shares_outstanding",
+                    "value": val,
+                    "unit": "shares",
+                    "period": period,
+                    "fiscal_year": None,
+                    "fiscal_quarter": None,
+                    "source_id": document.id,
+                    "source_type": "SEC",
+                    "is_reported": True,
+                    "confidence": Decimal("0.95"),
+                    "accession_number": entry.get("accn"),
+                    "filed": _publication_date(entry),
+                }
             )
             concept_usage.setdefault("shares_outstanding", {})[period] = (
                 "dei:EntityCommonStockSharesOutstanding"
@@ -2230,6 +2272,9 @@ class FinancialIngestionService:
             existing_meta["xbrl_taxonomy"] = taxonomy
             document.metadata_ = existing_meta
 
+        # La tanda en lote tiene que estar EN LA BASE antes de cualquier
+        # lectura de hechos (shadows, derivadas, conflictos, chunks).
+        _flush_fact_buffer(db)
         drop_shadowed_facts(db, company.id, document.id, tenant_condition(db))
 
         if cash_restricted_years:
