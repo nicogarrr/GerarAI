@@ -130,6 +130,10 @@ export function CompanyLogo({ ticker, name, className }: Props) {
                 ref={img}
                 src={ready ? ready.src : src}
                 alt=""
+                // Logo is decorative: lazy prevents React's eager SSR image
+                // preload and keeps slow third-party images out of window.load.
+                loading="lazy"
+                decoding="async"
                 crossOrigin="anonymous"
                 referrerPolicy="no-referrer"
                 onLoad={(e) => {
