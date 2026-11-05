@@ -89,8 +89,8 @@ describe('CompanyTechnicalChart: línea del objetivo con su % y sin panel del in
     it('empieza en línea y permite alternar a velas y volver sin duplicar precios', async () => {
         render(<CompanyTechnicalChart snapshot={snapshot} />);
         await waitFor(() => expect(captured.data.Area?.length).toBeGreaterThan(0));
-        const line = screen.getByRole('button', { name: 'Línea', exact: true });
-        const candles = screen.getByRole('button', { name: 'Velas', exact: true });
+        const line = screen.getByRole('button', { name: /^Línea$/ });
+        const candles = screen.getByRole('button', { name: /^Velas$/ });
         expect(line.getAttribute('aria-pressed')).toBe('true');
         expect(captured.data.Candlestick).toEqual([]);
         fireEvent.click(candles);
@@ -104,7 +104,7 @@ describe('CompanyTechnicalChart: línea del objetivo con su % y sin panel del in
 
     it('sin OHLC completo mantiene línea y no ofrece velas falsas', async () => {
         render(<CompanyTechnicalChart snapshot={{ ...snapshot, history: history.map((row) => ({ ...row, open: null })) }} />);
-        const candles = screen.getByRole('button', { name: 'Velas', exact: true });
+        const candles = screen.getByRole('button', { name: /^Velas$/ });
         expect(candles.hasAttribute('disabled')).toBe(true);
         await waitFor(() => expect(captured.data.Area?.length).toBeGreaterThan(0));
         expect(captured.data.Candlestick).toEqual([]);
