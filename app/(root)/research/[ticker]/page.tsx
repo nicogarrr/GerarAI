@@ -1,3 +1,4 @@
+import { thesisIsPublic } from '@/lib/research/thesis-publication';
 import { getFormat, getLocale, getT } from '@/lib/i18n/server';
 import { RATING_LABELS_EN, STATUS_LABELS_EN } from '@/lib/research/status-labels-en';
 import type { TranslationKey } from '@/lib/i18n/t';
@@ -346,10 +347,6 @@ function metricValue(value: number | string | null | undefined, unit: string, t:
   return formatResearchMetric(parsed, unit, locale);
 }
 
-/** Un borrador o una tesis en revisión no enseña veredicto ni cifras (regla vigente, igual que el memo y el PDF). */
-function thesisIsPublic(status: string | null | undefined): boolean {
-  return status === 'published' || status === 'approved';
-}
 
 async function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] }) {
   const t = await getT();
