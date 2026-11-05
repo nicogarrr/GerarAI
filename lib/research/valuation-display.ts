@@ -6,11 +6,12 @@
 import { formatPercent } from '@/lib/format';
 import type { Locale } from '@/lib/i18n/locale';
 import { createTranslator } from '@/lib/i18n/translate';
+import type { TranslationKey } from '@/lib/i18n/t';
 
 /** Motivos de no publicación: claves i18n (research.valuationText.blockers.*).
  *  «traceable_wacc» como blocker significa que FALTA (el token suelto se leía
  *  como «WACC con fuente trazable», justo lo contrario). */
-const BLOCKER_LABEL_KEYS: Record<string, string> = {
+const BLOCKER_LABEL_KEYS: Record<string, TranslationKey> = {
   traceable_wacc: 'research.valuationText.blockers.traceableWacc',
   forecast_is_not_the_driver: 'research.valuationText.blockers.forecastIsNotTheDriver',
   inferred_fcf_margin_target: 'research.valuationText.blockers.inferredFcfMarginTarget',
