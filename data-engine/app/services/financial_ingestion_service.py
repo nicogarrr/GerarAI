@@ -1648,10 +1648,16 @@ def _flush_fact_buffer(db: Session) -> None:
 def _latest_filed_date(us_gaap: dict[str, Any]):
     """Fecha `filed` mas reciente de los hechos companyfacts, o None."""
     latest = None
+    # Un filing repite su fecha en miles de hechos/conceptos. Validar cada
+    # literal una vez por payload (tambien los invalidos), sin cache global.
+    seen: set[str] = set()
     for concept in (us_gaap or {}).values():
         for entries in ((concept or {}).get("units") or {}).values():
             for entry in entries or []:
                 raw = str((entry or {}).get("filed") or "")[:10]
+                if raw in seen:
+                    continue
+                seen.add(raw)
                 try:
                     parsed = date.fromisoformat(raw)
                 except ValueError:

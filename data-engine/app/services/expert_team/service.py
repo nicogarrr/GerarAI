@@ -24,7 +24,9 @@ from app.services.expert_team.tools import build_tools
 SPEND_PER_CALL_EUR = 0.02
 
 
-def provider_reasoner(provider: Any | None = None, *, db: Session | None = None) -> Reasoner:
+def provider_reasoner(
+    provider: Any | None = None, *, db: Session | None = None, commit_usage: bool = True
+) -> Reasoner:
     async def reason(system: str, user: str, max_tokens: int, task: str) -> str:
         from app.core.i18n import current_language
         from app.llm import LLMRequest, Message
@@ -46,7 +48,10 @@ def provider_reasoner(provider: Any | None = None, *, db: Session | None = None)
             usage = resp.usage
             model = getattr(resp, "model", None) or "unknown"
             cost = budget.estimate_cost_eur(model, usage.input_tokens, usage.output_tokens)
-            budget.record(db, model, task, cost, usage.total_tokens)
+            budget.record(db, model, task, cost, usage.total_tokens, commit=commit_usage)
+            if not commit_usage:
+                # Autoflush puede estar apagado: la siguiente llamada debe ver el gasto.
+                db.flush()
 
         request = LLMRequest(
             messages=[Message("system", system), Message("user", user)],
