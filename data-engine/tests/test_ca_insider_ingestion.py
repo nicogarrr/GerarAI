@@ -202,17 +202,24 @@ def test_ca_accession_fits_pg_width_without_losing_fingerprint(db, monkeypatch):
     """SQLite ignores VARCHAR(n); CHECK enforces PG's real 40-char contract."""
     import base64
 
-    from sqlalchemy import text
+    from sqlalchemy import DDL
 
-    for table in ("insider_filings", "insider_transactions"):
-        db.execute(text(f"""
-            CREATE TRIGGER enforce_{table}_accession_width
-            BEFORE INSERT ON {table}
-            WHEN length(NEW.accession_number) > 40
-            BEGIN
-                SELECT RAISE(ABORT, 'value too long for type character varying(40)');
-            END
-        """))
+    db.execute(DDL("""
+        CREATE TRIGGER enforce_insider_filings_accession_width
+        BEFORE INSERT ON insider_filings
+        WHEN length(NEW.accession_number) > 40
+        BEGIN
+            SELECT RAISE(ABORT, 'value too long for type character varying(40)');
+        END
+    """))
+    db.execute(DDL("""
+        CREATE TRIGGER enforce_insider_transactions_accession_width
+        BEFORE INSERT ON insider_transactions
+        WHEN length(NEW.accession_number) > 40
+        BEGIN
+            SELECT RAISE(ABORT, 'value too long for type character varying(40)');
+        END
+    """))
     db.commit()
     expected = {
         ticker: map_transaction(ticker, raw)
