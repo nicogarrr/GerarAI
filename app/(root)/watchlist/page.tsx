@@ -399,7 +399,7 @@ export default async function WatchlistPage({
                         {displayStocks.map((stock) => (
                             <WatchlistEntry as="article" symbol={stock.symbol} key={stock.symbol} className="min-w-0 rounded-xl border border-gray-700/60 bg-gray-900/60 p-3">
                                 <div className="flex min-w-0 items-center gap-3">
-                                    <CompanyLogo loading="lazy" ticker={stock.quoteSymbol ?? stock.symbol} name={stock.name} className="size-11 shrink-0 rounded-lg" />
+                                    <CompanyLogo ticker={stock.quoteSymbol ?? stock.symbol} loading="lazy" name={stock.name} className="size-11 shrink-0 rounded-lg" />
                                     <div className="min-w-0 flex-1">
                                         <Link
                                             href={`/research/${stock.symbol}`}
@@ -505,7 +505,7 @@ export default async function WatchlistPage({
                                     <WatchlistEntry as="tr" symbol={stock.symbol} key={stock.symbol} className="border-gray-800 transition-colors hover:bg-gray-800/30">
                                         <TableCell>
                                             <Link href={`/research/${stock.symbol}`} className="group flex items-center gap-3">
-                                                <CompanyLogo loading="lazy" ticker={stock.quoteSymbol ?? stock.symbol} name={stock.name} className="size-10 shrink-0 rounded-lg" />
+                                                <CompanyLogo ticker={stock.quoteSymbol ?? stock.symbol} loading="lazy" name={stock.name} className="size-10 shrink-0 rounded-lg" />
                                                 <div>
                                                     <div className="flex items-center gap-2 font-bold text-gray-200 transition-colors group-hover:text-blue-400">
                                                         {stock.symbol}
