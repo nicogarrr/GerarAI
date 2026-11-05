@@ -14,7 +14,7 @@ TS_MAP = Path(__file__).resolve().parents[2] / "lib" / "research" / "framework-t
 
 def _ts_terms() -> dict[str, str]:
     src = TS_MAP.read_text(encoding="utf-8")
-    body = src[src.index("FRAMEWORK_TERMS") :]
+    body = src[src.index("export const FRAMEWORK_TERMS:") :]
     body = body[body.index("{") + 1 : body.index("\n};")]
     pairs = re.findall(r"(?:'([^']+)'|([A-Za-z_&][\w&]*))\s*:\s*'((?:[^'\\]|\\.)*)'", body)
     return {(a or b): v.replace("\\'", "'") for a, b, v in pairs}

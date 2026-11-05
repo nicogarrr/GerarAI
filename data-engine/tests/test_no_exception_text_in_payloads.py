@@ -61,7 +61,7 @@ def test_moat_unavailable_payload_hides_exception_text(monkeypatch):
         raise RuntimeError(f"db interna caida: {SECRET_MARK}")
 
     monkeypatch.setattr(MoatService, "assess", boom)
-    result = valuation_service.ValuationService().value_company(object(), company, as_of=date(2025, 12, 31))
+    result = valuation_service.ValuationService().value_company(SimpleNamespace(info={}), company, as_of=date(2025, 12, 31))
     assert result["moat"]["status"] == "unavailable"
     assert result["moat"]["error"] == "moat_no_disponible"
     assert SECRET_MARK not in str(result["moat"])
