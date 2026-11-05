@@ -5,7 +5,7 @@ recomputaba y reescribia todo: medido con companyfacts reales
 (CHTR/TSLA/MSFT, 5-nov-2026) eran ~800 sentencias por empresa (765 INSERT
 identicos en CHTR) y ~21-33k entradas XBRL reescaneadas, aunque ningun
 dato hubiera cambiado. Con la huella en el Document la segunda pasada se
-omite entera (sin pasadas, sin escrituras, sin fetch de anclas).
+omite la recoleccion y escrituras; anclas e indice se verifican siempre.
 
 Reglas que fijan estos tests:
 - payload identico + misma version de reglas -> status "unchanged", 0
@@ -188,10 +188,10 @@ def test_segunda_pasada_identica_no_reescribe_ni_reescanea(db_engine, monkeypatc
     assert second["status"] == "unchanged"
     assert second["facts_imported"] == 0
     assert second["unchanged"] is True
-    # CERO escrituras de hechos y CERO fetch de anclas/indice en la 2.ª pasada:
+    # CERO escrituras de hechos; anclas/indice siguen comprobando procedencia:
     assert cuenta == {"insert": 0, "delete": 0}
-    assert _FakeSECMini.llamadas["anchors"] == 1   # solo la 1.ª pasada
-    assert _FakeSECMini.llamadas["index"] == 1
+    assert _FakeSECMini.llamadas["anchors"] == 2  # verificar cambios de calendario
+    assert _FakeSECMini.llamadas["index"] == 2
     assert _fact_ids(db, company) == ids_antes     # mismas filas, mismo id
 
 
