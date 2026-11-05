@@ -1798,6 +1798,9 @@
     "scenarioWarnings": {
       "growthOutsideReference": "Scenario \"{name}\": revenue growth {value}, outside the general reference range ({low} to {high}); shown as declared, with its source.",
       "marginAboveReference": "Scenario \"{name}\": FCF margin {value}, above the general reference ({reference}); shown as declared, with its source."
+    },
+    "blockers": {
+      "scenarioSetMissing": "scenarios pending: the declared model values by scenarios and no sourced set exists yet; the figure is the default-set guidance, not a final valuation"
     }
   },
   "peerFormat": {

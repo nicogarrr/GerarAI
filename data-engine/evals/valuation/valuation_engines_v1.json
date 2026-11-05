@@ -7216,10 +7216,12 @@
       },
       "expected": {
         "engine_key": "scenario",
-        "status": "ok",
-        "publishable": true,
+        "status": "partial",
+        "publishable": false,
         "missing_inputs": [],
-        "publication_blockers": [],
+        "publication_blockers": [
+          "scenario_set_missing"
+        ],
         "adr_ratio": null,
         "trace_engine": "standard_dcf",
         "closed_form": {

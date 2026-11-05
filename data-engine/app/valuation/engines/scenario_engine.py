@@ -445,4 +445,13 @@ class ScenarioValuationEngine(ValuationEngine):
             "reason": reason,
             "detail": detail[:500],
         }
+        if reason == "scenario_set_missing":
+            # El modelo declarado valora por escenarios y no hay juego con
+            # fuente: el numero del motor de respaldo es una orientacion
+            # degradada con el motivo, nunca una valoracion final.
+            blockers = [str(b) for b in (result.get("publication_blockers") or []) if str(b).strip()]
+            if "scenario_set_missing" not in blockers:
+                blockers.append("scenario_set_missing")
+            result["publication_blockers"] = blockers
+            return apply_publication_blockers(result)
         return result
