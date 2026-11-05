@@ -70,7 +70,7 @@ def _value_company(monkeypatch, result: dict, **kwargs) -> dict:
     monkeypatch.setattr(valuation_service, "_position_price", lambda _db, _company_id, _as_of=None: 100.0)
     monkeypatch.setattr(valuation_service, "_free_data_trace", lambda _db, _company: None)
     monkeypatch.setattr(MoatService, "assess", lambda *_args, **_kwargs: {})
-    return valuation_service.ValuationService().value_company(object(), company, **kwargs)
+    return valuation_service.ValuationService().value_company(SimpleNamespace(info={}), company, **kwargs)
 
 
 def _valuation(periods: dict) -> dict:
