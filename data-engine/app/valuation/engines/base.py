@@ -61,6 +61,23 @@ def traceable_wacc(
     )
     if metric is None or metric.value is None:
         return None
+    # Persisted metrics can predate the calculator's stale-interest guard.
+    # Revalidate their recorded operands at read time without writing a new
+    # metric or borrowing current facts for an older calculation.
+    trace = metric.calculation_trace or {}
+    if trace.get("cost_of_debt_source") == "interest_expense_over_debt":
+        from app.services.metric_calculation_service import MAX_INTEREST_DEBT_YEAR_GAP
+
+        inputs = trace.get("inputs") or {}
+        years = []
+        for key in ("interest_expense", "total_debt"):
+            operand = inputs.get(key) or {}
+            period = str(operand.get("period") or "")
+            if len(period) < 4 or not period[:4].isdigit():
+                return None
+            years.append(int(period[:4]))
+        if abs(years[0] - years[1]) > MAX_INTEREST_DEBT_YEAR_GAP:
+            return None
     value = float(metric.value)
     if not math.isfinite(value) or not 0.0 < value < 1.0:
         return None
