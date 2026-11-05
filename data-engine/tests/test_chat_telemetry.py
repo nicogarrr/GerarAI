@@ -77,3 +77,24 @@ def test_record_chat_event_never_raises(monkeypatch):
         tenant_id=1, question="q", route="error", used_llm=False,
         model=None, latency_ms=1, error="x",
     )
+
+
+def test_record_redacts_secrets_from_question_and_error(monkeypatch):
+    engine = create_engine('sqlite+pysqlite:///:memory:')
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Tenant(external_id='redact', name='Redact', status='active'))
+        db.commit()
+    monkeypatch.setattr(chat_telemetry, 'SessionLocal', sessionmaker(engine))
+    secret = 'fixture-not-a-real-api-key-12345'
+    chat_telemetry.record_chat_event(
+        tenant_id=1, question=f'GET https://example.invalid/?api_key={secret}',
+        route='error', used_llm=False, model=None, latency_ms=1,
+        error=f'upstream ?token={secret}',
+    )
+    with Session(engine) as db:
+        row = db.scalar(select(ChatTelemetryEvent))
+        assert row is not None
+        assert secret not in row.question
+        assert secret not in row.error
+        assert 'example.invalid' in row.question

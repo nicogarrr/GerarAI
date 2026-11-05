@@ -203,3 +203,21 @@ def test_currency_key_preserves_missing_as_distinct_unregistered_key():
     assert currency_key("  ") == ""
     assert currency_key("") != currency_key("EUR")
     assert currency_key("") != currency_key("USD")
+
+
+def test_ensure_portfolio_promotes_existing_main_without_duplicate(db):
+    from sqlalchemy import select
+
+    from app.models.entities import Portfolio
+
+    original = Portfolio(name='Main', base_currency='USD', is_default=False)
+    db.add(original)
+    db.flush()
+    identity = original.id
+    service = PortfolioFXService()
+    found = service.ensure_portfolio(db)
+    assert found.id == identity
+    assert found.is_default is True
+    assert found.base_currency == 'USD'
+    assert service.ensure_portfolio(db).id == identity
+    assert len(db.scalars(select(Portfolio)).all()) == 1
