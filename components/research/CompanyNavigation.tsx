@@ -42,6 +42,13 @@ export function CompanyNavigation({ ticker, activeView, locale = 'es' }: { ticke
           className={`inline-flex min-h-[44px] shrink-0 items-center whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${activeTab === tab.key ? 'border-teal-300 text-gray-100' : 'border-transparent text-gray-500 hover:text-gray-200'}`}
           href={tabHref(ticker, tab.key)}
           key={tab.key}
+          // Sin prefetch: las 6 pestañas entran en viewport a la vez y cada
+          // prefetch dispara el render RSC completo de esa vista (medido en
+          // prod 5-nov-2026: 5-6 peticiones _rsc por ficha, 200-450 ms de
+          // servidor cada una, con workspaces de backend por pestaña). Con la
+          // VM al límite eso multiplica CPU por vistas que quizá no se abran;
+          // al pulsar, la navegación tarda lo mismo que hoy el prefetch.
+          prefetch={false}
           scroll={false}
         >
           {t(TAB_LABEL_KEYS[tab.key])}
