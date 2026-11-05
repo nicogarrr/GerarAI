@@ -187,3 +187,24 @@ def test_explicado_solo_deja_la_conciliacion() -> None:
     out = apply_consensus_sanity(result, sanity, enabled=True)
     assert out["trace"]["consensus_reconciliation"]["status"] == "explicado"
     assert out["publishable"] is True and "review_status" not in out
+
+
+def test_review_syncs_publication_state_and_keeps_numbers():
+    result = _valuation()
+    result["value_per_share"] = 42
+    apply_consensus_sanity(result, assess(42, 200), enabled=True)
+    assert result["status"] == "partial"
+    assert result["trace"]["status"] == result["status"]
+    assert result["trace"]["publishable"] is result["publishable"] is False
+    assert result["trace"]["publication_blockers"] == result["publication_blockers"] == [REVIEW_BLOCKER]
+    assert result["value_per_share"] == 42
+
+
+def test_diagnostic_review_never_changes_publication():
+    result = _valuation()
+    apply_consensus_sanity(result, assess(42, 200), enabled=True, block_publication=False)
+    assert result["trace"]["consensus_reconciliation"]["status"] == "revisar"
+    assert result["status"] == "ok"
+    assert result["publishable"] is True
+    assert result["publication_blockers"] == []
+    assert "review_status" not in result
