@@ -63,11 +63,11 @@ def test_known_industry_sector_conflict_is_excluded(db):
 
 
 def test_same_sector_different_industry_still_allowed(db):
-    """CHTR-CMCSA: industria distinta pero sector común conocido → entra."""
+    """CHTR-CMCSA: industria distinta, sector y negocio común → entra."""
     target = _co(db, "CABLE1", sector="Communication Services", industry="Entertainment",
-                 company_type="media_company")
+                 company_type="media_company", exchange="NYSE", tags=["cable"])
     _co(db, "CABLE2", sector="Communication Services", industry="Telecom Services",
-        company_type="media_company")
+        company_type="media_company", exchange="NYSE", tags=["cable"])
     selected, _ = _selected(PeerComparisonService(), db, target)
     assert selected == ["CABLE2"]
 
@@ -81,8 +81,8 @@ def test_currency_exchange_size_alone_never_qualifies(db):
 
 
 def test_known_company_type_and_shared_tags_qualify(db):
-    target = _co(db, "TGT2", company_type="holding", tags=["compounders", "europe"])
-    _co(db, "PEER2", company_type="holding", tags=["compounders"], exchange="AMS")
+    target = _co(db, "TGT2", sector="Financial Services", company_type="holding", exchange="NYSE", tags=["compounders", "europe"])
+    _co(db, "PEER2", sector="Financial Services", company_type="holding", exchange="NYSE", tags=["compounders"])
     _co(db, "NOPE2", company_type="industrial", tags=[])
     selected, _ = _selected(PeerComparisonService(), db, target)
     assert selected == ["PEER2"]
