@@ -8,5 +8,32 @@
 # Oracle frontend. Keep the backend block and Vercel deployment unchanged.
 gerarai.duckdns.org {
 	encode zstd gzip
+	# Access logs JSON a stdout para medir latencia por request (cola de red
+	# de /watchlist, 5-nov-2026); los rota Docker (json-file 10m x 3 del
+	# ancla de compose, tope ~30 MB). Cookie, Authorization,
+	# Proxy-Authorization y Set-Cookie salen REDACTED por defecto desde
+	# Caddy 2.5 y aqui se borran del todo; en la query se eliminan los
+	# parametros que suelen llevar credenciales antes de escribir.
+	log {
+		format filter {
+			wrap json
+			fields {
+				request>headers>Cookie delete
+				request>headers>Authorization delete
+				request>headers>Proxy-Authorization delete
+				resp_headers>Set-Cookie delete
+				request>uri query {
+					delete token
+					delete api_key
+					delete apikey
+					delete key
+					delete signature
+					delete code
+					delete secret
+					delete password
+				}
+			}
+		}
+	}
 	reverse_proxy gerarai-frontend:3000
 }
