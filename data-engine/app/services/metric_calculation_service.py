@@ -1,8 +1,9 @@
 import re
 from dataclasses import dataclass
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy import delete, desc, func, select
+from sqlalchemy import and_, delete, desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
@@ -325,6 +326,7 @@ def _capital_scale_conflict(equity_fact: FinancialFact, debt_fact: FinancialFact
 
 # Clave de db.info para la cache de hechos de calculate_all (ver alli).
 _FACTS_CACHE_KEY = "metric_calculation_facts_cache"
+_AS_OF_KEY = "metric_calculation_as_of"
 # Hechos que lee _facts_for_metric por metrica (tope y orden comunes al
 # camino de una metrica y a la precarga de calculate_all).
 _FACTS_PER_METRIC = 20
@@ -368,7 +370,20 @@ class MetricCalculationService:
             db.commit()
         return results
 
-    def calculate(self, db: Session, company: Company, metric: str, persist: bool = True) -> MetricResult:
+    def calculate(self, db: Session, company: Company, metric: str, persist: bool = True,
+                  *, as_of: date | None = None) -> MetricResult:
+        previous = db.info.get(_AS_OF_KEY)
+        if as_of is not None:
+            db.info[_AS_OF_KEY] = as_of
+        try:
+            return self._calculate_impl(db, company, metric, persist)
+        finally:
+            if previous is None:
+                db.info.pop(_AS_OF_KEY, None)
+            else:
+                db.info[_AS_OF_KEY] = previous
+
+    def _calculate_impl(self, db: Session, company: Company, metric: str, persist: bool = True) -> MetricResult:
         if metric not in METRIC_DEFINITIONS:
             raise ValueError(f"Unsupported calculated metric: {metric}")
         definition_version, formula, inputs, unit = METRIC_DEFINITIONS[metric]
@@ -595,14 +610,30 @@ class MetricCalculationService:
         return facts
 
     def _facts_for_metric(self, db: Session, company: Company, metric: str) -> list[FinancialFact]:
-        cache: dict[tuple[int, str], list[FinancialFact]] | None = db.info.get(_FACTS_CACHE_KEY)
+        cutoff = db.info.get(_AS_OF_KEY)
+        # A current prefetch cannot answer a historical query. Filter in SQL
+        # BEFORE LIMIT, otherwise future/restated rows hide eligible history.
+        cache: dict[tuple[int, str], list[FinancialFact]] | None = (
+            None if cutoff is not None else db.info.get(_FACTS_CACHE_KEY))
+        temporal = []
+        if cutoff is not None:
+            next_day = datetime.combine(cutoff+timedelta(days=1), time.min, UTC)
+            temporal = [
+                or_(FinancialFact.filed <= cutoff,
+                    and_(FinancialFact.filed.is_(None), FinancialFact.created_at < next_day)),
+                or_(FinancialFact.period.is_(None),
+                    func.substr(FinancialFact.period, 5, 1) != "-",
+                    func.substr(FinancialFact.period, 8, 1) != "-",
+                    func.substr(FinancialFact.period, 1, 10) <= cutoff.isoformat()),
+                or_(FinancialFact.fiscal_year.is_(None), FinancialFact.fiscal_year <= cutoff.year),
+            ]
         key = (company.id, metric)
         if cache is not None and key in cache:
             return list(cache[key])
         facts = list(
             db.scalars(
                 select(FinancialFact)
-                .where(FinancialFact.company_id == company.id, FinancialFact.metric == metric)
+                .where(FinancialFact.company_id == company.id, FinancialFact.metric == metric, *temporal)
                 .order_by(*_FACT_ORDER)
                 .limit(_FACTS_PER_METRIC)
             ).all()
@@ -1195,6 +1226,16 @@ class MetricCalculationService:
                 facts["cost_of_debt"] = direct_debt_cost[1]
                 cost_of_debt, _ = self._normalize_rate(direct_debt_cost[1].value, unit=direct_debt_cost[1].unit)
                 cost_of_debt_source = "reported_cost_of_debt"
+                debt_fact = facts.get("total_debt")
+                gap = _fiscal_year_gap(direct_debt_cost[1], debt_fact) if debt_fact is not None else None
+                if gap is None or gap > MAX_INTEREST_DEBT_YEAR_GAP:
+                    cost_of_debt = None
+                    missing.append("reported_cost_of_debt_same_period_as_debt")
+                    gated.append(_gated_input(
+                        "cost_of_debt", "reported_cost_of_debt_stale_vs_debt",
+                        f"coste reportado {direct_debt_cost[1].period}: desfase de deuda "
+                        f"{gap} anos; maximo {MAX_INTEREST_DEBT_YEAR_GAP}, fecha desconocida no valida",
+                        value=Decimal(direct_debt_cost[1].value)))
                 if cost_of_debt is None:
                     missing.append("valid_cost_of_debt")
             elif "total_debt" in facts and Decimal(facts["total_debt"].value) > 0:
