@@ -381,6 +381,30 @@ class FeedIngestionService:
         is_sec_host = (parsed_url.hostname or "").lower() in {"sec.gov", "www.sec.gov"}
         final_url = url
 
+        # Dedup ANTES de descargar: el dedup por checksum/archive_url de
+        # ingest_bytes ocurre tras la descarga (hasta 30 s de fetch + la CPU
+        # de extraccion por copia). Sin esta guarda, cada reencolado de una
+        # URL ya ingerida volvia a bajar el documento entero (5-nov-2026:
+        # avalancha KRKNF). Solo URL exacta; los redirects los sigue
+        # cubriendo el checksum de ingest_bytes tras la descarga.
+        from sqlalchemy import select
+
+        from app.core.tenancy import tenant_filters
+        from app.models import Document
+
+        known_id = db.scalar(
+            select(Document.id)
+            .where(Document.source_url == url, *tenant_filters(db, Document))
+            .limit(1)
+        )
+        if known_id is not None:
+            return {
+                "status": "duplicate",
+                "ticker": ticker,
+                "document_id": known_id,
+                "dedup": "source_url",
+            }
+
         _release_before_fetch(db)
         if is_sec_host:
             content, content_type = await (self._sec_client or SECClient()).filing_document(url)

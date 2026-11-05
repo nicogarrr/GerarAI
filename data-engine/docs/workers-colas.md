@@ -13,7 +13,7 @@ siguiente solo mapea cada clase a donde corre hoy ese trabajo.
 | Clase | Colas | Worker (docker-compose.prod.yml) |
 | --- | --- | --- |
 | interactiva (el usuario espera) | dca-manual, ibkr-sync, knowledge, thesis | worker-dca-manual, worker (compose ibkr-sync), worker-knowledge, worker-thesis |
-| ingesta (fuentes externas, idempotente) | prices, official-closes, gdelt, default, knowledge | worker, worker-official-closes, worker-gdelt, worker-knowledge |
+| ingesta (fuentes externas, idempotente) | prices, official-closes, gdelt, default, knowledge, documents | worker, worker-official-closes, worker-gdelt, worker-knowledge, worker-documents |
 | calculo (pesado sobre datos ingeridos) | kpis, computed, thesis, default | worker-kpis, worker-alerts (computed), worker-thesis |
 | mantenimiento (alertas, watchdogs) | alerts, default | worker-alerts |
 
@@ -55,3 +55,23 @@ mitad. Suelo declarado (`IMPORT_ACTORS`):
 | sync_official_closes | 60 min |
 
 Los backfills de datos mantienen sus limites medidos (5-30 min por lote).
+
+## Carril documents (5-nov-2026)
+
+`process_document` y `process_document_structured` (descarga + extraccion +
+embeddings) salen de default a la cola dedicada `documents`: una avalancha
+de 677 docs reencolados cada hora (universo global de paginas IR x todos los
+tenants) frenaba los periodicos de datos y el fallback de embeddings ponia
+el host al 95 % CPU. Autorizacion de Nico (5-nov-2026): colas nuevas que
+aporten velocidad real. Guardas en el mismo cambio: dedup al encolar
+(Document.source_url del tenant), filtro por seguimiento del tenant en
+refresh_ir_pages, tope por pasada (`document_enqueue_max_per_poll`, 50),
+semaforo de ingesta por proceso (`document_ingest_max_concurrency`, 1) y
+opt-out operativo (`document_ingest_exclusions`, p.ej. "10:KRKNF").
+
+Comando del worker (ya en docker-compose.prod.yml, servicio worker-documents):
+
+    dramatiq app.workers.dramatiq_app --processes 1 --threads 1 -Q documents
+
+`queue_name` solo enruta mensajes NUEVOS: los ya encolados en default los
+drena el worker default (el semaforo los serializa); nada que purgar.

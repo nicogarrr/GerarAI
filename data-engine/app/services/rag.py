@@ -67,6 +67,9 @@ class RAGIndex:
     _st_model = None
     _st_error: Exception | None = None
     _st_lock = threading.Lock()
+    # Circuit breaker del backend fastembed: una vez falla (p.ej. modelo sin
+    # pesos locales), no se reintenta por lote durante la vida del proceso.
+    _fastembed_error: Exception | None = None
 
     def _embedder(self):
         return type(self).warm_fallback()
@@ -110,17 +113,26 @@ class RAGIndex:
             self._setting("rag_dense_model", "sentence-transformers/all-MiniLM-L6-v2")
             or "sentence-transformers/all-MiniLM-L6-v2"
         )
-        if backend.strip().lower() != "sentence-transformers":
+        cls = type(self)
+        if backend.strip().lower() != "sentence-transformers" and cls._fastembed_error is None:
             try:
                 from app.services.hybrid_retrieval import embed_dense
 
                 return embed_dense(texts, model)
             except Exception as exc:
-                logger.warning(
-                    "fastembed dense backend unavailable (%s: %s); falling back to sentence-transformers",
-                    type(exc).__name__,
-                    redact_secrets(str(exc)),
-                )
+                # Sin este freno, CADA lote reintentaba fastembed (con intento
+                # de descarga del modelo incluido) y caia al fallback ST:
+                # "fallback repetido" (worker a 103 % CPU, 5-nov-2026). Se
+                # registra una vez y el proceso sigue con ST; reiniciar el
+                # proceso reintenta (tras fijar FASTEMBED_CACHE_PATH, p.ej.).
+                with cls._st_lock:
+                    if cls._fastembed_error is None:
+                        cls._fastembed_error = exc
+                        logger.warning(
+                            "fastembed dense backend unavailable (%s: %s); falling back to sentence-transformers for the rest of this process",
+                            type(exc).__name__,
+                            redact_secrets(str(exc)),
+                        )
         return self._embedder().encode(texts, normalize_embeddings=True).tolist()
 
     def _sparse_embeddings(self, texts: list[str]):
