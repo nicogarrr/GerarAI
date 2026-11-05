@@ -364,6 +364,18 @@ class Settings(BaseSettings):
     # entrando via el mirror HF (sec_hf_mirror_dataset) sincronizado por
     # GitHub Actions. True solo donde la SEC sea alcanzable (dev local).
     sec_document_jobs_enabled: bool = False
+    # Tope de process_document encolados por pasada IR/SEC: sin el, una
+    # pagina IR con cientos de comunicados reencolaba todo cada hora
+    # (677 docs de KRKNF en la cola default el 5-nov-2026, host al 95 % CPU).
+    # Lo que excede el tope entra en ticks siguientes; nada se pierde.
+    document_enqueue_max_per_poll: int = 50
+    # Concurrencia maxima de ingesta pesada (descarga + extraccion + embeddings)
+    # por proceso worker: Docling y el fallback de embeddings queman CPU/RAM;
+    # con varios hilos en default, N ingestas simultaneas tumban el host.
+    document_ingest_max_concurrency: int = 1
+    # Opt-out operativo de ingesta de documentos, sin despliegue de codigo:
+    # "10:KRKNF,2:PNG.V" excluye ese ticker en ese tenant; "TICKER" en todos.
+    document_ingest_exclusions: str = ""
     # Pipeline de ingesta en dos carriles (MarkItDown rapido / Docling
     # estructura / pypdf clasico; ver app/services/docling_pipeline.py).
     # Activo por defecto SI la dependencia opcional esta instalada; ausente,

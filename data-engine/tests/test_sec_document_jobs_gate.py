@@ -46,6 +46,12 @@ def _run_actor(monkeypatch, enabled: bool, items):
     monkeypatch.setattr(
         dramatiq_app.settings, "sec_document_jobs_enabled", enabled
     )
+    # Dedup de encolado (5-nov-2026): aqui ninguna URL esta ingerida todavia.
+    monkeypatch.setattr(dramatiq_app, "_document_url_ingested", lambda db, url: False)
+    # Sin opt-out operativo en estas pruebas.
+    monkeypatch.setattr(
+        dramatiq_app.settings, "document_ingest_exclusions", "", raising=False
+    )
     result = dramatiq_app.refresh_sec_filings.fn()
     return result, sends
 

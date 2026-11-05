@@ -703,6 +703,11 @@ def _session(tenant_id: int | None, user_id: str | None):
 
 
 KPI_QUEUE_NAME = "kpis"
+# Ingesta de documentos (descarga + extraccion + embeddings): carril propio
+# para que una avalancha de PDFs no frene los periodicos de datos de default
+# (5-nov-2026: 677 docs KRKNF, ~3 h de backlog, periodicos esperando).
+# Autorizacion de Nico (5-nov-2026): colas nuevas que aporten velocidad real.
+DOCUMENTS_QUEUE_NAME = "documents"
 # Carril de alertas aislado (patron thesis/kpis): la evaluacion de reglas
 # cada 5 min y las entregas no compiten con la ingesta larga (GDELT ~3 h)
 # en la cola default.
@@ -820,6 +825,57 @@ def _companies(db, ticker: str | None = None):
     if ticker:
         statement = statement.where(Company.ticker == ticker.upper())
     return list(db.scalars(statement.order_by(Company.ticker)).all())
+
+
+def _document_ingest_excluded(tenant_id: int | None, ticker: str) -> bool:
+    """Opt-out operativo (setting document_ingest_exclusions): bloquea el
+    encolado de documentos de un ticker, global o por tenant ("10:KRKNF").
+
+    5-nov-2026: Nico pidio quitar KRKNF de su cuenta; con el backlog activo,
+    cada pasada horaria la reencolaba. El bloqueo es inmediato al aplicar la
+    variable y no toca noticias ni datos ya ingeridos.
+    """
+    raw = (settings.document_ingest_exclusions or "").strip()
+    if not raw:
+        return False
+    wanted = ticker.strip().upper()
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        if ":" in entry:
+            tenant_raw, _, tick = entry.partition(":")
+            if tick.strip().upper() != wanted:
+                continue
+            try:
+                if int(tenant_raw.strip()) == tenant_id:
+                    return True
+            except ValueError:
+                continue
+        elif entry.upper() == wanted:
+            return True
+    return False
+
+
+def _document_url_ingested(db, url: str) -> bool:
+    """True si el tenant ya tiene un Document con este source_url.
+
+    Dedup en el ENCOLADO: sin el, cada pasada horaria de refresh_ir_pages
+    reencolaba todos los comunicados de la pagina (100 por empresa) aunque ya
+    estuvieran ingeridos, y cada tarea descargaba el documento antes de
+    deduplicar por checksum (5-nov-2026, KRKNF).
+    """
+    from app.core.tenancy import tenant_filters
+    from app.models import Document
+
+    return (
+        db.scalar(
+            select(Document.id)
+            .where(Document.source_url == url, *tenant_filters(db, Document))
+            .limit(1)
+        )
+        is not None
+    )
 
 
 def _price_tracked_companies(db):
@@ -2904,6 +2960,9 @@ def refresh_sec_filings(
             service = FeedIngestionService()
             processed = ingested = queued_documents = 0
             skipped_documents = 0
+            skipped_known = 0
+            skipped_excluded = 0
+            enqueue_capped = False
             errors: list[dict] = []
             emitted: set[str] = set()
             companies = _companies(db, ticker)
@@ -2937,6 +2996,15 @@ def refresh_sec_filings(
                                 continue
                             fingerprint = _emit_fingerprint("process_document", company.ticker, item.url)
                             if fingerprint in emitted:
+                                continue
+                            if _document_ingest_excluded(tenant_id, company.ticker):
+                                skipped_excluded += 1
+                                break
+                            if queued_documents >= settings.document_enqueue_max_per_poll:
+                                enqueue_capped = True
+                                break
+                            if _document_url_ingested(db, item.url):
+                                skipped_known += 1
                                 continue
                             emitted.add(fingerprint)
                             process_document.send(
@@ -2973,6 +3041,9 @@ def refresh_sec_filings(
                 "news_ingested": ingested,
                 "documents_queued": queued_documents,
                 "documents_skipped_sec_blocked": skipped_documents,
+                "documents_skipped_known": skipped_known,
+                "documents_skipped_excluded": skipped_excluded,
+                "documents_enqueue_capped": enqueue_capped,
                 "errors": errors,
             }
         finally:
@@ -2998,8 +3069,19 @@ def refresh_ir_pages(
         try:
             service = FeedIngestionService()
             processed = ingested = queued_documents = 0
+            skipped_known = 0
+            skipped_untracked = 0
+            skipped_excluded = 0
+            enqueue_capped = False
             errors: list[dict] = []
             emitted: set[str] = set()
+            # Descargar documentos solo de empresas que el tenant sigue
+            # (watchlist) o tiene en cartera: _companies es el universo GLOBAL
+            # y sin este filtro cada tenant encolaba los docs de TODAS las
+            # paginas IR (677 de KRKNF en tenant 10 sin seguirla, 5-nov-2026).
+            # La noticia del comunicado se ingiere igual; lo que se acota es
+            # la descarga pesada del documento.
+            tracked_tickers = {c.ticker.upper() for c in _tracked_companies(db) if c.ticker}
             for company in _companies(db, ticker):
                 if not company.ir_url:
                     continue
@@ -3023,6 +3105,18 @@ def refresh_ir_pages(
                             continue
                         fingerprint = _emit_fingerprint("process_document", company.ticker, item.url)
                         if fingerprint in emitted:
+                            continue
+                        if _document_ingest_excluded(tenant_id, company.ticker):
+                            skipped_excluded += 1
+                            continue
+                        if company.ticker.upper() not in tracked_tickers:
+                            skipped_untracked += 1
+                            continue
+                        if queued_documents >= settings.document_enqueue_max_per_poll:
+                            enqueue_capped = True
+                            break
+                        if _document_url_ingested(db, item.url):
+                            skipped_known += 1
                             continue
                         emitted.add(fingerprint)
                         process_document.send(
@@ -3051,6 +3145,10 @@ def refresh_ir_pages(
                 "companies_processed": processed,
                 "news_ingested": ingested,
                 "documents_queued": queued_documents,
+                "documents_skipped_known": skipped_known,
+                "documents_skipped_untracked": skipped_untracked,
+                "documents_skipped_excluded": skipped_excluded,
+                "documents_enqueue_capped": enqueue_capped,
                 "errors": errors,
             }
         finally:
@@ -3961,7 +4059,7 @@ def refresh_macro_news(
         return _handle_actor_error(actor_name, exc, tenant_id=tenant_id, user_id=user_id)
 
 
-@dramatiq.actor(max_retries=3, min_backoff=30_000)
+@dramatiq.actor(max_retries=3, min_backoff=30_000, queue_name=DOCUMENTS_QUEUE_NAME)
 def process_document(
     ticker: str,
     title: str,
@@ -3979,17 +4077,22 @@ def process_document(
         published = datetime.fromisoformat(published_at.replace("Z", "+00:00")) if published_at else None
         db = _session(tenant_id, user_id)
         try:
-            result = _run(
-                FeedIngestionService().ingest_document_url(
-                    db,
-                    ticker=ticker,
-                    title=title,
-                    url=url,
-                    source_type=source_type,
-                    published_at=published,
-                    filing_metadata=filing_metadata,
+            from app.workers.ingest_slot import document_ingest_slot
+
+            # Una ingesta pesada por proceso (defecto): descarga + Docling +
+            # embeddings no se solapan entre hilos del worker (5-nov-2026).
+            with document_ingest_slot().hold():
+                result = _run(
+                    FeedIngestionService().ingest_document_url(
+                        db,
+                        ticker=ticker,
+                        title=title,
+                        url=url,
+                        source_type=source_type,
+                        published_at=published,
+                        filing_metadata=filing_metadata,
+                    )
                 )
-            )
             return {"status": result.get("status", "ok"), "actor": actor_name, "result": result}
         finally:
             db.close()
@@ -4005,7 +4108,7 @@ def process_document(
         )
 
 
-@dramatiq.actor(max_retries=3, min_backoff=30_000)
+@dramatiq.actor(max_retries=3, min_backoff=30_000, queue_name=DOCUMENTS_QUEUE_NAME)
 def process_document_structured(
     ticker: str,
     title: str,
@@ -4030,7 +4133,9 @@ def process_document_structured(
         published = datetime.fromisoformat(published_at.replace("Z", "+00:00")) if published_at else None
         db = _session(tenant_id, user_id)
         try:
-            with docling_heavy_context():
+            from app.workers.ingest_slot import document_ingest_slot
+
+            with document_ingest_slot().hold(), docling_heavy_context():
                 result = _run(
                     FeedIngestionService().ingest_document_url(
                         db,
