@@ -33,6 +33,9 @@ from app.valuation.margin_convention import historical_margin_note
 _MAX_DRAFTS_SHOWN = 5
 
 
+_MAX_DRAFTS_SHOWN = 5
+
+
 def _number(value) -> str:
     return f"{float(value):,.2f}".replace(",", "\x07").replace(".", ",").replace("\x07", ".")
 
