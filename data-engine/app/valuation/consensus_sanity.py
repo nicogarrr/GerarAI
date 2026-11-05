@@ -433,10 +433,12 @@ def consensus_sanity_for_dcf(
 
 
 def apply_consensus_sanity(
-    result: dict[str, Any], sanity: ConsensusSanity, *, enabled: bool | None = None
+    result: dict[str, Any], sanity: ConsensusSanity, *, enabled: bool | None = None,
+    block_publication: bool = True
 ) -> dict[str, Any]:
     """Escribe ``trace.consensus_reconciliation``; sin explicar → «revisar» y bloqueo de publicación.
 
+    ``block_publication=False`` guarda solo el contraste, sin veto ni cambio de estado.
     ``enabled`` None = ``EXPERT_TEAM_ENABLED``; apagado devuelve el resultado intacto.
     """
     if enabled is None:
@@ -450,13 +452,15 @@ def apply_consensus_sanity(
         trace = {}
         result["trace"] = trace
     trace["consensus_reconciliation"] = sanity.as_dict()
-    if sanity.needs_review:
+    if sanity.needs_review and block_publication:
         result["review_status"] = REVIEW_STATUS
         blockers = list(result.get("publication_blockers") or [])
         if REVIEW_BLOCKER not in blockers:
             blockers.append(REVIEW_BLOCKER)
         result["publication_blockers"] = blockers
-        result["publishable"] = False
+        from app.valuation.engines.base import apply_publication_blockers
+
+        apply_publication_blockers(result)
     return result
 
 
