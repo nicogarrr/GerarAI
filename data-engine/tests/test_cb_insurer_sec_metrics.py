@@ -123,7 +123,7 @@ def test_insurer_engine_resolves_book_value_from_total_equity_alias(db):
     db.commit()
 
     resolved = _resolve_inputs(
-        context=type("Ctx", (), {"db": db, "company": company})(),
+        context=type("Ctx", (), {"db": db, "company": company, "as_of": None})(),
         anchor_metrics=("book_value", "common_equity", "total_equity"),
         inputs=dict(engine_inputs := {
             "book_value": ("book_value", "common_equity", "total_equity"),

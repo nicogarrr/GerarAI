@@ -619,8 +619,9 @@ def test_ingest_market_sin_timestamp_no_escribe_market_cap(db):
 @pytest.mark.parametrize("adjusted", [None, Decimal("4200")])
 def test_market_rejected_unitless_spot_does_not_publish_ok(db, adjusted):
     company = _company(db)
-    company.ticker = "CGEO.L"
-    company.currency = "GBP"
+    # A US listing can still have a mismatched persisted price unit.
+    # Exercise the unit gate, not the earlier non-US provider guard.
+    company.exchange = "NASDAQ"
     friday = datetime(2026, 9, 25, 20, tzinfo=UTC)
     bar = MarketPrice(company_id=company.id, date=friday.date(), open=4200, high=4300, low=4150,
                       close=4255, adj_close=adjusted, quote_currency="GBX", source="yfinance")
@@ -633,3 +634,62 @@ def test_market_rejected_unitless_spot_does_not_publish_ok(db, adjusted):
     assert "price" not in result
     assert (bar.open, bar.high, bar.low, bar.close) == (4200, 4300, 4150, 4255)
     assert bar.quote_currency == "GBX"
+
+
+def test_finnhub_usd_spot_refreshes_twice_on_same_provider_date(db):
+    """Explicit USD provenance must not freeze the close after its first write."""
+    company = _company(db)
+    company.exchange = 'NASDAQ'
+    service = ThesisEvidenceService()
+    friday = datetime(2026, 9, 25, 20, tzinfo=UTC)
+    for price, volume in [(190, 100), (195, 200)]:
+        _stub_market(service, quote={'c': price, 't': int(friday.timestamp()), 'v': volume}, profile=None)
+        result = service._ingest_market(db, company)
+        db.commit()
+        assert result['status'] == 'ok'
+        row = db.scalar(select(MarketPrice).where(MarketPrice.company_id == company.id))
+        assert row.close == Decimal(price)
+        assert row.volume == volume
+        assert row.quote_currency == 'USD'
+        assert row.source == 'Finnhub'
+        assert row.adj_close is None
+    assert (row.open, row.high, row.low) == (190, 190, 190)
+    assert db.scalar(select(func.count()).select_from(MarketPrice).where(MarketPrice.company_id == company.id)) == 1
+
+
+def test_finnhub_usd_refresh_preserves_real_adjusted_bar(db):
+    company = _company(db)
+    company.exchange = 'NASDAQ'
+    friday = datetime(2026, 9, 25, 20, tzinfo=UTC)
+    row = MarketPrice(company_id=company.id, date=friday.date(), open=180, high=200, low=175,
+                      close=190, adj_close=185, quote_currency='USD', source='yfinance')
+    db.add(row)
+    db.commit()
+    service = ThesisEvidenceService()
+    _stub_market(service, quote={'c': 195, 't': int(friday.timestamp())}, profile=None)
+    result = service._ingest_market(db, company)
+    assert result['status'] == 'ok'
+    assert row.close == Decimal(195)
+    assert (row.open, row.high, row.low, row.adj_close) == (180, 200, 175, 185)
+
+
+def test_non_us_listing_never_fetches_finnhub_spot_or_overwrites_gbx(db):
+    company = _company(db)
+    company.ticker = 'CGEO.L'
+    company.currency = 'GBP'
+    company.exchange = 'LSE'
+    friday = datetime(2026, 9, 25, 20, tzinfo=UTC)
+    row = MarketPrice(company_id=company.id, date=friday.date(), open=4200, high=4300, low=4150,
+                      close=4255, adj_close=4200, quote_currency='GBX', source='yfinance')
+    db.add(row)
+    db.commit()
+    service = ThesisEvidenceService()
+    def forbidden_quote(_ticker):
+        pytest.fail('Finnhub quote must not be called for a non-US listing')
+    service._fetch_quote = forbidden_quote
+    service._fetch_profile = lambda _ticker: None
+    result = service._ingest_market(db, company)
+    assert result['status'] == 'pending'
+    assert 'price' not in result
+    assert (row.open, row.high, row.low, row.close, row.adj_close) == (4200, 4300, 4150, 4255, 4200)
+    assert row.quote_currency == 'GBX'
