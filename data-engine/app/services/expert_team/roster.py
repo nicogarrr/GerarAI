@@ -109,6 +109,24 @@ def recopilador_expert() -> ExpertSpec:
     )
 
 
+def analyst_blend_expert() -> ExpertSpec:
+    """«Mezcla de analistas»: rellena los huecos del modelo con las mejores firmas.
+
+    Etapa del pipeline de la tesis tras el Recopilador y la detección de huecos.
+    No entra en ``default_experts``. La corre
+    ``expert_team.analyst_blend.run_analyst_blend`` (con EXPERT_TEAM_ENABLED).
+    """
+    from app.services.expert_team.analyst_blend import BLEND_NAME, BLEND_TOOLS
+
+    return ExpertSpec(
+        name=BLEND_NAME,
+        typical_s=20.0,
+        prompt_name="expert_mezcla_analistas",
+        tools=BLEND_TOOLS,
+        max_tokens=6000,
+    )
+
+
 def pipeline_experts() -> list[ExpertSpec]:
-    """Roles del pipeline automático de la tesis, en orden. Hoy: el Recopilador."""
-    return [recopilador_expert()]
+    """Roles del pipeline automático de la tesis, en orden: Recopilador y mezcla de analistas."""
+    return [recopilador_expert(), analyst_blend_expert()]

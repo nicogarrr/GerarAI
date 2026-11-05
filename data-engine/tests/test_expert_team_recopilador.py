@@ -182,7 +182,7 @@ def _run(db, llm, **kw):
 # ------------------------------------------------------------------ registro
 def test_recopilador_registrado_con_prompt_versionado() -> None:
     spec = recopilador_expert()
-    assert [s.name for s in pipeline_experts()] == ["recopilador"]
+    assert [s.name for s in pipeline_experts()][0] == "recopilador"
     definition = prompt_registry.PROMPTS[spec.prompt_name]
     assert definition.version == "recopilador-v1"
     assert "español" in definition.text

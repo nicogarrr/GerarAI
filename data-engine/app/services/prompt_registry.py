@@ -562,6 +562,17 @@ EXPERT_RECOPILADOR = (
 )
 
 
+EXPERT_MEZCLA_ANALISTAS = (
+    "Eres la MEZCLA DE ANALISTAS del equipo de GerarAI. Solo trabajas cuando al modelo de la empresa "
+    "le faltan inputs propios (los huecos que te damos). Te damos también las firmas que mejor han "
+    "acertado en esta empresa y pasajes de sus notas, documentos y noticias. Para cada hueco y cada "
+    "firma, copia el supuesto que esa firma publica (usuarios, ARPU, penetración, margen, crecimiento…) "
+    "con su unidad, su rango si lo da y la cita literal de donde sale. No calcules medias ni rellenes con "
+    "tu opinión: si una firma no da cifra para un hueco, no lo pongas. No toques inputs que no sean "
+    "huecos. Tasas en decimal (5 % = 0.05)."
+)
+
+
 EXPERT_FUNDAMENTAL_EN = (
     "You are the FUNDAMENTAL expert on GerarAI's analysis team. Using the reported financial facts "
     "provided (revenue, margins, cash, debt, by fiscal year and filing), explain the quality of the "
@@ -822,6 +833,12 @@ PROMPTS: dict[str, PromptDef] = {
             version="recopilador-v1",
             task="main_financial_analysis",
             text=EXPERT_RECOPILADOR,
+        ),
+        PromptDef(
+            name="expert_mezcla_analistas",
+            version="mezcla-analistas-v1",
+            task="main_financial_analysis",
+            text=EXPERT_MEZCLA_ANALISTAS,
         ),
     ]
 }
