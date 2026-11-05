@@ -1802,6 +1802,12 @@
     "scenarioWarnings": {
       "growthOutsideReference": "Scenario \"{name}\": revenue growth {value}, outside the general reference range ({low} to {high}); shown as declared, with its source.",
       "marginAboveReference": "Scenario \"{name}\": FCF margin {value}, above the general reference ({reference}); shown as declared, with its source."
+    },
+    "blockers": {
+      "traceableWacc": "WACC without a traceable calculation",
+      "forecastIsNotTheDriver": "terminal value is over 95 % of the value: the 5-year forecast is not what drives this valuation",
+      "inferredFcfMarginTarget": "inferred FCF margin target (with sources): indicative margin convergence for a growing company, not a final valuation",
+      "scenarioSetMissing": "scenarios pending: the declared model values by scenarios and no sourced set exists yet; the figure is the fallback engine guidance, not a final valuation"
     }
   },
   "peerFormat": {
