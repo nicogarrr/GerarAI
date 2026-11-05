@@ -2558,24 +2558,25 @@ class FinancialIngestionService:
                     continue
                 if metric == "capital_expenditure":
                     val = -val
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric=metric,
-                        value=val,
-                        unit=f"{ccy}/share" if unit.endswith("/xbrli:shares") else ccy,
-                        period=f"{period_date}:FY",
-                        fiscal_year=_annual_fiscal_year(period_date, None),
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="ESEF",
-                        is_reported=True,
-                        confidence=Decimal("0.95"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric=metric,
+                    value=val,
+                    unit=f"{ccy}/share" if unit.endswith("/xbrli:shares") else ccy,
+                    period=f"{period_date}:FY",
+                    fiscal_year=_annual_fiscal_year(period_date, None),
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="ESEF",
+                    is_reported=True,
+                    confidence=Decimal("0.95"),
                 )
                 facts_imported += 1
 
-        # la sesion de ingestion usa autoflush=False: drop_shadowed_facts hace flush antes de derivar
+        # la sesion de ingestion usa autoflush=False y la tanda bulk no la
+        # ve db.flush: se vuelca ANTES de que drop_shadowed_facts lea hechos
+        _flush_fact_buffer(db)
         drop_shadowed_facts(db, company.id, document.id, tenant_condition(db))
         facts_imported += self._derive_esef_metrics(db, company, document)
         facts_imported += self._import_esef_shares(db, company, document, facts_data, currency=ccy)
@@ -2783,28 +2784,11 @@ class FinancialIngestionService:
             if net_income is not None and equity is not None and prev_equity is not None:
                 avg_equity = (equity.value + prev_equity.value) / 2
                 if avg_equity > 0:
-                    db.add(
-                        FinancialFact(
-                            company_id=company.id,
-                            metric="roe",
-                            value=net_income.value / avg_equity,
-                            unit="decimal",
-                            period=equity.period,
-                            fiscal_year=year,
-                            fiscal_quarter="FY",
-                            source_id=document.id,
-                            source_type="SEC",
-                            is_reported=False,
-                            confidence=Decimal("0.85"),
-                        )
-                    )
-                    derived += 1
-            if equity is not None and prev_equity is not None and prev_equity.value > 0:
-                db.add(
-                    FinancialFact(
+                    _queue_fact(
+                        db,
                         company_id=company.id,
-                        metric="book_value_growth",
-                        value=(equity.value / prev_equity.value) - 1,
+                        metric="roe",
+                        value=net_income.value / avg_equity,
                         unit="decimal",
                         period=equity.period,
                         fiscal_year=year,
@@ -2814,15 +2798,32 @@ class FinancialIngestionService:
                         is_reported=False,
                         confidence=Decimal("0.85"),
                     )
+                    derived += 1
+            if equity is not None and prev_equity is not None and prev_equity.value > 0:
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="book_value_growth",
+                    value=(equity.value / prev_equity.value) - 1,
+                    unit="decimal",
+                    period=equity.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="SEC",
+                    is_reported=False,
+                    confidence=Decimal("0.85"),
                 )
                 derived += 1
 
-            fcf: FinancialFact | None = None
+            fcf_value: Any = None
             if ocf is not None and capex is not None:
-                fcf = FinancialFact(
+                fcf_value = ocf.value + capex.value
+                _queue_fact(
+                    db,
                     company_id=company.id,
                     metric="free_cash_flow",
-                    value=ocf.value + capex.value,
+                    value=fcf_value,
                     # Misma divisa que sus componentes (CNY en un 20-F de BABA).
                     unit=ocf.unit,
                     period=ocf.period,
@@ -2835,27 +2836,25 @@ class FinancialIngestionService:
                     # Derivada: conocible cuando lo fueron AMBAS entradas.
                     filed=_latest_known_filed(ocf, capex),
                 )
-                db.add(fcf)
                 derived += 1
             if (
-                fcf is not None
+                fcf_value is not None
                 and revenue is not None
                 and revenue.value > 0
             ):
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric="fcf_margin",
-                        value=fcf.value / revenue.value,
-                        unit="decimal",
-                        period=revenue.period,
-                        fiscal_year=year,
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="SEC",
-                        is_reported=False,
-                        confidence=Decimal("0.85"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="fcf_margin",
+                    value=fcf_value / revenue.value,
+                    unit="decimal",
+                    period=revenue.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="SEC",
+                    is_reported=False,
+                    confidence=Decimal("0.85"),
                 )
                 derived += 1
             previous_revenue = year_fact("revenue", year - 1)
@@ -2864,37 +2863,35 @@ class FinancialIngestionService:
                 and previous_revenue is not None
                 and previous_revenue.value > 0
             ):
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric="revenue_growth",
-                        value=(revenue.value / previous_revenue.value) - 1,
-                        unit="decimal",
-                        period=revenue.period,
-                        fiscal_year=year,
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="SEC",
-                        is_reported=False,
-                        confidence=Decimal("0.85"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="revenue_growth",
+                    value=(revenue.value / previous_revenue.value) - 1,
+                    unit="decimal",
+                    period=revenue.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="SEC",
+                    is_reported=False,
+                    confidence=Decimal("0.85"),
                 )
                 derived += 1
             if debt is not None and cash is not None:
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric="net_debt",
-                        value=debt.value - cash.value,
-                        unit=debt.unit,
-                        period=debt.period,
-                        fiscal_year=year,
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="SEC",
-                        is_reported=False,
-                        confidence=Decimal("0.85"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="net_debt",
+                    value=debt.value - cash.value,
+                    unit=debt.unit,
+                    period=debt.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="SEC",
+                    is_reported=False,
+                    confidence=Decimal("0.85"),
                 )
                 derived += 1
             elif (
@@ -2913,20 +2910,19 @@ class FinancialIngestionService:
                 # lleva is_reported=False, confidence rebajada y la etiqueta
                 # queda en document.metadata_["net_debt_no_financial_debt_periods"].
                 # Sin balance completo no hay inferencia: N/D (no se crea fila).
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric="net_debt",
-                        value=-cash.value,
-                        unit=cash.unit,
-                        period=cash.period,
-                        fiscal_year=year,
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="SEC",
-                        is_reported=False,
-                        confidence=Decimal("0.80"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="net_debt",
+                    value=-cash.value,
+                    unit=cash.unit,
+                    period=cash.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="SEC",
+                    is_reported=False,
+                    confidence=Decimal("0.80"),
                 )
                 derived += 1
                 no_financial_debt_periods[cash.period] = (
@@ -2942,6 +2938,7 @@ class FinancialIngestionService:
                 **(document.metadata_ or {}),
                 "net_debt_no_financial_debt_periods": existing,
             }
+        _flush_fact_buffer(db)
         db.flush()
         return derived
 
@@ -2989,37 +2986,35 @@ class FinancialIngestionService:
         )
         imported = 0
         for item in diluted:
-            db.add(
-                FinancialFact(
-                    company_id=company.id,
-                    metric=esef_shares.DILUTED_METRIC,
-                    value=item.shares,
-                    unit="shares",
-                    period=f"{item.period}:FY",
-                    fiscal_year=_annual_fiscal_year(item.period, None),
-                    fiscal_quarter="FY",
-                    source_id=document.id,
-                    source_type="ESEF",
-                    is_reported=False,
-                    confidence=Decimal("0.6") if item.numerator_adjustment_risk else Decimal("0.7"),
-                )
+            _queue_fact(
+                db,
+                company_id=company.id,
+                metric=esef_shares.DILUTED_METRIC,
+                value=item.shares,
+                unit="shares",
+                period=f"{item.period}:FY",
+                fiscal_year=_annual_fiscal_year(item.period, None),
+                fiscal_quarter="FY",
+                source_id=document.id,
+                source_type="ESEF",
+                is_reported=False,
+                confidence=Decimal("0.6") if item.numerator_adjustment_risk else Decimal("0.7"),
             )
             imported += 1
         for item in basic:
-            db.add(
-                FinancialFact(
-                    company_id=company.id,
-                    metric=esef_shares.BASIC_METRIC,
-                    value=item.shares,
-                    unit="shares",
-                    period=f"{item.period}:FY",
-                    fiscal_year=_annual_fiscal_year(item.period, None),
-                    fiscal_quarter="FY",
-                    source_id=document.id,
-                    source_type="ESEF",
-                    is_reported=False,
-                    confidence=Decimal("0.6"),
-                )
+            _queue_fact(
+                db,
+                company_id=company.id,
+                metric=esef_shares.BASIC_METRIC,
+                value=item.shares,
+                unit="shares",
+                period=f"{item.period}:FY",
+                fiscal_year=_annual_fiscal_year(item.period, None),
+                fiscal_quarter="FY",
+                source_id=document.id,
+                source_type="ESEF",
+                is_reported=False,
+                confidence=Decimal("0.6"),
             )
             imported += 1
         document.metadata_ = {
@@ -3049,6 +3044,7 @@ class FinancialIngestionService:
                 ],
             },
         }
+        _flush_fact_buffer(db)
         db.flush()
         return imported
 
