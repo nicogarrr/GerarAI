@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections import Counter
 from datetime import UTC, date, datetime, timedelta
@@ -241,6 +243,14 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
        for t, extra in g for t in (t, *extra)]
     + [TOTAL_DEBT_LAST_RESORT]
 ))
+
+# Version de las REGLAS de ingesta SEC; forma parte de la huella del payload
+# (sec_payload_fingerprint). Hay que subirla cuando cambie cualquier regla que
+# altere el resultado de reingerir el MISMO payload (aliases de
+# SEC_METRIC_MAP, puertas de signo, prioridades de alcance, derivadas...):
+# sin subirla, una empresa cuyo payload no cambia nunca recogeria la regla
+# nueva.
+SEC_INGESTION_RULES_VERSION = 2
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("revenue",           ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax", "RegulatedAndUnregulatedOperatingRevenue"],  "USD"),
@@ -1562,6 +1572,15 @@ def _recent_fiscal_mode(pairs: list[tuple[str, str]]) -> str:
 
 
 
+def _sec_payload_fingerprint(facts_data: dict[str, Any]) -> str:
+    """Huella de contenido del payload companyfacts (canonico, no bytes:
+    el orden de claves del JSON no cambia la huella)."""
+    canonical = json.dumps(
+        facts_data, sort_keys=True, separators=(",", ":"), default=str
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def _latest_filed_date(us_gaap: dict[str, Any]):
     """Fecha `filed` mas reciente de los hechos companyfacts, o None."""
     latest = None
@@ -1748,6 +1767,45 @@ class FinancialIngestionService:
                 "hechos (usa la fuente de su mercado local, p. ej. ESEF)"
             )
 
+        # Huella del payload + version de reglas: si nada cambio desde la
+        # ultima ingesta completa, el recomputo seria identico (F353: la
+        # misma importacion dos veces es idempotente) y se omite ENTERO: sin
+        # pasadas de recoleccion, sin borrado/reescritura de hechos, sin
+        # fetch de submissions/anclas ni resync de chunks. Medido con
+        # companyfacts reales (CHTR/TSLA/MSFT, 5-nov-2026): un refresh sin
+        # cambios costaba ~800 sentencias (765 INSERT identicos) y ~21-33k
+        # entradas XBRL reescaneadas por empresa; con la huella son 2 SELECT.
+        # Un corte as_of NUNCA salta ni ESCRIBE la huella: su resultado es un
+        # recorte deliberado de la historia, no el estado vigente, y ademas
+        # INVALIDA la huella guardada (ver mas abajo) para que el siguiente
+        # refresh completo reingiera.
+        document = self._source_document_sec(db, company, ticker)
+        payload_fingerprint = (
+            f"{SEC_INGESTION_RULES_VERSION}:{_sec_payload_fingerprint(facts_data)}"
+        )
+        if as_of is None and (document.metadata_ or {}).get(
+            "sec_payload_fingerprint"
+        ) == payload_fingerprint:
+            return {
+                "status": "unchanged",
+                "ticker": ticker,
+                "provider": "SEC",
+                "source_document_id": document.id,
+                "facts_imported": 0,
+                "cik": cik,
+                "as_of": None,
+                "date_filter_applied": False,
+                "conflicts": None,
+                "free_data": None,
+                "fy_periods": (document.metadata_ or {}).get("fy_periods") or [],
+                "annual_anchored_filings": None,
+                "annual_anchor_source": None,
+                "annual_anchor_partial": False,
+                "annual_anchor_note": None,
+                "mirror": None,
+                "unchanged": True,
+            }
+
         us_gaap = facts_data.get("facts", {}).get("us-gaap", {})
         # 40-F/20-F en IFRS (BN): sin us-gaap, la misma lectura va sobre
         # ifrs-full con su mapa de conceptos; el resto de reglas no cambia.
@@ -1779,7 +1837,6 @@ class FinancialIngestionService:
         except Exception:  # noqa: BLE001 - fail closed DEI, no romper lo demas
             index_accessions = None
 
-        document = self._source_document_sec(db, company, ticker)
         # published_at = presentacion mas reciente (campo `filed` de companyfacts)
         # para que la procedencia OFICIAL tenga fecha; nunca se inventa.
         latest_filed = _latest_filed_date(us_gaap)
@@ -2243,8 +2300,20 @@ class FinancialIngestionService:
         # "mirror" se escribe SIEMPRE (null cuando esta corrida fue SEC
         # directo): una clave vieja de una corrida con fallback no puede
         # sobrevivir y atribuir al mirror una ingesta directa.
+        # La huella SOLO se gana una ingesta completa y DIRECTA (as_of=None
+        # y sin mirror HF): un corte as_of deja un recorte de la historia en
+        # disco y el mirror puede ir parcial o desfasado; ambos INVALIDAN la
+        # huella previa - el siguiente refresh completo y directo tiene que
+        # reingerir, no saltar (y asi la procedencia "mirror" se reescribe
+        # SIEMPRE, regla FIX: la metadata no puede sobrevivir de una corrida
+        # con fallback).
+        metadata = dict(document.metadata_ or {})
+        if as_of is None and mirror_info is None:
+            metadata["sec_payload_fingerprint"] = payload_fingerprint
+        else:
+            metadata.pop("sec_payload_fingerprint", None)
         document.metadata_ = {
-            **(document.metadata_ or {}),
+            **metadata,
             "fy_periods": fy_periods,
             "mirror": mirror_info,
         }
