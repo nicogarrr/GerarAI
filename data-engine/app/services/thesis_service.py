@@ -1312,7 +1312,15 @@ class ThesisService:
                 "Hipótesis en formación: faltan datos de mercado (precio) "
                 "para formular una hipótesis comprobable."
             )
-        currency = valuation.get("currency") or company.currency
+        # The valuation wire carries reconciliation metadata in ``currency``;
+        # it is not a display code. Values have already been converted to the
+        # listed currency, so prefer that explicit output unit.
+        currency_meta = valuation.get("currency")
+        currency = valuation.get("value_currency") or (
+            currency_meta.get("price_currency")
+            if isinstance(currency_meta, dict)
+            else currency_meta
+        ) or company.currency
         price_text = _thesis_money(float(price), currency)
         base_text = _thesis_money(float(base), currency)
         if base <= 0:
