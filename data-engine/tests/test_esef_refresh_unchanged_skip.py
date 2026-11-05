@@ -15,7 +15,6 @@ Reglas que fijan estos tests:
 """
 
 import asyncio
-import copy
 
 import pytest
 from sqlalchemy import create_engine, event, select
