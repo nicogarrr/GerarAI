@@ -5,25 +5,34 @@
  */
 import { formatPercent } from '@/lib/format';
 import type { Locale } from '@/lib/i18n/locale';
+import type { TranslationKey } from '@/lib/i18n/t';
 import { createTranslator } from '@/lib/i18n/translate';
 
 /** Motivos de no publicación en español claro. «traceable_wacc» como blocker
  *  significa que FALTA (el token suelto se leía como «WACC con fuente
  *  trazable», justo lo contrario). */
-const BLOCKER_LABELS: Record<string, string> = {
-  traceable_wacc: 'WACC sin cálculo trazable',
-  forecast_is_not_the_driver: 'el valor terminal es más del 95 % del valor: la previsión a 5 años no es el motor de esta valoración',
-  inferred_fcf_margin_target: 'margen FCF objetivo inferido (con fuentes): convergencia de margen orientativa para una empresa en crecimiento, no una valoración final',
+const BLOCKER_KEYS: Record<string, TranslationKey> = {
+  traceable_wacc: 'research.valuationText.blockers.traceable_wacc',
+  forecast_is_not_the_driver: 'research.valuationText.blockers.forecast_is_not_the_driver',
+  inferred_fcf_margin_target: 'research.valuationText.blockers.inferred_fcf_margin_target',
+  consenso_sin_conciliar: 'research.valuationText.blockers.consenso_sin_conciliar',
+  impulsor_material_sin_tratar: 'research.valuationText.blockers.impulsor_material_sin_tratar',
+  inventario_impulsores_no_verificable: 'research.valuationText.blockers.inventario_impulsores_no_verificable',
+  declared_input_default: 'research.valuationText.blockers.declared_input_default',
 };
 
-const BLOCKER_LABELS_EN: Record<string, string> = {
-  traceable_wacc: 'WACC without a traceable calculation',
-  forecast_is_not_the_driver: 'terminal value is over 95 % of the value: the 5-year forecast is not what drives this valuation',
-  inferred_fcf_margin_target: 'inferred FCF margin target (with sources): indicative margin convergence for a growing company, not a final valuation',
-};
-
-export function blockerLabel(id: string, locale: 'es' | 'en' = 'es'): string {
-  return (locale === 'en' ? BLOCKER_LABELS_EN : BLOCKER_LABELS)[id] ?? id;
+export function blockerLabel(id: string, locale: Locale = 'es'): string {
+  const t = createTranslator(locale);
+  switch (id) {
+    case 'traceable_wacc': return t('research.valuationText.blockers.traceable_wacc');
+    case 'forecast_is_not_the_driver': return t('research.valuationText.blockers.forecast_is_not_the_driver');
+    case 'inferred_fcf_margin_target': return t('research.valuationText.blockers.inferred_fcf_margin_target');
+    case 'consenso_sin_conciliar': return t('research.valuationText.blockers.consenso_sin_conciliar');
+    case 'impulsor_material_sin_tratar': return t('research.valuationText.blockers.impulsor_material_sin_tratar');
+    case 'inventario_impulsores_no_verificable': return t('research.valuationText.blockers.inventario_impulsores_no_verificable');
+    case 'declared_input_default': return t('research.valuationText.blockers.declared_input_default');
+    default: return BLOCKER_KEYS[id] ?? id;
+  }
 }
 
 /** Procedencia del WACC usado por el motor (resolve_rates del backend). */
@@ -33,6 +42,7 @@ export function waccSourceLabel(source: string | null | undefined, locale: Local
   switch (source) {
     case 'calculated_metric': return t('research.valuationText.waccSource.calculated_metric');
     case 'inferred_input': return t('research.valuationText.waccSource.inferred_input');
+    case 'declared_input': return t('research.valuationText.waccSource.declared_input');
     case 'tag_default': return t('research.valuationText.waccSource.tag_default');
     case 'market_cap_band': return t('research.valuationText.waccSource.market_cap_band');
     default: return source;

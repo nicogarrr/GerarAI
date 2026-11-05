@@ -2,12 +2,13 @@ import { formatGeneratedDate } from '@/lib/format';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locale';
 import { createTranslator } from '@/lib/i18n/translate';
 import { cleanThesisText } from '@/lib/research/thesis-text';
+import { thesisIsPublic } from '@/lib/research/thesis-publication';
 
 export type ThesisTextVersion = { status: string; version: number; created_at?: string | null; executive_summary?: string | null };
 
 /** Publication alone does not establish that persisted valuation prose is usable. */
 export function canShowThesisText(thesis: ThesisTextVersion, model: { publishable: boolean } | null | undefined): boolean {
-  return (thesis.status === 'published' || thesis.status === 'approved') && model?.publishable === true;
+  return thesisIsPublic(thesis.status) && model?.publishable === true;
 }
 
 export function WithheldThesisText({ thesis, model, locale = DEFAULT_LOCALE }: { thesis: ThesisTextVersion; model: { publishable: boolean } | null | undefined; locale?: Locale }) {
