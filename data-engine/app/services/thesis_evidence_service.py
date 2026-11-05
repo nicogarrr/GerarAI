@@ -107,6 +107,38 @@ SEC_EVIDENCE_TAGS: dict[str, tuple[list[str], str]] = {
     ),
 }
 
+# Emisores 20-F/40-F que solo traen ``ifrs-full`` (BN, ASML, BABA...). La
+# unidad monetaria se detecta del propio payload; el marcador "USD" solo indica
+# que la métrica es monetaria.
+SEC_IFRS_EVIDENCE_TAGS: dict[str, tuple[list[str], str]] = {
+    "revenue": (["Revenue", "RevenueFromContractsWithCustomers"], "USD"),
+    "shares_diluted": (["AdjustedWeightedAverageShares", "NumberOfSharesOutstanding"], "shares"),
+    "total_assets": (["Assets"], "USD"),
+    "net_income": (["ProfitLossAttributableToOwnersOfParent", "ProfitLoss"], "USD"),
+    "operating_cash_flow": (["CashFlowsFromUsedInOperatingActivities"], "USD"),
+    "capital_expenditure": (
+        [
+            "PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities",
+            "PurchaseOfIntangibleAssetsClassifiedAsInvestingActivities",
+            "PurchaseOfPropertyPlantAndEquipmentIntangibleAssetsOtherThanGoodwillInvestmentPropertyAndOtherNoncurrentAssets",
+        ],
+        "USD",
+    ),
+    "cash_and_equivalents": (["CashAndCashEquivalents"], "USD"),
+    "total_debt": (["Borrowings"], "USD"),
+}
+
+
+def _facts_reporting_currency(facts: dict[str, Any]) -> str:
+    """Divisa ISO de un bloque companyfacts, sin adivinar por el país."""
+    for tag in ("Revenue", "Revenues", "Assets", "CashAndCashEquivalents"):
+        units = ((facts.get(tag) or {}).get("units") or {})
+        for key in units:
+            code = str(key).upper()
+            if len(code) == 3 and code.isalpha():
+                return code
+    return "USD"
+
 ANNUAL_FORMS = {"10-K", "20-F"}
 # Informe anual de cualquier emisor SEC: domestico (10-K), extranjero en
 # US GAAP/IFRS (20-F) o canadiense MJDS (40-F, p. ej. BN), con enmiendas.
@@ -414,12 +446,38 @@ class ThesisEvidenceService:
         except Exception as exc:  # noqa: BLE001 - best-effort
             _log_source_failure("SEC EDGAR companyfacts", company.ticker, exc)
             return _pending("SEC EDGAR companyfacts", "EDGAR inaccesible ahora mismo.")
-        us_gaap = ((facts_payload or {}).get("facts") or {}).get("us-gaap") or {}
-        extracted = self._extract_recent_annuals(us_gaap)
+        # Identidad del emisor: un ticker reutilizado o un mapa CIK obsoleto no
+        # puede pegar los hechos de OTRA empresa a esta tesis. La ingesta
+        # completa ya lo comprueba; el atajo de la tesis también debe hacerlo.
+        payload_cik = str((facts_payload or {}).get("cik") or "").lstrip("0")
+        requested_cik = str(cik or "").lstrip("0")
+        company_cik = str(getattr(company, "cik", "") or "").lstrip("0")
+        if payload_cik and payload_cik != requested_cik:
+            return _pending(
+                "SEC EDGAR companyfacts",
+                f"El CIK devuelto ({payload_cik}) no es el solicitado ({requested_cik}); no se importan hechos.",
+            )
+        if company_cik and payload_cik and payload_cik != company_cik:
+            return _pending(
+                "SEC EDGAR companyfacts",
+                f"El CIK devuelto ({payload_cik}) no coincide con el de la ficha ({company_cik}); no se importan hechos.",
+            )
+        facts = (facts_payload or {}).get("facts") or {}
+        us_gaap = facts.get("us-gaap") or {}
+        if us_gaap:
+            extracted = self._extract_recent_annuals(us_gaap)
+            taxonomy = "us-gaap"
+        else:
+            ifrs = facts.get("ifrs-full") or {}
+            currency = _facts_reporting_currency(ifrs) if ifrs else "USD"
+            extracted = self._extract_recent_annuals(
+                ifrs, tags_map=SEC_IFRS_EVIDENCE_TAGS, currency=currency
+            )
+            taxonomy = "ifrs-full"
         if not extracted:
             return _pending(
                 "SEC EDGAR companyfacts",
-                f"CIK {cik} sin métricas us-gaap aprovechables.",
+                f"CIK {cik} sin métricas {taxonomy} aprovechables.",
             )
         document = self._get_or_create_document(
             db,
@@ -466,6 +524,11 @@ class ThesisEvidenceService:
                     # ingesta SEC completa. En positivo, FCF = OCF + capex salia
                     # inflado en 2 x capex (TTM, modelo a largo plazo).
                     value = -abs(value)
+                filed_raw = str(info.get("filed") or "")[:10]
+                try:
+                    filed = date.fromisoformat(filed_raw) if filed_raw else None
+                except ValueError:
+                    filed = None
                 db.add(
                     FinancialFact(
                         company_id=company.id,
@@ -479,6 +542,8 @@ class ThesisEvidenceService:
                         source_type="SEC",
                         is_reported=True,
                         confidence=Decimal("0.95"),
+                        filed=filed,
+                        accession_number=str(info.get("accn") or "")[:40] or None,
                     )
                 )
                 imported += 1
@@ -528,20 +593,24 @@ class ThesisEvidenceService:
     RECENT_ANNUAL_YEARS = 3
 
     def _extract_recent_annuals(
-        self, us_gaap: dict[str, Any], max_years: int | None = None
+        self,
+        us_gaap: dict[str, Any],
+        max_years: int | None = None,
+        *,
+        tags_map: dict[str, tuple[list[str], str]] | None = None,
+        currency: str | None = None,
     ) -> dict[str, list[dict[str, Any]]]:
         """Hasta ``max_years`` hechos ANUALES por metrica, del mas reciente al mas antiguo.
 
-        Mismas reglas que ``_extract_latest_annual`` (F133): duracion anual
-        probada, nunca sumar tags, preferencia declarada entre tags a igual
-        periodo. Si una metrica no tiene NINGUN hecho anual, conserva el
-        comportamiento anterior: un unico hecho con el fallback de
-        ``_extract_latest_annual`` (ultimo trimestre), para no perder
-        empresas que solo reportan trimestres.
+        ``tags_map``/``currency`` permiten leer ``ifrs-full`` con la divisa de
+        reporte del propio payload. Sin ellos se mantiene el contrato us-gaap.
         """
         limit = max_years or self.RECENT_ANNUAL_YEARS
+        mapping = tags_map or SEC_EVIDENCE_TAGS
         out: dict[str, list[dict[str, Any]]] = {}
-        for metric, (tags, unit) in SEC_EVIDENCE_TAGS.items():
+        for metric, (tags, unit) in mapping.items():
+            if unit == "USD" and currency:
+                unit = currency
             # periodo (end) -> (preferencia de tag, filed, entry): a igual
             # periodo manda el tag preferido; a mismo tag, el envio reciente.
             by_end: dict[str, tuple[int, str, str, dict[str, Any]]] = {}
@@ -562,7 +631,9 @@ class ThesisEvidenceService:
                     ):
                         by_end[end] = (preference, filed, tag, entry)
             if not by_end:
-                legacy_map = self._extract_latest_annual(us_gaap)
+                legacy_map = self._extract_latest_annual(
+                    us_gaap, tags_map=mapping, currency=currency
+                )
                 legacy = legacy_map.get(metric)
                 if legacy is not None:
                     out[metric] = [legacy]
@@ -583,12 +654,20 @@ class ThesisEvidenceService:
                         "fiscal_quarter": "FY",
                         "concept": tag,
                         "form": entry.get("form"),
+                        "filed": entry.get("filed"),
+                        "accn": entry.get("accn"),
                     }
                 )
             out[metric] = infos
         return out
 
-    def _extract_latest_annual(self, us_gaap: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    def _extract_latest_annual(
+        self,
+        us_gaap: dict[str, Any],
+        *,
+        tags_map: dict[str, tuple[list[str], str]] | None = None,
+        currency: str | None = None,
+    ) -> dict[str, dict[str, Any]]:
         """Ultimo hecho anual por metrica (fallback: ultimo trimestre).
 
         Reglas (F133, MSFT tenant 5):
@@ -604,7 +683,10 @@ class ThesisEvidenceService:
           suman tags.
         """
         out: dict[str, dict[str, Any]] = {}
-        for metric, (tags, unit) in SEC_EVIDENCE_TAGS.items():
+        mapping = tags_map or SEC_EVIDENCE_TAGS
+        for metric, (tags, unit) in mapping.items():
+            if unit == "USD" and currency:
+                unit = currency
             best: dict[str, Any] | None = None
             for tag in tags:
                 entries = ((us_gaap.get(tag) or {}).get("units") or {}).get(unit, [])
@@ -660,12 +742,25 @@ class ThesisEvidenceService:
     def _ingest_market(self, db: Session, company: Company) -> dict[str, Any]:
         ticker = company.ticker.upper()
         result: dict[str, Any] = {"status": "pending", "source": "Finnhub"}
-        try:
-            quote = self._fetch_quote(ticker)
-        except Exception as exc:  # noqa: BLE001 - best-effort
-            _log_source_failure("Finnhub quote", ticker, exc)
-            result["detail"] = "Cotización inaccesible ahora mismo."
-            quote = None
+        # Finnhub resuelve el ticker PELADO en bolsas de EE. UU.: para un emisor
+        # no-US devuelve otro emisor o su ADR. Sin este guard el precio USD del
+        # ADR se guardaba bajo la identidad/divisa del listado local.
+        from app.services.market_refresh_service import _us_listed
+
+        us_listed = _us_listed(company)
+        quote = None
+        if not us_listed:
+            result["detail"] = (
+                "Cotización Finnhub omitida: el ticker sin sufijo resolvería al "
+                "listado de EE. UU.; el precio local lo aporta la fuente de mercado."
+            )
+        else:
+            try:
+                quote = self._fetch_quote(ticker)
+            except Exception as exc:  # noqa: BLE001 - best-effort
+                _log_source_failure("Finnhub quote", ticker, exc)
+                result["detail"] = "Cotización inaccesible ahora mismo."
+                quote = None
         price = _decimal((quote or {}).get("c")) if quote else None
         # Fallar cerrado ante payload malformado: timestamp o volumen invalidos
         # no propagan una excepcion; sin fecha honesta no se escribe barra.
@@ -692,7 +787,7 @@ class ThesisEvidenceService:
                         MarketPrice.company_id == company.id, MarketPrice.date == quote_date
                     )
                 )
-                if existing and existing.quote_currency is not None:
+                if existing and existing.quote_currency not in (None, "USD"):
                     result.update({"status": "unknown_price_unit", "detail": "Quote sin unidad verificable para esta barra ajustada."})
                 elif existing:
                     # Barra real ya persistida: se actualiza solo el close y se
@@ -701,7 +796,7 @@ class ThesisEvidenceService:
                     if volume is not None:
                         existing.volume = volume
                     existing.source = "Finnhub"
-                    existing.quote_currency = None
+                    existing.quote_currency = "USD"
                 else:
                     # Spot no es barra ajustada: adj_close NULL, nunca una copia
                     # de close que afirme un ajuste no realizado.
@@ -716,7 +811,7 @@ class ThesisEvidenceService:
                             adj_close=None,
                             volume=volume,
                             source="Finnhub",
-                            quote_currency=None,
+                            quote_currency="USD",
                         )
                     )
                 if result["status"] != "unknown_price_unit":
@@ -736,12 +831,21 @@ class ThesisEvidenceService:
                 db.add(company)
                 result["name"] = name
             market_cap = _decimal(profile.get("marketCapitalization"))
+            # El market cap del perfil viene en la divisa que declara el
+            # proveedor. Guardarlo siempre como USD convertía un market cap en
+            # EUR/GBP/JPY en una cifra 1:1 falsa. Si la divisa no casa con la
+            # del maestro y no es un listado US, no se escribe.
+            cap_currency = str(profile.get("currency") or company.currency or "USD").upper()
+            company_currency = str(company.currency or "").upper()
+            if not us_listed and company_currency and cap_currency != company_currency:
+                cap_currency = ""
             # El market cap se fecha con la sesion de la quote del proveedor,
             # nunca con el dia de la ingesta (fabricaba hechos de sabado/domingo
             # con una variacion inexistente). Sin fecha honesta no se escribe.
             cap_date = quote_date if quote_date and quote_date <= datetime.now(UTC).date() else None
-            if market_cap is not None and market_cap > 0 and cap_date is not None:
-                # marketCapitalization de Finnhub viene en millones de USD.
+            if market_cap is not None and market_cap > 0 and cap_date is not None and cap_currency:
+                # marketCapitalization de Finnhub viene en millones de la
+                # divisa del perfil.
                 value = market_cap * Decimal("1000000")
                 period = cap_date.isoformat()
                 already = db.scalar(
@@ -758,7 +862,7 @@ class ThesisEvidenceService:
                             company_id=company.id,
                             metric="market_cap",
                             value=value,
-                            unit="USD",
+                            unit=cap_currency,
                             period=period,
                             source_id=None,
                             source_type="Finnhub",

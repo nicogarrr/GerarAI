@@ -24,7 +24,7 @@ from app.models import (
     FinancialFact,
     KPIExtractionCandidate,
 )
-from app.services.budget import BudgetController, BudgetExceededError
+from app.services.budget import BudgetController
 from app.services.company_framework import resolve_company_framework
 from app.services.langfuse_client import LangfuseTracer
 from app.services.number_parsing import (
@@ -208,6 +208,18 @@ class KPIExtractionService:
         company = db.get(Company, document.company_id)
         if company is None:
             raise ValueError("Document company no longer exists")
+        # Legacy jobs already paid for this document. Never regenerate or
+        # overwrite their observations/approval state on an automatic retry.
+        existing_candidates = list(db.scalars(select(KPIExtractionCandidate).where(
+            KPIExtractionCandidate.document_id == document.id,
+            *tenant_filters(db, KPIExtractionCandidate),
+        ).order_by(KPIExtractionCandidate.id)))
+        if existing_candidates:
+            return existing_candidates
+        from app.services.ir_content_guard import normalized_digest, soft_404
+
+        if document.source_type == "IR" and soft_404(document.source_url, document.title or ""):
+            return []
         registry = CompanyKPIRegistryService().sync(db, company, commit=False)
         chunks = list(
             db.scalars(
@@ -232,6 +244,21 @@ class KPIExtractionService:
             if not chunks:
                 # Jev no ve senal KPI en ningun chunk: se ahorra la llamada LLM.
                 return []
+        if document.source_type == "IR":
+            visible = "\n".join(chunk.text for chunk in chunks)
+            if soft_404(document.source_url, visible):
+                return []
+            digest = normalized_digest(visible)
+            completed = db.scalar(select(Document.id).where(
+                Document.id != document.id, Document.company_id == document.company_id,
+                Document.source_url == document.source_url,
+                Document.metadata_["kpi_ir_completed_digest"].as_string() == digest,
+                *tenant_filters(db, Document),
+            ).limit(1))
+            if completed is not None or (document.metadata_ or {}).get("kpi_ir_completed_digest") == digest:
+                return []
+        else:
+            digest = None
         chunk_map = {chunk.id: chunk for chunk in chunks}
         source_text = "\n\n".join(
             f"[chunk:{chunk.id}]\n{chunk.text}" for chunk in chunks
@@ -240,6 +267,8 @@ class KPIExtractionService:
         schema = self._schema(metric_keys)
         budget = BudgetController()
         if not budget.can_spend(db, 0.02):
+            from app.services.budget import BudgetExceededError
+
             raise BudgetExceededError("LLM budget exhausted")
         request = LLMRequest(
                 messages=[
@@ -292,6 +321,9 @@ class KPIExtractionService:
             },
         ) as llm_trace:
             try:
+                from app.services.kpi_call_quota import reserve
+
+                reserve(db.info.get("tenant_id"))
                 response = await self.provider.complete(request)
                 payload = parse_json_response(response.text)
                 cost = budget.estimate_cost_eur(
@@ -432,6 +464,8 @@ class KPIExtractionService:
             )
             db.add(candidate)
             created.append(candidate)
+        if digest is not None:
+            document.metadata_ = {**(document.metadata_ or {}), "kpi_ir_completed_digest": digest}
         db.flush()
         if commit:
             db.commit()

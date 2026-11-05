@@ -364,6 +364,18 @@ class Settings(BaseSettings):
     # entrando via el mirror HF (sec_hf_mirror_dataset) sincronizado por
     # GitHub Actions. True solo donde la SEC sea alcanzable (dev local).
     sec_document_jobs_enabled: bool = False
+    # Tope de process_document encolados por pasada IR/SEC: sin el, una
+    # pagina IR con cientos de comunicados reencolaba todo cada hora
+    # (677 docs de KRKNF en la cola default el 5-nov-2026, host al 95 % CPU).
+    # Lo que excede el tope entra en ticks siguientes; nada se pierde.
+    document_enqueue_max_per_poll: int = 50
+    # Concurrencia maxima de ingesta pesada (descarga + extraccion + embeddings)
+    # por proceso worker: Docling y el fallback de embeddings queman CPU/RAM;
+    # con varios hilos en default, N ingestas simultaneas tumban el host.
+    document_ingest_max_concurrency: int = 1
+    # Opt-out operativo de ingesta de documentos, sin despliegue de codigo:
+    # "10:KRKNF,2:PNG.V" excluye ese ticker en ese tenant; "TICKER" en todos.
+    document_ingest_exclusions: str = ""
     # Pipeline de ingesta en dos carriles (MarkItDown rapido / Docling
     # estructura / pypdf clasico; ver app/services/docling_pipeline.py).
     # Activo por defecto SI la dependencia opcional esta instalada; ausente,
@@ -464,12 +476,12 @@ class Settings(BaseSettings):
     # por ticker. DCA_ALERT_TRIMS: avisar tambien de las zonas de recorte.
     # DCA_ALERT_CHANNELS: canales base; Telegram se anade solo si el tenant
     # tiene suscripcion "dca_levels" con chat vinculado.
-    dca_alerts_enabled: bool = True
+    dca_alerts_enabled: bool = False
     dca_alert_min_level: int = Field(default=2, ge=1, le=4)
     dca_alert_trims: bool = False
     # Cierre mas antiguo (dias naturales) con el que aun se emite una senal DCA.
     dca_max_data_age_days: int = Field(default=14, ge=1, le=90)
-    dca_alert_channels: str = "in_app,email"
+    dca_alert_channels: str = "in_app"
     # Avisos de proximos resultados (earnings) de watchlist + cartera, estilo
     # Investing: ventanas de 7 dias, 1 dia y el propio dia sobre las fechas ya
     # refrescadas en earnings_dates. EARNINGS_ALERT_CHANNELS: canales base;

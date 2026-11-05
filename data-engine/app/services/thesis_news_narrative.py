@@ -22,6 +22,7 @@ from app.llm import LLMRequest, Message, ResponseFormat, parse_json_response
 from app.llm.errors import ProviderDisabledError, ProviderHTTPError, ProviderTransportError
 from app.llm.thesis_go import create_thesis_narrative_provider
 from app.models.entities import Company, NewsEvent
+from app.services import thesis_news_cache
 from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetController
 from app.services.llm_output_guard import complete_guarded, inspect_text
@@ -266,6 +267,15 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
             # Modelo no disponible NO es ausencia de evidencia: compendio
             # factual (fuentes explícitas, sin LLM, EUR 0) en vez de «Sin datos».
             return compendio_factual(list(news_items or []), now or datetime.now(UTC), "provider")
+        cache_key = thesis_news_cache.input_key(db, request, provider)
+        cached_raw = thesis_news_cache.read(cache_key)
+        if cached_raw is not None:
+            try:
+                # Re-run current validation and rebuild citations from current
+                # evidence. Redis never bypasses output or evidence guards.
+                return validate_output(cached_raw, headlines)
+            except (ValueError, TypeError, KeyError):
+                pass
         budget = BudgetController()
         responses = []
 
@@ -279,19 +289,34 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
         if not allowed():
             return compendio_factual(list(news_items or []), now or datetime.now(UTC), "budget")
 
+        validated_raw = None
+
         async def complete():
+            nonlocal validated_raw
             # Únicamente escalares y proveedor en el puente. Ninguna Session.
             guarded = await complete_guarded(
                 _TransientRetryProvider(provider), request,
                 source="thesis_news_narrative", on_response=responses.append,
             )
-            return validate_output(parse_json_response(guarded.response.text), headlines)
+            raw = parse_json_response(guarded.response.text)
+            sections = validate_output(raw, headlines)
+            # Do not pin a fallback response under the primary model's key.
+            if (
+                cache_key is not None
+                and guarded.response.model == provider.model_router.resolve(request)
+                and not getattr(guarded.response, "degraded", False)
+                and not getattr(guarded.response, "warnings", ())
+                and getattr(guarded.response, "finish_reason", "stop") in {"stop", "end_turn"}
+                and request.cache is not False
+            ):
+                validated_raw = raw
+            return sections
 
         async def bounded():
             return await asyncio.wait_for(complete(), timeout=NETWORK_TIMEOUT_SECONDS)
 
         try:
-            return run_from_any_context(bounded(), timeout=NETWORK_TIMEOUT_SECONDS + 15)
+            sections = run_from_any_context(bounded(), timeout=NETWORK_TIMEOUT_SECONDS + 15)
         finally:
             # Red terminada o cancelada. Contabilidad independiente y breve,
             # sin commits parciales de los datos de tesis.
@@ -306,6 +331,9 @@ def maybe_news_narrative_sections(db, company, news_items, *, provider=None, now
                     budget.record(db, response.model, "thesis_news_narrative", 0,
                                   response.usage.total_tokens, commit=False)
                     db.flush()
+        if validated_raw is not None:
+            thesis_news_cache.write(cache_key, validated_raw)
+        return sections
     except (ProviderHTTPError, ProviderTransportError, ProviderDisabledError) as exc:
         # SOLO indisponibilidad del proveedor (HTTP 429/5xx/401/403, timeout
         # de transporte, proveedor deshabilitado): la evidencia EXISTE y

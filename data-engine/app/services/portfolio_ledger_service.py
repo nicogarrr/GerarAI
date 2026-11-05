@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from collections.abc import Callable
@@ -7,7 +8,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 
 from app.core.local_date import local_today
@@ -23,6 +24,24 @@ logger = logging.getLogger(__name__)
 #: Divisas/fecha de inicio ya intentadas en este proceso: si el BCE no responde
 #: o no publica la divisa, no se reintenta en cada reconstruccion.
 _ECB_BACKFILL_TRIED: set[tuple[str, date]] = set()
+
+
+def _lock_ledger_company(db: Session, company_id: int) -> None:
+    """Serializa compras/ventas de una empresa en Postgres hasta el commit.
+
+    Sin esto dos ventas concurrentes leen la misma cantidad disponible y ambas
+    pasan la validación; una sobrescribe la posición de la otra y el ledger
+    queda con más ventas que acciones. En SQLite (tests) es un no-op.
+    """
+    try:
+        if db.get_bind().dialect.name != "postgresql":
+            return
+    except Exception:  # noqa: BLE001 - una sesión doble no debe romper el alta
+        return
+    tenant = db.info.get("tenant_id") if isinstance(db.info, dict) else None
+    raw = f"ledger:{tenant}:{company_id}".encode()
+    key = int.from_bytes(hashlib.sha256(raw).digest()[:8], "big", signed=True)
+    db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
 
 
 def _default_fx_backfill(db: Session, currencies: set[str], start: date, end: date) -> dict:
@@ -250,6 +269,7 @@ class PortfolioLedgerService:
         if trade_date is None or trade_date > local_today():
             raise ValueError("Transaction trade_date cannot be in the future")
         company = self.ensure_company(db, ticker)
+        _lock_ledger_company(db, company.id)
         portfolio = self.fx.ensure_portfolio(db)
         if normalized_action in {"buy", "sell"}:
             snapshot_position = db.scalar(select(Position).where(
@@ -329,6 +349,7 @@ class PortfolioLedgerService:
         conserva su Position (p. ej. la foto de posiciones de un extracto IBKR
         a la que solo se le anade un dividendo).
         """
+        _lock_ledger_company(db, company_id)
         transactions = list(
             db.scalars(
                 select(Transaction)

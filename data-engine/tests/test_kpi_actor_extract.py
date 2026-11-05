@@ -153,3 +153,18 @@ def test_actor_5xx_del_proveedor_sigue_el_reintento_normal(engine, monkeypatch):
     _fake_service(monkeypatch, exc=ProviderHTTPError("openrouter", 503))
     with pytest.raises(ProviderHTTPError):
         dramatiq_app.extract_document_kpis.fn(doc_id)
+
+
+def test_daily_cap_defers_without_losing_document_until_next_utc_day(engine, monkeypatch):
+    from app.services.kpi_call_quota import KPIDailyDeferred
+    doc_id = _document(engine)
+    monkeypatch.setattr(dramatiq_app, "_session", lambda *a: _open(engine))
+    _fake_service(monkeypatch, exc=KPIDailyDeferred("cap"))
+    result = dramatiq_app.extract_document_kpis.fn(doc_id)
+    assert result["status"] == "deferred"
+    assert result["reason"] == "daily_call_limit"
+    with _open(engine) as db:
+        doc = db.get(Document, doc_id)
+        deferred = doc.metadata_[dramatiq_app.KPI_DEFERRED_KEY]
+        assert deferred["attempts"] == 0
+        assert deferred["not_before"] > doc.metadata_["kpi_daily_deferred"]["at"]

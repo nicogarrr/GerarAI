@@ -10,6 +10,8 @@ type Props = {
     ticker: string;
     name: string;
     className?: string;
+    /** List images can be lazy; single-company headers stay eager. */
+    loading?: 'eager' | 'lazy';
 };
 
 type LogoArt = { src: string; background: string | null; forKey: string };
@@ -42,7 +44,7 @@ export const LOGO_CROP_MAX_PX = 128;
  * Sin canvas (navegador raro o CORS retirado) se degrada a mostrar la imagen
  * tal cual. Nunca un hueco vacío ni el logo de otra empresa.
  */
-export function CompanyLogo({ ticker, name, className }: Props) {
+export function CompanyLogo({ ticker, name, className, loading: imageLoading = 'eager' }: Props) {
     const sources = logoSources(ticker);
     const [art, setArt] = useState<LogoArt | null>(null);
     // Índice de la fuente en curso; la clave ata cada estado a su ticker.
@@ -130,6 +132,9 @@ export function CompanyLogo({ ticker, name, className }: Props) {
                 ref={img}
                 src={ready ? ready.src : src}
                 alt=""
+                // List logos must not hold window.load; headers remain eager.
+                loading={imageLoading}
+                decoding="async"
                 crossOrigin="anonymous"
                 referrerPolicy="no-referrer"
                 onLoad={(e) => {

@@ -16,6 +16,28 @@ import { createTranslator } from '../i18n/translate.ts';
  *  la ficha mostraba el slug crudo. */
 const FRAMEWORK_TERMS_I18N: Record<string, TranslationKey> = {
     unassigned: 'researchShared.frameworkTerms.unassigned',
+    deliveries: 'researchShared.frameworkTerms.autoEnergy.deliveries',
+    storage: 'researchShared.frameworkTerms.autoEnergy.storage',
+    optionality: 'researchShared.frameworkTerms.autoEnergy.optionality',
+    attach_rate: 'researchShared.frameworkTerms.autoEnergy.attachRate',
+    automotive: 'researchShared.frameworkTerms.autoEnergy.automotive',
+    energy: 'researchShared.frameworkTerms.autoEnergy.energy',
+    fsd_robotaxi: 'researchShared.frameworkTerms.autoEnergy.fsdRobotaxi',
+    optimus: 'researchShared.frameworkTerms.autoEnergy.optimus',
+    demand: 'researchShared.frameworkTerms.autoEnergy.demand',
+    battery_supply: 'researchShared.frameworkTerms.autoEnergy.batterySupply',
+    autonomy_regulation: 'researchShared.frameworkTerms.autoEnergy.autonomyRegulation',
+    auto_energy_optionality: 'researchShared.frameworkTerms.autoEnergy.autoEnergyOptionality',
+    vehicle_deliveries: 'researchShared.frameworkTerms.autoEnergy.vehicleDeliveries',
+    average_selling_price: 'researchShared.frameworkTerms.autoEnergy.averageSellingPrice',
+    energy_storage_deployed: 'researchShared.frameworkTerms.autoEnergy.energyStorageDeployed',
+    energy_storage_price: 'researchShared.frameworkTerms.autoEnergy.energyStoragePrice',
+    fsd_attach_rate: 'researchShared.frameworkTerms.autoEnergy.fsdAttachRate',
+    robotaxi_vehicles: 'researchShared.frameworkTerms.autoEnergy.robotaxiVehicles',
+    robotaxi_revenue_per_vehicle: 'researchShared.frameworkTerms.autoEnergy.robotaxiRevenuePerVehicle',
+    optimus_units: 'researchShared.frameworkTerms.autoEnergy.optimusUnits',
+    optimus_price: 'researchShared.frameworkTerms.autoEnergy.optimusPrice',
+    automotive_gross_margin: 'researchShared.frameworkTerms.autoEnergy.automotiveGrossMargin',
 };
 
 /** Métodos de trace.method de las valoraciones persistidas (data-engine
@@ -50,10 +72,7 @@ export const FRAMEWORK_TERMS: Record<string, string> = {
     subscriber: 'suscriptores / ingresos recurrentes', software_ai: 'software / plataforma de IA', capacity_infrastructure: 'capacidad / infraestructura',
     holding_asset_manager: 'holding / gestora de activos', bank: 'banco / negocio de depósitos', insurer: 'aseguradora', reit: 'SOCIMI / propietario de inmuebles',
     commodity: 'materias primas / royalties / recursos', biotech_pre_fcf: 'biotecnología / IA-biología pre-FCF', generic_fcf: 'compounder de flujo de caja libre',
-    auto_energy_optionality: 'auto / energía / opcionalidad', vehicle_deliveries: 'entregas de vehículos', average_selling_price: 'precio medio de venta',
-    energy_storage_deployed: 'almacenamiento energético desplegado', energy_storage_price: 'precio del almacenamiento energético',
-    fsd_attach_rate: 'tasa de adopción de FSD', robotaxi_vehicles: 'vehículos robotaxi', robotaxi_revenue_per_vehicle: 'ingresos por vehículo robotaxi',
-    optimus_units: 'unidades de Optimus', optimus_price: 'precio de Optimus', automotive_gross_margin: 'margen bruto automovilístico',
+
     // métricas y drivers
     collaboration_revenue: 'ingresos por colaboraciones', product_revenue: 'ingresos por producto', milestones: 'hitos de colaboración',
     pipeline_stage: 'fase del pipeline', cash_and_investments: 'caja e inversiones', partner_dependence: 'dependencia de socios',
@@ -117,6 +136,7 @@ export const FRAMEWORK_TERMS: Record<string, string> = {
 };
 
 export const FRAMEWORK_LABELS: Record<string, string> = {
+    'Auto / energy / optionality': createTranslator('es')('researchShared.frameworkTerms.autoEnergy.label'),
     'Space network / connectivity': 'Red espacial / conectividad',
     'Space and defense platform': 'Plataforma espacial y de defensa',
     'Platform / marketplace': 'Plataforma / marketplace',
@@ -189,6 +209,8 @@ export function frameworkLabel(label: string): string {
 function frameworkTermEn(raw: string): string | null {
     const one = (part: string): string | null => {
         const key = normalise(part);
+        const i18nKey = Object.hasOwn(FRAMEWORK_TERMS_I18N, key) ? FRAMEWORK_TERMS_I18N[key] : null;
+        if (i18nKey && key !== 'unassigned') return createTranslator('en')(i18nKey);
         if (Object.hasOwn(FRAMEWORK_TERMS_EN, key)) return FRAMEWORK_TERMS_EN[key];
         return Object.hasOwn(FRAMEWORK_TERMS, key) || Object.hasOwn(FRAMEWORK_TERMS_I18N, key) ? key.replaceAll('_', ' ') : null;
     };

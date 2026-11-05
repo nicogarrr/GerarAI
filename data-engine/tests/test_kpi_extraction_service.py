@@ -136,3 +136,80 @@ def test_normalize_units_negatives_and_percents():
     value, meta = normalize("not-a-number", "USD", "USD")
     assert value is None
     assert meta["status"] == "invalid_number"
+
+
+def test_existing_approved_candidates_return_before_any_llm(db):
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    existing = _scaffold(db, status="approved")
+    original = existing.normalized_value
+    provider = SimpleNamespace(complete=AsyncMock(side_effect=AssertionError("LLM called")))
+    result = asyncio.run(KPIExtractionService(provider).extract_document(db, db.get(Document, existing.document_id)))
+    assert result == [existing]
+    assert existing.normalized_value == original and existing.status == "approved"
+    provider.complete.assert_not_awaited()
+
+
+def _ir_document(db):
+    candidate = _scaffold(db)
+    document = db.get(Document, candidate.document_id)
+    db.delete(candidate)
+    document.source_type = "IR"
+    document.source_url = "https://ir.test/results"
+    db.commit()
+    return document
+
+
+@pytest.mark.parametrize("error_in_title", [True, False])
+def test_ir_soft404_skips_llm(db, error_in_title):
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    document = _ir_document(db)
+    if error_in_title:
+        document.title = "Page not found"
+    else:
+        db.scalar(select(DocumentChunk)).text = "Page not found"
+    db.commit()
+    provider = SimpleNamespace(complete=AsyncMock(side_effect=AssertionError("LLM called")))
+    assert asyncio.run(KPIExtractionService(provider).extract_document(db, document)) == []
+    provider.complete.assert_not_awaited()
+    assert "kpi_ir_completed_digest" not in document.metadata_
+
+
+def test_ir_empty_extraction_marks_completion_and_dedups_same_url(db):
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from app.llm.contracts import LLMResponse, Message, Usage
+    from app.services.ir_content_guard import normalized_digest
+
+    document = _ir_document(db)
+    chunk = db.scalar(select(DocumentChunk))
+    response = LLMResponse(
+        model="test", provider="test",
+        usage=Usage(input_tokens=1, output_tokens=1),
+        message=Message("assistant", '{"observations": []}'),
+    )
+    provider = SimpleNamespace(complete=AsyncMock(return_value=response))
+    service = KPIExtractionService(provider)
+    assert asyncio.run(service.extract_document(db, document)) == []
+    assert document.metadata_["kpi_ir_completed_digest"] == normalized_digest(chunk.text)
+    assert asyncio.run(service.extract_document(db, document)) == []
+    copy = Document(company_id=document.company_id, title="Results copy", source_type="IR",
+                    source_url=document.source_url, metadata_={})
+    db.add(copy)
+    db.flush()
+    db.add(DocumentChunk(document_id=copy.id, chunk_index=0, text=chunk.text))
+    db.commit()
+    assert asyncio.run(service.extract_document(db, copy)) == []
+    assert provider.complete.await_count == 1
+    # Same public text at a different URL is not an authorized duplicate key.
+    copy.source_url = "https://ir.test/another-results"
+    db.commit()
+    assert asyncio.run(service.extract_document(db, copy)) == []
+    assert provider.complete.await_count == 2

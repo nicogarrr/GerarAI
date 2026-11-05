@@ -491,6 +491,11 @@ services:
       # Opt-in (#726): top_ten_sp500 se calcula en refresh_macro_context (cola default).
       SP500_FACTSHEET_SNAPSHOT_DIR: ${SP500_FACTSHEET_SNAPSHOT_DIR:-/data/sp500-factsheet-snapshots}
       RSS_FEEDS: ${RSS_FEEDS:-}
+      # Los modelos de embeddings (ST + fastembed MiniLM denso/bm25 sparse)
+      # van horneados en la imagen (/opt/hf, HF_HUB_OFFLINE=1): sin descarga
+      # en runtime ni fallback permanente a torch (worker a 103 % CPU y
+      # 2,13 GiB RSS, medido por el piloto 5-nov-2026). Docling sigue en /data.
+      DOCLING_ARTIFACTS_PATH: /data/docling-artifacts
     volumes:
       - duckdb_data:/data
       - ./data-esef-snapshots:/data/esef-snapshots:ro
@@ -971,9 +976,11 @@ services:
       # Un job pesado en curso como mucho: sin prefetch extra.
       dramatiq_queue_prefetch: "1"
       dramatiq_delay_queue_prefetch: "1"
-      FASTEMBED_CACHE_PATH: /data/fastembed-cache
       # Pesos Docling/HF fuera de la imagen, en el volumen con espacio.
+      # e5-large (knowledge_rag_v2) NO va horneado: su cache persistente vive
+      # aqui (solo lo usa este carril).
       DOCLING_ARTIFACTS_PATH: /data/docling-artifacts
+      FASTEMBED_CACHE_PATH: /data/fastembed-cache
       HF_HOME: /data/hf-home
       # Con el flag a 0 el actor rechaza el trabajo (apagado por defecto).
       KNOWLEDGE_RAG_ENABLED: ${KNOWLEDGE_RAG_ENABLED:-0}
@@ -1011,6 +1018,57 @@ services:
         limits:
           cpus: "0.50"
           memory: 512M
+
+  # Carril "documents" (process_document / process_document_structured):
+  # descarga + extraccion + embeddings de documentos. 5-nov-2026: 677 docs de
+  # KRKNF reencolados cada hora en default frenaban los periodicos de datos
+  # (~3 h de backlog) y el fallback de embeddings ponia el host al 95 % CPU.
+  # Cola dedicada de 1 hilo, prefetch 1 y caches de modelos persistentes.
+  # Los mensajes ya encolados en default los drena el worker default (el
+  # semaforo document_ingest_max_concurrency los serializa); nada que purgar.
+  worker-documents:
+    image: cavaai-backend:prod
+    container_name: cavaai-worker-documents
+    restart: unless-stopped
+    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "${DOCUMENTS_THREADS:-1}", "-Q", "documents"]
+    environment:
+      <<: [*app-env, *worker-db-env]
+      # Un job pesado en curso como mucho: sin prefetch extra.
+      dramatiq_queue_prefetch: "1"
+      dramatiq_delay_queue_prefetch: "1"
+      DOCLING_ARTIFACTS_PATH: /data/docling-artifacts
+    volumes:
+      - duckdb_data:/data
+    logging: *default-logging
+    healthcheck:
+      # Sin HTTP: dramatiq vivo (PID 1) + Redis de cola accesible.
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import os,sys,redis; sys.exit(0 if 'dramatiq' in open('/proc/1/cmdline','rb').read().decode(errors='ignore') and redis.from_url(os.environ['REDIS_URL'], socket_connect_timeout=3).ping() else 1)"
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          # 1 CPU: la ingesta no compite con la web. 1G = el presupuesto que
+          # quedaba en el techo del stack (16 GiB, test_documents_queue) y
+          # sigue el precedente de Docling en worker-knowledge (512-640M).
+          # Con fastembed cacheado el ONNX cabe holgado; si el fallback
+          # sentence-transformers (~2,3 GiB medido) llegara a cargar, el
+          # cgroup tumba ESE job (reintentos acotados -> DL visible) en vez
+          # de swap-ear el host entero como el 5-nov-2026.
+          cpus: "1.00"
+          memory: 1G
 
   scheduler:
     image: cavaai-backend:prod

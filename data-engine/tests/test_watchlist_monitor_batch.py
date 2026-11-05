@@ -36,9 +36,10 @@ def test_monitor_twenty_companies_has_constant_query_count():
     event.listen(engine, "before_cursor_execute", lambda *a: statements.append(a[2]))
     result = asyncio.run(watchlist.watchlist_monitor(
         tickers=','.join(f"BATCH{i}" for i in range(20)), db=db))
-    # Una query batch adicional verifica publicación del modelo y otra lee los
-    # splits (mínimo de 52 semanas desde el último split); coste constante.
-    assert len(statements) == 9
+    # 9 consultas anteriores + 4 GROUP BY de frescura: financial_facts,
+    # news_events, documents y market_prices (cierre oficial). Las cuatro
+    # son batch, sin N+1. Se conserva igualdad con 1 y 20 empresas.
+    assert len(statements) == 13
     assert len(result["items"]) == 20
     for row in result["items"].values():
         assert row["low_52w"] == 80
@@ -51,7 +52,7 @@ def test_monitor_twenty_companies_has_constant_query_count():
         assert row["valuation_side"] == "infravalorada"
     statements.clear()
     asyncio.run(watchlist.watchlist_monitor(tickers="BATCH0", db=db))
-    assert len(statements) == 9
+    assert len(statements) == 13
     db.close()
 
 

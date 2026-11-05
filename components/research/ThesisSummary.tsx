@@ -5,7 +5,9 @@ import { cleanThesisText } from '@/lib/research/thesis-text';
 
 export type ThesisTextVersion = { status: string; version: number; created_at?: string | null; executive_summary?: string | null };
 
-/** Publication alone does not establish that persisted valuation prose is usable. */
+/** Publication alone does not establish that persisted valuation prose is usable.
+ * TODO: legacy approved is accepted here; the page uses the stricter
+ * thesisIsPublic helper (published only). Align this component separately. */
 export function canShowThesisText(thesis: ThesisTextVersion, model: { publishable: boolean } | null | undefined): boolean {
   return (thesis.status === 'published' || thesis.status === 'approved') && model?.publishable === true;
 }

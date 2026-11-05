@@ -569,6 +569,104 @@ def valuation_method_lines(valuation: dict) -> list[str]:
         lines.append(f"- Qué descuenta el precio: {reverse['explanation_es']}")
     return lines
 
+async def _run_thesis_experts(db: Session, ticker: str) -> dict:
+    """Etapas del roster, en orden, en la misma sesión y transacción de la tesis."""
+    from app.services.expert_team.analyst_blend import run_analyst_blend
+    from app.services.expert_team.recopilador import run_recopilador
+    from app.services.expert_team.roster import pipeline_experts
+    from app.services.expert_team.service import provider_reasoner, run_context
+
+    ctx = run_context(db, ticker=ticker, mode="thesis")
+    reasoner = provider_reasoner(db=db, commit_usage=False)
+    history = None
+    history_loaded = False
+
+    async def load_history(symbol):
+        nonlocal history, history_loaded
+        if not history_loaded:
+            from app.services.analyst_history_service import analyst_history_service
+
+            history = await analyst_history_service.get(symbol)
+            history_loaded = True
+        return history
+
+    stages = []
+    for spec in pipeline_experts():
+        if spec.name == "recopilador":
+            result = await run_recopilador(db, ctx=ctx, reasoner=reasoner, spec=spec, enabled=True)
+        elif spec.name == "mezcla_analistas":
+            result = await run_analyst_blend(
+                db, ctx=ctx, reasoner=reasoner, spec=spec, enabled=True, load_history=load_history,
+            )
+        else:
+            raise ValueError(f"Etapa de tesis no soportada: {spec.name}")
+        stages.append({"name": spec.name, **result.as_dict()})
+    # El consenso es una referencia externa, nunca un input que fuerce el valor.
+    try:
+        reference = await load_history(ticker)
+    except Exception as exc:  # diagnóstico opcional; no inventar consenso si falla la fuente
+        return {"stages": stages, "consensus": None, "consensus_error": type(exc).__name__}
+    consensus = reference.consensus
+    return {
+        "stages": stages,
+        "consensus": consensus.mean if consensus is not None else None,
+        "consensus_source": reference.source_url,
+    }
+
+
+def _expert_inputs_from_pipeline(pipeline: dict | None) -> dict:
+    """Adapta las etapas de ``_prepare_thesis_experts`` al formato de inputs."""
+    if not isinstance(pipeline, dict):
+        return {}
+    if pipeline.get("error"):
+        return {"status": f"error:{pipeline['error']}"}
+    stages = {
+        stage.get("name"): {k: v for k, v in stage.items() if k != "name"}
+        for stage in pipeline.get("stages") or []
+        if isinstance(stage, dict)
+    }
+    recopilador = stages.get("recopilador") or {}
+    analista = stages.get("mezcla_analistas") or {}
+    if not recopilador and not analista:
+        return {}
+    return {"status": "ok", "recopilador": recopilador, "analista": analista, "errors": []}
+
+
+def _prepare_thesis_experts(db: Session, ticker: str, *, stored_evidence_only: bool) -> dict | None:
+    from app.core.config import get_settings
+
+    if not get_settings().expert_team_enabled or stored_evidence_only:
+        return None
+    import asyncio
+
+    # No mover una Session ni sus escrituras a un hilo que pueda sobrevivir al timeout.
+    # Las rutas async deben offload la generación sync completa, no solo esta etapa.
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        async def bounded():
+            return await asyncio.wait_for(_run_thesis_experts(db, ticker), timeout=120.0)
+
+        from app.services.async_bridge import run_from_any_context
+
+        return run_from_any_context(bounded())
+    raise RuntimeError("La generación de tesis con expertos debe ejecutarse fuera del event loop")
+
+
+def _apply_thesis_consensus(valuation: dict, pipeline: dict | None) -> None:
+    if pipeline is None:
+        return
+    from app.valuation.consensus_sanity import apply_consensus_sanity, consensus_sanity_for_dcf
+
+    valuation.setdefault("trace", {})["expert_pipeline"] = pipeline
+    sanity = consensus_sanity_for_dcf(
+        valuation, consensus=pipeline.get("consensus"), our_value=valuation.get("base_value"),
+        consensus_source=pipeline.get("consensus_source"),
+    )
+    # La tesis pide contraste, no autorización para despublicar ni topar escenarios.
+    apply_consensus_sanity(valuation, sanity, enabled=True, block_publication=False)
+
+
 class ThesisService:
     def __init__(self) -> None:
         self.valuation_service = ValuationService()
@@ -908,31 +1006,20 @@ class ThesisService:
                     type(exc).__name__,
                 )
 
-        # Inputs de los expertos ANTES de modelar: el Recopilador inventaría los
-        # impulsores de valor y la mezcla de analistas rellena solo los huecos
-        # del modelo con supuestos estimados, con fuente y cita. Best-effort:
-        # apagado por EXPERT_TEAM_ENABLED o sin tenant no toca nada y nunca
-        # rompe la generación.
-        expert_inputs: dict = {}
-        if not stored_evidence_only:
-            try:
-                from app.services.expert_team.pipeline import run_pipeline_inputs
-
-                expert_inputs = run_pipeline_inputs(db, company).as_dict()
-            except Exception as exc:  # noqa: BLE001 - el pipeline es opcional
-                logger.warning(
-                    "pipeline de expertos omitido para %s: %s",
-                    company.ticker,
-                    type(exc).__name__,
-                )
-                expert_inputs = {"status": f"error:{type(exc).__name__}"}
-
+        expert_pipeline = _prepare_thesis_experts(
+            db, ticker, stored_evidence_only=stored_evidence_only,
+        )
+        # Inputs de los expertos ANTES de modelar (Recopilador + mezcla de
+        # analistas). Ya los corre _prepare_thesis_experts: se reutilizan sus
+        # etapas en lugar de lanzar el mismo pipeline dos veces contra el LLM.
+        expert_inputs = _expert_inputs_from_pipeline(expert_pipeline)
         _phase("build_fundamental_model")
         long_term_model = LongTermModelService().build(
             db, company, horizon=5, commit=False
         )
         _phase("run_valuation")
         valuation = self.valuation_service.value_company(db, company)
+        _apply_thesis_consensus(valuation, expert_pipeline)
         # Los KPIs operativos del marco sin dato ya no despublican la
         # valoracion: se declaran «sin dato (motivo)» en el memo (seccion 3)
         # y siguen en la traza. Solo los inputs centrales del modelo

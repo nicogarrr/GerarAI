@@ -65,6 +65,16 @@ RUN set -eu; \
 # [] en silencio: la tesis corria sin contexto de documentos.
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')" \
     && chmod -R a+rX /opt/hf
+
+# Modelos fastembed (denso MiniLM + sparse bm25) horneados en la imagen. Sin
+# esto, con HF_HUB_OFFLINE=1 y la cache de runtime vacia, el primer embedding
+# intentaba descargar, fallaba y el proceso caia PERMANENTEMENTE al fallback
+# sentence-transformers (torch): worker default a 103 % CPU y 2,13 GiB RSS +
+# 1,2 GiB swap (medido por el piloto, 5-nov-2026 02:22). La ruta fijada por
+# ENV para que runtime no dependa de volar con volumen poblado.
+ENV FASTEMBED_CACHE_PATH=/opt/hf/fastembed
+RUN python -c "from fastembed import TextEmbedding, SparseTextEmbedding; TextEmbedding('sentence-transformers/all-MiniLM-L6-v2'); SparseTextEmbedding('Qdrant/bm25')" \
+    && chmod -R a+rX /opt/hf
 # Carga realmente offline en runtime: el modelo ya esta en /opt/hf; sin esto
 # SentenceTransformer consulta HF Hub y puede necesitar escribir en la cache.
 ENV HF_HUB_OFFLINE=1

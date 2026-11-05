@@ -7,6 +7,7 @@ import type { ResearchLongTermModel, MoatScoreMetric } from '@/lib/actions/resea
 import type { ShareCapital } from '@/lib/actions/share-capital.actions';
 import type { ManagementCredibility } from '@/components/research/sections/ManagementCredibilitySection';
 import { getFormat, getT } from '@/lib/i18n/server';
+import { sameTargetUnit } from '@/lib/analyst-target-currency';
 
 const GRADE_KEYS = {
   high: 'research.credibility.grade.high',
@@ -88,7 +89,12 @@ export async function QuickGlancePanel({ ticker, currency, model, analysts, live
   // mediana y recorrido contra el precio en vivo de la cabecera.
   const median = analysts?.status === 'available' ? analysts.consensus?.median ?? null : null;
   if (median !== null && Number.isFinite(median)) {
-    const recorrido = livePrice !== null && livePrice > 0 ? (median - livePrice) / livePrice : null;
+    const sameUnit = analysts?.currency && currency
+      ? sameTargetUnit(analysts.currency, currency)
+      : false;
+    const recorrido = sameUnit && livePrice !== null && livePrice > 0
+      ? (median - livePrice) / livePrice
+      : null;
     rows.push(
       <Row
         href="#analistas"

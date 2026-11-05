@@ -608,7 +608,9 @@
       "terminalSharesMissing": "diluted share count missing",
       "waccNotAboveTerminalGrowth": "WACC does not exceed terminal growth",
       "terminalFcfNotPositive": "terminal FCF is not positive"
-    }
+    },
+    "marginOutOfRange": "N/A: margin outside the interpretable range (over ±100% of revenue); with near-zero revenue the percentage is not a usable proportion.",
+    "fcfOutOfRange": "N/A: FCF derived from a margin outside the interpretable range; the figure is not usable."
   },
   "journal": {
     "title": "Decision journal",
@@ -817,7 +819,11 @@
       "insiderBuys": "{name} buys shares",
       "insiderSells": "{name} sells shares",
       "insiderDetail": "${value} trade (form {form})"
-    }
+    },
+    "chartType": "Chart type",
+    "lineMode": "Line",
+    "candlesMode": "Candles",
+    "candlesUnavailable": "Candles require complete daily OHLC data."
   },
   "memo": {
     "catalystNextEarnings": "Upcoming earnings",
@@ -897,7 +903,9 @@
     "invalidationPending": "Pending: generate a new version to record invalidation criteria.",
     "debate": "Bull/bear debate",
     "debateNoTicker": "Debate unavailable without a ticker: reload the page to challenge the thesis.",
-    "fullMemo": "Full memo"
+    "fullMemo": "Full memo",
+    "scaleHigherBetter": "Higher = better",
+    "scaleHigherWorse": "Higher = more risk"
   },
   "thesisDoc": {
     "metaTitle": "Investment thesis",
@@ -1798,6 +1806,12 @@
     "scenarioWarnings": {
       "growthOutsideReference": "Scenario \"{name}\": revenue growth {value}, outside the general reference range ({low} to {high}); shown as declared, with its source.",
       "marginAboveReference": "Scenario \"{name}\": FCF margin {value}, above the general reference ({reference}); shown as declared, with its source."
+    },
+    "blockers": {
+      "traceableWacc": "WACC without a traceable calculation",
+      "forecastIsNotTheDriver": "terminal value is over 95 % of the value: the 5-year forecast is not what drives this valuation",
+      "inferredFcfMarginTarget": "inferred FCF margin target (with sources): indicative margin convergence for a growing company, not a final valuation",
+      "scenarioSetMissing": "scenarios pending: the declared model values by scenarios and no sourced set exists yet; the figure is the fallback engine guidance, not a final valuation"
     }
   },
   "peerFormat": {

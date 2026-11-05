@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import IntentLink from '@/components/layout/IntentLink';
 import { usePathname } from 'next/navigation';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
 import { MOBILE_TAB_ITEMS, isNavItemActive, isNavItemExact } from '@/lib/constants';
@@ -48,7 +48,7 @@ export default function BottomNav() {
                     const active = isNavItemActive(pathname, item.href);
                     return (
                         <li key={item.href}>
-                            <Link
+                            <IntentLink
                                 href={item.href}
                                 aria-current={active ? (isNavItemExact(pathname, item.href) ? 'page' : 'true') : undefined}
                                 className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${
@@ -57,7 +57,7 @@ export default function BottomNav() {
                             >
                                 <item.icon aria-hidden="true" className="h-5 w-5" />
                                 <span>{t(item.labelKey)}</span>
-                            </Link>
+                            </IntentLink>
                         </li>
                     );
                 })}

@@ -130,7 +130,7 @@ class ModelPrice:
     value: float
     currency: str
     as_of: date | None
-    source: str  # "market_close" | "position_mark"
+    source: str  # "market_close" | "intraday_quote" | "position_mark"
 
 
 def resolve_model_price(db: Session, company_id: int, as_of: date | None = None) -> ModelPrice | None:
@@ -182,11 +182,17 @@ def resolve_model_price(db: Session, company_id: int, as_of: date | None = None)
             if listed is not None:
                 converted, price_currency = listed
         if converted is not None:
+            raw_source = (market_price.source or "").lower()
+            source = (
+                "intraday_quote"
+                if any(token in raw_source for token in ("intraday", "spot", "quote"))
+                else "market_close"
+            )
             close = ModelPrice(
                 value=float(converted),
                 currency=price_currency,
                 as_of=market_price.date,
-                source="market_close",
+                source=source,
             )
 
     mark: ModelPrice | None = None

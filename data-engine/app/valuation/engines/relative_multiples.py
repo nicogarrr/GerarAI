@@ -183,18 +183,20 @@ class _PeerBundle:
     provider_multiples: dict[str, SourcedFact]
 
 
-def _latest_price(db, company: Company) -> tuple[float | None, str | None]:
+def _latest_price(
+    db, company: Company, *, as_of: date | None = None
+) -> tuple[float | None, str | None]:
     """Ultimo cierre del par en la divisa de SUS cuentas (la de sus hechos).
 
     Un par de Londres cotiza en GBp y reporta en GBP (o USD): el cierre crudo
     en peniques contra un EPS en libras daba un PER x100 que entraba en la
     mediana del grupo. Misma conversion que el screener; sin FX, sin precio.
     """
+    query = select(MarketPrice).where(MarketPrice.company_id == company.id)
+    if as_of is not None:
+        query = query.where(MarketPrice.date <= as_of)
     row = db.scalar(
-        select(MarketPrice)
-        .where(MarketPrice.company_id == company.id)
-        .order_by(MarketPrice.date.desc())
-        .limit(1)
+        query.order_by(MarketPrice.date.desc()).limit(1)
     )
     if row is None or row.close is None:
         return None, None
@@ -663,7 +665,7 @@ class RelativeMultiplesEngine(ValuationEngine):
         """Price + fundamentals + provider multiples for every peer, 3 queries."""
         tickers = [peer.ticker for peer in peers]
         prices: dict[int, tuple[float | None, str | None]] = {
-            peer.id: _latest_price(context.db, peer) for peer in peers
+            peer.id: _latest_price(context.db, peer, as_of=context.as_of) for peer in peers
         }
         fundamentals: dict[int, dict[str, float]] = {
             # Cada par en la base de SU ultimo cierre (splits posteriores fuera).
@@ -673,14 +675,21 @@ class RelativeMultiplesEngine(ValuationEngine):
         # The metric name embeds the ticker, so the lookup is keyed by the
         # generated name rather than by parsing it back: a peer ticker with an
         # underscore in it would silently lose its prefix here.
-        provider_rows = {
-            row.metric: row
-            for row in context.db.scalars(
-                select(FinancialFact).where(
-                    FinancialFact.metric.in_(_provider_multiple_metrics(tickers))
-                )
-            ).all()
-        }
+        provider_conditions = [
+            FinancialFact.metric.in_(_provider_multiple_metrics(tickers))
+        ]
+        if context.as_of is not None:
+            provider_conditions.append(FinancialFact.filed <= context.as_of)
+        provider_rows: dict[str, FinancialFact] = {}
+        for row in context.db.scalars(
+            select(FinancialFact)
+            .where(*provider_conditions)
+            .order_by(
+                FinancialFact.fiscal_year.desc().nullslast(),
+                FinancialFact.created_at.desc(),
+            )
+        ).all():
+            provider_rows.setdefault(row.metric, row)
         bundles: dict[str, _PeerBundle] = {}
         for peer in peers:
             price, price_as_of = prices.get(peer.id, (None, None))

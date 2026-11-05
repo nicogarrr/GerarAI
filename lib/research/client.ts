@@ -133,6 +133,15 @@ export async function researchRequest<T>(
   const deadlineMs = Date.now() + timeoutMs;
   const remainingMs = () => Math.max(deadlineMs - Date.now(), 1);
 
+  // Atribución de latencia por llamada al backend: UNA línea por request con
+  // método, ruta, resultado y milisegundos totales (incluido el retry 429).
+  // Motivo: atribuir los 4,6 s medidos de la pestaña Finanzas (5-nov-2026) a
+  // sus endpoints concretos; la telemetría por workspace no llega a los logs.
+  const startedAt = Date.now();
+  const logCall = (outcome: string) => {
+    console.info(`[research-api] ${method} ${path} ${outcome} ${Date.now() - startedAt}ms`);
+  };
+
   let response: Response;
   try {
     response = await doFetch();
@@ -159,6 +168,7 @@ export async function researchRequest<T>(
       : abortedByCaller
         ? 'cancelado por el llamador'
         : 'fetch fallido';
+    logCall(detail);
     throw new ExternalAPIError(
       `Research engine unavailable for ${path} (${detail}); reintenta en unos segundos.`,
       'research-engine',
@@ -166,6 +176,7 @@ export async function researchRequest<T>(
     );
   }
 
+  logCall(String(response.status));
   if (!response.ok) await responseError(response, path);
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;

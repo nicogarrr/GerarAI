@@ -69,6 +69,37 @@
       "fcffDcfMultistage": "multistage DCF",
       "probabilityWeightedScenario": "probability-weighted scenarios",
       "explicitDriverFcffDcf": "explicit driver DCF"
+    },
+    "autoEnergy": {
+      "autoEnergyOptionality": "auto / energy / optionality",
+      "vehicleDeliveries": "vehicle deliveries",
+      "averageSellingPrice": "average selling price",
+      "energyStorageDeployed": "deployed energy storage",
+      "energyStoragePrice": "energy storage price",
+      "fsdAttachRate": "FSD adoption rate",
+      "robotaxiVehicles": "robotaxi vehicles",
+      "robotaxiRevenuePerVehicle": "revenue per robotaxi vehicle",
+      "optimusUnits": "Optimus units",
+      "optimusPrice": "Optimus price",
+      "automotiveGrossMargin": "automotive gross margin",
+      "deliveries": "deliveries",
+      "storage": "storage",
+      "optionality": "optionality",
+      "attachRate": "attach rate",
+      "automotive": "automotive",
+      "energy": "energy",
+      "fsdRobotaxi": "FSD / robotaxi",
+      "optimus": "Optimus",
+      "demand": "demand",
+      "batterySupply": "battery supply",
+      "autonomyRegulation": "autonomous driving regulation",
+      "label": "Auto / energy / optionality"
     }
+  },
+  "missingMetricLabels": {
+    "netDebtAtTargetValue": "net debt at target valuation date",
+    "totalDebtOrCompleteComponents": "total debt or complete debt components",
+    "costOfDebt": "cost of debt",
+    "taxRate": "tax rate"
   }
 }

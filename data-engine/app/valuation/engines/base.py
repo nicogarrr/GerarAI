@@ -363,6 +363,13 @@ def snapshot_trace(snapshot: FinancialSnapshot) -> dict:
             if getattr(snapshot, "source_checks", None)
             else {}
         ),
+        # Recuento de acciones declarado en miles/millones y corregido, con
+        # la referencia del contraste. Solo si lo hay.
+        **(
+            {"share_scale": dict(snapshot.share_scale)}
+            if getattr(snapshot, "share_scale", None)
+            else {}
+        ),
     }
 
 

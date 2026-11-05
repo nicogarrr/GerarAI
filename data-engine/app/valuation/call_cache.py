@@ -37,14 +37,20 @@ def valuation_call_cache(db: Session) -> Iterator[None]:
     Anidamiento: si otra llamada ya la instaló (owns=False) no se toca al
     salir; el dueño la limpia.
     """
-    owns = _CACHE_KEY not in db.info
+    info = getattr(db, "info", None)
+    if not isinstance(info, dict):
+        # Unit tests y consumidores que pasan un doble mínimo de sesión: sin
+        # almacén por sesión no hay caché, pero la valoración debe funcionar.
+        yield
+        return
+    owns = _CACHE_KEY not in info
     if owns:
-        db.info[_CACHE_KEY] = {}
+        info[_CACHE_KEY] = {}
     try:
         yield
     finally:
         if owns:
-            db.info.pop(_CACHE_KEY, None)
+            info.pop(_CACHE_KEY, None)
 
 
 def cached(db: Session, namespace: str, key: object, producer: Callable[[], T]) -> T:
@@ -53,10 +59,13 @@ def cached(db: Session, namespace: str, key: object, producer: Callable[[], T]) 
     Sin caché instalada ejecuta ``producer()`` directamente: comportamiento
     idéntico al de antes fuera del embudo de valoración.
     """
-    cache = db.info.get(_CACHE_KEY)
+    info = getattr(db, "info", None)
+    if not isinstance(info, dict):
+        return producer()
+    cache = info.get(_CACHE_KEY)
     if cache is None:
         return producer()
-    full_key = (namespace, db.info.get("tenant_id"), key)
+    full_key = (namespace, info.get("tenant_id"), key)
     if full_key not in cache:
         cache[full_key] = producer()
     return cache[full_key]
