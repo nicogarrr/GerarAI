@@ -196,3 +196,53 @@ def test_desktop_and_mobile_preserve_source_and_missing_currency_labels():
     assert feed["canadaBadge"] == "Canadá · fuente no oficial"  # f443af3f5: badge sin proveedor (guard TS lo fija)
     assert feed["currencyMissing"] == "Divisa no informada"
     assert "Totales y señales: solo Form 4" in feed["totalsNote"]
+
+
+def test_ca_accession_fits_pg_width_without_losing_fingerprint(db, monkeypatch):
+    """SQLite ignores VARCHAR(n); CHECK enforces PG's real 40-char contract."""
+    import base64
+
+    from sqlalchemy import text
+
+    for table in ("insider_filings", "insider_transactions"):
+        db.execute(text(f"""
+            CREATE TRIGGER enforce_{table}_accession_width
+            BEFORE INSERT ON {table}
+            WHEN length(NEW.accession_number) > 40
+            BEGIN
+                SELECT RAISE(ABORT, 'value too long for type character varying(40)');
+            END
+        """))
+    db.commit()
+    expected = {
+        ticker: map_transaction(ticker, raw)
+        for ticker, raw in (("BN", RECORDED_BN[0]), ("KRKNF", RECORDED_KRKNF[0]))
+    }
+    assert _ingest(db, monkeypatch)["saved"] == 2
+    txs = list(db.scalars(select(InsiderTransaction)))
+    assert len({tx.accession_number for tx in txs}) == 2
+    for tx in txs:
+        mapped = expected[tx.issuer_ticker]
+        filing = db.get(InsiderFiling, tx.filing_id)
+        assert len(tx.accession_number) == 40
+        assert tx.accession_number == filing.accession_number
+        assert base64.b85decode(tx.accession_number).hex() == tx.fingerprint == mapped["fingerprint"]
+        assert len(tx.fingerprint) == 64
+        assert tx.shares == mapped["shares"] and tx.value == mapped["value"]
+        assert tx.price == mapped["price"] and tx.code == mapped["code"]
+        assert tx.source_url == mapped["source_url"]
+    assert _ingest(db, monkeypatch)["saved"] == 0
+    assert len(list(db.scalars(select(InsiderFiling)))) == 2
+
+
+def test_legacy_fingerprints_remain_known_without_rewriting_accessions(db, monkeypatch):
+    _ingest(db, monkeypatch)
+    tx = db.scalar(select(InsiderTransaction).where(InsiderTransaction.issuer_ticker == "BN"))
+    filing = db.get(InsiderFiling, tx.filing_id)
+    # Legacy permissive stores may contain the full digest; never rewrite them.
+    tx.accession_number = filing.accession_number = tx.fingerprint
+    db.commit()
+    assert _ingest(db, monkeypatch)["saved"] == 0
+    db.refresh(tx)
+    db.refresh(filing)
+    assert tx.accession_number == filing.accession_number == tx.fingerprint
