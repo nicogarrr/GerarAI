@@ -50,6 +50,10 @@ export const FRAMEWORK_TERMS: Record<string, string> = {
     subscriber: 'suscriptores / ingresos recurrentes', software_ai: 'software / plataforma de IA', capacity_infrastructure: 'capacidad / infraestructura',
     holding_asset_manager: 'holding / gestora de activos', bank: 'banco / negocio de depósitos', insurer: 'aseguradora', reit: 'SOCIMI / propietario de inmuebles',
     commodity: 'materias primas / royalties / recursos', biotech_pre_fcf: 'biotecnología / IA-biología pre-FCF', generic_fcf: 'compounder de flujo de caja libre',
+    auto_energy_optionality: 'auto / energía / opcionalidad', vehicle_deliveries: 'entregas de vehículos', average_selling_price: 'precio medio de venta',
+    energy_storage_deployed: 'almacenamiento energético desplegado', energy_storage_price: 'precio del almacenamiento energético',
+    fsd_attach_rate: 'tasa de adopción de FSD', robotaxi_vehicles: 'vehículos robotaxi', robotaxi_revenue_per_vehicle: 'ingresos por vehículo robotaxi',
+    optimus_units: 'unidades de Optimus', optimus_price: 'precio de Optimus', automotive_gross_margin: 'margen bruto automovilístico',
     // métricas y drivers
     collaboration_revenue: 'ingresos por colaboraciones', product_revenue: 'ingresos por producto', milestones: 'hitos de colaboración',
     pipeline_stage: 'fase del pipeline', cash_and_investments: 'caja e inversiones', partner_dependence: 'dependencia de socios',

@@ -755,6 +755,13 @@ class ThesisService:
             "margin_of_safety_convention": MARGIN_OF_SAFETY_CONVENTION,
             "prompt_version": PROMPT_VERSION,
             "valuation_status": valuation.get("status"),
+            # Los gates posteriores al motor (consenso, impulsores, defaults de
+            # inputs) también gobiernan la publicación: si cambian, la huella
+            # debe cambiar para no devolver una versión final antigua.
+            "valuation_publishable": bool(valuation.get("publishable")),
+            "publication_blockers": sorted(str(b) for b in (valuation.get("publication_blockers") or [])),
+            "consensus_status": (valuation.get("consensus_check") or {}).get("status"),
+            "value_drivers_status": (valuation.get("value_drivers") or {}).get("status"),
             "engine": (valuation.get("trace") or {}).get("engine"),
             "input_source": (valuation.get("trace") or {}).get("input_source"),
             "fundamental_model_fingerprint": (
@@ -901,6 +908,25 @@ class ThesisService:
                     type(exc).__name__,
                 )
 
+        # Inputs de los expertos ANTES de modelar: el Recopilador inventaría los
+        # impulsores de valor y la mezcla de analistas rellena solo los huecos
+        # del modelo con supuestos estimados, con fuente y cita. Best-effort:
+        # apagado por EXPERT_TEAM_ENABLED o sin tenant no toca nada y nunca
+        # rompe la generación.
+        expert_inputs: dict = {}
+        if not stored_evidence_only:
+            try:
+                from app.services.expert_team.pipeline import run_pipeline_inputs
+
+                expert_inputs = run_pipeline_inputs(db, company).as_dict()
+            except Exception as exc:  # noqa: BLE001 - el pipeline es opcional
+                logger.warning(
+                    "pipeline de expertos omitido para %s: %s",
+                    company.ticker,
+                    type(exc).__name__,
+                )
+                expert_inputs = {"status": f"error:{type(exc).__name__}"}
+
         _phase("build_fundamental_model")
         long_term_model = LongTermModelService().build(
             db, company, horizon=5, commit=False
@@ -923,6 +949,57 @@ class ThesisService:
             "missing_mandatory_drivers": missing_drivers,
         }
         valuation["long_term_model"] = long_term_model
+        # Contraste con el consenso y puerta del inventario de impulsores. La
+        # primera exige conciliación dato a dato si nos alejamos >35 %; la
+        # segunda impide publicar si un impulsor firmado y material quedó sin
+        # tratamiento. Ambas son best-effort y dejan su resultado en la traza.
+        consensus_check: dict = {}
+        try:
+            from app.services.thesis_consensus_service import apply_consensus_control
+
+            consensus_check = apply_consensus_control(db, company, valuation)
+        except Exception as exc:  # noqa: BLE001 - el control no rompe la tesis
+            logger.warning(
+                "control de consenso omitido para %s: %s",
+                company.ticker,
+                type(exc).__name__,
+            )
+            consensus_check = {"status": f"error:{type(exc).__name__}"}
+        value_drivers_check: dict = {}
+        try:
+            from app.services.value_driver_publication_service import value_driver_gate
+
+            value_drivers_check = value_driver_gate(db, company)
+            if not value_drivers_check.get("publishable", True):
+                blockers = list(valuation.get("publication_blockers") or [])
+                blocker = value_drivers_check.get("blocker") or "impulsor_material_sin_tratar"
+                if blocker not in blockers:
+                    blockers.append(blocker)
+                valuation["publication_blockers"] = blockers
+                valuation["publishable"] = False
+        except Exception as exc:  # noqa: BLE001 - el inventario no rompe la tesis
+            logger.warning(
+                "puerta de impulsores omitida para %s: %s",
+                company.ticker,
+                type(exc).__name__,
+            )
+            value_drivers_check = {"status": f"error:{type(exc).__name__}"}
+        # Los gates posteriores al motor pueden añadir blockers: sincroniza la
+        # traza con la misma función canónica que usan los motores, para que
+        # ningún consumidor lea `trace.publishable=true` en un valor bloqueado.
+        try:
+            from app.valuation.engines.base import apply_publication_blockers
+
+            valuation = apply_publication_blockers(valuation)
+        except Exception as exc:  # noqa: BLE001 - si falla, el top-level manda
+            logger.warning(
+                "sincronización de blockers omitida para %s: %s",
+                company.ticker,
+                type(exc).__name__,
+            )
+        valuation["consensus_check"] = consensus_check
+        valuation["value_drivers"] = value_drivers_check
+        valuation["expert_inputs"] = expert_inputs
         news_items = ((evidence.get("sources") or {}).get("news") or {}).get("items") or []
         # Una tesis insufficient_data no usa el precio (no hay valoracion): el
         # precio no puede distinguir versiones, asi que queda fuera de la huella.
@@ -1082,11 +1159,29 @@ class ThesisService:
         thesis_markdown += ownership_markdown(
             {"ticker": company.ticker.upper(), **ownership_evidence}
         ) + "\n"
+        thesis_markdown += self._consensus_markdown(consensus_check)
+        thesis_markdown += self._value_drivers_markdown(value_drivers_check)
+        thesis_markdown += self._expert_inputs_markdown(expert_inputs)
 
         def _dec(value) -> Decimal | None:
             return None if value is None else Decimal(str(value))
 
         valuation_basis = self._valuation_basis(valuation)
+        if valuation_basis is not None:
+            trace = valuation.get("trace") or {}
+            valuation_basis = {
+                **valuation_basis,
+                "valuation_publishable": bool(publishable),
+                "valuation_status": valuation.get("status"),
+                "value_currency": valuation.get("value_currency"),
+                "price_currency": trace.get("price_currency"),
+            }
+        if consensus_check:
+            valuation_basis = {**(valuation_basis or {}), "consensus_check": consensus_check}
+        if value_drivers_check:
+            valuation_basis = {**(valuation_basis or {}), "value_drivers": value_drivers_check}
+        if expert_inputs:
+            valuation_basis = {**(valuation_basis or {}), "expert_inputs": expert_inputs}
         if narrative_model_trace:
             # Trazabilidad del modelo que redacto la narrativa (Go real vs
             # fallback): se persiste con la version, fuera del fingerprint.
@@ -1113,6 +1208,7 @@ class ThesisService:
                 valuation.get("margin_of_safety"),
                 audit.passed,
                 valuation.get("status"),
+                publishable,
             ),
             current_price=_dec(valuation.get("current_price")),
             bear_value=_dec(valuation.get("bear_value")),
@@ -1517,10 +1613,16 @@ class ThesisService:
             ),
         }
 
-    def _rating(self, margin_of_safety: float | None, audit_passed: bool, status: str | None) -> str:
+    def _rating(
+        self,
+        margin_of_safety: float | None,
+        audit_passed: bool,
+        status: str | None,
+        publishable: bool = True,
+    ) -> str:
         if status == "insufficient_data":
             return "insufficient_data"
-        if not audit_passed:
+        if not audit_passed or not publishable:
             return "blocked"
         if margin_of_safety is None:
             return "incomplete_price"
@@ -2367,3 +2469,168 @@ Afirmaciones sin respaldo: {len(audit["unsupported_claims"] or [])}
 {provenance_section}
 Fingerprint: el hash del conjunto de evidencia gobierna el versionado.
 """
+
+    @staticmethod
+    def _md_cell(value) -> str:
+        text = "" if value is None else str(value)
+        return text.replace("|", "\\|").replace("\n", " ").strip()
+
+    def _consensus_markdown(self, data: dict | None) -> str:
+        """Sección determinista del control vs consenso (dato a dato)."""
+        if not data or data.get("status") in {"disabled"}:
+            return ""
+        lines = ["", "## 25. Contraste con el consenso de analistas", ""]
+        status = str(data.get("status") or "sin_datos")
+        if status in {"sin_consenso", "no_comparable"} or status.startswith("error:"):
+            reason = data.get("reason") or "sin datos suficientes"
+            lines.append(f"Estado: `{status}`. {reason}.")
+            return "\n".join(lines) + "\n"
+        consensus = data.get("consensus") or {}
+        our = data.get("our_value")
+        mean = consensus.get("mean") or data.get("consensus")
+        gap = data.get("gap_pct")
+        threshold = data.get("threshold") or 0.35
+        lines.append(
+            f"Umbral de revisión: {percent_es(threshold, 0)}. "
+            f"Valor de GerarAI: {number_es(our) if our is not None else 'N/D'}. "
+            f"Consenso (media): {number_es(mean) if mean is not None else 'N/D'}. "
+            f"Desviación: {percent_es(gap) if gap is not None else 'N/D'}."
+        )
+        if consensus.get("low") is not None or consensus.get("high") is not None:
+            lines.append(
+                "Rango de objetivos: "
+                f"{number_es(consensus.get('low')) if consensus.get('low') is not None else 'N/D'} – "
+                f"{number_es(consensus.get('high')) if consensus.get('high') is not None else 'N/D'} "
+                f"({consensus.get('currency') or 'divisa no declarada'})."
+            )
+        lines.append(
+            f"Fuente del consenso: {consensus.get('source') or 'no declarada'}"
+            + (f" — {consensus.get('source_url')}" if consensus.get("source_url") else "")
+            + f". Estado del control: `{status}`."
+        )
+        if data.get("reason"):
+            lines.append(f"Lectura: {data['reason']}.")
+        steps = data.get("steps") or []
+        if steps:
+            lines.extend(
+                [
+                    "",
+                    "| Dato | GerarAI | Consenso | Efecto $/acción | Etiqueta | Fuente |",
+                    "|---|---:|---:|---:|---|---|",
+                ]
+            )
+            for step in steps:
+                effect = step.get("effect_per_share")
+                lines.append(
+                    "| "
+                    + " | ".join(
+                        [
+                            self._md_cell(step.get("name") or step.get("input")),
+                            self._md_cell(number_es(step.get("ours")) if step.get("ours") is not None else "N/D"),
+                            self._md_cell(number_es(step.get("theirs")) if step.get("theirs") is not None else "N/D"),
+                            self._md_cell(number_es(effect) if effect is not None else "N/D"),
+                            self._md_cell(step.get("label") or "abierta"),
+                            self._md_cell(step.get("source") or "sin fuente"),
+                        ]
+                    )
+                    + " |"
+                )
+        rows = data.get("data_rows") or []
+        analyst_rows = [
+            row
+            for row in rows
+            if isinstance(row, dict) and row.get("method") == "analyst"
+        ]
+        if analyst_rows:
+            lines.extend(
+                [
+                    "",
+                    "Supuestos de analista usados en el modelo (estimados, con fuente):",
+                ]
+            )
+            for row in analyst_rows:
+                lines.append(
+                    f"- {self._md_cell(row.get('name') or row.get('input'))}: "
+                    f"{row.get('value')} {row.get('unit') or ''} "
+                    f"({row.get('analyst_firm') or 'firma no declarada'}, "
+                    f"{row.get('as_of') or 'fecha no declarada'}) — "
+                    f"{row.get('source_url') or 'sin URL'}"
+                    + (
+                        f". Cita: «{self._md_cell(row.get('source_quote'))}»"
+                        if row.get("source_quote")
+                        else ""
+                    )
+                )
+        if data.get("status") == "revisar":
+            lines.append(
+                "No publicable hasta conciliar la diferencia dato a dato: "
+                "la conciliación no explica el residuo dentro del máximo permitido."
+            )
+        return "\n".join(lines) + "\n"
+
+    def _value_drivers_markdown(self, data: dict | None) -> str:
+        """Inventario de impulsores de valor con su fuente y tratamiento."""
+        if not data or data.get("status") == "no_tenant":
+            return ""
+        lines = ["", "## 26. Inventario de impulsores de valor", ""]
+        drivers = data.get("drivers") or []
+        if not drivers:
+            lines.append(
+                "Sin impulsores registrados para esta empresa en esta corrida. "
+                "El Recopilador solo guarda lo que tiene fuente y cita."
+            )
+            return "\n".join(lines) + "\n"
+        if not data.get("publishable", True):
+            lines.append(
+                f"**Publicación bloqueada:** {data.get('reason') or 'impulsor material sin tratamiento'}."
+            )
+            for block in data.get("blocking") or []:
+                lines.append(
+                    f"- {block.get('name') or block.get('driver_key')}: {block.get('why')}."
+                )
+            lines.append("")
+        for driver in drivers:
+            head = (
+                f"- **{driver.get('name') or driver.get('driver_key')}** "
+                f"({driver.get('category')}, {driver.get('status')}, "
+                f"tratamiento: {driver.get('treatment')})"
+            )
+            lines.append(head)
+            if driver.get("source_url"):
+                lines.append(f"  - Fuente: {driver['source_url']}")
+            if driver.get("source_quote"):
+                lines.append(f"  - Cita: «{self._md_cell(driver['source_quote'])}»")
+            if driver.get("as_of"):
+                lines.append(f"  - Fecha: {driver['as_of']}")
+            if driver.get("value_per_share_marginal") is not None:
+                lines.append(
+                    f"  - Valor marginal por acción: {number_es(driver['value_per_share_marginal'])}"
+                )
+            if driver.get("model_link"):
+                lines.append(f"  - Recogido en el modelo: {driver['model_link']}")
+            if driver.get("reason_if_not_valued"):
+                lines.append(f"  - No valorado: {driver['reason_if_not_valued']}")
+        return "\n".join(lines) + "\n"
+
+    def _expert_inputs_markdown(self, data: dict | None) -> str:
+        """Trazabilidad del pipeline de expertos (Recopilador + mezcla)."""
+        if not data or data.get("status") in {None, "", "disabled"}:
+            return ""
+        lines = ["", "## 27. Pipeline de expertos", ""]
+        lines.append(f"Estado: `{data.get('status')}`.")
+        for label, key in (("Recopilador", "recopilador"), ("Mezcla de analistas", "analista")):
+            stage = data.get(key) or {}
+            if not stage:
+                continue
+            detail = stage.get("status") or "sin estado"
+            lines.append(f"- {label}: `{detail}`.")
+            stored = stage.get("stored")
+            if stored:
+                lines.append(f"  - Entradas guardadas: {stored}.")
+            firms = stage.get("firms") or []
+            if firms:
+                lines.append(f"  - Firmas que cumplen el ranking: {', '.join(str(f) for f in firms)}.")
+        errors = data.get("errors") or []
+        if errors:
+            lines.append("- Incidencias: " + ", ".join(str(e) for e in errors) + ".")
+        return "\n".join(lines) + "\n"

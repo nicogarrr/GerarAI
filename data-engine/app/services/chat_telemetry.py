@@ -10,6 +10,7 @@ import logging
 from typing import Any
 
 from app.core.database import SessionLocal
+from app.core.errors import redact_secrets
 from app.models import ChatTelemetryEvent
 
 logger = logging.getLogger(__name__)
@@ -51,12 +52,12 @@ def record_chat_event(
                 db.info["tenant_id"] = tenant_id
             db.add(
                 ChatTelemetryEvent(
-                    question=(question or "")[:_MAX_TEXT],
+                    question=redact_secrets((question or "")[:_MAX_TEXT]),
                     route=route[:60],
                     used_llm=used_llm,
                     model=(model or None) and model[:160],
                     latency_ms=max(0, int(latency_ms)),
-                    error=(error or None) and error[:_MAX_TEXT],
+                    error=redact_secrets((error or "")[:_MAX_TEXT]) if error else None,
                 )
             )
             db.commit()

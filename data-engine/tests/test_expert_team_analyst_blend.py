@@ -336,7 +336,11 @@ def test_mezcla_se_guarda_como_estimado_de_analistas(db) -> None:
     assert float(subs.base) == 140_000_000  # mediana de 160 y 120
     assert (float(subs.low), float(subs.high)) == (120_000_000, 160_000_000)
     assert subs.analyst_firm == "Firm A, Firm B"  # por ranking
-    assert subs.source_url == NOTE_URL and "160 million" in subs.source_quote
+    # La mediana (140 M) no la dijo ninguna firma: no se copia la cita de una
+    # firma que publicó 160 M. Las fuentes por firma quedan en metadata.
+    assert subs.source_url == NOTE_URL
+    assert subs.source_quote is None
+    assert "mediana de varias firmas" in subs.metadata_["fuente_agregada"]
     assert subs.metadata_["metodo"] == "mezcla de analistas"
     assert [f["firma"] for f in subs.metadata_["firmas"]] == ["Firm A", "Firm B"]
     arpu = rows[("monthly_arpu", "")]
@@ -456,7 +460,7 @@ def test_mezcla_mediana_rango_y_orden_por_ranking() -> None:
     assert notes == []
     (item,) = inputs
     assert (item.base, item.low, item.high) == (200.0, 100.0, 500.0)
-    assert item.analyst_firm == "A, B, C" and item.source_url.endswith("/A")
+    assert item.analyst_firm == "A, B, C" and item.source_url.endswith("/C")
     assert item.method == "analyst" and item.status == "estimado"
 
 
