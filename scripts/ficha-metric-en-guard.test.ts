@@ -38,6 +38,8 @@ test('las excepciones EN de framework-terms son claves reales y el ES no cambia'
   assert.equal(frameworkTerm('loan_growth', 'en'), 'loan growth');
   assert.equal(frameworkTerm('ARR × retention', 'en'), 'ARR × retention');
   assert.equal(frameworkTerm('desconocido_total', 'en'), null);
+  assert.equal(frameworkTerm('unassigned'), 'sin asignar');
+  assert.equal(frameworkTerm('unassigned', 'en'), 'unassigned');
 });
 
 test('financial-display: ES histórico intacto y EN sin texto español', () => {

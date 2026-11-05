@@ -387,6 +387,18 @@
     "methodRange": "Rango de contraste {low}–{high}:",
     "methodPriceImplies": "Qué descuenta el precio: {text}"
   },
+  "frameworkTerms": {
+    "unassigned": "sin asignar",
+    "method": {
+      "medianLastNYears": "mediana de los últimos ejercicios",
+      "cyclicalMidcycleMean": "media de ciclo medio de los últimos ejercicios",
+      "fcffDcf": "DCF de flujo de caja libre",
+      "fcffDcfMarginConvergence": "DCF con convergencia de margen",
+      "fcffDcfMultistage": "DCF multietapa",
+      "probabilityWeightedScenario": "escenarios ponderados por probabilidad",
+      "explicitDriverFcffDcf": "DCF por drivers explícitos"
+    }
+  },
   "identity": {
     "metaDescription": "Research de {subject}: tesis versionada, financieros canónicos, modelo a largo plazo, valoración y evidencia con fuentes trazables.",
     "feature": "Research de {ticker}",
