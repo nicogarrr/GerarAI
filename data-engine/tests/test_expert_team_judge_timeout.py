@@ -79,6 +79,15 @@ class _SlowJudge(_FakeProvider):
 
 def test_chat_slow_judge_keeps_the_team_answer(db, synthesis_calls, flag_on, monkeypatch):
     monkeypatch.setattr(team_chat, "CHAT_TEAM_TIMEOUT_S", 2.0)
+    # Este contrato mide el timeout del juez, no el coste del motor financiero.
+    # La herramienta real tiene sus propios tests; aquí se fija su evidencia
+    # para que una CPU lenta con coverage no consuma el presupuesto del juez.
+    from app.services.valuation_service import ValuationService
+
+    monkeypatch.setattr(ValuationService, "value_company", lambda *a, **kw: {
+        "model_type": "fixture", "base_value": 100, "publishable": True,
+        "trace": {"price_as_of": "2026-11-05"},
+    })
     provider = _SlowJudge()
     response = _ask(db, QUESTION, provider)
     assert "judge:slow" in provider.tasks
