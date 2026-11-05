@@ -49,6 +49,24 @@ def _history(symbol: str, top: list[ahs.FirmScore]) -> ahs.AnalystHistory:
     )
 
 
+@pytest.fixture(autouse=True)
+def mount_unregistered_route():
+    # API read model is staged first; production registration follows separately.
+    if any(getattr(item, "path", "") == "/api/companies/{ticker}/analyst-notes" for item in main.app.routes):
+        yield
+        return
+    original = list(main.app.router.routes)
+    from app.api.router import api_router
+    from fastapi import APIRouter
+
+    staging = APIRouter(dependencies=api_router.dependencies)
+    staging.include_router(route.router, prefix="/companies", tags=["companies"])
+    main.app.include_router(staging, prefix="/api")
+    yield
+    main.app.router.routes[:] = original
+    main.app.openapi_schema = None
+
+
 @pytest.fixture()
 def env(monkeypatch):
     _no_network(monkeypatch)
