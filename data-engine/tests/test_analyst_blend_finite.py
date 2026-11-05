@@ -1,5 +1,7 @@
 import pytest
+
 from app.services.expert_team.analyst_blend import _number
+
 
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf"), True, False, "1", None])
 def test_non_finite_or_non_numeric_is_rejected(value):

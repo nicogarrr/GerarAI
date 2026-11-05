@@ -46,7 +46,12 @@ from app.services.thesis_publication_gate import (
     thesis_withheld_reasons,
     withhold_thesis_payload,
 )
-from app.services.thesis_service import ThesisService, engine_stale, latest_inputs_provenance, latest_missing_inputs
+from app.services.thesis_service import (
+    ThesisService,
+    engine_stale,
+    latest_inputs_provenance,
+    latest_missing_inputs,
+)
 
 router = APIRouter()
 
