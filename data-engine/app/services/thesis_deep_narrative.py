@@ -431,6 +431,14 @@ def fact_pack(
     expected = valuation.get("expected_value")
     if bear is not None:
         add(f"Escenario pesimista (bear): {bear:.2f} {currency} por acción.", internal)
+    else:
+        # A negative raw bear can be withheld from the displayed range while
+        # still contributing to the expected value. Preserve the engine's
+        # explanation, not a guessed zero or an inferred weighting policy.
+        scenario_notes = valuation.get("scenario_notes")
+        bear_note = scenario_notes.get("bear") if isinstance(scenario_notes, dict) else None
+        if isinstance(bear_note, str) and bear_note.strip():
+            add(f"Escenario pesimista (bear) N/D. {bear_note.strip()}", internal)
     if bull is not None:
         add(f"Escenario optimista (bull): {bull:.2f} {currency} por acción.", internal)
     if expected is not None:
