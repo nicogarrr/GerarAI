@@ -189,16 +189,15 @@ async def db_metrics(db: Session = Depends(get_db)) -> dict[str, Any]:
     Metadatos operativos de TODA la base: solo con el gate de ops abierto
     (mismo flag que las invalidaciones globales). En producción es un script
     de operación, no una ruta que cualquier tenant pueda leer.
-    """
-    if not get_settings().cache_global_invalidation_allowed:
-        raise HTTPException(status_code=404, detail="Not found")
-    
+
     Returns:
         - Connection pool statistics (active, idle, max connections)
         - Disk usage (database size, table sizes)
         - Table bloat detection (PostgreSQL only)
-    
+
     This endpoint requires authentication and is intended for monitoring
     and operational visibility.
     """
+    if not get_settings().cache_global_invalidation_allowed:
+        raise HTTPException(status_code=404, detail="Not found")
     return await _collect_metrics(db)
