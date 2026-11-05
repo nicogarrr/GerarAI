@@ -8,6 +8,7 @@ Company en base. Idempotente: re-ingestar no duplica.
 from __future__ import annotations
 
 import asyncio
+import base64
 from typing import Any
 
 from sqlalchemy import select
@@ -59,8 +60,12 @@ async def ingest_ca_insiders(
             if mapped["fingerprint"] in known:
                 result["skipped_known"] += 1
                 continue
+            # SHA256 hex is 64 chars, but both accession columns are VARCHAR(40).
+            # Base85 encodes all 32 digest bytes into 40 ASCII chars, reversibly:
+            # no truncation, changed fingerprint, or rewrite of existing rows.
+            accession = base64.b85encode(bytes.fromhex(mapped["fingerprint"])).decode("ascii")
             filing = InsiderFiling(
-                accession_number=mapped["fingerprint"],
+                accession_number=accession,
                 form=FORM,
                 issuer_cik=ticker,  # no es emisor SEC: se guarda el ticker, nunca un CIK inventado
                 issuer_ticker=ticker,
@@ -76,7 +81,7 @@ async def ingest_ca_insiders(
             db.add(InsiderTransaction(
                 fingerprint=mapped["fingerprint"],
                 filing_id=filing.id,
-                accession_number=mapped["fingerprint"],
+                accession_number=accession,
                 form=FORM,
                 issuer_ticker=ticker,
                 insider=mapped["insider"],
