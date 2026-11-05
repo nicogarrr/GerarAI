@@ -385,7 +385,7 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
       </div>
 
       <p className="mt-5 border-t border-gray-800 pt-3 text-xs leading-5 text-gray-500">
-        {ti(model.historical_review.years_covered === 1 ? 'research.model.historyOne' : 'research.model.historyOther', { years: model.historical_review.years_covered, first: model.historical_review.first_year ?? '—', last: model.historical_review.last_year ?? '—', horizon: model.horizon_years })}
+        {ti(model.historical_review.years_covered === 1 ? 'research.model.historyOne' : 'research.model.historyOther', { years: model.historical_review.years_covered, first: model.historical_review.first_year ?? ti('research.model.na'), last: model.historical_review.last_year ?? ti('research.model.na'), horizon: model.horizon_years })}
       </p>
     </section>
   );

@@ -32,6 +32,8 @@ export const METRIC_LABELS_EN: Record<string, string> = {
     total_equity: 'Total equity',
     total_debt: 'Total debt',
     net_debt: 'Net debt',
+    minority_interest: 'Minority interest',
+    preferred_stock: 'Preferred stock',
     market_price: 'Market price',
     cash_and_equivalents: 'Cash and equivalents',
     goodwill: 'Goodwill',

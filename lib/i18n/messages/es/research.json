@@ -560,8 +560,8 @@
     "timeline": "Cronología reciente de la empresa",
     "impact": "impacto {impact}",
     "noEvents": "No hay eventos históricos almacenados.",
-    "historyOne": "Historial disponible: {years} año ({first}–{last}), frente a los {horizon} años proyectados. Los números calculados conservan sus fact IDs; lo no disponible se muestra como unknown/insufficient_data.",
-    "historyOther": "Historial disponible: {years} años ({first}–{last}), frente a los {horizon} años proyectados. Los números calculados conservan sus fact IDs; lo no disponible se muestra como unknown/insufficient_data.",
+    "historyOne": "Historial disponible: {years} año ({first}–{last}), frente a los {horizon} años proyectados. Los números calculados conservan sus fact IDs; lo no disponible se muestra como s/d o datos insuficientes.",
+    "historyOther": "Historial disponible: {years} años ({first}–{last}), frente a los {horizon} años proyectados. Los números calculados conservan sus fact IDs; lo no disponible se muestra como s/d o datos insuficientes.",
     "cond": {
       "revenueGrowth": "Los ingresos deben crecer al menos un {pct} anual",
       "fcfMargin": "El margen FCF normalizado debe mantenerse al menos en un {pct}",
