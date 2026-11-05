@@ -56,8 +56,9 @@ def mount_unregistered_route():
         yield
         return
     original = list(main.app.router.routes)
-    from app.api.router import api_router
     from fastapi import APIRouter
+
+    from app.api.router import api_router
 
     staging = APIRouter(dependencies=api_router.dependencies)
     staging.include_router(route.router, prefix="/companies", tags=["companies"])
