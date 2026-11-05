@@ -41,6 +41,7 @@ from app.valuation.moat_framework import empty_moat_framework
 from app.valuation.normalized_fcf import (
     ProjectionPlan,
     build_projection,
+    fy_history,
     planned_reverse_dcf,
     planned_sensitivity,
     plausibility_warning,
@@ -48,7 +49,7 @@ from app.valuation.normalized_fcf import (
 )
 from app.valuation.revenue_base import resolve_revenue_base
 from app.valuation.reverse_dcf import ReverseDCFInputs, solve_required_growth
-from app.valuation.scenario_definitions import mechanical_dcf_scenarios
+from app.valuation.scenario_definitions import mechanical_dcf_scenarios, own_history_ranges
 from app.valuation.scenario_model import Scenario, probability_weighted_value
 from app.valuation.sensitivity import sensitivity_grid
 from app.valuation.wacc_band import (
@@ -269,6 +270,28 @@ def _resolve_band(context: ValuationContext, company, snapshot, shares: float) -
         fact_units=[getattr(fact, "unit", None) for fact in facts.values()],
         on=on,
     )
+
+
+def _own_history(context: ValuationContext, company_id: int) -> dict | None:
+    """Rangos del historial FY propio para la amplitud de los escenarios
+    mecánicos (mismo corte point-in-time que el snapshot). Sin historial o con
+    error de lectura: ``None`` y los escenarios usan la amplitud de siempre."""
+    try:
+        history = fy_history(
+            context.db,
+            company_id,
+            context.as_of,
+            metrics=("revenue", "operating_cash_flow", "capital_expenditure"),
+        )
+    except Exception:  # noqa: BLE001 - sin historial, amplitud mecánica
+        return None
+    rows: dict[int, dict[str, float | None]] = {}
+    for year, row in history.items():
+        units = {(fact.unit or "") for fact in row.values()}
+        if "revenue" not in row or len(units) != 1:
+            continue
+        rows[year] = {metric: float(fact.value) for metric, fact in row.items() if fact.value is not None}
+    return own_history_ranges(rows) if rows else None
 
 
 class StandardDCFEngine(ValuationEngine):
@@ -533,12 +556,14 @@ class StandardDCFEngine(ValuationEngine):
             if confidence_facts
             else 0.0
         )
+        own_history = _own_history(context, company.id)
         scenarios = mechanical_dcf_scenarios(
             growth,
             margin,
             wacc,
             terminal,
             evidence_confidence,
+            history=own_history,
         )
         scenario_results = {}
         for scenario in scenarios:
@@ -795,6 +820,11 @@ class StandardDCFEngine(ValuationEngine):
                 "scenario_notes": scenario_notes,
                 "publication_blockers": publication_blockers,
                 "scenario_style": "fact_anchored_sensitivity",
+                **(
+                    {"scenario_amplitude_history": own_history}
+                    if own_history and any(own_history.values())
+                    else {}
+                ),
                 "probability_method": "source_confidence_plus_company_financials",
                 "evidence_confidence": evidence_confidence,
                 "evidence_confidence_inputs": sorted(MODEL_INPUT_METRICS & set(snapshot.facts)),
