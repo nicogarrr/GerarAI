@@ -17,7 +17,7 @@ describe('ficha en inglés: resumen retenido de la tesis y panel TTM', () => {
   });
   it('unpublished and unverified reasons in English', () => {
     render(<ThesisSummary thesis={{ ...thesis, status: 'draft', created_at: null }} model={{ publishable: true }} locale="en" />);
-    expect(screen.getByRole('note')).toHaveTextContent('with no verified generation date: summary and figures withheld because the thesis is neither published nor approved');
+    expect(screen.getByRole('note')).toHaveTextContent('with no verified generation date: summary and figures withheld because the thesis is not published');
   });
   it('Spanish stays the same', () => {
     render(<ThesisSummary thesis={thesis} model={null} />);

@@ -476,12 +476,12 @@ class Settings(BaseSettings):
     # por ticker. DCA_ALERT_TRIMS: avisar tambien de las zonas de recorte.
     # DCA_ALERT_CHANNELS: canales base; Telegram se anade solo si el tenant
     # tiene suscripcion "dca_levels" con chat vinculado.
-    dca_alerts_enabled: bool = True
+    dca_alerts_enabled: bool = False
     dca_alert_min_level: int = Field(default=2, ge=1, le=4)
     dca_alert_trims: bool = False
     # Cierre mas antiguo (dias naturales) con el que aun se emite una senal DCA.
     dca_max_data_age_days: int = Field(default=14, ge=1, le=90)
-    dca_alert_channels: str = "in_app,email"
+    dca_alert_channels: str = "in_app"
     # Avisos de proximos resultados (earnings) de watchlist + cartera, estilo
     # Investing: ventanas de 7 dias, 1 dia y el propio dia sobre las fechas ya
     # refrescadas en earnings_dates. EARNINGS_ALERT_CHANNELS: canales base;
@@ -504,6 +504,11 @@ class Settings(BaseSettings):
     # Equipo de expertos con coordinador (app/services/expert_team). Apagado:
     # tesis y chat siguen exactamente igual. Env: EXPERT_TEAM_ENABLED.
     expert_team_enabled: bool = False
+    # Control de la valoración frente al consenso de analistas (>35 % exige
+    # conciliación dato a dato). Independiente del equipo de expertos: sin
+    # consenso se publica con la salvedad, con desviación no conciliada no.
+    # Env: CONSENSUS_CONTROL_ENABLED.
+    consensus_control_enabled: bool = True
 
     # Invalidación GLOBAL de la caché de mercado (compartida entre tenants).
     # Las rutas POST /api/cache/invalidate/market-data e /invalidate/all la

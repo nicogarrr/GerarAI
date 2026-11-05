@@ -608,7 +608,9 @@
       "terminalSharesMissing": "falta el número de acciones diluidas",
       "waccNotAboveTerminalGrowth": "el WACC no supera el crecimiento terminal",
       "terminalFcfNotPositive": "el FCF terminal no es positivo"
-    }
+    },
+    "marginOutOfRange": "N/D: margen fuera de rango interpretable (más del ±100 % de los ingresos); con ingresos casi nulos el porcentaje no es una proporción usable.",
+    "fcfOutOfRange": "N/D: FCF derivado de un margen fuera de rango interpretable; la cifra no es usable."
   },
   "journal": {
     "title": "Diario de decisiones",
@@ -817,7 +819,11 @@
       "insiderBuys": "{name} compra acciones",
       "insiderSells": "{name} vende acciones",
       "insiderDetail": "Operación de {value} $ (formulario {form})"
-    }
+    },
+    "chartType": "Tipo de gráfico",
+    "lineMode": "Línea",
+    "candlesMode": "Velas",
+    "candlesUnavailable": "Velas disponibles con datos OHLC diarios completos."
   },
   "memo": {
     "catalystNextEarnings": "Próximos resultados",
@@ -852,7 +858,7 @@
     "provAssumption": "Supuestos del modelo",
     "withheldNotPublishable": "el modelo no es publicable",
     "withheldUnverified": "no se pudo verificar que el modelo sea publicable",
-    "withheldNotPublished": "la tesis no está publicada ni aprobada",
+    "withheldNotPublished": "la tesis no está publicada",
     "archivedMarginNote": "Margen histórico con fórmula no verificada: el porcentaje y el texto originales se conservan como archivo. No los compares con el margen actual (V - P) / V ni los uses como señal actual.",
     "generatedOn": "generada el {date}",
     "staleData": "Datos nuevos disponibles — considera regenerar",
@@ -897,7 +903,9 @@
     "invalidationPending": "Pendiente: genera una nueva versión para registrar criterios de invalidación.",
     "debate": "Debate bull/bear",
     "debateNoTicker": "Debate no disponible sin ticker: recarga la ficha para contrastar la tesis.",
-    "fullMemo": "Memorando completo"
+    "fullMemo": "Memorando completo",
+    "scaleHigherBetter": "Mayor = mejor",
+    "scaleHigherWorse": "Mayor = más riesgo"
   },
   "thesisDoc": {
     "metaTitle": "Tesis de inversión",
@@ -1723,7 +1731,7 @@
   "thesisWithheld": {
     "dated": "Texto archivado de v{version}, generada el {date}: resumen y cifras retenidos porque {reason}. No se presentan como análisis actual; el original se conserva guardado.",
     "undated": "Texto archivado de v{version}, sin fecha de generación verificada: resumen y cifras retenidos porque {reason}. No se presentan como análisis actual; el original se conserva guardado.",
-    "reasonNotPublic": "la tesis no está publicada ni aprobada",
+    "reasonNotPublic": "la tesis no está publicada",
     "reasonNotPublishable": "el modelo no es publicable",
     "reasonUnverified": "no se pudo verificar que el modelo sea publicable"
   },
@@ -1809,6 +1817,12 @@
     "scenarioWarnings": {
       "growthOutsideReference": "Escenario «{name}»: crecimiento de ventas {value}, fuera de la referencia general ({low} a {high}); se muestra tal cual, con su fuente.",
       "marginAboveReference": "Escenario «{name}»: margen FCF {value}, por encima de la referencia general ({reference}); se muestra tal cual, con su fuente."
+    },
+    "blockers": {
+      "traceableWacc": "WACC sin cálculo trazable",
+      "forecastIsNotTheDriver": "el valor terminal es más del 95 % del valor: la previsión a 5 años no es el motor de esta valoración",
+      "inferredFcfMarginTarget": "margen FCF objetivo inferido (con fuentes): convergencia de margen orientativa para una empresa en crecimiento, no una valoración final",
+      "scenarioSetMissing": "escenarios pendientes: el modelo declarado valora por escenarios y aún no hay un juego con fuente; el número es la orientación del motor de respaldo, no una valoración final"
     }
   },
   "peerFormat": {

@@ -471,7 +471,14 @@ def blend_assumptions(
         base = float(median(values))
         lows = values + [a.low for a in items if a.low is not None]
         highs = values + [a.high for a in items if a.high is not None]
-        best = items[0]
+        # La fuente principal solo puede atribuirse a una firma cuyo valor sea
+        # EXACTAMENTE el publicado. Si la base es una mediana que ninguna firma
+        # dijo, no se copia la cita de una firma distinta: las fuentes y citas
+        # por firma quedan en metadata y la fila agregada no afirma una cita
+        # que no respalda el número.
+        source_item = next(
+            (a for a in items if abs(float(a.value) - base) <= 1e-9), None
+        )
         names = ", ".join(a.firm for a in items)
         if len(names) > ANALYST_FIRM_MAX_CHARS:
             names = names[: ANALYST_FIRM_MAX_CHARS - 1] + "…"
@@ -482,17 +489,21 @@ def blend_assumptions(
                 base=base,
                 low=min(lows),
                 high=max(highs),
-                unit=best.unit,
+                unit=items[0].unit,
                 method="analyst",
-                source_url=best.source_url,
-                source_quote=best.source_quote,
-                document_id=best.document_id,
+                source_url=source_item.source_url if source_item else items[0].source_url,
+                source_quote=source_item.source_quote if source_item else None,
+                document_id=source_item.document_id if source_item else None,
                 analyst_firm=names,
                 as_of=max((a.as_of for a in items if a.as_of is not None), default=None),
                 metadata={
                     "metodo": BLEND_METHOD_LABEL,
                     "estado": "estimado",
                     "agregado": "mediana" if len(items) > 1 else "una firma",
+                    "fuente_agregada": (
+                        "una firma" if source_item else "mediana de varias firmas; "
+                        "cada valor y su cita están en «firmas»"
+                    ),
                     "expert": BLEND_NAME,
                     "firmas": [
                         {

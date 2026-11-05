@@ -15,7 +15,7 @@ export function canShowThesisText(thesis: ThesisTextVersion, model: { publishabl
 export function WithheldThesisText({ thesis, model, locale = DEFAULT_LOCALE }: { thesis: ThesisTextVersion; model: { publishable: boolean } | null | undefined; locale?: Locale }) {
   const t = createTranslator(locale);
   const generated = formatGeneratedDate(thesis.created_at, undefined, locale);
-  const reason = thesis.status !== 'published' && thesis.status !== 'approved'
+  const reason = !thesisIsPublic(thesis.status)
     ? t('research.thesisWithheld.reasonNotPublic')
     : model?.publishable === false
       ? t('research.thesisWithheld.reasonNotPublishable')

@@ -25,9 +25,52 @@ const FINNHUB_BASE_URL = env.FINNHUB_BASE_URL;
 
 export type FinnhubCandles = { source?: string; /** Divisa de la misma respuesta del proveedor (solo la trae el backend/Yahoo). */ currency?: string; s: 'ok' | 'no_data'; c: number[]; t: number[]; o: (number | null)[]; h: (number | null)[]; l: (number | null)[]; v: (number | null)[] };
 
+// Caché del último dato bueno de velas por (símbolo, resolución, rango
+// agrupado como en el backend): si la cadena Finnhub->backend falla en un
+// pico de carga, la ficha muestra las velas recientes en vez de "Sin datos".
+// 5-nov-2026: velas CHTR vacías con el backend respondiendo en 0,03-0,14 s
+// [medido piloto] pero el host al 95 % CPU abortando la server action a los
+// 8 s. TTL 6 h: dato diario con caducidad honesta, nunca un fósil.
+const CANDLES_STALE_TTL_MS = 6 * 3600 * 1000;
+const CANDLES_BACKEND_TIMEOUT_MS = 8_000;
+// Reintento único con margen: el pico de carga alarga la cadena Next->backend
+// por encima de los 8 s normales; el backend sano responde en <1 s.
+const CANDLES_BACKEND_RETRY_TIMEOUT_MS = 20_000;
+const CANDLES_STALE_CACHE_MAX = 256;
+const staleCandlesCache = new Map<string, { at: number; payload: FinnhubCandles }>();
+
+function candlesCacheKey(symbol: string, from: number, to: number, resolution: string): string {
+    return `${symbol}|${resolution}|${Math.floor(from / 86400)}|${Math.floor(to / 3600)}`;
+}
+
+function rememberCandles(key: string, payload: FinnhubCandles, now: number): void {
+    if (staleCandlesCache.size >= CANDLES_STALE_CACHE_MAX) staleCandlesCache.clear();
+    staleCandlesCache.set(key, { at: now, payload });
+}
+
+async function fetchBackendCandles(backendUrl: string, path: string, query: string, identityHeaders: HeadersInit, timeoutMs: number): Promise<FinnhubCandles | null> {
+    try {
+        const response = await fetch(`${backendUrl}${path}?${query}`, {
+            headers: identityHeaders,
+            signal: AbortSignal.timeout(timeoutMs),
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data && data.s === 'ok' && Array.isArray(data.c) && data.c.length) {
+            return { ...data, source: data.source ?? 'Yahoo Finance' };
+        }
+        return null;
+    } catch {
+        // Backend caído, timeout o abort: el llamador reintenta o sirve caché.
+        return null;
+    }
+}
+
 export async function getCandles(symbol: string, from: number, to: number, resolution: 'D' | 'W' | 'M' | '60' = 'D', revalidateSeconds = 1800): Promise<FinnhubCandles> {
     await requireAuthenticatedUser();
     const noData: FinnhubCandles = { s: 'no_data', c: [], t: [], o: [], h: [], l: [], v: [] };
+    const cacheKey = candlesCacheKey(symbol, from, to, resolution);
+    const now = Date.now();
     const token = env.FINNHUB_API_KEY;
     if (token) {
         const url = `${FINNHUB_BASE_URL}/stock/candle?symbol=${encodeURIComponent(symbol)}&resolution=${resolution}&from=${from}&to=${to}&token=${token}`;
@@ -35,32 +78,39 @@ export async function getCandles(symbol: string, from: number, to: number, resol
             const result = await fetchJSON<FinnhubCandles>(url, revalidateSeconds);
             // fetchJSON puede retornar array vacío en caso de error, verificar si es un objeto válido
             if (!Array.isArray(result) && result && typeof result === 'object' && result.s === 'ok' && result.c?.length) {
-                return { ...result, source: 'Finnhub' };
+                const payload = { ...result, source: 'Finnhub' };
+                rememberCandles(cacheKey, payload, now);
+                return payload;
             }
         } catch {
             // Si el plan no permite el recurso (403) u otro error, seguimos al fallback
         }
     }
     // Fallback al backend (Yahoo chart API): Finnhub free no sirve velas de
-    // mercados no-US (IBEX .MC...). Sin fallback el gráfico de la ficha sale vacío.
+    // mercados no-US (IBEX .MC...) y en prod /stock/candle da 403 con la
+    // clave actual [medido piloto 5-nov-2026], así que el gráfico depende
+    // SIEMPRE de este camino. Un abort a los 8 s en un pico de carga no
+    // puede dejar la ficha sin velas: un reintento con más margen y, si aun
+    // así falla, el último dato bueno de las últimas 6 h.
     const backendUrl = process.env.FMP_BACKEND_URL;
     if (backendUrl) {
-        try {
-            const path = `/api/market/candles/${encodeURIComponent(symbol)}`;
-            const identityHeaders = await researchIdentityHeaders({ method: 'GET', path });
-            const response = await fetch(`${backendUrl}${path}?from=${from}&to=${to}&resolution=${resolution}`, {
-                headers: identityHeaders,
-                signal: AbortSignal.timeout(8000),
-            });
-            if (response.ok) {
-                const data = await response.json();
-                if (data && data.s === 'ok' && Array.isArray(data.c) && data.c.length) {
-                    return { ...data, source: data.source ?? 'Yahoo Finance' };
-                }
-            }
-        } catch {
-            // Backend caído o sin datos: estado vacío honesto
+        const path = `/api/market/candles/${encodeURIComponent(symbol)}`;
+        const query = `from=${from}&to=${to}&resolution=${resolution}`;
+        const identityHeaders = await researchIdentityHeaders({ method: 'GET', path });
+        const first = await fetchBackendCandles(backendUrl, path, query, identityHeaders, CANDLES_BACKEND_TIMEOUT_MS);
+        if (first) {
+            rememberCandles(cacheKey, first, now);
+            return first;
         }
+        const retry = await fetchBackendCandles(backendUrl, path, query, identityHeaders, CANDLES_BACKEND_RETRY_TIMEOUT_MS);
+        if (retry) {
+            rememberCandles(cacheKey, retry, now);
+            return retry;
+        }
+    }
+    const stale = staleCandlesCache.get(cacheKey);
+    if (stale && now - stale.at <= CANDLES_STALE_TTL_MS) {
+        return stale.payload;
     }
     return noData;
 }

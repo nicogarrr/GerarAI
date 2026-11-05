@@ -13,8 +13,9 @@ describe('overview latest thesis summary', () => {
   render(<ThesisSummary thesis={thesis} model={{ publishable: true }} />);
   expect(screen.getByText(thesis.executive_summary)).toBeInTheDocument();
  });
- it('does not expose unpublished text against a publishable model', () => {
-  render(<ThesisSummary thesis={{ ...thesis, status: 'draft' }} model={{ publishable: true }} />);
+ it.each(['draft', 'approved', 'final'])('does not expose %s text against a publishable model', (status) => {
+  render(<ThesisSummary thesis={{ ...thesis, status }} model={{ publishable: true }} />);
   expect(screen.queryByText(/65,1/)).not.toBeInTheDocument();
+  expect(screen.getByRole('note')).toHaveTextContent('la tesis no está publicada');
  });
 });

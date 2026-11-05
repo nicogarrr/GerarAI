@@ -116,6 +116,19 @@ FRAMEWORKS: dict[str, CompanyFramework] = {
         active_modules=COMMON_MODULES + ("market_opportunity", "unit_economics", "segment_model", "macro_sensitivity"),
         required_fact_metrics=(),
     ),
+    "auto_energy_optionality": CompanyFramework(
+        key="auto_energy_optionality",
+        label="Auto / energy / optionality",
+        primary_question="Can vehicle deliveries, energy storage deployment, autonomy and optionality monetization compound into durable revenue and cash flow?",
+        market_opportunity_mode="required",
+        revenue_drivers=("vehicle_deliveries", "average_selling_price", "energy_storage_deployed", "energy_storage_price", "fsd_attach_rate", "robotaxi_vehicles", "robotaxi_revenue_per_vehicle", "optimus_units", "optimus_price"),
+        kpis=("vehicle_deliveries", "automotive_gross_margin", "energy_storage_deployed", "fsd_attach_rate", "robotaxi_vehicles", "optimus_units", "capex", "cash_burn"),
+        unit_economics=("deliveries × average selling price", "storage × price", "optionality × attach rate"),
+        segment_model=("automotive", "energy", "fsd_robotaxi", "optimus", "geography"),
+        binding_constraints=("demand", "pricing", "battery_supply", "autonomy_regulation", "capital"),
+        active_modules=COMMON_MODULES + ("market_opportunity", "unit_economics", "segment_model", "macro_sensitivity"),
+        required_fact_metrics=(),
+    ),
     "subscriber": CompanyFramework(
         key="subscriber",
         label="Subscriber / recurring revenue",
@@ -303,6 +316,15 @@ def resolve_company_framework(company: Company) -> CompanyFramework:
 
     if is_equity_reit_industry(reference_industry(company)):
         return FRAMEWORKS["reit"]
+    if any(
+        word in industry
+        for word in ("telecom", "cable", "fitness", "gym", "leisure", "streaming", "subscription")
+    ):
+        return FRAMEWORKS["subscriber"]
+    if any(word in industry for word in ("ecommerce", "e-commerce", "retail", "marketplace")):
+        return FRAMEWORKS["generic_fcf"]
+    if "social" in industry or "advertising" in industry:
+        return FRAMEWORKS["advertising_platform"]
     if "asset management" in industry:
         return FRAMEWORKS["holding_asset_manager"]
     if "bank" in industry:
@@ -310,6 +332,12 @@ def resolve_company_framework(company: Company) -> CompanyFramework:
 
     if is_holding_company_type(company_type) or "sotp" in model:
         return FRAMEWORKS["holding_asset_manager"]
+    if "software_ai" in company_type:
+        return FRAMEWORKS["software_ai"]
+    if "auto_energy" in company_type or ("auto" in company_type and "optionality" in company_type):
+        return FRAMEWORKS["auto_energy_optionality"]
+    if "optionality" in tags and ({"auto", "automobiles", "automotive"} & tags):
+        return FRAMEWORKS["auto_energy_optionality"]
     if "commodity" in tags or "mining" in company_type or "uranium" in company_type or "royalty" in company_type:
         return FRAMEWORKS["commodity"]
     if "subscriber" in tags or "subscriber" in company_type:
@@ -318,7 +346,11 @@ def resolve_company_framework(company: Company) -> CompanyFramework:
         return FRAMEWORKS["platform"]
     if "infra" in tags or "capacity" in company_type:
         return FRAMEWORKS["capacity_infrastructure"]
-    if "software" in tags or "ai" in tags or "cloud" in tags:
+    if "ecommerce" in tags or "e-commerce" in tags or "retail" in tags:
+        return FRAMEWORKS["generic_fcf"]
+    if "software" in tags:
+        return FRAMEWORKS["software_ai"]
+    if "ai" in tags or "cloud" in tags:
         return FRAMEWORKS["software_ai"]
     if "space" in tags or "defense" in tags:
         return FRAMEWORKS["space_defense"]

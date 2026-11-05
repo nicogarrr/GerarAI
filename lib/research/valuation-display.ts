@@ -5,36 +5,23 @@
  */
 import { formatPercent } from '@/lib/format';
 import type { Locale } from '@/lib/i18n/locale';
-import type { TranslationKey } from '@/lib/i18n/t';
 import { createTranslator } from '@/lib/i18n/translate';
+import type { TranslationKey } from '@/lib/i18n/t';
 
-/** Motivos de no publicación en español claro. «traceable_wacc» como blocker
- *  significa que FALTA (el token suelto se leía como «WACC con fuente
- *  trazable», justo lo contrario). */
-const BLOCKER_KEYS: Record<string, TranslationKey> = {
-  traceable_wacc: 'research.valuationText.blockers.traceable_wacc',
-  forecast_is_not_the_driver: 'research.valuationText.blockers.forecast_is_not_the_driver',
-  inferred_fcf_margin_target: 'research.valuationText.blockers.inferred_fcf_margin_target',
-  consenso_sin_conciliar: 'research.valuationText.blockers.consenso_sin_conciliar',
-  impulsor_material_sin_tratar: 'research.valuationText.blockers.impulsor_material_sin_tratar',
-  inventario_impulsores_no_verificable: 'research.valuationText.blockers.inventario_impulsores_no_verificable',
-  declared_input_default: 'research.valuationText.blockers.declared_input_default',
-  inferred_sector_input: 'research.valuationText.blockers.inferred_sector_input',
+/** Motivos de no publicación: claves i18n (research.valuationText.blockers.*).
+ *  «traceable_wacc» como blocker significa que FALTA (el token suelto se leía
+ *  como «WACC con fuente trazable», justo lo contrario). */
+const BLOCKER_LABEL_KEYS: Record<string, TranslationKey> = {
+  traceable_wacc: 'research.valuationText.blockers.traceableWacc',
+  forecast_is_not_the_driver: 'research.valuationText.blockers.forecastIsNotTheDriver',
+  inferred_fcf_margin_target: 'research.valuationText.blockers.inferredFcfMarginTarget',
+  scenario_set_missing: 'research.valuationText.blockers.scenarioSetMissing',
 };
 
-export function blockerLabel(id: string, locale: Locale = 'es'): string {
-  const t = createTranslator(locale);
-  switch (id) {
-    case 'traceable_wacc': return t('research.valuationText.blockers.traceable_wacc');
-    case 'forecast_is_not_the_driver': return t('research.valuationText.blockers.forecast_is_not_the_driver');
-    case 'inferred_fcf_margin_target': return t('research.valuationText.blockers.inferred_fcf_margin_target');
-    case 'consenso_sin_conciliar': return t('research.valuationText.blockers.consenso_sin_conciliar');
-    case 'impulsor_material_sin_tratar': return t('research.valuationText.blockers.impulsor_material_sin_tratar');
-    case 'inventario_impulsores_no_verificable': return t('research.valuationText.blockers.inventario_impulsores_no_verificable');
-    case 'declared_input_default': return t('research.valuationText.blockers.declared_input_default');
-    case 'inferred_sector_input': return t('research.valuationText.blockers.inferred_sector_input');
-    default: return BLOCKER_KEYS[id] ?? id;
-  }
+export function blockerLabel(id: string, locale: 'es' | 'en' = 'es'): string {
+  const key = BLOCKER_LABEL_KEYS[id];
+  return key ? createTranslator(locale)(key) : id;
+
 }
 
 /** Procedencia del WACC usado por el motor (resolve_rates del backend). */

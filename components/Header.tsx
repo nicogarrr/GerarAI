@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import IntentLink from '@/components/layout/IntentLink';
 import { GerarAIWordmark } from '@/components/GerarAIWordmark';
 import UserDropdown from '@/components/UserDropdown';
 import SearchCommand from '@/components/SearchCommand';
@@ -38,7 +39,7 @@ const Header = async ({ user, initialStocks }: { user: User; initialStocks?: Sto
                             initialStocks={initialStocks}
                         />
                     </div>
-                    <Link href="/alerts" aria-label={t('shell.header.alerts')} title={t('shell.header.alerts')} className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-800 hover:text-teal-300"><Bell aria-hidden="true" className="h-5 w-5" /></Link>
+                    <IntentLink href="/alerts" aria-label={t('shell.header.alerts')} title={t('shell.header.alerts')} className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-800 hover:text-teal-300"><Bell aria-hidden="true" className="h-5 w-5" /></IntentLink>
                     <UserDropdown user={user} />
                 </div>
             </div>
