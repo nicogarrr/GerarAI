@@ -55,6 +55,20 @@ function waccDisplay(wacc: { value: number | null; source_type: string } | null 
   return percentage(wacc?.value, fmt);
 }
 
+/** Un margen FCF proyectado fuera de [-100 %, 100 %] no es una proporción
+ *  interpretable: con ingresos casi nulos (empresa pre-ingresos) el
+ *  porcentaje explota (-1546 % visto en prod) y el FCF derivado
+ *  (margen × ingresos) arrastra la misma explosión. Regla de veracidad:
+ *  N/D con aviso, nunca una cifra absurda (misma política que el WACC
+ *  sin fuente). */
+function fcfMarginSane(value: number | null | undefined): value is number {
+  return value != null && Number.isFinite(value) && Math.abs(value) <= 1;
+}
+
+function fcfMarginDisplay(value: number | null | undefined, fmt: Formatters = esFormat) {
+  return fcfMarginSane(value) ? fmt.formatPercent(value) : fmt.na;
+}
+
 /** Frases «what must be true» en español (F24). El backend las genera en
  *  inglés, pero cada condición trae id + valor estructurados: se redacta la
  *  prosa en la UI. Id desconocido: se muestra la frase original, nunca se
@@ -173,6 +187,7 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
 
   const base = model.scenarios.base;
   const year5 = base?.year_5 ?? base?.terminal_year;
+  const year5MarginSane = fcfMarginSane(year5?.fcf_margin);
   const terminal = base?.terminal_year;
   const growthAssumption = model.assumptions.revenue_growth;
   const marginAssumption = model.assumptions.fcf_margin;
@@ -228,8 +243,8 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <ModelStat label={ti('research.model.revenueYear', { year: year5?.year ?? ti('research.model.year5') })} value={num(year5?.revenue)} />
-        <ModelStat label={ti('research.model.fcfYear', { year: year5?.year ?? ti('research.model.year5') })} value={num(year5?.free_cash_flow)} positive />
-        <ModelStat label={ti('research.model.fcfMargin')} value={pctv(year5?.fcf_margin)} />
+        <ModelStat label={ti('research.model.fcfYear', { year: year5?.year ?? ti('research.model.year5') })} value={year5MarginSane ? num(year5?.free_cash_flow) : fmt.na} positive hint={year5MarginSane ? undefined : ti('research.model.fcfOutOfRange')} />
+        <ModelStat label={ti('research.model.fcfMargin')} value={fcfMarginDisplay(year5?.fcf_margin, fmt)} hint={year5MarginSane ? undefined : ti('research.model.marginOutOfRange')} />
         <ModelStat label={ti('research.model.fcfPerShare')} value={num(year5?.fcf_per_share)} positive hint={year5?.fcf_per_share == null ? ti('research.model.fcfPerShareNa') : undefined} />
       </div>
 
@@ -253,8 +268,8 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
                   <div className="font-semibold capitalize text-gray-200">{translate(SCENARIO_LABELS, name, ti)}</div>
                   <dl className="mt-2 space-y-1.5 text-sm">
                     <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.revenue')}</dt><dd className="text-gray-300">{num(point?.revenue)}</dd></div>
-                    <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.fcf')}</dt><dd className="text-gray-300">{num(point?.free_cash_flow)}</dd></div>
-                    <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.fcfMargin')}</dt><dd className="text-gray-300">{pctv(point?.fcf_margin)}</dd></div>
+                    <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.fcf')}</dt><dd className="text-gray-300">{fcfMarginSane(point?.fcf_margin) ? num(point?.free_cash_flow) : fmt.na}</dd></div>
+                    <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.fcfMargin')}</dt><dd className="text-gray-300">{fcfMarginDisplay(point?.fcf_margin, fmt)}</dd></div>
                     <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.valuePerShare')}</dt><dd className="font-semibold text-teal-200">{num(scenario.valuation?.value_per_share)}</dd></div>
                     {scenario.valuation == null && scenarioValuationCause(scenario, ti) ? (
                       <p className="text-xs leading-5 text-gray-500">{scenarioValuationCause(scenario, ti)}</p>
@@ -283,8 +298,8 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
                     <tr key={name} className="border-b border-gray-900 last:border-0">
                       <th className="py-3 text-left text-sm font-semibold capitalize text-gray-200" scope="row">{translate(SCENARIO_LABELS, name, ti)}</th>
                       <td className="py-3 text-right text-gray-300">{num(point?.revenue)}</td>
-                      <td className="py-3 text-right text-gray-300">{num(point?.free_cash_flow)}</td>
-                      <td className="py-3 text-right text-gray-300">{pctv(point?.fcf_margin)}</td>
+                      <td className="py-3 text-right text-gray-300">{fcfMarginSane(point?.fcf_margin) ? num(point?.free_cash_flow) : fmt.na}</td>
+                      <td className="py-3 text-right text-gray-300">{fcfMarginDisplay(point?.fcf_margin, fmt)}</td>
                       <td className="py-3 text-right text-teal-200">
                         {num(scenario.valuation?.value_per_share)}
                         {scenario.valuation == null && scenarioValuationCause(scenario, ti) ? (
@@ -306,7 +321,7 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
             <div className="text-xs font-semibold uppercase text-gray-500">{ti('research.model.baseAssumptions')}</div>
             <div className="mt-2 grid gap-2 text-sm">
               <div className="flex justify-between gap-3"><span className="text-gray-400">{ti('research.model.revenueCagr')}</span><span className="text-gray-200">{pctv(growthAssumption?.value)}</span></div>
-              <div className="flex justify-between gap-3"><span className="text-gray-400">{ti('research.model.normalizedFcfMargin')}</span><span className="text-gray-200">{pctv(marginAssumption?.value)}</span></div>
+              <div className="flex justify-between gap-3"><span className="text-gray-400">{ti('research.model.normalizedFcfMargin')}</span><span className="text-gray-200">{fcfMarginDisplay(marginAssumption?.value, fmt)}</span></div>
               <div className="flex justify-between gap-3"><span className="text-gray-400"><GlossaryTerm k="roic" icon={false}>ROIC</GlossaryTerm> / <GlossaryTerm k="wacc" icon={false}>WACC</GlossaryTerm></span><span className="text-gray-200">{pctv(terminal?.roic)} / {waccDisplay(model.assumptions.wacc, fmt)}</span></div>
             </div>
             <p className="mt-3 text-xs leading-5 text-gray-500">
