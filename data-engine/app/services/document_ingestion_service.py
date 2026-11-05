@@ -210,6 +210,23 @@ class DocumentIngestionService:
             raise ValueError(f"Company {ticker.upper()} not found")
 
         checksum = hashlib.sha256(content).hexdigest()
+        ir_digest = None
+        if source_type == "IR":
+            from app.services.ir_content_guard import normalized_digest, soft_404
+
+            html = "html" in (content_type or "") or filename.lower().endswith((".html", ".htm"))
+            if soft_404(source_url, content.decode("utf-8", errors="replace"), html=html):
+                return {"status": "skipped", "reason": "ir_soft_404", "ticker": ticker}
+            # PDFs se comparan por bytes, nunca decodificados como texto.
+            ir_digest = normalized_digest(content, html=True) if html else checksum
+            known = db.scalar(select(Document).where(
+                Document.company_id == company.id, Document.source_url == source_url,
+                Document.metadata_["ir_normalized_digest"].as_string() == ir_digest,
+                *tenant_filters(db, Document),
+            ).limit(1))
+            if known is not None:
+                return {"status": "duplicate", "reason": "ir_normalized_content", "document_id": known.id, "ticker": ticker}
+
         # F252: la re-ingesta diaria del mismo filing de la SEC deriva unos
         # pocos bytes y el checksum no la capturaba (cada dia, otra fila).
         # La identidad por URL solo se aplica a URLs de archivo inmutable:
@@ -293,6 +310,7 @@ class DocumentIngestionService:
             metadata_={
                 **{key: value for key, value in (filing_metadata or {}).items()
                    if key in {"form", "report_date", "period_of_report", "accession_number", "parent_form", "fiscal_quarter", "items"}},
+                **({"ir_normalized_digest": ir_digest} if ir_digest else {}),
                 "parser": parsed.parser,
                 "filename": filename,
                 "content_type": content_type,

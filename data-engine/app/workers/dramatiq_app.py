@@ -1105,6 +1105,17 @@ def extract_document_kpis(
         }
     except Exception as exc:
         _rollback(db)
+        from app.services.kpi_call_quota import KPIDailyDeferred
+
+        if isinstance(exc, KPIDailyDeferred):
+            document = db.get(Document, document_id)
+            if document is not None:
+                meta = dict(document.metadata_ or {})
+                meta[KPI_DEFERRED_KEY] = {"attempts": 0, "not_before": (int(time.time()) // 86400 + 1) * 86400}
+                meta["kpi_daily_deferred"] = {"at": int(time.time()), "reason": "daily_call_limit"}
+                document.metadata_ = meta
+                db.commit()
+            return {"status": "deferred", "reason": "daily_call_limit", "document_id": document_id}
         from app.llm.errors import ProviderHTTPError
 
         if isinstance(exc, ProviderHTTPError) and exc.status_code == 429:
@@ -1217,6 +1228,7 @@ def backfill_document_kpis() -> dict[str, Any]:
                     # docs antiguos agotados llenaria el LIMIT en cada corrida
                     # y ningun diferido elegible se reencolaria jamas.
                     func.coalesce(attempts_expr, 0) < KPI_DEFER_MAX_ATTEMPTS,
+                    func.coalesce(cast(Document.metadata_[(KPI_DEFERRED_KEY, "not_before")].as_string(), Integer), 0) <= now,
                     lease_filter,
                 )
                 .order_by(Document.created_at)
@@ -3085,6 +3097,9 @@ def refresh_ir_pages(
             # la descarga pesada del documento.
             tracked_tickers = {c.ticker.upper() for c in _tracked_companies(db) if c.ticker}
             for company in _companies(db, ticker):
+                if company.ticker.upper() not in tracked_tickers:
+                    skipped_untracked += 1
+                    continue
                 if not company.ir_url:
                     continue
                 try:

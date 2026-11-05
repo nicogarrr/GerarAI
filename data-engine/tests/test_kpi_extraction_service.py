@@ -136,3 +136,17 @@ def test_normalize_units_negatives_and_percents():
     value, meta = normalize("not-a-number", "USD", "USD")
     assert value is None
     assert meta["status"] == "invalid_number"
+
+
+def test_existing_approved_candidates_return_before_any_llm(db):
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    existing = _scaffold(db, status="approved")
+    original = existing.normalized_value
+    provider = SimpleNamespace(complete=AsyncMock(side_effect=AssertionError("LLM called")))
+    result = asyncio.run(KPIExtractionService(provider).extract_document(db, db.get(Document, existing.document_id)))
+    assert result == [existing]
+    assert existing.normalized_value == original and existing.status == "approved"
+    provider.complete.assert_not_awaited()
