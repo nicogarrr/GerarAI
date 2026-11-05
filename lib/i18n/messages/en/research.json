@@ -1803,7 +1803,8 @@
       "consenso_sin_conciliar": "the valuation is more than 35 % away from analyst consensus and the gap is not reconciled item by item",
       "impulsor_material_sin_tratar": "a signed, material value driver has no treatment in the model",
       "inventario_impulsores_no_verificable": "the value-driver inventory could not be verified",
-      "declared_input_default": "the projection uses a default declared assumption without a source"
+      "declared_input_default": "the projection uses a default declared assumption without a source",
+      "inferred_sector_input": "the valuation uses an inferred sector input (with sources), not a reported fact: indicative result"
     },
     "scenarioWarnings": {
       "growthOutsideReference": "Scenario \"{name}\": revenue growth {value}, outside the general reference range ({low} to {high}); shown as declared, with its source.",

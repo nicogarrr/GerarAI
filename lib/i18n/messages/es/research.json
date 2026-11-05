@@ -1803,7 +1803,8 @@
       "consenso_sin_conciliar": "la valoración se aleja más del 35 % del consenso de analistas y la diferencia no está conciliada dato a dato",
       "impulsor_material_sin_tratar": "hay un impulsor de valor firmado y material sin tratamiento en el modelo",
       "inventario_impulsores_no_verificable": "no se pudo verificar el inventario de impulsores de valor",
-      "declared_input_default": "la proyección usa un supuesto por defecto declarado, sin fuente"
+      "declared_input_default": "la proyección usa un supuesto por defecto declarado, sin fuente",
+      "inferred_sector_input": "la valoración usa un input sectorial inferido (con fuentes), no un dato reportado: resultado orientativo"
     },
     "scenarioWarnings": {
       "growthOutsideReference": "Escenario «{name}»: crecimiento de ventas {value}, fuera de la referencia general ({low} a {high}); se muestra tal cual, con su fuente.",

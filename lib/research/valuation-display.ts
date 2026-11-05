@@ -19,6 +19,7 @@ const BLOCKER_KEYS: Record<string, TranslationKey> = {
   impulsor_material_sin_tratar: 'research.valuationText.blockers.impulsor_material_sin_tratar',
   inventario_impulsores_no_verificable: 'research.valuationText.blockers.inventario_impulsores_no_verificable',
   declared_input_default: 'research.valuationText.blockers.declared_input_default',
+  inferred_sector_input: 'research.valuationText.blockers.inferred_sector_input',
 };
 
 export function blockerLabel(id: string, locale: Locale = 'es'): string {
@@ -31,6 +32,7 @@ export function blockerLabel(id: string, locale: Locale = 'es'): string {
     case 'impulsor_material_sin_tratar': return t('research.valuationText.blockers.impulsor_material_sin_tratar');
     case 'inventario_impulsores_no_verificable': return t('research.valuationText.blockers.inventario_impulsores_no_verificable');
     case 'declared_input_default': return t('research.valuationText.blockers.declared_input_default');
+    case 'inferred_sector_input': return t('research.valuationText.blockers.inferred_sector_input');
     default: return BLOCKER_KEYS[id] ?? id;
   }
 }
