@@ -1098,6 +1098,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/analyst-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Company Analyst Notes
+         * @description Últimas notas de analista guardadas para este tenant: primero las de las
+         *     casas mejor puntuadas para el ticker (ranking de /analyst-history, por error
+         *     frente a sus pares), en ese orden, y después las últimas de otras casas.
+         *     Cada nota lleva su fuente, su tipo y su verificación (las de redes son
+         *     «rumor_no_verificado»). Si el ranking no está disponible, las notas salen
+         *     por fecha con ``ranking_status=unranked``. Solo lectura.
+         */
+        get: operations["company_analyst_notes_api_companies__ticker__analyst_notes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{ticker}/analyst-targets": {
         parameters: {
             query?: never;
@@ -7007,6 +7032,147 @@ export interface components {
              */
             targets_total: number;
         };
+        /** AnalystNoteOut */
+        AnalystNoteOut: {
+            /** Action */
+            action: string;
+            /** Analyst */
+            analyst?: string | null;
+            /** Bear Case */
+            bear_case?: string | null;
+            /** Bear Target */
+            bear_target?: number | null;
+            /** Bull Case */
+            bull_case?: string | null;
+            /** Bull Target */
+            bull_target?: number | null;
+            /**
+             * Catalysts
+             * @default []
+             */
+            catalysts: string[];
+            /** Changes Since Previous */
+            changes_since_previous?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Driver Refs */
+            driver_refs?: string[] | null;
+            /**
+             * Estimates
+             * @default {}
+             */
+            estimates: {
+                [key: string]: unknown;
+            };
+            /**
+             * Extras
+             * @default {}
+             */
+            extras: {
+                [key: string]: unknown;
+            };
+            /** Firm */
+            firm: string;
+            /** Firm Rank */
+            firm_rank?: number | null;
+            /** Id */
+            id: number;
+            /**
+             * Key Arguments
+             * @default []
+             */
+            key_arguments: string[];
+            /**
+             * Links
+             * @default []
+             */
+            links: string[];
+            /**
+             * Note Date
+             * Format: date
+             */
+            note_date: string;
+            /** Price At Note */
+            price_at_note?: number | null;
+            /** Pt New */
+            pt_new?: number | null;
+            /** Pt Old */
+            pt_old?: number | null;
+            /** Quote */
+            quote?: string | null;
+            /** Rating New */
+            rating_new?: string | null;
+            /** Rating Old */
+            rating_old?: string | null;
+            /**
+             * Risks
+             * @default []
+             */
+            risks: string[];
+            /**
+             * Segment Assumptions
+             * @default {}
+             */
+            segment_assumptions: {
+                [key: string]: unknown;
+            };
+            /** Sentiment */
+            sentiment?: string | null;
+            /** Source Type */
+            source_type: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Ticker */
+            ticker: string;
+            /** Upside Pct */
+            upside_pct?: number | null;
+            /**
+             * Valuation
+             * @default {}
+             */
+            valuation: {
+                [key: string]: unknown;
+            };
+            /**
+             * Verification
+             * @enum {string}
+             */
+            verification: "verificado" | "fragmento" | "rumor_no_verificado";
+        };
+        /** AnalystNotesView */
+        AnalystNotesView: {
+            /**
+             * Notes
+             * @default []
+             */
+            notes: components["schemas"]["AnalystNoteOut"][];
+            /**
+             * Other Notes
+             * @default []
+             */
+            other_notes: components["schemas"]["AnalystNoteOut"][];
+            /**
+             * Ranked Firms
+             * @default []
+             */
+            ranked_firms: components["schemas"]["RankedFirmOut"][];
+            /** Ranking Horizon */
+            ranking_horizon?: ("6m" | "12m") | null;
+            /** Ranking Note */
+            ranking_note?: string | null;
+            /**
+             * Ranking Status
+             * @enum {string}
+             */
+            ranking_status: "ranked" | "unranked";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "available" | "empty" | "no_tenant";
+            /** Ticker */
+            ticker: string;
+        };
         /** AnalystTargetRow */
         AnalystTargetRow: {
             /** Action */
@@ -12617,6 +12783,26 @@ export interface components {
             /** Source */
             source: string;
         };
+        /** RankedFirmOut */
+        RankedFirmOut: {
+            /** Direction Hit Rate */
+            direction_hit_rate: number;
+            /** Firm */
+            firm: string;
+            /** Median Abs Error Pct */
+            median_abs_error_pct: number;
+            /** Rank */
+            rank: number;
+            /** Relative Error */
+            relative_error?: number | null;
+            /** Samples */
+            samples: number;
+            /**
+             * Small Sample
+             * @default false
+             */
+            small_sample: boolean;
+        };
         /** RatingChanges */
         RatingChanges: {
             /**
@@ -16967,6 +17153,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalystHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    company_analyst_notes_api_companies__ticker__analyst_notes_get: {
+        parameters: {
+            query?: {
+                per_firm?: number;
+                others?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalystNotesView"];
                 };
             };
             /** @description Validation Error */
