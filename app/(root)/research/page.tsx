@@ -109,7 +109,7 @@ function CompanyCard({ row, t, locale }: { row: CompanyRow; t: TranslateFn; loca
                 <div className="flex items-center gap-3">
                     {/* Mismo logo con cadena de fuentes y fallback a iniciales
                         que cartera, watchlist y cabecera de ficha. */}
-                    <CompanyLogo ticker={company.ticker} name={company.name || company.ticker} className="size-10 shrink-0 rounded-lg" />
+                    <CompanyLogo loading="lazy" ticker={company.ticker} name={company.name || company.ticker} className="size-10 shrink-0 rounded-lg" />
                     <div className="min-w-0">
                         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                             <span className="text-base font-semibold text-gray-100">{company.ticker}</span>
