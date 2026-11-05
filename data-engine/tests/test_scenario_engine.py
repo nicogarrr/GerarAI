@@ -139,6 +139,25 @@ def test_without_sourced_scenarios_no_scenario_value_is_published(db):
     assert _engine_that_ran(result, company) == "standard_dcf"
 
 
+def test_without_sourced_scenarios_the_fallback_is_not_publishable(db):
+    """Dato ausente = N/D: el modelo declarado (escenarios) no ha corrido, así
+    que el número del respaldo no puede presentarse como valoración final. Los
+    números se quedan (la ficha los muestra degradados, con el motivo)."""
+    company = _company(db, "scenario_auto_energy_fsd")
+    result = ValuationService().value_company(db, company)
+    assert result["publishable"] is False
+    assert result["status"] == "partial"
+    assert "scenario_set_missing" in result["publication_blockers"]
+    assert "scenario_set_missing" in result["trace"]["publication_blockers"]
+    # El DCF estándar con las mismas entradas, sin la ruta de escenarios, sí
+    # publica: la degradación viene de que el modelo declarado no corrió.
+    plain = ValuationService().value_company(db, _company(db, "dcf+reverse_dcf", ticker="XDCF"))
+    assert plain["publishable"] is True
+    assert plain["status"] == "ok"
+    assert result["expected_value"] == pytest.approx(plain["expected_value"])
+    assert result["base_value"] == pytest.approx(plain["base_value"])
+
+
 def test_without_sourced_scenarios_a_cash_burner_takes_the_classification_engine(db):
     burner = {
         2023: dict(revenue=1000, operating_cash_flow=-300, capital_expenditure=-500, depreciation_amortization=50),

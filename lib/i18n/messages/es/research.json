@@ -1806,6 +1806,12 @@
     "scenarioWarnings": {
       "growthOutsideReference": "Escenario «{name}»: crecimiento de ventas {value}, fuera de la referencia general ({low} a {high}); se muestra tal cual, con su fuente.",
       "marginAboveReference": "Escenario «{name}»: margen FCF {value}, por encima de la referencia general ({reference}); se muestra tal cual, con su fuente."
+    },
+    "blockers": {
+      "traceableWacc": "WACC sin cálculo trazable",
+      "forecastIsNotTheDriver": "el valor terminal es más del 95 % del valor: la previsión a 5 años no es el motor de esta valoración",
+      "inferredFcfMarginTarget": "margen FCF objetivo inferido (con fuentes): convergencia de margen orientativa para una empresa en crecimiento, no una valoración final",
+      "scenarioSetMissing": "escenarios pendientes: el modelo declarado valora por escenarios y aún no hay un juego con fuente; el número es la orientación del motor de respaldo, no una valoración final"
     }
   },
   "peerFormat": {

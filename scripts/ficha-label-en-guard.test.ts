@@ -27,11 +27,20 @@ test('label() sin locale conserva el ES histórico y con en usa los catálogos E
   assert.equal(STATUS_LABELS_EN.insufficient_data, 'insufficient data');
 });
 
-test('blockerLabel: firma con locale y catálogo EN con las mismas tres claves', () => {
+test('blockerLabel: firma con locale y etiquetas en i18n (research.valuationText.blockers.*)', () => {
   const src = readFileSync('lib/research/valuation-display.ts', 'utf8');
   assert.match(src, /export function blockerLabel\(id: string, locale: 'es' \| 'en' = 'es'\): string/);
-  for (const key of ['traceable_wacc', 'forecast_is_not_the_driver', 'inferred_fcf_margin_target']) {
-    assert.equal((src.match(new RegExp(`^  ${key}:`, 'gm')) ?? []).length, 2, key);
+  const es = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8'));
+  const en = JSON.parse(readFileSync('lib/i18n/messages/en/research.json', 'utf8'));
+  for (const [id, camel] of [
+    ['traceable_wacc', 'traceableWacc'],
+    ['forecast_is_not_the_driver', 'forecastIsNotTheDriver'],
+    ['inferred_fcf_margin_target', 'inferredFcfMarginTarget'],
+    ['scenario_set_missing', 'scenarioSetMissing'],
+  ] as const) {
+    assert.match(src, new RegExp(`${id}: 'research\\.valuationText\\.blockers\\.${camel}'`), id);
+    assert.equal(typeof es.valuationText.blockers[camel], 'string', `es ${camel}`);
+    assert.equal(typeof en.valuationText.blockers[camel], 'string', `en ${camel}`);
   }
 });
 
