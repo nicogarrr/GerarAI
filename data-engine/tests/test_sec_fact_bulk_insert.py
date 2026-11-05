@@ -15,14 +15,13 @@ Reglas que fijan estos tests (contadores, sin reloj):
 
 import asyncio
 
-import pytest
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import sessionmaker
 
 from app.models.entities import Base, FinancialFact
 from app.services import financial_ingestion_service as ingestion
 from app.services.financial_ingestion_service import FinancialIngestionService
-from tests.test_sec_refresh_unchanged_skip import _FakeSECMini, _company
+from tests.test_sec_refresh_unchanged_skip import _company, _FakeSECMini
 
 
 def _session(*, tenant="tenant-test"):
