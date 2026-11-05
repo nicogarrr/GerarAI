@@ -3,10 +3,10 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
+from test_thesis_news_narrative import ITEM, NOW, Provider, output
 
 from app.services import thesis_news_cache as cache
 from app.services import thesis_news_narrative as svc
-from test_thesis_news_narrative import ITEM, NOW, Provider, output
 
 
 @pytest.fixture
