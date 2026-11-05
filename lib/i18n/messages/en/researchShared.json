@@ -70,5 +70,11 @@
       "probabilityWeightedScenario": "probability-weighted scenarios",
       "explicitDriverFcffDcf": "explicit driver DCF"
     }
+  },
+  "missingMetricLabels": {
+    "netDebtAtTargetValue": "net debt at target valuation date",
+    "totalDebtOrCompleteComponents": "total debt or complete debt components",
+    "costOfDebt": "cost of debt",
+    "taxRate": "tax rate"
   }
 }
