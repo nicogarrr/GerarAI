@@ -133,6 +133,20 @@ class WorkflowEnvelope:
                 self._tracer_token = None
         return self.run
 
+    def fail(self, exc: BaseException) -> None:
+        """Cierra la corrida como fallida si un paso externo lanza."""
+        self.run.status = "failed"
+        self.run.error_class = type(exc).__name__
+        self.run.error_message = str(exc)[:1000]
+        self.run.finished_at = _utcnow()
+        self.db.add(self.run)
+        _safe_commit(self.db, "run failure")
+        if self.tracer:
+            self.tracer.finish(status="failed", error_class=type(exc).__name__)
+            if self._tracer_token is not None:
+                tracing.reset_current_tracer(self._tracer_token)
+                self._tracer_token = None
+
 
 def begin_run(
     db: Session,
@@ -166,6 +180,31 @@ def begin_run(
         )
         if existing is not None and existing.status == "succeeded":
             return WorkflowEnvelope(db, existing, replayed=True)
+        if existing is not None and existing.status == "running":
+            # Reentrega mientras la primera ejecución sigue viva: no se lanza
+            # una segunda. El llamador ve replayed=True y no repite efectos.
+            return WorkflowEnvelope(db, existing, replayed=True)
+        if existing is not None:
+            # Un intento fallido con la MISMA clave reutiliza la fila y sube
+            # attempt. Insertar otra violaría la unicidad (tenant, workflow,
+            # key) y el commit best-effort se comía el error, dejando el run
+            # sin id y los steps huérfanos. Sin tenant (solo tests/legado) la
+            # unicidad no aplica y se conserva el intento nuevo.
+            if tenant_id is None:
+                existing = None
+            else:
+                existing.execution_mode = execution_mode or existing.execution_mode
+                existing.input_payload = input_payload or {}
+                existing.status = "running"
+                existing.attempt = (existing.attempt or 1) + 1
+                existing.started_at = _utcnow()
+                existing.finished_at = None
+                existing.error_class = None
+                existing.error_message = None
+                existing.result_payload = None
+                db.add(existing)
+                _safe_commit(db, "run retry")
+                return WorkflowEnvelope(db, existing)
 
     run = WorkflowRun(
         tenant_id=tenant_id,
@@ -178,5 +217,17 @@ def begin_run(
         started_at=_utcnow(),
     )
     db.add(run)
-    _safe_commit(db, "run start")
+    if not _safe_commit(db, "run start") and idempotency_key:
+        # Carrera entre dos primeras entregas: la otra insertó la fila. Se
+        # recupera en vez de seguir con un run sin id.
+        raced = db.scalar(
+            select(WorkflowRun).where(
+                WorkflowRun.workflow_name == workflow_name,
+                WorkflowRun.idempotency_key == idempotency_key,
+                WorkflowRun.tenant_id.is_(None) if tenant_id is None
+                else WorkflowRun.tenant_id == tenant_id,
+            )
+        )
+        if raced is not None:
+            return WorkflowEnvelope(db, raced, replayed=raced.status == "succeeded")
     return WorkflowEnvelope(db, run)

@@ -40,7 +40,9 @@ def test_reit_values_with_inferred_cap_rate_labeled():
                 db, company, input_key="cap_rate", value=Decimal("0.0525"), base=BASE, source_urls=URLS
             )
             result = ValuationService().value_company(db, company)
-            assert result["status"] == "ok"
+            assert result["status"] == "partial"
+            assert result["publishable"] is False
+            assert "inferred_sector_input" in result["publication_blockers"]
             (item,) = [i for i in result["estimated_inputs"] if i["metric"] == "cap_rate"]
             assert item["status"] == "inferido" and BASE in item["method"]
             assert item["note"].startswith("una sola fuente, no oficial")
@@ -79,6 +81,9 @@ def test_reported_nav_entity_uses_inferred_discount_labeled():
                 source_urls=URLS,
             )
             result = ValuationService().value_company(db, company)
+            assert result["status"] == "partial"
+            assert result["publishable"] is False
+            assert "inferred_sector_input" in result["publication_blockers"]
             assert result["trace"]["holding_discount_source"] == "inferred_input"
             assert result["estimated_inputs"][0]["metric"] == "holding_company_discount"
             assert abs(result["base_value"] - at_par["base_value"] * 0.75) < 1e-6

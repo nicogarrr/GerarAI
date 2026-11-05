@@ -242,43 +242,47 @@ class ThesisShadowService:
         )
         config = {"configurable": {"thread_id": thread_id}}
 
-        with sqlite_checkpointer() as saver:
-            graph = build_thesis_graph(
-                checkpointer=saver, session_factory=lambda: _session_scope(db)
-            )
-            initial = graph.invoke(
-                {
-                    "ticker": company.ticker,
-                    "tenant_id": tenant_external_id,
-                    "company_id": str(company.id),
-                    "input_fingerprint": f"shadow-{company.ticker}",
-                },
-                config=config,
-            )
-            # 6c: the run pauses at the real approval_gate interrupt. The
-            # shadow resumes with an explicit synthetic decision so the
-            # comparison still validates full traversal; the decision is
-            # recorded in control state only, never in domain artifacts.
-            snapshot = graph.get_state(config)
-            interrupted_at_gate = snapshot.next == ("approval_gate",)
-            if interrupted_at_gate:
-                first = graph.invoke(
-                    Command(resume={"decision": "approve", "actor": "shadow-auto-approve"}),
+        try:
+            with sqlite_checkpointer() as saver:
+                graph = build_thesis_graph(
+                    checkpointer=saver, session_factory=lambda: _session_scope(db)
+                )
+                initial = graph.invoke(
+                    {
+                        "ticker": company.ticker,
+                        "tenant_id": tenant_external_id,
+                        "company_id": str(company.id),
+                        "input_fingerprint": f"shadow-{company.ticker}",
+                    },
                     config=config,
                 )
-            else:
-                first = initial
-            # Idempotent re-delivery: a retry on the same thread must add
-            # zero newly committed nodes.
-            second = graph.invoke(
-                {
-                    "ticker": company.ticker,
-                    "tenant_id": tenant_external_id,
-                    "company_id": str(company.id),
-                    "input_fingerprint": f"shadow-{company.ticker}",
-                },
-                config=config,
-            )
+                # 6c: the run pauses at the real approval_gate interrupt. The
+                # shadow resumes with an explicit synthetic decision so the
+                # comparison still validates full traversal; the decision is
+                # recorded in control state only, never in domain artifacts.
+                snapshot = graph.get_state(config)
+                interrupted_at_gate = snapshot.next == ("approval_gate",)
+                if interrupted_at_gate:
+                    first = graph.invoke(
+                        Command(resume={"decision": "approve", "actor": "shadow-auto-approve"}),
+                        config=config,
+                    )
+                else:
+                    first = initial
+                # Idempotent re-delivery: a retry on the same thread must add
+                # zero newly committed nodes.
+                second = graph.invoke(
+                    {
+                        "ticker": company.ticker,
+                        "tenant_id": tenant_external_id,
+                        "company_id": str(company.id),
+                        "input_fingerprint": f"shadow-{company.ticker}",
+                    },
+                    config=config,
+                )
+        except Exception as exc:
+            envelope.fail(exc)
+            raise
 
         graph_nodes = list(first.get("completed_nodes") or [])
         retry_new_nodes = [

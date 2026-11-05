@@ -193,20 +193,26 @@ def _resolve_inputs(
     periodo y su periodo se expone en el trace en vez de anclarlas al balance.
     """
     aliases = {alias for group in inputs.values() for alias in group} | set(anchor_metrics)
+    conditions = [
+        FinancialFact.company_id == context.company.id,
+        FinancialFact.metric.in_(sorted(aliases)),
+    ]
+    if context.as_of is not None:
+        # Misma regla punto-en-el-tiempo que el snapshot y _latest_usable: un
+        # hecho presentado después de as_of no existía en esa foto.
+        conditions.append(FinancialFact.filed <= context.as_of)
+    as_of_key = context.as_of.isoformat() if context.as_of is not None else None
     # Misma consulta repetida dentro de una valoracion (medido 9x por llamada):
     # cache acotada a la llamada (app/valuation/call_cache.py).
     rows = cached(
         context.db,
         "sector_alias_rows",
-        (context.company.id, tuple(sorted(aliases))),
+        (context.company.id, tuple(sorted(aliases)), as_of_key),
         lambda: [
             row
             for row in context.db.scalars(
                 select(FinancialFact)
-                .where(
-                    FinancialFact.company_id == context.company.id,
-                    FinancialFact.metric.in_(sorted(aliases)),
-                )
+                .where(*conditions)
                 .order_by(
                     FinancialFact.fiscal_year.desc().nullslast(),
                     desc(FinancialFact.created_at),
@@ -572,6 +578,23 @@ def _result(
         # Mismo contrato que el puente de inputs del DCF: la tesis, el valor
         # justo y la API lo muestran etiquetado, nunca como dato oficial.
         result["estimated_inputs"] = estimated_inputs
+        inferred_only = [
+            item
+            for item in estimated_inputs
+            if "inferido por el modelo" in str(item.get("method") or "").lower()
+        ]
+        if inferred_only:
+            # Un input sectorial inferido (cap rate, ratio combinado, descuento
+            # de holding) mueve el valor materialmente y no es un hecho: el
+            # resultado se publica como parcial y con blocker, nunca como final.
+            blockers = ["inferred_sector_input"]
+            result["status"] = "partial"
+            result["publishable"] = False
+            result["publication_blockers"] = blockers
+            trace["status"] = "partial"
+            trace["publishable"] = False
+            trace["publication_blockers"] = blockers
+            trace["input_source"] = "financial_facts+inferred_sector"
     return result
 
 
