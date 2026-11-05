@@ -39,3 +39,16 @@ test('F307: el estado sin alertas de /risk solo tranquiliza con estado ok y escr
     assert.doesNotMatch(risk, /del cartera/);
     assert.ok(!JSON.stringify(esAlerts).includes('del cartera'), 'concordancia «de la cartera» en el diccionario');
 });
+
+test('F306: el pie no anuncia tokens internos del wire y el año ausente usa el marcador del modelo', () => {
+    const es = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).model;
+    const en = JSON.parse(readFileSync('lib/i18n/messages/en/research.json', 'utf8')).model;
+    for (const msg of [es.historyOne, es.historyOther, en.historyOne, en.historyOther]) {
+        // Lo no disponible se traduce (s/d, datos insuficientes): la frase no
+        // puede anunciar los literales del catálogo interno como si el usuario
+        // los viera tal cual.
+        assert.doesNotMatch(msg, /unknown|insufficient_data/);
+    }
+    // Año ausente = marcador traducido (research.model.na), no guion suelto.
+    assert.doesNotMatch(panels, /\?\? '—'/);
+});
