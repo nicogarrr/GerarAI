@@ -6,10 +6,11 @@ import asyncio
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.database import engine, get_db
 
 router = APIRouter(tags=["admin"])
@@ -184,6 +185,13 @@ async def _collect_metrics(db: Session) -> dict[str, Any]:
 @router.get("/admin/db-metrics")
 async def db_metrics(db: Session = Depends(get_db)) -> dict[str, Any]:
     """Get database performance metrics.
+
+    Metadatos operativos de TODA la base: solo con el gate de ops abierto
+    (mismo flag que las invalidaciones globales). En producción es un script
+    de operación, no una ruta que cualquier tenant pueda leer.
+    """
+    if not get_settings().cache_global_invalidation_allowed:
+        raise HTTPException(status_code=404, detail="Not found")
     
     Returns:
         - Connection pool statistics (active, idle, max connections)
