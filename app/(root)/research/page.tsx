@@ -105,6 +105,14 @@ function CompanyCard({ row, t, locale }: { row: CompanyRow; t: TranslateFn; loca
             <Link
                 className="block rounded-xl border border-gray-700/50 bg-surface-1 p-4 transition hover:border-teal-700"
                 href={`/research/${encodeURIComponent(company.ticker)}`}
+                // Sin prefetch: la página muestra hasta 40 tarjetas y cada
+                // prefetch dispara el render RSC completo de la ficha (la
+                // vista más cara: varios workspaces de backend por render).
+                // Medido en prod 5-nov-2026: 18 peticiones _rsc por carga
+                // del índice; con la VM al límite eso multiplica la CPU por
+                // fichas que quizá no se abran. Al pulsar, la navegación
+                // tarda lo mismo que hoy el prefetch.
+                prefetch={false}
             >
                 <div className="flex items-center gap-3">
                     {/* Mismo logo con cadena de fuentes y fallback a iniciales
