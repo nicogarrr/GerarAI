@@ -45,7 +45,7 @@ def test_value_company_fails_closed_on_future_trace_period(monkeypatch) -> None:
 
     with pytest.raises(LookaheadError, match="FY2999"):
         valuation_service.ValuationService().value_company(
-            object(), company, as_of=date(2026, 9, 23)
+            SimpleNamespace(info={}), company, as_of=date(2026, 9, 23)
         )
 
 
@@ -67,7 +67,7 @@ def test_value_company_accepts_trace_period_on_or_before_as_of(monkeypatch) -> N
     monkeypatch.setattr(MoatService, "assess", lambda *_args, **_kwargs: {})
 
     result = valuation_service.ValuationService().value_company(
-        object(), company, as_of=date(2025, 12, 31)
+        SimpleNamespace(info={}), company, as_of=date(2025, 12, 31)
     )
 
     assert result["status"] == "ok"
