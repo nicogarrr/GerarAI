@@ -7,7 +7,9 @@
  * («net_debt_to_ebitda»). Si el backend añade una clave nueva, el fallback
  * la humaniza (guiones bajos -> espacios) en vez de ocultarla.
  */
-// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+// @ts-expect-error TS5097: los guards Node necesitan la extensión.
+import { createTranslator } from '../i18n/translate.ts';
+// @ts-expect-error TS5097: los guards Node necesitan la extensión.
 import { METRIC_LABELS_EN } from './metric-labels-en.ts';
 
 export const METRIC_LABELS: Record<string, string> = {
@@ -180,6 +182,13 @@ export const METRIC_LABELS: Record<string, string> = {
 
 /** Etiqueta de una métrica (ES por defecto); humaniza la clave si es desconocida. */
 export function metricLabel(metric: string, locale: 'es' | 'en' = 'es'): string {
+    const t = createTranslator(locale);
+    switch (metric) {
+        case 'net_debt_at_target_value': return t('researchShared.missingInputs.net_debt_at_target_value');
+        case 'total_debt_or_complete_components': return t('researchShared.missingInputs.total_debt_or_complete_components');
+        case 'cost_of_debt': return t('researchShared.missingInputs.cost_of_debt');
+        case 'tax_rate': return t('researchShared.missingInputs.tax_rate');
+    }
     const table = locale === 'en' ? METRIC_LABELS_EN : METRIC_LABELS;
     const known = (Object.hasOwn(table, metric) ? table[metric] : null) ?? (Object.hasOwn(table, metric.toLowerCase()) ? table[metric.toLowerCase()] : null);
     if (known) return known;

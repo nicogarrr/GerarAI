@@ -70,5 +70,11 @@
       "probabilityWeightedScenario": "escenarios ponderados por probabilidad",
       "explicitDriverFcffDcf": "DCF por drivers explícitos"
     }
+  },
+  "missingInputs": {
+    "net_debt_at_target_value": "Deuda neta en la fecha del valor objetivo",
+    "total_debt_or_complete_components": "Deuda total o todos sus componentes",
+    "cost_of_debt": "Coste de la deuda",
+    "tax_rate": "Tipo impositivo"
   }
 }

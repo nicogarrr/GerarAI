@@ -6,8 +6,10 @@ import { readFileSync } from 'node:fs';
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 
 describe('ficha: borrador sin veredicto ni cifras en «Última tesis»', () => {
-    it('solo published/approved son públicas (insufficient_data es provisional y tampoco muestra veredicto)', () => {
-        assert.match(page, /status === 'published' \|\| status === 'approved';/);
+    it('solo published es pública; approved y insufficient_data no publican el veredicto)', () => {
+        const publication = readFileSync('lib/research/thesis-publication.ts', 'utf8');
+        assert.match(publication, /return status === 'published';/);
+        assert.match(page, /import \{ thesisIsPublic \} from '@\/lib\/research\/thesis-publication';/);
     });
     it('rating y resumen condicionados a tesis pública; el borrador dice por qué', () => {
         assert.match(page, /thesisIsPublic\(snapshot\.latest_thesis\.status\) && visibleThesisRating/);

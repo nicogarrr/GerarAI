@@ -118,7 +118,7 @@ nuevos solo en MinIO con la base apuntando a Garage:
 
 ```bash
 docker compose -p cavaai -f docker-compose.prod.yml stop \
-  backend worker worker-thesis worker-kpis worker-knowledge \
+  backend worker worker-thesis worker-kpis worker-documents worker-knowledge \
   worker-alerts worker-gdelt scheduler \
   worker-official-closes worker-prices worker-externa \
   worker-finnhub worker-yahoo worker-dca-manual
@@ -199,7 +199,7 @@ docker compose -p cavaai -f docker-compose.prod.yml config \
 
 ```bash
 docker compose -p cavaai -f docker-compose.prod.yml up -d --no-deps \
-  backend worker worker-thesis worker-kpis worker-knowledge \
+  backend worker worker-thesis worker-kpis worker-documents worker-knowledge \
   worker-alerts worker-gdelt scheduler worker-official-closes \
   worker-prices worker-externa worker-finnhub worker-yahoo \
   worker-dca-manual
@@ -236,7 +236,7 @@ solo en Garage.
 
 ```bash
 docker compose -p cavaai -f docker-compose.prod.yml stop \
-  backend worker worker-thesis worker-kpis worker-knowledge \
+  backend worker worker-thesis worker-kpis worker-documents worker-knowledge \
   worker-alerts worker-gdelt scheduler worker-official-closes \
   worker-prices worker-externa worker-finnhub worker-yahoo \
   worker-dca-manual
