@@ -22,6 +22,13 @@ from app.models import Company, Document, DocumentChunk, Tenant
 from app.services import hybrid_retrieval as hr
 from app.services.rag import RAGIndex
 
+
+@pytest.fixture(autouse=True)
+def isolated_fastembed_breaker(monkeypatch):
+    """Each test starts a fresh process-level breaker and restores it after."""
+    monkeypatch.setattr(RAGIndex, "_fastembed_error", None)
+
+
 LEGACY_KEYS = {
     "text", "ticker", "document_id", "knowledge_document_id", "collection_id",
     "page_number", "source_type", "title", "score", "point_id", "entity_type",

@@ -16,6 +16,12 @@ import app.services.rag as rag
 from app.models.entities import Base, Company, Document, DocumentChunk
 
 
+@pytest.fixture(autouse=True)
+def isolated_fastembed_breaker(monkeypatch):
+    """Each test starts a fresh process-level breaker and restores it after."""
+    monkeypatch.setattr(rag.RAGIndex, "_fastembed_error", None)
+
+
 class _FakeCollections:
     def __init__(self, names):
         self.collections = [type("C", (), {"name": n}) for n in names]
