@@ -16,6 +16,7 @@ from app.core.errors import redact_secrets
 from app.models import Company, MarketPrice, Position, ValuationModel, ValuationOutput
 from app.services.price_units import listing_price, price_in_currency
 from app.services.split_adjustment import split_after_price, split_events_by_company
+from app.valuation.call_cache import valuation_call_cache
 from app.valuation.currency import (
     listing_currency,
     listing_quote_unit,
@@ -672,6 +673,13 @@ def _fair_value_range(result: dict, cross: dict) -> dict | None:
 
 class ValuationService:
     def value_company(self, db: Session, company: Company, *, as_of: date | None = None) -> dict:
+        # Cache de lecturas acotada a esta llamada (app/valuation/call_cache.py):
+        # los puentes, cross-checks y motores repiten las mismas consultas de
+        # hechos y FX; la cache se borra SIEMPRE al salir, exito o error.
+        with valuation_call_cache(db):
+            return self._value_company(db, company, as_of=as_of)
+
+    def _value_company(self, db: Session, company: Company, *, as_of: date | None = None) -> dict:
         price_error = None
         try:
             resolved_price = resolve_model_price(db, company.id, as_of)

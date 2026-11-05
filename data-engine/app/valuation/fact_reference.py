@@ -43,6 +43,7 @@ from app.models import FinancialFact
 from app.services.esef_fact_quarantine import fact_quarantine_reason
 from app.services.reviewed_eps_adjustments import eligible_fact
 from app.services.split_adjustment import split_factor_for_fact
+from app.valuation.call_cache import cached
 
 
 @dataclass(frozen=True)
@@ -133,6 +134,54 @@ def latest_fact(
     return None
 
 
+def latest_facts_multi(
+    db: Session,
+    company_id: int,
+    metrics: Sequence[str],
+    *,
+    cutoff: date | None = None,
+) -> dict[str, SourcedFact]:
+    """Misma seleccion que ``latest_facts`` metrica a metrica, en UNA consulta.
+
+    El cross-check de multiplos pedia cada alias por separado (medido: 157
+    SELECTs a financial_facts en una valoracion con 8 peers). La ordenacion
+    global (fiscal_year DESC NULLS LAST, created_at DESC) restringida a una
+    metrica es exactamente la de la consulta individual, asi que agrupar en
+    Python elige la misma fila usable; el ajuste por split sigue por metrica.
+    """
+    unique = sorted(set(metrics))
+    rows = cached(
+        db,
+        "latest_facts_multi_rows",
+        (company_id, tuple(unique)),
+        lambda: list(
+            db.scalars(
+                select(FinancialFact)
+                .where(
+                    FinancialFact.company_id == company_id,
+                    FinancialFact.metric.in_(unique),
+                )
+                .order_by(
+                    FinancialFact.fiscal_year.desc().nullslast(),
+                    desc(FinancialFact.created_at),
+                )
+            ).all()
+        ),
+    )
+    by_metric: dict[str, list[FinancialFact]] = {metric: [] for metric in unique}
+    for row in rows:
+        by_metric[row.metric].append(row)
+    resolved: dict[str, SourcedFact] = {}
+    for metric in metrics:
+        row = next((candidate for candidate in by_metric[metric] if usable_fact(candidate)), None)
+        if row is None:
+            continue
+        sourced = _to_sourced(row)
+        if sourced is not None:
+            resolved[metric] = _split_adjusted(db, company_id, row, sourced, cutoff=cutoff)
+    return resolved
+
+
 def latest_facts(
     db: Session,
     company_id: int,
@@ -154,20 +203,27 @@ def latest_facts(
     for metric in metrics:
         # Sin LIMIT 1: la fila mas reciente puede estar en cuarentena y la
         # usable es la anterior; el orden ya es "ultimo primero".
-        row = next(
-            (
-                candidate
-                for candidate in db.scalars(
-                    select(FinancialFact)
-                    .where(FinancialFact.company_id == company_id, FinancialFact.metric == metric)
-                    .order_by(
-                        FinancialFact.fiscal_year.desc().nullslast(),
-                        desc(FinancialFact.created_at),
-                    )
-                ).all()
-                if usable_fact(candidate)
+        # La eleccion de fila no depende de ``cutoff`` (eso es el ajuste por
+        # split de despues): se cachea por llamada (app/valuation/call_cache.py).
+        row = cached(
+            db,
+            "latest_facts_row",
+            (company_id, metric),
+            lambda metric=metric: next(
+                (
+                    candidate
+                    for candidate in db.scalars(
+                        select(FinancialFact)
+                        .where(FinancialFact.company_id == company_id, FinancialFact.metric == metric)
+                        .order_by(
+                            FinancialFact.fiscal_year.desc().nullslast(),
+                            desc(FinancialFact.created_at),
+                        )
+                    ).all()
+                    if usable_fact(candidate)
+                ),
+                None,
             ),
-            None,
         )
         if row is None:
             continue

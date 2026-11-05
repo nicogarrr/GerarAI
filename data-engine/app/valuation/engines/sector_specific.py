@@ -47,6 +47,7 @@ from dataclasses import dataclass, replace
 from sqlalchemy import desc, select
 
 from app.models import FinancialFact
+from app.valuation.call_cache import cached
 from app.valuation.engines.base import (
     MODEL_VERSION,
     ValuationContext,
@@ -192,24 +193,31 @@ def _resolve_inputs(
     periodo y su periodo se expone en el trace en vez de anclarlas al balance.
     """
     aliases = {alias for group in inputs.values() for alias in group} | set(anchor_metrics)
-    rows = [
-        row
-        for row in context.db.scalars(
-            select(FinancialFact)
-            .where(
-                FinancialFact.company_id == context.company.id,
-                FinancialFact.metric.in_(sorted(aliases)),
-            )
-            .order_by(
-                FinancialFact.fiscal_year.desc().nullslast(),
-                desc(FinancialFact.created_at),
-            )
-        ).all()
-        # Misma frontera que el snapshot: un hecho en cuarentena (p. ej.
-        # acciones derivadas de un BPA ESEF en conflicto de escala) no es un
-        # input del ejercicio; es ausente y el motor cae en insufficient.
-        if usable_fact(row)
-    ]
+    # Misma consulta repetida dentro de una valoracion (medido 9x por llamada):
+    # cache acotada a la llamada (app/valuation/call_cache.py).
+    rows = cached(
+        context.db,
+        "sector_alias_rows",
+        (context.company.id, tuple(sorted(aliases))),
+        lambda: [
+            row
+            for row in context.db.scalars(
+                select(FinancialFact)
+                .where(
+                    FinancialFact.company_id == context.company.id,
+                    FinancialFact.metric.in_(sorted(aliases)),
+                )
+                .order_by(
+                    FinancialFact.fiscal_year.desc().nullslast(),
+                    desc(FinancialFact.created_at),
+                )
+            ).all()
+            # Misma frontera que el snapshot: un hecho en cuarentena (p. ej.
+            # acciones derivadas de un BPA ESEF en conflicto de escala) no es un
+            # input del ejercicio; es ausente y el motor cae en insufficient.
+            if usable_fact(row)
+        ],
+    )
     anchor_row = next((row for row in rows if row.metric in anchor_metrics), None)
     anchor = (
         PeriodAnchor(
@@ -271,13 +279,19 @@ def _latest_usable(context: ValuationContext, metric: str) -> FinancialFact | No
         # Igual que el snapshot: sin fecha de publicación no se demuestra
         # disponibilidad; filtrar ANTES del LIMIT evita ocultar hechos antiguos.
         conditions.append(FinancialFact.filed <= context.as_of)
-    rows = context.db.scalars(
-        select(FinancialFact)
-        .where(*conditions)
-        .order_by(FinancialFact.fiscal_year.desc().nullslast(), desc(FinancialFact.created_at))
-        .limit(5)
-    ).all()
-    return next((row for row in rows if usable_fact(row)), None)
+    as_of_key = context.as_of.isoformat() if context.as_of is not None else None
+
+    def _query() -> FinancialFact | None:
+        rows = context.db.scalars(
+            select(FinancialFact)
+            .where(*conditions)
+            .order_by(FinancialFact.fiscal_year.desc().nullslast(), desc(FinancialFact.created_at))
+            .limit(5)
+        ).all()
+        return next((row for row in rows if usable_fact(row)), None)
+
+    # Cache acotada a la llamada; la clave incluye el corte as_of.
+    return cached(context.db, "latest_usable", (context.company.id, metric, as_of_key), _query)
 
 
 def capm_cost_of_equity(context: ValuationContext) -> SourcedValue | None:
