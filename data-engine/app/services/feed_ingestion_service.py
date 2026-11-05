@@ -414,7 +414,12 @@ class FeedIngestionService:
             )
 
         from app.services.document_ingestion_service import DocumentIngestionService
+        from app.services.ir_content_guard import soft_404
 
+        if source_type == "IR" and soft_404(
+            final_url, content.decode("utf-8", errors="replace"), html="html" in (content_type or ""),
+        ):
+            return {"status": "skipped", "reason": "ir_soft_404", "ticker": ticker}
         filename = PurePosixPath(parsed_url.path).name or f"{parsed_url.hostname}.html"
         result = DocumentIngestionService().ingest_bytes(
             db,

@@ -105,6 +105,7 @@ def test_kpi_extraction_requires_verified_locator_and_approval_before_fact():
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
+        db.info["tenant_id"] = "intelligence-kpi-fixture"
         company = _company("ASTS", "space_telecom_pre_fcf", ["space", "telecom"])
         db.add(company)
         db.flush()

@@ -105,7 +105,7 @@ def test_empresa_no_seguida_no_encola_documentos(monkeypatch):
     result, sent = _run_ir(monkeypatch, tracked=[], known_urls=set(), n_items=3)
     assert sent == []
     assert result["documents_queued"] == 0
-    assert result["documents_skipped_untracked"] == 3
+    assert result["documents_skipped_untracked"] == 1  # empresa omitida ANTES de sondear sus tres URLs
 
 
 def test_empresa_seguida_encola_y_omite_ya_ingeridas(monkeypatch):
@@ -122,3 +122,12 @@ def test_tope_por_pasada_se_declara_y_no_se_supera(monkeypatch):
     assert len(sent) == 3
     assert result["documents_queued"] == 3
     assert result["documents_enqueue_capped"] is True
+
+
+def test_untracked_company_never_polled(monkeypatch):
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("polled global company")
+    monkeypatch.setattr(_FakeService, "poll_ir", forbidden)
+    result, sent = _run_ir(monkeypatch, tracked=[], known_urls=set(), n_items=3)
+    assert sent == [] and result["documents_queued"] == 0
+    assert result.get("errors", []) == []
