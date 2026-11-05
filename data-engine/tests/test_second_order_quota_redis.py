@@ -18,7 +18,7 @@ import subprocess
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import redis
@@ -75,12 +75,38 @@ def _prod_settings(url: str, **overrides) -> Settings:
     return Settings(**base)
 
 
+# Reloj congelado para todo el modulo: las claves de cuota llevan el minuto
+# UTC y, con el reloj real, un test que cruce :00.000 entre dos reservas ve la
+# ventana reseteada a mitad de las aserciones (flake de CI #4686). El servicio
+# lee ``datetime.now`` via el atributo de modulo, asi que el parche basta; una
+# subclase nueva por test evita que avanzar el reloj en un test contamine otro.
+FROZEN_NOW = datetime(2026, 11, 5, 12, 34, 56, tzinfo=UTC)
+
+
+@pytest.fixture(autouse=True)
+def frozen_clock(monkeypatch):
+    class FrozenDateTime(datetime):
+        frozen = FROZEN_NOW
+
+        @classmethod
+        def now(cls, tz=None):
+            current = cls.frozen
+            if tz is None:
+                return current.replace(tzinfo=None)
+            return current.astimezone(tz)
+
+    monkeypatch.setattr(quota_store, "datetime", FrozenDateTime)
+    return FrozenDateTime
+
+
 def _minute_key(tenant: str, namespace: str = "second-order") -> str:
-    return f"cavaai:{namespace}:{tenant}:minute:{datetime.now(UTC):%Y%m%d%H%M}"
+    now = quota_store.datetime.now(UTC)
+    return f"cavaai:{namespace}:{tenant}:minute:{now:%Y%m%d%H%M}"
 
 
 def _day_key(tenant: str, namespace: str = "second-order") -> str:
-    return f"cavaai:{namespace}:{tenant}:day:{datetime.now(UTC):%Y%m%d}"
+    now = quota_store.datetime.now(UTC)
+    return f"cavaai:{namespace}:{tenant}:day:{now:%Y%m%d}"
 
 
 def test_minute_cap_4_blocks_5th_and_rejection_does_not_consume(redis_url):
@@ -173,28 +199,34 @@ def test_redis_down_fails_closed_without_local_fallback(redis_url):
         second_order_quota.reserve_llm_call("t1", settings)
 
 
-def test_minute_window_rolls_and_day_keeps_counting(redis_url, monkeypatch):
+def test_minute_window_rolls_and_day_keeps_counting(redis_url, frozen_clock):
     settings = _prod_settings(redis_url)
-    real_now = datetime.now(UTC)
-
-    class FakeDateTime(datetime):
-        frozen = real_now
-
-        @classmethod
-        def now(cls, tz=None):
-            return cls.frozen
-
-    monkeypatch.setattr(quota_store, "datetime", FakeDateTime)
     for _ in range(4):
         assert second_order_quota.reserve_llm_call("t1", settings)["allowed"] is True
     assert second_order_quota.reserve_llm_call("t1", settings)["allowed"] is False
     # Ventana deslizante por minuto: el minuto siguiente vuelve a admitir...
-    FakeDateTime.frozen = real_now.replace(minute=(real_now.minute + 1) % 60)
+    frozen_clock.frozen = FROZEN_NOW + timedelta(minutes=1)
     rolled = second_order_quota.reserve_llm_call("t1", settings)
     assert rolled["allowed"] is True
     assert rolled["minute_used"] == 1
     # ...pero el dia acumula (4 + 1): el tope diario no se resetea por minuto.
     assert rolled["day_used"] == 5
+
+
+def test_minute_window_rolls_for_asts_namespace(redis_url, frozen_clock):
+    # El cruce de minuto se prueba tambien en el namespace asts-llm (2/min,
+    # 30/dia): la ventana nueva readmite sin tocar el acumulado diario.
+    settings = _prod_settings(redis_url)
+    assert settings.asts_llm_calls_per_minute == 2
+    assert settings.asts_llm_calls_per_day == 30
+    for _ in range(2):
+        assert quota_store.reserve_llm_call("t1", settings)["allowed"] is True
+    assert quota_store.reserve_llm_call("t1", settings)["allowed"] is False
+    frozen_clock.frozen = FROZEN_NOW + timedelta(minutes=1)
+    rolled = quota_store.reserve_llm_call("t1", settings)
+    assert rolled["allowed"] is True
+    assert rolled["minute_used"] == 1
+    assert rolled["day_used"] == 3
 
 
 def test_missing_tenant_rejected_before_touching_redis(redis_url):
