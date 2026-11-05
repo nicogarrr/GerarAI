@@ -1,75 +1,78 @@
-"""Contratos de los scripts ops de disco (sin servicios ni docker).
-
-rotate-predeploy-snapshots.sh: retencion de los snapshots predeploy-*.json
-del volumen duckdb (~40 MB por deploy, nunca rotaban - medido 5-nov-2026).
-check-disk-space.sh: alerta al 85% para no redescubrir el disco al 90%.
-
-Ambos los ejecuta un operador, nunca un agente ni un cron ciego. Estos
-tests fijan el contrato: confirmacion explicita, alcance limitado a
-predeploy-*.json (la cache de modelos del volumen NO se toca), bash valido
-y comportamiento real del chequeo de disco con umbrales forzados.
-"""
-
+"""Snapshot inspection must be read-only and preserve complete sets."""
 from __future__ import annotations
 
+import importlib.util
+import json
+import os
 import subprocess
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-ROTATE = REPO_ROOT / "scripts" / "ops" / "rotate-predeploy-snapshots.sh"
-DISK = REPO_ROOT / "scripts" / "ops" / "check-disk-space.sh"
+ROOT = Path(__file__).resolve().parents[2]
+ROTATE = ROOT / "scripts/ops/rotate-predeploy-snapshots.sh"
+DISK = ROOT / "scripts/ops/check-disk-space.sh"
+SPEC = importlib.util.spec_from_file_location("inventory", ROOT / "scripts/ops/snapshot_inventory.py")
+assert SPEC and SPEC.loader
+MODULE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(MODULE)
 
 
-def test_scripts_bash_validos():
-    subprocess.run(["bash", "-n", str(ROTATE)], check=True)
-    subprocess.run(["bash", "-n", str(DISK)], check=True)
+def test_bash_valid():
+    for script in (ROTATE, DISK):
+        subprocess.run(["bash", "-n", str(script)], check=True)
 
 
-def test_rotacion_exige_confirmacion_y_limita_alcance():
-    src = ROTATE.read_text(encoding="utf-8")
-    assert "--confirm-rotate" in src
-    # Solo predeploy-*.json del nivel raiz del volumen: la cache de modelos
-    # (fastembed-cache, docling-artifacts) y el resto del volumen no se tocan.
-    assert "predeploy-*.json" in src
-    assert "fastembed" not in src.split("set -euo pipefail", 1)[1].replace("#", " ")
-    # Conserva los KEEP mas recientes por fecha de modificacion.
-    assert "ls -1t" in src and "tail -n +" in src
+def test_no_deletion_and_mount_readonly():
+    src = ROTATE.read_text()
+    assert ":/data:ro" in src and "--network none --read-only" in src
+    assert "rm -f" not in src and "tail -n" not in src
+    result = subprocess.run(["bash", str(ROTATE), "--confirm-rotate"], capture_output=True, text=True)
+    assert result.returncode == 1 and "disabled" in result.stdout
 
 
-def test_rotacion_sin_flag_no_hace_nada():
-    r = subprocess.run(["bash", str(ROTATE)], capture_output=True, text=True)
-    assert r.returncode == 1
-    assert "confirm-rotate" in r.stdout
+def test_rejects_untrusted_volume_and_keep_without_docker():
+    for updates in ({"DUCKDB_VOLUME": "other"}, *({"KEEP": x} for x in ("abc", "0", "-3", "1; touch /bad"))):
+        r = subprocess.run(["bash", str(ROTATE), "--dry-run"], env={**os.environ, **updates}, capture_output=True)
+        assert r.returncode == 2
 
 
-def test_disco_umbral_85_por_defecto_y_sale_1_en_alerta():
-    src = DISK.read_text(encoding="utf-8")
-    assert '"${1:-85}"' in src
-    ok = subprocess.run(["bash", str(DISK), "99"], capture_output=True, text=True)
-    assert ok.returncode == 0 and "[disk] OK" in ok.stdout
-    alerta = subprocess.run(["bash", str(DISK), "1"], capture_output=True, text=True)
-    assert alerta.returncode == 1 and "ALERTA" in alerta.stdout
-    mal = subprocess.run(["bash", str(DISK), "abc"], capture_output=True, text=True)
-    assert mal.returncode == 2
+def test_default_is_readonly_inventory():
+    src = ROTATE.read_text()
+    assert "${1:---dry-run}" in src and "${DUCKDB_VOLUME}:/data:ro" in src
 
 
-def test_rotacion_valida_keep_numerico_y_no_lo_interpola_en_sh():
-    import os
-    src = ROTATE.read_text(encoding="utf-8")
-    # KEEP=30 por defecto (cada deploy escribe 3 JSON; 10 archivos serian
-    # solo 3-4 deploys) y validacion numerica antes de tocar docker.
-    assert 'KEEP="${KEEP:-30}"' in src
-    assert "*[!0-9]*" in src
-    # KEEP viaja como argumento posicional del sh -c, nunca interpolado en
-    # el script que corre como root en el contenedor (hallazgo auditoria).
-    assert "' -- \"${KEEP}\"" in src
-    cuerpo = src.split("alpine sh -c '", 1)[1].split("' -- \"${KEEP}\"", 1)[0]
-    assert '"'"'"'"${KEEP}"'"'"'' not in cuerpo, "KEEP interpolado dentro del sh -c"
-    # Validacion funcional sin docker: valores no numericos o < 1 salen con 2.
-    for valor in ("abc", "10; rm -rf /", "0", "-3"):
-        env = dict(os.environ, KEEP=valor)
-        r = subprocess.run(
-            ["bash", str(ROTATE), "--confirm-rotate"],
-            capture_output=True, text=True, env=env,
-        )
-        assert r.returncode == 2, f"KEEP={valor!r} no rechazado: {r}"
+def test_complete_sets_and_references_retained(tmp_path):
+    kinds = ("critical-state", "esef-valuations", "complete-state")
+    for index, sha in enumerate(("1111111", "2222222", "3333333", "4444444")):
+        for kind in kinds:
+            p = tmp_path / f"predeploy-{sha}-{kind}.json"
+            p.write_text(json.dumps({"sha": sha}))
+            os.utime(p, ns=(index + 1, index + 1))
+    partial = tmp_path / "predeploy-5555555-critical-state.json"
+    partial.write_text("{}")
+    unknown = tmp_path / "predeploy-legacy.json"
+    unknown.write_text("{}")
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+    out = MODULE.inventory(tmp_path, {"1111111"}, {"predeploy-2222222-complete-state.json"})
+    assert not out["deletion_supported"]
+    assert not any(x["candidate_only"] for x in out["sets"].values())
+    assert out["sets"]["5555555"]["retain_reasons"] == ["incomplete_set"]
+    assert unknown.name in out["unknown_retained"]
+    assert before == {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+
+
+def test_old_complete_set_is_only_a_candidate_not_deleted(tmp_path):
+    for index, sha in enumerate(("1111111", "2222222", "3333333")):
+        for kind in MODULE.REQUIRED:
+            p = tmp_path / f"predeploy-{sha}-{kind}.json"
+            p.write_text("{}")
+            os.utime(p, ns=(index + 1, index + 1))
+    out = MODULE.inventory(tmp_path, set(), set())
+    assert out["sets"]["1111111"]["candidate_only"]
+    assert len(list(tmp_path.iterdir())) == 9
+
+
+def test_disk_threshold_and_invalid_argument():
+    assert '"${1:-85}"' in DISK.read_text()
+    for threshold, expected in (("99", 0), ("1", 1), ("abc", 2)):
+        r = subprocess.run(["bash", str(DISK), threshold], capture_output=True)
+        assert r.returncode == expected
