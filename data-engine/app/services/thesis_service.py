@@ -667,6 +667,17 @@ def _apply_thesis_consensus(valuation: dict, pipeline: dict | None) -> None:
     apply_consensus_sanity(valuation, sanity, enabled=True, block_publication=False)
 
 
+def _apply_value_driver_warning(valuation: dict, check: dict) -> None:
+    """Keep inventory diagnostics without changing the engine publication decision."""
+    check["block_publication"] = False
+    if not check.get("publishable", True):
+        warning = check.get("blocker") or "impulsor_material_sin_tratar"
+        warnings = list(valuation.get("publication_warnings") or [])
+        if warning not in warnings:
+            warnings.append(warning)
+        valuation["publication_warnings"] = warnings
+
+
 class ThesisService:
     def __init__(self) -> None:
         self.valuation_service = ValuationService()
@@ -1036,15 +1047,14 @@ class ThesisService:
             "missing_mandatory_drivers": missing_drivers,
         }
         valuation["long_term_model"] = long_term_model
-        # Contraste con el consenso y puerta del inventario de impulsores. La
-        # primera exige conciliación dato a dato si nos alejamos >35 %; la
-        # segunda impide publicar si un impulsor firmado y material quedó sin
-        # tratamiento. Ambas son best-effort y dejan su resultado en la traza.
+        # Consenso e inventario son avisos: conservan cifras y elegibilidad del motor.
         consensus_check: dict = {}
         try:
             from app.services.thesis_consensus_service import apply_consensus_control
 
-            consensus_check = apply_consensus_control(db, company, valuation)
+            consensus_check = apply_consensus_control(
+                db, company, valuation, block_publication=False,
+            )
         except Exception as exc:  # noqa: BLE001 - el control no rompe la tesis
             logger.warning(
                 "control de consenso omitido para %s: %s",
@@ -1057,13 +1067,7 @@ class ThesisService:
             from app.services.value_driver_publication_service import value_driver_gate
 
             value_drivers_check = value_driver_gate(db, company)
-            if not value_drivers_check.get("publishable", True):
-                blockers = list(valuation.get("publication_blockers") or [])
-                blocker = value_drivers_check.get("blocker") or "impulsor_material_sin_tratar"
-                if blocker not in blockers:
-                    blockers.append(blocker)
-                valuation["publication_blockers"] = blockers
-                valuation["publishable"] = False
+            _apply_value_driver_warning(valuation, value_drivers_check)
         except Exception as exc:  # noqa: BLE001 - el inventario no rompe la tesis
             logger.warning(
                 "puerta de impulsores omitida para %s: %s",
@@ -2650,8 +2654,8 @@ Fingerprint: el hash del conjunto de evidencia gobierna el versionado.
                 )
         if data.get("status") == "revisar":
             lines.append(
-                "No publicable hasta conciliar la diferencia dato a dato: "
-                "la conciliación no explica el residuo dentro del máximo permitido."
+                "Aviso: revisar la diferencia dato a dato; "
+                "este contraste no bloquea la publicación ni cambia el valor."
             )
         return "\n".join(lines) + "\n"
 
@@ -2660,6 +2664,15 @@ Fingerprint: el hash del conjunto de evidencia gobierna el versionado.
         if not data or data.get("status") == "no_tenant":
             return ""
         lines = ["", "## 26. Inventario de impulsores de valor", ""]
+        if not data.get("publishable", True):
+            lines.append(
+                f"**Aviso (sin veto de publicación):** {data.get('reason') or 'impulsor material sin tratamiento'}."
+            )
+            for block in data.get("blocking") or []:
+                lines.append(
+                    f"- {block.get('name') or block.get('driver_key')}: {block.get('why')}."
+                )
+            lines.append("")
         drivers = data.get("drivers") or []
         if not drivers:
             lines.append(
@@ -2667,15 +2680,6 @@ Fingerprint: el hash del conjunto de evidencia gobierna el versionado.
                 "El Recopilador solo guarda lo que tiene fuente y cita."
             )
             return "\n".join(lines) + "\n"
-        if not data.get("publishable", True):
-            lines.append(
-                f"**Publicación bloqueada:** {data.get('reason') or 'impulsor material sin tratamiento'}."
-            )
-            for block in data.get("blocking") or []:
-                lines.append(
-                    f"- {block.get('name') or block.get('driver_key')}: {block.get('why')}."
-                )
-            lines.append("")
         for driver in drivers:
             head = (
                 f"- **{driver.get('name') or driver.get('driver_key')}** "
