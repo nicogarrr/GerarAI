@@ -1823,7 +1823,8 @@ class FinancialIngestionService:
         # ultima ingesta completa, el recomputo seria identico (F353: la
         # misma importacion dos veces es idempotente) y se omite ENTERO: sin
         # pasadas de recoleccion, sin borrado/reescritura de hechos, sin
-        # fetch de submissions/anclas ni resync de chunks. Medido con
+        # resync de chunks. Anclas/indice se verifican siempre: pueden cambiar
+        # aunque companyfacts sea identico. Medido con
         # companyfacts reales (CHTR/TSLA/MSFT, 5-nov-2026): un refresh sin
         # cambios costaba ~800 sentencias (765 INSERT identicos) y ~21-33k
         # entradas XBRL reescaneadas por empresa; con la huella son 2 SELECT.
@@ -1835,46 +1836,6 @@ class FinancialIngestionService:
         payload_fingerprint = (
             f"{SEC_INGESTION_RULES_VERSION}:{_sec_payload_fingerprint(facts_data)}"
         )
-        if as_of is None and (document.metadata_ or {}).get(
-            "sec_payload_fingerprint"
-        ) == payload_fingerprint:
-            return {
-                "status": "unchanged",
-                "ticker": ticker,
-                "provider": "SEC",
-                "source_document_id": document.id,
-                "facts_imported": 0,
-                "cik": cik,
-                "as_of": None,
-                "date_filter_applied": False,
-                "conflicts": None,
-                "free_data": None,
-                "fy_periods": (document.metadata_ or {}).get("fy_periods") or [],
-                "annual_anchored_filings": None,
-                "annual_anchor_source": None,
-                "annual_anchor_partial": False,
-                "annual_anchor_note": None,
-                "mirror": None,
-                "unchanged": True,
-            }
-
-        # Una tanda abandonada por una corrida anterior que rompio a mitad
-        # (rollback) no puede colarse en ESTA transaccion: se descarta.
-        db.info.pop("_fact_bulk_buffer", None)
-
-        us_gaap = facts_data.get("facts", {}).get("us-gaap", {})
-        # 40-F/20-F en IFRS (BN): sin us-gaap, la misma lectura va sobre
-        # ifrs-full con su mapa de conceptos; el resto de reglas no cambia.
-        metric_map = SEC_METRIC_MAP
-        taxonomy = "us-gaap"
-        if not us_gaap and facts_data.get("facts", {}).get("ifrs-full"):
-            us_gaap = facts_data["facts"]["ifrs-full"]
-            metric_map = SEC_IFRS_METRIC_MAP
-            taxonomy = "ifrs-full"
-        # Divisa de reporte del filer (10-K: USD; 20-F en US GAAP: CNY, TWD...).
-        # Cada hecho monetario se guarda con ELLA como unidad.
-        reporting_currency = _sec_reporting_currency(us_gaap)
-
         # Evidencia de calendario a nivel de filing (submissions). Fail
         # closed: sin anclas no entra NINGUN hecho anual (la cobertura
         # parcial queda visible en el resultado); los trimestres siguen su
@@ -1892,6 +1853,56 @@ class FinancialIngestionService:
             index_accessions: set[str] | None = await sec.index_accessions(cik)
         except Exception:  # noqa: BLE001 - fail closed DEI, no romper lo demas
             index_accessions = None
+
+        anchor_fingerprint = _sec_payload_fingerprint({
+            "anchors": dict(annual_anchors),
+            "partial": bool(getattr(annual_anchors, "partial", False)),
+            "source": getattr(annual_anchors, "source", "sec-submissions"),
+            "note": getattr(annual_anchors, "note", None),
+            "index_accessions": sorted(index_accessions) if index_accessions is not None else None,
+        })
+        if as_of is None and (document.metadata_ or {}).get(
+            "sec_payload_fingerprint"
+        ) == payload_fingerprint and (document.metadata_ or {}).get(
+            "sec_anchor_fingerprint"
+        ) == anchor_fingerprint:
+            # Caller-owned pending rows still need the normal refresh flush.
+            db.flush()
+            return {
+                "status": "unchanged",
+                "ticker": ticker,
+                "provider": "SEC",
+                "source_document_id": document.id,
+                "facts_imported": 0,
+                "cik": cik,
+                "as_of": None,
+                "date_filter_applied": False,
+                "conflicts": None,
+                "free_data": None,
+                "fy_periods": (document.metadata_ or {}).get("fy_periods") or [],
+                "annual_anchored_filings": None,
+                "annual_anchor_source": getattr(annual_anchors, "source", "sec-submissions"),
+                "annual_anchor_partial": bool(getattr(annual_anchors, "partial", False)),
+                "annual_anchor_note": getattr(annual_anchors, "note", None),
+                "mirror": None,
+                "unchanged": True,
+            }
+
+        # Drop a buffer left by a prior rolled-back ingestion.
+        db.info.pop("_fact_bulk_buffer", None)
+
+        us_gaap = facts_data.get("facts", {}).get("us-gaap", {})
+        # 40-F/20-F en IFRS (BN): sin us-gaap, la misma lectura va sobre
+        # ifrs-full con su mapa de conceptos; el resto de reglas no cambia.
+        metric_map = SEC_METRIC_MAP
+        taxonomy = "us-gaap"
+        if not us_gaap and facts_data.get("facts", {}).get("ifrs-full"):
+            us_gaap = facts_data["facts"]["ifrs-full"]
+            metric_map = SEC_IFRS_METRIC_MAP
+            taxonomy = "ifrs-full"
+        # Divisa de reporte del filer (10-K: USD; 20-F en US GAAP: CNY, TWD...).
+        # Cada hecho monetario se guarda con ELLA como unidad.
+        reporting_currency = _sec_reporting_currency(us_gaap)
 
         # published_at = presentacion mas reciente (campo `filed` de companyfacts)
         # para que la procedencia OFICIAL tenga fecha; nunca se inventa.
@@ -2372,8 +2383,10 @@ class FinancialIngestionService:
         metadata = dict(document.metadata_ or {})
         if as_of is None and mirror_info is None:
             metadata["sec_payload_fingerprint"] = payload_fingerprint
+            metadata["sec_anchor_fingerprint"] = anchor_fingerprint
         else:
             metadata.pop("sec_payload_fingerprint", None)
+            metadata.pop("sec_anchor_fingerprint", None)
         document.metadata_ = {
             **metadata,
             "fy_periods": fy_periods,
