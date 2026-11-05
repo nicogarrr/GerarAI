@@ -32,6 +32,10 @@ export interface paths {
          * Db Metrics
          * @description Get database performance metrics.
          *
+         *     Metadatos operativos de TODA la base: solo con el gate de ops abierto
+         *     (mismo flag que las invalidaciones globales). En producción es un script
+         *     de operación, no una ruta que cualquier tenant pueda leer.
+         *
          *     Returns:
          *         - Connection pool statistics (active, idle, max connections)
          *         - Disk usage (database size, table sizes)
@@ -612,7 +616,7 @@ export interface paths {
         put?: never;
         /**
          * Reset Stats
-         * @description Reset cache statistics counters (for testing).
+         * @description Reset cache statistics counters (for testing). GLOBAL: gated.
          */
         post: operations["reset_stats_api_cache_stats_reset_post"];
         delete?: never;

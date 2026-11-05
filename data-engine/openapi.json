@@ -24303,7 +24303,7 @@
     },
     "/api/admin/db-metrics": {
       "get": {
-        "description": "Get database performance metrics.\n\nReturns:\n    - Connection pool statistics (active, idle, max connections)\n    - Disk usage (database size, table sizes)\n    - Table bloat detection (PostgreSQL only)\n\nThis endpoint requires authentication and is intended for monitoring\nand operational visibility.",
+        "description": "Get database performance metrics.\n\nMetadatos operativos de TODA la base: solo con el gate de ops abierto\n(mismo flag que las invalidaciones globales). En producci\u00f3n es un script\nde operaci\u00f3n, no una ruta que cualquier tenant pueda leer.\n\nReturns:\n    - Connection pool statistics (active, idle, max connections)\n    - Disk usage (database size, table sizes)\n    - Table bloat detection (PostgreSQL only)\n\nThis endpoint requires authentication and is intended for monitoring\nand operational visibility.",
         "operationId": "db_metrics_api_admin_db_metrics_get",
         "parameters": [
           {
@@ -30926,7 +30926,7 @@
     },
     "/api/cache/stats/reset": {
       "post": {
-        "description": "Reset cache statistics counters (for testing).",
+        "description": "Reset cache statistics counters (for testing). GLOBAL: gated.",
         "operationId": "reset_stats_api_cache_stats_reset_post",
         "parameters": [
           {

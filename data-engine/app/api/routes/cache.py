@@ -81,6 +81,7 @@ def invalidate_all(db: Session = Depends(get_db)) -> dict[str, str]:
 
 @router.post("/stats/reset")
 def reset_stats() -> dict[str, str]:
-    """Reset cache statistics counters (for testing)."""
+    """Reset cache statistics counters (for testing). GLOBAL: gated."""
+    _require_global_invalidation_allowed()
     reset_cache_stats()
     return {"status": "ok", "message": "Cache statistics reset"}
