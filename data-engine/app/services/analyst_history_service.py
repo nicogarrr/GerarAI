@@ -281,11 +281,18 @@ def _add_relative(rows: list[dict[str, Any]]) -> None:
     """Error relativo: el propio menos la mediana de otras firmas en ±45 días."""
     days = [r["date"] for r in rows]  # ya ordenadas por fecha
     window = timedelta(days=PEER_WINDOW_DAYS)
+    # Varias revisiones de la misma casa/fecha comparten exactamente la cohorte.
+    # Guardar solo su mediana, nunca listas de peers ni datos entre corridas.
+    peer_medians: dict[tuple[int, int, str], float | None] = {}
     for row in rows:
         lo = bisect_left(days, row["date"] - window)
         hi = bisect_right(days, row["date"] + window)
-        peers = [o["abs"] for o in rows[lo:hi] if o["firm"] != row["firm"]]
-        row["rel"] = row["abs"] - median(peers) if len(peers) >= MIN_PEERS else None
+        key = (lo, hi, row["firm"])
+        if key not in peer_medians:
+            peers = [o["abs"] for o in rows[lo:hi] if o["firm"] != row["firm"]]
+            peer_medians[key] = median(peers) if len(peers) >= MIN_PEERS else None
+        reference = peer_medians[key]
+        row["rel"] = row["abs"] - reference if reference is not None else None
 
 
 def _weight(day: date, ref: date) -> float:
