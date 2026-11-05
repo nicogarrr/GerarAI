@@ -1598,17 +1598,29 @@ def _sec_payload_fingerprint(facts_data: dict[str, Any]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _queue_fact(db: Session, **fields: Any) -> None:
+def _queue_fact(
+    db: Session, fact: FinancialFact | None = None, **fields: Any
+) -> None:
     """Acumula un hecho para insercion EN LOTE (una executemany por tanda en
     vez de una sentencia por fila: medido con companyfacts reales, CHTR
     5-nov-2026, 765 INSERT por refresh). La tanda se vuelca con
     ``_flush_fact_buffer`` antes de cualquier lectura de hechos. Sin tenant
     en la sesion cae al ORM: el guardia de tenancy de database.py
-    (before_flush) manda ahi y esta via no lo esquiva."""
+    (before_flush) manda ahi y esta via no lo esquiva.
+
+    Acepta los campos como kwargs o una instancia TRANSITORIA (p.ej. si el
+    llamador aun la consulta en memoria): de la instancia solo se encolan
+    las columnas con valor no None, igual que al pasar campos sueltos."""
     tenant_id = db.info.get("tenant_id")
     if tenant_id is None:
-        db.add(FinancialFact(**fields))
+        db.add(fact if fact is not None else FinancialFact(**fields))
         return
+    if fact is not None:
+        fields = {
+            attr.key: getattr(fact, attr.key)
+            for attr in FinancialFact.__mapper__.column_attrs
+            if getattr(fact, attr.key) is not None
+        }
     buffer = db.info.setdefault("_fact_bulk_buffer", [])
     fields["tenant_id"] = tenant_id
     buffer.append(fields)
@@ -3074,20 +3086,19 @@ class FinancialIngestionService:
         def add_ratio(metric: str, numerator: FinancialFact, denominator: FinancialFact) -> int:
             if denominator.value is None or denominator.value <= 0:
                 return 0
-            db.add(
-                FinancialFact(
-                    company_id=company.id,
-                    metric=metric,
-                    value=numerator.value / denominator.value,
-                    unit="decimal",
-                    period=numerator.period,
-                    fiscal_year=numerator.fiscal_year,
-                    fiscal_quarter="FY",
-                    source_id=document.id,
-                    source_type="ESEF",
-                    is_reported=False,
-                    confidence=Decimal("0.85"),
-                )
+            _queue_fact(
+                db,
+                company_id=company.id,
+                metric=metric,
+                value=numerator.value / denominator.value,
+                unit="decimal",
+                period=numerator.period,
+                fiscal_year=numerator.fiscal_year,
+                fiscal_quarter="FY",
+                source_id=document.id,
+                source_type="ESEF",
+                is_reported=False,
+                confidence=Decimal("0.85"),
             )
             return 1
 
@@ -3107,20 +3118,19 @@ class FinancialIngestionService:
             fl_noncurrent = year_fact("financial_liabilities_noncurrent", year)
 
             if fl_current is not None and fl_noncurrent is not None:
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric="total_debt",
-                        value=fl_current.value + fl_noncurrent.value,
-                        unit=fl_current.unit or "EUR",
-                        period=fl_current.period,
-                        fiscal_year=year,
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="ESEF",
-                        is_reported=False,
-                        confidence=Decimal("0.85"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="total_debt",
+                    value=fl_current.value + fl_noncurrent.value,
+                    unit=fl_current.unit or "EUR",
+                    period=fl_current.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="ESEF",
+                    is_reported=False,
+                    confidence=Decimal("0.85"),
                 )
                 derived += 1
 
@@ -3139,7 +3149,7 @@ class FinancialIngestionService:
                     is_reported=False,
                     confidence=Decimal("0.85"),
                 )
-                db.add(fcf)
+                _queue_fact(db, fcf)
                 derived += 1
             if fcf is not None and revenue is not None and revenue.value > 0:
                 derived += add_ratio("fcf_margin", fcf, revenue)
@@ -3149,20 +3159,19 @@ class FinancialIngestionService:
                 and previous_revenue is not None
                 and previous_revenue.value > 0
             ):
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric="revenue_growth",
-                        value=(revenue.value / previous_revenue.value) - 1,
-                        unit="decimal",
-                        period=revenue.period,
-                        fiscal_year=year,
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="ESEF",
-                        is_reported=False,
-                        confidence=Decimal("0.85"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="revenue_growth",
+                    value=(revenue.value / previous_revenue.value) - 1,
+                    unit="decimal",
+                    period=revenue.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="ESEF",
+                    is_reported=False,
+                    confidence=Decimal("0.85"),
                 )
                 derived += 1
             if revenue is not None and revenue.value > 0:
@@ -3179,22 +3188,22 @@ class FinancialIngestionService:
             ):
                 derived += add_ratio("effective_tax_rate", income_tax_expense, income_before_tax)
             if operating_income is not None and depreciation is not None:
-                db.add(
-                    FinancialFact(
-                        company_id=company.id,
-                        metric="ebitda",
-                        value=operating_income.value + depreciation.value,
-                        unit=operating_income.unit or "EUR",
-                        period=operating_income.period,
-                        fiscal_year=year,
-                        fiscal_quarter="FY",
-                        source_id=document.id,
-                        source_type="ESEF",
-                        is_reported=False,
-                        confidence=Decimal("0.85"),
-                    )
+                _queue_fact(
+                    db,
+                    company_id=company.id,
+                    metric="ebitda",
+                    value=operating_income.value + depreciation.value,
+                    unit=operating_income.unit or "EUR",
+                    period=operating_income.period,
+                    fiscal_year=year,
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="ESEF",
+                    is_reported=False,
+                    confidence=Decimal("0.85"),
                 )
                 derived += 1
+        _flush_fact_buffer(db)
         db.flush()
         return derived
 
