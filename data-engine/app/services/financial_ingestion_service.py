@@ -402,6 +402,13 @@ SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
 ]
 
 
+# Version de las REGLAS de ingesta ESEF; forma parte de la huella del
+# snapshot (esef_snapshot_fingerprint). Hay que subirla cuando cambie
+# cualquier regla que altere el resultado de reingerir el MISMO snapshot
+# (ESEF_METRIC_MAP, fusion de alias, cuarentena, derivadas): sin subirla,
+# un emisor cuyo snapshot no cambia nunca recogeria la regla nueva.
+ESEF_INGESTION_RULES_VERSION = 1
+
 ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # RevenueFromContractsWithCustomers: emisores que solo etiquetan la cifra
     # IFRS 15 (Basic-Fit FY2025: 1.420,5 M, sin ifrs-full:Revenue ese ano).
@@ -1572,6 +1579,16 @@ def _recent_fiscal_mode(pairs: list[tuple[str, str]]) -> str:
 
 
 
+def _esef_snapshot_fingerprint(snapshot: dict[str, Any]) -> str:
+    """Huella de contenido de los hechos del snapshot ESEF (solo "facts":
+    la envoltura - fetched_at, origen, fxo_id - cambia en cada lectura sin
+    cambiar un solo hecho)."""
+    canonical = json.dumps(
+        snapshot.get("facts", {}), sort_keys=True, separators=(",", ":"), default=str
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def _sec_payload_fingerprint(facts_data: dict[str, Any]) -> str:
     """Huella de contenido del payload companyfacts (canonico, no bytes:
     el orden de claves del JSON no cambia la huella)."""
@@ -2438,6 +2455,31 @@ class FinancialIngestionService:
                     "no se escriben hechos de una entidad bajo otra"
                 )
 
+        # Huella de los hechos del snapshot + version de reglas: si nada
+        # cambio desde la ultima ingesta, el recomputo seria identico y se
+        # omite ENTERO: sin borrado/reescritura de hechos, sin derivadas ni
+        # resync de chunks. ESEF no tiene cortes as_of ni mirror: toda
+        # ingesta completada gana la huella.
+        document = self._source_document_esef(db, company, ticker, snapshot)
+        snapshot_fingerprint = (
+            f"{ESEF_INGESTION_RULES_VERSION}:{_esef_snapshot_fingerprint(snapshot)}"
+        )
+        if (document.metadata_ or {}).get("esef_snapshot_fingerprint") == (
+            snapshot_fingerprint
+        ):
+            return {
+                "status": "unchanged",
+                "ticker": ticker,
+                "provider": "ESEF",
+                "source_document_id": document.id,
+                "facts_imported": 0,
+                "lei": snapshot.get("lei"),
+                "period_end": snapshot.get("period_end"),
+                "latest_periods": self.latest_periods(db, company),
+                "valuation_input_ready": self.valuation_input_ready(db, company),
+                "unchanged": True,
+            }
+
         from app.services.esef_fact_quarantine import reviewed_eps_conflict
 
         # Reviewed issuer conflicts stay in the source snapshot, but are not
@@ -2453,7 +2495,6 @@ class FinancialIngestionService:
             }
             for concept, units in snapshot.get("facts", {}).items()
         }
-        document = self._source_document_esef(db, company, ticker, snapshot)
         self._replace_esef_data(db, company, document)
         facts_imported = 0
 
@@ -2505,6 +2546,7 @@ class FinancialIngestionService:
             "esef_coverage": esef_coverage,
             "reporting_currency": ccy,
             "origin": snapshot.get("origin") or "local_snapshot",
+            "esef_snapshot_fingerprint": snapshot_fingerprint,
             **({"source": snapshot["source"]} if snapshot.get("source") else {}),
             **({"identity": live_identity} if live_identity else {}),
             "last_refreshed_at": datetime.now(UTC).isoformat(),
