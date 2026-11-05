@@ -127,7 +127,7 @@
   "lib/research/fact-display-audit.ts": 4,
   "lib/research/filings-yoy-text.ts": 9,
   "lib/research/financial-display.ts": 48,
-  "lib/research/framework-terms.ts": 170,
+  "lib/research/framework-terms.ts": 159,
   "lib/research/implied-growth.ts": 3,
   "lib/research/listed-share-values.ts": 2,
   "lib/research/metric-labels-en.ts": 3,

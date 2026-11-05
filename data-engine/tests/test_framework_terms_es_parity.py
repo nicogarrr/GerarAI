@@ -1,5 +1,6 @@
 """El memo (Python) y el panel (TS) traducen los drivers del marco igual."""
 
+import json
 import re
 from pathlib import Path
 
@@ -17,7 +18,17 @@ def _ts_terms() -> dict[str, str]:
     body = src[src.index("export const FRAMEWORK_TERMS:") :]
     body = body[body.index("{") + 1 : body.index("\n};")]
     pairs = re.findall(r"(?:'([^']+)'|([A-Za-z_&][\w&]*))\s*:\s*'((?:[^'\\]|\\.)*)'", body)
-    return {(a or b): v.replace("\\'", "'") for a, b, v in pairs}
+    terms = {(a or b): v.replace("\\'", "'") for a, b, v in pairs}
+    mapping = src.split("const FRAMEWORK_TERMS_I18N:", 1)[1].split("\n};", 1)[0]
+    catalog = json.loads((TS_MAP.parents[1] / "i18n/messages/es/researchShared.json").read_text())
+    for key, path in re.findall(r"(\w+): 'researchShared\.([^']+)'", mapping):
+        if key == "unassigned":
+            continue  # existing UI-only label, not a backend framework driver
+        value = catalog
+        for segment in path.split("."):
+            value = value[segment]
+        terms[key] = value
+    return terms
 
 
 @pytest.mark.skipif(not TS_MAP.exists(), reason="sin el front en este checkout")

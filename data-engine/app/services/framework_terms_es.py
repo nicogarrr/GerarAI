@@ -7,6 +7,18 @@ mapas no divergen.
 """
 
 FRAMEWORK_TERMS_ES: dict[str, str] = {
+    "deliveries": "entregas",
+    "storage": "almacenamiento",
+    "optionality": "opcionalidad",
+    "attach_rate": "tasa de adopción",
+    "automotive": "automoción",
+    "energy": "energía",
+    "fsd_robotaxi": "FSD / robotaxi",
+    "optimus": "Optimus",
+    "demand": "demanda",
+    "battery_supply": "suministro de baterías",
+    "autonomy_regulation": "regulación de conducción autónoma",
+
     'non_negative_fcf_margin': 'margen de flujo de caja libre no negativo',
     'normalized_fcf_or_fcf_margin': 'flujo de caja libre normalizado o margen de flujo de caja libre',
     'standard_dcf': 'DCF de flujo de caja libre',
