@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 from dataclasses import asdict
 
@@ -34,10 +35,13 @@ def input_key(db, request, provider) -> str | None:
         # Rotation must not reuse a response from a previous credential.
         # Only a digest enters the identity; never serialize the credential.
         credential = getattr(provider, "_api_key", "") or ""
-        configuration["credential_sha256"] = hashlib.sha256(credential.encode()).hexdigest()
-        configuration["headers_sha256"] = hashlib.sha256(json.dumps(
-            getattr(provider, "_extra_headers", {}), sort_keys=True,
-        ).encode()).hexdigest()
+        configuration["credential_identity"] = hmac.new(
+            credential.encode(), b"gerarai:thesis-news-cache:credential:v2", "sha256",
+        ).hexdigest()
+        configuration["headers_identity"] = hmac.new(
+            json.dumps(getattr(provider, "_extra_headers", {}), sort_keys=True).encode(),
+            b"gerarai:thesis-news-cache:headers:v2", "sha256",
+        ).hexdigest()
         for name in ("_reasoning_effort_models", "_hidden_reasoning_models"):
             values = getattr(provider, name, ()) or ()
             configuration[name] = sorted(values)
@@ -51,7 +55,7 @@ def input_key(db, request, provider) -> str | None:
         digest = hashlib.sha256(json.dumps(
             identity, sort_keys=True, ensure_ascii=False, allow_nan=False,
         ).encode()).hexdigest()
-        return f"thesis_news:v1:tenant:{tenant}:{digest}"
+        return f"thesis_news:v2:tenant:{tenant}:{digest}"
     except Exception:
         # Unknown/nonserializable configuration must miss, never collide.
         return None
