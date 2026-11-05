@@ -16,12 +16,16 @@ const BLOCKER_LABEL_KEYS: Record<string, TranslationKey> = {
   forecast_is_not_the_driver: 'research.valuationText.blockers.forecastIsNotTheDriver',
   inferred_fcf_margin_target: 'research.valuationText.blockers.inferredFcfMarginTarget',
   scenario_set_missing: 'research.valuationText.blockers.scenarioSetMissing',
+  consenso_sin_conciliar: 'research.valuationText.blockers.consensusUnreconciled',
+  impulsor_material_sin_tratar: 'research.valuationText.blockers.materialDriverUntreated',
+  inventario_impulsores_no_verificable: 'research.valuationText.blockers.driverInventoryUnverified',
+  declared_input_default: 'research.valuationText.blockers.declaredInputDefault',
+  inferred_sector_input: 'research.valuationText.blockers.inferredSectorInput',
 };
 
 export function blockerLabel(id: string, locale: 'es' | 'en' = 'es'): string {
   const key = BLOCKER_LABEL_KEYS[id];
   return key ? createTranslator(locale)(key) : id;
-
 }
 
 /** Procedencia del WACC usado por el motor (resolve_rates del backend). */

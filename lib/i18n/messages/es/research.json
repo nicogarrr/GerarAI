@@ -1804,16 +1804,6 @@
       "tag_default": "tipo por defecto del modelo, sin fuente trazable",
       "market_cap_band": "banda por capitalización en dólares (8,5 % desde 200.000 M$; 9,5 % desde 50.000 M$; 10,5 % desde 10.000 M$; 11,5 % por debajo)"
     },
-    "blockers": {
-      "traceable_wacc": "WACC sin cálculo trazable",
-      "forecast_is_not_the_driver": "el valor terminal es más del 95 % del valor: la previsión a 5 años no es el motor de esta valoración",
-      "inferred_fcf_margin_target": "margen FCF objetivo inferido (con fuentes): convergencia de margen orientativa para una empresa en crecimiento, no una valoración final",
-      "consenso_sin_conciliar": "la valoración se aleja más del 35 % del consenso de analistas y la diferencia no está conciliada dato a dato",
-      "impulsor_material_sin_tratar": "hay un impulsor de valor firmado y material sin tratamiento en el modelo",
-      "inventario_impulsores_no_verificable": "no se pudo verificar el inventario de impulsores de valor",
-      "declared_input_default": "la proyección usa un supuesto por defecto declarado, sin fuente",
-      "inferred_sector_input": "la valoración usa un input sectorial inferido (con fuentes), no un dato reportado: resultado orientativo"
-    },
     "scenarioWarnings": {
       "growthOutsideReference": "Escenario «{name}»: crecimiento de ventas {value}, fuera de la referencia general ({low} a {high}); se muestra tal cual, con su fuente.",
       "marginAboveReference": "Escenario «{name}»: margen FCF {value}, por encima de la referencia general ({reference}); se muestra tal cual, con su fuente."
@@ -1822,7 +1812,12 @@
       "traceableWacc": "WACC sin cálculo trazable",
       "forecastIsNotTheDriver": "el valor terminal es más del 95 % del valor: la previsión a 5 años no es el motor de esta valoración",
       "inferredFcfMarginTarget": "margen FCF objetivo inferido (con fuentes): convergencia de margen orientativa para una empresa en crecimiento, no una valoración final",
-      "scenarioSetMissing": "escenarios pendientes: el modelo declarado valora por escenarios y aún no hay un juego con fuente; el número es la orientación del motor de respaldo, no una valoración final"
+      "scenarioSetMissing": "escenarios pendientes: el modelo declarado valora por escenarios y aún no hay un juego con fuente; el número es la orientación del motor de respaldo, no una valoración final",
+      "consensusUnreconciled": "la valoración se aleja más del 35 % del consenso de analistas y la diferencia no está conciliada dato a dato",
+      "materialDriverUntreated": "hay un impulsor de valor firmado y material sin tratamiento en el modelo",
+      "driverInventoryUnverified": "no se pudo verificar el inventario de impulsores de valor",
+      "declaredInputDefault": "la proyección usa un supuesto por defecto declarado, sin fuente",
+      "inferredSectorInput": "la valoración usa un input sectorial inferido (con fuentes), no un dato reportado: resultado orientativo"
     }
   },
   "peerFormat": {
