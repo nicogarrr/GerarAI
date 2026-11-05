@@ -10,6 +10,8 @@
 // @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
 import { METRIC_LABELS_EN } from './metric-labels-en.ts';
 
+// @ts-expect-error TS5097: node strip-types imports require the extension.
+import { createTranslator } from '../i18n/translate.ts';
 export const METRIC_LABELS: Record<string, string> = {
     market_cap: 'Capitalización bursátil',
     // Screener conectado (screener_context_metrics.py).
@@ -180,6 +182,13 @@ export const METRIC_LABELS: Record<string, string> = {
 
 /** Etiqueta de una métrica (ES por defecto); humaniza la clave si es desconocida. */
 export function metricLabel(metric: string, locale: 'es' | 'en' = 'es'): string {
+    const t = createTranslator(locale);
+    switch (metric) {
+        case 'net_debt_at_target_value': return t('researchShared.missingMetricLabels.netDebtAtTargetValue');
+        case 'total_debt_or_complete_components': return t('researchShared.missingMetricLabels.totalDebtOrCompleteComponents');
+        case 'cost_of_debt': return t('researchShared.missingMetricLabels.costOfDebt');
+        case 'tax_rate': return t('researchShared.missingMetricLabels.taxRate');
+    }
     const table = locale === 'en' ? METRIC_LABELS_EN : METRIC_LABELS;
     const known = (Object.hasOwn(table, metric) ? table[metric] : null) ?? (Object.hasOwn(table, metric.toLowerCase()) ? table[metric.toLowerCase()] : null);
     if (known) return known;

@@ -121,7 +121,7 @@ docker compose -p cavaai -f docker-compose.prod.yml stop \
   backend worker worker-thesis worker-kpis worker-knowledge \
   worker-alerts worker-gdelt scheduler \
   worker-official-closes worker-prices worker-externa \
-  worker-finnhub worker-yahoo worker-dca-manual
+  worker-finnhub worker-yahoo worker-documents worker-dca-manual
 ```
 
 Postgres, Redis, Qdrant, MinIO y Garage siguen arriba; la app no responde hasta
@@ -201,7 +201,7 @@ docker compose -p cavaai -f docker-compose.prod.yml config \
 docker compose -p cavaai -f docker-compose.prod.yml up -d --no-deps \
   backend worker worker-thesis worker-kpis worker-knowledge \
   worker-alerts worker-gdelt scheduler worker-official-closes \
-  worker-prices worker-externa worker-finnhub worker-yahoo \
+  worker-prices worker-externa worker-finnhub worker-yahoo worker-documents \
   worker-dca-manual
 ```
 
@@ -238,7 +238,7 @@ solo en Garage.
 docker compose -p cavaai -f docker-compose.prod.yml stop \
   backend worker worker-thesis worker-kpis worker-knowledge \
   worker-alerts worker-gdelt scheduler worker-official-closes \
-  worker-prices worker-externa worker-finnhub worker-yahoo \
+  worker-prices worker-externa worker-finnhub worker-yahoo worker-documents \
   worker-dca-manual
 ```
 
