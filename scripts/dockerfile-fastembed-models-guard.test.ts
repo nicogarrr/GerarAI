@@ -23,7 +23,7 @@ test('la imagen hornea los modelos fastembed del carril caliente con ruta fija',
   );
 });
 
-const serviceBlock = (name) => {
+const serviceBlock = (name: string) => {
   const start = compose.indexOf(`\n  ${name}:`);
   assert.ok(start > 0, `servicio ${name} no encontrado`);
   const rest = compose.slice(start + 1);
