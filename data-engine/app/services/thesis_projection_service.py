@@ -531,7 +531,9 @@ class ThesisProjectionService:
         as_of: date,
     ) -> RateAssumption:
         """Margen FCF base: InferredInput validado o derivado de facts."""
-        inferred = InferredInputService().latest_valid(db, company.id, MARGIN_KEY)
+        inferred = InferredInputService().latest_valid(
+            db, company.id, MARGIN_KEY, as_of=as_of
+        )
         if inferred is not None:
             assert_no_lookahead(
                 as_of=as_of,
@@ -579,8 +581,13 @@ class ThesisProjectionService:
     def _current_price(
         self, db: Session, company: Company, as_of: date
     ) -> tuple[float | None, str | None]:
-        price = _position_price(db, company.id)
-        price_date = _position_price_as_of(db, company.id)
+        price = _position_price(db, company.id, as_of=as_of)
+        price_date = _position_price_as_of(db, company.id, as_of=as_of)
+        if price is None and _position_price_as_of(db, company.id) is None:
+            # Mark manual sin fecha (Position) y sin ningún cierre fechado: se
+            # puede enseñar como referencia, pero nunca acota el múltiplo ni el
+            # MOS (el test y la ficha lo rotulan como precio sin fecha).
+            price = _position_price(db, company.id)
         if price_date:
             assert_no_lookahead(
                 as_of=as_of,
