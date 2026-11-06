@@ -86,11 +86,12 @@ describe('SectionNav', () => {
         expect(screen.getByRole('link', { name: 'Noticias' })).toHaveAttribute('aria-current', 'page');
         expect(screen.getByRole('link', { name: 'Empresas' })).not.toHaveAttribute('aria-current');
     });
-    it('empieza plegado, despliega al pulsar y recuerda la decisión en localStorage', () => {
+    it('empieza plegado, despliega al pulsar y recuerda la decisión en localStorage', async () => {
         mocks.pathname.mockReturnValue('/portfolio');
         render(<SectionNav />);
         const toggle = screen.getByRole('button', { name: /Resumen|Secciones/ });
         expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        await waitFor(() => expect(toggle).toBeEnabled());
         fireEvent.click(toggle);
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
         expect(window.localStorage.getItem('subnav-seccion')).toBe('abierto');
