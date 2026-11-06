@@ -31,11 +31,13 @@ export default function SectionNav(){
  const pathname=usePathname();
  const t=useT();
  const [open,setOpen]=useState(false);
+ const [ready,setReady]=useState(false);
  useEffect(()=>{
   // Preferencia persistida (almacén externo del navegador): se lee tras
   // montar y el setState no es síncrono dentro del efecto.
   queueMicrotask(() => {
    try { setOpen(window.localStorage.getItem('subnav-seccion')==='abierto'); } catch { /* Storage may be disabled. */ }
+   setReady(true);
   });
  },[]);
  const toggle=()=>{
@@ -71,7 +73,7 @@ export default function SectionNav(){
  // Activo neutro (gris claro sobre surface-2), igual que el item activo del
  // sidebar: el teal queda para acciones y datos, no para "estoy aqui".
  return <div className="-mx-4 mb-4 border-b border-gray-800 px-4 pb-1 sm:mx-0 sm:mb-6 sm:border-b-0 sm:px-0 sm:pb-0">
-  <button aria-controls="subnav-seccion-lista" aria-expanded={open} className="-ml-3 inline-flex min-h-11 items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-gray-200 sm:hidden" onClick={toggle} type="button">
+  <button disabled={!ready} aria-controls="subnav-seccion-lista" aria-expanded={open} className="-ml-3 inline-flex min-h-11 items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-gray-200 sm:hidden" onClick={toggle} type="button">
    {currentItem?t(currentItem.subnavLabelKey??currentItem.labelKey):t('shell.sectionNav.sections')}
    {open?<ChevronUp aria-hidden className="text-gray-500" size={16}/>:<ChevronDown aria-hidden className="text-gray-500" size={16}/>}
   </button>
