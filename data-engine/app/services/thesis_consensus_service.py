@@ -99,6 +99,7 @@ def apply_consensus_control(
     valuation: dict[str, Any],
     *,
     enabled: bool | None = None,
+    block_publication: bool = True,
 ) -> dict[str, Any]:
     """Contrasta ``valuation`` con el consenso y deja el blocker si toca."""
     if enabled is None:
@@ -152,8 +153,9 @@ def apply_consensus_control(
         target_high=high,
         consensus_source=snapshot.source,
     )
-    apply_consensus_sanity(valuation, sanity, enabled=True)
+    apply_consensus_sanity(valuation, sanity, enabled=True, block_publication=block_publication)
     result = sanity.as_dict()
+    result["block_publication"] = block_publication
     result["consensus"] = snapshot.as_dict()
     result["consensus_basis"] = "mean" if snapshot.mean is not None else "median"
     result["comparison"] = {
@@ -203,7 +205,7 @@ def apply_consensus_control(
         },
         *analyst_inputs.rows,
     ]
-    if sanity.needs_review and REVIEW_BLOCKER not in (valuation.get("publication_blockers") or []):
+    if block_publication and sanity.needs_review and REVIEW_BLOCKER not in (valuation.get("publication_blockers") or []):
         blockers = list(valuation.get("publication_blockers") or [])
         blockers.append(REVIEW_BLOCKER)
         valuation["publication_blockers"] = blockers
