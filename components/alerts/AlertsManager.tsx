@@ -61,6 +61,7 @@ function AlertsManager() {
     };
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [loading, setLoading] = useState(true);
+    const [ready, setReady] = useState(false);
     const [loadError, setLoadError] = useState<{ message: string; cause: AlertsLoadCause } | null>(null);
     // Deep-link desde QuickAlertButton (/alerts?symbol=MSFT&type=price_below&value=300):
     // el diálogo arranca abierto y pre-rellenado desde la URL, sin efecto.
@@ -139,7 +140,10 @@ function AlertsManager() {
     useEffect(() => {
         // Carga inicial tras montar: el setState de loadAlerts no es síncrono
         // dentro del efecto.
-        queueMicrotask(() => void loadAlerts());
+        queueMicrotask(() => {
+            setReady(true);
+            void loadAlerts();
+        });
     }, []);
 
     useEffect(() => {
@@ -306,7 +310,7 @@ function AlertsManager() {
                         if (!next) setCreateError(null);
                     }}>
                     <DialogTrigger asChild>
-                        <Button size="sm" className="gap-2 min-h-[44px] px-4 text-sm sm:min-h-0 sm:text-xs">
+                        <Button size="sm" disabled={!ready} className="gap-2 min-h-[44px] px-4 text-sm sm:min-h-0 sm:text-xs">
                             <Plus aria-hidden="true" className="h-4 w-4" />
                             {ti('alerts.new')}
                         </Button>
