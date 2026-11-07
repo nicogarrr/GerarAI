@@ -7485,8 +7485,8 @@
       },
       "expected": {
         "engine_key": "standard_dcf",
-        "status": "ok",
-        "publishable": true,
+        "status": "partial",
+        "publishable": false,
         "missing_inputs": [],
         "publication_blockers": [],
         "adr_ratio": null,
