@@ -668,6 +668,11 @@ class StandardDCFEngine(ValuationEngine):
                 "una cifra negativa."
             )
 
+        # An explained N/D is not a publishable valuation. Keep the raw
+        # scenarios and notes, but make the state match the displayed result.
+        publishable = expected is not None
+        result_status = "ok" if publishable else "partial"
+
         # Terminal value share guard: a DCF where >80% of the EV is the terminal
         # value is not a 5-year forecast, it is a perpetuity assumption.
 
@@ -716,8 +721,8 @@ class StandardDCFEngine(ValuationEngine):
             {
             "ticker": company.ticker,
             "model_type": company.valuation_model,
-            "status": "ok",
-            "publishable": True,
+            "status": result_status,
+            "publishable": publishable,
             "current_price": current_price,
             "bear_value": bear,
             "base_value": base,
@@ -750,8 +755,8 @@ class StandardDCFEngine(ValuationEngine):
                 "method": company.valuation_model,
                 "engine": self.key,
                 "input_source": "financial_facts",
-                "publishable": True,
-                "status": "ok",
+                "publishable": publishable,
+                "status": result_status,
                 "model_version": MODEL_VERSION,
                 "revenue_base": revenue_base.trace(),
                 "growth_source": growth_source,

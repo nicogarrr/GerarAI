@@ -77,6 +77,8 @@ def test_negative_bear_scenario_is_explained_nd_and_expected_keeps_ordering():
         # queda por debajo del base (no se infla excluyéndolo).
         assert result["base_value"] is not None and result["base_value"] > 0
         assert result["expected_value"] is not None
+        assert result["status"] == "ok"
+        assert result["publishable"] is True
         assert result["trace"]["expected_value_raw"] == pytest.approx(result["expected_value"])
         # El esperado sale de los brutos (bear negativo incluido): se
         # recompute a mano con las probabilidades de la traza y coincide;
@@ -124,7 +126,10 @@ def test_negative_expected_value_is_explained_nd():
     try:
         leveraged = {"revenue": 1000, "free_cash_flow": 11, "revenue_growth": 0.07, "shares_diluted": 100, "net_debt": 100000}
         result = _value(db, "NDC", facts=leveraged)
-        assert result["status"] == "ok"
+        assert result["status"] == "partial"
+        assert result["publishable"] is False
+        assert result["trace"]["status"] == "partial"
+        assert result["trace"]["publishable"] is False
         assert result["expected_value"] is None
         assert "expected" in result["scenario_notes"]
         assert "N/D" in result["scenario_notes"]["expected"]
@@ -132,4 +137,21 @@ def test_negative_expected_value_is_explained_nd():
         assert result["margin_of_safety"] is None
     finally:
         _cleanup(db, ["NDC"])
+        db.close()
+
+
+def test_negative_expected_with_positive_bull_is_not_publishable():
+    """CHTR regression: one positive scenario cannot publish a missing expected."""
+    init_db()
+    db = SessionLocal()
+    try:
+        leveraged = {**FACTS, "net_debt": 1000}
+        result = _value(db, "NDD", facts=leveraged)
+        assert result["bull_value"] is not None and result["bull_value"] > 0
+        assert result["expected_value"] is None
+        assert result["status"] == result["trace"]["status"] == "partial"
+        assert result["publishable"] is result["trace"]["publishable"] is False
+        assert "N/D" in result["scenario_notes"]["expected"]
+    finally:
+        _cleanup(db, ["NDD"])
         db.close()
