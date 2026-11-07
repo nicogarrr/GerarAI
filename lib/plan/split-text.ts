@@ -26,6 +26,9 @@ export function splitReasonText(row: ContributionAllocation, locale: Locale): st
   if (row.dca_level === null || row.dca_level === undefined) return 'no DCA level: normal weight (1X)';
   const label = LEVEL_LABELS_EN[row.dca_level] ?? `level ${row.dca_level}`;
   if (row.multiplier === 0) return `${label}: trim zone, no contribution this month`;
+  if (row.low_volatility) {
+    return `${label}: weight ×1 (low volatility, vol ${pct1(row.volatility_pct)}%: in these stocks 2X–4X has not returned more than 1X)`;
+  }
   return `${label}: weight ×${row.multiplier}`;
 }
 
@@ -40,12 +43,15 @@ const NOTES_EN: Record<string, string> = {
 
 const STALE_NOTE = /^Nivel DCA de hace más de un mes en (.+): pesa como 1X hasta que se vuelva a evaluar\.$/;
 const CAP_NOTE = /^Sin aportación nueva este mes a (.+): ya pesan? más del doble de su peso objetivo en el plan\.$/;
+const LOW_VOL_NOTE = /^Poco volátil(?:es)? \(vol < (\d+) %\): (.+) pesan? como 1X aunque estén? en 2X–4X; en estos valores el nivel no ha rendido más \(backtest\)\.$/;
 
 export function splitNoteText(note: string, locale: Locale): string {
   if (locale !== 'en') return note;
   if (Object.hasOwn(NOTES_EN, note)) return NOTES_EN[note];
   const stale = STALE_NOTE.exec(note);
   if (stale) return `DCA level older than a month for ${stale[1]}: weighted as 1X until re-evaluated.`;
+  const lowVol = LOW_VOL_NOTE.exec(note);
+  if (lowVol) return `Low volatility (vol < ${lowVol[1]}%): ${lowVol[2]} weighted as 1X even at 2X–4X; in these stocks the level has not paid off (backtest).`;
   const capped = CAP_NOTE.exec(note);
   return capped ? `No new money this month for ${capped[1]}: already over twice the target weight in the plan.` : note;
 }

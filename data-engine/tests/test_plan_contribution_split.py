@@ -513,3 +513,105 @@ def test_other_tenant_positions_do_not_count_for_the_cap(db):
     assert rows["POOL"]["concentration_capped"] is False
     assert rows["POOL"]["market_share_pct"] == 33.3
     assert rows["POOL"]["amount"] == 100.0
+
+
+
+# --- Valores poco volatiles: el nivel no inclina el reparto (gerarai-dcavalor1, 7-nov-2026) ---
+
+
+def _vcand(ticker: str, level: int | None, vol: float | None) -> SplitCandidate:
+    return SplitCandidate(ticker=ticker, base_weight=Decimal("1"), dca_level=level, dca_vol=vol)
+
+
+def test_low_volatility_buy_level_weighs_as_1x():
+    """Vol anualizada < 25 %: 2X-4X pesan como 1X.
+
+    Backtest (work/gerarai-dcavalor1, regla fijada antes de mirar): en esos valores
+    2X-4X no rinden mas que 1X a 12 meses, y quitar la inclinacion gana al reparto
+    nivel² en las 4 ventanas (+0,09 / +0,29 / +0,99 / +0,64 puntos de TIR).
+    """
+    result = split_contribution(
+        Decimal("300"),
+        [_vcand("KO", 3, 0.18), _vcand("RKLB", 3, 0.80), _vcand("PG", 4, 0.249)],
+    )
+    rows = {row["ticker"]: row for row in result["allocations"]}
+    assert rows["KO"]["multiplier"] == 1
+    assert rows["PG"]["multiplier"] == 1
+    assert rows["RKLB"]["multiplier"] == 9
+    assert rows["KO"]["low_volatility"] is True
+    assert rows["RKLB"]["low_volatility"] is False
+    assert rows["KO"]["volatility_pct"] == 18.0
+    assert rows["KO"]["reason"] == (
+        "3X DCA: peso ×1 (poco volátil, vol 18,0 %: en estos valores 2X–4X no ha rendido más que 1X)"
+    )
+    # 9 : 1 : 1 sobre 11 partes de 300.
+    # 245,45 + el centimo de redondeo, que va al de mayor peso.
+    assert rows["RKLB"]["amount"] == 245.46
+    assert sum(Decimal(str(r["amount"])) for r in rows.values()) == Decimal("300")
+
+
+def test_volatility_at_threshold_or_unknown_keeps_the_square():
+    result = split_contribution(
+        Decimal("100"), [_vcand("A", 2, 0.25), _vcand("B", 2, None), _vcand("C", 4, float("nan"))]
+    )
+    rows = {row["ticker"]: row for row in result["allocations"]}
+    assert {t: rows[t]["multiplier"] for t in "ABC"} == {"A": 4, "B": 4, "C": 16}
+    assert rows["B"]["low_volatility"] is False
+    assert rows["B"]["volatility_pct"] is None
+    assert rows["A"]["reason"] == "2X DCA: peso ×4"
+
+
+def test_low_volatility_trim_still_gets_nothing_and_1x_unchanged():
+    result = split_contribution(Decimal("100"), [_vcand("A", -1, 0.10), _vcand("B", 1, 0.10)])
+    rows = {row["ticker"]: row for row in result["allocations"]}
+    assert rows["A"]["multiplier"] == 0
+    assert rows["B"]["multiplier"] == 1
+    assert rows["B"]["low_volatility"] is False  # 1X: no hay inclinacion que quitar
+
+
+def test_build_reads_volatility_from_the_engine_metrics(db):
+    pool = _company(db, "POOL")
+    uber = _company(db, "UBER")
+    _plan(
+        db,
+        [
+            {"kind": "ticker", "label": "POOL", "target_pct": 50, "band_pct": 5},
+            {"kind": "ticker", "label": "UBER", "target_pct": 50, "band_pct": 5},
+        ],
+    )
+    low = _real_dca_row(tenant=TENANT, symbol="POOL", level=3, company_id=pool.id)
+    low.metrics = {"vol": 0.21, "signal": "combined"}
+    high = _real_dca_row(tenant=TENANT, symbol="UBER", level=3, company_id=uber.id)
+    high.metrics = {"vol": 0.42}
+    db.add_all([low, high])
+    db.commit()
+    result = build_contribution_split(db)
+    rows = {row["ticker"]: row for row in result["allocations"]}
+    assert rows["POOL"]["multiplier"] == 1
+    assert rows["UBER"]["multiplier"] == 9
+    assert rows["POOL"]["amount"] == 30.0
+    assert rows["UBER"]["amount"] == 270.0
+    assert (
+        "Poco volátil (vol < 25 %): POOL pesa como 1X aunque esté en 2X–4X; en estos valores "
+        "el nivel no ha rendido más (backtest)."
+    ) in result["notes"]
+
+
+def test_build_with_unreadable_metrics_keeps_the_square(db):
+    pool = _company(db, "POOL")
+    _company(db, "UBER")
+    _plan(
+        db,
+        [
+            {"kind": "ticker", "label": "POOL", "target_pct": 50, "band_pct": 5},
+            {"kind": "ticker", "label": "UBER", "target_pct": 50, "band_pct": 5},
+        ],
+    )
+    row = _real_dca_row(tenant=TENANT, symbol="POOL", level=3, company_id=pool.id)
+    row.metrics = {"vol": "n/d"}
+    db.add(row)
+    db.add(_real_dca_row(tenant=TENANT, symbol="UBER", level=1))
+    db.commit()
+    rows = {r["ticker"]: r for r in build_contribution_split(db)["allocations"]}
+    assert rows["POOL"]["multiplier"] == 9
+    assert rows["POOL"]["amount"] == 270.0

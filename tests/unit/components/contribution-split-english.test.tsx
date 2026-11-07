@@ -23,6 +23,19 @@ describe('contribution split in English', () => {
     expect(splitReasonText(row({}), 'es')).toBe('2X DCA: peso ×2');
   });
 
+  it('low-volatility reason and note', () => {
+    const low = row({
+      dca_level: 3, dca_label: '3X DCA', multiplier: 1, low_volatility: true, volatility_pct: 18,
+      reason: '3X DCA: peso ×1 (poco volátil, vol 18,0 %: en estos valores 2X–4X no ha rendido más que 1X)',
+    });
+    expect(splitReasonText(low, 'en')).toBe('3X DCA: weight ×1 (low volatility, vol 18.0%: in these stocks 2X–4X has not returned more than 1X)');
+    expect(splitReasonText(low, 'es')).toBe(low.reason);
+    expect(splitNoteText('Poco volátil (vol < 25 %): POOL pesa como 1X aunque esté en 2X–4X; en estos valores el nivel no ha rendido más (backtest).', 'en'))
+      .toBe('Low volatility (vol < 25%): POOL weighted as 1X even at 2X–4X; in these stocks the level has not paid off (backtest).');
+    expect(splitNoteText('Poco volátiles (vol < 25 %): KO, PG pesan como 1X aunque estén en 2X–4X; en estos valores el nivel no ha rendido más (backtest).', 'en'))
+      .toBe('Low volatility (vol < 25%): KO, PG weighted as 1X even at 2X–4X; in these stocks the level has not paid off (backtest).');
+  });
+
   it('concentration cap reason', () => {
     const capped = row({
       dca_level: 4, dca_label: '4X DCA', multiplier: 16, amount: 0, concentration_capped: true, market_share_pct: 80, base_share_pct: 33.3,
