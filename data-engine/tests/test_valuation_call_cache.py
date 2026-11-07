@@ -14,13 +14,13 @@ from __future__ import annotations
 
 import contextlib
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, delete, event
 from sqlalchemy.orm import Session
 
-from app.models import Company, FinancialFact, FXRate, MarketPrice, Tenant
+from app.models import CalculatedMetric, Company, FinancialFact, FXRate, MarketPrice, Tenant
 from app.models.entities import Base
 from app.services.valuation_service import ValuationService
 from app.valuation.call_cache import _CACHE_KEY, valuation_call_cache
@@ -86,6 +86,15 @@ def db():
                                     quote_currency="USD", source="yfinance"))
         session.add(FXRate(base_currency="USD", quote_currency="EUR", rate=0.92,
                            rate_date=TODAY - timedelta(days=1), source="ecb", tenant_id=1))
+        # CAPM requires a traceable discount rate. This fixture tests caching,
+        # not the fallback-rate publication blocker; keep its assert status=ok.
+        session.add(CalculatedMetric(
+            tenant_id=1, company_id=1, metric="wacc", value=0.09, unit="decimal",
+            period=f"{FY}-12-31:FY", fiscal_year=FY, status="ok",
+            definition_version="WACC_STANDARD_V1",
+            formula="ke*E/(D+E) + kd*(1-t)*D/(D+E)",
+            created_at=datetime(2026, 11, 3, tzinfo=timezone.utc),
+        ))
         session.commit()
         session.info["tenant_id"] = 1
         yield session
@@ -121,6 +130,17 @@ def test_results_bit_identical_with_and_without_cache(db, monkeypatch):
     uncached_result = ValuationService().value_company(db, company)
     assert _canon(cached_result) == _canon(uncached_result)
     assert cached_result["status"] == "ok"
+    assert cached_result["trace"]["wacc_source"] == "calculated_metric"
+
+
+def test_missing_traceable_wacc_stays_partial_with_cache(db):
+    db.execute(delete(CalculatedMetric).where(CalculatedMetric.company_id == 1))
+    db.commit()
+    result = ValuationService().value_company(db, db.get(Company, 1))
+    assert result["status"] == "partial"
+    assert result["publishable"] is False
+    assert "traceable_wacc" in result["trace"]["publication_blockers"]
+    assert _CACHE_KEY not in db.info
 
 
 def test_query_count_drops_with_cache(db, monkeypatch):
