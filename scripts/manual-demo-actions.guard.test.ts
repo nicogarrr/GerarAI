@@ -878,7 +878,8 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
     it('429 frena la siguiente valoración (backoff compartido, medido): cero fetches durante Retry-After', async () => {
         // Reproduce el borde de apertura: el Retry-After cruza las 09:30 ET.
         skewMs = Date.parse('2026-11-06T14:29:00Z') - realNow();
-        await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'BBVA', name: 'BBVA' }, currency: 'EUR', quantity: 1, price: 1 }));
+        const order = await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'BBVA', name: 'BBVA' }, currency: 'EUR', quantity: 1, price: 1, executedAt: Date.parse('2026-11-06T14:28:00Z') }));
+        assert.equal(order.ok, true, 'la orden de prueba precede al reloj simulado');
         listing = [{ symbol: 'BBVA', currency: 'EUR' }];
         g.__GUARD_QUOTES__ = { BBVA: new Response('throttled', { status: 429, headers: { 'retry-after': '120' } }) };
         const r1 = (await actions.getManualDemoValuation()) as unknown as VResult;

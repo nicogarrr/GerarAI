@@ -72,6 +72,7 @@ export default function PushNotifications() {
     const ti = useT();
     const [support, setSupport] = useState<Support>('checking');
     const [status, setStatus] = useState<PushStatus | null>(null);
+    const [statusLoading, setStatusLoading] = useState(true);
     const [thisDevice, setThisDevice] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -81,6 +82,8 @@ export default function PushNotifications() {
             setStatus(await getPushStatus());
         } catch {
             setStatus(null);
+        } finally {
+            setStatusLoading(false);
         }
         if ('serviceWorker' in navigator) {
             const registration = await navigator.serviceWorker.getRegistration('/sw.js').catch(() => undefined);
@@ -165,7 +168,9 @@ export default function PushNotifications() {
     return (
         <section data-testid="push-notifications" className="rounded-lg border border-gray-700/60 bg-surface-1 p-4 space-y-3">
             <h2 className="text-lg font-semibold text-white">{ti('alerts.push.title')}</h2>
-            {support === 'checking' ? null : support === 'ios-install' ? (
+            {support === 'checking' || (support === 'ready' && statusLoading) ? (
+                <p aria-hidden="true" className="h-5" data-testid="push-loading-space" />
+            ) : support === 'ios-install' ? (
                 <p className="text-sm text-gray-400" data-testid="push-ios">
                     {ti('alerts.push.iosPre')}
                     <span className="text-gray-200">{ti('alerts.push.iosShare')}</span>{ti('alerts.push.iosMid')}

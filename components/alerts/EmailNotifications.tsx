@@ -61,7 +61,9 @@ export default function EmailNotifications() {
     return (
         <section data-testid="email-notifications" className="rounded-lg border border-gray-700/60 bg-surface-1 p-4 space-y-3">
             <h2 className="text-lg font-semibold text-white">{ti('alerts.email.title')}</h2>
-            {!status ? null : !status.smtp ? (
+            {!status ? (
+                <p aria-hidden="true" className="h-5" data-testid="email-loading-space" />
+            ) : !status.smtp ? (
                 <p className="text-sm text-gray-400" data-testid="email-server-off">
                     {ti('alerts.email.serverOff')}
                 </p>
