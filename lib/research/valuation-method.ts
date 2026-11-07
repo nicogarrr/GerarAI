@@ -51,3 +51,16 @@ export function valuationMethodView(valuation: ValuationMethodLike | null | unde
   if (!label && !warning && !range) return null;
   return { label, notes, warning, range, priceImplies };
 }
+
+/** Fiabilidad histórica del DCF estándar (data-engine app/valuation/track_record.py). */
+export type TrackRecordLike = {
+  message_es?: string | null;
+  message_en?: string | null;
+} | null;
+
+/** Una línea: cuánto pesar el número. Solo existe cuando el valor sale del DCF estándar. */
+export function trackRecordText(record: TrackRecordLike | undefined, locale: string): string | null {
+  if (!record) return null;
+  const text = locale === 'en' ? record.message_en ?? record.message_es : record.message_es;
+  return typeof text === 'string' && text ? text : null;
+}

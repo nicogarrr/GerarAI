@@ -951,6 +951,8 @@ class ValuationResponse(BaseModel):
     plausibility_warning: dict | None = None
     # Rango DCF + múltiplos de comparables (contraste, no valor publicado).
     fair_value_range: dict | None = None
+    # Fiabilidad historica del DCF estandar (app/valuation/track_record.py).
+    track_record: dict | None = None
     reverse_dcf: dict = {}
     sensitivity: dict = {}
     moat: dict = {}

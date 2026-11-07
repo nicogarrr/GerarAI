@@ -151,7 +151,7 @@ import QuickAlertButton from '@/components/research/QuickAlertButton';
 import ThesisMemo from '@/components/research/ThesisMemo';
 import { valuationScenarioDisplay } from '@/lib/research/listed-share-values';
 import { baseAssumptionsText, blockerLabel, reverseDcfText, scenarioNotesList, scenarioWarningLines } from '@/lib/research/valuation-display';
-import { valuationMethodView } from '@/lib/research/valuation-method';
+import { trackRecordText, valuationMethodView } from '@/lib/research/valuation-method';
 import { scenarioNoteText } from '@/lib/research/scenario-notes-text';
 import ThesisExportMenu from '@/components/research/ThesisExportMenu';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
@@ -416,6 +416,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
   const scenarioWarnings = scenarioWarningLines(valuation.trace, locale);
   const reverseText = reverseDcfText(valuation.reverse_dcf, locale);
   const methodView = valuationMethodView(valuation);
+  const trackRecord = trackRecordText(valuation.track_record, locale);
   const assumptionsText = baseAssumptionsText(valuation.trace, locale);
   // F348: el precio del modelo es un snapshot persistido; el precio canónico
   // (en vivo) es el de la cabecera. El del modelo se rotula con su fecha,
@@ -465,6 +466,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
           </ul>
         ) : null}
         {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
+      {trackRecord ? <p className="text-xs leading-5 text-gray-500">{trackRecord}</p> : null}
         {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
         <p className="text-xs leading-5 text-gray-500">
           {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type, locale), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${methodLabel(method, locale)}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
@@ -507,6 +509,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
         </div>
       ) : null}
       {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
+      {trackRecord ? <p className="text-xs leading-5 text-gray-500">{trackRecord}</p> : null}
       {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
       <p className="text-xs leading-5 text-gray-500">
         {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type, locale), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${methodLabel(method, locale)}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
