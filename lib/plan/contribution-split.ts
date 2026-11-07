@@ -21,6 +21,10 @@ export type ContributionAllocation = {
   /** Peso actual en la cartera del plan y peso base, en %; null si no hay valores fiables. */
   market_share_pct?: number | null;
   base_share_pct?: number | null;
+  /** 2X–4X en un valor poco volátil (vol < 25 %): pesa como 1X. */
+  low_volatility?: boolean;
+  /** Volatilidad anualizada del motor DCA, en %; null si no se conoce. */
+  volatility_pct?: number | null;
   reason: string;
 };
 

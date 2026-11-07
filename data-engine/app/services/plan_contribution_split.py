@@ -20,6 +20,19 @@ plano): fuera de muestra (2013-2026) nivel² gana al DCA plano por +1,3 puntos
 de TIR en el 82 % de las carteras, frente a +0,6 del peso ×nivel anterior; al
 reves (1996-2012) +1,2, y gana en las 21 ventanas de 10 anos.
 
+Valores poco volatiles (volatilidad anualizada del motor < 25 %, la misma
+``vol`` de 36 meses que guarda ``dca_signal_states.metrics``): 2X-4X pesan como
+1X. En ellos el nivel no anticipa nada: a 12 meses, frente al SPY, 2X-4X no
+rinden mas que 1X (mediana 1996-2012: 1X +2,4, 2X +0,5, 3X +0,5, 4X -1,1 puntos;
+2013-2025: -0,4 / -3,6 / -2,4 / +1,7), mientras que en los volatiles (> 40 %) 4X
+rinde +14 / +16 puntos. Backtest gerarai-dcavalor1 (7-nov-2026, regla de
+robustez fijada antes de mirar, 600 carteras por ventana frente a nivel² con
+tope): gana en las 4 ventanas, +0,09 (1996-2012) y +0,29 (2013-2026) puntos de
+TIR con 491 valores del S&P 500, +0,99 (2015-2020) y +0,64 (2021-2026) con 361;
+gana en el 67-86 % de las carteras y la peor pierde menos de 3 puntos. Sin vol
+(historia corta) o con un valor no legible, se mantiene nivel². Los recortes
+siguen pesando 0 y 1X sigue siendo 1X.
+
 Tope de concentracion: un ticker que ya pesa mas del doble de su peso base en
 la cartera del plan (valor de mercado en divisa base de sus posiciones vivas,
 sumando carteras) no recibe aportacion este mes; su parte va al resto. Mismo
@@ -36,6 +49,8 @@ cuota queda sin asignar (liquidez) y se dice.
 
 from __future__ import annotations
 
+import json
+import math
 from dataclasses import dataclass, replace
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
@@ -64,6 +79,8 @@ _CENT = Decimal("0.01")
 # Un nivel DCA vale para el mes en formacion o el ultimo confirmado. Uno mas
 # viejo (ticker que dejo de evaluarse, motor parado) no dice nada de este mes.
 DCA_MAX_AGE_MONTHS = 1
+# Vol anualizada (fraccion) por debajo de la cual 2X-4X pesan como 1X (ver docstring).
+LOW_VOLATILITY_THRESHOLD = 0.25
 # Sin aportacion nueva a un ticker que pesa mas de CONCENTRATION_CAP x su peso base.
 CONCENTRATION_CAP = Decimal(2)
 
@@ -95,6 +112,16 @@ class SplitCandidate:
     concentration_capped: bool = False
     market_share_pct: Decimal | None = None
     base_share_pct: Decimal | None = None
+    # Volatilidad anualizada del motor (metrics["vol"]); None = desconocida.
+    dca_vol: float | None = None
+
+    @property
+    def low_volatility(self) -> bool:
+        """Nivel de compra 2X-4X en un valor poco volatil: pesa como 1X."""
+        if self.dca_level is None or int(self.dca_level) < 2:
+            return False
+        vol = _volatility(self.dca_vol)
+        return vol is not None and vol < LOW_VOLATILITY_THRESHOLD
 
 
 def _money_es(value: Decimal) -> str:
@@ -108,10 +135,25 @@ def _pct_es(value: Decimal) -> str:
     return f"{value.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP)}".replace(".", ",")
 
 
+def _volatility(raw: object) -> float | None:
+    """Vol anualizada legible (> 0 y finita) o None."""
+    if isinstance(raw, bool):
+        return None
+    try:
+        value = float(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) and value > 0 else None
+
+
 def _multiplier(level: int | None) -> int:
     if level is None:
         return 1
     return DCA_MULTIPLIER.get(int(level), 1)
+
+
+def _candidate_multiplier(candidate: SplitCandidate) -> int:
+    return 1 if candidate.low_volatility else _multiplier(candidate.dca_level)
 
 
 def _reason(candidate: SplitCandidate) -> str:
@@ -134,6 +176,12 @@ def _reason(candidate: SplitCandidate) -> str:
     label = DCA_LABELS.get(int(level), f"nivel {level}")
     if _multiplier(level) == 0:
         return f"{label}: zona de recorte, este mes no recibe aportación"
+    if candidate.low_volatility:
+        vol_pct = _pct_es(Decimal(str(_volatility(candidate.dca_vol))) * 100)
+        return (
+            f"{label}: peso ×1 (poco volátil, vol {vol_pct} %: en estos valores 2X–4X "
+            "no ha rendido más que 1X)"
+        )
     return f"{label}: peso ×{_multiplier(level)}"
 
 
@@ -144,7 +192,7 @@ def split_contribution(amount: Decimal, candidates: list[SplitCandidate]) -> dic
     def _weight(candidate: SplitCandidate) -> Decimal:
         if candidate.concentration_capped:
             return Decimal(0)
-        return max(Decimal(candidate.base_weight), Decimal(0)) * _multiplier(candidate.dca_level)
+        return max(Decimal(candidate.base_weight), Decimal(0)) * _candidate_multiplier(candidate)
 
     if candidates and sum((_weight(c) for c in candidates), Decimal(0)) <= 0:
         # El tope nunca deja el mes sin destino: si todo lo demas esta en recorte, se ignora.
@@ -181,7 +229,11 @@ def split_contribution(amount: Decimal, candidates: list[SplitCandidate]) -> dic
                 "dca_period": candidate.dca_period,
                 "dca_status": candidate.dca_status,
                 "dca_stale": candidate.dca_stale,
-                "multiplier": _multiplier(candidate.dca_level),
+                "multiplier": _candidate_multiplier(candidate),
+                "low_volatility": candidate.low_volatility,
+                "volatility_pct": (
+                    round(vol * 100, 1) if (vol := _volatility(candidate.dca_vol)) is not None else None
+                ),
                 "concentration_capped": candidate.concentration_capped,
                 "market_share_pct": _pct_float(candidate.market_share_pct),
                 "base_share_pct": _pct_float(candidate.base_share_pct),
@@ -280,9 +332,16 @@ def _dca_rows(db: Session) -> list[Any] | None:
         sa.column("level"),
         sa.column("status"),
         sa.column("period"),
+        sa.column("metrics", sa.JSON),
     )
     statement = select(
-        table.c.id, table.c.symbol, table.c.company_id, table.c.level, table.c.status, table.c.period
+        table.c.id,
+        table.c.symbol,
+        table.c.company_id,
+        table.c.level,
+        table.c.status,
+        table.c.period,
+        table.c.metrics,
     )
     tenant_id = db.info.get("tenant_id")
     if tenant_id is not None:
@@ -291,6 +350,21 @@ def _dca_rows(db: Session) -> list[Any] | None:
         return list(db.execute(statement).all())
     except Exception:  # noqa: BLE001 - esquema distinto al esperado: se degrada a "sin nivel"
         return None
+
+
+def _row_volatility(row: Any) -> float | None:
+    """``metrics["vol"]`` de la fila del motor; cualquier forma ilegible = None."""
+    if row is None:
+        return None
+    metrics = getattr(row, "metrics", None)
+    if isinstance(metrics, str):
+        try:
+            metrics = json.loads(metrics)
+        except ValueError:
+            return None
+    if not isinstance(metrics, dict):
+        return None
+    return _volatility(metrics.get("vol"))
 
 
 def build_contribution_split(db: Session) -> dict[str, Any]:
@@ -364,6 +438,7 @@ def build_contribution_split(db: Session) -> dict[str, Any]:
                 dca_period=period,
                 dca_status=str(row.status) if row is not None and row.status is not None else None,
                 dca_stale=stale,
+                dca_vol=_row_volatility(row),
             )
         )
     stale_tickers = [c.ticker for c in candidates if c.dca_stale]
@@ -375,6 +450,17 @@ def build_contribution_split(db: Session) -> dict[str, Any]:
         )
     if dca_available and candidates and all(c.dca_level is None and not c.dca_stale for c in candidates):
         notes.append("Ningún ticker del plan tiene nivel DCA calculado: todos pesan como 1X.")
+
+    low_vol_tickers = [c.ticker for c in candidates if c.low_volatility]
+    if low_vol_tickers:
+        many = len(low_vol_tickers) > 1
+        notes.append(
+            ("Poco volátiles" if many else "Poco volátil")
+            + f" (vol < {int(LOW_VOLATILITY_THRESHOLD * 100)} %): "
+            + ", ".join(low_vol_tickers)
+            + (" pesan como 1X aunque estén" if many else " pesa como 1X aunque esté")
+            + " en 2X–4X; en estos valores el nivel no ha rendido más (backtest)."
+        )
 
     candidates = _apply_concentration_cap(candidates, _plan_market_values(db, companies))
     amount = Decimal(plan.monthly_contribution)
