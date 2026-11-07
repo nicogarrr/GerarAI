@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { valuationMethodView } from '@/lib/research/valuation-method';
+import { trackRecordText, valuationMethodView } from '@/lib/research/valuation-method';
 
 describe('valuationMethodView', () => {
   it('devuelve null sin etiqueta, aviso ni rango (la ficha no cambia)', () => {
@@ -39,5 +39,17 @@ describe('valuationMethodView', () => {
     expect(view?.warning).toContain('0,10 veces');
     expect(view?.range).toBeNull();
     expect(view?.priceImplies).toBeNull();
+  });
+});
+
+describe('trackRecordText', () => {
+  it('una línea de fiabilidad del método, en el idioma de la interfaz', () => {
+    const record = { message_es: 'Fiabilidad del método: …', message_en: 'Method track record: …' };
+    expect(trackRecordText(record, 'es')).toBe('Fiabilidad del método: …');
+    expect(trackRecordText(record, 'en')).toBe('Method track record: …');
+    expect(trackRecordText({ message_es: 'Fiabilidad del método: …' }, 'en')).toBe('Fiabilidad del método: …');
+    expect(trackRecordText(null, 'es')).toBeNull();
+    expect(trackRecordText(undefined, 'es')).toBeNull();
+    expect(trackRecordText({ message_es: '' }, 'es')).toBeNull();
   });
 });

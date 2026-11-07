@@ -46,6 +46,7 @@ from app.valuation.point_in_time import (
     assert_period_no_lookahead,
     resolve_as_of,
 )
+from app.valuation.track_record import dcf_track_record
 
 
 def _free_data_trace(db: Session, company: Company) -> dict | None:
@@ -821,6 +822,11 @@ class ValuationService:
             for key, value in currency_gate.items()
             if key not in {"price_to_reporting", "reporting_to_listing"}
         }
+
+        # Cuánto pesar el número: historial medido del DCF estándar (solo ese motor).
+        track_record = dcf_track_record(result)
+        if track_record is not None:
+            result["track_record"] = track_record
 
         # Ensure contract fields always present for API / thesis consumers.
         result.setdefault("status", "ok")

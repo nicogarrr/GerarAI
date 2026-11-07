@@ -12,7 +12,7 @@ import { paginateAll } from '@/lib/paginate-all';
 import type { components } from '@/lib/research/openapi.generated';
 import type { JournalFairValue, JournalTrade } from '@/lib/research/journal-trade';
 import type { ResearchTtm } from '@/lib/research/ttm-display';
-import type { ValuationMethodLike } from '@/lib/research/valuation-method';
+import type { TrackRecordLike, ValuationMethodLike } from '@/lib/research/valuation-method';
 
 
 type ResearchCompany = {
@@ -167,6 +167,8 @@ export type ResearchValuation = {
   plausibility_warning?: ValuationMethodLike['plausibility_warning'];
   /** Rango DCF + múltiplos de comparables (contraste, no valor publicado). */
   fair_value_range?: ValuationMethodLike['fair_value_range'];
+  /** Fiabilidad histórica del DCF estándar: cuánto se alejó el precio del valor en el backtest. */
+  track_record?: TrackRecordLike;
   reverse_dcf: {
     status?: string;
     out_of_bounds?: boolean;
