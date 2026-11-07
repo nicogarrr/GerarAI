@@ -39,7 +39,8 @@ def test_monitor_twenty_companies_has_constant_query_count():
     # 9 consultas anteriores + 4 GROUP BY de frescura: financial_facts,
     # news_events, documents y market_prices (cierre oficial). Las cuatro
     # son batch, sin N+1. Se conserva igualdad con 1 y 20 empresas.
-    assert len(statements) == 13
+    # +1: comparables del puesto relativo (una consulta para todo el universo).
+    assert len(statements) == 14
     assert len(result["items"]) == 20
     for row in result["items"].values():
         assert row["low_52w"] == 80
@@ -52,7 +53,7 @@ def test_monitor_twenty_companies_has_constant_query_count():
         assert row["valuation_side"] == "infravalorada"
     statements.clear()
     asyncio.run(watchlist.watchlist_monitor(tickers="BATCH0", db=db))
-    assert len(statements) == 13
+    assert len(statements) == 14
     db.close()
 
 
