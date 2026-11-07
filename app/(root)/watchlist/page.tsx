@@ -9,6 +9,7 @@ import { getWatchlistState, getWatchlistEntryData, getWatchlistMonitor, type Wat
 import { getResearchCompaniesBasics, getResearchCompanyBasics, type ResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
 import { getProfile } from '@/lib/actions/finnhub.actions';
 import { isTickerNotFound } from '@/lib/watchlist/lookup-status';
+import { valueRankKey, valueRankSummary } from '@/lib/watchlist/value-rank';
 import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
@@ -276,10 +277,11 @@ export default async function WatchlistPage({
     const sortIndicator = (key: SortKey) =>
         sort === key ? <span aria-hidden="true" className="text-teal-400">{dir === 'asc' ? '▲' : '▼'}</span> : null;
     // Solo cuentan tickers con valor justo ÚNICO (tesis publicada de K o motor,
-    // misma cifra que inicio y screener); sin valoración no se juzga caro/barato.
-    const undervaluedCount = watchlistStocks.filter((stock) => stock.monitor?.valuation_side === 'infravalorada').length;
-    const overvaluedCount = watchlistStocks.filter((stock) => stock.monitor?.valuation_side === 'sobrevalorada').length;
-    const judged = watchlistStocks.filter((stock) => stock.monitor?.valuation_side);
+    // misma cifra que inicio y screener) y puesto frente al resto de empresas
+    // valoradas: «infravalorada/sobrevalorada» (valor > precio) no anticipaba
+    // nada a 12 meses; el puesto relativo sí ordenó a 24 (lib/watchlist/value-rank.ts).
+    const rankSummary = valueRankSummary(watchlistStocks.map((stock) => stock.monitor?.valuation_rank));
+    const judged = watchlistStocks.filter((stock) => valueRankKey(stock.monitor?.valuation_rank) !== null);
     const byThesis = judged.filter((stock) => stock.monitor?.fair_value_source === 'tesis').length;
     const byEngine = judged.length - byThesis;
     const fairValueSourceNote = [
@@ -313,6 +315,17 @@ export default async function WatchlistPage({
     const formatPriceCell = (price: number | null, currency: string | null) =>
         price === null ? NA : currency ? formatPrice(price, currency) : formatNumber(price);
 
+    const valueRankNote = (stock: WatchlistStock) => {
+        const rank = stock.monitor?.valuation_rank;
+        const key = valueRankKey(rank);
+        if (!rank || !key) return null;
+        return (
+            <span className="block text-[11px] text-gray-500" title={t('watchlist.page.fairValue.rankTitle', { peers: rank.peers, pct: rank.cheaper_than_pct })}>
+                {t(key)}
+            </span>
+        );
+    };
+
     const dca = await dcaPromise;
     const dcaBySymbol = new Map<string, DcaSignalItem>((dca.data?.items ?? []).map((item) => [item.symbol.toUpperCase(), item]));
     const dcaSignalMonths = dca.data?.signal_months ?? null;
@@ -326,9 +339,9 @@ export default async function WatchlistPage({
                         <Eye className="h-5 w-5 shrink-0 text-purple-400" aria-hidden="true" />
                         Watchlist
                     </h1>
-                    {undervaluedCount + overvaluedCount > 0 ? (
+                    {rankSummary.ranked > 0 ? (
                         <p className="text-xs text-gray-500">
-                            {t('watchlist.page.fairValue.summary', { source: fairValueSourceNote, under: undervaluedCount, over: overvaluedCount })}
+                            {t('watchlist.page.fairValue.summary', { source: fairValueSourceNote, peers: rankSummary.peers, cheap: rankSummary.cheap, dear: rankSummary.dear })}
                         </p>
                     ) : null}
                 </div>
@@ -407,7 +420,7 @@ export default async function WatchlistPage({
                                         >
                                             {stock.symbol}
                                         </Link>
-                                        {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <p className="truncate text-xs text-gray-500" title={stock.name}>{stock.name}</p> : null}<TrackedAnalysisStatus analysis={stock.analysis} locale={locale} /><DcaLevelBadge item={dcaBySymbol.get(stock.symbol.toUpperCase())} signalMonths={dcaSignalMonths} compact />
+                                        {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <p className="truncate text-xs text-gray-500" title={stock.name}>{stock.name}</p> : null}<TrackedAnalysisStatus analysis={stock.analysis} locale={locale} /><DcaLevelBadge item={dcaBySymbol.get(stock.symbol.toUpperCase())} signalMonths={dcaSignalMonths} compact />{valueRankNote(stock)}
                                         {stock.notFound ? (
                                             <Badge variant="outline" className="mt-1 border-amber-800/60 text-amber-300/90" title={t('watchlist.page.notFound.title')}>
                                                 {t('watchlist.page.notFound.label')}
@@ -524,7 +537,7 @@ export default async function WatchlistPage({
                                                             </Badge>
                                                         ) : null}
                                                     </div>
-                                                    {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <div className="max-w-[150px] truncate text-xs text-gray-500" title={stock.name}>{stock.name}</div> : null}<TrackedAnalysisStatus analysis={stock.analysis} locale={locale} /><DcaLevelBadge item={dcaBySymbol.get(stock.symbol.toUpperCase())} signalMonths={dcaSignalMonths} compact />
+                                                    {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <div className="max-w-[150px] truncate text-xs text-gray-500" title={stock.name}>{stock.name}</div> : null}<TrackedAnalysisStatus analysis={stock.analysis} locale={locale} /><DcaLevelBadge item={dcaBySymbol.get(stock.symbol.toUpperCase())} signalMonths={dcaSignalMonths} compact />{valueRankNote(stock)}
                                                 </div>
                                             </Link>
                                             <div className="ml-2 flex items-center gap-1">

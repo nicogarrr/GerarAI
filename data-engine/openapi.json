@@ -24396,6 +24396,16 @@
             ],
             "title": "Next Earnings Source"
           },
+          "valuation_rank": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WatchlistValuationRankOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "valuation_side": {
             "anyOf": [
               {
@@ -24453,6 +24463,38 @@
           "earnings_status"
         ],
         "title": "WatchlistMonitorOut",
+        "type": "object"
+      },
+      "WatchlistValuationRankOut": {
+        "description": "Puesto por valor justo / precio frente a las empresas valoradas por el motor.",
+        "properties": {
+          "cheaper_than_pct": {
+            "description": "% de comparables con un valor/precio menor",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Cheaper Than Pct",
+            "type": "integer"
+          },
+          "peers": {
+            "description": "Empresas comparadas",
+            "minimum": 1.0,
+            "title": "Peers",
+            "type": "integer"
+          },
+          "quintile": {
+            "description": "1 = el 20 % m\u00e1s barato; 5 = el 20 % m\u00e1s caro",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Quintile",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "quintile",
+          "cheaper_than_pct",
+          "peers"
+        ],
+        "title": "WatchlistValuationRankOut",
         "type": "object"
       },
       "WhatToBelieve": {

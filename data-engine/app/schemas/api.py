@@ -2157,6 +2157,14 @@ class WatchlistItemOut(BaseModel):
 # (no cerrado: str honesto).
 
 
+class WatchlistValuationRankOut(BaseModel):
+    """Puesto por valor justo / precio frente a las empresas valoradas por el motor."""
+
+    quintile: int = Field(ge=1, le=5, description="1 = el 20 % más barato; 5 = el 20 % más caro")
+    cheaper_than_pct: int = Field(ge=0, le=100, description="% de comparables con un valor/precio menor")
+    peers: int = Field(ge=1, description="Empresas comparadas")
+
+
 class WatchlistMonitorItemOut(BaseModel):
     low_52w: float | None
     low_52w_date: str | None
@@ -2171,6 +2179,7 @@ class WatchlistMonitorItemOut(BaseModel):
     fair_value_publishable: bool
     fair_value_reason: str | None
     valuation_side: Literal["infravalorada", "sobrevalorada"] | None
+    valuation_rank: WatchlistValuationRankOut | None = None
     currency: str | None
     next_earnings_date: str | None
     next_earnings_source: str | None

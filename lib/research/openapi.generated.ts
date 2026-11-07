@@ -14710,6 +14710,7 @@ export interface components {
             next_earnings_date: string | null;
             /** Next Earnings Source */
             next_earnings_source: string | null;
+            valuation_rank?: components["schemas"]["WatchlistValuationRankOut"] | null;
             /** Valuation Side */
             valuation_side: ("infravalorada" | "sobrevalorada") | null;
         };
@@ -14721,6 +14722,27 @@ export interface components {
             items: {
                 [key: string]: components["schemas"]["WatchlistMonitorItemOut"];
             };
+        };
+        /**
+         * WatchlistValuationRankOut
+         * @description Puesto por valor justo / precio frente a las empresas valoradas por el motor.
+         */
+        WatchlistValuationRankOut: {
+            /**
+             * Cheaper Than Pct
+             * @description % de comparables con un valor/precio menor
+             */
+            cheaper_than_pct: number;
+            /**
+             * Peers
+             * @description Empresas comparadas
+             */
+            peers: number;
+            /**
+             * Quintile
+             * @description 1 = el 20 % más barato; 5 = el 20 % más caro
+             */
+            quintile: number;
         };
         /** WhatToBelieve */
         WhatToBelieve: {
