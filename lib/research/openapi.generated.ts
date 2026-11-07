@@ -14599,6 +14599,10 @@ export interface components {
             trace: {
                 [key: string]: unknown;
             };
+            /** Track Record */
+            track_record?: {
+                [key: string]: unknown;
+            } | null;
             /** Valuation Label */
             valuation_label?: string | null;
             /**

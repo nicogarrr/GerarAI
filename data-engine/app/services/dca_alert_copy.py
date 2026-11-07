@@ -12,6 +12,7 @@ la alerta; con "en" todo el texto sale en ingles y el espanol no cambia.
 
 from __future__ import annotations
 
+import math
 from html import escape
 from typing import Any
 
@@ -124,6 +125,47 @@ def drop_note(dca: dict[str, Any], language: str = "es") -> str | None:
     return f"Aviso informativo: el nivel baja{origin} a {label}."
 
 
+# Mismo umbral que el reparto del plan (plan_contribution_split.LOW_VOLATILITY_THRESHOLD).
+LOW_VOLATILITY_THRESHOLD = 0.25
+
+
+def low_volatility_note(dca: dict[str, Any], language: str = "es") -> str | None:
+    """Linea para un aviso 2X-4X en un valor poco volatil (vol anual < 25 %).
+
+    Backtest gerarai-dcavalor1 (7-nov-2026, 491 valores del S&P 500): en esos
+    valores 2X-4X no han rendido mas que 1X a 12 meses, en 1996-2012 ni en
+    2013-2025, y el reparto del plan los pesa como 1X. El aviso se envia igual;
+    solo se dice. Sin vol legible, en 1X, en recorte o en una bajada: nada.
+    """
+    if is_drop(dca):
+        return None
+    try:
+        level = int(dca.get("level"))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if level < 2:
+        return None
+    raw = (dca.get("metrics") or {}).get("vol")
+    if isinstance(raw, bool):
+        return None
+    try:
+        vol = float(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(vol) or vol <= 0 or vol >= LOW_VOLATILITY_THRESHOLD:
+        return None
+    pct = percent_es(vol, language=language)
+    if _en(language):
+        return (
+            f"Low-volatility stock (vol {pct} a year): in stocks like this, 2X–4X have not returned more "
+            "than 1X over 12 months (backtest 1996–2025). The plan split weights it as 1X."
+        )
+    return (
+        f"Valor poco volátil (vol {pct} anual): en valores así, 2X–4X no han rendido más que 1X "
+        "a 12 meses (backtest 1996–2025). En el reparto del plan pesa como 1X."
+    )
+
+
 def signal_metric(dca: dict[str, Any], language: str = "es") -> tuple[str, str] | None:
     """(etiqueta, valor) de la metrica que decide el nivel de compra."""
     en = _en(language)
@@ -186,6 +228,9 @@ def message_text(dca: dict[str, Any], language: str = "es") -> str:
     if note:
         lines += [note, ""]
     lines += [f"{label}: {value}" for label, value in detail_rows(dca, language)]
+    low_vol = low_volatility_note(dca, language)
+    if low_vol:
+        lines += ["", low_vol]
     if dca.get("status") == "forming":
         lines += ["", FORMING_NOTE_EN if en else FORMING_NOTE]
     lines += ["", DISCLAIMER_EN if en else DISCLAIMER]
@@ -220,6 +265,11 @@ def email_content(dca: dict[str, Any], language: str = "es") -> EmailContent:
         f"color:{escape(fg)};font-weight:700;border:1px solid #d0d0d0\">{escape(level_label(dca['label'], language))}</span>"
         + (f"<p style=\"margin:12px 0 0;color:#555\">{escape(drop_note(dca, language) or '')}</p>" if is_drop(dca) else "")
         + f"<table style=\"margin-top:16px;border-collapse:collapse\">{rows_html}</table>"
+        + (
+            f"<p style=\"font-size:12px;color:#555;margin:12px 0 0\">{escape(low_vol_note)}</p>"
+            if (low_vol_note := low_volatility_note(dca, language))
+            else ""
+        )
         + forming_note
         + f"<p style=\"font-size:11px;color:#777;margin:20px 0 0\">{escape(DISCLAIMER_EN if en else DISCLAIMER)} "
         f"{escape(FOOTER_EN if en else FOOTER)}</p>"

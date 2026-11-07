@@ -23941,6 +23941,18 @@
             "title": "Trace",
             "type": "object"
           },
+          "track_record": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Track Record"
+          },
           "valuation_label": {
             "anyOf": [
               {
