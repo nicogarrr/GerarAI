@@ -880,3 +880,14 @@ def test_trivy_install_is_pinned_verified_and_shared_by_all_scanners():
     assert len(scanners) == 3
     assert all(s["with"]["skip-setup-trivy"] is True for s in scanners)
     assert steps.index(installer) < min(steps.index(s) for s in scanners)
+
+
+def test_frontend_stages_install_the_alpine_zlib_security_fix():
+    """CVE-2026-4738 must be fixed in the image, never hidden by policy."""
+    production = (REPO / "Dockerfile").read_text(encoding="utf-8")
+    base_stage = production.split("FROM node:22-alpine AS base", 1)[1].split("FROM base AS deps", 1)[0]
+    assert re.search(r'RUN apk add --no-cache --upgrade "zlib>=1\.4-r0"', base_stage)
+    assert "FROM base AS runner" in production
+    development = (REPO / "Dockerfile.dev").read_text(encoding="utf-8")
+    assert re.search(r'RUN apk add --no-cache --upgrade libc6-compat "zlib>=1\.4-r0"', development)
+    assert development.index('"zlib>=1.4-r0"') < development.index("USER node")

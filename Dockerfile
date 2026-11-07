@@ -4,6 +4,9 @@
 
 FROM node:22-alpine AS base
 
+# Alpine fixes CVE-2026-4738 in zlib 1.4-r0. All stages inherit it.
+RUN apk add --no-cache --upgrade "zlib>=1.4-r0"
+
 # Instalar dependencias solo cuando sea necesario
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
