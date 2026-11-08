@@ -550,11 +550,26 @@ def _pytest_command(*, extra: list[str] | None) -> list[str]:
     return cmd
 
 
+# Modulos vigilados, precalculados para casar classnames de JUnit: pytest
+# escribe el modulo y, si el test vive en una clase, la clase detras
+# (tests.test_queue_watchdog.TestWatchdog): casa por prefijo de modulo.
+_SKIP_GUARD_MODULES: frozenset[str] = frozenset(
+    f[:-3].replace("/", ".") for f in SKIP_GUARD_FILES
+)
+
+
+def _classname_vigilado(classname: str) -> bool:
+    return any(
+        classname == module or classname.startswith(module + ".")
+        for module in _SKIP_GUARD_MODULES
+    )
+
+
 def skipped_guard_failures(junit_path: Path | str = JUNIT_REPORT) -> list[str]:
     """Nodeids de SKIP_GUARD_FILES que aparecen como skipped en el JUnit.
 
-    Fail-closed como el resto del gate: JUnit ausente o corrupto es un
-    GateConfigError (pytest no llego a escribirlo: la corrida no es fiable).
+    JUnit ausente, corrupto o XML que no es JUnit (raiz distinta de
+    testsuite/testsuites) es un GateConfigError: la corrida no es fiable.
     """
     from defusedxml import ElementTree
 
@@ -565,18 +580,25 @@ def skipped_guard_failures(junit_path: Path | str = JUNIT_REPORT) -> list[str]:
         root = ElementTree.parse(str(path)).getroot()
     except Exception as exc:
         raise GateConfigError(f"informe JUnit ilegible: {path}: {exc}") from exc
+    root_tag = str(root.tag).split("}")[-1]  # por si viene con namespace
+    if root_tag not in ("testsuite", "testsuites"):
+        raise GateConfigError(
+            f"el informe no es JUnit (raiz <{root_tag}>): {path}"
+        )
     failures: list[str] = []
     for testcase in root.iter("testcase"):
         if testcase.find("skipped") is None:
             continue
         classname = str(testcase.get("classname") or "")
-        file_path = classname.replace(".", "/") + ".py"
-        if file_path in SKIP_GUARD_FILES:
+        if _classname_vigilado(classname):
             failures.append(f"{classname}::{testcase.get('name')}")
     return failures
 
 
 def run_pytest(*, extra: list[str] | None = None) -> int:
+    # Sin borrar el JUnit de la corrida anterior, una corrida que muere antes
+    # de escribirlo dejaria al guard leyendo los skips de ayer.
+    JUNIT_REPORT.unlink(missing_ok=True)
     return subprocess.call(_pytest_command(extra=extra), cwd=str(ENGINE_ROOT))
 
 
