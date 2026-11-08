@@ -18,14 +18,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.i18n import generation_language
 from app.core.local_date import local_today
 from app.models import ResearchAlert
 from app.services.date_format import readable_date
+from app.services.in_app_alerts import insert_alert_once
 
 VERSION = "macro-event-v1"
 ET = ZoneInfo("America/New_York")
@@ -139,11 +138,6 @@ def emit_macro_reminders(db: Session, events: list[dict[str, Any]], now: datetim
             continue
         for window in due_windows(event, now):
             fingerprint = f"{VERSION}:{tenant_id}:{event['kind']}:{event['date']}:{window}"
-            if db.scalar(select(ResearchAlert.id).where(
-                ResearchAlert.tenant_id == tenant_id, ResearchAlert.fingerprint == fingerprint,
-            )) is not None:
-                existing += 1
-                continue
             title, message = _message(event, window, now, language)
             alert = ResearchAlert(
                 tenant_id=tenant_id, company_id=None, severity="medium", status="open",
@@ -155,13 +149,9 @@ def emit_macro_reminders(db: Session, events: list[dict[str, Any]], now: datetim
                            "source_url": event.get("source_url"), "label": event.get("label"),
                            **({"language": language} if language != "es" else {})},
             )
-            try:
-                with db.begin_nested():
-                    db.add(alert)
-                    db.flush()
-            except IntegrityError:
+            if insert_alert_once(db, alert):
+                created.append(alert.id)
+            else:
                 existing += 1
-                continue
-            created.append(alert.id)
     db.commit()
     return {"created": len(created), "existing": existing, "alert_ids": created}

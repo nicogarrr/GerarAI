@@ -5,6 +5,9 @@ emisión copiada a mano: dedup por fingerprint (select previo + carrera con
 IntegrityError), inserción con savepoint y un único commit al final. Aquí
 vive una sola copia; cada watchdog conserva su fingerprint, su mensaje y su
 metadata (eso es dominio, no andamio).
+
+``insert_alert_once`` es la primitiva compartida de esa cola; también la usa
+``macro_reminders`` (misma dedup por fingerprint sobre ResearchAlert).
 """
 
 from __future__ import annotations
@@ -32,6 +35,33 @@ class InAppAlert:
     metadata: dict[str, Any]
 
 
+def insert_alert_once(db: Session, alert: ResearchAlert) -> bool:
+    """Graba ``alert`` si no hay ya una fila con su (tenant, fingerprint).
+
+    Devuelve ``True`` si la fila es nueva. Idempotente: dedup por
+    fingerprint (select previo, o IntegrityError si otra corrida gana la
+    carrera, bajo savepoint). No commitea: el caller hace un único commit
+    al final de su lote (un rollback no consume transiciones).
+    """
+    if (
+        db.scalar(
+            select(ResearchAlert.id).where(
+                ResearchAlert.tenant_id == alert.tenant_id,
+                ResearchAlert.fingerprint == alert.fingerprint,
+            )
+        )
+        is not None
+    ):
+        return False
+    try:
+        with db.begin_nested():
+            db.add(alert)
+            db.flush()
+    except IntegrityError:
+        return False
+    return True
+
+
 def persist_in_app_alerts(
     db: Session,
     *,
@@ -50,17 +80,6 @@ def persist_in_app_alerts(
     created: list[int] = []
     existing = 0
     for item in alerts:
-        if (
-            db.scalar(
-                select(ResearchAlert.id).where(
-                    ResearchAlert.tenant_id == tenant_id,
-                    ResearchAlert.fingerprint == item.fingerprint,
-                )
-            )
-            is not None
-        ):
-            existing += 1
-            continue
         alert = ResearchAlert(
             tenant_id=tenant_id,
             company_id=None,
@@ -74,13 +93,9 @@ def persist_in_app_alerts(
             last_triggered_at=now,
             metadata_=item.metadata,
         )
-        try:
-            with db.begin_nested():
-                db.add(alert)
-                db.flush()
-        except IntegrityError:
+        if insert_alert_once(db, alert):
+            created.append(alert.id)
+        else:
             existing += 1
-            continue
-        created.append(alert.id)
     db.commit()
     return created, existing
