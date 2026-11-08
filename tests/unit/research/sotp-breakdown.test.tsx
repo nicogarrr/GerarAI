@@ -128,3 +128,30 @@ describe('SotpBreakdownView', () => {
     expect(screen.getByRole('button', { name: 'Generar con expertos' })).toBeTruthy();
   });
 });
+
+describe('SotpBreakdownView · cuentas británicas escaneadas', () => {
+  it('muestra cada cifra con su página enlazada, la línea literal y la comprobación del balance', () => {
+    const doc = 'https://find-and-update.company-information.service.gov.uk/company/15884169/filing-history/TX/document?format=pdf&download=0';
+    const withCh = {
+      ...data,
+      companies_house: [{
+        company_name: 'BRIT GROUP HOLDINGS LIMITED', company_number: '15884169', made_up_to: '2025-12-31', document_url: doc,
+        status: 'ok', page_count: 193,
+        checks: { balance: { ok: true, why: 'activo 9681.1 = pasivo 6957.3 + patrimonio 2723.8', pages: [78] } },
+        figures: [
+          { metric: 'total_equity', label: 'Total equity', value: 2723.8, unit: '$m', currency: 'USD', period_end: '2025-12-31', page: 78, line: 'Total equity . - 2,723.8 2,291.6 .', page_url: `${doc}#page=78` },
+          { metric: 'cash', label: 'Cash and cash equivalents', value: 577.2, unit: '$m', currency: 'USD', period_end: '2025-12-31', page: 78, line: 'Cash and cash equivalents 24 577.2 476.4', page_url: `${doc}#page=78` },
+        ],
+        rejected: [],
+      }],
+    } as SotpResponse;
+    render(<SotpBreakdownView data={withCh} t={createTranslator('es')} fmt={createFormatters('es')} locale="es" ticker="FFH.TO" editable={false} />);
+    const box = screen.getByTestId('sotp-companies-house');
+    expect(box.textContent).toContain('Cuentas británicas escaneadas (Companies House)');
+    expect(box.textContent).toContain('Patrimonio total: 2.723,8 $m');
+    expect(box.textContent).toContain('«Cash and cash equivalents 24 577.2 476.4»');
+    expect(box.textContent).toContain('Comprobación: activo 9681.1 = pasivo 6957.3 + patrimonio 2723.8');
+    const pageLinks = within(box).getAllByRole('link', { name: 'pág. 78' });
+    expect(pageLinks[0].getAttribute('href')).toBe(`${doc}#page=78`);
+  });
+});

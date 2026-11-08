@@ -1,0 +1,54 @@
+22 Strategic Report | Corporate Governance | Financial Statements
+GROUP BALANCE SHEET
+AS AT 04 JANUARY 2026
+04 January 2026 29 December 2024
+Note im tm
+Fixed assets
+Property, plant and equipment i) 3,873.5 3,953.4
+Investment property : 12 13.5 115
+Right-of-use assets 20 412.0 428.6
+Intangibles 10 40.8 13.8
+Goodwill 10 802.6 802.6
+Other financial assets . 13 97 9.4
+Trade and other receivables 16 32.2 30.6
+Post-employment assets 8 /  * §6.2 48.4
+5,240.5 5,298.3
+Current assets
+Inventories {5 49.9 56.2
+Other financial assets 3 45 49
+Income tax receivable 9 5.6 13.3
+_ Trade and other receivables 16 88.8 90.5
+Prepayments 28.7 27.9
+Cash and cash equivalents 17 132.6 104.5
+310.1 297.3
+Property, plant and equipment held for sale 18 13.2 42
+323.3 301.5
+Total assets 5,563.8 5,599.8
+Current liabilities
+Borrowings 21 (482.4) (953.9)
+Lease liabilities 20 (34.4) (25.1)
+Derivative financial instruments 22 (3.0) (1.0)
+Trade and other payables 19 (458.0) (450.1)
+Provisions 23 (2.9) (10.9)
+(980.7) (1,441.0)
+Non-current liabilities ,
+Borrowings 2I (1,724.4) (1,268.3)
+Lease Liabilities 20 (452.5) (465.6) ,
+Derivative financial instruments 22 (12.5) (12.9)
+Deferred tax liabilities 9 (90.2) (76.7)
+Provisions 23 (1.7) (1.5)
+(2,281.3) (1,825.0)
+Total liabilities (3,262.0) (3,266.0)
+Net assets 2,301.8 2,333.8
+Issued capital and reserves
+Share capital 24 39.0 39.0
+Share premium 25 1,184.4 1,184.4
+Merger reserve 25 752.0 752.0
+Capital redemption reserve 25 3.3 3.3
+Hedging reserve 22 (11.5) (10.4)
+Retained earnings 334.6 365.5
+Total equity 2,301.8 2,333.8
+The notes on pages 25 to 62 form part of these financial statements.
+The financial statements were approved by the board of directors and authorised for issue on 29 April 2026. They were signed on its behalf by
+Jonathan Fearn
+Director

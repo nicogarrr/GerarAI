@@ -359,13 +359,19 @@ class ThesisEvidenceService:
         Las grandes van en PDF escaneado: la ingesta normal (con OCR) las deja citables por
         pagina, con el nombre de la filial en el titulo para que nadie las tome por las del
         holding. Apagado sin ``COMPANIES_HOUSE_API_KEY``; nunca tumba la tesis."""
-        from app.services.companies_house_evidence import subsidiary_hints, subsidiary_reports
+        from app.services.companies_house_evidence import (
+            queue_scanned_reads,
+            subsidiary_hints,
+            subsidiary_reports,
+        )
 
         if not company.name:
             return []
         try:
             hints = subsidiary_hints(db, company, db.info.get("tenant_id"))
             result = self._fetch_uk_group(company, hints)
+            # Las escaneadas (sin iXBRL ni texto) se leen por OCR en el worker: cifras con pagina.
+            queue_scanned_reads(result, company.ticker)
         except Exception as exc:  # noqa: BLE001 - best-effort
             _log_source_failure("Companies House (filiales britanicas)", company.ticker, exc)
             return []

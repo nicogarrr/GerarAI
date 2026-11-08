@@ -19,7 +19,7 @@ import yaml
 COMPOSE_PATH = Path(__file__).resolve().parents[2] / "docker-compose.prod.yml"
 WORKERS_PATH = Path(__file__).resolve().parents[1] / "app" / "workers" / "dramatiq_app.py"
 
-ACTORES_DOCUMENTOS = ["process_document", "process_document_structured"]
+ACTORES_DOCUMENTOS = ["process_document", "process_document_structured", "extract_scanned_accounts"]
 
 
 class _ComposeLoader(yaml.SafeLoader):

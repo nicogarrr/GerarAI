@@ -333,7 +333,72 @@ async def latest_accounts(client: CompaniesHouseClient, member: GroupMember) -> 
             out["figures"] = figures_from_ixbrl(await client.document_content(meta, IXBRL_MIME))
         except (CompaniesHouseError, ValueError, SyntaxError) as exc:
             out["figures_error"] = type(exc).__name__
+    elif PDF_MIME in out["formats"] and tx:
+        attach_scanned_figures(out)
     return out
+
+
+PDF_MIME = "application/pdf"
+#: Etiquetas de las cifras leidas de las cuentas escaneadas (estados primarios).
+SCANNED_LABELS = {
+    "revenue": "ingresos / primas", "profit_before_tax": "resultado antes de impuestos",
+    "profit_for_year": "resultado del ejercicio", "profit_attributable": "resultado atribuible",
+    "total_equity": "patrimonio total", "equity_attributable": "patrimonio atribuible",
+    "net_assets": "activos netos (NAV)", "cash": "caja y equivalentes", "borrowings": "deuda financiera",
+}
+
+
+def attach_scanned_figures(row: dict[str, Any]) -> None:
+    """Cifras con pagina de unas cuentas en PDF escaneado, si el worker ya las leyo (cache).
+
+    Sin lectura: ``scanned.status = pending`` (la encola :func:`queue_scanned_reads`)."""
+    from app.services import scanned_accounts
+
+    cached = scanned_accounts.load_cached(str(row["company_number"]), row.get("made_up_to"))
+    if not cached:
+        row["scanned"] = {"status": "pending"}
+        return
+    doc = row.get("document_url")
+    row["scanned"] = {"status": cached.get("status"), "reason": cached.get("reason"),
+                      "checks": cached.get("checks"), "statements": cached.get("statements"),
+                      "rejected": [{"metric": f.get("metric"), "page": f.get("page"), "reason": f.get("reason")}
+                                   for f in cached.get("rejected") or []]}
+    row["figures"] = [
+        {"metric": f["metric"], "label": SCANNED_LABELS.get(f["metric"], f["metric"]), "value": f["value"],
+         "value_millions": f.get("value_millions"), "currency": f.get("currency"), "unit": f.get("unit"),
+         "period_end": f.get("period_end"), "concept": f"pág. {f['page']}: «{f['label']}»",
+         "page": f.get("page"), "line": f.get("line"), "basis": f.get("basis"), "check": f.get("check"),
+         "page_url": scanned_accounts.page_url(doc, f.get("page")), "source": "ocr"}
+        for f in cached.get("figures") or [] if f.get("value") is not None
+    ]
+
+
+def scanned_targets(result: dict[str, Any] | None, *, limit: int = 3) -> list[dict[str, Any]]:
+    """Cuentas en PDF escaneado que merece la pena leer: las del propio emisor (nombre exacto)
+    y las consolidadas de sus filiales (:func:`subsidiary_reports`)."""
+    rows = [m for m in (result or {}).get("members") or [] if m.get("via") == "nombre exacto del holding"]
+    rows += subsidiary_reports(result or {}, limit=limit)
+    return [m for m in rows if (m.get("scanned") or {}).get("status") == "pending" and m.get("document_url")][:limit]
+
+
+def queue_scanned_reads(result: dict[str, Any] | None, ticker: str | None) -> int:
+    """Encola (una vez) la lectura OCR de las cuentas escaneadas del grupo; devuelve cuantas."""
+    from app.services import scanned_accounts
+
+    sent = 0
+    for row in scanned_targets(result):
+        number, made_up = str(row["company_number"]), row.get("made_up_to")
+        if not scanned_accounts.claim_pending(number, made_up):
+            continue
+        try:
+            from app.workers.dramatiq_app import extract_scanned_accounts
+
+            extract_scanned_accounts.send(number, made_up, str(row["document_url"]),
+                                          str(row.get("company_name") or ""), ticker)
+            sent += 1
+        except Exception:  # noqa: BLE001 - sin broker la cuenta queda pendiente
+            continue
+    return sent
 
 
 async def group_accounts(client: CompaniesHouseClient, *, holding_name: str, hints: list[str] | tuple[str, ...] = (),
@@ -373,8 +438,11 @@ def collect_group_accounts(holding_name: str, hints: list[str] | tuple[str, ...]
     now = time.monotonic()
     with _CACHE_LOCK:
         hit = _CACHE.get(key)
-        if hit and now - hit[0] < CACHE_TTL_S:
-            return hit[1]
+    if hit and now - hit[0] < CACHE_TTL_S:
+        for row in hit[1].get("members") or []:
+            if (row.get("scanned") or {}).get("status") == "pending":
+                attach_scanned_figures(row)  # el worker pudo terminar la lectura OCR despues
+        return hit[1]
     ch = client or client_from_settings()
     if ch is None:
         return None
@@ -458,6 +526,9 @@ async def issuer_annual_accounts(client: CompaniesHouseClient, holding_name: str
 
 
 __all__ = [
+    "attach_scanned_figures",
+    "queue_scanned_reads",
+    "scanned_targets",
     "FIGURE_CONCEPTS",
     "GroupMember",
     "collect_group_accounts",
