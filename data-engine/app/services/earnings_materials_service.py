@@ -9,11 +9,17 @@ Reglas (comprobadas con 8-K reales de TSLA, META y ASTS el 21-oct-2026):
   del evento (presentado entre D y D+2), no por "el ultimo 2.02".
 - EX-99.1/99.2 no dicen si es nota o presentacion (Tesla trae el deck en 99.1, META solo
   la nota, ASTS nota en 99.1 y deck en 99.2): se clasifica por el encabezado real.
-- Solo se enlaza un documento si su propio texto confirma el periodo del evento; si lo
-  contradice o no lo confirma, ante la duda no hay enlace.
+- Solo se enlaza un documento si su propio texto confirma el periodo del evento en contexto
+  (cierre con "ended" o trimestre con año); una fecha suelta de portada no confirma y un
+  "ended" de otro periodo contradice aunque la portada lleve la fecha del cierre. Ante la
+  duda no hay enlace.
+- Emisores extranjeros (6-K/20-F/40-F, sin Item 2.02): se empareja el 6-K de la ventana
+  D..D+2 y el periodo lo confirma el propio documento, igual que con el 8-K. Como el 6-K
+  de resultados es voluntario, si no hay 6-K en ventana o ningun documento confirma el
+  periodo no se afirma nada (``sin_cobertura_sec``, no ``sin_filing``).
 - Estados: ``ok``, ``sin_filing`` (leido bien, emisor domestico, nada en D..D+2),
   ``no_disponible`` (fallo de red/SEC: NO es ausencia), ``sin_cobertura_sec`` (emisor
-  extranjero, ticker sin CIK o fecha estimada) y ``periodo_no_coincide``.
+  extranjero sin 6-K verificado, ticker sin CIK o fecha estimada) y ``periodo_no_coincide``.
 """
 
 from __future__ import annotations
@@ -102,17 +108,29 @@ def is_foreign_private_issuer(submissions: dict[str, Any]) -> bool:
     return bool(forms & {"6-K", "20-F", "40-F"}) and not (forms & {"8-K", "10-Q", "10-K"})
 
 
-def pick_results_filing(submissions: dict[str, Any], event_date: date) -> dict[str, str] | None:
-    """8-K con Item 2.02 presentado entre ``event_date`` y +2 dias (el mas cercano; 8-K gana a 8-K/A)."""
+def pick_results_filing(
+    submissions: dict[str, Any],
+    event_date: date,
+    *,
+    forms: tuple[str, ...] = ("8-K", "8-K/A"),
+    require_results_item: bool = True,
+) -> dict[str, str] | None:
+    """Filing de resultados entre ``event_date`` y +2 dias (el mas cercano; la forma base gana a la /A).
+
+    Emisores domesticos: 8-K con Item 2.02. Extranjeros (``forms=("6-K", "6-K/A)",
+    require_results_item=False``): el 6-K no lleva items; la ventana de fechas solo
+    candidata y la confirmacion del periodo la hace el texto del propio documento.
+    """
     recent = (submissions.get("filings") or {}).get("recent") or {}
     best: dict[str, str] | None = None
     last = event_date + timedelta(days=MATCH_WINDOW_AFTER_DAYS)
     for index, form in enumerate(recent.get("form") or []):
-        if form not in ("8-K", "8-K/A"):
+        if form not in forms:
             continue
-        items = [i.strip() for i in str(_col(recent, "items", index) or "").split(",")]
-        if "2.02" not in items:
-            continue
+        if require_results_item:
+            items = [i.strip() for i in str(_col(recent, "items", index) or "").split(",")]
+            if "2.02" not in items:
+                continue
         try:
             filed = date.fromisoformat(str(_col(recent, "filingDate", index)))
         except ValueError:
@@ -121,7 +139,7 @@ def pick_results_filing(submissions: dict[str, Any], event_date: date) -> dict[s
         if not accession or not event_date <= filed <= last:
             continue
         if best is None or filed.isoformat() < best["filed_at"] or (
-            filed.isoformat() == best["filed_at"] and form == "8-K"
+            filed.isoformat() == best["filed_at"] and form == forms[0]
         ):
             best = {"accession": accession, "filed_at": filed.isoformat(), "form": str(form)}
     return best
@@ -150,8 +168,21 @@ def classify_exhibit(head_html: str) -> str:
     return "documento"
 
 
+_ENDED_RE = re.compile(
+    r"(?:quarter|period|months?|semester|year)\s+(?:ended|ending)\s+([a-z]+)\s+\d{1,2},?\s+(\d{4})",
+    re.IGNORECASE,
+)
+
+
 def check_period(doc_html: str, fiscal_label: str | None) -> str:
-    """``confirmado`` / ``contradice`` / ``no_verificado`` frente al cierre del calendario ("Sep/2026")."""
+    """``confirmado`` / ``contradice`` / ``no_verificado`` frente al cierre del calendario ("Sep/2026").
+
+    Confirma solo el periodo declarado en contexto: un "quarter/period/months ended ..." que
+    coincide con el cierre, o el nombre del trimestre con su año ("second quarter 2026"). Una
+    fecha suelta de portada o publicación ("June 5, 2026") NO confirma. Si el texto declara
+    "ended" de otro periodo y ninguno del cierre, contradice aunque la portada lleve una fecha
+    del mes del cierre; las comparativas de otros años no tumban una confirmación real.
+    """
     match = re.match(r"^([A-Za-z]{3})/(\d{4})$", fiscal_label or "")
     if not match:
         return "no_verificado"
@@ -162,15 +193,15 @@ def check_period(doc_html: str, fiscal_label: str | None) -> str:
     year = match.group(2)
     month = _MONTHS[month_index]
     text = _text(doc_html)[:6000].lower()
-    if re.search(rf"{month}\s+\d{{1,2}},?\s+{year}", text):
+    ended_matches = list(_ENDED_RE.finditer(text))
+    if any(m.group(1) == month and m.group(2) == year for m in ended_matches):
         return "confirmado"
+    if any(m.group(1) in _MONTHS for m in ended_matches):
+        return "contradice"
     if month_index % 3 == 2:
         quarter = month_index // 3
         if re.search(rf"\b{_ORDINALS[quarter]} quarter,? (?:of )?{year}\b|\bq{quarter + 1}\s*{year}\b", text):
             return "confirmado"
-    for ended in re.finditer(r"(?:quarter|period|months?)\s+(?:ended|ending)\s+([a-z]+)\s+\d{1,2},?\s+(\d{4})", text):
-        if ended.group(1) in _MONTHS and (ended.group(1) != month or ended.group(2) != year):
-            return "contradice"
     return "no_verificado"
 
 
@@ -199,11 +230,16 @@ async def resolve_materials(
     # Reconstruccion parcial (EFTS) sin items/formas completos: no se puede afirmar nada.
     if not isinstance(submissions, dict) or submissions.get("_fallback"):
         return _result("no_disponible")
-    if is_foreign_private_issuer(submissions):
-        return _result("sin_cobertura_sec")
-    filing = pick_results_filing(submissions, event_date)
+    foreign = is_foreign_private_issuer(submissions)
+    filing = (
+        pick_results_filing(submissions, event_date, forms=("6-K", "6-K/A"), require_results_item=False)
+        if foreign
+        else pick_results_filing(submissions, event_date)
+    )
     if filing is None:
-        return _result("sin_filing")
+        # Domestico sin 8-K 2.02 en ventana: ausencia real. Extranjero sin 6-K: el
+        # furnish de resultados es voluntario, asi que no se afirma ni presencia ni ausencia.
+        return _result("sin_cobertura_sec" if foreign else "sin_filing")
     base = sec.filing_index_url(cik, filing["accession"])
     index_url = f"{base}{filing['accession']}-index.htm"
     try:
@@ -230,6 +266,10 @@ async def resolve_materials(
     if incomplete and not documents:
         return None
     if not documents:
+        if foreign:
+            # Habia un 6-K en la ventana pero ningun documento confirma el periodo: no se
+            # puede afirmar que ese 6-K fuera (ni que no fuera) el de los resultados.
+            return _result("sin_cobertura_sec", filed_at=filing["filed_at"], filing_url=index_url)
         return _result("periodo_no_coincide", filed_at=filing["filed_at"], filing_url=index_url)
     return _result("ok", filed_at=filing["filed_at"], filing_url=index_url, documents=documents)
 

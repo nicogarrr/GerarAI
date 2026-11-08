@@ -105,6 +105,30 @@ def test_period_confirms_contradicts_or_does_not_assert():
     assert svc.check_period("Highlights", None) == "no_verificado"
 
 
+def test_cover_date_never_confirms_and_ended_context_wins():
+    # Repro del auditor: portada de junio + trimestre cerrado en marzo NO es el T2.
+    assert svc.check_period(
+        "PRESS RELEASE June 5, 2026. Reports results for the quarter ended March 31, 2026.", "Jun/2026"
+    ) == "contradice"
+    # Una fecha suelta de portada/publicacion sin contexto no confirma nada.
+    assert svc.check_period("PRESS RELEASE June 5, 2026. Results attached.", "Jun/2026") == "no_verificado"
+    # Las comparativas de otros periodos no tumban una confirmacion real.
+    assert svc.check_period(
+        "results for the quarter ended June 30, 2026, compared with the quarter ended June 30, 2025", "Jun/2026"
+    ) == "confirmado"
+    # Solo periodo de otro año: contradice.
+    assert svc.check_period("results for the quarter ended June 30, 2025", "Jun/2026") == "contradice"
+
+
+def test_domestic_doc_with_cover_date_but_other_period_links_nothing():
+    sec = FakeSEC(TSLA, {
+        "0001628280-26-049213-index.htm": INDEX,
+        "exhibit991.htm": "PRESS RELEASE July 22, 2026. Production update for the quarter ended March 31, 2026.",
+        "deck.htm": "Highlights without any period",
+    })
+    assert _run(sec, date(2026, 7, 22))["status"] == "periodo_no_coincide"
+
+
 def test_ok_links_only_period_confirmed_documents():
     sec = FakeSEC(TSLA, {
         "0001628280-26-049213-index.htm": INDEX,
@@ -134,10 +158,73 @@ def test_unreadable_exhibit_is_not_memoized_as_valid():
 
 def test_estimated_foreign_and_unknown_issuers_assert_nothing():
     assert _run(FakeSEC(TSLA), date(2026, 7, 22), confirmed=False)["status"] == "sin_cobertura_sec"
-    bn = {"filings": {"recent": {"form": ["6-K", "40-F"], "items": ["", ""], "filingDate": ["2026-08-13", "2026-03-01"],
+    bn = {"filings": {"recent": {"form": ["6-K", "40-F"], "items": ["", ""], "filingDate": ["2026-08-10", "2026-03-01"],
                                  "accessionNumber": ["a", "b"]}}}
     assert _run(FakeSEC(bn), date(2026, 8, 13))["status"] == "sin_cobertura_sec"
     assert _run(FakeSEC(None, cik=None), date(2026, 8, 13))["status"] == "sin_cobertura_sec"
+
+
+BN_6K = {
+    "filings": {
+        "recent": {
+            "form": ["6-K", "6-K/A", "6-K"],
+            "items": ["", "", ""],
+            "filingDate": ["2026-08-13", "2026-08-13", "2026-05-10"],
+            "accessionNumber": ["0009999999-26-000001", "0009999999-26-000002", "0009999999-26-000003"],
+        }
+    }
+}
+INDEX_6K = (
+    "<table>"
+    "<tr><td>1</td><td>6-K</td><td><a href='/x'>cover.htm</a> iXBRL</td><td>6-K</td></tr>"
+    "<tr><td>2</td><td>EX-99.1</td><td><a href='/x'>release.htm</a></td><td>EX-99.1</td></tr>"
+    "</table>"
+)
+
+
+def _run_6k(sec, event_date, label="Jun/2026"):
+    return asyncio.run(
+        svc.resolve_materials(sec=sec, ticker="BN", event_date=event_date, fiscal_label=label, confirmed=True)
+    )
+
+
+def test_foreign_issuer_6k_in_window_links_period_confirmed_docs():
+    sec = FakeSEC(BN_6K, {
+        "0009999999-26-000001-index.htm": INDEX_6K,
+        "release.htm": "EX-99.1 PRESS RELEASE Brookfield Reports Second Quarter 2026 Results quarter ended June 30, 2026",
+    })
+    result = _run_6k(sec, date(2026, 8, 13))
+    assert result["status"] == "ok" and result["filed_at"] == "2026-08-13"
+    assert [(d["exhibit"], d["kind"]) for d in result["documents"]] == [("EX-99.1", "nota_prensa")]
+    assert result["documents"][0]["url"] == (
+        "https://www.sec.gov/Archives/edgar/data/1318605/000999999926000001/release.htm"
+    )
+
+
+def test_foreign_issuer_6k_amendment_loses_to_base_form_same_day():
+    filing = svc.pick_results_filing(BN_6K, date(2026, 8, 13), forms=("6-K", "6-K/A"), require_results_item=False)
+    assert filing["accession"] == "0009999999-26-000001" and filing["form"] == "6-K"
+    only_amended = {"filings": {"recent": {"form": ["6-K/A"], "items": [""], "filingDate": ["2026-08-14"],
+                                             "accessionNumber": ["0009999999-26-000009"]}}}
+    filing = svc.pick_results_filing(only_amended, date(2026, 8, 13), forms=("6-K", "6-K/A"), require_results_item=False)
+    assert filing["accession"] == "0009999999-26-000009" and filing["form"] == "6-K/A"
+
+
+def test_foreign_issuer_without_6k_in_window_asserts_nothing():
+    assert _run_6k(FakeSEC(BN_6K), date(2026, 6, 1))["status"] == "sin_cobertura_sec"
+
+
+def test_foreign_issuer_6k_without_period_confirmation_links_nothing():
+    sec = FakeSEC(BN_6K, {
+        "0009999999-26-000001-index.htm": INDEX_6K,
+        "release.htm": "Highlights with no date at all",
+    })
+    result = _run_6k(sec, date(2026, 8, 13))
+    assert result["status"] == "sin_cobertura_sec" and result["documents"] == []
+
+
+def test_foreign_issuer_unreadable_index_is_failure_not_absence():
+    assert _run_6k(FakeSEC(BN_6K, {}), date(2026, 8, 13))["status"] == "no_disponible"
 
 
 def test_period_mismatch_links_nothing_and_cache_skips_unfinished():
