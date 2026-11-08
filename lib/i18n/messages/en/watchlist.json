@@ -26,7 +26,8 @@
       "rankQ3": "Middle rank by value",
       "rankQ4": "In the most expensive 20–40%",
       "rankQ5": "In the most expensive 20%",
-      "rankTitle": "Fair value / price against {peers} companies valued by the engine: cheaper than {pct}% of them. It is a rank, not a price target. In the backtest (S&P 500, 2015–2026) the cheapest 20% beat the most expensive 20% over 24 months (+4 and +12 points); a plain “undervalued” predicted nothing over 12 months."
+      "rankTitle": "Fair value / price against {peers} companies valued by the engine: cheaper than {pct}% of them. It is a rank, not a price target.",
+      "rankEvidence": "Measured ({universe}, {years}, {companies} companies): over {months} months the cheapest 20% vs the most expensive 20%, {spreads} points of return vs SPY; a plain “undervalued” beat SPY over 12 months {under}% of the time, the rest {rest}%."
     },
     "earningsUnavailable": "Earnings calendar unavailable right now.",
     "earningsPartial": "Earnings calendar incomplete: some dates may be missing.",

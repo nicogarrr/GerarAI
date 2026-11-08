@@ -15,7 +15,8 @@ from app.models.entities import (
     ValuationModel,
     ValuationOutput,
 )
-from app.valuation.relative_rank import MIN_PEERS, rank_against
+from app.valuation.engines.standard_dcf import WACC_POLICY
+from app.valuation.relative_rank import MIN_PEERS, rank_against, rank_evidence
 
 
 def test_quintile_one_is_the_cheapest_fifth():
@@ -99,4 +100,30 @@ def test_monitor_without_enough_peers_has_no_rank():
     items = asyncio.run(watchlist.watchlist_monitor(tickers="CHEAP", db=db))["items"]
     assert items["CHEAP"]["valuation_rank"] is None
     assert items["CHEAP"]["fair_value"] == 140.0
+    db.close()
+
+
+def test_evidence_was_measured_with_the_current_discount_method():
+    # El texto del puesto cita lo medido. Si el DCF estándar cambia de método de
+    # descuento (#4729 volvió a CAPM), las cifras medidas con el método anterior
+    # dejan de valer: este test falla hasta que se vuelva a medir.
+    evidence = rank_evidence()
+    assert evidence is not None
+    assert evidence["wacc_policy"] == WACC_POLICY
+
+
+def test_evidence_carries_the_capm_spread_not_the_old_band_one():
+    # Con la banda por tamaño el quintil barato batía al caro en +4/+12 puntos;
+    # con CAPM (track_record_capm_vs_band.csv de dca-valor-2b) en +0,4/+1,6.
+    evidence = rank_evidence()
+    spreads = {row["period"]: row["pts"] for row in evidence["cheapest_vs_dearest_quintile_pts"]}
+    assert spreads == {"2015–2020": 0.4, "2021–2026": 1.6}
+    assert evidence["horizon_months"] == 24
+    assert evidence["source"]
+
+
+def test_monitor_rank_ships_the_measured_evidence():
+    db = _db_with_peers(50)
+    items = asyncio.run(watchlist.watchlist_monitor(tickers="CHEAP", db=db))["items"]
+    assert items["CHEAP"]["valuation_rank"]["evidence"] == rank_evidence()
     db.close()

@@ -1,0 +1,24 @@
+{
+  "_doc": "Medida del puesto por valor justo / precio (app/valuation/relative_rank.py). El texto de la watchlist lee sus cifras de aquí: si cambia el método de descuento del DCF estándar, hay que volver a medir y actualizar este fichero (lo exige tests/test_watchlist_relative_rank.py).",
+  "wacc_policy": "capm_traceable",
+  "measured_on": "2026-11-08",
+  "method": "Réplica point-in-time del DCF estándar con WACC CAPM; quintil por valor justo / precio; rentabilidad mediana frente al SPY a 24 meses del quintil más barato menos la del más caro.",
+  "source": "Backtest dca-valor-2b (capm_track_record.py sobre bt2.py de dca-valor-1), track_record_capm_vs_band.csv, columna capm; PR #4739.",
+  "universe": "S&P 500",
+  "companies": 377,
+  "observations": 11673,
+  "sample_years": "2015–2026",
+  "horizon_months": 24,
+  "cheapest_vs_dearest_quintile_pts": [
+    {
+      "period": "2015–2020",
+      "pts": 0.4
+    },
+    {
+      "period": "2021–2026",
+      "pts": 1.6
+    }
+  ],
+  "undervalued_beat_spy_12m": 0.49,
+  "rest_beat_spy_12m": 0.48
+}

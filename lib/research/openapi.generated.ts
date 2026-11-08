@@ -15058,6 +15058,41 @@ export interface components {
             };
         };
         /**
+         * WatchlistValuationRankEvidenceOut
+         * @description Lo medido del puesto (app/data/value_rank_evidence.json): el texto lee sus cifras de aquí.
+         */
+        WatchlistValuationRankEvidenceOut: {
+            /** Cheapest Vs Dearest Quintile Pts */
+            cheapest_vs_dearest_quintile_pts: components["schemas"]["WatchlistValuationRankSpreadOut"][];
+            /** Companies */
+            companies: number;
+            /** Horizon Months */
+            horizon_months: number;
+            /** Measured On */
+            measured_on: string;
+            /**
+             * Rest Beat Spy 12M
+             * @description La misma fracción para el resto
+             */
+            rest_beat_spy_12m: number;
+            /** Sample Years */
+            sample_years: string;
+            /** Source */
+            source: string;
+            /**
+             * Undervalued Beat Spy 12M
+             * @description Fracción de «infravaloradas» que batieron al SPY a 12 meses
+             */
+            undervalued_beat_spy_12m: number;
+            /** Universe */
+            universe: string;
+            /**
+             * Wacc Policy
+             * @description Método de descuento del DCF con el que se midió
+             */
+            wacc_policy: string;
+        };
+        /**
          * WatchlistValuationRankOut
          * @description Puesto por valor justo / precio frente a las empresas valoradas por el motor.
          */
@@ -15067,6 +15102,7 @@ export interface components {
              * @description % de comparables con un valor/precio menor
              */
             cheaper_than_pct: number;
+            evidence?: components["schemas"]["WatchlistValuationRankEvidenceOut"] | null;
             /**
              * Peers
              * @description Empresas comparadas
@@ -15077,6 +15113,19 @@ export interface components {
              * @description 1 = el 20 % más barato; 5 = el 20 % más caro
              */
             quintile: number;
+        };
+        /** WatchlistValuationRankSpreadOut */
+        WatchlistValuationRankSpreadOut: {
+            /**
+             * Period
+             * @description Periodo medido, p. ej. 2015–2020
+             */
+            period: string;
+            /**
+             * Pts
+             * @description Puntos de rentabilidad mediana frente al SPY: quintil más barato − más caro
+             */
+            pts: number;
         };
         /** WhatToBelieve */
         WhatToBelieve: {

@@ -62,6 +62,11 @@ MODEL_INPUT_METRICS = frozenset(
 )
 
 
+#: Política de descuento del DCF estándar (#4729: CAPM trazable; la banda por
+#: tamaño solo queda como diagnóstico). Lo que se midió con un método vale para
+#: ese método: ``app/data/value_rank_evidence.json`` declara con cuál se midió.
+WACC_POLICY = "capm_traceable"
+
 _SCENARIO_LABEL_ES = {"bear": "bajista", "base": "base", "bull": "alcista"}
 
 
@@ -783,7 +788,7 @@ class StandardDCFEngine(ValuationEngine):
                 "terminal_source": terminal_source,
                 "inferred_inputs_ignored": dropped_inferred,
                 "wacc": wacc,
-                "wacc_policy": "capm_traceable",
+                "wacc_policy": WACC_POLICY,
                 "wacc_band": band.trace(),
                 # Only a calculated CAPM is labelled traceable; a fallback
                 # keeps its source and publication blocker.

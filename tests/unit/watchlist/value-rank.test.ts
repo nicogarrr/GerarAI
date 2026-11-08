@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { valueRankKey, valueRankSummary } from '@/lib/watchlist/value-rank';
+import { valueRankEvidenceParams, valueRankKey, valueRankSummary } from '@/lib/watchlist/value-rank';
+import measured from '@/data-engine/app/data/value_rank_evidence.json';
 import es from '@/lib/i18n/messages/es/watchlist.json';
 import en from '@/lib/i18n/messages/en/watchlist.json';
 
@@ -30,5 +31,29 @@ describe('puesto relativo por valor justo (sustituye a infravalorada/sobrevalora
             expect(es.page.fairValue[key]).toBeTruthy();
             expect(en.page.fairValue[key]).toBeTruthy();
         }
+    });
+
+    it('el texto no lleva cifras de backtest fijas: las lee del artefacto medido', () => {
+        // #4733 decía «+4 y +12 puntos» (medido con la banda por tamaño); con CAPM (#4729) es +0,4/+1,6.
+        for (const messages of [es, en]) {
+            for (const text of [messages.page.fairValue.rankTitle, messages.page.fairValue.rankEvidence]) {
+                expect(text).not.toMatch(/[+−]\s?\d/);
+                expect(text).not.toMatch(/\d+[.,]\d/);
+                expect(text).not.toMatch(/20\d\d/);
+            }
+            expect(messages.page.fairValue.rankEvidence).toContain('{spreads}');
+        }
+    });
+
+    it('los parámetros salen del artefacto medido (CAPM)', () => {
+        const signed = (value: number) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: 'exceptZero' }).format(value);
+        const join = (parts: string[]) => new Intl.ListFormat('es', { style: 'long', type: 'conjunction' }).format(parts);
+        const params = valueRankEvidenceParams(measured, signed, join);
+        expect(measured.wacc_policy).toBe('capm_traceable');
+        expect(params?.spreads).toBe('+0,4 (2015–2020) y +1,6 (2021–2026)');
+        expect(params?.months).toBe(24);
+        expect(params?.under).toBe(49);
+        expect(valueRankEvidenceParams(null, signed, join)).toBeNull();
+        expect(valueRankEvidenceParams({ ...measured, cheapest_vs_dearest_quintile_pts: [] }, signed, join)).toBeNull();
     });
 });

@@ -26,7 +26,8 @@
       "rankQ3": "Puesto medio por valor",
       "rankQ4": "Entre el 20–40 % más caro",
       "rankQ5": "Entre el 20 % más caro",
-      "rankTitle": "Valor justo / precio frente a {peers} empresas valoradas por el motor: más barata que el {pct} %. Es un puesto, no un precio objetivo. En el backtest (S&P 500, 2015–2026) el 20 % más barato batió al 20 % más caro a 24 meses (+4 y +12 puntos); «infravalorada» a secas no anticipaba nada a 12 meses."
+      "rankTitle": "Valor justo / precio frente a {peers} empresas valoradas por el motor: más barata que el {pct} %. Es un puesto, no un precio objetivo.",
+      "rankEvidence": "Medido ({universe}, {years}, {companies} empresas): a {months} meses el 20 % más barato frente al 20 % más caro, {spreads} puntos de rentabilidad frente al SPY; «infravalorada» a secas batía al SPY a 12 meses el {under} % de las veces, y el resto el {rest} %."
     },
     "earningsUnavailable": "Calendario de resultados no disponible ahora mismo.",
     "earningsPartial": "Calendario de resultados incompleto: puede faltar alguna fecha.",
