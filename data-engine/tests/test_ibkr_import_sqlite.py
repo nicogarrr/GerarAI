@@ -52,6 +52,7 @@ def db():
     with factory() as session:
         session.info["tenant_id"] = "tenant-test"
         yield session
+    engine.dispose()
 
 
 def _flex(*filas: str) -> str:
