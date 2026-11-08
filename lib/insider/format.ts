@@ -150,11 +150,36 @@ const CODE_LABELS: Record<string, string> = {
     X: 'Ejercicio de opción',
 };
 
+/** Claves i18n de los códigos conocidos, como literales para que el chequeo
+ *  i18n las vea referenciadas y TranslationKey las acepte. */
+const CODE_KEYS: Record<string, Parameters<TranslateFn>[0]> = {
+    A: 'insider.feed.codeLabels.A',
+    C: 'insider.feed.codeLabels.C',
+    D: 'insider.feed.codeLabels.D',
+    E: 'insider.feed.codeLabels.E',
+    F: 'insider.feed.codeLabels.F',
+    G: 'insider.feed.codeLabels.G',
+    H: 'insider.feed.codeLabels.H',
+    I: 'insider.feed.codeLabels.I',
+    J: 'insider.feed.codeLabels.J',
+    K: 'insider.feed.codeLabels.K',
+    M: 'insider.feed.codeLabels.M',
+    O: 'insider.feed.codeLabels.O',
+    U: 'insider.feed.codeLabels.U',
+    W: 'insider.feed.codeLabels.W',
+    X: 'insider.feed.codeLabels.X',
+};
+
 export function insiderCodeLabel(code: string | null | undefined, t?: TranslateFn): string {
     const clean = (code ?? '').trim().toUpperCase();
     if (!clean) return '—';
     if (clean === 'P') return sideLabel('compra', t);
     if (clean === 'S') return sideLabel('venta', t);
+    if (t) {
+        const key = CODE_KEYS[clean];
+        return key ? t(key) : t('insider.feed.codeUnknown', { code: clean });
+    }
+    // Sin t: literales historicos es (scripts y llamadas legacy fuera de React).
     return CODE_LABELS[clean] ?? `Código ${clean}`;
 }
 

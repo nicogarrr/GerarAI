@@ -108,8 +108,6 @@
   "fichaNoInsiderTrades": "Sin operaciones insider persistidas para este ticker.",
   "fichaAmendmentSuffix": " (enmienda)",
   "fichaOriginalForm4": "Form 4 original",
-  "fichaTxBuy": "Compra",
-  "fichaTxSell": "Venta",
   "fichaTxSharesSuffix": " · {count} acciones",
   "fichaTxNoCurrencySuffix": " · divisa no informada",
   "fichaTxShown": "Se muestran 6 de {total} operaciones de este formulario.",

@@ -134,7 +134,25 @@
     "canadaSourcePre": "Unofficial source; the official record is ",
     "canadaSourcePost": " (manual check)",
     "sideBuyLabel": "Buy",
-    "sideSellLabel": "Sell"
+    "sideSellLabel": "Sell",
+    "codeUnknown": "Code {code}",
+    "codeLabels": {
+      "A": "Grant or award",
+      "C": "Derivative conversion",
+      "D": "Disposition to the issuer",
+      "E": "Derivative expiration",
+      "F": "Tax withholding",
+      "G": "Gift",
+      "H": "Derivative expiration",
+      "I": "Discretionary transaction",
+      "J": "Other transaction",
+      "K": "Equity swap",
+      "M": "Option exercise",
+      "O": "Option exercise",
+      "U": "Tender offer disposition",
+      "W": "Inheritance",
+      "X": "Option exercise"
+    }
   },
   "statusCopy": {
     "reason": {

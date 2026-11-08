@@ -173,7 +173,7 @@ import { getPoliticianTickerTrades } from '@/lib/actions/politicians.actions';
 import { InsidersSection } from '@/components/research/InsidersSection';
 import { PoliticiansSection } from '@/components/research/PoliticiansSection';
 import { OwnershipSignalsPanel } from '@/components/research/OwnershipSignalsPanel';
-import { insiderName, insiderRole } from '@/lib/insider/format';
+import { insiderCodeLabel, insiderName, insiderRole } from '@/lib/insider/format';
 import { glossaryFor, moatGlossaryKey } from '@/lib/glossary';
 import {
   RESEARCH_RENDER_BUDGET_MS,
@@ -1612,7 +1612,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                   <ul className="mt-2 space-y-1 text-xs text-gray-400">
                     {filing.transactions.slice(0, 6).map((tx, index) => (
                       <li key={`${filing.accession_number}-${index}`}>
-                        {insiderName(tx.insider)} · {insiderRole(tx.role, tx.officer_title, locale)} · {tx.code === 'P' ? t('research.fichaTxBuy') : tx.code === 'S' ? t('research.fichaTxSell') : tx.code ?? '—'}
+                        {insiderName(tx.insider)} · {insiderRole(tx.role, tx.officer_title, locale)} · {insiderCodeLabel(tx.code, t)}
                         {typeof tx.shares === 'number' ? t('research.fichaTxSharesSuffix', { count: fmt.formatNumber(tx.shares) }) : ''}
                         {typeof tx.value === 'number' && Number.isFinite(tx.value) ? ` · ${tx.currency && isValidCurrencyCode(tx.currency) ? fmt.formatPrice(tx.value, tx.currency, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : fmt.formatNumber(tx.value, { maximumFractionDigits: 0 })}` : ''}
                         {tx.currency == null && typeof tx.value === 'number' ? t('research.fichaTxNoCurrencySuffix') : ''}

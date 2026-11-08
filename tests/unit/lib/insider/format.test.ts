@@ -87,6 +87,28 @@ describe('sideLabel / insiderCodeLabel', () => {
         expect(insiderCodeLabel('P', en)).toBe('Buy');
         expect(insiderCodeLabel('S', en)).toBe('Sell');
     });
+    it('códigos no P/S con traductor salen de las claves i18n (ES y EN)', () => {
+        const es = ((path: string, vars?: Record<string, string>) =>
+            path === 'insider.feed.codeLabels.A'
+                ? 'Concesión'
+                : path === 'insider.feed.codeUnknown'
+                  ? `Código ${vars?.code}`
+                  : path) as never;
+        const en = ((path: string, vars?: Record<string, string>) =>
+            path === 'insider.feed.codeLabels.A'
+                ? 'Grant or award'
+                : path === 'insider.feed.codeLabels.M'
+                  ? 'Option exercise'
+                  : path === 'insider.feed.codeUnknown'
+                    ? `Code ${vars?.code}`
+                    : path) as never;
+        expect(insiderCodeLabel('A', es)).toBe('Concesión');
+        expect(insiderCodeLabel('a', en)).toBe('Grant or award');
+        expect(insiderCodeLabel('M', en)).toBe('Option exercise');
+        expect(insiderCodeLabel('Z', en)).toBe('Code Z');
+        expect(insiderCodeLabel('Z', es)).toBe('Código Z');
+        expect(insiderCodeLabel('', en)).toBe('—');
+    });
     it('P y S se tratan como compra/venta; el resto se traduce; desconocido se muestra crudo', () => {
         expect(insiderCodeLabel('P')).toBe('Compra');
         expect(insiderCodeLabel('S')).toBe('Venta');
