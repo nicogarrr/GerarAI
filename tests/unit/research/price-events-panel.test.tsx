@@ -19,7 +19,7 @@ function renderPanel() {
             onFocus={() => {}}
             hourly={false}
             t={t}
-            formatMarketDate={(date: string) => date}
+            formatMarketDate={(date) => String(date)}
         />,
     );
 }
