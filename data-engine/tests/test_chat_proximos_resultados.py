@@ -14,13 +14,25 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from app.core import local_date
 from app.core.config import get_settings
 from app.core.local_date import local_today
 from app.models.entities import Base, Company, EarningsDate, Position
 from app.services.chat_service import ChatService
 from app.services.display_es import fecha_es
 
-TODAY = local_today()
+# Reloj congelado para TODA la prueba, TODAY incluido: antes TODAY se calculaba
+# al importar el módulo y el servicio volvía a llamar local_today() al ejecutar;
+# si la noche caía entre medias, la ventana «hasta el ...» difería un día
+# (esperado 6 feb 2027, salió 7 feb tras medianoche).
+FIXED_NOW = datetime(2027, 2, 3, 12, 0, tzinfo=UTC)  # 13:00 en Madrid: fecha inequívoca
+TODAY = local_today(FIXED_NOW)
+assert TODAY == date(2027, 2, 3)
+
+
+@pytest.fixture(autouse=True)
+def _frozen_clock(monkeypatch):
+    monkeypatch.setattr(local_date, "_utc_now", lambda: FIXED_NOW)
 
 
 def _en(day: date) -> str:
@@ -34,7 +46,7 @@ class _NoLLM:
         raise AssertionError("las fechas de resultados no deben pasar por el LLM")
 
 
-def _db():
+def _db(today: date = TODAY):
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     db = Session(engine)
@@ -50,15 +62,15 @@ def _db():
         db.info["tenant_id"] = tenant
         for ticker in tickers:
             db.add(Position(tenant_id=tenant, company_id=ids[ticker], quantity=Decimal("10"),
-                            average_cost=Decimal("10"), currency="USD", as_of=TODAY))
+                            average_cost=Decimal("10"), currency="USD", as_of=today))
         db.commit()
     fresh = datetime.now(UTC)
     for ticker, day, session, confirmed in (
-        ("UBER", TODAY + timedelta(days=3), "pre_market", False),
-        ("KO", TODAY + timedelta(days=8), None, True),
-        ("MSFT", TODAY + timedelta(days=120), "after_market", True),
-        ("AAPL", TODAY + timedelta(days=5), "after_market", True),
-        ("UBER", TODAY - timedelta(days=90), "pre_market", True),
+        ("UBER", today + timedelta(days=3), "pre_market", False),
+        ("KO", today + timedelta(days=8), None, True),
+        ("MSFT", today + timedelta(days=120), "after_market", True),
+        ("AAPL", today + timedelta(days=5), "after_market", True),
+        ("UBER", today - timedelta(days=90), "pre_market", True),
     ):
         db.add(EarningsDate(ticker=ticker, event_date=day, session=session, confirmed=confirmed,
                             source="nasdaq", source_label="Nasdaq", fetched_at=fresh))
@@ -121,6 +133,23 @@ def test_english(monkeypatch):
             assert "No date in that window: ASTS, MSFT." in resp.answer
     finally:
         get_settings.cache_clear()
+
+
+def test_frontera_de_medianoche_es_consistente(monkeypatch):
+    # 23:00 UTC es 00:00 en Madrid (invierno): la fecha local cambia de día.
+    # Antes del fix, el TODAY del import y el del servicio podían caer a cada
+    # lado y la ventana salía incoherente; ahora cada llamada es autoconsistente.
+    answers = []
+    for instant in (datetime(2027, 2, 3, 22, 59, 59, tzinfo=UTC), datetime(2027, 2, 3, 23, 0, 1, tzinfo=UTC)):
+        monkeypatch.setattr(local_date, "_utc_now", lambda i=instant: i)
+        day = local_today()
+        db = _db(today=day)
+        resp = _ask(db, "¿Cuándo presentan resultados mis empresas?")
+        end = day + timedelta(days=90)
+        assert resp.answer.startswith(f"Próximos resultados de tus posiciones (hasta el {fecha_es(end)}):")
+        assert f"- UBER: {fecha_es(day + timedelta(days=3))}, antes de la apertura (fecha estimada)" in resp.answer
+        answers.append((day, resp.answer))
+    assert answers[1][0] == answers[0][0] + timedelta(days=1), "un segundo después de medianoche es el día siguiente"
 
 
 @pytest.mark.parametrize("question", [
