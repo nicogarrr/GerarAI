@@ -326,6 +326,7 @@ class ThesisEvidenceService:
                 "form": filing.get("form"),
                 "accession_number": filing.get("accession_number"),
                 "report_date": filing.get("report_date"),
+                **({"parent_form": filing["parent_form"]} if filing.get("parent_form") else {}),
             },
         )
 
@@ -957,6 +958,10 @@ class ThesisEvidenceService:
             return _pending("SEC EDGAR (informe anual)", "No hay informe anual (10-K/20-F/40-F) en el indice de la SEC.")
         url = annual["document_url"]
         base = {"form": annual.get("form"), "filing_date": annual.get("filing_date"), "url": url}
+        # 40-F / 10-K con EX-13: el informe anual de verdad va en un anexo.
+        exhibits = self._annual_report_exhibits(db, company, annual)
+        if exhibits:
+            base["exhibits"] = exhibits
         if annual_report_has_text(db, company.id, url):
             return {"status": "ok", "source": "SEC EDGAR (informe anual)", "text": "ingested", **base}
         try:
@@ -965,6 +970,49 @@ class ThesisEvidenceService:
             _log_source_failure("SEC EDGAR (informe anual)", company.ticker, exc)
             return _pending("SEC EDGAR (informe anual)", "No se pudo encolar la descarga del informe anual.")
         return {"status": "queued", "source": "SEC EDGAR (informe anual)", "text": "queued", **base}
+
+    def _fetch_annual_report_exhibits(self, filing: dict[str, Any]) -> list[dict[str, Any]]:
+        from app.services.annual_report_exhibits import fetch_report_exhibits
+
+        return _await_sync(lambda: fetch_report_exhibits(filing))
+
+    def _annual_report_exhibits(
+        self, db: Session, company: Company, annual: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """Anexos del informe anual (EX-99.x de un 40-F, EX-13 de un 10-K): su
+        texto se encola igual que el del documento principal, con su tipo y
+        el filing del que cuelgan, para que la tesis y el desglose por partes
+        lean el MD&A y los segmentos y los citen con su URL."""
+        from app.services.annual_report_exhibits import ANNUAL_WITH_EXHIBIT_REPORT
+
+        form = str(annual.get("form") or "").upper()
+        if form not in ANNUAL_WITH_EXHIBIT_REPORT:
+            return []
+        try:
+            exhibits = self._fetch_annual_report_exhibits(annual) or []
+        except Exception as exc:  # noqa: BLE001 - best-effort: la tesis sigue
+            _log_source_failure("SEC EDGAR (anexos del informe anual)", company.ticker, exc)
+            return []
+        out: list[dict[str, Any]] = []
+        for ex in exhibits:
+            item = {"type": ex.get("type"), "url": ex.get("url"), "size": ex.get("size")}
+            if annual_report_has_text(db, company.id, str(ex.get("url") or "")):
+                out.append({**item, "text": "ingested"})
+                continue
+            exhibit_filing = {
+                **annual,
+                "form": f"{form} {ex.get('type')}",
+                "document_url": ex.get("url"),
+                "parent_form": form,
+            }
+            try:
+                self._enqueue_annual_report_text(db, company, exhibit_filing)
+            except Exception as exc:  # noqa: BLE001
+                _log_source_failure("SEC EDGAR (anexos del informe anual)", company.ticker, exc)
+                out.append({**item, "text": "pending"})
+                continue
+            out.append({**item, "text": "queued"})
+        return out
 
     # -- 4. noticias (solo lectura del pipeline news) --------------------------
     def _collect_news(self, db: Session, company: Company) -> dict[str, Any]:

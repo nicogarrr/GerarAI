@@ -26,6 +26,7 @@
 #   llm/thesis_go.py: LLM provider endpoint; custom URLs via egress_guard
 #   services/class_filer_eps_service.py: SEC EDGAR fixed host
 #   services/company_enrichment_service.py: fixed provider APIs (OpenFIGI/Finnhub)
+#   services/annual_report_exhibits.py: SEC filing index on the fixed host www.sec.gov (SEC pacer + identity headers)
 #   services/connectors/alpha_vantage.py: Alpha Vantage fixed host (www.alphavantage.co), rate-limited
 #   services/connectors/base.py: connector to a fixed public data API
 #   services/connectors/ca_insider_yahoo.py: connector to a fixed public data API
@@ -119,6 +120,7 @@ rules:
     - /data-engine/app/services/connectors/ecb.py
     - /data-engine/app/services/connectors/ecb_history.py
     - /data-engine/app/services/connectors/edgar_common.py
+    - /data-engine/app/services/annual_report_exhibits.py
     - /data-engine/app/services/connectors/esef.py
     - /data-engine/app/services/connectors/fca_nsm.py
     - /data-engine/app/services/connectors/finnhub.py
