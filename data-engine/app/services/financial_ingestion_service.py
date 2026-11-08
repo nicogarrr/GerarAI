@@ -270,7 +270,8 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # 10 (8-nov-2026): total_debt con DebtCurrent cuando el emisor solo etiqueta la deuda a plazo no corriente
 #    y el total corriente (UNH 3T 2026: 68.714 -> 74.331 M).
 # 11 (8-nov-2026): filers IFRS: pasivos por arrendamiento (LeaseLiabilities y sus partes corriente/no corriente).
-SEC_INGESTION_RULES_VERSION = 11
+# 12 (8-nov-2026): plan B: el último filing anual que companyfacts no trae se lee de su instancia XBRL (TSM 20-F 2025).
+SEC_INGESTION_RULES_VERSION = 12
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Arrendadores (REIT): su ingreso principal es el del arrendamiento (ASC 842),
@@ -1024,6 +1025,30 @@ def _revenue_with_lessor_income(
         return base
     lease = _collapse_aliases(lessor)
     return widest_in_same_filing({"revenue": base, "lease": lease}, {**lease, **base})
+
+
+async def _merge_latest_filing_instance(sec: Any, cik: str, facts_data: dict[str, Any]) -> dict[str, Any] | None:
+    """Añade a ``facts_data`` los hechos del último filing anual que companyfacts no trae (ver
+    ``connectors/sec_filing_instance``). Devuelve la procedencia, o None si no hacía falta o no se pudo:
+    un fallo aquí nunca rompe la ingesta de companyfacts."""
+    from app.services.connectors import sec_filing_instance as fin
+
+    try:
+        submissions = getattr(sec, "_last_submissions_payload", None) or await sec.submissions(cik)
+        missing = fin.latest_annual_missing(submissions, fin.accessions_in(facts_data), set(ANNUAL_REPORT_FORMS))
+        if missing is None:
+            return None
+        from app.services.connectors.sec import SECClient as _SEC
+
+        url = _SEC.filing_document_url(cik, missing["accn"], fin.instance_name(missing["primary"]))
+        xml, _ctype = await sec.filing_document(url)
+        parsed = fin.parse_instance(xml, accn=missing["accn"], form=missing["form"], filed=missing["filed"],
+                                    fiscal_year=int(str(missing["report"])[:4]))
+        added = fin.merge_into(facts_data, parsed)
+    except Exception:  # noqa: BLE001 - plan B: sin él, companyfacts sigue igual
+        return None
+    return {"accession": missing["accn"], "form": missing["form"], "report_date": missing["report"],
+            "filed": missing["filed"], "url": url, "facts_added": added} if added else None
 
 
 def _negate_entry(entry: dict[str, Any]) -> dict[str, Any]:
@@ -2030,6 +2055,18 @@ class FinancialIngestionService:
         except Exception:  # noqa: BLE001 - fail closed DEI, no romper lo demas
             index_accessions = None
 
+        # Plan B: el último filing anual (10-K/20-F/40-F) que companyfacts no
+        # trae se lee de su propia instancia XBRL en EDGAR (TSM: 20-F 2025 sin
+        # un hecho IFRS en companyfacts). Solo valoración vigente (sin as_of);
+        # reutiliza el índice submissions ya leído para las anclas.
+        filing_instance = (
+            await _merge_latest_filing_instance(sec, cik, facts_data) if as_of is None else None
+        )
+        if filing_instance:
+            document.metadata_ = {**(document.metadata_ or {}), "sec_filing_instance": filing_instance}
+            payload_fingerprint = (
+                f"{SEC_INGESTION_RULES_VERSION}:{_sec_payload_fingerprint(facts_data)}"
+            )
         anchor_fingerprint = _sec_payload_fingerprint({
             "anchors": dict(annual_anchors),
             "partial": bool(getattr(annual_anchors, "partial", False)),
