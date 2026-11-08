@@ -408,6 +408,103 @@ def estimated_input_items(context: ValuationContext, values: dict[str, SourcedVa
     return items
 
 
+# --- Aseguradoras: ROE y crecimiento del libro derivados de los hechos -------
+# Mismo calculo que midio el backtest del motor actual (metodo-1,
+# RESULT_RINS.md, «motor actual (1 ejercicio)»): ROE = beneficio / libro medio
+# del ejercicio y crecimiento = libro / libro del ejercicio anterior - 1. NO es
+# la regla de ventana de 5 anos (R-INS), que no paso el holdout.
+
+
+def _prior_year_book(
+    context: ValuationContext, anchor: PeriodAnchor, metrics: tuple[str, ...]
+) -> FinancialFact | None:
+    """Libro del ejercicio anterior al ancla (mismo concepto primero, anual)."""
+    if anchor.fiscal_year is None:
+        return None
+    conditions = [
+        FinancialFact.company_id == context.company.id,
+        FinancialFact.metric.in_(sorted(metrics)),
+        FinancialFact.fiscal_year == anchor.fiscal_year - 1,
+    ]
+    if context.as_of is not None:
+        conditions.append(FinancialFact.filed <= context.as_of)
+    rows = [
+        row
+        for row in context.db.scalars(
+            select(FinancialFact).where(*conditions).order_by(desc(FinancialFact.created_at))
+        ).all()
+        if usable_fact(row) and _period_kind(row) == "FY"
+    ]
+    rows.sort(key=lambda row: row.metric != anchor.metric)
+    return rows[0] if rows else None
+
+
+def derived_insurer_inputs(
+    context: ValuationContext,
+    resolved: ResolvedInputs,
+    *,
+    book_metrics: tuple[str, ...],
+) -> tuple[dict[str, SourcedValue], dict[str, str]]:
+    """ROE y crecimiento del libro calculados con hechos del mismo ejercicio.
+
+    Devuelve los valores derivados y, para lo que no se pudo derivar, el motivo
+    (que viaja al trace: nunca se pierde en silencio).
+    """
+    values = resolved.values
+    book = values.get("book_value")
+    income = values.get("net_income")
+    anchor = resolved.anchor
+    derived: dict[str, SourcedValue] = {}
+    reasons: dict[str, str] = {}
+    if book is None or anchor is None:
+        return derived, {"roe": "sin libro del ejercicio", "book_value_growth": "sin libro del ejercicio"}
+    prior = _prior_year_book(context, anchor, book_metrics)
+    prior_value = float(prior.value) if prior is not None else None
+    if prior is None or prior_value is None or prior_value <= 0:
+        reason = f"sin libro del ejercicio {anchor.fiscal_year - 1 if anchor.fiscal_year else 'anterior'}"
+        return derived, {"roe": reason, "book_value_growth": reason}
+    sources = [
+        {"source": f"{anchor.metric} ({book.source_type})", "value": book.value, "period": book.period,
+         "fact_id": book.fact_id},
+        {"source": f"{prior.metric} ({prior.source_type})", "value": prior_value, "period": prior.period,
+         "fact_id": prior.id},
+    ]
+    growth = book.value / prior_value - 1
+    derived["book_value_growth"] = SourcedValue(
+        growth, None, book.period, min(book.confidence, float(prior.confidence)),
+        source_type="derived_from_facts", is_reported=False,
+        estimate={
+            "metric": "book_value_growth", "value": growth, "period": book.period, "status": "calculado",
+            "method": f"libro {book.period[:10]} / libro {prior.period[:10]} − 1 = {growth:.2%}",
+            "note": "calculado con el patrimonio publicado de dos ejercicios; no lo publica la empresa",
+            "sources": sources,
+        },
+    )
+    if income is None:
+        reasons["roe"] = "sin beneficio del ejercicio del libro"
+    else:
+        average = (book.value + prior_value) / 2
+        roe = income.value / average if average > 0 else None
+        if roe is None:
+            reasons["roe"] = "libro medio no positivo"
+        else:
+            derived["roe"] = SourcedValue(
+                roe, None, income.period, min(book.confidence, income.confidence, float(prior.confidence)),
+                source_type="derived_from_facts", is_reported=False,
+                estimate={
+                    "metric": "roe", "value": roe, "period": income.period, "status": "calculado",
+                    "method": f"beneficio {income.value:,.0f} / libro medio {average:,.0f} = {roe:.2%}",
+                    "note": "calculado con el beneficio y el patrimonio publicados; no lo publica la empresa",
+                    "sources": [
+                        {"source": f"net_income ({income.source_type})", "value": income.value,
+                         "period": income.period, "fact_id": income.fact_id},
+                        *sources,
+                    ],
+                },
+            )
+    return derived, reasons
+
+
 def _probabilities(values: list[SourcedValue], directional_quality: float = 0.0) -> dict[str, float]:
     confidence = sum(value.confidence for value in values) / len(values)
     base = max(0.40, min(0.64, 0.38 + confidence * 0.26))
@@ -741,10 +838,24 @@ class InsurerValuationEngine(ValuationEngine):
                 "cost_of_equity": ("cost_of_equity",),
                 "combined_ratio": ("combined_ratio",),
                 "book_value_growth": ("book_value_growth",),
+                "net_income": ("net_income",),
             },
             market_rates=("cost_of_equity",),
         )
-        sourced = resolved.values
+        sourced = dict(resolved.values)
+        # El beneficio solo sirve para derivar el ROE: no es un input del P/VC.
+        sourced.pop("net_income", None)
+        derivation_gaps: dict[str, str] = {}
+        if sourced.get("roe") is None or sourced.get("book_value_growth") is None:
+            # CB (8-nov-2026): beneficio 10.310, patrimonio 73.757 y 64.021 del
+            # ejercicio anterior, y el motor pedia el ROE y el crecimiento ya
+            # calculados: «insufficient» en 2 de 2 aseguradoras.
+            derived, derivation_gaps = derived_insurer_inputs(
+                context, resolved, book_metrics=("book_value", "common_equity", "total_equity")
+            )
+            for key, value in derived.items():
+                if sourced.get(key) is None:
+                    sourced[key] = value
         if sourced.get("combined_ratio") is None:
             sourced["combined_ratio"] = inferred_sourced(context, "combined_ratio")
         if sourced.get("cost_of_equity") is None:
@@ -764,7 +875,10 @@ class InsurerValuationEngine(ValuationEngine):
                     "year counts as missing instead of being crossed into the book value."
                 ),
                 snapshot=context.snapshot,
-                extra_trace=resolved.as_trace(),
+                extra_trace={
+                    **resolved.as_trace(),
+                    **({"derivation_gaps": derivation_gaps} if derivation_gaps else {}),
+                },
             )
         book = sourced["book_value"]
         shares = sourced["shares_diluted"]
@@ -781,9 +895,23 @@ class InsurerValuationEngine(ValuationEngine):
                 engine_key=self.key,
                 current_price=context.current_price,
                 missing_inputs=["valid_shares_and_cost_of_equity_spread"],
-                reason="Insurer price-to-book model inputs are economically inconsistent.",
+                reason=(
+                    "Insurer price-to-book model inputs are economically inconsistent: "
+                    f"book value growth {growth_value:.2%} is not below the cost of equity "
+                    f"{cost_equity.value:.2%} (Gordon P/B undefined)."
+                ),
                 snapshot=context.snapshot,
-                extra_trace=resolved.as_trace(),
+                extra_trace={
+                    **resolved.as_trace(),
+                    "inputs": {
+                        "roe": roe.value,
+                        "book_value_growth": growth_value,
+                        "cost_of_equity": cost_equity.value,
+                        "combined_ratio": combined_ratio.value,
+                        "book_per_share": book.value / shares.value if shares.value > 0 else None,
+                    },
+                    "estimated_inputs": estimated_input_items(context, sourced),
+                },
             )
         book_per_share = book.value / shares.value
         specs = {
