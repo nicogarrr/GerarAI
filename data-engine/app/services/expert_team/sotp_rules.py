@@ -382,6 +382,14 @@ def historical_growth(revenue_actuals: Iterable[Mapping[str, Any]]) -> float | N
     return (last / first) ** (1 / years) - 1
 
 
+def burn_gap_unknown(anchors: Mapping[str, Any]) -> str | None:
+    """Motivo por el que la ampliación para cubrir la quema no se calcula, o ``None`` si se calcula."""
+    burn = anchors.get("annual_burn_millions")
+    if anchors.get("burns_cash") and burn and burn > 0 and anchors.get("cash_millions") is None:
+        return "falta la caja del último balance SEC: la ampliación para cubrir la quema no se calcula (N/D)"
+    return None
+
+
 def code_dilution(anchors: Mapping[str, Any], years: int) -> list[dict[str, Any]]:
     """Dilución que sale de los datos: SBC al precio de hoy y el hueco de financiación si quema caja."""
     out: list[dict[str, Any]] = []
@@ -396,8 +404,12 @@ def code_dilution(anchors: Mapping[str, Any], years: int) -> list[dict[str, Any]
                     "why": {"shares": f"SBC {_fmt(sbc)} M$/año × {years} años ÷ precio {price:.2f} = {_fmt(shares)} M"},
                     "sources": [{"label": "SBC anual (SEC)", "url": url, "date": anchors.get("sbc_period_end")}]})
     burn = anchors.get("annual_burn_millions")
-    if anchors.get("burns_cash") and burn and burn > 0:
-        liquid = (anchors.get("cash_millions") or 0.0) + (anchors.get("short_term_investments_millions") or 0.0)
+    cash = anchors.get("cash_millions")
+    # Sin caja en el balance no hay hueco calculable: suponer caja 0 inventaba una ampliación de toda la quema.
+    # Se queda fuera y ``burn_gap_unknown`` lo dice (N/D con motivo).
+    if anchors.get("burns_cash") and burn and burn > 0 and cash is not None:
+        sti = anchors.get("short_term_investments_millions")
+        liquid = cash + (sti if sti is not None else 0.0)  # inversiones a corto sin dato: no se suman
         gap = burn * BURN_YEARS - liquid
         if gap > 0:
             shares = gap / price

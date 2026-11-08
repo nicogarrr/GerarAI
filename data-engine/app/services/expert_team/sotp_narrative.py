@@ -112,9 +112,11 @@ def sotp_markers(model: Mapping[str, Any], result: Mapping[str, Any]) -> dict[st
         "sotp.total_present_value": _fmt_millions(result.get("total_present_value"), munit),
         "dilution.current_shares": _fmt_share_count(model.get("shares_current")),
         "dilution.total_shares": _fmt_share_count(result.get("shares_diluted")),
+        # Sin acciones de hoy o sin diluidas no hay «acciones nuevas»: N/D (antes, sin las de hoy, todas
+        # las diluidas salían como nuevas).
         "dilution.new_shares": _fmt_share_count(
-            (result.get("shares_diluted") or 0) - float(model.get("shares_current") or 0)
-            if result.get("shares_diluted") is not None else None
+            float(result["shares_diluted"]) - float(model["shares_current"])
+            if result.get("shares_diluted") is not None and model.get("shares_current") is not None else None
         ),
     }
     for i, scenario in enumerate(model.get("scenarios") or []):

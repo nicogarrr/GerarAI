@@ -242,6 +242,42 @@ def leverage_limit(prev_row: Mapping[str, Any]) -> float:
     return max(LEVERAGE_FLOOR, prev + LEVERAGE_JUMP) if prev is not None else LEVERAGE_FLOOR
 
 
+def _abs_or_none(x: float | None) -> float | None:
+    return abs(x) if x is not None else None
+
+
+def roic_text(row: Mapping[str, Any]) -> str:
+    """ROIC, o N/D con la pieza del capital invertido que falta."""
+    if row.get("roic") is not None:
+        return pct(row["roic"])
+    missing = row.get("roic_missing") or []
+    return "N/D" + (f" (falta {', '.join(missing)})" if missing else "")
+
+
+_PAYOUT_PARTS = (("dividends", "dividendos"), ("buybacks", "recompras"))
+
+
+def payout_ratio(row: Mapping[str, Any]) -> tuple[float | None, list[str]]:
+    """(dividendos + recompras) / beneficio, sin inventar ceros: lo que falta se nombra y no se suma.
+
+    Sin beneficio positivo o sin ninguna de las dos partes, ``None``. Con una sola parte, el cociente es una
+    cota inferior (el reparto es AL MENOS eso) y la parte que falta va en la lista."""
+    ni = row.get("net_income")
+    known = [row[k] for k, _ in _PAYOUT_PARTS if row.get(k) is not None]
+    missing = [label for k, label in _PAYOUT_PARTS if row.get(k) is None]
+    if not ni or ni <= 0 or not known:
+        return None, missing
+    return sum(known) / ni, missing
+
+
+def payout_text(ratio: float | None, missing: Sequence[str]) -> str:
+    if ratio is None:
+        return "N/D" + (f" (sin {' ni '.join(missing)} en los filings)" if len(missing) == len(_PAYOUT_PARTS) else "")
+    if missing:
+        return f"≥ {pct(ratio, 0)} (sin {' ni '.join(missing)})"
+    return pct(ratio, 0)
+
+
 def kill_switches(val: Mapping[str, Any], hist_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Umbrales falsables sobre métricas que GerarAI vuelve a leer con cada informe. Derivados del propio
     escenario bajista: si la realidad cae por debajo de lo que ya suponía el bajista, la tesis está rota."""
@@ -302,9 +338,9 @@ def kill_switches(val: Mapping[str, Any], hist_rows: Sequence[Mapping[str, Any]]
         "pérdida de poder de precio o de eficiencia por debajo del peor de los tres últimos ejercicios")
     c_now = last.get("conversion")
     if pb:
-        d_now = ((last.get("dividends") or 0.0) + (last.get("buybacks") or 0.0)) / last["net_income"] \
-            if last.get("net_income") and last["net_income"] > 0 else None
-        add("reparto", labels["conversion"], f"> {pct(1.0, 0)}", pct(d_now, 0), d_now is not None and d_now > 1.0,
+        d_now, d_missing = payout_ratio(last)
+        add("reparto", labels["conversion"], f"> {pct(1.0, 0)}", payout_text(d_now, d_missing),
+            d_now is not None and d_now > 1.0,
             "revisar", "repartir más de lo que se gana consume el valor contable que compone")
         add("valor_contable", "Valor contable por acción", "cae en un ejercicio", pct(g_now, signed=True),
             g_now is not None and g_now < 0, "revisar y, si se repite, vender",
@@ -369,7 +405,11 @@ def history_rows(cites: Mapping[str, Any], basis: str, points: Mapping[str, Mapp
         debt = (points.get("total_debt") or {}).get(y)
         cash = (points.get("cash_and_equivalents") or {}).get(y)
         tax = 0.25
-        invested = (eq + (debt or 0.0) - (cash or 0.0)) if eq is not None else None
+        # Capital invertido = patrimonio + deuda − caja; si falta una pieza, el ROIC es N/D con el motivo
+        # (nada de deuda o caja 0 inventadas).
+        roic_missing = [label for label, x in (("patrimonio", eq), ("deuda", debt), ("caja", cash), ("resultado operativo", oi))
+                        if x is None]
+        invested = (eq + debt - cash) if (eq is not None and debt is not None and cash is not None) else None
         roic = (oi * (1 - tax) / invested) if (oi is not None and invested and invested > 0) else None
         rows.append({
             "year": y, "revenue": rev, "growth": (rev / prev_rev - 1) if rev and prev_rev else None,
@@ -379,11 +419,14 @@ def history_rows(cites: Mapping[str, Any], basis: str, points: Mapping[str, Mapp
             "book": eq, "book_per_share": (eq / sh_raw) if (eq and sh_raw) else None,
             "fcf": fcf, "conversion": (fcf / ebitda) if fcf is not None and ebitda else None,
             "shares": sh_raw, "fcf_per_share": (fcf / sh_raw) if fcf is not None and sh_raw else None,
-            "dividends": abs(v("dividends_paid", y) or 0.0) or None,
-            "buybacks": abs(v("common_stock_repurchased", y) or 0.0) or None,
-            "acquisitions": abs(v("acquisitions", y) or 0.0) or None, "roic": roic,
-            "net_debt_to_ebitda": ((debt - (cash or 0.0)) / ebitda) if (debt is not None and ebitda and ebitda > 0)
-                                  else None,
+            # Un 0 declarado es un dato (no repartió); un hueco es None. Antes los dos acababan en None.
+            "dividends": _abs_or_none(v("dividends_paid", y)),
+            "buybacks": _abs_or_none(v("common_stock_repurchased", y)),
+            "acquisitions": _abs_or_none(v("acquisitions", y)), "roic": roic,
+            "roic_missing": roic_missing,
+            # Sin caja no hay deuda neta: N/D (no deuda − 0).
+            "net_debt_to_ebitda": ((debt - cash) / ebitda) if (debt is not None and cash is not None and ebitda
+                                                               and ebitda > 0) else None,
         })
         prev_rev = rev
     return rows
@@ -942,7 +985,7 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
         "Año", "Ingresos", "Crec.", lab["margin"], "FCF", "Conv.", "FCF/acción", "Acciones", "ROIC"], "rows": [
         [str(r["year"]), millions(r["revenue"], ccy), pct(r["growth"], signed=True), pct(r["margin"]),
          millions(r["fcf"], ccy), pct(r["conversion"], 0), money(r["fcf_per_share"], ccy), shares(r["shares"]),
-         pct(r["roic"])] for r in ctx.history[-10:]]}
+         roic_text(r)] for r in ctx.history[-10:]]}
     if sp["basis"] == "pb":
         t["historial"] = {"title": "Historial del valor contable (millones, ejercicio fiscal)", "head": [
             "Año", "Ingresos", "Beneficio", "ROE", "Valor contable", "VC/acción", "Crec. VC/acción", "Acciones", "Reparto"],
@@ -950,11 +993,11 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
         prev_bv = None
         for r in ctx.history[-10:]:
             bvps = r.get("book_per_share")
-            dist = ((r.get("dividends") or 0.0) + (r.get("buybacks") or 0.0))
+            ratio, missing = payout_ratio(r)
             t["historial"]["rows"].append([
                 str(r["year"]), millions(r["revenue"], ccy), millions(r.get("net_income"), ccy), pct(r["margin"]),
                 millions(r.get("book"), ccy), money(bvps, ccy), pct((bvps / prev_bv - 1) if bvps and prev_bv else None, signed=True),
-                shares(r["shares"]), pct(dist / r["net_income"], 0) if r.get("net_income") and r["net_income"] > 0 else "N/D"])
+                shares(r["shares"]), payout_text(ratio, missing)])
             prev_bv = bvps
     t["historial"]["links"] = [link((annual.get("revenue") or {}).get(str(r["year"]))) for r in ctx.history[-10:]]
     t["capital"] = {"title": "Asignación de capital (millones)", "head": ["Año", "FCF", "Dividendos", "Recompras", "Adquisiciones"],

@@ -112,6 +112,7 @@ def test_arnes_pit_usa_el_mismo_ebitda_por_componentes_que_la_app():
                  ("FinanceCosts", s, e, fin * 1e6, "CAD"), ("DepreciationAndAmortisationExpense", s, e, da * 1e6, "CAD"),
                  ("ProfitLossAttributableToOwnersOfParent", s, e, pbt * 0.75e6, "CAD"),
                  ("AdjustedWeightedAverageShares", s, e, 1_070e6, "shares")]
+    rows.append(("CashAndCashEquivalents", None, "2024-12-31", 3_000e6, "CAD"))  # sin caja el arnés descarta la fecha
     facts = bt.facts_from_companyfacts(_ifrs_payload(rows))
     t = date(2025, 6, 30)
     inp = bt.build_inputs(bt.as_of(facts, t), t=t, price=45.0, splits=[], financial=False, currency="CAD")

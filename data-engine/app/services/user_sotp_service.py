@@ -362,8 +362,12 @@ def _mostly_cash(result: dict | None) -> dict | None:
     """Cuánto del $/acción es caja menos deuda de hoy (no negocio): aviso si pasa de la mitad."""
     if not result or not result.get("value_per_share") or result["value_per_share"] <= 0:
         return None
-    cash = sum(r.get("value_per_share") or 0.0 for r in result.get("rows") or []
-               if str(r.get("name") or "").startswith("Caja menos deuda"))
+    # Solo filas de caja con cifra: una sin cifra es N/D y no cuenta como caja 0.
+    known = [float(r["value_per_share"]) for r in result.get("rows") or []
+             if str(r.get("name") or "").startswith("Caja menos deuda") and r.get("value_per_share") is not None]
+    if not known:
+        return None
+    cash = sum(known)
     share = cash / result["value_per_share"]
     if cash <= 0 or share <= MOSTLY_CASH_SHARE:
         return None

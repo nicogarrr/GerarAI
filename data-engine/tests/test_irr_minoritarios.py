@@ -98,6 +98,7 @@ def test_arnes_pit_lleva_los_flujos_a_la_parte_del_accionista():
                  ("ProfitLossAttributableToNoncontrollingInterests", s, e, nci * 1e6, "USD"),
                  ("CashFlowsFromUsedInOperatingActivities", s, e, ocf * 1e6, "USD"),
                  ("AdjustedWeightedAverageShares", s, e, 1_650e6, "shares")]
+    rows.append(("CashAndCashEquivalents", None, "2025-12-31", 9_000e6, "USD"))  # sin caja el arnés descarta la fecha
     facts = bt.facts_from_companyfacts(_ifrs_payload(rows))
     t = date(2026, 6, 30)
     inp = bt.build_inputs(bt.as_of(facts, t), t=t, price=45.0, splits=[], financial=True, currency="USD")

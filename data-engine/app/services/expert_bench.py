@@ -325,13 +325,16 @@ def source_check(valuation: Mapping[str, Any], tol: float = 0.005) -> dict[str, 
     cash_c = _num((cites.get("cash_and_equivalents") or {}).get("value"))
     sti_c = _num((cites.get("short_term_investments") or {}).get("value")) or 0.0
     extra = sum(_num(sp.get(k)) or 0.0 for k in ("leases", "hybrids", "minorities"))
+    # Solo se reconstruye con deuda Y caja citadas: con una sola, la otra sería un 0 inventado (N/D con motivo).
     rebuilt = None
-    if debt_c is not None or cash_c is not None:
-        rebuilt = ((debt_c or 0.0) - (cash_c or 0.0) - sti_c) / 1e6 + extra
+    rebuilt_missing = [label for label, x in (("deuda", debt_c), ("caja", cash_c)) if x is None]
+    if not rebuilt_missing and debt_c is not None and cash_c is not None:
+        rebuilt = (debt_c - cash_c - sti_c) / 1e6 + extra
     nd = _num(sp.get("net_debt"))
     out["net_debt"] = {
         "value": nd,
         "rebuilt_from_citations": rebuilt,
+        "rebuilt_missing": rebuilt_missing,
         "abs_diff_m": None if nd is None or rebuilt is None else abs(nd - rebuilt),
         "rel_to_mcap": None
         if nd is None or rebuilt is None or not _num(sp.get("market_cap"))
@@ -507,7 +510,12 @@ def cost_by_role(calls: Iterable[CallRecord | Mapping[str, Any]]) -> dict[str, d
         r["input_tokens"] += int(d.get("input_tokens") or 0)
         r["output_tokens"] += int(d.get("output_tokens") or 0)
         r["seconds"] += float(d.get("seconds") or 0.0)
-        r["cost_eur"] += float(d.get("cost_eur") or 0.0)
+        # Una llamada sin coste registrado no cuesta 0: se cuenta aparte y el total queda como cota inferior.
+        cost = d.get("cost_eur")
+        if cost is None:
+            r["cost_unknown_calls"] = r.get("cost_unknown_calls", 0) + 1
+        else:
+            r["cost_eur"] += float(cost)
     return out
 
 

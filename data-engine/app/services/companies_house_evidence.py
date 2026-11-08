@@ -25,6 +25,7 @@ House las guarda escaneadas) se citan con su enlace, fecha y paginas, sin cifras
 from __future__ import annotations
 
 import io
+import logging
 import re
 import threading
 import time
@@ -75,6 +76,8 @@ FIGURE_LABELS = {
     "profit": "resultado del ejercicio",
     "profit_before_tax": "resultado antes de impuestos",
 }
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_name(raw: Any) -> str:
@@ -530,7 +533,7 @@ def _run_sync(factory: Any) -> Any:
 HINT_CATEGORIES = ("linea_negocio", "activo", "opcion")
 
 
-def subsidiary_hints(db: Any, company: Any, tenant_id: int | None) -> list[str]:
+def subsidiary_hints(db: Any, company: Any, tenant_id: int | None, notes: list[str] | None = None) -> list[str]:
     """Nombres de filiales y segmentos que ya tiene GerarAI de la empresa, por este orden:
     filiales verificadas de los alias de datos (Wikidata P355/P749, ``company_alias_sources``)
     y nombres de segmentos/activos de los impulsores de valor del Recopilador."""
@@ -542,8 +545,11 @@ def subsidiary_hints(db: Any, company: Any, tenant_id: int | None) -> list[str]:
         for alias in (record.aliases if record else []):
             if alias.tipo == "filial" and alias.etiqueta == VERIFIED:
                 names.append(alias.termino)
-    except Exception:  # noqa: BLE001 - sin cache de alias se sigue con los impulsores
-        pass
+    except Exception as exc:  # noqa: BLE001 - sin cache de alias se sigue con los impulsores, pero se dice
+        reason = f"pistas de filial sin la caché de alias verificados ({type(exc).__name__}: {str(exc)[:160]})"
+        logger.warning("Companies House %s: %s", getattr(company, "ticker", None), reason)
+        if notes is not None:
+            notes.append(reason)
     if type(tenant_id) is int:
         from app.services.value_driver_service import ValueDriverService
 
