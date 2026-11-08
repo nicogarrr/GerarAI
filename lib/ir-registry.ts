@@ -80,6 +80,60 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
         events: [],
         verifiedOn: '2026-10-21',
     },
+    ZETA: {
+        name: 'Zeta Global',
+        section: { url: 'https://investors.zetaglobal.com/events-and-presentations/default.aspx', label: 'Eventos y presentaciones' },
+        events: [],
+        verifiedOn: '2026-11-08',
+    },
+    'CGEO.L': {
+        name: 'Georgia Capital',
+        section: { url: 'https://georgiacapital.ge/investor-relations/results-and-reports', label: 'Resultados e informes' },
+        events: [],
+        verifiedOn: '2026-11-08',
+    },
+    KRKNF: {
+        name: 'Kraken Robotics',
+        section: { url: 'https://krakenrobotics.com/investors/press-releases/', label: 'Notas de prensa' },
+        events: [],
+        verifiedOn: '2026-11-08',
+    },
+    BABA: {
+        name: 'Alibaba Group',
+        section: { url: 'https://www.alibabagroup.com/en-US/ir-financial-reports-quarterly-results', label: 'Resultados trimestrales' },
+        events: [],
+        verifiedOn: '2026-11-08',
+    },
+    BWMX: {
+        name: 'Betterware de México',
+        section: { url: 'https://www.befra.com/financials/quarterly-results', label: 'Resultados trimestrales' },
+        events: [],
+        verifiedOn: '2026-11-08',
+    },
+    KKR: {
+        name: 'KKR & Co.',
+        section: { url: 'https://ir.kkr.com/', label: 'Eventos y presentaciones' },
+        events: [],
+        verifiedOn: '2026-11-08',
+    },
+    POOL: {
+        name: 'Pool Corporation',
+        section: { url: 'https://ir.poolcorp.com/', label: 'Relación con inversores' },
+        events: [],
+        verifiedOn: '2026-11-08',
+    },
+    CB: {
+        name: 'Chubb',
+        section: { url: 'https://investors.chubb.com/', label: 'Relación con inversores' },
+        events: [],
+        verifiedOn: '2026-11-08',
+    },
+    CPT: {
+        name: 'Camden Property Trust',
+        section: { url: 'https://investors.camdenliving.com/', label: 'Relación con inversores' },
+        events: [],
+        verifiedOn: '2026-11-08',
+    },
 };
 
 export type IrLinks = {

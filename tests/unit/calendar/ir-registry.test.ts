@@ -44,6 +44,13 @@ describe('irLinksFor', () => {
         expect(irLinksFor('NOEXISTE', '2026-11-08')).toBeNull();
     });
 
+    it('cubre las posiciones y watchlist registradas el 2026-11-08', () => {
+        // Guard anti-regresion: cada ticker registrado responde con su seccion oficial.
+        for (const ticker of ['META', 'BN', 'TSLA', 'ASTS', 'ZETA', 'CGEO.L', 'KRKNF', 'BABA', 'BWMX', 'KKR', 'POOL', 'CB', 'CPT']) {
+            expect(irLinksFor(ticker, '2026-11-08')?.section.url, ticker).toMatch(/^https:\/\//);
+        }
+    });
+
     it('normaliza el ticker a mayusculas', () => {
         expect(irLinksFor('meta', '2026-10-21')?.section.url).toBe(IR_REGISTRY.META.section.url);
     });
