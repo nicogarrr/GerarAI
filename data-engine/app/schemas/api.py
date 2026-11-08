@@ -2161,12 +2161,33 @@ class WatchlistItemOut(BaseModel):
 # (no cerrado: str honesto).
 
 
+class WatchlistValuationRankSpreadOut(BaseModel):
+    period: str = Field(description="Periodo medido, p. ej. 2015–2020")
+    pts: float = Field(description="Puntos de rentabilidad mediana frente al SPY: quintil más barato − más caro")
+
+
+class WatchlistValuationRankEvidenceOut(BaseModel):
+    """Lo medido del puesto (app/data/value_rank_evidence.json): el texto lee sus cifras de aquí."""
+
+    wacc_policy: str = Field(description="Método de descuento del DCF con el que se midió")
+    measured_on: str
+    universe: str
+    companies: int
+    sample_years: str
+    horizon_months: int
+    cheapest_vs_dearest_quintile_pts: list[WatchlistValuationRankSpreadOut]
+    undervalued_beat_spy_12m: float = Field(description="Fracción de «infravaloradas» que batieron al SPY a 12 meses")
+    rest_beat_spy_12m: float = Field(description="La misma fracción para el resto")
+    source: str
+
+
 class WatchlistValuationRankOut(BaseModel):
     """Puesto por valor justo / precio frente a las empresas valoradas por el motor."""
 
     quintile: int = Field(ge=1, le=5, description="1 = el 20 % más barato; 5 = el 20 % más caro")
     cheaper_than_pct: int = Field(ge=0, le=100, description="% de comparables con un valor/precio menor")
     peers: int = Field(ge=1, description="Empresas comparadas")
+    evidence: WatchlistValuationRankEvidenceOut | None = None
 
 
 class WatchlistMonitorItemOut(BaseModel):

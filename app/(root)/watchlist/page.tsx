@@ -9,7 +9,7 @@ import { getWatchlistState, getWatchlistEntryData, getWatchlistMonitor, type Wat
 import { getResearchCompaniesBasics, getResearchCompanyBasics, type ResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
 import { getProfile } from '@/lib/actions/finnhub.actions';
 import { isTickerNotFound } from '@/lib/watchlist/lookup-status';
-import { valueRankKey, valueRankSummary } from '@/lib/watchlist/value-rank';
+import { type ValueRank, valueRankEvidenceParams, valueRankKey, valueRankSummary } from '@/lib/watchlist/value-rank';
 import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
@@ -315,12 +315,23 @@ export default async function WatchlistPage({
     const formatPriceCell = (price: number | null, currency: string | null) =>
         price === null ? NA : currency ? formatPrice(price, currency) : formatNumber(price);
 
+    // Cifras del backtest: del artefacto medido que manda el backend, nunca fijas en el texto.
+    const listJoin = new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' });
+    const rankTitle = (rank: ValueRank) => {
+        const evidence = valueRankEvidenceParams(
+            rank.evidence,
+            (value) => formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: 'exceptZero' }),
+            (parts) => listJoin.format(parts),
+        );
+        const base = t('watchlist.page.fairValue.rankTitle', { peers: rank.peers, pct: rank.cheaper_than_pct });
+        return evidence ? `${base} ${t('watchlist.page.fairValue.rankEvidence', evidence)}` : base;
+    };
     const valueRankNote = (stock: WatchlistStock) => {
         const rank = stock.monitor?.valuation_rank;
         const key = valueRankKey(rank);
         if (!rank || !key) return null;
         return (
-            <span className="block text-[11px] text-gray-500" title={t('watchlist.page.fairValue.rankTitle', { peers: rank.peers, pct: rank.cheaper_than_pct })}>
+            <span className="block text-[11px] text-gray-500" title={rankTitle(rank)}>
                 {t(key)}
             </span>
         );

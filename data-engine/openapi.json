@@ -24665,6 +24665,71 @@
         "title": "WatchlistMonitorOut",
         "type": "object"
       },
+      "WatchlistValuationRankEvidenceOut": {
+        "description": "Lo medido del puesto (app/data/value_rank_evidence.json): el texto lee sus cifras de aqu\u00ed.",
+        "properties": {
+          "cheapest_vs_dearest_quintile_pts": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistValuationRankSpreadOut"
+            },
+            "title": "Cheapest Vs Dearest Quintile Pts",
+            "type": "array"
+          },
+          "companies": {
+            "title": "Companies",
+            "type": "integer"
+          },
+          "horizon_months": {
+            "title": "Horizon Months",
+            "type": "integer"
+          },
+          "measured_on": {
+            "title": "Measured On",
+            "type": "string"
+          },
+          "rest_beat_spy_12m": {
+            "description": "La misma fracci\u00f3n para el resto",
+            "title": "Rest Beat Spy 12M",
+            "type": "number"
+          },
+          "sample_years": {
+            "title": "Sample Years",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "undervalued_beat_spy_12m": {
+            "description": "Fracci\u00f3n de \u00abinfravaloradas\u00bb que batieron al SPY a 12 meses",
+            "title": "Undervalued Beat Spy 12M",
+            "type": "number"
+          },
+          "universe": {
+            "title": "Universe",
+            "type": "string"
+          },
+          "wacc_policy": {
+            "description": "M\u00e9todo de descuento del DCF con el que se midi\u00f3",
+            "title": "Wacc Policy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "wacc_policy",
+          "measured_on",
+          "universe",
+          "companies",
+          "sample_years",
+          "horizon_months",
+          "cheapest_vs_dearest_quintile_pts",
+          "undervalued_beat_spy_12m",
+          "rest_beat_spy_12m",
+          "source"
+        ],
+        "title": "WatchlistValuationRankEvidenceOut",
+        "type": "object"
+      },
       "WatchlistValuationRankOut": {
         "description": "Puesto por valor justo / precio frente a las empresas valoradas por el motor.",
         "properties": {
@@ -24674,6 +24739,16 @@
             "minimum": 0.0,
             "title": "Cheaper Than Pct",
             "type": "integer"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WatchlistValuationRankEvidenceOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "peers": {
             "description": "Empresas comparadas",
@@ -24695,6 +24770,26 @@
           "peers"
         ],
         "title": "WatchlistValuationRankOut",
+        "type": "object"
+      },
+      "WatchlistValuationRankSpreadOut": {
+        "properties": {
+          "period": {
+            "description": "Periodo medido, p. ej. 2015\u20132020",
+            "title": "Period",
+            "type": "string"
+          },
+          "pts": {
+            "description": "Puntos de rentabilidad mediana frente al SPY: quintil m\u00e1s barato \u2212 m\u00e1s caro",
+            "title": "Pts",
+            "type": "number"
+          }
+        },
+        "required": [
+          "period",
+          "pts"
+        ],
+        "title": "WatchlistValuationRankSpreadOut",
         "type": "object"
       },
       "WhatToBelieve": {

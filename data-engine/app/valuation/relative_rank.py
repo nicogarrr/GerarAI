@@ -1,15 +1,11 @@
 """Puesto relativo del valor justo: en qué quintil cae una empresa frente al resto.
 
 Sustituye a la etiqueta binaria «infravalorada / sobrevalorada» (valor > precio),
-que no anticipa nada. Medido (backtest gerarai-dcavalor1, 7-nov-2026, réplica
-point-in-time del DCF estándar, 377 empresas del S&P 500, 2015-2026):
-
-* «Infravalorada» bate al S&P 500 a 12 meses el 49 % de las veces, igual que el
-  resto (49 %): el umbral valor = precio no separa nada, sobre todo porque el
-  método sale de mediana a 0,61x el precio (el 76 % salían «sobrevaloradas»).
-* Ordenar sí sirve: a 24 meses, el quintil más barato según valor/precio batió
-  al más caro en +4,0 (2015-20) y +12,1 (2021-26) puntos de rentabilidad mediana
-  frente al SPY.
+que no anticipa nada. Lo medido (cuánto separa el quintil más barato del más
+caro, y si «infravalorada» batía al SPY) vive en ``app/data/value_rank_evidence.json``
+con su fuente y el método de descuento con el que se midió; la watchlist lee las
+cifras de ahí (``rank_evidence``), nunca de un texto fijo. Si el DCF estándar
+cambia de método de descuento, un test obliga a volver a medir.
 
 El puesto se calcula sobre el cociente valor justo / precio, así que no depende
 del nivel absoluto del método: si el valor justo se recalibra (todo sube o baja
@@ -23,9 +19,12 @@ diez empresas no dice nada. Quintil 1 = el 20 % más barato; 5 = el 20 % más ca
 
 from __future__ import annotations
 
+import json
 import math
 from bisect import bisect_left, bisect_right
 from collections.abc import Iterable, Mapping
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import func, select
@@ -36,12 +35,40 @@ from app.core.tenancy import tenant_filters
 MIN_PEERS = 30
 #: Cocientes valor/precio fuera de este rango son datos rotos (unidades, splits), no comparables.
 RATIO_BOUNDS = (0.02, 50.0)
-EVIDENCE = {
-    "horizon_months": 24,
-    "cheapest_vs_dearest_quintile_pts": {"2015_2020": 4.0, "2021_2026": 12.1},
-    "undervalued_label_beat_spy_12m": 0.49,
-    "rest_beat_spy_12m": 0.49,
-}
+EVIDENCE_PATH = Path(__file__).resolve().parents[1] / "data" / "value_rank_evidence.json"
+
+
+@lru_cache(maxsize=1)
+def _evidence_file() -> dict[str, Any]:
+    return json.loads(EVIDENCE_PATH.read_text(encoding="utf-8"))
+
+
+def rank_evidence() -> dict[str, Any] | None:
+    """Lo medido del puesto, para el texto de la watchlist (o None si el fichero no se lee).
+
+    Sin cifras inventadas: cada valor sale del artefacto medido, con el método
+    de descuento con el que se midió (``wacc_policy``).
+    """
+    try:
+        raw = _evidence_file()
+        spreads = [
+            {"period": str(row["period"]), "pts": float(row["pts"])}
+            for row in raw["cheapest_vs_dearest_quintile_pts"]
+        ]
+        return {
+            "wacc_policy": str(raw["wacc_policy"]),
+            "measured_on": str(raw["measured_on"]),
+            "universe": str(raw["universe"]),
+            "companies": int(raw["companies"]),
+            "sample_years": str(raw["sample_years"]),
+            "horizon_months": int(raw["horizon_months"]),
+            "cheapest_vs_dearest_quintile_pts": spreads,
+            "undervalued_beat_spy_12m": float(raw["undervalued_beat_spy_12m"]),
+            "rest_beat_spy_12m": float(raw["rest_beat_spy_12m"]),
+            "source": str(raw["source"]),
+        }
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
 
 
 def _ratio(value: object, price: object) -> float | None:
@@ -131,4 +158,9 @@ def relative_ranks(
 ) -> dict[Any, dict[str, Any] | None]:
     """Puesto de cada objetivo frente a los comparables (sin contarse a sí mismo dos veces)."""
     pool = list(peers.values())
-    return {key: rank_against(ratio, pool) for key, ratio in targets.items()}
+    evidence = rank_evidence()
+    out: dict[Any, dict[str, Any] | None] = {}
+    for key, ratio in targets.items():
+        rank = rank_against(ratio, pool)
+        out[key] = {**rank, "evidence": evidence} if rank is not None else None
+    return out
