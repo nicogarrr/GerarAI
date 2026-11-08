@@ -154,7 +154,7 @@ The full product rationale is in [docs/PRODUCT_VISION.md](docs/PRODUCT_VISION.md
 flowchart LR
     U([Browser]) --> FE
 
-    subgraph Vercel
+    subgraph Frontend["Frontend (Oracle VM · docker-compose.frontend.yml)"]
         FE["Next.js 16 app<br/>App Router · server actions"]
     end
 
@@ -267,7 +267,7 @@ All configuration is provided through environment variables. Templates:
 
 Never commit a real `.env`; only the `.example` files are versioned. Generate secrets with `openssl rand -base64 32`.
 
-### Frontend variables (Next.js / Vercel)
+### Frontend variables (Next.js)
 
 | Variable | Purpose | Required |
 | --- | --- | --- |
@@ -361,8 +361,8 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) also checks dependen
 
 The repository includes the following deployment topology. It is not a statement that a particular installation is configured or healthy:
 
-- **Frontend on Vercel** ([`vercel.json`](vercel.json)): Next.js build in the `fra1` region. Only `main` deploys automatically. Recovery runbook: [docs/RUNBOOK_VERCEL_DEPLOY_RECOVERY.md](docs/RUNBOOK_VERCEL_DEPLOY_RECOVERY.md).
-- **Backend on Oracle Cloud** (Always Free, Ampere ARM VM) with [`docker-compose.prod.yml`](docker-compose.prod.yml): Caddy, PostgreSQL, Redis, Qdrant, MinIO, API, worker and scheduler, with health checks and automatic restarts. Setup: [docs/oracle-setup.md](docs/oracle-setup.md).
+- **Frontend on Oracle Cloud** (Always Free, Ampere ARM VM) with [`docker-compose.frontend.yml`](docker-compose.frontend.yml): a standalone Next.js server behind Caddy on `gerarai.duckdns.org`, with a loopback-only host port and 1 CPU / 2 GiB limits. Runbook: [docs/frontend-oracle.md](docs/frontend-oracle.md). The Vercel configuration ([`vercel.json`](vercel.json)) stays in the repo as a fallback path; recovery runbook: [docs/RUNBOOK_VERCEL_DEPLOY_RECOVERY.md](docs/RUNBOOK_VERCEL_DEPLOY_RECOVERY.md).
+- **Backend on the same Oracle VM** with [`docker-compose.prod.yml`](docker-compose.prod.yml): Caddy, PostgreSQL, Redis, Qdrant, MinIO, API, worker and scheduler, with health checks and automatic restarts. Setup: [docs/oracle-setup.md](docs/oracle-setup.md).
 
 Operational notes:
 
