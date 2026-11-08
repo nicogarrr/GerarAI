@@ -41,6 +41,7 @@
 #   services/connectors/esef.py: connector to a fixed public data API
 #   services/connectors/fca_nsm.py: FCA National Storage Mechanism, fixed hosts (api.data.fca.org.uk, data.fca.org.uk)
 #   services/connectors/companies_house.py: Companies House REST/document API, fixed hosts (api.company-information.service.gov.uk, document-api...) + its signed S3 redirect
+#   services/scanned_accounts.py: public Companies House filing PDF, fixed host find-and-update.company-information.service.gov.uk + its S3 redirect (host allowlist in code)
 #   services/connectors/finnhub.py: connector to a fixed public data API
 #   services/connectors/fmp.py: connector to a fixed public data API
 #   services/connectors/form13dg.py: connector to a fixed public data API
@@ -128,6 +129,7 @@ rules:
     - /data-engine/app/services/connectors/esef.py
     - /data-engine/app/services/connectors/fca_nsm.py
     - /data-engine/app/services/connectors/companies_house.py
+    - /data-engine/app/services/scanned_accounts.py
     - /data-engine/app/services/connectors/finnhub.py
     - /data-engine/app/services/connectors/fmp.py
     - /data-engine/app/services/connectors/form13dg.py

@@ -5380,3 +5380,28 @@ def ingest_house_ptr(
             release_job_lease(f"ingest_house_ptr:{tenant_id}", lease, redis_url=_lease_redis_url())
         if db is not None:
             db.close()
+
+
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=30 * 60 * 1000, queue_name=DOCUMENTS_QUEUE_NAME)
+def extract_scanned_accounts(
+    company_number: str,
+    made_up_to: str | None,
+    document_url: str,
+    company_name: str | None = None,
+    ticker: str | None = None,
+) -> dict[str, Any]:
+    """Lee por OCR (pagina a pagina, un tesseract) los estados primarios de unas cuentas
+    escaneadas de Companies House y guarda las cifras validadas con su pagina (cache Redis)."""
+    actor_name = "extract_scanned_accounts"
+    try:
+        from app.services import scanned_accounts
+        from app.workers.ingest_slot import document_ingest_slot
+
+        # Mismo cupo que la ingesta pesada: un OCR largo no se solapa con Docling.
+        with document_ingest_slot().hold():
+            result = scanned_accounts.read_and_cache(company_number, made_up_to, document_url,
+                                                     ticker=ticker, company_name=company_name)
+        return {"status": result.get("status"), "actor": actor_name, "figures": len(result.get("figures") or []),
+                "reason": result.get("reason")}
+    except Exception as exc:
+        return _handle_actor_error(actor_name, exc, ticker=ticker, url=document_url)

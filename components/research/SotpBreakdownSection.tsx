@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { deleteSotpResult, saveSotpResult } from '@/lib/actions/sotp.actions';
 import { formatNumberForInput, formatUserDate } from '@/lib/format';
 import { getFormat, getLocale, getT } from '@/lib/i18n/server';
-import { SOTP_EXTRA_DILUTION, SOTP_EXTRA_PARTS, SOTP_EXTRA_SCENARIOS, getSotp, type SotpModel, type SotpResponse, type SotpSource, type SotpVariantKey, type SotpWhy } from '@/lib/research/sotp';
+import { SOTP_EXTRA_DILUTION, SOTP_EXTRA_PARTS, SOTP_EXTRA_SCENARIOS, getSotp, type SotpCompaniesHouse, type SotpModel, type SotpResponse, type SotpSource, type SotpVariantKey, type SotpWhy } from '@/lib/research/sotp';
 
 type T = Awaited<ReturnType<typeof getT>>;
 type F = Awaited<ReturnType<typeof getFormat>>;
@@ -242,8 +242,59 @@ export function SotpBreakdownView({ data, t, fmt, locale, ticker, editable = tru
           ))}
         </section>
       ) : null}
+      {data.companies_house?.length ? <SotpCompaniesHouseAccounts rows={data.companies_house} t={t} fmt={fmt} /> : null}
       {editable ? <SotpAgentsButton hasProposal={(data.variants ?? []).some((v) => v.key === 'agents' && v.available)} ticker={ticker} /> : null}
       {editable ? <SotpEditor model={model} t={t} locale={locale} ticker={ticker} saved={data.origin === 'saved'} versions={data.saved?.versions ?? 0} fromAgents={data.origin === 'agents'} /> : null}
+    </section>
+  );
+}
+
+const CH_METRIC_KEYS = {
+  revenue: 'research.sotp.chMetric.revenue',
+  profit_before_tax: 'research.sotp.chMetric.profitBeforeTax',
+  profit_for_year: 'research.sotp.chMetric.profitForYear',
+  profit_attributable: 'research.sotp.chMetric.profitAttributable',
+  total_equity: 'research.sotp.chMetric.totalEquity',
+  equity_attributable: 'research.sotp.chMetric.equityAttributable',
+  net_assets: 'research.sotp.chMetric.netAssets',
+  cash: 'research.sotp.chMetric.cash',
+  borrowings: 'research.sotp.chMetric.borrowings',
+} as const;
+const CH_METRICS = Object.keys(CH_METRIC_KEYS) as (keyof typeof CH_METRIC_KEYS)[];
+
+/** Cuentas británicas escaneadas del grupo: cada cifra con su página, la línea literal y su comprobación. */
+function SotpCompaniesHouseAccounts({ rows, t, fmt }: { rows: SotpCompaniesHouse[]; t: T; fmt: F }) {
+  return (
+    <section className={`${BOX} space-y-2`} data-testid="sotp-companies-house">
+      <h4 className="text-sm font-semibold text-gray-200">{t('research.sotp.chTitle')}</h4>
+      <p className="text-xs text-gray-500">{t('research.sotp.chHint')}</p>
+      {rows.map((row) => (
+        <div key={`${row.company_number}-${row.made_up_to}`} className="space-y-1">
+          <p className="text-xs text-gray-300">
+            {row.document_url ? <a className="underline" href={row.document_url} rel="noopener noreferrer" target="_blank">{row.company_name}</a> : row.company_name}
+            {` (${row.company_number ?? '—'}) · ${row.made_up_to ?? '—'}`}
+          </p>
+          {row.figures.length ? (
+            <ul className="space-y-0.5 text-xs text-gray-300">
+              {CH_METRICS.flatMap((metric) => row.figures.filter((f) => f.metric === metric)).map((f) => (
+                <li key={f.metric} title={f.line ?? undefined}>
+                  <span className="text-gray-400">{t(CH_METRIC_KEYS[f.metric as keyof typeof CH_METRIC_KEYS])}: </span>
+                  {fmt.formatNumber(f.value, { maximumFractionDigits: 1 })} {f.unit ?? f.currency ?? ''}
+                  {f.page ? <>{' · '}{f.page_url ? <a className="underline" href={f.page_url} rel="noopener noreferrer" target="_blank">{t('research.sotp.chPage', { page: f.page })}</a> : t('research.sotp.chPage', { page: f.page })}</> : null}
+                  {f.line ? <span className="text-gray-500">{` «${f.line}»`}</span> : null}
+                  {f.basis ? <span className="text-gray-500">{` — ${f.basis}`}</span> : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {Object.values(row.checks ?? {}).map((c, i) => (
+            <p key={i} className={`text-xs ${c.ok ? 'text-gray-500' : 'text-amber-200'}`}>{t('research.sotp.chChecks', { why: c.why })}</p>
+          ))}
+          {(row.rejected ?? []).map((r, i) => (
+            <p key={`r-${i}`} className="text-xs text-amber-200">{t('research.sotp.chRejected', { metric: r.metric, page: r.page ?? '—', reason: r.reason ?? '—' })}</p>
+          ))}
+        </div>
+      ))}
     </section>
   );
 }

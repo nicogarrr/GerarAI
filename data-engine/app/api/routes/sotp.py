@@ -33,7 +33,31 @@ def get_user_sotp(
     editada por el usuario (si es posterior) y el ejemplo de código del ticker.
     Supuestos no validados: no es el valor justo de GerarAI."""
     company, tenant = _context(db, ticker)
-    return UserSotpService().read(db, company, tenant, variant=variant)
+    out = UserSotpService().read(db, company, tenant, variant=variant)
+    # Cifras con pagina de las cuentas britanicas escaneadas ya leidas por el worker (solo cache).
+    out["companies_house"] = companies_house_scanned(company.ticker)
+    return out
+
+
+def companies_house_scanned(ticker: str) -> list[dict]:
+    """Por sociedad: cifras validadas (pagina, linea literal, unidades, periodo) y motivo de lo descartado."""
+    from app.services import scanned_accounts
+
+    rows = []
+    for item in scanned_accounts.for_ticker(ticker):
+        doc = item.get("document_url")
+        rows.append({
+            "company_name": item.get("company_name"), "company_number": item.get("company_number"),
+            "made_up_to": item.get("made_up_to"), "document_url": doc, "status": item.get("status"),
+            "reason": item.get("reason"), "page_count": item.get("page_count"),
+            "checks": item.get("checks") or {},
+            "figures": [{**{k: f.get(k) for k in ("metric", "label", "value", "unit", "currency", "period_end",
+                                                   "page", "line", "basis", "check")},
+                         "page_url": scanned_accounts.page_url(doc, f.get("page"))}
+                        for f in item.get("figures") or []],
+            "rejected": [{k: f.get(k) for k in ("metric", "page", "reason")} for f in item.get("rejected") or []],
+        })
+    return rows
 
 
 @router.post("/{ticker}/sotp/generate", status_code=202)

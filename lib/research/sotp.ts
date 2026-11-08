@@ -137,8 +137,23 @@ export type SotpAgentsStatus = {
   finished_at?: string | null;
 };
 
+/** Cifras de unas cuentas británicas escaneadas, leídas por OCR con su página (Companies House). */
+export type SotpCompaniesHouseFigure = {
+  metric: string; label: string; value: number; unit?: string | null; currency?: string | null; period_end?: string | null;
+  page?: number | null; line?: string | null; basis?: string | null; check?: string | null; page_url?: string | null;
+};
+export type SotpCompaniesHouse = {
+  company_name?: string | null; company_number?: string | null; made_up_to?: string | null; document_url?: string | null;
+  status?: string | null; reason?: string | null; page_count?: number | null;
+  checks?: Record<string, { ok: boolean; why: string; pages?: number[] }>;
+  figures: SotpCompaniesHouseFigure[];
+  rejected?: { metric: string; page?: number | null; reason?: string | null }[];
+};
+
 export type SotpResponse = {
   ticker: string;
+  /** Cuentas escaneadas de las sociedades británicas del grupo ya leídas (solo caché, sin red). */
+  companies_house?: SotpCompaniesHouse[];
   available: boolean;
   origin?: 'saved' | 'example' | 'agents';
   variant?: SotpVariantKey | null;

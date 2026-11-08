@@ -1992,7 +1992,23 @@
     "unvaluedTitle": "Not valued (no checkable figure in the evidence, they add nothing):",
     "mostlyCash": "Note: {cash} of the {total} per share ({share}) is today's cash minus debt, not business. The core business is undervalued for lack of estimates: this figure is not a fair value of the share.",
     "narrativeTitle": "The experts' thesis on the breakdown",
-    "narrativeHint": "Prose by the agents; every figure comes from the calculation above (markers), never from the model."
+    "narrativeHint": "Prose by the agents; every figure comes from the calculation above (markers), never from the model.",
+    "chTitle": "Scanned UK accounts (Companies House)",
+    "chHint": "Read by OCR from the primary statements. Each figure opens its page of the filing; used only if the balance sheet balances.",
+    "chPage": "p. {page}",
+    "chChecks": "Check: {why}",
+    "chRejected": "Not used ({metric}, p. {page}): {reason}",
+    "chMetric": {
+      "revenue": "Revenue / premiums",
+      "profitBeforeTax": "Profit before tax",
+      "profitForYear": "Profit for the year",
+      "profitAttributable": "Attributable profit",
+      "totalEquity": "Total equity",
+      "equityAttributable": "Attributable equity",
+      "netAssets": "Net assets (NAV)",
+      "cash": "Cash and equivalents",
+      "borrowings": "Borrowings"
+    }
   },
   "informe": {
     "nav": {

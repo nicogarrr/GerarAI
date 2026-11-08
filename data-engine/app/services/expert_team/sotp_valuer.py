@@ -910,18 +910,36 @@ def _company_guidance_outputs(db: Session, company: Company, tenant_id: int) -> 
 
 def companies_house_outputs(result: Mapping[str, Any] | None) -> list[ToolOutput]:
     """Una salida por filial britanica verificada: sus ultimas cuentas en Companies House,
-    citadas con su URL publica, y las cifras del iXBRL cuando las cuentas van etiquetadas."""
+    citadas con su URL publica, y las cifras del iXBRL cuando las cuentas van etiquetadas o
+    las leidas por OCR de los estados primarios (con pagina y linea literal) si van escaneadas."""
     out: list[ToolOutput] = []
     for row in (result or {}).get("members") or []:
-        figures = {
-            f["metric"]: {"millones": f["value_millions"], "moneda": f["currency"], "cierre": f["period_end"],
-                          "concepto": f["concept"]}
-            for f in row.get("figures") or []
-        }
+        rows = row.get("figures") or []
+        figures: dict[str, dict[str, Any]] = {}
+        for f in rows:
+            item: dict[str, Any] = {"millones": f["value_millions"], "moneda": f["currency"], "cierre": f["period_end"],
+                                    "concepto": f["concept"]}
+            if f.get("source") == "ocr":
+                item.update(pagina=f.get("page"), linea=f.get("line"), unidad=f.get("unit"),
+                            enlace=f.get("page_url"), base=f.get("basis"), comprobacion=f.get("check"))
+            figures[f["metric"]] = item
         made_up = row.get("made_up_to") or ""
         kind = row.get("accounts_type") or "sin cuentas"
-        quote = "; ".join(f"{f['label']} {f['value']:,.0f} {f['currency']} a {f['period_end']} ({f['concept']})"
-                          for f in row.get("figures") or [])
+        ocr = any(f.get("source") == "ocr" for f in rows)
+        quote = "; ".join(
+            (f"{f['label']} {f['value']:,.1f} {f.get('unit') or f['currency']} a {f['period_end']} "
+             f"(pág. {f.get('page')}: «{f.get('line')}»)") if f.get("source") == "ocr" else
+            f"{f['label']} {f['value']:,.0f} {f['currency']} a {f['period_end']} ({f['concept']})"
+            for f in rows)
+        scanned = row.get("scanned") or {}
+        if figures:
+            nota = "cifras leidas por OCR de los estados primarios; el balance cuadra" if ocr else None
+        elif scanned.get("status") == "pending":
+            nota = "cuentas en PDF escaneado: lectura OCR en cola, citables por su enlace"
+        elif scanned:
+            nota = f"cuentas en PDF escaneado sin cifras utilizables: {scanned.get('reason') or scanned.get('status')}"
+        else:
+            nota = "cuentas en PDF (sin iXBRL): citables por su enlace, sin cifras extraidas"
         out.append(ToolOutput(
             source={"table": "companies_house", "id": str(row.get("company_number") or ""),
                     "url": row.get("ixbrl_url") if figures and row.get("ixbrl_url") else
@@ -935,7 +953,7 @@ def companies_house_outputs(result: Mapping[str, Any] | None) -> list[ToolOutput
                 "tipo_cuentas": kind, "cierre": made_up, "presentadas": row.get("filed_on"),
                 "formatos": row.get("formats"), "paginas": row.get("pages"),
                 "cifras": figures or None,
-                "nota": None if figures else "cuentas en PDF (sin iXBRL): citables por su enlace, sin cifras extraidas",
+                "nota": nota,
                 "quote": quote or None, "ficha": row.get("company_url"),
             },
         ))
@@ -948,7 +966,11 @@ def companies_house_tool(db: Session) -> ToolSpec:
     def companies_house(ctx: RunContext) -> list[ToolOutput]:
         from sqlalchemy import select
 
-        from app.services.companies_house_evidence import collect_group_accounts, subsidiary_hints
+        from app.services.companies_house_evidence import (
+            collect_group_accounts,
+            queue_scanned_reads,
+            subsidiary_hints,
+        )
 
         if not ctx.ticker:
             return []
@@ -959,6 +981,7 @@ def companies_house_tool(db: Session) -> ToolSpec:
             return []
         tenant = ctx.tenant_id if type(ctx.tenant_id) is int else None
         result = collect_group_accounts(company.name, subsidiary_hints(db, company, tenant))
+        queue_scanned_reads(result, company.ticker)
         return companies_house_outputs(result)
 
     return ToolSpec(name="companies_house", fn=companies_house,

@@ -1992,7 +1992,23 @@
     "unvaluedTitle": "Sin valorar (no hay cifra comprobable en la evidencia, no suman):",
     "mostlyCash": "Ojo: {cash} de los {total} por acción ({share}) son caja menos deuda de hoy, no negocio. El negocio principal queda infravalorado por falta de estimaciones: esta cifra no es un valor razonable de la acción.",
     "narrativeTitle": "Tesis de los expertos sobre el desglose",
-    "narrativeHint": "Prosa de los agentes; cada cifra sale del cálculo de arriba (marcadores), nunca del modelo."
+    "narrativeHint": "Prosa de los agentes; cada cifra sale del cálculo de arriba (marcadores), nunca del modelo.",
+    "chTitle": "Cuentas británicas escaneadas (Companies House)",
+    "chHint": "Leídas por OCR de los estados primarios. Cada cifra abre su página del depósito; solo se usan si el balance cuadra.",
+    "chPage": "pág. {page}",
+    "chChecks": "Comprobación: {why}",
+    "chRejected": "No se usa ({metric}, pág. {page}): {reason}",
+    "chMetric": {
+      "revenue": "Ingresos / primas",
+      "profitBeforeTax": "Resultado antes de impuestos",
+      "profitForYear": "Resultado del ejercicio",
+      "profitAttributable": "Resultado atribuible",
+      "totalEquity": "Patrimonio total",
+      "equityAttributable": "Patrimonio atribuible",
+      "netAssets": "Activos netos (NAV)",
+      "cash": "Caja y equivalentes",
+      "borrowings": "Deuda financiera"
+    }
   },
   "informe": {
     "nav": {
