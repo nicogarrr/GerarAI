@@ -169,7 +169,7 @@ erDiagram
 
 ## 5. Estrategia de Rendimiento y Escalabilidad
 
-- **Pool de Conexiones**: SQLAlchemy gestiona un pool con reciclaje automático (`pool_pre_ping=True`). Por defecto tamaño 10 y overflow 10; el compose de producción fija el backend en 20+10 y los workers en 4+2 (`DB_POOL_SIZE` / `DB_MAX_OVERFLOW`), por proceso.
+- **Pool de Conexiones**: SQLAlchemy gestiona un pool con reciclaje automático (`pool_pre_ping=True`). Defaults de código 10+10, configurables por proceso con `DB_POOL_SIZE` / `DB_MAX_OVERFLOW`; el compose de producción los fija en 20+10 para el backend, 8+2 para el worker principal (`WORKER_DB_POOL_SIZE`) y 4+2 para el resto de workers.
 - **Qdrant Client Pool**: Los clientes Qdrant se reutilizan de forma thread-safe evitando desconexiones y re-aperturas de sockets gRPC/HTTP.
 - **Redis Multi-Layer Caching**: Claves deterministas SHA256 para cotizaciones (TTL 5 min), valoraciones de cartera (TTL 10 min) y señales DCA (TTL 5 min), con invalidación reactiva mediante eventos SQLAlchemy.
 - **Generación PDF Zero-Cost**: Procesamiento asíncrono y en memoria de PDFs mediante matplotlib y pypdf, sin dependencias externas pesadas como Chromium/Puppeteer.
