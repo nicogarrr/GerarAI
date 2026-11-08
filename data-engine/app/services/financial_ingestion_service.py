@@ -463,7 +463,9 @@ def sec_ifrs_metric_map_for(ifrs_facts: dict[str, Any]) -> list[tuple[str, list[
 # un emisor cuyo snapshot no cambia nunca recogeria la regla nueva.
 # 2 (8-nov-2026): ``acquisitions`` (CashFlowsUsedInObtainingControlOfSubsidiaries…) y recompras
 # (PaymentsToAcquireOrRedeemEntitysShares).
-ESEF_INGESTION_RULES_VERSION = 2
+# 3 (8-nov-2026): ``net_income`` = beneficio atribuible a la dominante (ProfitLoss solo de respaldo) y
+# ``shares_diluted`` = AdjustedWeightedAverageShares cuando el emisor la etiqueta (sin derivar).
+ESEF_INGESTION_RULES_VERSION = 3
 
 ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # RevenueFromContractsWithCustomers: emisores que solo etiquetan la cifra
@@ -472,7 +474,10 @@ ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # un periodo, _merge_esef_periods lo rechaza como ambiguo.
     ("revenue",           ["ifrs-full:Revenue", "ifrs-full:RevenueFromInterest",
                            "ifrs-full:RevenueFromContractsWithCustomers"],                               "iso4217:EUR"),
-    ("net_income",        ["ifrs-full:ProfitLoss"],                                                      "iso4217:EUR"),
+    # Beneficio ATRIBUIBLE a la dominante primero (como en us-gaap y en el mapa IFRS de la SEC); el total con
+    # minoritarios solo si el emisor no lo desglosa. Eurofins 2024: 367,6 M frente a 405,5 M; las acciones
+    # derivadas (beneficio / BPA diluido) salían 194 M en vez de 176 M.
+    ("net_income",        ["ifrs-full:ProfitLossAttributableToOwnersOfParent", "ifrs-full:ProfitLoss"],  "iso4217:EUR"),
     ("operating_income",  ["ifrs-full:ProfitLossFromOperatingActivities"],                               "iso4217:EUR"),
     ("gross_profit",      ["ifrs-full:GrossProfit"],                                                     "iso4217:EUR"),
     ("income_before_tax", ["ifrs-full:ProfitLossBeforeTax"],                                             "iso4217:EUR"),
@@ -1225,6 +1230,21 @@ def _esef_period(entry: dict[str, Any]) -> str | None:
     if "instant" in entry:
         return str(entry["instant"])
     return None
+
+
+ESEF_DILUTED_SHARES_CONCEPT = "ifrs-full:AdjustedWeightedAverageShares"
+
+
+def esef_tagged_diluted_shares(facts_data: dict[str, Any]) -> dict[str, Decimal]:
+    """Media ponderada DILUIDA de acciones (IAS 33) por cierre, cuando el emisor la etiqueta sin dimensiones
+    (Eurofins 2024: 194,5 M). Vacío si no la etiqueta: entonces se deriva como beneficio / BPA diluido."""
+    periods, _cov = _merge_esef_periods(facts_data, [ESEF_DILUTED_SHARES_CONCEPT], "xbrli:shares", "shares_diluted")
+    out: dict[str, Decimal] = {}
+    for period, entry in periods.items():
+        val = _decimal(entry.get("val"))
+        if val is not None and val > 0:
+            out[period] = val
+    return out
 
 
 def _esef_annual_ends(facts_data: dict[str, Any]) -> frozenset[str]:
@@ -3083,6 +3103,26 @@ class FinancialIngestionService:
             profit_periods, diluted_periods, basic_periods
         )
         imported = 0
+        # Lo que el emisor etiqueta manda: IAS 33 «AdjustedWeightedAverageShares» (media ponderada
+        # diluida) se publica tal cual y la derivación beneficio / BPA solo cubre los ejercicios sin ella.
+        tagged = esef_tagged_diluted_shares(facts_data)
+        for period, shares in sorted(tagged.items()):
+            _queue_fact(
+                db,
+                company_id=company.id,
+                metric=esef_shares.DILUTED_METRIC,
+                value=shares,
+                unit="shares",
+                period=f"{period}:FY",
+                fiscal_year=_annual_fiscal_year(period, None),
+                fiscal_quarter="FY",
+                source_id=document.id,
+                source_type="ESEF",
+                is_reported=True,
+                confidence=Decimal("0.95"),
+            )
+            imported += 1
+        diluted = [d for d in diluted if d.period not in tagged]
         for item in diluted:
             _queue_fact(
                 db,
