@@ -41,7 +41,9 @@
     "unavailable": "Valuation not available yet: no quotes checked. They are checked on their own while the tab is visible, or you can request it with the button.",
     "rowNotes": {
       "listingCurrency": "The listing says {currency}: there is no conversion, N/A.",
+      "backendCurrency": "The quote source reports {currency}: there is no conversion, N/A.",
       "currencyNotVerifiedListing": "Quote currency not verified in the listing: N/A (it is not inferred from the ticker).",
+      "currencyNotVerifiedBackend": "Currency not declared by the quote source: N/A (it is not inferred from the ticker).",
       "optionNotValued": "Option not valued: there is no quote for the contract's premium, and the underlying's quote is not its price.",
       "noSymbol": "Instrument without a recognizable ticker.",
       "notQueried": "Not checked: limit of 25 tickers per request.",

@@ -43,16 +43,43 @@ test('sin cotizacion: N/D, nunca el precio de coste; fuera de totales', () => {
     }
 });
 
-test('Yahoo NO cuenta como valorada aunque traiga precio y divisa', () => {
+test('Yahoo del BACKEND con divisa declarada SÍ valora (basis backend-yahoo)', () => {
     const san: ValuationPosition = { ...asts, instrumentKey: 'A:SAN.MC', name: 'Santander', currency: 'EUR', quantity: 10, avgCost: 4 };
     const r = valuePositions([san], { 'SAN.MC': yahoo });
+    assert.equal(r.rows[0].status, 'valorada');
+    assert.equal(r.rows[0].marketValue, 50);
+    assert.equal(r.rows[0].unrealizedPnl, 10);
+    assert.equal(r.rows[0].currencyBasis, 'backend-yahoo');
+    assert.ok(r.rows[0].quoteLabel);
+    assert.deepEqual(r.totals, [{ currency: 'EUR', marketValue: 50, unrealizedPnl: 10, costBasis: 40, valuedPositions: 1 }]);
+    assert.deepEqual(r.coverage, { valued: 1, total: 1 });
+});
+
+test('Yahoo del BACKEND SIN divisa declarada: N/D con aviso, nunca inferida', () => {
+    const san: ValuationPosition = { ...asts, instrumentKey: 'A:SAN.MC', name: 'Santander', currency: 'EUR', quantity: 10, avgCost: 4 };
+    for (const currency of [null, undefined, '  ']) {
+        const r = valuePositions([san], { 'SAN.MC': { ...yahoo, currency } });
+        assert.equal(r.rows[0].status, 'divisa-no-coincide');
+        assert.equal(r.rows[0].marketValue, null);
+        assert.equal(r.rows[0].note, 'Divisa no declarada por la fuente de cotización: N/D (no se infiere del símbolo).');
+        assert.deepEqual(r.totals, []);
+    }
+});
+
+test('Yahoo del BACKEND con divisa no EUR/USD: N/D sin conversión, nombrando la fuente', () => {
+    const san: ValuationPosition = { ...asts, instrumentKey: 'A:SAN.MC', name: 'Santander', currency: 'EUR', quantity: 10, avgCost: 4 };
+    const r = valuePositions([san], { 'SAN.MC': { ...yahoo, currency: 'GBP' } });
+    assert.equal(r.rows[0].status, 'divisa-no-coincide');
+    assert.equal(r.rows[0].note, 'La fuente de cotización indica GBP: no hay conversión, N/D.');
+});
+
+test('una fuente DESCONOCIDA se rechaza aunque traiga precio y divisa', () => {
+    const san: ValuationPosition = { ...asts, instrumentKey: 'A:SAN.MC', name: 'Santander', currency: 'EUR', quantity: 10, avgCost: 4 };
+    const r = valuePositions([san], { 'SAN.MC': { ...yahoo, source: undefined } });
     assert.equal(r.rows[0].status, 'fuente-no-aprobada');
     assert.equal(r.rows[0].marketValue, null);
-    assert.equal(r.rows[0].price, null);
-    assert.equal(r.rows[0].note, 'Sin cotización disponible de las fuentes admitidas.');
     assert.equal(r.rows[0].quoteLabel, null);
     assert.deepEqual(r.totals, []);
-    assert.deepEqual(r.coverage, { valued: 0, total: 1 });
 });
 
 test('cobertura honesta: solo suma las valoradas', () => {

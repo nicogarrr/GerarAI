@@ -41,7 +41,9 @@
     "unavailable": "Valoración no disponible todavía: sin cotizaciones consultadas. Se consultan solas con la pestaña visible, o puedes pedirlo con el botón.",
     "rowNotes": {
       "listingCurrency": "El listado indica {currency}: no hay conversión, N/D.",
+      "backendCurrency": "La fuente de cotización indica {currency}: no hay conversión, N/D.",
       "currencyNotVerifiedListing": "Divisa de la cotización no verificada en el listado: N/D (no se infiere del símbolo).",
+      "currencyNotVerifiedBackend": "Divisa no declarada por la fuente de cotización: N/D (no se infiere del símbolo).",
       "optionNotValued": "Opción sin valorar: no hay cotización de la prima del contrato y la del subyacente no es su precio.",
       "noSymbol": "Instrumento sin símbolo reconocible.",
       "notQueried": "No consultada: límite de 25 símbolos por consulta.",

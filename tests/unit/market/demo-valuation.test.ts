@@ -34,11 +34,18 @@ describe('valuePositions - honestidad de la valoración', () => {
         expect(valuePositions([pos()], { ASTS: q({ c }) }).rows[0].status).toBe('sin-cotizacion');
     });
 
-    it('una cotización de Yahoo se rechaza aunque traiga precio y divisa', () => {
-        const row = valuePositions([pos()], { ASTS: q({ source: 'Yahoo Finance' }) }).rows[0];
-        expect(row.status).toBe('fuente-no-aprobada');
-        expect(row.marketValue).toBeNull();
-        expect(row.quoteLabel).toBeNull();
+    it('Yahoo del backend con divisa declarada SÍ valora (basis backend-yahoo); sin divisa, N/D', () => {
+        const approved = valuePositions([pos({ currency: 'EUR' })], { ASTS: q({ source: 'Yahoo Finance', currency: 'EUR', t: null, kind: 'close', closeDate: '2026-10-28' }) }).rows[0];
+        expect(approved.status).toBe('valorada');
+        expect(approved.currencyBasis).toBe('backend-yahoo');
+        const noCurrency = valuePositions([pos({ currency: 'EUR' })], { ASTS: q({ source: 'Yahoo Finance', currency: null }) }).rows[0];
+        expect(noCurrency.status).toBe('divisa-no-coincide');
+        expect(noCurrency.marketValue).toBeNull();
+        expect(noCurrency.note).toContain('no se infiere del símbolo');
+        const unknown = valuePositions([pos()], { ASTS: q({ source: undefined }) }).rows[0];
+        expect(unknown.status).toBe('fuente-no-aprobada');
+        expect(unknown.marketValue).toBeNull();
+        expect(unknown.quoteLabel).toBeNull();
     });
 
     it('divisa: ausente o desconocida => N/D; distinta de la posición => N/D sin conversión', () => {
