@@ -19,8 +19,9 @@
  * - Divisa: NUNCA se infiere del simbolo ni del sufijo. La divisa debe venir
  *   en ValuationQuote.currency, que la accion rellena SOLO con la divisa de
  *   cotizacion del listado US de Finnhub (/stock/symbol?exchange=US, campo
- *   currency) o con la divisa declarada por el backend (meta de Yahoo
- *   normalizada a ISO 4217 en data-engine). Solo 'EUR' y 'USD' exactos se
+ *   currency) o con la divisa declarada por el backend (meta.currency de
+ *   Yahoo, copiada tal cual por data-engine, sin normalizar). Solo 'EUR' y
+ *   'USD' exactos se
  *   valoran. Sin divisa verificada => N/D. Si no coincide con la divisa de
  *   la posicion => N/D (sin conversion).
  * - Opciones: la cotizacion del subyacente NO es la prima del contrato, asi
