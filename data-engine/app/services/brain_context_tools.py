@@ -548,7 +548,11 @@ def dca_answer(db: Session, tenant: int, company: Company | None, *, today: date
 
 _ENGINE_RE = re.compile(
     r"(?i)\b(?:valor\s+(?:justo|intr[ií]nseco|razonable)|valoraci[oó]n\s+del\s+motor|motor\s+de\s+valoraci[oó]n|"
-    r"dcf|infravalorad\w*|sobrevalorad\w*)\b"
+    r"dcf|infravalorad\w*|sobrevalorad\w*"
+    # «¿Cuánto vale POOL?» (sin «mi/mis/la pena»): el valor de la empresa.
+    r"|cu[aá]nto\s+vale(?!\s+(?:la\s+pena|mis?|tus?)\b)(?![^.!?\n]*\b(?:hoy|ahora|en\s+bolsa|cotiza)\b)"
+    # «¿Qué escenarios tiene la valoración de META?»: bajista/base/alcista.
+    r"|escenarios?\b[^.!?\n]{0,30}\bvaloraci[oó]n|valoraci[oó]n\b[^.!?\n]{0,30}\bescenarios?)\b"
 )
 
 

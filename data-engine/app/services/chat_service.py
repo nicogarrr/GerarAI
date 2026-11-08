@@ -1144,7 +1144,11 @@ _PORTFOLIO_EXPOSURE_RE = re.compile(
 _POSITION_QUERY_RE = re.compile(
     r"(?i)\b(?:peso|posici[oó]n|acciones|t[ií]tulos)\b[^.!?\n]{0,40}\b(?:cartera|tengo|mis)\b"
     r"|\b(?:peso|posici[oó]n)\s+(?:de|en|que)\b"
-    r"|\bcu[aá]nt[oa]s?\s+(?:acciones\s+|t[ií]tulos\s+)?(?:tengo|vale|valen|tienen)\b"
+    r"|\bcu[aá]nt[oa]s?\s+(?:acciones\s+|t[ií]tulos\s+)?(?:tengo|tienen)\b"
+    # «¿cuánto valen mis POOL?» es tu posición; «¿cuánto vale POOL?» sin
+    # posesivo pregunta por la empresa (su valoración), no por tu posición.
+    r"|\bcu[aá]nt[oa]s?\s+(?:acciones\s+|t[ií]tulos\s+)?valen?\s+(?:mis?|tus?|las\s+(?:acciones\s+)?que\s+tengo|mi\s+posici[oó]n)\b"
+    r"|\bcu[aá]nt[oa]s?\s+(?:acciones\s+|t[ií]tulos\s+)?valen?\b[^.!?\n]{0,40}\b(?:tengo|mi\s+posici[oó]n|mis\s+acciones)\b"
     # «¿Cuánto representa UBER en mi cartera?»: su peso.
     r"|\bcu[aá]nto\s+representan?\b[^.!?\n]{0,40}\bcartera\b"
     # «¿Cuántas UBER tengo?»: el ticker entre «cuántas» y «tengo».
