@@ -1337,9 +1337,18 @@ class ChatSynthesisService:
         # recuperada. Antes "+202% desde su inicio" (literal en la carta) se
         # rechazaba por no llevar "aproximadamente" y el usuario recibia el
         # fallback "no tengo datos" con la carta en el prompt.
+        # Las cifras que da el propio usuario (en la pregunta o en sus turnos
+        # previos) tampoco son inventadas: «¿y si aporto los 600 € del plan?»
+        # se rechazaba por repetir «600» sin «unos» (benchmark 2026-11-08).
+        user_words = [question or ""] + [
+            str(getattr(turn, "content", "") or "")
+            for turn in history or []
+            if getattr(turn, "role", None) == "user"
+        ]
         doctrine_numbers = grounded_numbers_in(
             [str(item.get("text") or "") for item in doctrine or []]
             + [json.dumps(row, default=str, ensure_ascii=False) for row in portfolio_rows]
+            + user_words
         )
 
         def _record(resp: Any) -> None:
