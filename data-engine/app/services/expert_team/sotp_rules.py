@@ -20,10 +20,10 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 #: Sube cuando cambie cualquier tabla o fórmula: invalida la caché de clasificaciones.
-RULES_VERSION = "sotp-rules-v2"
+RULES_VERSION = "sotp-rules-v3"
 #: Versión de lo que se pide y se valida al CLASIFICAR (entra en la huella de la caché).
 #: Las reglas numéricas (RULES_VERSION) no: el modelo se recalcula siempre con las vigentes.
-CLASSIFIER_VERSION = "sotp-classifier-v1"
+CLASSIFIER_VERSION = "sotp-classifier-v2"
 
 #: Años desde hoy hasta el año de madurez que se valora (fijo, no lo elige el modelo).
 HORIZON_YEARS = 4
@@ -83,7 +83,9 @@ _SCALE = {
     "million": 1.0, "millones": 1.0, "mn": 1.0, "m": 1.0, "thousand": 0.001, "k": 0.001,
 }
 _NUMBER = re.compile(
-    r"(\d{1,3}(?:[.,\s]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*"
+    # Un mismo separador de miles en toda la cifra: «158,302 153,084» (dos columnas de una tabla) son DOS cifras.
+    r"(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?"
+    r"|\d+(?:[.,]\d+)?)\s*"
     r"(mil millones|billion|billones|million|millones|thousand|bn|mn|mm|[bmk](?![a-z]))?",
     re.IGNORECASE,
 )
@@ -179,19 +181,82 @@ def revenue_context(amount: float, texts: Iterable[str], quote: str | None = Non
     return None
 
 
+def funding_reason(quote: str | None) -> str | None:
+    """Para una clasificación guardada solo queda la cita: basta para ver financiación, no para exigir
+    la palabra «ingresos» (la cabecera de una tabla de resultados no está en la fila citada)."""
+    found = [w for w in FUNDING_WORDS if w in (quote or "").casefold()]
+    return f"la cifra es financiación o inversión ({found[0]}), no ingresos" if found else None
+
+
+_QUARTERLY_REPORT = re.compile(r"\b10-?Q\b", re.IGNORECASE)
+
+
+def _raw_numbers(text: str) -> list[float]:
+    out = []
+    for match in _NUMBER.finditer(text or ""):
+        value = _as_float(match.group(1))
+        if value is not None and not (match.group(2) or "") and not re.fullmatch(r"(?:19|20)\d{2}", match.group(1)):
+            out.append(value)
+    return out
+
+
+def quarterly_report_anchor(anchor: Mapping[str, Any]) -> tuple[dict[str, Any], str | None]:
+    """Un 10-Q no publica cifras anuales: una cifra «reportada» de un 10-Q marcada como anual (o total) es el trimestre o
+    el acumulado del año. En la fila de tabla típica (trimestre, trimestre año anterior, acumulado, acumulado año
+    anterior) el código toma el trimestre; la regla de ingresos lo anualiza como cualquier ancla trimestral."""
+    if anchor.get("type") != "reportado" or anchor.get("period") not in ("anual", "total"):
+        return dict(anchor), None
+    labels = " ".join(str(s.get("label") or s.get("title") or "") for s in anchor.get("sources") or []
+                      if isinstance(s, Mapping))
+    if not _QUARTERLY_REPORT.search(labels):
+        return dict(anchor), None
+    amount = float(anchor["amount_millions"])
+    numbers = _raw_numbers(anchor.get("quote") or "")
+    for index, raw in enumerate(numbers):
+        scale = next((s for s in (1.0, 0.001, 0.000001) if raw * s > 0 and abs(raw * s - amount) <= 0.015 * amount),
+                     None)
+        if scale is None:
+            continue
+        out = dict(anchor, period="trimestral")
+        if index >= 2 and len(numbers) >= 4:
+            out["amount_millions"] = numbers[index - 2] * scale
+            return out, (f"cifra de un 10-Q tomada como anual: es el acumulado del año ({_fmt(amount)} M); "
+                         f"se toma el trimestre de la misma fila ({_fmt(out['amount_millions'])} M)")
+        return out, "cifra de un 10-Q tomada como anual: es la del trimestre"
+    return dict(anchor), None
+
+
+#: Acciones preferentes: no son capital común ni diluyen el $/acción común salvo que se conviertan.
+_PREFERRED = ("preferred", "preferente", "privilegiad")
+_CONVERTIBLE = ("convertible", "conversion", "conversión", "exchangeable", "canjeable", "convert into")
+
+
+def dilution_reason(label: str | None, quote: str | None) -> str | None:
+    """Motivo por el que una «dilución» citada no diluye la acción común (None si sí)."""
+    blob = f"{label or ''} {quote or ''}".casefold()
+    if any(w in blob for w in _PREFERRED) and not any(w in blob for w in _CONVERTIBLE):
+        return "son acciones preferentes no convertibles: no diluyen la acción común"
+    return None
+
+
 #: Ancla que no es una previsión de ingresos: el segmento puede quedar infravalorado.
 NON_FORECAST_ANCHORS = ("reportado", "backlog", "contrato")
+
+
+#: Herramientas cuya salida calcula el código a partir de otros datos (no entran en la huella).
+CODE_TOOLS = ("sotp_anchors", "valuation_engine")
 
 
 def fingerprint(evidence: Iterable[Mapping[str, Any]], *, prompt_version: str | None) -> dict[str, Any]:
     """Huella de las entradas del modelo (sin el precio: el % frente al precio lo rehace el código)."""
     items = []
     for item in evidence:
-        if item.get("tool") == "sotp_anchors":
-            data = item.get("data") or {}
-            data = {k: v for k, v in data.items() if k not in ("price", "price_as_of")} if isinstance(data, dict) else data
-        else:
-            data = item.get("data")
+        if item.get("tool") in CODE_TOOLS:
+            # Cifras que pone el código (precio, acciones, caja, deuda, tasa; el estado del motor de valoración
+            # con su precio actual): se recalculan siempre y no cambian la clasificación; un dato nuevo de verdad
+            # entra por los hechos SEC y los documentos.
+            continue
+        data = item.get("data")
         source = item.get("source") or {}
         key = "|".join(str(source.get(k) or "") for k in ("table", "id", "document_id", "url", "date", "title"))
         items.append({"key": key, "tool": item.get("tool"), "data": data})
@@ -330,6 +395,9 @@ __all__ = [
     "NON_FORECAST_ANCHORS",
     "REVENUE_WORDS",
     "revenue_context",
+    "funding_reason",
+    "quarterly_report_anchor",
+    "dilution_reason",
     "ANCHOR_TYPES",
     "BURN_YEARS",
     "BUSINESS_TABLE",

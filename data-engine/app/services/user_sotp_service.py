@@ -17,7 +17,7 @@ usuario, no validados contra histórico».
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy import desc, select
@@ -33,6 +33,8 @@ SOTP_INPUT_KEY = "sotp_user_model"
 #: Segmentos de la misma clave: el modelo del usuario ("") y la propuesta de los agentes.
 USER_SEGMENT = ""
 AGENTS_SEGMENT = "agents"
+#: Caché de una clasificación que no dio modelo (misma huella → mismo rechazo, sin otra llamada). No es una versión.
+AGENTS_REJECTED_SEGMENT = "agents_rejected"
 
 USER_ASSUMPTIONS_LABEL = "Supuestos del usuario, no validados contra histórico"
 AGENTS_ASSUMPTIONS_LABEL = "Propuesta de los agentes expertos: supuestos no validados contra histórico"
@@ -83,6 +85,35 @@ def _base_rate(db: Session, company: Company) -> dict:
     }
 
 
+def convert_amount(db: Session, amount: float, from_currency: str, to_currency: str, as_of: date | None = None
+                   ) -> tuple[float, str] | None:
+    """``amount`` en ``from_currency`` → ``to_currency`` con los tipos guardados (BCE; cruce por EUR si hace falta).
+    Devuelve (importe, cómo se convirtió) o None si no hay tipo."""
+    from app.services.portfolio_fx_service import PortfolioFXService
+
+    src, dst = (from_currency or "").upper(), (to_currency or "").upper()
+    if not src or not dst:
+        return None
+    if src == dst:
+        return amount, ""
+    day = as_of or datetime.now(UTC).date()
+    fx = PortfolioFXService()
+    legs = [(src, dst)] if fx.rate_with_provenance(db, quote_currency=src, base_currency=dst, as_of=day) else [
+        (src, "EUR"), ("EUR", dst)]
+    rate, dates = 1.0, []
+    for quote, base in legs:
+        found = fx.rate_with_provenance(db, quote_currency=quote, base_currency=base, as_of=day)
+        if not found:
+            return None
+        rate *= float(found["rate"])
+        if found.get("rate_date"):
+            dates.append(str(found["rate_date"]))
+    converted = amount * rate
+    when = max(dates) if dates else "N/D"
+    return converted, (f"{amount:,.2f} {src} × {rate:.4f} {dst}/{src} (tipo {', '.join(sorted({l[0] + '/' + l[1] for l in legs}))}"
+                       f" del {when}) = {converted:,.2f} {dst}")
+
+
 def _price(db: Session, company: Company) -> tuple[float | None, str | None, str | None]:
     try:
         from app.services.valuation_service import resolve_model_price
@@ -100,6 +131,10 @@ def _envelope(db: Session, company: Company, model: dict, *, origin: str, saved:
     price, price_currency, price_as_of = _price(db, company)
     # El % frente al precio solo vale en la misma divisa.
     comparable = price if (price_currency and price_currency == model.get("currency")) else None
+    if comparable is None and price is not None and price_currency and model.get("currency"):
+        # Informes en otra moneda (p. ej. un 40-F en CAD con precio en USD): el precio se pasa a la del modelo.
+        converted = convert_amount(db, float(price), price_currency, str(model["currency"]))
+        comparable = converted[0] if converted else None
     result = run_user_sotp(model, price=comparable)
     return {
         "ticker": company.ticker,
@@ -250,6 +285,27 @@ class UserSotpService:
                 model_family="sotp_agents",
                 input_set_version=USER_SOTP_VERSION,
                 metadata={"model": model, "origin": "agents", **meta},
+            ),
+        )
+        db.commit()
+        return outcome.row
+
+    def save_rejected(self, db: Session, company: Company, tenant_id: int, *, meta: dict) -> DeclaredInputValue:
+        """Guarda la clasificación rechazada con su huella (no se enseña: solo evita repetir la llamada)."""
+        outcome = self.inputs.upsert(
+            db,
+            company=company,
+            tenant_id=tenant_id,
+            item=DeclaredInput(
+                input_key=SOTP_INPUT_KEY,
+                segment_key=AGENTS_REJECTED_SEGMENT,
+                base=Decimal("0"),
+                unit="clasificación",
+                method="manual",
+                as_of=datetime.now(UTC).date(),
+                model_family="sotp_agents",
+                input_set_version=USER_SOTP_VERSION,
+                metadata={"origin": "agents_rejected", **meta},
             ),
         )
         db.commit()

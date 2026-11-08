@@ -99,6 +99,7 @@ def sotp_markers(model: Mapping[str, Any], result: Mapping[str, Any]) -> dict[st
     """Marcadores → valor ya formateado. Todo sale del modelo y de su cálculo (``run_user_sotp``)."""
     currency = str(model.get("currency") or "")
     unit = "$" if currency in ("USD", "") else currency
+    munit = "M$" if currency in ("USD", "") else f"M {currency}"  # millones en la moneda del modelo
     scen = {s.get("key"): s for s in result.get("scenarios") or []}
     markers: dict[str, str] = {
         "sotp.base_per_share": _fmt_money(result.get("value_per_share"), unit),
@@ -108,7 +109,7 @@ def sotp_markers(model: Mapping[str, Any], result: Mapping[str, Any]) -> dict[st
         "sotp.vs_price": _fmt_pct(result.get("vs_price")),
         "sotp.discount_rate": f"{float(model.get('discount_rate') or 0) * 100:.1f} %".replace(".", ","),
         "sotp.valuation_year": str(model.get("valuation_year") or ""),
-        "sotp.total_present_value": _fmt_millions(result.get("total_present_value")),
+        "sotp.total_present_value": _fmt_millions(result.get("total_present_value"), munit),
         "dilution.current_shares": _fmt_share_count(model.get("shares_current")),
         "dilution.total_shares": _fmt_share_count(result.get("shares_diluted")),
         "dilution.new_shares": _fmt_share_count(
@@ -128,7 +129,7 @@ def sotp_markers(model: Mapping[str, Any], result: Mapping[str, Any]) -> dict[st
         prefix = f"part.{i}"
         markers[f"{prefix}.value_per_share"] = _fmt_money(row.get("value_per_share"), unit)
         if row.get("revenue") is not None:
-            markers[f"{prefix}.revenue"] = _fmt_millions(row.get("revenue"))
+            markers[f"{prefix}.revenue"] = _fmt_millions(row.get("revenue"), munit)
         if row.get("ebitda_margin") is not None:
             markers[f"{prefix}.margin"] = f"{row['ebitda_margin'] * 100:.0f} %"
         if row.get("multiple") is not None:
@@ -136,7 +137,7 @@ def sotp_markers(model: Mapping[str, Any], result: Mapping[str, Any]) -> dict[st
         if row.get("probability") is not None:
             markers[f"{prefix}.probability"] = f"{row['probability'] * 100:.0f} %"
         if row.get("value") is not None:
-            markers[f"{prefix}.value"] = _fmt_millions(row.get("value"))
+            markers[f"{prefix}.value"] = _fmt_millions(row.get("value"), munit)
     for i, item in enumerate(model.get("dilution") or [], start=1):
         markers[f"dilution.{i}.shares"] = _fmt_share_count(item.get("shares"))
     return markers
@@ -191,7 +192,8 @@ def render_narrative(sections: Mapping[str, str], markers: Mapping[str, str]) ->
 
 
 def narrative_fingerprint(sotp_fingerprint: str | None, markers: Mapping[str, str]) -> str:
-    blob = json.dumps({"v": NARRATIVE_VERSION, "sotp": sotp_fingerprint, "markers": dict(sorted(markers.items()))},
+    # Solo los NOMBRES de los marcadores: sus valores se sustituyen al mostrar (un precio nuevo no reescribe la prosa).
+    blob = json.dumps({"v": NARRATIVE_VERSION, "sotp": sotp_fingerprint, "markers": sorted(markers)},
                       ensure_ascii=False, sort_keys=True)
     return hashlib.sha256(blob.encode()).hexdigest()
 
