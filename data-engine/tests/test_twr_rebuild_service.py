@@ -398,3 +398,80 @@ def test_restore_relinks_real_snapshot_following_the_range(db, tmp_path):
     assert later.daily_return == pytest.approx(original_return)
     assert later.cumulative_twr is not None
     assert later.metadata_["twr_base_after_scope_change"] is False
+
+
+def test_restore_tolerates_v1_backup_with_none_literals(db, tmp_path):
+    """Los backups v1 escribian los NULL como la cadena 'None' (str(None)).
+    Esos archivos existen en disco: restore debe seguir restaurandolos."""
+    import json
+
+    from app.models.entities import CashDailySnapshot, PositionDailySnapshot
+
+    _world(db)
+    portfolio = db.scalars(select(Portfolio)).one()
+    company = db.scalars(select(Company)).one()
+    legacy = PortfolioDailySnapshot(
+        portfolio_id=portfolio.id,
+        snapshot_date=D0 + timedelta(days=1),
+        base_currency="EUR",
+        positions_value_base=Decimal("999"),
+        cash_value_base=Decimal("0"),
+        total_value_base=Decimal("999"),
+        pricing_coverage=Decimal("0.5"),
+        source="market_refresh",
+    )
+    db.add(legacy)
+    db.flush()
+    db.add(
+        CashDailySnapshot(
+            portfolio_snapshot_id=legacy.id,
+            portfolio_id=portfolio.id,
+            snapshot_date=legacy.snapshot_date,
+            currency="USD",
+            balance_native=Decimal("100"),
+            fx_rate=None,
+            balance_base=None,
+            source="market_refresh",
+        )
+    )
+    db.add(
+        PositionDailySnapshot(
+            portfolio_snapshot_id=legacy.id,
+            portfolio_id=portfolio.id,
+            company_id=company.id,
+            snapshot_date=legacy.snapshot_date,
+            quantity=Decimal("10"),
+            market_price_native=Decimal("10"),
+            currency="EUR",
+            fx_rate=Decimal("1"),
+            market_value_native=Decimal("100"),
+            market_value_base=None,
+            weight=None,
+            source="market_refresh",
+        )
+    )
+    db.commit()
+    service = TwrRebuildService()
+    backup_path = tmp_path / "backup.json"
+    service.apply(db, backup_path=backup_path)
+
+    # Reescribe el backup como lo habria generado la v1: str(None) -> 'None'.
+    backup = json.loads(backup_path.read_text())
+    for cash_row in backup["children"]["cash"]:
+        for key in ("fx_rate", "balance_base"):
+            if cash_row[key] is None:
+                cash_row[key] = "None"
+    for pos_row in backup["children"].get("positions", []):
+        for key in ("market_value_base", "weight"):
+            if pos_row[key] is None:
+                pos_row[key] = "None"
+    backup_path.write_text(json.dumps(backup))
+
+    restored = service.restore_backup(db, backup_path=backup_path)
+    assert restored["status"] == "restored"
+    cash = db.scalars(select(CashDailySnapshot)).one()
+    assert cash.fx_rate is None
+    assert cash.balance_base is None
+    pos = db.scalars(select(PositionDailySnapshot)).one()
+    assert pos.market_value_base is None
+    assert pos.weight is None
