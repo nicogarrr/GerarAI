@@ -172,10 +172,10 @@ def build_market(
     debt = point("total_debt")
     avg_volume = round(sum(volumes) / len(volumes)) if volumes else None
     major_currency, price_divisor = normalize_currency(price_currency)
-    major_price = price / price_divisor if price is not None else None
     market_cap = None
     market_cap_basis = None
     if price is not None and price > 0:
+        major_price = price / price_divisor
         if shares and shares["value"] and shares["value"] > 0:
             market_cap, market_cap_basis = float(major_price) * shares["value"], "shares_outstanding"
         elif diluted and diluted["value"] and diluted["value"] > 0:
