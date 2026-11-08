@@ -9,8 +9,21 @@ const compose = readFileSync('docker-compose.prod.yml', 'utf8');
 // no arrancaba nunca - la cola default estaba envenenada (7476 mensajes,
 // 5276 de ingesta SEC imposible desde OCI) y los jobs de usuario quedaban
 // hambreados. Los jobs interactivos de tesis van en cola dedicada.
+// El time_limit del actor de tesis es intencionado: Dramatiq cortaba a los
+// 10 min implicitos (#4778 lo puso; #4865 lo dejo explicito en 40 min leido
+// de la constante GENERATE_THESIS_JOB_TIME_LIMIT_MS). El guard lo EXIGE:
+// ni ausente (volveria el corte de 10 min) ni hardcodeado (se perderia la
+// unica fuente del valor).
+function assertThesisActorConTimeLimit(source: string): void {
+    assert.match(
+        source,
+        /@dramatiq\.actor\(max_retries=2, min_backoff=15_000, queue_name="thesis", time_limit=GENERATE_THESIS_JOB_TIME_LIMIT_MS\)\ndef generate_thesis_job/,
+        'generate_thesis_job debe llevar time_limit=GENERATE_THESIS_JOB_TIME_LIMIT_MS explicito',
+    );
+}
+
 test('F359: la tesis va en cola dedicada consumida por un worker DEDICADO', () => {
-    assert.match(workers, /@dramatiq\.actor\(max_retries=2, min_backoff=15_000, queue_name="thesis"\)\ndef generate_thesis_job/);
+    assertThesisActorConTimeLimit(workers);
     // Servicio aparte con sus propios hilos: compartir proceso con
     // default/prices dejaba la tesis hambreada (exigencia del auditor).
     assert.match(compose, /worker-thesis:[\s\S]{0,900}"-Q", "thesis"/);
@@ -21,6 +34,24 @@ test('F359: la tesis va en cola dedicada consumida por un worker DEDICADO', () =
   assert.match(thesisBlock, /memory: 1024M/);
     const workerCmd = compose.match(/worker:\n[\s\S]{0,200}command: \[[^\]]*\]/)?.[0] ?? '';
     assert.ok(workerCmd && !workerCmd.includes('thesis'), 'el worker general NO consume thesis');
+});
+
+test('F359: el guard exige el time_limit explicito (ni ausente ni hardcodeado)', () => {
+    // Controles negativos: quitar el time_limit o hardcodear el valor rompe
+    // el guard nombrando el requisito.
+    const sinTimeLimit = workers.replace(', time_limit=GENERATE_THESIS_JOB_TIME_LIMIT_MS)', ')');
+    assert.throws(
+        () => assertThesisActorConTimeLimit(sinTimeLimit),
+        /time_limit=GENERATE_THESIS_JOB_TIME_LIMIT_MS/,
+    );
+    const hardcodeado = workers.replace(
+        'time_limit=GENERATE_THESIS_JOB_TIME_LIMIT_MS)',
+        'time_limit=2_400_000)',
+    );
+    assert.throws(
+        () => assertThesisActorConTimeLimit(hardcodeado),
+        /time_limit=GENERATE_THESIS_JOB_TIME_LIMIT_MS/,
+    );
 });
 
 test('F359: SEC 403 es permanente; 429 SEC se reintenta acotado con circuit breaker por origen', () => {
