@@ -12,7 +12,7 @@ const PARTY_KEYS = {
   I: 'insider.politicians.parties.I',
 } as const;
 
-/** Ficha de un político en /politicos: operaciones, puntualidad frente a 45 días y tickers más operados. */
+/** Ficha de un político en /insider#politicos: operaciones, puntualidad frente a 45 días y tickers más operados. */
 export function PoliticianCardView({ card, locale = DEFAULT_LOCALE }: { card: PoliticianCard; locale?: Locale }) {
   const t = createTranslator(locale);
   const intl = intlLocale(locale);
