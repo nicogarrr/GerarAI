@@ -41,6 +41,8 @@ DEFINITIONS: dict[str, str] = {
     "apalancamiento": "El apalancamiento amplía una exposición mediante deuda, derivados u otros compromisos. Puede aumentar tanto ganancias como pérdidas respecto al capital propio. Sus riesgos dependen de garantías, vencimientos y condiciones de financiación. No se limita a la deuda que aparece de forma evidente en el balance.",
     "dilución": "La dilución es la reducción de la participación relativa o de ciertas magnitudes por acción al aumentar las acciones o los derechos que pueden convertirse en ellas. Su efecto económico depende del precio y del uso de los recursos obtenidos. No toda emisión destruye valor, aunque sí puede cambiar el reparto de propiedad.",
     "valor contable": "El valor contable es el importe registrado de un activo, pasivo o patrimonio según las normas contables. Para acciones suele usarse el patrimonio atribuible por acción. No es una estimación automática del valor de mercado o de liquidación. Activos no reconocidos, deterioros y criterios contables pueden afectar a la comparación.",
+    # El DCA de GerarAI (app/services/dca_signal_engine.py): niveles 1X-4X y recortes.
+    "DCA": "El DCA (dollar-cost averaging, o promediar el coste) es invertir una cantidad fija cada cierto tiempo, normalmente cada mes, compre caro o barato, para no depender de acertar el momento. En GerarAI el DCA va por niveles: cada mes, con cierres mensuales y sin mirar al futuro, la fórmula da a cada valor un nivel de 1X a 4X, que es el múltiplo de tu aportación base que tocaría ese mes. Sube cuanto más lejos está el precio de su media larga, ajustado por volatilidad, y cuanto más cae desde máximos (4X es la zona de compra extrema). Cuando el precio se estira mucho al alza, marca un recorte suave o fuerte (Light/Strong Trim). Es una regla de ritmo de compra, no una valoración de la empresa ni una orden.",
     # Tanda 2026-10-20 (apuntes manuscritos de Nico): mismas reglas - definiciones
     # revisadas, sin LLM, sin datos de mercado ni recomendaciones.
     "WACC": "El WACC (coste medio ponderado de capital) es el coste de financiar una empresa ponderando el coste de los fondos propios y el de la deuda según su peso en la financiación. Se usa como tasa de descuento y como referencia para el ROIC: si la rentabilidad del capital invertido no supera el WACC, la empresa no crea valor. Su cálculo depende de hipótesis como la beta o la prima de riesgo; dos analistas pueden obtener WACC distintos y defendibles.",
@@ -69,6 +71,7 @@ def _normalize(text: str) -> str:
 
 _ALIASES = {_normalize(k): k for k in DEFINITIONS}
 _ALIASES.update({
+    "dca": "DCA", "dca de gerarai": "DCA", "dollar cost averaging": "DCA", "dollar-cost averaging": "DCA",
     "dividendos": "dividendo", "revenue": "ingresos", "beneficios": "beneficio",
     "margenes": "margen", "eps": "BPA", "beneficio por accion": "BPA",
     "fcf": "flujo de caja libre", "cash flow": "flujo de caja", "cash flow libre": "flujo de caja libre",
@@ -90,7 +93,7 @@ _ALIASES.update({
     "efectos de segundo orden": "segundas derivadas",
     "second order thinking": "segundas derivadas",
 })
-_PREFIX = r"(?:que es|que son|que significa|como funciona|como se calcula|explica|explicame|define|what is|how does) "
+_PREFIX = r"(?:que es|que son|que significa|como funciona|como se calcula|explicame que es|explicame que son|explica|explicame|define|what is|how does) "
 
 
 def canonical_concept(question: str) -> str | None:

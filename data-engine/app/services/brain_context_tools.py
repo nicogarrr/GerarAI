@@ -847,6 +847,13 @@ def answer_context_question(
     if _ORDER_RE.search(_DCA_RE.sub(" ", question)):
         return None
     if _DCA_RE.search(question):
+        # «¿Qué es el DCA?» pide la definición, no tus niveles guardados (antes
+        # contestaba «Niveles DCA guardados…» o «Sin nivel DCA»).
+        from app.llm.general_concepts import local_definition
+
+        definition = local_definition(question)
+        if definition is not None:
+            return _response([definition], [], "local_educational")
         return dca_answer(db, tenant, resolve_company())
     # La tesis tiene su propia respuesta (margen/escenarios PUBLICADOS).
     if _ENGINE_RE.search(question) and not re.search(r"(?i)\btesis\b", question):
