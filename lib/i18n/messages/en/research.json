@@ -1259,7 +1259,12 @@
       "missing": "missing",
       "unavailable": "no data",
       "blocked": "blocked"
-    }
+    },
+    "summaryCagr": "CAGR {from}–{to}: {pct} a year",
+    "summaryCagrRatio": "CAGR: not applicable to ratios or margins",
+    "summaryCagrSign": "CAGR: not computed when the first or last year is ≤ 0",
+    "summaryStats": "{years} fiscal years ({from}–{to}) · mean {mean}",
+    "summaryRange": "min {min} ({minYear}) · max {max} ({maxYear})"
   },
   "sectionLoadError": "Couldn't load {title}.",
   "companyPaper": {

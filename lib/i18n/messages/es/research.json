@@ -1259,7 +1259,12 @@
       "missing": "faltante",
       "unavailable": "sin datos",
       "blocked": "bloqueada"
-    }
+    },
+    "summaryCagr": "TACC {from}–{to}: {pct} al año",
+    "summaryCagrRatio": "TACC: no aplica a ratios ni márgenes",
+    "summaryCagrSign": "TACC: no se calcula si el primer o el último ejercicio es ≤ 0",
+    "summaryStats": "{years} ejercicios ({from}–{to}) · media {mean}",
+    "summaryRange": "mín {min} ({minYear}) · máx {max} ({maxYear})"
   },
   "sectionLoadError": "No se pudo cargar {title}.",
   "companyPaper": {
