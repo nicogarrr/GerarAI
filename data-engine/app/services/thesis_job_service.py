@@ -943,6 +943,18 @@ def run_thesis_job(run_id: int) -> None:
                 attach_to_thesis_run(db, run_id, payload["ticker"], thesis.id)
             except (Exception, TimeLimitExceeded):  # noqa: BLE001 - la tesis ya está confirmada
                 logger.warning("propuesta SOTP de los agentes omitida tras la tesis %s", thesis.id)
+            # Equipo de expertos (Recopilador, mezcla de analistas, escéptico) para la tesis v2: misma regla.
+            # Si EXPERT_TEAM_ENABLED ya lo corrió antes de valorar (tesis no de seguimiento), no se repite.
+            try:
+                from app.core.config import get_settings as _settings
+                from app.services.thesis_service import run_thesis_experts_after_commit
+
+                run_thesis_experts_after_commit(
+                    db, payload["ticker"],
+                    ran_before=bool(_settings().expert_team_enabled and not payload.get("tracked")),
+                )
+            except (Exception, TimeLimitExceeded):  # noqa: BLE001 - la tesis ya está confirmada
+                logger.warning("equipo de expertos omitido tras la tesis %s", thesis.id)
             # Tesis v2 (TIR para el accionista, nivel comité): misma regla, nunca bloquea la tesis.
             try:
                 from app.services.expert_team.thesis_v2 import attach_to_thesis_run

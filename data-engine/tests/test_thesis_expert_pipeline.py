@@ -21,6 +21,19 @@ def test_off_and_stored_do_not_enter_pipeline(monkeypatch):
     run.assert_not_called()
 
 
+def test_team_timeout_or_failure_never_breaks_the_thesis(monkeypatch):
+    monkeypatch.setattr(get_settings(), "expert_team_enabled", True)
+
+    async def boom(db, ticker):
+        raise TimeoutError
+
+    monkeypatch.setattr(thesis, "_run_thesis_experts", boom)
+    out = thesis._prepare_thesis_experts(None, "TSLA", stored_evidence_only=False)
+    assert out == {"stages": [], "error": "TimeoutError", "consensus": None}
+    assert thesis._expert_inputs_from_pipeline(out) == {"status": "error:TimeoutError"}
+    assert thesis._experts_timeout() > 120
+
+
 def test_roster_specs_are_consumed_in_order_and_same_session(monkeypatch):
     specs = roster.pipeline_experts()
     # Modified specs prove callers do not quietly replace them with defaults.

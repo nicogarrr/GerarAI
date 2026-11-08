@@ -32,6 +32,7 @@ No toca la tesis: el gancho en thesis_service queda como lead (lane c2acb5b0).
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -53,6 +54,8 @@ from app.services.value_driver_service import (
     ValueDriverService,
     normalize_item,
 )
+
+logger = logging.getLogger(__name__)
 
 RECOPILADOR_NAME = "recopilador"
 RECOPILADOR_TOOLS: tuple[str, ...] = ("company_documents", "news_events", "financial_facts", "risk_events")
@@ -263,11 +266,13 @@ def _as_date(value: Any) -> date | None:
 
 
 def parse_inventory(
-    parsed: Any, ledger: EvidenceLedger, *, expert: str = RECOPILADOR_NAME
+    parsed: Any, ledger: EvidenceLedger, *, expert: str = RECOPILADOR_NAME, partial: bool = False
 ) -> tuple[list[ValueDriverItem], list[str]]:
     """JSON del modelo → impulsores validados, o la lista de problemas.
 
-    Fail-closed: un solo problema invalida el inventario entero.
+    Fail-closed: un solo problema invalida el inventario entero. Con ``partial`` (último recurso, tras los
+    reintentos) devuelve los impulsores que pasan TODAS las comprobaciones y los problemas de los demás:
+    un impulsor mal citado ya no tira los bien citados.
     """
     problems: list[str] = []
     if not isinstance(parsed, dict) or not isinstance(parsed.get("drivers"), list):
@@ -330,7 +335,11 @@ def parse_inventory(
         if item.driver_key in seen:
             problems.append(f"{label}: clave repetida")
         seen.add(item.driver_key)
+        if partial and any(p.startswith(f"{label}: ") for p in problems):
+            continue
         items.append(item)
+    if partial:
+        return items, problems
     if problems:
         return [], problems
     return items, []
@@ -392,12 +401,20 @@ async def run_recopilador(
             parsed = None
         items, problems = parse_inventory(parsed, ledger, expert=spec.name)
         if not problems:
+            result.problems = []
             break
         result.problems = problems
         payload["problems_previous_answer"] = problems[:20]
     else:
-        result.status = "rejected"
-        return result
+        # Que no se pierda nada de lo bien citado: se guardan los impulsores que pasan todas las
+        # comprobaciones; los demás quedan descartados con su motivo en ``problems``.
+        items, problems = parse_inventory(parsed, ledger, expert=spec.name, partial=True)
+        if not items:
+            result.status = "rejected"
+            return result
+        result.problems = problems
+        logger.info("recopilador %s: %d impulsores guardados, descartados: %s", ctx.ticker, len(items),
+                    "; ".join(problems[:10]))
     try:
         outcomes = ValueDriverService().upsert_many(db, company=company, tenant_id=ctx.tenant_id, items=items)
     except ValueDriverError as exc:
@@ -405,7 +422,6 @@ async def run_recopilador(
         result.problems = exc.problems
         return result
     result.status = "stored"
-    result.problems = []
     result.drivers = items
     result.stored = sum(1 for o in outcomes if o.changed)
     result.unchanged = sum(1 for o in outcomes if not o.changed)

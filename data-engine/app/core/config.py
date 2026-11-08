@@ -522,6 +522,12 @@ class Settings(BaseSettings):
     sotp_agents_narrative_enabled: bool = True
     # Tesis v2 de nivel comité (TIR para el accionista + 15 secciones) tras la tesis; nunca la bloquea.
     thesis_v2_enabled: bool = True
+    # Equipo de expertos de la tesis (Recopilador, mezcla de analistas, escéptico) tras confirmar la tesis,
+    # y su trabajo como entrada citada de la tesis v2. Independiente de EXPERT_TEAM_ENABLED (chat, workflow
+    # y paso previo a la valoración): hasta tres llamadas LLM más por tesis, con tope de 180 s; si fallan o
+    # vencen, la tesis y la v2 quedan igual.
+    # Env THESIS_EXPERTS_ENABLED. Nico, 8-nov-2026: «Soluciona todo, que no se pierda ningún dato».
+    thesis_experts_enabled: bool = True
     # Control de la valoración frente al consenso de analistas (>35 % exige
     # conciliación dato a dato). Independiente del equipo de expertos: sin
     # consenso se publica con la salvedad, con desviación no conciliada no.
