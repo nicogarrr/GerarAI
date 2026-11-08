@@ -10,7 +10,14 @@ import { researchRequest } from '@/lib/research/client';
  * queman caja. Importes en millones de la divisa del modelo.
  */
 
-export type SotpPart = {
+/** Fuente de una cifra de la propuesta de los agentes (filing, nota, dato de GerarAI). */
+export type SotpSource = { label: string; url?: string | null; date?: string | null };
+/** «¿De dónde sale?» de cada cifra (lo rellenan los agentes; opcional en los modelos del usuario). */
+export type SotpWhy = Partial<Record<'revenue' | 'margin' | 'multiple' | 'probability' | 'value' | 'shares', string>>;
+type SotpProvenance = { why?: SotpWhy; sources?: SotpSource[]; assumption?: string | null };
+
+export type SotpPart = SotpProvenance & {
+  commercial?: boolean;
   name: string;
   kind: 'operating' | 'asset';
   group?: string | null;
@@ -24,7 +31,7 @@ export type SotpPart = {
   discounted?: boolean;
 };
 
-export type SotpScenario = {
+export type SotpScenario = SotpProvenance & {
   key: string;
   label: string;
   note?: string | null;
@@ -44,15 +51,24 @@ export type SotpModel = {
   discount_years?: number | null;
   discount_rate: number;
   shares_current: number;
-  dilution: { label: string; shares: number }[];
+  dilution: (SotpProvenance & { label: string; shares: number })[];
   parts: SotpPart[];
   scenarios: SotpScenario[];
   author?: string | null;
   source?: string | null;
   stated_value_per_share?: number | null;
+  summary?: string | null;
+  /** Segmentos que los agentes vieron pero sin cifra comprobable: no suman (no se inventan). */
+  unvalued?: { name: string; status?: string | null; reason?: string | null }[];
+  rules_version?: string | null;
+  /** Avisos del cálculo (faltan clases de acciones, segmento infravalorado por falta de estimaciones…). */
+  warnings?: string[];
+  discount_rate_source?: string | null;
+  shares_why?: SotpWhy;
 };
 
-export type SotpRow = {
+export type SotpRow = SotpProvenance & {
+  commercial?: boolean;
   name: string;
   kind: 'operating' | 'asset';
   group: string | null;
@@ -101,10 +117,45 @@ export type SotpBaseRate = {
   message_en: string | null;
 };
 
+export type SotpVariantKey = 'agents' | 'user' | 'example';
+export type SotpVariant = {
+  key: SotpVariantKey;
+  label: string;
+  available: boolean;
+  saved_at?: string | null;
+  generated_at?: string | null;
+  price?: number | null;
+  price_as_of?: string | null;
+  value_per_share?: number | null;
+};
+export type SotpAgentsStatus = {
+  source: 'button' | 'thesis';
+  run_id: number;
+  job_status: string;
+  status?: string | null;
+  problems: string[];
+  finished_at?: string | null;
+};
+
 export type SotpResponse = {
   ticker: string;
   available: boolean;
-  origin?: 'saved' | 'example';
+  origin?: 'saved' | 'example' | 'agents';
+  variant?: SotpVariantKey | null;
+  default_variant?: SotpVariantKey | null;
+  variants?: SotpVariant[];
+  agents_status?: SotpAgentsStatus | null;
+  /** Propuesta vigente frente a la anterior de los agentes; «unstable» si cambian más de un 30 %. */
+  agents_stability?: { previous_value_per_share: number; previous_generated_at?: string | null; current_value_per_share: number; change: number | null; unstable: boolean; threshold: number } | null;
+  agents?: {
+    generated_at?: string | null; price?: number | null; price_currency?: string | null; price_as_of?: string | null;
+    thesis_version_id?: number | null; trigger?: string | null; rules_version?: string | null; cache_hit?: boolean | null;
+    readings?: { value_per_share: number }[] | null; readings_differ?: boolean | null; changed_by?: string[] | null; fingerprint?: string | null;
+    /** Tesis larga de los expertos: prosa con las cifras del cálculo ya sustituidas (marcadores). */
+    narrative?: { status?: string | null; version?: string | null; sections: { key: string; title: string; text: string }[] } | null;
+    /** El total es casi todo caja menos deuda de hoy: no es un valor razonable del negocio. */
+    mostly_cash?: { cash_per_share: number; value_per_share: number; share: number } | null;
+  } | null;
   label: string;
   validated: false;
   model?: SotpModel;
@@ -116,9 +167,17 @@ export type SotpResponse = {
   saved?: { row_id: number; saved_at: string | null; versions: number } | null;
 };
 
-export const getSotp = cache(async (ticker: string): Promise<SotpResponse | null> => {
+export const SOTP_VARIANT_KEYS: readonly SotpVariantKey[] = ['agents', 'user', 'example'];
+
+export function sotpVariantParam(raw: string | string[] | undefined | null): SotpVariantKey | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return value && (SOTP_VARIANT_KEYS as readonly string[]).includes(value) ? (value as SotpVariantKey) : null;
+}
+
+export const getSotp = cache(async (ticker: string, variant: SotpVariantKey | null = null): Promise<SotpResponse | null> => {
   try {
-    return await researchRequest<SotpResponse>(`/api/valuation/${encodeURIComponent(ticker.toUpperCase())}/sotp`);
+    const query = variant ? `?variant=${variant}` : '';
+    return await researchRequest<SotpResponse>(`/api/valuation/${encodeURIComponent(ticker.toUpperCase())}/sotp${query}`);
   } catch {
     return null;
   }

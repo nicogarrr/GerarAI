@@ -51,6 +51,7 @@ ACTOR_CLASS: dict[str, str] = {
     # interactiva: el usuario espera el resultado
     "evaluate_manual_dca": INTERACTIVA,
     "generate_thesis_job": INTERACTIVA,
+    "generate_sotp_agents_job": INTERACTIVA,  # «Generar con expertos» del desglose por partes
     "ingest_knowledge_source": INTERACTIVA,
     "process_document": INTERACTIVA,
     "process_document_structured": INTERACTIVA,

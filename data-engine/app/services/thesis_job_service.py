@@ -935,6 +935,14 @@ def run_thesis_job(run_id: int) -> None:
                 db.rollback()
                 return
             db.commit()
+            # Desglose por partes de los agentes, DESPUÉS de confirmar la tesis:
+            # nunca la bloquea ni la revierte (attach_to_thesis_run no lanza).
+            try:
+                from app.services.sotp_agents_job import attach_to_thesis_run
+
+                attach_to_thesis_run(db, run_id, payload["ticker"], thesis.id)
+            except (Exception, TimeLimitExceeded):  # noqa: BLE001 - la tesis ya está confirmada
+                logger.warning("propuesta SOTP de los agentes omitida tras la tesis %s", thesis.id)
         except (Exception, TimeLimitExceeded) as exc:
             # The rollback discards the step rows flushed by on_phase, so the
             # in-memory `open_step` is expunged and its identity is gone. The

@@ -4903,6 +4903,14 @@ def generate_thesis_job(run_id: int) -> None:
     run_thesis_job(run_id)
 
 
+@dramatiq.actor(max_retries=0, queue_name="thesis", time_limit=300_000)
+def generate_sotp_agents_job(run_id: int) -> None:
+    """«Generar con expertos» del desglose por partes (valorador SOTP del equipo)."""
+    from app.services.sotp_agents_job import run_job
+
+    run_job(run_id)
+
+
 # Se queda en default (29-oct, revision del piloto): no esta acreditado que
 # sea un job corto (hasta 50 quotes de proveedor + sync de acciones
 # corporativas por fila; time_limit 900 s) y en el worker-alerts de 2 hilos

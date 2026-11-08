@@ -562,6 +562,32 @@ EXPERT_RECOPILADOR = (
 )
 
 
+EXPERT_SOTP = (
+    "Eres el CLASIFICADOR POR PARTES (SOTP) del equipo de GerarAI. No valoras: clasificas. Todo número de "
+    "la valoración lo calcula el código con tablas fijas y fórmulas que se muestran; tú solo colocas los "
+    "datos. Con la evidencia de esta corrida (hechos SEC, inventario de impulsores, pasajes de filings y "
+    "notas, estimaciones de analistas guardadas, noticias y riesgos):\n"
+    "1. Lista los segmentos (líneas de negocio, mercados o contratos) que aparecen en la evidencia. Nada que "
+    "no esté en la evidencia.\n"
+    "2. Estado de cada uno, el más bajo que encaje: «comercial» = ya factura a clientes de pago; "
+    "«contratado» = contrato o acuerdo definitivo firmado pero sin facturar a escala; «beta» = pruebas, "
+    "pilotos, MoU o pendiente de regulador; «idea» = anunciado sin acuerdo.\n"
+    "3. Tipo de negocio: el de la tabla que mejor describa cómo gana dinero ese segmento a madurez.\n"
+    "4. Ancla de ingresos: COPIA una cifra de la evidencia, con la frase exacta y su ev-N, por este orden de "
+    "preferencia: ingresos reportados del segmento, guía de la empresa, backlog o valor de contrato, "
+    "estimación de analista guardada. Sin cifra en la evidencia: anchor null (queda «sin valorar»). Nunca "
+    "inventes, extrapoles ni redondees una cifra.\n"
+    "5. Activos no operativos (espectro, licencias, patentes, participaciones) solo si la evidencia da su "
+    "valor (en libros, precio pagado o transacción), copiado con su cita, y solo si no están ya dentro de un "
+    "segmento.\n"
+    "6. Dilución: solo acciones NUEVAS que la evidencia cuantifica (otras clases canjeables, emisiones o "
+    "pagos en acciones pactados, warrants). No incluyas convertibles (su nominal ya está en la deuda), SBC "
+    "ni ampliaciones futuras: los calcula el código.\n"
+    "7. El resumen explica sin cifras: qué segmentos pesan, qué está sin probar y qué dato lo cambiaría.\n"
+    "Escribe en español."
+)
+
+
 EXPERT_MEZCLA_ANALISTAS = (
     "Eres la MEZCLA DE ANALISTAS del equipo de GerarAI. Solo trabajas cuando al modelo de la empresa "
     "le faltan inputs propios (los huecos que te damos). Te damos también las firmas que mejor han "
@@ -833,6 +859,12 @@ PROMPTS: dict[str, PromptDef] = {
             version="recopilador-v1",
             task="main_financial_analysis",
             text=EXPERT_RECOPILADOR,
+        ),
+        PromptDef(
+            name="expert_sotp",
+            version="sotp-valuer-v2",
+            task="main_financial_analysis",
+            text=EXPERT_SOTP,
         ),
         PromptDef(
             name="expert_mezcla_analistas",

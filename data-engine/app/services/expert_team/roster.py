@@ -127,6 +127,27 @@ def analyst_blend_expert() -> ExpertSpec:
     )
 
 
+def sotp_valuer_expert() -> ExpertSpec:
+    """«Valorador SOTP»: propone el desglose por partes con razones y fuentes.
+
+    No entra en ``default_experts`` ni en ``pipeline_experts`` (no escribe la
+    tesis): lo corre ``expert_team.sotp_valuer`` al terminar la tesis y desde
+    el botón «Generar con expertos» del desglose.
+    """
+    from app.services.expert_team.sotp_valuer import SOTP_VALUER_NAME, SOTP_VALUER_TOOLS
+
+    return ExpertSpec(
+        name=SOTP_VALUER_NAME,
+        typical_s=40.0,
+        prompt_name="expert_sotp",
+        tools=SOTP_VALUER_TOOLS,
+        timeout_s=150.0,
+        # Medido en ASTS (8-nov-2026): con 8.000 el razonamiento se comió todo y la
+        # respuesta salió vacía; con margen, ~4.600 de razonamiento + ~3.100 de JSON.
+        max_tokens=16000,
+    )
+
+
 def pipeline_experts() -> list[ExpertSpec]:
     """Roles del pipeline automático de la tesis, en orden: Recopilador y mezcla de analistas."""
     return [recopilador_expert(), analyst_blend_expert()]
