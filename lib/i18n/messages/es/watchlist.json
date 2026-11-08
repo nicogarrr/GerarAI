@@ -260,5 +260,55 @@
     "missingAnnualRevenue": "ingresos anuales",
     "missingFiscalYear": "cierre de ejercicio",
     "missingAssumptions": "supuestos del modelo"
+  },
+  "dcaCard": {
+    "trigger": "Tarjeta DCA",
+    "loading": "Cargando tarjeta…",
+    "unavailable": "Tarjeta DCA no disponible ahora mismo.",
+    "notEnough": "Aún no hay historia suficiente para la tarjeta (hacen falta 12 meses).",
+    "label": "Tarjeta DCA de {symbol}",
+    "timeframes": "Nivel por marco temporal",
+    "tf": {
+      "week": "Semanal",
+      "month": "Mensual (señal oficial)",
+      "quarter": "Trimestral",
+      "year": "Anual"
+    },
+    "tfShort": {
+      "week": "S",
+      "month": "M",
+      "quarter": "T",
+      "year": "A"
+    },
+    "tfMissing": "Sin historia suficiente en este marco",
+    "monthsInZone": "{count} meses en zona",
+    "forming": "provisional: el mes no ha cerrado",
+    "risk": {
+      "low": "Riesgo bajo",
+      "medium": "Riesgo medio",
+      "high": "Riesgo alto"
+    },
+    "sinceChange": "{change} desde que estaba en {from} a {price} ({date})",
+    "noChange": "Sin cambio de nivel en el histórico.",
+    "why": "¿Por qué?",
+    "whyDrawdown": "Caída desde el máximo de {months} meses ({high}): {dd}. Umbrales 2X/3X/4X: {t2} / {t3} / {t4} → {level}.",
+    "whySma": "Distancia bajo la media de {months} meses ({sma}): {gap}; ajustada por volatilidad: {adj} → {level}.",
+    "whyVol": "Volatilidad anual {vol} (referencia {ref}): con más volatilidad hace falta más caída para subir de nivel.",
+    "whyBinding": "Manda {binding}.",
+    "binding": {
+      "drawdown": "la caída desde el máximo",
+      "smaGap": "la distancia a la media",
+      "empate": "empate entre las dos"
+    },
+    "whyPrices": "Cierres que activarían cada nivel: {prices}.",
+    "whyRisk": "Riesgo: {reasons}.",
+    "riskReason": {
+      "volatility": "volatilidad {value}",
+      "volatilityUnknown": "volatilidad sin datos",
+      "preRevenue": "empresa sin ingresos relevantes",
+      "shortHistory": "solo {value} meses de historia",
+      "stale": "datos desactualizados"
+    },
+    "whyOfficial": "La señal oficial (avisos y plan) es la mensual; semana, trimestre y año son la misma fórmula sobre cierres de ese periodo, como contexto. Histórico, no predice."
   }
 }

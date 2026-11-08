@@ -194,3 +194,55 @@ export interface DcaBacktest {
     hit_rates: DcaHitRates | null;
     disclaimer: string;
 }
+
+
+/** Tarjeta DCA de la watchlist (GET /api/watchlist/dca-signals/{symbol}/card). */
+export type DcaWatchZone = DcaZone;
+
+export interface DcaWatchTimeframe {
+    key: 'week' | 'month' | 'quarter' | 'year';
+    short: string;
+    label: string;
+    available: boolean;
+    reason?: string;
+    zone?: DcaWatchZone;
+    status?: string;
+    period?: string;
+    streak?: number;
+}
+
+export interface DcaWatchCardData {
+    symbol: string;
+    available: boolean;
+    reason?: string;
+    currency?: string | null;
+    currency_label?: string | null;
+    official_timeframe?: 'month';
+    current?: DcaWatchZone & { status: string; period: string; signal_date: string; close: number; months_in_zone: number };
+    timeframes: DcaWatchTimeframe[];
+    last_change?: { from: DcaWatchZone; to: DcaWatchZone; period: string; signal_date: string; close: number; change: number | null } | null;
+    risk?: { key: 'low' | 'medium' | 'high'; label: string; reasons: Array<{ key: string; value: number | null }> };
+    why?: {
+        signal: string | null;
+        binding: string | null;
+        close: number;
+        drawdown: number | null;
+        high: number | null;
+        high_lookback_months: number;
+        dd_thresholds: number[];
+        sma: number | null;
+        sma_months: number | null;
+        sma_gap: number | null;
+        adj_gap: number | null;
+        gap_thresholds: number[];
+        vol: number | null;
+        vol_ratio: number | null;
+        vol_ref: number;
+        level_drawdown: number | null;
+        level_sma_gap: number | null;
+        rsi: number | null;
+        months_of_history: number | null;
+        level_prices: Record<string, number | null>;
+        params_version: string;
+    };
+}

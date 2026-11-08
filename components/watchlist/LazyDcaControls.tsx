@@ -15,3 +15,4 @@ function ControlFallback() {
 
 export const LazyDcaEvaluateButton = dynamic(() => import('@/components/watchlist/DcaEvaluateButton'), { loading: () => <ControlFallback /> });
 export const LazyDcaHitRatesPopover = dynamic(() => import('@/components/watchlist/DcaHitRatesPopover'), { loading: () => <ControlFallback /> });
+export const LazyDcaWatchCardToggle = dynamic(() => import('@/components/watchlist/DcaWatchCardToggle'), { loading: () => <ControlFallback /> });

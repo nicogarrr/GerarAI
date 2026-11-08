@@ -260,5 +260,55 @@
     "missingAnnualRevenue": "annual revenue",
     "missingFiscalYear": "fiscal year end",
     "missingAssumptions": "model assumptions"
+  },
+  "dcaCard": {
+    "trigger": "DCA card",
+    "loading": "Loading card…",
+    "unavailable": "DCA card not available right now.",
+    "notEnough": "Not enough history for the card yet (12 months needed).",
+    "label": "DCA card for {symbol}",
+    "timeframes": "Level by timeframe",
+    "tf": {
+      "week": "Weekly",
+      "month": "Monthly (official signal)",
+      "quarter": "Quarterly",
+      "year": "Yearly"
+    },
+    "tfShort": {
+      "week": "W",
+      "month": "M",
+      "quarter": "Q",
+      "year": "Y"
+    },
+    "tfMissing": "Not enough history in this timeframe",
+    "monthsInZone": "{count} months in zone",
+    "forming": "provisional: the month has not closed",
+    "risk": {
+      "low": "Low risk",
+      "medium": "Medium risk",
+      "high": "High risk"
+    },
+    "sinceChange": "{change} since it was in {from} at {price} ({date})",
+    "noChange": "No level change in the history.",
+    "why": "Why this level?",
+    "whyDrawdown": "Drop from the {months}-month high ({high}): {dd}. 2X/3X/4X thresholds: {t2} / {t3} / {t4} → {level}.",
+    "whySma": "Distance below the {months}-month average ({sma}): {gap}; volatility-adjusted: {adj} → {level}.",
+    "whyVol": "Annual volatility {vol} (reference {ref}): more volatility needs a bigger drop to move up a level.",
+    "whyBinding": "Driven by {binding}.",
+    "binding": {
+      "drawdown": "the drop from the high",
+      "smaGap": "the distance to the average",
+      "empate": "a tie between both"
+    },
+    "whyPrices": "Closes that would trigger each level: {prices}.",
+    "whyRisk": "Risk: {reasons}.",
+    "riskReason": {
+      "volatility": "volatility {value}",
+      "volatilityUnknown": "no volatility data",
+      "preRevenue": "company without meaningful revenue",
+      "shortHistory": "only {value} months of history",
+      "stale": "stale data"
+    },
+    "whyOfficial": "The official signal (alerts and plan) is the monthly one; week, quarter and year apply the same formula to closes of that period, as context. Historical, not a prediction."
   }
 }
