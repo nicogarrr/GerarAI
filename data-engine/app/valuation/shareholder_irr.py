@@ -18,12 +18,15 @@ patrimonio en ≤ 0) y el dividendo es la TIR menos esa TCAC. Por construcción 
 Dos bases (``basis``):
 * ``ev_ebitda``: empresa operativa. EV = múltiplo × EBITDA; patrimonio = EV − deuda neta − híbridos − minoritarios.
 * ``pe``: holding/financiera (la deuda es de las filiales, el EBITDA consolidado no es del accionista):
-  precio = PER × beneficio por acción; no hay paso de deuda. El «beneficio» puede ser el FFO de un REIT
-  (``earnings_label``), con la misma mecánica.
+  precio = PER × beneficio por acción; la deuda de partida no se resta. El «beneficio» puede ser el FFO de
+  un REIT (``earnings_label``), con la misma mecánica.
 * ``pb``: aseguradora, banco u holding: el valor contable (o el NAV) es lo que compone. ``revenue`` lleva el
   valor contable atribuible al accionista, ``margin`` es el ROE, el beneficio = ROE × valor contable y el
-  precio = P/VC × valor contable por acción; no hay paso de deuda (la deuda es parte del balance que ya
+  precio = P/VC × valor contable por acción; la deuda de partida no se resta (es parte del balance que ya
   descuenta el valor contable).
+En ``pe`` y ``pb`` el flujo que no va a dividendo ni a recompras se queda en la empresa como caja (o, si
+el M&A supera el flujo, como deuda) y suma (o resta) al patrimonio a 1×: el paso «deuda» de la
+descomposición es esa caja retenida.
 """
 from __future__ import annotations
 
@@ -149,10 +152,13 @@ def _interp(a: float, b: float, t: int, n: int) -> float:
 
 
 def _equity(sp: StartingPoint, multiple: float, earnings: float, net_debt: float, book: float = 0.0) -> float:
+    # pe/pb: la deuda de partida es de las filiales (no se resta), pero ``net_debt`` lleva lo que el
+    # accionista retiene año a año (flujo distribuible − dividendos − recompras): caja acumulada (< 0)
+    # o deuda tomada para pagar M&A por encima del flujo (> 0). Antes ese resto desaparecía.
     if sp.basis == "pb":
-        return multiple * book
+        return multiple * book - net_debt
     if sp.basis == "pe":
-        return multiple * earnings
+        return multiple * earnings - net_debt
     return multiple * earnings - net_debt - sp.claims
 
 
@@ -178,8 +184,7 @@ def project(sp: StartingPoint, d: Drivers, years: int = 10) -> list[YearRow]:
         distributable = fcf - mna_spend
         dividends = max(distributable, 0.0) * d.dividend_payout
         buybacks = max(distributable, 0.0) * d.buyback_payout
-        if sp.basis not in ("pe", "pb"):
-            net_debt = net_debt - (distributable - dividends - buybacks)
+        net_debt = net_debt - (distributable - dividends - buybacks)
         multiple_t = _interp(m0, d.exit_multiple, t, years)
         shares_pre = shares * (1 + d.sbc_dilution)
         price_t = _equity(sp, multiple_t, earnings, net_debt, rev) / shares_pre if shares_pre > 0 else 0.0
