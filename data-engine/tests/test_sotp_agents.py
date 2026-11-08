@@ -85,7 +85,7 @@ def test_numbers_come_from_fixed_tables_and_cited_figures_with_a_formula_trace()
     assert problems == []
     # El código fija la tasa CAPM, las acciones SEC, el año de madurez y la caja menos deuda.
     assert model["discount_rate"] == 0.11 and model["shares_current"] == 300.0 and model["valuation_year"] == 2030
-    assert "CAPM" in model["discount_rate_source"] and model["rules_version"] == "sotp-rules-v2"
+    assert "CAPM" in model["discount_rate_source"] and model["rules_version"] == "sotp-rules-v3"
     cash = model["parts"][-1]
     assert cash["name"].startswith("Caja menos deuda") and cash["value"] == 600.0 and cash["discounted"] is False
     first = model["parts"][0]
@@ -667,3 +667,212 @@ def test_when_the_total_is_mostly_cash_the_reader_is_told():
     flag = _mostly_cash({"value_per_share": 4.80, "rows": rows})
     assert flag["share"] == pytest.approx(3.95 / 4.80)
     assert _mostly_cash({"value_per_share": 10.0, "rows": rows}) is None
+
+
+def test_without_traceable_wacc_the_rate_is_capm_cost_of_equity_and_a_default_is_flagged(db):
+    from app.services.expert_team.sotp_valuer import sotp_anchors
+
+    company = _company(db)
+    _seed_market(db, company)
+    anchors = sotp_anchors(db, company, today=TODAY)
+    assert anchors["discount_rate_source"] == "tag_default"
+    model, _ = parse_proposal(_good(), _ledger(), {**ANCHORS, "discount_rate_source": "tag_default"})
+    assert model["discount_rate_source"].startswith("Tasa por defecto")
+    assert any(w.startswith("Sin CAPM calculable") for w in model["warnings"])
+    for metric, value in (("risk_free_rate", "0.048"), ("beta", "1.5"), ("equity_risk_premium", "0.044"),
+                          ("country_risk_premium", "0.01")):
+        db.add(FinancialFact(company_id=company.id, metric=metric, value=Decimal(value), unit="decimal",
+                             period="2026-11-08", source_type="market", is_reported=False))
+    db.flush()
+    anchors = sotp_anchors(db, company, today=TODAY)
+    assert anchors["discount_rate"] == pytest.approx(0.048 + 1.5 * 0.044 + 0.01)
+    assert anchors["discount_rate_source"].startswith("capm_cost_of_equity")
+
+
+def test_fingerprint_ignores_code_figures_and_narrative_cache_ignores_marker_values():
+    from app.services.expert_team import sotp_rules
+    from app.services.expert_team.sotp_narrative import narrative_fingerprint
+
+    ev = [{"tool": "value_drivers", "source": {"table": "value_drivers", "title": "8-K"}, "data": {"text": EV_TEXT}}]
+    a = sotp_rules.fingerprint(ev + [{"tool": "sotp_anchors", "source": {"title": "Precio"}, "data": {"price": 30}}],
+                               prompt_version="v")
+    b = sotp_rules.fingerprint(ev + [{"tool": "sotp_anchors", "source": {"title": "Precio"}, "data": {"price": 31}}],
+                               prompt_version="v")
+    assert a["hash"] == b["hash"]
+    assert narrative_fingerprint("h", {"sotp.price": "30 $"}) == narrative_fingerprint("h", {"sotp.price": "31 $"})
+    assert narrative_fingerprint("h", {"sotp.price": "30 $"}) != narrative_fingerprint("h", {"sotp.otro": "1"})
+
+
+def test_no_model_call_when_shares_or_rate_are_missing(db):
+    company = _company(db)
+    reasoner = _Recorded([])
+    ctx = RunContext(tenant_id=T1, ticker="SYNTH", mode="thesis", lang="es")
+    result = asyncio.run(run_sotp_valuer(db, ctx=ctx, reasoner=reasoner, tools=_fake_tools(ANCHORS),
+                                         anchors={**ANCHORS, "shares_current_millions": None}))
+    assert result.status == "no_data" and reasoner.calls == [] and "acciones (SEC)" in result.problems[0]
+
+
+
+# --- cartera-1 (8-nov-2026): prueba con la cartera de Nico (TSLA, FRPH, POOL, BN) ---------------------------------
+
+
+def test_adjacent_table_columns_are_two_figures_not_one():
+    from app.services.expert_team import sotp_rules
+
+    row = "Investments in joint ventures 158,302 153,084"
+    assert sotp_rules.figure_supported(158.302, [row]) and sotp_rules.figure_supported(153.084, [row])
+    assert sotp_rules.figure_supported(1.234567, ["1 234 567 shares"])
+    assert sotp_rules.figure_supported(1504.957, ["Net sales $ 1,504,957 $ 1,451,131"])
+
+
+def _stored_classification(quote, amount, *, period="trimestral", source="SYNTH 10-Q (2026-10-28)"):
+    from app.services.expert_team.sotp_valuer import parse_classification
+
+    classification, problems = parse_classification(_good(), _ledger())
+    assert classification is not None, problems
+    seg = classification["segments"][0]
+    seg["status"] = "comercial"
+    seg["anchor"] = {"type": "reportado", "amount_millions": amount, "period": period, "year": 2026, "years": None,
+                     "quote": quote, "sources": [{"label": source, "url": "https://example.com/10q",
+                                                  "date": "2026-10-28"}]}
+    return classification
+
+
+def test_a_stored_table_row_without_the_word_revenue_is_still_valued_but_funding_is_not():
+    from app.services.expert_team.sotp_valuer import build_model
+
+    seg_name = _good()["segments"][0]["name"]
+    model, problems = build_model(_stored_classification("Energy generation and storage 2,881 3,415 8,428 8,934",
+                                                         2881.0), ANCHORS)
+    assert model is not None, problems
+    assert any(p["name"] == seg_name for p in model["parts"])
+    assert not any(u["name"] == seg_name for u in model.get("unvalued") or [])
+    model, _ = build_model(_stored_classification("non-dilutive funding of $2,881 million", 2881.0), ANCHORS)
+    unvalued = {u["name"]: u["reason"] for u in (model or {}).get("unvalued") or []}
+    assert "financiación" in unvalued.get(seg_name, "")
+
+
+def test_an_annual_figure_from_a_10q_is_the_year_to_date_and_the_code_takes_the_quarter():
+    from app.services.expert_team import sotp_rules
+    from app.services.expert_team.sotp_valuer import build_model
+
+    quote = "Net sales $ 1,504,957 $ 1,451,131 $ 4,465,909 $ 4,307,187"
+    anchor = _stored_classification(quote, 4465.909, period="anual")["segments"][0]["anchor"]
+    fixed, note = sotp_rules.quarterly_report_anchor(anchor)
+    assert fixed["period"] == "trimestral" and fixed["amount_millions"] == pytest.approx(1504.957)
+    assert "acumulado" in note
+    # Fuera de un 10-Q (un 10-K) la cifra anual es anual.
+    total = _stored_classification(quote, 4465.909, period="total")["segments"][0]["anchor"]
+    assert sotp_rules.quarterly_report_anchor(total)[0]["amount_millions"] == pytest.approx(1504.957)
+    other = _stored_classification(quote, 4465.909, period="anual", source="SYNTH 10-K (2026-02-20)")
+    assert sotp_rules.quarterly_report_anchor(other["segments"][0]["anchor"])[1] is None
+    model, _ = build_model(_stored_classification(quote, 4465.909, period="anual"), ANCHORS)
+    part = model["parts"][0]
+    assert "1.505,0 M × 4 trimestres" in part["why"]["revenue"] and "acumulado" in part["why"]["revenue"]
+
+
+def test_non_convertible_preferred_shares_never_dilute_the_common_share():
+    from app.services.expert_team import sotp_rules
+    from app.services.expert_team.sotp_valuer import build_model
+
+    assert sotp_rules.dilution_reason("Preferred Shares, Series 56", "2,000,000 Preferred Shares") is not None
+    assert sotp_rules.dilution_reason("Convertible preferred", "convertible into common shares") is None
+    assert sotp_rules.dilution_reason("Clase B canjeable", "12,000,000 Class B shares") is None
+    classification = _stored_classification("Energy generation and storage 2,881 3,415", 2881.0)
+    classification["dilution"] = [{"label": "Preferred Shares, Series 56", "shares_millions": 2.0,
+                                   "quote": "2,000,000 Preferred Shares, Series 56", "sources": []}]
+    model, _ = build_model(classification, ANCHORS)
+    assert not any("Preferred" in d["label"] for d in model["dilution"])
+
+
+def test_a_rejected_classification_is_cached_by_fingerprint_and_not_shown(db, monkeypatch):
+    company = _company(db)
+    rejected = _good_for_tools()
+    for seg in rejected["segments"]:
+        seg["anchor"], seg["guidance_anchor"] = None, None
+    rejected["assets"] = []
+    first = _generate(db, company, monkeypatch, [json.dumps(rejected)] * 2)
+    assert first.status == "rejected" and first.calls >= 1 and first.model is None
+    again = _generate(db, company, monkeypatch, [])
+    assert again.status == "rejected" and again.calls == 0 and again.cache_hit
+    assert again.problems == first.problems
+    assert UserSotpService().read(db, company, T1)["available"] is False
+
+
+
+def test_a_foreign_filer_is_valued_in_its_reporting_currency_with_the_price_converted(db):
+    from app.models.entities import FXRate
+    from app.services.expert_team.sotp_valuer import build_model, sotp_anchors
+
+    company = _company(db, ticker="CANCO")
+    _seed_market(db, company)  # precio 32 USD
+    for fact in db.query(FinancialFact).filter(FinancialFact.company_id == company.id).all():
+        if fact.unit == "USD":
+            fact.unit = "CAD"  # un 40-F canadiense: los hechos SEC van en CAD
+    db.flush()
+    anchors = sotp_anchors(db, company, today=TODAY)
+    assert anchors["fx_missing"] == "tipo de cambio USD→CAD"  # sin tipo guardado: no hay propuesta ni llamada
+    for quote, eur_per_unit in (("USD", "0.92"), ("CAD", "0.66")):
+        db.add(FXRate(tenant_id=T1, base_currency="EUR", quote_currency=quote, rate=Decimal(eur_per_unit),
+                      rate_date=TODAY - timedelta(days=2), source="ECB"))
+    db.flush()
+    anchors = sotp_anchors(db, company, today=TODAY)
+    assert anchors["currency"] == "CAD" and anchors["fx_missing"] is None
+    assert anchors["price"] == pytest.approx(32 * 0.92 / 0.66)
+    model, _ = build_model(parse_classification_or_fail(), {**ANCHORS, "currency": "CAD",
+                                                            "price_fx_note": anchors["price_fx_note"]})
+    assert model["currency"] == "CAD" and any("moneda de los informes" in w for w in model["warnings"])
+
+
+def parse_classification_or_fail():
+    from app.services.expert_team.sotp_valuer import parse_classification
+
+    classification, problems = parse_classification(_good(), _ledger())
+    assert classification is not None, problems
+    return classification
+
+
+def test_missing_debt_is_said_never_shown_as_zero():
+    from app.services.expert_team.sotp_valuer import build_model
+
+    model, _ = build_model(parse_classification_or_fail(), {**ANCHORS, "debt_millions": None})
+    cash = next(p for p in model["parts"] if p["name"].startswith("Caja"))
+    assert "SIN DATO" in cash["why"]["value"] and "deuda 0" not in cash["why"]["value"]
+    assert any(w.startswith("Falta la deuda") for w in model["warnings"])
+
+
+
+def test_engine_state_with_todays_price_does_not_change_the_fingerprint():
+    from app.services.expert_team import sotp_rules
+
+    ev = [{"tool": "value_drivers", "source": {"table": "value_drivers", "title": "8-K"}, "data": {"text": EV_TEXT}}]
+    a = sotp_rules.fingerprint(ev + [{"tool": "valuation_engine", "source": {"title": "Motor"},
+                                      "data": {"current_price": 48.55, "missing_inputs": ["net_debt"]}}], prompt_version="v")
+    b = sotp_rules.fingerprint(ev + [{"tool": "valuation_engine", "source": {"title": "Motor"},
+                                      "data": {"current_price": 51.2, "missing_inputs": []}}], prompt_version="v")
+    assert a["hash"] == b["hash"]
+
+
+def test_new_rules_save_a_new_version_but_reuse_the_long_thesis_without_a_call(db, monkeypatch):
+    from app.services.expert_team import sotp_rules
+
+    company = _company(db)
+    first = _generate(db, company, monkeypatch, [json.dumps(_good_for_tools()), _narrative_answer()], narrative=True)
+    assert first.status == "stored" and first.calls == 2
+    monkeypatch.setattr(sotp_rules, "RULES_VERSION", "sotp-rules-test")  # reglas nuevas: el modelo cambia de texto
+    again = _generate(db, company, monkeypatch, [], narrative=True)
+    assert again.status == "stored" and again.calls == 0 and again.row_id != first.row_id
+    assert again.narrative["status"] == "cached"
+    shown = UserSotpService().read(db, company, T1)
+    assert shown["agents"]["narrative"]["sections"]  # la tesis queda también en la versión nueva
+
+
+
+def test_markers_carry_the_model_currency_in_millions_too():
+    from app.services.expert_team.sotp_narrative import sotp_markers
+    from app.valuation.sotp import run_user_sotp
+
+    model, _ = parse_proposal(_good(), _ledger(), {**ANCHORS, "currency": "CAD"})
+    markers = sotp_markers(model, run_user_sotp(model, price=40.0))
+    assert markers["sotp.base_per_share"].endswith(" CAD") and markers["sotp.total_present_value"].endswith(" M CAD")
+    assert not any(v.endswith("M$") for v in markers.values())

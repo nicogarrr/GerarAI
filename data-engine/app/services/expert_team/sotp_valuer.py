@@ -67,6 +67,8 @@ SOTP_VALUER_TOOLS: tuple[str, ...] = (
     "risk_events",
 )
 MAX_ATTEMPTS = 2
+#: Rechazo por contenido (forma válida, ninguna cifra comprobable): con la misma evidencia se repetiría.
+NO_SEGMENTS = "ningún segmento tiene una cifra de ingresos comprobable en la evidencia"
 MAX_SEGMENTS = 12
 MAX_ASSET_PARTS = 4
 AGENTS_LABEL = "Propuesta de los agentes"
@@ -207,6 +209,7 @@ def parse_classification(parsed: Any, ledger: EvidenceLedger, *, expert: str = S
             continue
         label = _text(raw.get("label"), 120) or "Dilución"
         shares, sources, quote, reason = _verified(raw, "shares_millions", ledger, expert)
+        reason = reason or sotp_rules.dilution_reason(label, quote)
         if reason:
             unvalued.append({"name": label, "status": None, "reason": f"dilución: {reason}"})
             continue
@@ -215,7 +218,7 @@ def parse_classification(parsed: Any, ledger: EvidenceLedger, *, expert: str = S
     if problems:
         return None, problems
     if not segments:
-        return None, ["ningún segmento tiene una cifra de ingresos comprobable en la evidencia"]
+        return None, [NO_SEGMENTS]
     return {
         "segments": segments,
         "assets": assets,
@@ -247,6 +250,14 @@ def build_model(classification: Mapping[str, Any], anchors: Mapping[str, Any]) -
     parts: list[dict[str, Any]] = []
     warnings: list[str] = []
     unvalued = list(classification.get("unvalued") or [])
+    if anchors.get("price_fx_note"):
+        warnings.append(f"Cifras en {anchors.get('currency')} (moneda de los informes SEC); el precio se convierte: "
+                        f"{anchors['price_fx_note']}.")
+    if anchors.get("debt_millions") is None:
+        warnings.append("Falta la deuda en los datos SEC: «caja menos deuda» no la resta y el valor puede estar "
+                        "sobreestimado.")
+    if anchors.get("discount_rate_source") == "tag_default":
+        warnings.append("Sin CAPM calculable para esta empresa (faltan beta o tipos): se usa la tasa por defecto.")
     if anchors.get("shares_basis") != "shares_outstanding":
         warnings.append("Faltan clases de acciones: la SEC solo da la media diluida de la clase cotizada; "
                         "si hay otras clases canjeables, el recuento diluido es más alto y el $/acción más bajo.")
@@ -256,10 +267,12 @@ def build_model(classification: Mapping[str, Any], anchors: Mapping[str, Any]) -
         status, btype, anchor = seg["status"], seg["business_type"], seg["anchor"]
         # Las reglas vigentes también valen para una clasificación guardada (la cita se conserva).
         if anchor.get("quote"):
-            reason = sotp_rules.revenue_context(float(anchor["amount_millions"]), [], anchor["quote"])
+            # Al clasificar ya se exigió hablar de ingresos con el pasaje entero; aquí solo queda la cita.
+            reason = sotp_rules.funding_reason(anchor["quote"])
             if reason:
                 unvalued.append({"name": seg["name"], "status": status, "reason": f"ancla {anchor['type']}: {reason}"})
                 continue
+        anchor, period_note = sotp_rules.quarterly_report_anchor(anchor)
         margin, multiple, desc = sotp_rules.BUSINESS_TABLE[btype]
         probability = sotp_rules.STATUS_PROBABILITY[status]
         revenue, formula = sotp_rules.revenue_rule(anchor, status, base_year=base_year, valuation_year=year,
@@ -276,6 +289,8 @@ def build_model(classification: Mapping[str, Any], anchors: Mapping[str, Any]) -
                 warnings.append(f"«{seg['name']}»: infravalorado por falta de estimaciones: su ancla es {anchor['type']}, "
                                 "no una previsión de ingresos, y no hay guía de la empresa citada.")
         quote = f" Cita: «{anchor['quote']}»" if anchor.get("quote") else ""
+        if period_note:
+            quote = f" ({period_note}).{quote}"
         parts.append({
             "group": seg.get("group"),
             "name": seg["name"],
@@ -321,8 +336,9 @@ def build_model(classification: Mapping[str, Any], anchors: Mapping[str, Any]) -
             "value": liquid - (debt or 0.0),
             "discounted": False,
             "probability": 1.0,
-            "why": {"value": f"{liquid_text} − deuda {debt or 0:,.0f} M = {liquid - (debt or 0.0):,.0f} M a "
-                             f"{anchors.get('balance_period_end') or 'N/D'} (SEC; la deuda incluye los convertibles)."},
+            "why": {"value": ((f"{liquid_text} − deuda SIN DATO (no restada) = {liquid:,.0f} M a " if debt is None else
+                               f"{liquid_text} − deuda {debt:,.0f} M = {liquid - debt:,.0f} M a ")
+                              + f"{anchors.get('balance_period_end') or 'N/D'} (SEC; la deuda incluye los convertibles).")},
             "sources": [{"label": "Acciones, caja y deuda (SEC)", "url": f"/research/{anchors['ticker']}?view=valuation",
                          "date": anchors.get("balance_period_end")}],
         })
@@ -330,7 +346,8 @@ def build_model(classification: Mapping[str, Any], anchors: Mapping[str, Any]) -
                  "why": {"shares": _cut(f"{d['shares_millions']:,.1f} M copiados de la evidencia."
                                         + (f" Cita: «{d['quote']}»" if d.get("quote") else ""))},
                  "sources": d.get("sources") or []}
-                for d in classification.get("dilution") or []]
+                for d in classification.get("dilution") or []
+                if sotp_rules.dilution_reason(d.get("label"), d.get("quote")) is None]
     dilution += sotp_rules.code_dilution(anchors, sotp_rules.HORIZON_YEARS)
     if burns_cash and not any(d["shares"] > 0 for d in dilution):
         dilution.append({"label": "Sin dilución calculable", "shares": 0.0,
@@ -341,7 +358,9 @@ def build_model(classification: Mapping[str, Any], anchors: Mapping[str, Any]) -
         "base_year": base_year,
         "valuation_year": year,
         "discount_rate": rate,
-        "discount_rate_source": f"CAPM de GerarAI ({anchors.get('discount_rate_source') or 'resolve_rates'}): {rate:.1%}",
+        "discount_rate_source": (f"Tasa por defecto (sin CAPM calculable): {rate:.1%}"
+                                 if anchors.get("discount_rate_source") == "tag_default" else
+                                 f"CAPM de GerarAI ({anchors.get('discount_rate_source') or 'resolve_rates'}): {rate:.1%}"),
         "shares_current": anchors["shares_current_millions"],
         "shares_why": {"shares": f"{anchors['shares_current_millions']:,.1f} M ({anchors.get('shares_basis')}, "
                                  f"SEC {anchors.get('shares_period_end') or ''}) + la dilución de abajo."},
@@ -448,6 +467,42 @@ def _fact_millions(db: Session, company: Company, metric: str, *, period_prefix:
     return None, None
 
 
+def _capm_cost_of_equity(db: Session, company: Company) -> tuple[float, str] | None:
+    from sqlalchemy import desc, select
+
+    from app.models import FinancialFact
+
+    values: dict[str, float] = {}
+    for metric in ("risk_free_rate", "beta", "equity_risk_premium", "country_risk_premium"):
+        row = db.scalars(
+            select(FinancialFact).where(FinancialFact.company_id == company.id, FinancialFact.metric == metric)
+            .order_by(desc(FinancialFact.period), desc(FinancialFact.id))
+        ).first()
+        if row is not None and row.value is not None:
+            values[metric] = float(row.value)
+    if not all(k in values for k in ("risk_free_rate", "beta", "equity_risk_premium")):
+        return None
+    rate = values["risk_free_rate"] + values["beta"] * values["equity_risk_premium"] + values.get("country_risk_premium", 0.0)
+    if not (0.03 <= rate <= 0.4):
+        return None
+    return rate, (f"capm_cost_of_equity: {values['risk_free_rate']:.2%} + {values['beta']:.2f} × "
+                  f"{values['equity_risk_premium']:.2%} + {values.get('country_risk_premium', 0.0):.2%}")
+
+
+def _reporting_currency(db: Session, company: Company) -> str | None:
+    from sqlalchemy import desc, select
+
+    from app.models import FinancialFact
+
+    unit = db.scalar(
+        select(FinancialFact.unit).where(FinancialFact.company_id == company.id,
+                                         FinancialFact.metric.in_(("revenue", "cash_and_equivalents")))
+        .order_by(desc(FinancialFact.period), desc(FinancialFact.id)).limit(1)
+    )
+    unit = str(unit or "").strip().upper()
+    return unit if len(unit) == 3 and unit.isalpha() else None
+
+
 def sotp_anchors(db: Session, company: Company, *, today: date | None = None) -> dict[str, Any]:
     """Cifras que fija el código (en millones), con su procedencia. Pura lectura."""
     from app.services.analyst_report import build_company_report
@@ -473,6 +528,12 @@ def sotp_anchors(db: Session, company: Company, *, today: date | None = None) ->
     except Exception as exc:  # noqa: BLE001 - sin tasa no hay propuesta
         logger.warning("sotp anchors: resolve_rates falló para %s: %s", company.ticker, type(exc).__name__)
         rate, rate_source = None, None
+    if rate_source in (None, "tag_default"):
+        # Sin WACC trazable: coste del capital por CAPM con los mismos insumos SEC/mercado de GerarAI
+        # (tipo sin riesgo + beta × prima de mercado + prima país). Si faltan, la tasa por defecto, avisada.
+        capm = _capm_cost_of_equity(db, company)
+        if capm is not None:
+            rate, rate_source = capm
     annual = (report.get("estimates") or {}).get("annual") or []
     revenue_rows = [
         {"period_end": str(row.get("period_end")), "revenue_millions": _millions(row.get("revenue"))}
@@ -485,13 +546,29 @@ def sotp_anchors(db: Session, company: Company, *, today: date | None = None) ->
     short_term, _ = _fact_millions(db, company, "short_term_investments", period_prefix=balance_end) if balance_end else (None, None)
     sbc, sbc_end = _fact_millions(db, company, "stock_based_compensation", annual=True)
     fcf, fcf_end = _fact_millions(db, company, "free_cash_flow", annual=True)
+    # Moneda de los informes (unidad de los hechos SEC; un 40-F canadiense va en CAD) frente a la del precio:
+    # todo el modelo va en la de los informes y el precio se convierte con el tipo guardado (BCE).
+    reporting = _reporting_currency(db, company)
+    price_currency = (price_currency or company.currency or "").upper() or None
+    fx_note = fx_missing = None
+    if price is not None and reporting and price_currency and reporting != price_currency:
+        from app.services.user_sotp_service import convert_amount
+
+        converted = convert_amount(db, float(price), price_currency, reporting, today)
+        if converted is None:
+            fx_missing = f"tipo de cambio {price_currency}→{reporting}"
+        else:
+            price, fx_note = converted
+        price_currency = reporting
     return {
         "ticker": company.ticker.upper(),
         "company": company.name,
         "today": today.isoformat(),
         "base_year": today.year,
-        "currency": (price_currency or company.currency or "").upper() or None,
+        "currency": price_currency,
         "price": price,
+        "price_fx_note": fx_note,
+        "fx_missing": fx_missing,
         "price_as_of": price_as_of,
         "shares_current_millions": _millions(shares_point),
         "shares_basis": shares_basis if shares_point else None,
@@ -786,6 +863,14 @@ async def run_sotp_valuer(
         result.status = "no_price"
         result.problems = ["sin precio de la empresa"]
         return result
+    missing = [label for key, label in (("shares_current_millions", "acciones (SEC)"),
+                                         ("discount_rate", "tasa de descuento")) if not anchors.get(key)]
+    if anchors.get("fx_missing"):
+        missing.append(str(anchors["fx_missing"]))
+    if missing:
+        # Sin estos datos no hay modelo posible: no se gasta una llamada al modelo.
+        result.problems = [f"faltan datos: {', '.join(missing)}"]
+        return result
     tools = tools if tools is not None else build_sotp_tools(db, anchors)
     ledger = EvidenceLedger()
     evidence, result.tool_errors = await gather_evidence(spec, ctx, tools, ledger)
@@ -798,12 +883,15 @@ async def run_sotp_valuer(
     ][:12]
     hit = cached(result.fingerprint["hash"]) if cached is not None else None
     if hit:
-        model, problems = build_model(hit, anchors)
+        model, problems = build_model(hit, anchors) if hit.get("segments") else (None, [NO_SEGMENTS])
+        result.cache_hit, result.classification = True, dict(hit)
         if model is not None:
-            result.status, result.model, result.cache_hit = "ok", model, True
-            result.classification = dict(hit)
+            result.status, result.model = "ok", model
             result.value_per_share = run_user_sotp(model)["value_per_share"]
             return result
+        # Misma huella, misma clasificación: el mismo rechazo, sin volver a llamar al modelo.
+        result.status, result.problems = "rejected", problems
+        return result
     system = f"{prompt.text}\n\n{SOTP_CONTRACT}"
     payload: dict[str, Any] = {
         "ticker": ctx.ticker,
@@ -813,6 +901,7 @@ async def run_sotp_valuer(
         "evidence": evidence,
     }
     found: list[tuple[float, dict[str, Any], dict[str, Any]]] = []
+    rejected_classification: dict[str, Any] | None = None
     for _ in range(max(1, readings)):
         attempt_payload = dict(payload)
         for _attempt in range(MAX_ATTEMPTS):
@@ -837,10 +926,14 @@ async def run_sotp_valuer(
             if model is not None and classification is not None:
                 found.append((run_user_sotp(model)["value_per_share"], classification, model))
                 break
+            if classification is not None or problems == [NO_SEGMENTS]:
+                rejected_classification = classification or {"segments": [], "assets": [], "dilution": [],
+                                                             "unvalued": [], "rejected": NO_SEGMENTS}
             result.problems = problems
             attempt_payload["problems_previous_answer"] = problems[:25]
     if not found:
         result.status = "rejected"
+        result.classification = rejected_classification  # válida de forma: se guarda para no repetir la llamada
         return result
     result.readings = [
         {"value_per_share": vps, "segments": [list(k) for k in _classification_key(c)],
@@ -857,13 +950,21 @@ async def run_sotp_valuer(
 
 def _cache_lookup(db: Session, company: Company, tenant_id: int) -> Callable[[str], Mapping[str, Any] | None]:
     """Clasificación guardada con la misma huella (último guardado de los agentes primero)."""
-    from app.services.user_sotp_service import AGENTS_SEGMENT, SOTP_INPUT_KEY, UserSotpService
+    from app.services.user_sotp_service import (
+        AGENTS_REJECTED_SEGMENT,
+        AGENTS_SEGMENT,
+        SOTP_INPUT_KEY,
+        UserSotpService,
+    )
 
-    rows = UserSotpService().inputs.history(db, company_id=company.id, tenant_id=tenant_id,
-                                            input_key=SOTP_INPUT_KEY, segment_key=AGENTS_SEGMENT)
+    inputs = UserSotpService().inputs
+    rows = inputs.history(db, company_id=company.id, tenant_id=tenant_id,
+                          input_key=SOTP_INPUT_KEY, segment_key=AGENTS_SEGMENT)
+    rejected = inputs.history(db, company_id=company.id, tenant_id=tenant_id,
+                              input_key=SOTP_INPUT_KEY, segment_key=AGENTS_REJECTED_SEGMENT)
 
     def lookup(fingerprint_hash: str) -> Mapping[str, Any] | None:
-        for row in reversed(rows):
+        for row in [*reversed(rows), *reversed(rejected)]:
             meta = row.metadata_ or {}
             if (meta.get("fingerprint") or {}).get("hash") == fingerprint_hash and meta.get("classification"):
                 return meta["classification"]
@@ -921,6 +1022,17 @@ def generate_sotp_proposal(
         logger.warning("valorador SOTP falló para %s: %s", company.ticker, type(exc).__name__)
         return SotpProposalResult(status="error", problems=[f"{type(exc).__name__}"])
     if result.model is None:
+        if (result.status == "rejected" and not result.cache_hit and result.classification is not None
+                and result.fingerprint):
+            try:
+                UserSotpService().save_rejected(db, company, tenant_id, meta={
+                    "generated_at": datetime.now(UTC).isoformat(), "trigger": trigger,
+                    "prompt_version": result.prompt_version, "rules_version": sotp_rules.RULES_VERSION,
+                    "llm_calls": result.llm_calls, "fingerprint": result.fingerprint,
+                    "classification": result.classification, "problems": list(result.problems)[:20]})
+            except Exception as exc:  # noqa: BLE001 - la caché del rechazo nunca rompe a quien llama
+                db.rollback()
+                logger.warning("no se pudo guardar el rechazo SOTP de %s: %s", company.ticker, type(exc).__name__)
         return result
     previous = getattr(lookup, "previous_fingerprint", None)
     changed_by = [] if result.cache_hit else sotp_rules.fingerprint_changes(previous, result.fingerprint or {})
@@ -962,6 +1074,18 @@ def generate_sotp_proposal(
     return result
 
 
+def _previous_narrative(db: Session, company: Company, tenant_id: int, expected: str) -> dict[str, Any] | None:
+    from app.services.user_sotp_service import AGENTS_SEGMENT, SOTP_INPUT_KEY, UserSotpService
+
+    rows = UserSotpService().inputs.history(db, company_id=company.id, tenant_id=tenant_id,
+                                            input_key=SOTP_INPUT_KEY, segment_key=AGENTS_SEGMENT)
+    for row in reversed(rows):
+        narrative = (row.metadata_ or {}).get("narrative") or {}
+        if narrative.get("fingerprint") == expected and narrative.get("sections"):
+            return dict(narrative)
+    return None
+
+
 def _attach_narrative(db: Session, company: Company, tenant_id: int, result: SotpProposalResult,
                       reasoner: Reasoner, *, timeout: float) -> None:
     """Tesis larga con marcadores sobre la propuesta guardada (misma huella → la guardada). Nunca lanza."""
@@ -970,7 +1094,7 @@ def _attach_narrative(db: Session, company: Company, tenant_id: int, result: Sot
     from app.core.config import get_settings
     from app.models import DeclaredInputValue
     from app.services.async_bridge import run_from_any_context
-    from app.services.expert_team.sotp_narrative import write_narrative
+    from app.services.expert_team.sotp_narrative import narrative_fingerprint, sotp_markers, write_narrative
 
     if not getattr(get_settings(), "sotp_agents_narrative_enabled", True) or not result.row_id or not result.model:
         return
@@ -983,13 +1107,19 @@ def _attach_narrative(db: Session, company: Company, tenant_id: int, result: Sot
         context = {"ticker": company.ticker, "company": company.name, "headlines": result.headlines,
                    "classification": [{k: s.get(k) for k in ("name", "status", "business_type", "why_status")}
                                       for s in (result.classification or {}).get("segments") or []]}
+        cached = meta.get("narrative")
+        if not (cached or {}).get("sections"):
+            # Versión nueva por reglas nuevas (mismas partes y misma huella): la tesis guardada en una versión
+            # anterior sigue valiendo si su huella coincide (los números los pone el cálculo al mostrarla).
+            expected = narrative_fingerprint((result.fingerprint or {}).get("hash"), sotp_markers(result.model, computed))
+            cached = _previous_narrative(db, company, tenant_id, expected)
         narrative = run_from_any_context(
             write_narrative(reasoner=reasoner, model=result.model, result=computed, context=context,
-                            sotp_fingerprint=(result.fingerprint or {}).get("hash"), cached=meta.get("narrative")),
+                            sotp_fingerprint=(result.fingerprint or {}).get("hash"), cached=cached),
             timeout=timeout,
         )
         result.narrative = narrative.as_dict()
-        if narrative.status == "cached" or not narrative.sections:
+        if not narrative.sections or (narrative.status == "cached" and cached is meta.get("narrative")):
             return
         meta["narrative"] = narrative.as_dict()
         row.metadata_ = meta
