@@ -30,8 +30,8 @@ import pytest
 from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import Session
 
-import app.models  # noqa: F401  (registra tablas e instala los listeners reales)
 import app.core.cache as cache_module
+import app.models  # noqa: F401  (registra tablas e instala los listeners reales)
 from app.models import Company, Position, Tenant, Transaction, WatchItem
 from app.models.entities import Base
 
