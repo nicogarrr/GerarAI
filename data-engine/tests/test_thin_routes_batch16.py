@@ -103,6 +103,39 @@ def test_fetch_index_payload_malformado():
     assert m._fetch_index(cliente, "^GSPC") is None
 
 
+def test_fetch_index_camino_feliz():
+    # Lineas 65-83: cierres con un hueco (None) en medio; la variacion sale
+    # de los dos ultimos cierres VALIDOS y priceAsOf del timestamp del ultimo
+    # valido. Sin red real (cliente doblado).
+    cliente = Mock()
+    cliente.get.return_value = _resp_yahoo(
+        closes=[100.0, None, 102.0, 104.04],
+        timestamps=[1000, 2000, 3000, 4000],
+    )
+    salida = m._fetch_index(cliente, "^GSPC")
+    assert salida == {
+        "symbol": "^GSPC",
+        "priceAsOf": 4000,
+        "price": 104.04,
+        "change": 2.04,
+        "changePercent": 2.0,
+    }
+
+
+def test_fetch_index_menos_de_dos_cierres_validos_no_publica():
+    # Con un solo cierre valido no hay variacion medible: la serie no se
+    # publica (el hueco sale por coverage, nunca como 0.00% inventado).
+    cliente = Mock()
+    cliente.get.return_value = _resp_yahoo(closes=[None, 104.0], timestamps=[1, 2])
+    assert m._fetch_index(cliente, "^GSPC") is None
+
+
+def test_fetch_index_cierre_previo_cero_no_publica_variacion():
+    cliente = Mock()
+    cliente.get.return_value = _resp_yahoo(closes=[0.0, 104.0], timestamps=[1, 2])
+    assert m._fetch_index(cliente, "^GSPC") is None
+
+
 # --- cliente compartido --------------------------------------------------------------
 
 
