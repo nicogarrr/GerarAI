@@ -38,7 +38,7 @@ def _historia(best_horizon, horizontes):
 
 def test_ranked_firms_sin_horizonte_con_datos_devuelve_vacio():
     """Horizontes presentes pero sin casas puntuadas: (None, [])."""
-    history = _historia("1y", [SimpleNamespace(horizon="1y", top=[])])
+    history = _historia("12m", [SimpleNamespace(horizon="12m", top=[])])
     assert notes_route.ranked_firms(history) == (None, [])
 
 
@@ -46,10 +46,10 @@ def test_ranked_firms_best_horizon_desaparecido_pasa_al_siguiente():
     """Si el mejor horizonte ya no esta en la lista, se sigue con el resto."""
     top = [SimpleNamespace(firm="Casa X")]
     history = _historia(
-        "5y", [SimpleNamespace(horizon="1y", top=top)]
+        "6m", [SimpleNamespace(horizon="12m", top=top)]
     )
     clave, firms = notes_route.ranked_firms(history)
-    assert clave == "1y"
+    assert clave == "12m"
     assert [f.firm for f in firms] == ["Casa X"]
 
 
