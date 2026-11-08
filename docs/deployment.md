@@ -137,10 +137,12 @@ docker compose -f docker-compose.prod.yml --env-file .env.production run --rm \
   backend uv run alembic downgrade -1
 ```
 
-### 2. Restaurar Backup de Base de Datos (En Caso de Corrupción)
+### 2. Restaurar Backup (En Caso de Corrupción)
 ```bash
-gunzip -c storage/backups/pg_dump_ULTIMO.sql.gz | docker exec -i gerarai-postgres psql -U portfolio -d cavaai_research
+./scripts/restore.sh backups/<AAAAMMDD-HHMMSS> --confirm-restore
 ```
+El script verifica los checksums del manifest antes de tocar los datos y usa
+`pg_restore` para el volcado `pg_dump -Fc`. Detalles: [BACKUP_RESTORE.md](BACKUP_RESTORE.md).
 
 ### 3. Volver a la Imagen / Commit Anterior
 ```bash
@@ -149,4 +151,4 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --bui
 ```
 
 ### 4. Confirmar Estabilización
-Verificar que `/api/health` vuelve a reportar `"status": "healthy"`.
+Verificar que `/api/health` vuelve a reportar `"status": "ok"`.
