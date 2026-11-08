@@ -178,20 +178,66 @@ def test_public_feed_ip_rate_limit_returns_429_after_limit(monkeypatch):
     assert exc.value.status_code == 429
 
 
-def test_public_client_ip_uses_last_xff_only_behind_private_proxy():
+def test_public_client_ip_uses_last_xff_only_behind_trusted_proxy():
     from types import SimpleNamespace
 
     from app.core.rate_limit import public_client_ip
 
+    settings = SimpleNamespace(forwarded_allow_ips="172.16.0.0/12")
+
     def req(peer, xff=None):
         return SimpleNamespace(client=SimpleNamespace(host=peer), headers={"x-forwarded-for": xff} if xff else {})
 
-    # Tras Caddy (peer privado): ultima entrada, las anteriores son falsificables.
-    assert public_client_ip(req("172.18.0.2", "1.1.1.1, 76.76.21.9")) == "76.76.21.9"
-    assert public_client_ip(req("172.18.0.2")) == "172.18.0.2"
-    assert public_client_ip(req("172.18.0.2", "basura")) == "172.18.0.2"
+    # Tras Caddy (peer en la allowlist de proxies): ultima entrada, las
+    # anteriores son falsificables.
+    assert public_client_ip(req("172.18.0.2", "1.1.1.1, 76.76.21.9"), settings) == "76.76.21.9"
+    assert public_client_ip(req("172.18.0.2"), settings) == "172.18.0.2"
+    assert public_client_ip(req("172.18.0.2", "basura"), settings) == "172.18.0.2"
     # Acceso directo (peer publico): la cabecera se ignora.
-    assert public_client_ip(req("8.8.4.4", "9.9.9.9")) == "8.8.4.4"
+    assert public_client_ip(req("8.8.4.4", "9.9.9.9"), settings) == "8.8.4.4"
+
+
+def test_public_client_ip_ignores_xff_from_untrusted_private_peer():
+    """Un cliente directo en la red interna (privado, fuera de la allowlist)
+    no puede rotar su cubo falsificando X-Forwarded-For."""
+    from types import SimpleNamespace
+
+    from app.core.rate_limit import public_client_ip
+
+    settings = SimpleNamespace(forwarded_allow_ips="172.16.0.0/12")
+
+    def req(peer, xff=None):
+        return SimpleNamespace(client=SimpleNamespace(host=peer), headers={"x-forwarded-for": xff} if xff else {})
+
+    for fake in ("1.1.1.1", "2.2.2.2", "76.76.21.9"):
+        assert public_client_ip(req("192.168.1.77", fake), settings) == "192.168.1.77"
+
+
+def test_public_feed_limit_bucket_not_rotated_by_untrusted_xff(monkeypatch):
+    """El limite del feed tampoco rota el cubo con XFF de un peer no confiable."""
+    import asyncio
+    from types import SimpleNamespace
+
+    from app.core import rate_limit as rl
+
+    monkeypatch.setattr(rl, "PUBLIC_FEED_LIMIT_PER_MINUTE", 2)
+    rl._local_hits.clear()
+    try:
+        for fake in ("1.1.1.1", "2.2.2.2"):
+            req = SimpleNamespace(
+                client=SimpleNamespace(host="192.168.1.77"),
+                headers={"x-forwarded-for": fake},
+            )
+            asyncio.run(rl.enforce_public_ip_rate_limit(req))
+        req = SimpleNamespace(
+            client=SimpleNamespace(host="192.168.1.77"),
+            headers={"x-forwarded-for": "3.3.3.3"},
+        )
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(rl.enforce_public_ip_rate_limit(req))
+        assert exc.value.status_code == 429
+    finally:
+        rl._local_hits.clear()
 
 
 def test_ics_calname_follows_scope():

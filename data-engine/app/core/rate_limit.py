@@ -286,23 +286,23 @@ async def enforce_llm_test_rate_limit(
 PUBLIC_FEED_LIMIT_PER_MINUTE = 60
 
 
-def public_client_ip(request: Request) -> str:
-    """IP real para el limite publico.
+def public_client_ip(request: Request, settings) -> str:
+    """IP real para los limites por IP (feed publico, fallos de auth).
 
-    Detras de Caddy el peer del socket es la IP privada del proxy (todo el
-    mundo compartiria un cubo). Solo si el peer es privado/loopback se usa la
-    ULTIMA entrada de X-Forwarded-For: la anade el proxy de confianza con la
-    IP que ve; las anteriores las puede falsificar el cliente. Un peer
-    publico (acceso directo) usa su propia IP e ignora la cabecera.
+    X-Forwarded-For solo se mira si el peer es un proxy de la allowlist
+    ``forwarded_allow_ips`` (_trusted_proxy_peer, la misma que arranca
+    uvicorn con --forwarded-allow-ips): la ULTIMA entrada la anade ese proxy
+    con la IP que ve; las anteriores las puede falsificar el cliente.
+    Cualquier otro peer (publico, o privado fuera de la allowlist, como un
+    cliente directo en la red interna) cuenta por su propia IP y no puede
+    rotar su cubo falsificando la cabecera. Cuando uvicorn --proxy-headers
+    ya sustituyo scope["client"] por la IP real, ese peer publico cae aqui y
+    se usa tal cual.
     """
     import ipaddress
 
     peer = request.client.host if request.client else "unknown"
-    try:
-        peer_ip = ipaddress.ip_address(peer)
-    except ValueError:
-        return peer
-    if not (peer_ip.is_private or peer_ip.is_loopback):
+    if not _trusted_proxy_peer(peer, settings):
         return peer
     forwarded = request.headers.get("x-forwarded-for", "")
     last = forwarded.split(",")[-1].strip() if forwarded else ""
@@ -315,14 +315,14 @@ def public_client_ip(request: Request) -> str:
 async def enforce_public_ip_rate_limit(request: Request) -> None:
     """Limite por IP para rutas publicas sin identidad (feed ICS).
 
-    La IP sale de public_client_ip (peer del socket; tras proxy privado, la ultima entrada de X-Forwarded-For). En
-    produccion falla cerrado (503) si Redis no responde, como el limite
-    principal.
+    La IP sale de public_client_ip (peer del socket; XFF solo de un proxy
+    de la allowlist forwarded_allow_ips). En produccion falla cerrado (503)
+    si Redis no responde, como el limite principal.
     """
     settings = get_settings()
     if not settings.rate_limit_enabled:
         return
-    client_ip = public_client_ip(request)
+    client_ip = public_client_ip(request, settings)
     digest = hashlib.sha256(f"public-feed:{client_ip}".encode()).hexdigest()
     try:
         count, retry_after = await _record_hit(
@@ -502,15 +502,11 @@ class AuthFailureLimitMiddleware:
         if not settings.rate_limit_enabled or is_exempt_path(path) or scope.get("method") == "OPTIONS":
             await self.app(scope, receive, send)
             return
-        client = scope.get("client")
-        peer = client[0] if client else "unknown"
-        # XFF solo la aporta un proxy de la allowlist (o la IP real que ya
-        # dejo uvicorn --proxy-headers en scope["client"], que no es proxy
-        # confiable y por tanto cae al peer tal cual).
-        if _trusted_proxy_peer(peer, settings):
-            ip = public_client_ip(Request(scope))
-        else:
-            ip = peer
+        # Misma resolucion en ambos limites por IP: XFF solo de un proxy
+        # de la allowlist forwarded_allow_ips; si uvicorn --proxy-headers ya
+        # sustituyo scope["client"] por la IP real, ese peer publico se usa
+        # tal cual y la cabecera se ignora.
+        ip = public_client_ip(Request(scope), settings)
         key = "cavaai:authfail:" + hashlib.sha256(ip.encode()).hexdigest()
         use_redis = not settings.is_local_environment
         try:
