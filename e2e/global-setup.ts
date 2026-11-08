@@ -2,7 +2,7 @@ import { chromium, type FullConfig } from "@playwright/test";
 import { isRetryableWarmup, PER_ROUTE_BUDGET_MS, WARMUP_ROUTES } from "./warmup-routes";
 
 /**
- * Calentamiento de la suite de flujos (solo con E2E_USER_FLOWS=1).
+ * Calentamiento de la suite UI completa (E2E_UI_RUN=1).
  *
  * `next dev` compila cada ruta la primera vez que se pide. Sin calentar, esa
  * compilación (10-20 s por página en CI) cae dentro del primer test que visita
@@ -37,7 +37,7 @@ export default async function globalSetup(config: FullConfig) {
         if (!isRetryableWarmup(status, error)) break;
         if (Date.now() > deadline) {
           // No se aborta la suite: el test de esa ruta dará el fallo con su contexto.
-          console.warn(`[user-flows warmup] ${route} sigue fallando tras ${attempt} intentos: ${last}`);
+          console.warn(`[e2e warmup] ${route} sigue fallando tras ${attempt} intentos: ${last}`);
           break;
         }
         await new Promise((r) => setTimeout(r, 2_000));
@@ -46,5 +46,5 @@ export default async function globalSetup(config: FullConfig) {
   } finally {
     await browser.close();
   }
-  console.log(`[user-flows warmup] ${WARMUP_ROUTES.length} rutas compiladas en ${Math.round((Date.now() - started) / 1000)} s`);
+  console.log(`[e2e warmup] ${WARMUP_ROUTES.length} rutas compiladas en ${Math.round((Date.now() - started) / 1000)} s`);
 }

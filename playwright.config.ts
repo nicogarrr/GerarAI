@@ -12,9 +12,12 @@ const apiPort = new URL(apiBaseURL).port || "8101";
 const uiBackendURL = E2E_UI_BACKEND_URL;
 const e2eResearchSecret = process.env.RESEARCH_AUTH_SECRET ?? "cavaai-e2e-research-secret-at-least-32-characters";
 const pythonBin = process.env.PYTHON_BIN ?? "python";
-// La suite de flujos calienta las rutas de `next dev` antes del primer test
-// (e2e/user-flows/global-setup.ts); el resto de suites no lo necesita.
-const runUserFlows = runUiE2E && process.env.E2E_USER_FLOWS === "1";
+// Toda la suite UI (E2E_UI_RUN=1) calienta las rutas pesadas de `next dev`
+// antes del primer test (e2e/global-setup.ts): sin calentar, la compilación
+// en frío de la primera visita se come los timeouts de `expect` (caso
+// medido: la figure del gráfico de company-header-quote, cuyo chunk dinámico
+// se compila bajo demanda). La suite de API (E2E_RUN=1) no levanta UI.
+
 export default defineConfig({
   testDir: "./e2e",
   // El repo arrastra GB de historial (snapshots versionados): el
@@ -22,7 +25,7 @@ export default defineConfig({
   // acumulando stdout en memoria y el runner muere con
   // "RangeError: Invalid string length" antes de correr un solo test.
   captureGitInfo: { commit: false, diff: false },
-  globalSetup: runUserFlows ? "./e2e/user-flows/global-setup.ts" : undefined,
+  globalSetup: runUiE2E ? "./e2e/global-setup.ts" : undefined,
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
