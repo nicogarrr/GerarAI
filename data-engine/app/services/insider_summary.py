@@ -216,8 +216,9 @@ def _side(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "trades": len(rows),
         "insiders": len({r["_key"] for r in rows}),
-        "shares": sum(float(r["shares"] or 0) for r in rows),
-        "value": sum(float(r["value"] or 0) for r in rows),
+        "shares": sum(float(r["shares"]) for r in rows if r["shares"] is not None),
+        "shares_missing": sum(1 for r in rows if r["shares"] is None),
+        "value": sum(float(r["value"]) for r in rows if r["value"] is not None),
         "value_missing": sum(1 for r in rows if r["value"] is None),
         "planned_10b5_1": sum(1 for r in rows if r["rule_10b5_1"]),
     }
@@ -250,7 +251,8 @@ def _clusters(buys: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "insiders": len({r["_key"] for r in rows}),
             "names": names,
             "trades": len(rows),
-            "value": sum(float(r["value"] or 0) for r in rows),
+            "value": sum(float(r["value"]) for r in rows if r["value"] is not None),
+            "value_missing": sum(1 for r in rows if r["value"] is None),
         })
     return out
 
@@ -359,9 +361,12 @@ def insider_summary(
 
     by_nature: dict[str, dict[str, Any]] = {}
     for r in rows:
-        slot = by_nature.setdefault(r["nature"], {"trades": 0, "value": 0.0})
+        slot = by_nature.setdefault(r["nature"], {"trades": 0, "value": 0.0, "value_missing": 0})
         slot["trades"] += 1
-        slot["value"] += float(r["value"] or 0)
+        if r["value"] is None:
+            slot["value_missing"] += 1
+        else:
+            slot["value"] += float(r["value"])
 
     form4_filings: dict[str, bool] = {}
     for r in rows:

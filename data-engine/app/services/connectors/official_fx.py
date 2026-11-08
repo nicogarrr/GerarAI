@@ -32,6 +32,8 @@ from decimal import Decimal, InvalidOperation
 
 import httpx
 
+from app.services.public_fetch import fetch_public_url_async
+
 NBG_URL = "https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json/?date={day}"
 CBC_DAILY_URL = "https://www.cbc.gov.tw/en/lp-700-2.html"
 CBC_API_URL = "https://cpx.cbc.gov.tw/API/DataAPI/Get?FileName=BP01D01"
@@ -141,10 +143,12 @@ Fetcher = Callable[[str], Awaitable[str]]
 
 
 async def _http_get(url: str) -> str:
-    async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS, follow_redirects=True) as client:
-        response = await client.get(url, headers={"User-Agent": USER_AGENT})
-        response.raise_for_status()
-        return response.text
+    # Aunque los hosts son fijos, la descarga pasa por public_fetch: bloquea
+    # IPs privadas, fija la IP resuelta y revalida cada redireccion.
+    content, _content_type, _final_url = await fetch_public_url_async(
+        url, timeout=TIMEOUT_SECONDS, headers={"User-Agent": USER_AGENT}
+    )
+    return content.decode("utf-8", errors="replace")
 
 
 async def fetch_official_quotes(

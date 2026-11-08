@@ -239,3 +239,55 @@ def test_role_names_other_relationship_instead_of_generic_insider():
     )
     (tx,) = form4_connector.parse_form4_xml(xml)["transactions"]
     assert tx["role"] == "other (Member of 13(d) group)"
+
+
+def _xml_no_price(*, owner_cik: str, name: str, code: str, ad: str, shares: float, day: str) -> str:
+    tx = (
+        f"<securityTitle><value>Common Stock</value></securityTitle>"
+        f"<transactionDate><value>{day}</value></transactionDate>"
+        f"<transactionCoding><transactionCode>{code}</transactionCode></transactionCoding>"
+        f"<transactionAmounts><transactionShares><value>{shares}</value></transactionShares>"
+        f"<transactionAcquiredDisposedCode><value>{ad}</value></transactionAcquiredDisposedCode>"
+        f"</transactionAmounts>"
+        "<ownershipNature><directOrIndirectOwnership><value>D</value></directOrIndirectOwnership></ownershipNature>"
+    )
+    return (
+        f"<ownershipDocument><documentType>4</documentType>"
+        f"<periodOfReport><value>{day}</value></periodOfReport>"
+        "<issuer><issuerCik>0009999999</issuerCik><issuerName>Test Corp</issuerName>"
+        "<issuerTradingSymbol>TSTX</issuerTradingSymbol></issuer>"
+        f"<reportingOwner><reportingOwnerId><rptOwnerCik>{owner_cik}</rptOwnerCik>"
+        f"<rptOwnerName>{name}</rptOwnerName></reportingOwnerId>"
+        "<reportingOwnerRelationship><isDirector>1</isDirector></reportingOwnerRelationship>"
+        f"</reportingOwner><nonDerivativeTable><nonDerivativeTransaction>{tx}</nonDerivativeTransaction></nonDerivativeTable>"
+        "</ownershipDocument>"
+    )
+
+
+def test_side_and_clusters_count_missing_amounts_instead_of_zeroing():
+    rows = [
+        {"_key": "a", "insider": "ANA", "tx_date": "2026-01-05", "shares": 10.0, "value": None, "rule_10b5_1": False},
+        {"_key": "b", "insider": "BEA", "tx_date": "2026-01-06", "shares": None, "value": 500.0, "rule_10b5_1": True},
+        {"_key": "c", "insider": "CAR", "tx_date": "2026-01-07", "shares": 5.0, "value": 250.0, "rule_10b5_1": False},
+    ]
+    side = insider_summary._side(rows)
+    assert side["value"] == 750.0 and side["value_missing"] == 1
+    assert side["shares"] == 15.0 and side["shares_missing"] == 1
+    clusters = insider_summary._clusters(rows)
+    assert len(clusters) == 1
+    assert clusters[0]["value"] == 750.0 and clusters[0]["value_missing"] == 1
+
+
+def test_summary_by_nature_counts_operations_without_price():
+    db = _db()
+    try:
+        _store(db, "0000000003-26-000001", "2026-09-03", _xml(owner_cik="1", name="ANA", code="P", ad="A", shares=100, price=10, day="2026-09-01", after=1100))
+        _store(db, "0000000003-26-000002", "2026-09-03", _xml_no_price(owner_cik="2", name="BEA", code="P", ad="A", shares=50, day="2026-09-01"))
+        out = insider_summary.insider_summary(db, "TSTX", as_of=date(2026, 11, 8))
+        assert out["status"] == "ok"
+        slot = out["by_nature"]["compra_mercado"]
+        assert slot["trades"] == 2
+        assert slot["value"] == 1000.0
+        assert slot["value_missing"] == 1
+    finally:
+        db.close()

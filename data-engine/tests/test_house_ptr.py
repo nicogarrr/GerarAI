@@ -189,3 +189,20 @@ def test_party_match_ignores_accents_and_compound_surnames():
     assert _name_tokens("Sánchez") & _name_tokens("Sanchez")
     assert _name_tokens("McClain Delaney") & _name_tokens("Delaney")
     assert not (_name_tokens("Greene") & _name_tokens("Green"))
+
+
+def test_member_card_counts_trades_without_amount_range():
+    recs = [{
+        "member": "Jane Doe", "member_key": "jane-doe", "chamber": "house",
+        "state": "CA", "district": "12", "state_district": "CA-12", "party": "D",
+        "bioguide": "D000123", "filing_date": "2026-01-10", "readable": True,
+        "trades": [
+            {"ticker": "ABC", "tx_date": "2026-01-02", "amount_min": 1001, "amount_max": 15000, "days_late": 0},
+            {"ticker": "XYZ", "tx_date": "2026-01-03", "amount_min": None, "amount_max": None, "days_late": None},
+        ],
+    }]
+    card = politician_trades._member_card("jane-doe", recs)
+    # Solo se suma la horquilla declarada; la operacion sin importes no vale 0.
+    assert card["volume_min"] == 1001
+    assert card["volume_max"] == 15000
+    assert card["volume_unknown_trades"] == 1
