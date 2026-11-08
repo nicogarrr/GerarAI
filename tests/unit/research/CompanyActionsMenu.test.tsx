@@ -14,6 +14,7 @@ describe('Company secondary actions navigation', () => {
         const links = [
             [changeCount ? 'Qué ha cambiado (3)' : 'Qué ha cambiado', '/research/A%2FB%20%26%20C?view=seguimiento'],
             ['Diario de decisiones', '/research/A%2FB%20%26%20C?view=seguimiento#diario-decisiones'],
+            ['Informe tipo analista', '/research/A%2FB%20%26%20C/informe'],
             ['Terminal financiero', '/research/A%2FB%20%26%20C?view=finanzas#terminal'],
             ['Supuestos de drivers', '/research/A%2FB%20%26%20C?view=valoracion#supuestos'],
             ['Lecciones de decisiones', '/research/A%2FB%20%26%20C?view=seguimiento#lecciones'],
@@ -25,7 +26,7 @@ describe('Company secondary actions navigation', () => {
             ['Dividendos y splits', '/corporate-actions?ticker=A%2FB%20%26%20C'],
         ];
         for (const [name, href] of links) expect(within(nav).getByRole('link', { name })).toHaveAttribute('href', href);
-        expect(within(nav).getAllByRole('link')).toHaveLength(11);
+        expect(within(nav).getAllByRole('link')).toHaveLength(12);
         expect(within(nav).getByRole('button', { name: 'Guía de investigación' })).toBeVisible();
         fireEvent.keyDown(nav, { key: 'Escape' });
         expect(screen.queryByRole('navigation')).not.toBeInTheDocument();

@@ -33,6 +33,7 @@ export default function CompanyActionsMenu({ ticker, changeCount }: { ticker: st
                     </Link>
                     <DecisionJournalEntryLink className={ITEM} ticker={ticker} />
                     <p className="mt-1 border-t border-gray-700/60 px-0 pb-0.5 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{tr('research.companyMenu.deepAnalysis')}</p>
+                    <Link className={ITEM} href={`/research/${t}/informe`}>{tr('research.informe.link')}</Link>
                     <Link className={ITEM} href={`/research/${t}?view=finanzas#terminal`}>{tr('research.companyMenu.terminal')}</Link>
                     <Link className={ITEM} href={`/research/${t}?view=valoracion#supuestos`}>{tr('research.companyMenu.driverAssumptions')}</Link>
                     <Link className={ITEM} href={`/research/${t}?view=seguimiento#lecciones`}>{tr('research.companyMenu.decisionLessons')}</Link>

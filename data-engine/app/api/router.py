@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     alerts,
     analyst_notes,
+    analyst_report,
     asts,
     audit,
     bottlenecks,
@@ -76,6 +77,7 @@ api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar"]
 api_router.include_router(companies.router, prefix="/companies", tags=["companies"])
 api_router.include_router(company_events.router, prefix="/companies", tags=["companies"])
 api_router.include_router(analyst_notes.router, prefix="/companies", tags=["companies"])
+api_router.include_router(analyst_report.router, prefix="/companies", tags=["companies"])
 api_router.include_router(
     corporate_actions.router, prefix="/corporate-actions", tags=["corporate-actions"]
 )
