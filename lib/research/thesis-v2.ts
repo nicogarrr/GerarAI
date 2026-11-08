@@ -6,7 +6,8 @@ import { researchRequest } from '@/lib/research/client';
  * código; el texto lo redactan los agentes con marcadores sustituidos en el
  * servidor. Aquí solo tipos, la lectura y helpers puros.
  */
-export type ThesisV2Table = { title: string; head: string[]; rows: string[][] };
+/** `links[r]`: enlace de un clic al documento de la fila (filing de EDGAR, ESEF o web), si lo hay. */
+export type ThesisV2Table = { title: string; head: string[]; rows: string[][]; links?: (string | null)[] };
 export type ThesisV2Section = { key: string; title: string; text: string; tables: ThesisV2Table[] };
 export type ThesisV2 = {
   status: string | null;
@@ -56,4 +57,9 @@ export function thesisParagraphs(text: string | null | undefined): string[] {
 /** Una tabla se pinta si tiene cabecera y al menos una fila. */
 export function hasRows(table: ThesisV2Table | null | undefined): table is ThesisV2Table {
   return !!table && Array.isArray(table.head) && table.head.length > 0 && Array.isArray(table.rows) && table.rows.length > 0;
+}
+
+/** Solo enlaces https: lo demás no se pinta como enlace. */
+export function safeLink(url: string | null | undefined): string | null {
+  return typeof url === 'string' && url.startsWith('https://') ? url : null;
 }

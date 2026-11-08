@@ -56,8 +56,8 @@ SECTIONS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
     ("consenso_guia", "8 bis. Guía de la empresa y consenso", "a", ("guia",)),
     ("metodo", "9. Por qué este método", "b", ("metodos",)),
     ("valoracion", "10. Valoración: qué rentabilidad esperamos y de dónde sale", "b",
-     ("escenarios", "descomposicion", "sensibilidad")),
-    ("que_descuenta", "11. Qué descuenta el precio", "b", ()),
+     ("escenarios", "supuestos", "descomposicion", "sensibilidad")),
+    ("que_descuenta", "11. Qué descuenta el precio", "b", ("descuenta",)),
     ("riesgos", "12. Riesgos y kill switches", "b", ()),
     ("que_vigilar", "13. Qué vigilar", "b", ("vigilar",)),
     ("pre_mortem", "14. Pre-mortem: la inversión mirada desde dentro de cinco años", "b", ()),
@@ -365,6 +365,7 @@ class ThesisContext:
     passages: list[dict[str, Any]]
     optional: dict[str, str] = field(default_factory=dict)  # sección opcional → por qué entra
     guidance: list[dict[str, Any]] = field(default_factory=list)
+    cik: str | None = None
 
 
 def build_context(db: Session, company: Company, *, today: date, tenant_id: int | None = None) -> ThesisContext:
@@ -394,7 +395,9 @@ def build_context(db: Session, company: Company, *, today: date, tenant_id: int 
     guidance = company_guidance_rows(db, company)
     if guidance:
         optional["consenso_guia"] = "la empresa da previsiones citadas en sus notas de resultados"
-    return ThesisContext(company.ticker, name, val, hist, peers, switches, ig, passages, optional, guidance)
+    switches += estimate_switches(guidance, sp.get("currency") or "", (val.get("citations") or {}).get("annual"))
+    return ThesisContext(company.ticker, name, val, hist, peers, switches, ig, passages, optional, guidance,
+                         getattr(company, "cik", None))
 
 
 def display_name(name: str) -> str:
@@ -457,6 +460,8 @@ def thesis_markers(ctx: ThesisContext) -> dict[str, str]:
         "pond.valor": money(val.get("weighted_value_per_share"), ccy),
         "base.tir10_multiplo_congelado": pct(val.get("base_frozen_multiple_irr_10")),
         "descuenta.crecimiento": pct(ctx.implied_growth),
+        "descuenta.percentil": implied_percentile(
+            ctx.implied_growth, ((val.get("trace") or {}).get("crecimiento") or {}).get("tasa_base")) or "N/D",
     }
     tr = val["trace"]
     mult = tr["multiplo"]
@@ -543,6 +548,113 @@ def marker_catalog(ctx: ThesisContext) -> list[dict[str, str]]:
     return [{"marker": "{{" + k + "}}", "value": v} for k, v in thesis_markers(ctx).items()]
 
 
+def source_link(cite: Any, cik: str | None) -> str | None:
+    """Enlace de un clic al documento de donde sale la cifra: el filing de EDGAR por su accession (el ancla
+    al hecho etiquetado llegará con fuentes-1, P4) o la URL https que trae la cita (ESEF, NSM, web)."""
+    if not isinstance(cite, Mapping):
+        return None
+    acc = str(cite.get("accession") or "")
+    if cite.get("source_type") == "SEC" and acc and cik and str(cik).strip().isdigit():
+        return f"https://www.sec.gov/Archives/edgar/data/{int(str(cik).strip())}/{acc.replace('-', '')}/"
+    url = str(cite.get("url") or "")
+    return url if url.startswith("https://") and "browse-edgar" not in url else None
+
+
+def plausible_guidance(g: Mapping[str, Any], annual: Mapping[str, Any] | None) -> bool:
+    """Guía anual frente al último dato anual de la misma métrica: entre la mitad y el doble."""
+    if not str(g.get("period") or "").startswith("fy") or not annual:
+        return True
+    metric = "eps_diluted" if g.get("metric") == "eps" else str(g.get("metric"))
+    years = annual.get(metric) or {}
+    if not years:
+        return True
+    last = years[max(years, key=lambda y: int(y))]
+    actual = last.get("value") if isinstance(last, Mapping) else None
+    if not actual or not g.get("base"):
+        return True
+    ratio = float(g["base"]) / float(actual)
+    return 0.5 <= ratio <= 2.0
+
+
+def implied_percentile(value: float | None, rate: Mapping[str, Any] | None) -> str | None:
+    """Dónde cae el crecimiento implícito dentro de la distribución medida de su tramo (p25/p50/p75)."""
+    if value is None or not rate or any(rate.get(q) is None for q in ("p25", "p50", "p75")):
+        return None
+    p25, p50, p75 = float(rate["p25"]), float(rate["p50"]), float(rate["p75"])
+    if value < p25:
+        return "por debajo del percentil 25"
+    if value <= p50:
+        return "entre los percentiles 25 y 50"
+    if value <= p75:
+        return "entre los percentiles 50 y 75"
+    return "por encima del percentil 75"
+
+
+def assumption_rows(val: Mapping[str, Any]) -> list[list[str]]:
+    """Cada supuesto con su fuente y su confianza (alta: dato de la empresa; media: regla con historia
+    suficiente; baja: regla sin historia o sin comparables)."""
+    tr = val.get("trace") or {}
+    sc = val.get("scenarios") or {}
+    cr, mult, mna = tr.get("crecimiento") or {}, tr.get("multiplo") or {}, tr.get("mna") or {}
+
+    def vals(key: str, fmt) -> list[str]:
+        return [fmt((sc.get(k) or {}).get("drivers", {}).get(key)) for k in ("bear", "base", "bull")]
+
+    rate = cr.get("tasa_base") or {}
+    guide = cr.get("guia")
+    years = int(cr.get("anos_historico") or 0)
+    if guide:
+        g_src, g_conf = f"guía de ingresos de la empresa ({guide.get('as_of') or 's/f'}) el año 1; luego la regla", "alta"
+    elif years >= 3:
+        g_src = (f"½ crecimiento orgánico histórico ({pct(cr.get('historico_organico'))}, {years} años) + ½ mediana "
+                 f"de la tasa base del tramo {cr.get('tramo_tasa_base')} (n = {rate.get('n', 'N/D')}); bajista = "
+                 "percentil 25 de la tasa base")
+        g_conf = "media"
+    else:
+        g_src, g_conf = f"tasa base del tramo {cr.get('tramo_tasa_base')} (historia insuficiente)", "baja"
+    n_peers = int(mult.get("n_comparables") or 0)
+    rows = [
+        ["Crecimiento orgánico años 1–5", *vals("organic_growth", pct), g_src, g_conf],
+        ["Crecimiento orgánico años 6–10", *vals("organic_growth_late", pct),
+         "se desvanece hacia la tasa base del tramo", "media" if years >= 3 else "baja"],
+        ["Margen objetivo", *vals("margin_target", pct), "mínimo / mediana / máximo de los 3 últimos ejercicios",
+         "alta" if len((tr.get("margen") or {}).get("ultimos") or []) >= 3 else "baja"],
+        ["Conversión de caja", *vals("cash_conversion", lambda x: pct(x, 0)),
+         "mínimo / mediana / máximo de los 3 últimos ejercicios",
+         "alta" if len((tr.get("conversion") or {}).get("ultimos") or []) >= 3 else "baja"],
+        ["Gasto en M&A (% de ingresos)", *vals("mna_spend_pct_revenue", pct), "media histórica de adquisiciones",
+         "media" if mna.get("gasto_pct_ingresos") else "baja"],
+        ["Múltiplo de salida", *vals("exit_multiple", times),
+         (f"media del propio y la mediana de {n_peers} comparables" if n_peers >= 3
+          else f"propio × 0,8 / 1 / 1,2 ({mult.get('por_que') or 'menos de 3 comparables'})"),
+         "media" if n_peers >= 3 else "baja"],
+    ]
+    return rows
+
+
+def estimate_switches(guidance: Sequence[Mapping[str, Any]], ccy: str,
+                      annual: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Kill switches sobre estimaciones: el dato real por debajo del bajo de la guía de la empresa (o un 5 %
+    por debajo del punto medio si no da rango). Se comprueban cuando se publica el resultado del periodo.
+    Una guía anual a más de la mitad o el doble del último dato anual de la misma métrica no se usa: lo más
+    probable es que la frase hable de otra cosa (un segmento, un trimestre)."""
+    out = []
+    for g in guidance:
+        if g.get("metric") in ("capex",):
+            continue  # más capex no es una mala noticia por sí mismo
+        if not plausible_guidance(g, annual):
+            continue
+        low = g.get("low") if g.get("low") is not None else (g["base"] * 0.95 if g.get("base") else None)
+        if low is None:
+            continue
+        out.append({"key": f"guia.{g['metric']}.{g['period']}", "metric": f"{g['metric']} {g['period']} frente a la guía",
+                    "threshold": f"< {_guidance_value(g, low)}", "current": "pendiente de publicar",
+                    "status": "pendiente", "action": "revisar la credibilidad de la dirección",
+                    "why": "la empresa no cumple lo que ella misma anunció" + ("" if g.get("low") is not None
+                                                                              else " (sin rango: 5 % bajo el punto medio)")})
+    return out
+
+
 def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
     """Las tablas que pinta el código (cabecera + filas de texto ya formateado)."""
     val = ctx.valuation
@@ -569,11 +681,22 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
         ["Mediana de comparables", times(((val.get("trace") or {}).get("multiplo") or {}).get("mediana_comparables")),
          f"{((val.get('trace') or {}).get('multiplo') or {}).get('n_comparables', 0)} comparables calculados con la misma fórmula"],
     ]}
+    annual = cites.get("annual") or {}
+    last_year = str(ctx.history[-1]["year"]) if ctx.history else ""
+
+    def link(c: Any) -> str | None:
+        return source_link(c, ctx.cik)
+
+    t["partida"]["links"] = [
+        None, link(cites.get("shares")), None, link(cites.get("cash_and_equivalents")), link(cites.get("total_debt")),
+        None, None, None, None, link((annual.get("operating_income") or {}).get(last_year)
+                                     or (annual.get("net_income") or {}).get(last_year)), None, None]
     t["historial"] = {"title": "Historial (millones, ejercicio fiscal)", "head": [
         "Año", "Ingresos", "Crec.", "Margen", "FCF", "Conv.", "FCF/acción", "Acciones", "ROIC"], "rows": [
         [str(r["year"]), millions(r["revenue"], ccy), pct(r["growth"], signed=True), pct(r["margin"]),
          millions(r["fcf"], ccy), pct(r["conversion"], 0), money(r["fcf_per_share"], ccy), shares(r["shares"]),
          pct(r["roic"])] for r in ctx.history[-10:]]}
+    t["historial"]["links"] = [link((annual.get("revenue") or {}).get(str(r["year"]))) for r in ctx.history[-10:]]
     t["capital"] = {"title": "Asignación de capital (millones)", "head": ["Año", "FCF", "Dividendos", "Recompras", "Adquisiciones"],
                     "rows": [[str(r["year"]), millions(r["fcf"], ccy), millions(r["dividends"], ccy),
                               millions(r["buybacks"], ccy), millions(r["acquisitions"], ccy)] for r in ctx.history[-6:]]}
@@ -586,7 +709,11 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
     t["guia"] = {"title": "Guía de la propia empresa (notas de resultados)", "head": [
         "Métrica", "Periodo", "Bajo", "Punto medio", "Alto", "Fuente"], "rows": [
         [g["metric"], g["period"], _guidance_value(g, g["low"]), _guidance_value(g, g["base"]), _guidance_value(g, g["high"]),
-         f"{g.get('document') or ''} ({g.get('as_of') or ''}) {g.get('url') or ''}".strip()] for g in ctx.guidance]}
+         (f"{g.get('document') or ''}" + ("" if (g.get("as_of") or "") in (g.get("document") or "")
+                                             else f" ({g.get('as_of')})")
+          + ("" if plausible_guidance(g, (val.get("citations") or {}).get("annual"))
+             else " · no cuadra con el último dato anual: no se usa"))] for g in ctx.guidance],
+        "links": [source_link({"url": g.get("url")}, None) for g in ctx.guidance]}
     meth = val.get("method") or {}
     labels = {"tir_ev_ebitda": "TIR para el accionista sobre EV/EBITDA", "tir_per": "TIR para el accionista sobre PER",
               "dcf": "DCF con WACC", "sotp": "Suma de partes"}
@@ -600,6 +727,8 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
         t["escenarios"] = note
         t["descomposicion"] = {"title": "", "head": [], "rows": []}
         t["sensibilidad"] = {"title": "", "head": [], "rows": []}
+        t["supuestos"] = {"title": "", "head": [], "rows": []}
+        t["descuenta"] = {"title": "", "head": [], "rows": []}
         t["vigilar"] = {"title": "Qué vigilar: kill switches", "head": ["Métrica", "Umbral", "Hoy", "Estado", "Acción", "Por qué"],
                         "rows": [[s["metric"], s["threshold"], s["current"], s["status"], s["action"], s["why"]] for s in ctx.switches]}
         return t
@@ -613,6 +742,19 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
          money((val.get("value_per_share") or {}).get(k), ccy)] for k in ("bear", "base", "bull")]
         + [["Ponderada", "—", "", "", "", "", pct(val["weighted"]["5"]), pct(val["weighted"]["10"]),
             money(val.get("weighted_value_per_share"), ccy)]]}
+    t["supuestos"] = {"title": "De dónde sale cada supuesto (fuente y confianza)", "head": [
+        "Supuesto", "Bajista", "Base", "Alcista", "Fuente (la regla del código)", "Confianza"], "rows": assumption_rows(val)}
+    cr = (val.get("trace") or {}).get("crecimiento") or {}
+    rate = cr.get("tasa_base") or {}
+    t["descuenta"] = {"title": "Qué descuenta el precio frente a las referencias", "head": ["Referencia", "Crecimiento anual", "Nota"], "rows": [
+        ["Implícito en el precio (TIR base a 10 años = coste del capital)", pct(ctx.implied_growth),
+         implied_percentile(ctx.implied_growth, rate) and f"{implied_percentile(ctx.implied_growth, rate)} de su tramo" or ""],
+        ["Escenario base (años 1–5)", pct(((val.get("scenarios") or {}).get("base") or {}).get("drivers", {}).get("organic_growth")), "regla pre-registrada"],
+        ["Orgánico histórico", pct(cr.get("historico_organico")), f"{cr.get('anos_historico') or 0} años"],
+        ["Tasa base del tramo: p25 / p50 / p75", f"{pct(rate.get('p25'))} / {pct(rate.get('p50'))} / {pct(rate.get('p75'))}",
+         f"tramo {cr.get('tramo_tasa_base') or 'N/D'}, n = {rate.get('n', 'N/D')}, crecimiento a 5 años"],
+    ] + [[f"Guía de la empresa: {g['metric']} {g['period']}", _guidance_value(g, g["base"]), g.get("document") or ""]
+         for g in ctx.guidance if g.get("metric") == "revenue"]}
     from app.valuation.shareholder_irr import COMPONENT_LABELS, COMPONENTS
 
     t["descomposicion"] = {"title": "De dónde sale la TIR (puntos porcentuales al año)", "head": [
