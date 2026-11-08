@@ -14,28 +14,13 @@ import httpx
 # rechazadas sin expandir; ParseError/Element siguen del stdlib.
 from defusedxml import ElementTree as DefusedElementTree
 
-from app.services.connectors.base import ConnectorItem, ConnectorResult
+from app.services.connectors.base import ConnectorItem, ConnectorResult, record_poll_health_failure
 from app.services.data_source_health import get_data_source_registry
 from app.services.public_fetch import fetch_public_url_async
 
 _REGISTRY_KEY = "rss"
 # Raíces válidas de un feed: Atom (<feed>), RSS 2.0 (<rss>) y RSS 1.0/RDF (<RDF>).
 _FEED_ROOTS = {"feed", "rss", "rdf"}
-
-
-def _record_health_failure(exc: Exception) -> None:
-    """5xx/401/403/429/red/documento inválido degradan; 400/404/410 (feed
-    retirado o movido) son del feed concreto, no de la fuente: neutros."""
-    registry = get_data_source_registry()
-    if isinstance(exc, httpx.HTTPStatusError):
-        if exc.response.status_code in (400, 404, 410):
-            return
-        registry.record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
-        return
-    if isinstance(exc, httpx.TransportError):
-        registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
-        return
-    registry.record_failure(_REGISTRY_KEY, f"documento inválido: {type(exc).__name__}")
 
 
 def _local_name(tag: str) -> str:
@@ -133,7 +118,7 @@ class RSSConnector:
             get_data_source_registry().record_success(_REGISTRY_KEY)
             return ConnectorResult(source="rss", items=items, metadata=metadata)
         except Exception as exc:
-            _record_health_failure(exc)
+            record_poll_health_failure(_REGISTRY_KEY, exc)
             return ConnectorResult.failed("rss", exc, metadata=metadata)
 
     def _entries(self, root: ElementTree.Element) -> tuple[str, list[ElementTree.Element]]:

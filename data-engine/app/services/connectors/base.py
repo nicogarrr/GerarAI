@@ -21,6 +21,8 @@ from tenacity import (
     stop_after_attempt,
 )
 
+from app.services.data_source_health import get_data_source_registry
+
 # ---------------- Ritmo de salida a la SEC (estado GLOBAL de proceso) ----------------
 
 # SEC fair-use: maximo 10 peticiones/segundo. El limite lo aplica la SEC por
@@ -286,6 +288,25 @@ def record_connector_http_failures(
     except ValueError:
         registry.record_failure(registry_key, "respuesta no JSON")
         raise
+
+
+def record_poll_health_failure(registry_key: str, exc: Exception) -> None:
+    """Registry de salud de los conectores de sondeo (ir, rss): no relanzan.
+
+    400/404/410 (pagina o feed retirado) son del recurso concreto, no de la
+    fuente: neutros. 5xx/401/403/429, errores de red y documentos invalidos
+    degradan. ir.py y rss.py traian esta funcion copiada exactamente.
+    """
+    registry = get_data_source_registry()
+    if isinstance(exc, httpx.HTTPStatusError):
+        if exc.response.status_code in (400, 404, 410):
+            return
+        registry.record_failure(registry_key, f"HTTP {exc.response.status_code}")
+        return
+    if isinstance(exc, httpx.TransportError):
+        registry.record_failure(registry_key, f"error de red: {type(exc).__name__}")
+        return
+    registry.record_failure(registry_key, f"documento inválido: {type(exc).__name__}")
 
 
 @dataclass(slots=True)
