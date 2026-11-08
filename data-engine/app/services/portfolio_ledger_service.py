@@ -305,7 +305,7 @@ class PortfolioLedgerService:
             fees=fees,
             currency=canonical_currency_code(currency),
             external_id=external_id or f"manual-{uuid4().hex}",
-            raw_payload={"notes": notes} if notes else {},
+            raw_payload={"notes": notes, "notes_author": "user"} if notes else {},
         )
         db.add(row)
         db.flush()

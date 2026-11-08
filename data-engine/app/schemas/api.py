@@ -1773,6 +1773,9 @@ class PortfolioTransactionOut(BaseModel):
     currency: str
     trade_date: str
     notes: str | None
+    # Codigos de maquina del extracto IBKR (leyenda oficial del broker),
+    # nunca mezclados con la nota del usuario; null si la fila no los tiene.
+    ibkr_note_codes: list[str] | None = None
     # Compra a precio 0 aceptada pero marcada para revision (regalo/spin-off).
     review_flag: str | None
     created_at: str
@@ -1795,6 +1798,7 @@ class PortfolioTransactionCreateOut(BaseModel):
     currency: str
     trade_date: str
     notes: str | None
+    ibkr_note_codes: list[str] | None = None
     review_flag: str | None
     created_at: str
     updated_at: str
