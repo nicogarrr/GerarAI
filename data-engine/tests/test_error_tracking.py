@@ -94,3 +94,53 @@ def test_un_500_real_se_reporta_con_su_ref(monkeypatch):
     ref = response.json()["detail"].rsplit("ref: ", 1)[-1].rstrip(")")
     assert calls[0][1]["ref"] == ref
     assert calls[0][1]["path"] == "/__test_error_tracking_boom"
+
+
+def test_parse_dsn_puerto_mal_formado_devuelve_none():
+    """``parts.port`` lanza ValueError fuera de rango o no numerico: el DSN
+    mal configurado del operador no puede lanzar dentro del handler 500."""
+    assert er.parse_dsn("https://clave@host:badport/3") is None
+    assert er.parse_dsn("https://clave@host:99999/3") is None
+    url, _ = er.parse_dsn("https://clave@host:8443/3")
+    assert url == "https://host:8443/api/3/store/"
+
+
+def test_ventana_desaloja_firmas_antiguas():
+    _reset()
+    ahora = er.time.monotonic()
+    er._window_start = ahora - 120  # ventana rodada: toca reinicio
+    er._recent["firma-vieja"] = ahora - 120  # candidata a desalojo (>60 s)
+    er._recent["firma-reciente"] = ahora - 10  # se conserva
+    assert er._allow("firma-nueva", ahora) is True
+    assert "firma-vieja" not in er._recent
+    assert "firma-reciente" in er._recent
+    _reset()
+
+
+def test_post_traga_fallo_de_red(caplog):
+    def _urlopen_roto(request, timeout):
+        raise OSError("red caida")
+
+    original = er.urllib.request.urlopen
+    er.urllib.request.urlopen = _urlopen_roto
+    try:
+        with caplog.at_level("WARNING", logger="gerarai.error_tracking"):
+            er._post("https://host/api/1/store/", "auth", {"x": 1})  # no lanza
+    finally:
+        er.urllib.request.urlopen = original
+    assert "error_tracking send failed" in caplog.text
+
+
+def test_report_exception_encola_con_sender():
+    _reset()
+    hecho = threading.Event()
+    settings = SimpleNamespace(
+        error_tracking_dsn="https://clave@glitchtip.example.com/7", app_env="test"
+    )
+    ok = er.report_exception(
+        _exc(), ref="r-sender", settings=settings,
+        sender=lambda: hecho.set(),
+    )
+    assert ok is True
+    assert hecho.wait(timeout=5)
+    _reset()
