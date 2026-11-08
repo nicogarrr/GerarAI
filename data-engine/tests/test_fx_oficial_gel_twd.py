@@ -197,3 +197,19 @@ def test_refresh_reports_official_source_failure(db):
     assert stage["status"] == "partial"
     assert [e["currency"] for e in stage["errors"]] == ["GEL"]
     assert "GEL" not in {r.quote_currency for r in db.scalars(select(FXRate)).all()}
+
+
+def test_http_get_goes_through_public_fetch(monkeypatch):
+    from app.services.connectors import official_fx
+
+    calls = {}
+
+    async def fake_fetch(url, *, timeout, headers):
+        calls["url"] = url
+        calls["headers"] = headers
+        return b"contenido", "text/plain", url
+
+    monkeypatch.setattr(official_fx, "fetch_public_url_async", fake_fetch)
+    text = asyncio.run(official_fx._http_get("https://nbg.gov.ge/ejemplo"))
+    assert text == "contenido"
+    assert calls["url"] == "https://nbg.gov.ge/ejemplo"

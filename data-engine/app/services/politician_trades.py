@@ -225,9 +225,12 @@ def _member_card(key: str, recs: list[dict[str, Any]]) -> dict[str, Any]:
     tickers = Counter(t["ticker"] for t in trades if t.get("ticker"))
     last_trade = max((t["tx_date"] for t in trades if t.get("tx_date")), default=None)
     head = max(recs, key=lambda r: r.get("filing_date") or "")
-    vol_min = sum(int(t.get("amount_min") or 0) for t in trades)
+    # Solo se suman los importes declarados; las operaciones sin horquilla se
+    # cuentan en volume_unknown_trades en vez de convertir su desconocido en 0.
+    vol_min = sum(int(t["amount_min"]) for t in trades if t.get("amount_min") is not None)
     open_ended = any(t.get("amount_min") is not None and t.get("amount_max") is None for t in trades)
-    vol_max = None if open_ended else sum(int(t.get("amount_max") or 0) for t in trades)
+    vol_max = None if open_ended else sum(int(t["amount_max"]) for t in trades if t.get("amount_max") is not None)
+    amount_unknown = sum(1 for t in trades if t.get("amount_min") is None and t.get("amount_max") is None)
     return {
         "member_key": key,
         "member": head.get("member"),
@@ -249,6 +252,7 @@ def _member_card(key: str, recs: list[dict[str, Any]]) -> dict[str, Any]:
         "on_time_pct": round((len(dated) - len(late)) / len(dated) * 100, 1) if dated else None,
         "volume_min": vol_min,
         "volume_max": vol_max,
+        "volume_unknown_trades": amount_unknown,
     }
 
 
