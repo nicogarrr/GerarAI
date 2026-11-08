@@ -1,4 +1,5 @@
 import { cache } from 'react';
+import { convertWithPortfolioFx } from '@/lib/analyst-target-currency';
 
 import { researchRequest } from '@/lib/research/client';
 import type { DcaWatchCardData } from '@/lib/dca/types';
@@ -29,6 +30,8 @@ export type AnalystReportData = {
     shares_outstanding: ReportPoint;
     shares_diluted: ReportPoint;
     market_cap: number | null;
+    market_cap_currency?: string | null;
+    enterprise_value_currency?: string | null;
     market_cap_basis: 'shares_outstanding' | 'shares_diluted' | null;
     cash: ReportPoint;
     total_debt: ReportPoint;
@@ -80,7 +83,7 @@ export type ReportInputs = {
   thesis: ReportThesis | null;
   sotp: SotpResponse | null;
   honesty: ReportHonesty;
-  engineRange: { low: number; high: number } | null;
+  engineRange: { low: number; high: number; currency?: string | null } | null;
   keyStats: KeyStats | null;
   shorts: PublicShorts | null;
   /** Fecha de hoy (YYYY-MM-DD) en la que se compone el informe. */
@@ -126,11 +129,11 @@ export function fairValueRange(fair: ReportFairValue | null, thesis: ReportThesi
 }
 
 /** Rango del motor desde ValuationResponse.fair_value_range ({low, high} o {min, max}). */
-export function engineRangeFrom(range: Record<string, unknown> | null | undefined): { low: number; high: number } | null {
+export function engineRangeFrom(range: Record<string, unknown> | null | undefined): { low: number; high: number; currency?: string | null } | null {
   if (!range) return null;
   const low = finite(range.low ?? range.min);
   const high = finite(range.high ?? range.max);
-  return low !== null && high !== null ? { low, high } : null;
+  return low !== null && high !== null ? { low, high, ...(typeof range.currency === 'string' ? { currency: range.currency } : {}) } : null;
 }
 
 /** Riesgos: criterios de invalidación + secciones de la tesis cuyo título habla de riesgos. */
@@ -158,4 +161,11 @@ export function userEstimates(sotp: SotpResponse | null): { year: number; revenu
 export function vsPrice(value: number | null | undefined, price: number | null | undefined): number | null {
   if (value == null || price == null || !Number.isFinite(value) || !Number.isFinite(price) || price <= 0) return null;
   return value / price - 1;
+}
+
+/** Compare only after an exact unit conversion. No FX is invented. */
+export function reportVsPrice(value: number | null | undefined, valueCurrency: string | null | undefined, price: number | null | undefined, priceCurrency: string | null | undefined): number | null {
+  if (value == null || !valueCurrency || !priceCurrency) return null;
+  const converted = convertWithPortfolioFx(value, valueCurrency, priceCurrency, null, null);
+  return converted === null ? null : vsPrice(converted, price);
 }

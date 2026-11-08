@@ -33,6 +33,7 @@ from app.services.esef_fact_quarantine import fact_quarantine_reason
 from app.services.financial_ingestion_service import SOURCE_PRIORITY
 from app.services.split_adjustment import split_events_by_company
 from app.services.ttm_service import _is_segment, _period_end, compute_company_ttm
+from app.valuation.currency import normalize_currency
 
 REPORT_VERSION = "analyst-report-v1"
 AVG_VOLUME_SESSIONS = 63  # ~3 meses de sesiones
@@ -170,13 +171,15 @@ def build_market(
     cash = point("cash_and_equivalents")
     debt = point("total_debt")
     avg_volume = round(sum(volumes) / len(volumes)) if volumes else None
+    major_currency, price_divisor = normalize_currency(price_currency)
+    major_price = price / price_divisor if price is not None else None
     market_cap = None
     market_cap_basis = None
     if price is not None and price > 0:
         if shares and shares["value"] and shares["value"] > 0:
-            market_cap, market_cap_basis = float(price) * shares["value"], "shares_outstanding"
+            market_cap, market_cap_basis = float(major_price) * shares["value"], "shares_outstanding"
         elif diluted and diluted["value"] and diluted["value"] > 0:
-            market_cap, market_cap_basis = float(price) * diluted["value"], "shares_diluted"
+            market_cap, market_cap_basis = float(major_price) * diluted["value"], "shares_diluted"
     enterprise_value = None
     ev_reason = None
     if market_cap is None:
@@ -185,10 +188,13 @@ def build_market(
         ev_reason = "missing_cash_or_debt"
     elif cash["period_end"] != debt["period_end"]:
         ev_reason = "cash_debt_different_dates"
-    elif not price_currency or (cash["unit"] or "").upper() != price_currency.upper() or (debt["unit"] or "").upper() != price_currency.upper():
+    elif not major_currency or normalize_currency(cash["unit"])[0] != major_currency or normalize_currency(debt["unit"])[0] != major_currency:
         ev_reason = "currency_mismatch"
     else:
-        enterprise_value = market_cap + debt["value"] - cash["value"]
+        enterprise_value = (
+            market_cap + debt["value"] / normalize_currency(debt["unit"])[1]
+            - cash["value"] / normalize_currency(cash["unit"])[1]
+        )
     return {
         "price": _num(price),
         "price_date": price_date,
@@ -199,6 +205,8 @@ def build_market(
         "shares_diluted": diluted,
         "market_cap": market_cap,
         "market_cap_basis": market_cap_basis,
+        "market_cap_currency": major_currency,
+        "enterprise_value_currency": major_currency,
         "cash": cash,
         "total_debt": debt,
         "enterprise_value": enterprise_value,

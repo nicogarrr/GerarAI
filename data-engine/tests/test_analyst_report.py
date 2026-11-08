@@ -201,3 +201,29 @@ def test_endpoint_is_mounted_under_companies():
     assert body["ticker"] == "ASTS" and body["version"] == "analyst-report-v1"
     assert body["estimates"]["annual"][0]["revenue"]["value"] == 416_161 * M
     assert client.get("/api/companies/NOPE/analyst-report").status_code == 404
+
+
+@pytest.mark.parametrize("quote,price,unit,cash,debt", [
+    ("GBp", 4255, "GBP", 10_000_000, 5_000_000),
+    ("GBX", 4255, "GBP", 10_000_000, 5_000_000),
+    ("GBP", 42.55, "GBp", 1_000_000_000, 500_000_000),
+    ("USD", 42.55, "USD", 10_000_000, 5_000_000),
+])
+def test_market_minor_units_keep_quote_and_normalize_cap_ev(db, quote, price, unit, cash, debt):
+    company = _company(db, "MINOR", currency=unit)
+    _prices(db, company, [price], currency=quote)
+    _fact(db, company, "shares_outstanding", "2026-09-30:Q3", M, "Q3", unit="shares")
+    _fact(db, company, "cash_and_equivalents", "2026-09-30:Q3", cash, "Q3", unit=unit)
+    _fact(db, company, "total_debt", "2026-09-30:Q3", debt, "Q3", unit=unit)
+    db.commit()
+    market = build_company_report(db, company, today=date(2026, 11, 8))["market"]
+    expected_currency = "USD" if quote == "USD" else "GBP"
+    assert market["price"] == pytest.approx(price)
+    assert market["currency"] == quote
+    assert market["cash"]["unit"] == unit and market["cash"]["value"] == cash
+    assert market["total_debt"]["unit"] == unit and market["total_debt"]["value"] == debt
+    assert market["market_cap_currency"] == expected_currency
+    assert market["enterprise_value_currency"] == expected_currency
+    assert market["market_cap"] == pytest.approx(42_550_000)
+    assert market["enterprise_value"] == pytest.approx(37_550_000)
+    assert market["enterprise_value_reason"] is None
