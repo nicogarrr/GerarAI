@@ -43,6 +43,8 @@ CONCEPTS: dict[str, tuple[str, ...]] = {
     "income_tax_expense": ("IncomeTaxExpenseBenefit", "IncomeTaxExpenseContinuingOperations"),
     "net_income_total": ("ProfitLoss",),
     "finance_income_cost": ("FinanceIncomeCost",),
+    "net_income_minority": ("NetIncomeLossAttributableToNoncontrollingInterest",
+                            "ProfitLossAttributableToNoncontrollingInterests"),
     "net_income": ("NetIncomeLoss", "ProfitLoss", "ProfitLossAttributableToOwnersOfParent"),
     "depreciation_amortization": ("DepreciationDepletionAndAmortization", "DepreciationAmortizationAndAccretionNet",
                                   "DepreciationAndAmortization", "DepreciationAmortizationAndImpairmentLossReversalOfImpairmentLossRecognisedInProfitOrLoss",
@@ -85,7 +87,7 @@ CONCEPTS: dict[str, tuple[str, ...]] = {
 _PRODUCT_METRIC = {"revenue": "revenue", "operating_income": "operating_income", "net_income": "net_income",
                    "income_before_tax": "income_before_tax", "interest_expense": "interest_expense",
                    "income_tax_expense": "income_tax_expense", "net_income_total": "net_income_total",
-                   "finance_income_cost": "finance_income_cost",
+                   "finance_income_cost": "finance_income_cost", "net_income_minority": "net_income_minority",
                    "depreciation_amortization": "depreciation_amortization",
                    "operating_cash_flow": "operating_cash_flow", "capital_expenditure": "capital_expenditure",
                    "dividends_paid": "dividends_paid", "common_stock_repurchased": "common_stock_repurchased",
@@ -287,7 +289,7 @@ def build_inputs(facts: Sequence[Fact], *, t: date, price: float, splits: Sequen
     last = years[-1]
     series = {m: annual(facts, m) for m in ("operating_income", "depreciation_amortization", "net_income",
                                              "income_before_tax", "interest_expense", "income_tax_expense",
-                                             "net_income_total", "finance_income_cost",
+                                             "net_income_total", "finance_income_cost", "net_income_minority",
                                              "operating_cash_flow", "capital_expenditure", "dividends_paid",
                                              "common_stock_repurchased", "acquisitions",
                                              "stock_based_compensation", "shares_diluted", "eps_diluted")}
@@ -354,10 +356,19 @@ def build_inputs(facts: Sequence[Fact], *, t: date, price: float, splits: Sequen
         net_income=net_income[-1], cash=(cash or 0.0) + (sti or 0.0), debt=debt, leases=leases or 0.0,
         minorities=(mi or 0.0) if basis != "pe" else 0.0, currency=currency, basis=basis,
     )
+    ocf, capex_s, acq = s("operating_cash_flow"), s("capital_expenditure"), s("acquisitions")
+    if basis == "pe":  # misma regla que la app (app.valuation.attributable); aquí solo con la parte del beneficio
+        from app.valuation.attributable import attributable_shares, scale_flows
+
+        nn = [None] * len(years)
+        shares_attr = attributable_shares(net_income, s("net_income_minority"), nn, nn)
+        if any(x is not None and x[0] < 1.0 for x in shares_attr):
+            ocf, capex_s, acq = (scale_flows(v, shares_attr) for v in (ocf, capex_s, acq))
+            warnings.append("minoritarios: flujos consolidados a la parte del accionista")
     hist = rules.History(
         years=years, revenue=revenue, earnings=net_income if basis == "pe" else ebitda,
-        operating_cash_flow=s("operating_cash_flow"), capex=s("capital_expenditure"),
-        dividends=s("dividends_paid"), buybacks=s("common_stock_repurchased"), acquisitions=s("acquisitions"),
+        operating_cash_flow=ocf, capex=capex_s,
+        dividends=s("dividends_paid"), buybacks=s("common_stock_repurchased"), acquisitions=acq,
         sbc=series["stock_based_compensation"].get(last),
     )
     return Inputs(sp, hist, method, fy_end, k, warnings)
