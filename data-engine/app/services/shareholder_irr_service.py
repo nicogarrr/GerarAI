@@ -47,7 +47,7 @@ _FLOW = ("revenue", "operating_income", "depreciation_amortization", "ebitda", "
          "gain_on_sale_real_estate", "income_before_tax", "income_tax_expense", "finance_income_cost",
          "net_income_total", "net_income_minority")
 _POINT = ("cash_and_equivalents", "short_term_investments", "total_debt", "long_term_debt",
-          "operating_lease_liabilities", "lease_liabilities_current", "lease_liabilities_noncurrent",
+          "operating_lease_liabilities", "lease_liabilities", "lease_liabilities_current", "lease_liabilities_noncurrent",
           "minority_interest", "hybrid_capital", "shares_outstanding", "total_equity", "preferred_stock")
 #: Saldos de balance que además se leen por ejercicio (cierre del año fiscal) para la base de valor contable.
 _POINT_ANNUAL = ("total_equity", "preferred_stock", "minority_interest")
@@ -433,9 +433,19 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
         if debt is None:
             warnings.append("deuda sin dato: se toma 0 y se avisa")
             debt = 0.0
-    ifrs = reporting != "USD" or any(str((c or {}).get("source_type") or "").lower().startswith("esef")
-                                     for c in annual.get("revenue", {}).values())
-    leases_ifrs = (_mill(point.get("lease_liabilities_current")) or 0.0) + (_mill(point.get("lease_liabilities_noncurrent")) or 0.0)
+    # Los pasivos por arrendamiento ``lease_liabilities*`` solo salen de los mapas IFRS (US GAAP usa
+    # operating_lease_liabilities): su presencia identifica a un filer IFRS de la SEC que reporta en USD (BN).
+    ifrs = (reporting != "USD"
+            or any(str((c or {}).get("source_type") or "").lower().startswith("esef")
+                   for c in annual.get("revenue", {}).values())
+            or any(k in point for k in ("lease_liabilities", "lease_liabilities_current", "lease_liabilities_noncurrent")))
+    # El total declarado por el emisor manda; sin él, corriente + no corriente.
+    leases_total = _mill(point.get("lease_liabilities"))
+    leases_ifrs = leases_total if leases_total else (
+        (_mill(point.get("lease_liabilities_current")) or 0.0) + (_mill(point.get("lease_liabilities_noncurrent")) or 0.0))
+    for k in ("lease_liabilities", "lease_liabilities_current", "lease_liabilities_noncurrent"):
+        if k in point:
+            cites[k] = point[k]
     use_leases = ifrs if include_leases is None else include_leases
     leases = leases_ifrs if use_leases else 0.0
     if use_leases and not leases_ifrs:

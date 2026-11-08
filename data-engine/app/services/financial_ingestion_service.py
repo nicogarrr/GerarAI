@@ -269,7 +269,8 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 #    entre ese concepto y el de contratos con clientes (CPT 12,97 M -> 1.573,5 M).
 # 10 (8-nov-2026): total_debt con DebtCurrent cuando el emisor solo etiqueta la deuda a plazo no corriente
 #    y el total corriente (UNH 3T 2026: 68.714 -> 74.331 M).
-SEC_INGESTION_RULES_VERSION = 10
+# 11 (8-nov-2026): filers IFRS: pasivos por arrendamiento (LeaseLiabilities y sus partes corriente/no corriente).
+SEC_INGESTION_RULES_VERSION = 11
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Arrendadores (REIT): su ingreso principal es el del arrendamiento (ASC 842),
@@ -434,6 +435,12 @@ SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Minoritarios (IAS 1.54q / 81B): sin ellos el puente EV → capital no los restaba (BN, 40-F).
     ("minority_interest", ["NoncontrollingInterests"],                                                 "USD"),
     ("net_income_minority", ["ProfitLossAttributableToNoncontrollingInterests"],                       "USD"),
+    # Pasivos por arrendamiento (NIIF 16): en un filer IFRS van en la deuda del EV
+    # (su EBITDA ya excluye los alquileres). CNQ 2025: 373 + 2.733 = 3.106 M CAD;
+    # BN solo etiqueta el total (LeaseLiabilities 9.201 M).
+    ("lease_liabilities", ["LeaseLiabilities"],                                                         "USD"),
+    ("lease_liabilities_current", ["CurrentLeaseLiabilities"],                                          "USD"),
+    ("lease_liabilities_noncurrent", ["NoncurrentLeaseLiabilities"],                                    "USD"),
     ("cash_and_equivalents", ["CashAndCashEquivalents"],                                               "USD"),
     ("short_term_investments", ["ShorttermDepositsNotClassifiedAsCashEquivalents"],                     "USD"),
     ("operating_cash_flow", ["CashFlowsFromUsedInOperatingActivities"],                                "USD"),
