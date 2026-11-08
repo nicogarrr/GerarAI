@@ -200,3 +200,79 @@ def test_existing_dir_validated_not_chmodded(tmp_path):
     notdir.write_text("x")
     with pytest.raises(NotADirectoryError):
         TaskTraceMiddleware()._write_snapshot(str(notdir), [msg()])
+
+
+def test_args_digest_args_no_serializables_devuelve_guion(monkeypatch):
+    monkeypatch.setenv("TRACE_HASH_KEY", "k" * 32)
+    # sort_keys con claves de tipos mezclados: TypeError -> "-" y nunca rompe el log
+    m = dramatiq.Message("default", "actor", ({1: "x", "a": "y"},), {}, {})
+    assert args_digest(m) == "-"
+
+
+def test_env_roto_cae_al_default(monkeypatch):
+    from app.workers import task_trace
+
+    monkeypatch.setenv("TRACE_SNAPSHOT_MAX_BYTES", "no-numero")
+    monkeypatch.setenv("TRACE_SNAPSHOT_KEEP", "no-numero")
+    assert task_trace._int_env("TRACE_SNAPSHOT_MAX_BYTES", 1_048_576, 4096) == 1_048_576
+    assert task_trace._keep() == 5
+
+
+def test_drop_stale_partials_tolera_borrado_roto(tmp_path, monkeypatch):
+    import time
+
+    d = tmp_path / "snap"
+    d.mkdir()
+    viejo = d / ".inflight-viejo.tmp"
+    viejo.write_text("{}")
+    hace_una_hora = time.time() - 3600
+    os.utime(viejo, (hace_una_hora, hace_una_hora))
+    reciente = d / ".inflight-nuevo.tmp"
+    reciente.write_text("{}")
+
+    real_remove = os.remove
+
+    def remove_roto(path):
+        if "viejo" in str(path):
+            raise OSError("en uso por otro proceso")
+        return real_remove(path)
+
+    monkeypatch.setattr(os, "remove", remove_roto)
+    TaskTraceMiddleware._drop_stale_partials(str(d))
+    assert viejo.exists()  # el fallo de borrado no rompe la limpieza
+    assert reciente.exists()  # y un tmp en curso (mtime reciente) no se toca
+
+
+def test_snapshot_replace_roto_limpia_tmp_y_propaga(tmp_path, monkeypatch):
+    mw = TaskTraceMiddleware()
+
+    def replace_roto(src, dst):
+        raise RuntimeError("disco lleno")
+
+    def remove_roto(path):
+        raise OSError("tampoco se puede borrar")
+
+    monkeypatch.setattr(os, "replace", replace_roto)
+    monkeypatch.setattr(os, "remove", remove_roto)
+    with pytest.raises(RuntimeError):
+        mw._write_snapshot(str(tmp_path / "snap"), [msg()])
+
+
+def test_snapshot_retencion_tolera_borrado_roto(tmp_path, monkeypatch):
+    d = tmp_path / "snap"
+    d.mkdir(mode=0o700)
+    os.chmod(d, 0o700)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions -- test: chmod deliberado para fijar los permisos del escenario bajo prueba
+    monkeypatch.setenv("TRACE_SNAPSHOT_KEEP", "1")
+    for i in range(3):
+        (d / f"inflight-2000010{i}T000000-1.json").write_text("{}")
+    mw = TaskTraceMiddleware()
+    borrados = []
+
+    def remove_fallando(path):
+        borrados.append(str(path))
+        raise OSError("bloqueado")
+
+    monkeypatch.setattr(os, "remove", remove_fallando)
+    mw._write_snapshot(str(d), [])
+    assert any("inflight-2000" in b for b in borrados)  # intento podar los viejos
+    assert sum(1 for f in os.listdir(d) if f.startswith("inflight-")) == 4

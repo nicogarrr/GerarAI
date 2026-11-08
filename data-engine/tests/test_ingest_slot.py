@@ -82,3 +82,22 @@ def test_singleton_respeta_setting_y_se_recrea_al_cambiar(monkeypatch):
     dos = document_ingest_slot(2)
     assert dos is not uno and dos.limit == 2
     reset_document_ingest_slot()
+
+
+def test_try_hold_sonda_sin_efectos():
+    slot = DocumentIngestSlot(1)
+    assert slot.try_hold()  # hueco libre
+    assert slot.try_hold()  # la sonda no gasta el permiso
+    with slot.hold():
+        assert not slot.try_hold()  # ocupado: False al momento, sin esperar
+    assert slot.try_hold()  # liberado: vuelve a haber hueco
+    assert slot.acquired == 1  # solo el hold() real cuenta como adquisicion
+
+
+def test_document_ingest_slot_sin_limite_lee_settings():
+    reset_document_ingest_slot()
+    slot = document_ingest_slot()
+    from app.core.config import get_settings
+
+    assert slot.limit == get_settings().document_ingest_max_concurrency
+    reset_document_ingest_slot()
