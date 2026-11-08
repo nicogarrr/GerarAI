@@ -251,7 +251,8 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # sin subirla, una empresa cuyo payload no cambia nunca recogeria la regla
 # nueva.
 # 3 (8-nov-2026): ``acquisitions`` (PaymentsToAcquireBusinesses…), que el motor de TIR necesita.
-SEC_INGESTION_RULES_VERSION = 3
+# 4 (8-nov-2026): ``gain_on_sale_real_estate`` (plusvalías por ventas de inmuebles), para el FFO de un REIT.
+SEC_INGESTION_RULES_VERSION = 4
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("revenue",           ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax", "RegulatedAndUnregulatedOperatingRevenue"],  "USD"),
@@ -323,6 +324,10 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("lease_income",      ["OperatingLeaseLeaseIncome", "OperatingLeasesIncomeStatementLeaseRevenue"],            "USD"),
     ("property_operating_expense", ["DirectCostsOfLeasedAndRentedPropertyOrEquipment"],                            "USD"),
     ("real_estate_tax_expense", ["RealEstateTaxExpense"],                                                           "USD"),
+    # Plusvalías por venta de inmuebles: se restan del beneficio para el FFO (NAREIT) de un REIT
+    # (Camden FY2025: GainLossOnDispositionOfAssets 260,9 M$ → FFO = 384,5 + 611,0 − 260,9 = 734,6 M$).
+    ("gain_on_sale_real_estate", ["GainsLossesOnSalesOfInvestmentRealEstate", "GainLossOnSaleOfProperties",
+                                  "GainLossOnDispositionOfAssets", "GainLossOnDispositionOfAssets1"],             "USD"),
     # Puente EV -> equity del DCF: patrimonio de minoritarios (NCI) y valor de
     # las preferentes. Saldos de balance (instantes).
     ("minority_interest", ["MinorityInterest"],                                                                     "USD"),

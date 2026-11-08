@@ -14,7 +14,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import date
 from typing import Any
 
@@ -28,15 +28,20 @@ from app.valuation import shareholder_irr_rules as rules
 
 logger = logging.getLogger(__name__)
 
-SERVICE_VERSION = "shareholder-irr-service-v1"
+SERVICE_VERSION = "shareholder-irr-service-v2"
 HISTORY_YEARS = 10
 _FLOW = ("revenue", "operating_income", "depreciation_amortization", "ebitda", "net_income",
          "net_income_attributable", "operating_cash_flow", "capital_expenditure", "dividends_paid",
          "common_stock_repurchased", "acquisitions", "stock_based_compensation", "shares_diluted",
-         "eps_diluted", "free_cash_flow", "interest_expense")
+         "eps_diluted", "free_cash_flow", "interest_expense", "earned_premiums", "lease_income",
+         "gain_on_sale_real_estate")
 _POINT = ("cash_and_equivalents", "short_term_investments", "total_debt", "long_term_debt",
           "operating_lease_liabilities", "lease_liabilities_current", "lease_liabilities_noncurrent",
-          "minority_interest", "hybrid_capital", "shares_outstanding", "total_equity")
+          "minority_interest", "hybrid_capital", "shares_outstanding", "total_equity", "preferred_stock")
+#: Saldos de balance que además se leen por ejercicio (cierre del año fiscal) para la base de valor contable.
+_POINT_ANNUAL = ("total_equity", "preferred_stock", "minority_interest")
+#: Umbral de «sin ingresos» para el método de caja (millones de la moneda de los informes).
+PRE_REVENUE_MAX = 50.0
 #: Sectores/códigos SIC en los que el EBITDA consolidado no es del accionista (deuda de filiales, balance
 #: financiero): la TIR se calcula sobre el beneficio (PER).
 FINANCIAL_SIC = range(6000, 6800)
@@ -101,6 +106,15 @@ def company_facts(db: Session, company: Company) -> tuple[dict[str, dict[int, di
                 slot[year] = (rank, _cite(fact))
         elif fact.metric in _POINT:
             end = _end(period)
+            if fact.metric in _POINT_ANNUAL and period.endswith(":FY"):
+                try:
+                    year = int(end[:4])
+                except ValueError:
+                    year = None
+                if year is not None:
+                    slot = annual.setdefault(fact.metric, {})
+                    if year not in slot or rank < slot[year][0]:
+                        slot[year] = (rank, _cite(fact))
             cur = point.get(fact.metric)
             if cur is None or end > cur[0] or (end == cur[0] and rank < cur[1]):
                 point[fact.metric] = (end, rank, _cite(fact))
@@ -111,6 +125,68 @@ def company_facts(db: Session, company: Company) -> tuple[dict[str, dict[int, di
 def _mill(cite: Mapping[str, Any] | None) -> float | None:
     v = _f((cite or {}).get("value"))
     return None if v is None else v / 1_000_000.0
+
+
+#: Tipos de empresa y el método que les corresponde (lo decide el código; el modelo no lo elige).
+KIND_METHODS = {
+    "operating": "TIR para el accionista sobre EV/EBITDA o PER",
+    "insurer": "TIR sobre el valor contable: ROE, reparto y P/VC (el float queda dentro del balance)",
+    "bank": "TIR sobre el valor contable: ROE, reparto y P/VC",
+    "holding": "TIR sobre el valor contable o NAV por acción y el P/VC (descuento sobre NAV)",
+    "real_estate": "TIR sobre el FFO (beneficio + amortización de inmuebles − plusvalías por ventas) y el P/FFO",
+    "pre_revenue": "caja, consumo y meses de margen (runway), dilución y suma de partes para lo que aún no factura",
+}
+
+
+def company_kind(company: Company, annual: Mapping[str, Mapping[int, dict]]) -> tuple[str, str]:
+    """(tipo, por qué). Primero la clasificación de la ficha (tipo de empresa, industria: el mismo
+    registro que usan los motores de valoración); si no decide, los propios hechos del último ejercicio:
+    primas devengadas ≥ 50 % de los ingresos → aseguradora; ingresos por arrendamiento ≥ 50 % → inmobiliaria
+    (las dos, solo si la industria de la ficha es desconocida o es la de seguros / inmobiliaria);
+    ingresos < 50 M o EBITDA, beneficio y flujo libre negativos los dos últimos años → preingresos/quema caja."""
+    try:
+        from app.valuation.engines.registry import classification_engine_key
+
+        key = classification_engine_key(company)
+    except Exception:  # noqa: BLE001 - sin registro, solo los hechos
+        key = "standard_dcf"
+    years = sorted({y for m in ("revenue", "net_income", "lease_income", "earned_premiums")
+                    for y in annual.get(m, {})})
+    last = years[-1] if years else None
+
+    def v(metric: str, year: int | None = last) -> float | None:
+        return _mill(annual.get(metric, {}).get(year)) if year is not None else None
+
+    rev, prem, lease = v("revenue"), v("earned_premiums"), v("lease_income")
+    # Los hechos solo deciden donde la ficha no dice otra cosa: una industria conocida que no es seguros
+    # (UNH, «Health Care»: primas de salud con márgenes de distribuidor) o inmobiliaria no se reclasifica.
+    industry = str(getattr(company, "industry", None) or "").strip().lower()
+    unknown = industry in ("", "unknown", "n/a", "none")
+    if key in ("insurer", "bank"):
+        return key, f"clasificación de la ficha ({'aseguradora' if key == 'insurer' else 'banco'})"
+    if key == "holding_company":
+        return "holding", "holding o gestora según la clasificación de la ficha"
+    if prem and rev and prem / rev >= 0.5 and (unknown or "insur" in industry):
+        return "insurer", f"primas devengadas = {prem / rev:.0%} de los ingresos de {last}"
+    if key == "reit":
+        return "real_estate", "REIT según la industria de la ficha"
+    if lease and (not rev or lease >= 0.5 * rev) and (unknown or "real estate" in industry or "reit" in industry):
+        return "real_estate", f"ingresos por arrendamiento ≥ 50 % de los ingresos de {last}"
+    top = max(x for x in (rev, lease, 0.0) if x is not None)
+    if key == "pre_revenue" or top < PRE_REVENUE_MAX:
+        return "pre_revenue", (f"ingresos de {last} por debajo de {PRE_REVENUE_MAX:g} M" if top < PRE_REVENUE_MAX
+                               else "preingresos según la clasificación de la ficha")
+    burning = 0
+    for y in years[-2:]:
+        oi, da, ni = v("operating_income", y), v("depreciation_amortization", y), v("net_income", y)
+        ocf, capex = v("operating_cash_flow", y), v("capital_expenditure", y)
+        ebitda = (oi + abs(da)) if (oi is not None and da is not None) else v("ebitda", y)
+        fcf = (ocf - abs(capex or 0.0)) if ocf is not None else None
+        if all(x is not None and x <= 0 for x in (ebitda, ni, fcf)):
+            burning += 1
+    if len(years) >= 2 and burning == 2:
+        return "pre_revenue", "EBITDA, beneficio y flujo libre negativos en los dos últimos ejercicios: quema caja"
+    return "operating", ""
 
 
 def _is_financial(company: Company) -> bool:
@@ -185,7 +261,17 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     annual, point = company_facts(db, company)
     warnings: list[str] = []
     cites: dict[str, Any] = {}
+    kind, kind_reason = company_kind(company, annual)
+    if kind == "real_estate":
+        # Un REIT etiqueta a menudo solo el arrendamiento (Camden: «Revenues» hasta 2016 y después
+        # OperatingLeaseLeaseIncome): los ingresos de cada año son el mayor de los dos datos.
+        rev_slot = annual.setdefault("revenue", {})
+        for y, cite in (annual.get("lease_income") or {}).items():
+            if _mill(cite) is not None and (_mill(rev_slot.get(y)) or 0.0) < (_mill(cite) or 0.0):
+                rev_slot[y] = cite
     years = sorted(set(annual.get("revenue", {})))[-HISTORY_YEARS:]
+    if not years and kind == "pre_revenue":
+        years = sorted(set(annual.get("net_income", {})))[-HISTORY_YEARS:]
     if not years:
         raise ValueError("sin ingresos anuales")
     last = years[-1]
@@ -205,10 +291,60 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     ni_attr = series("net_income_attributable")
     net_income = [a if a is not None else n for a, n in zip(ni_attr, series("net_income"), strict=True)]
     reporting = str((annual.get("revenue", {}).get(last) or {}).get("unit") or company.currency or "USD").upper()[:3]
-    financial = _is_financial(company)
+    financial = _is_financial(company) or kind in ("insurer", "bank", "holding")
     method = choose_method(revenue=revenue[-1], ebitda_years=ebitda, net_income=net_income[-1],
                            financial=financial, segment_ebitda=False)
-    chosen_basis = basis or ("pe" if method["chosen"] == "tir_per" else "ev_ebitda")
+    book = [None] * len(years)
+    earnings_label = ""
+    if kind in ("insurer", "bank", "holding"):
+        eq, pref = series("total_equity"), series("preferred_stock")
+        book = [None if e is None else e - (p or 0.0) for e, p in zip(eq, pref, strict=True)]
+        if book[-1] is not None and book[-1] > 0 and net_income[-1] is not None:
+            method = {"chosen": "tir_pb", "discarded": {
+                "tir_ev_ebitda": ("el EBITDA de una aseguradora, un banco o un holding no es del accionista: la deuda y "
+                                  "las reservas son parte del negocio"),
+                "tir_per": ("el beneficio de un año lo mueven la siniestralidad, las plusvalías y las revalorizaciones; "
+                            "lo que compone es el valor contable al ROE, y el PER queda como contraste"),
+                "dcf": method["discarded"].get("dcf", ""),
+                "sotp": ("la suma de partes necesita el valor de cada filial; con NAV publicado, el P/VC ya es "
+                         "el descuento sobre ese NAV"),
+            }}
+            cites["book_value"] = {"formula": "patrimonio atribuible a la matriz − preferentes al cierre del ejercicio",
+                                   "inputs": [annual.get("total_equity", {}).get(last),
+                                              annual.get("preferred_stock", {}).get(last)]}
+        else:
+            warnings.append("sin valor contable por ejercicio: se valora por el beneficio (PER) y se avisa")
+    elif kind == "real_estate":
+        gains = series("gain_on_sale_real_estate")
+        da = series("depreciation_amortization")
+        ffo = [None if n is None else n + abs(d or 0.0) - (g or 0.0) for n, d, g in zip(net_income, da, gains, strict=True)]
+        if ffo[-1] is not None and ffo[-1] > 0:
+            net_income = ffo
+            earnings_label = "FFO"
+            method = {"chosen": "tir_ffo", "discarded": {
+                "tir_ev_ebitda": "un REIT reparte casi todo: lo que gana el accionista es el FFO, no el EBITDA",
+                "tir_per": ("el beneficio neto resta la amortización de los inmuebles (que no pierden valor como una "
+                            "máquina) y suma las plusvalías de ventas: el FFO corrige las dos cosas"),
+                "dcf": method["discarded"].get("dcf", ""),
+                "sotp": ("el NAV (NOI / tasa de capitalización) necesita la tasa de capitalización de mercado, que "
+                         "no es un dato gratuito citado; queda como contraste"),
+            }}
+            cites["ffo"] = {"formula": "beneficio neto + amortizaciones − plusvalías por ventas de inmuebles",
+                            "inputs": [annual.get("net_income", {}).get(last),
+                                       annual.get("depreciation_amortization", {}).get(last),
+                                       annual.get("gain_on_sale_real_estate", {}).get(last)]}
+            if gains[-1] is None:
+                warnings.append("plusvalías por ventas de inmuebles sin etiquetar: el FFO puede estar inflado")
+    elif kind == "pre_revenue":
+        method = {"chosen": "caja_runway", "discarded": {
+            "tir_ev_ebitda": "sin EBITDA positivo: no hay beneficio que proyectar con una TIR",
+            "tir_per": "sin beneficio positivo",
+            "dcf": "un DCF de una empresa que aún no gana dinero es la suma de supuestos sin historia propia",
+            "sotp": ("se usa solo para las partes que aún no facturan y con sus propias probabilidades; lo que "
+                     "decide hoy es cuánta caja queda y cuánto se diluye"),
+        }}
+    method = {**method, "kind": kind, "kind_reason": kind_reason, "kind_method": KIND_METHODS[kind]}
+    chosen_basis = basis or {"tir_per": "pe", "tir_ffo": "pe", "tir_pb": "pb"}.get(method["chosen"], "ev_ebitda")
     price, price_ccy, price_as_of = _price(db, company)
     if price is None:
         raise ValueError("sin precio")
@@ -227,9 +363,21 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
         price, fx_note = conv[0], "; ".join(x for x in (fx_note, conv[1]) if x)
     cites["price"] = {"value": price, "as_of": price_as_of, "currency": reporting, "fx": fx_note,
                       "document": "Cierre de mercado guardado por GerarAI"}
-    # acciones diluidas: media diluida del último ejercicio; si falta, beneficio / BPA diluido (derivado)
+    # acciones: las de la portada del último informe (dei:EntityCommonStockSharesOutstanding) si son
+    # posteriores al cierre y coherentes con la media diluida (±20 %: una portada por clase no es el total);
+    # si no, la media diluida del último ejercicio; si falta, beneficio / BPA diluido (derivado)
     shares = _mill(annual.get("shares_diluted", {}).get(last))
-    if shares is not None:
+    cover = point.get("shares_outstanding")
+    cover_sh = _mill(cover)
+    fy_end = _end(str((annual.get("revenue", {}).get(last) or annual.get("net_income", {}).get(last) or {}).get("period") or ""))
+    cover_end = _end(str((cover or {}).get("period") or ""))
+    if cover_sh and cover_end > fy_end and (shares is None or 0.8 <= cover_sh / shares <= 1.2):
+        if shares is not None and cover_sh < shares:
+            warnings.append("acciones de la portada del último informe (sin opciones ni convertibles): por debajo "
+                            "de la media diluida del ejercicio")
+        shares = cover_sh
+        cites["shares"] = cover
+    elif shares is not None:
         cites["shares"] = annual["shares_diluted"][last]
     else:
         eps = _f((annual.get("eps_diluted", {}).get(last) or {}).get("value"))
@@ -267,22 +415,73 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     sp = engine.StartingPoint(
         price=float(price), shares_diluted=shares, revenue=revenue[-1] or 0.0,
         ebitda=ebitda[-1], net_income=net_income[-1], cash=cash, debt=debt, leases=leases, hybrids=hybrids,
-        minorities=minorities if chosen_basis != "pe" else 0.0, currency=reporting, basis=chosen_basis,
+        minorities=minorities if chosen_basis == "ev_ebitda" else 0.0, currency=reporting, basis=chosen_basis,
         sources={"revenue": f"revenue {last}:FY", "ebitda": "resultado operativo + amortizaciones del ejercicio"},
+        earnings_label=earnings_label,
     )
-    earnings_series = net_income if chosen_basis == "pe" else ebitda
-    hist = rules.History(
-        years=years, revenue=revenue, earnings=earnings_series,
-        operating_cash_flow=series("operating_cash_flow"), capex=series("capital_expenditure"),
-        dividends=series("dividends_paid"), buybacks=series("common_stock_repurchased"),
-        acquisitions=series("acquisitions"), sbc=sbc,
-    )
-    if not any(a for a in hist.acquisitions if a):
+    if chosen_basis == "pb" and book[-1] is None:  # comparable valorado con la base de la empresa
+        eq, pref = series("total_equity"), series("preferred_stock")
+        book = [None if e is None else e - (p or 0.0) for e, p in zip(eq, pref, strict=True)]
+        if book[-1] is None or book[-1] <= 0:
+            raise ValueError("sin valor contable")
+    if chosen_basis == "pb":
+        # Valor contable: «ingresos» = valor contable, beneficio = el neto; lo repartido (dividendos +
+        # recompras) hace de flujo para el accionista, sin capex ni adquisiciones aparte.
+        dist = [None if d is None and b is None else abs(d or 0.0) + abs(b or 0.0)
+                for d, b in zip(series("dividends_paid"), series("common_stock_repurchased"), strict=True)]
+        sp = replace(sp, revenue=book[-1] or 0.0)
+        hist = rules.History(years=years, revenue=book, earnings=net_income, operating_cash_flow=dist,
+                             capex=[None] * len(years), dividends=series("dividends_paid"),
+                             buybacks=series("common_stock_repurchased"), acquisitions=(), sbc=sbc)
+    else:
+        earnings_series = net_income if chosen_basis == "pe" else ebitda
+        hist = rules.History(
+            years=years, revenue=revenue, earnings=earnings_series,
+            operating_cash_flow=series("operating_cash_flow"), capex=series("capital_expenditure"),
+            dividends=series("dividends_paid"), buybacks=series("common_stock_repurchased"),
+            acquisitions=series("acquisitions"), sbc=sbc,
+        )
+    if chosen_basis != "pb" and not any(a for a in hist.acquisitions if a):
         warnings.append("adquisiciones sin dato: el crecimiento histórico (que puede incluir compras) se toma como orgánico")
     cites["annual"] = {m: {str(y): annual[m][y] for y in years if y in annual.get(m, {})} for m in _FLOW if m in annual}
     cites["method"] = method
     cites["ifrs16_leases_in_debt"] = use_leases
     return sp, hist, warnings, cites
+
+
+def runway(sp: engine.StartingPoint, hist: rules.History, cites: Mapping[str, Any]) -> dict[str, Any]:
+    """Caja, consumo y meses de margen de una empresa que aún no gana dinero (fórmulas a la vista).
+
+    consumo anual = −(flujo de caja operativo − capex) del último ejercicio (0 si genera caja);
+    meses de margen = (caja + inversiones a corto) / consumo anual × 12;
+    dilución = TCAC de las acciones diluidas de los tres últimos ejercicios."""
+    ocf = hist.operating_cash_flow[-1] if hist.operating_cash_flow else None
+    capex = hist.capex[-1] if hist.capex else None
+    fcf = None if ocf is None else ocf - abs(capex or 0.0)
+    burn = max(-fcf, 0.0) if fcf is not None else None
+    months = (sp.cash / burn * 12.0) if burn else None
+    annual = cites.get("annual") or {}
+    sh = [(int(y), _mill(c)) for y, c in sorted((annual.get("shares_diluted") or {}).items()) if _mill(c)]
+    dil = None
+    if len(sh) >= 2:
+        (y0, s0), (y1, s1) = sh[max(0, len(sh) - 4)], sh[-1]
+        if y1 > y0 and s0 and s0 > 0:
+            dil = (s1 / s0) ** (1 / (y1 - y0)) - 1
+    rev = sp.revenue or None
+    ev = sp.enterprise_value
+    year = str(hist.years[-1]) if hist.years else ""
+    return {
+        "year": year, "cash": sp.cash, "debt": sp.debt, "operating_cash_flow": ocf, "capex": capex,
+        "free_cash_flow": fcf, "burn": burn, "months": months, "dilution_cagr": dil,
+        "ev_to_cash": (ev / sp.cash) if sp.cash > 0 else None, "ev_to_revenue": (ev / rev) if rev and rev > 0 else None,
+        "formulas": {
+            "consumo": "−(flujo de caja operativo − capex) del último ejercicio",
+            "meses": "(caja + inversiones a corto) / consumo anual × 12",
+            "dilucion": "TCAC de las acciones diluidas de los tres últimos ejercicios",
+        },
+        "sources": {"ocf": (annual.get("operating_cash_flow") or {}).get(year),
+                    "capex": (annual.get("capital_expenditure") or {}).get(year)},
+    }
 
 
 def guidance_growth(db: Session, company: Company, last_year: int, revenue_last: float | None
@@ -363,13 +562,23 @@ def value_company(db: Session, company: Company, *, today: date | None = None,
         sp, hist, warnings, cites = starting_point(db, company, today=today)
     except ValueError as exc:
         return {"status": "insufficient", "reason": redact_secrets(str(exc)), "ticker": company.ticker}
+    if cites["method"]["chosen"] == "caja_runway":
+        return {"status": "not_meaningful", "ticker": company.ticker, "as_of": today.isoformat(),
+                "reason": ("empresa sin beneficio que proyectar (" + cites["method"]["kind_reason"] + "): se valora por "
+                           "su caja, su consumo y su dilución, y por la suma de partes de lo que aún no factura"),
+                "method": cites["method"], "runway": runway(sp, hist, cites),
+                "starting_point": {**asdict(sp), "market_cap": sp.market_cap, "net_debt": sp.net_debt,
+                                   "enterprise_value": sp.enterprise_value, "multiple": sp.multiple,
+                                   "margin": sp.margin},
+                "citations": cites, "warnings": warnings, "fingerprint": fingerprint(sp, hist, [], None)}
     if cites["method"]["chosen"] == "sotp":
         return {"status": "not_applicable", "method": cites["method"], "ticker": company.ticker,
                 "warnings": warnings}
     peers = _peer_multiples(db, company, sp.basis, today)
     multiples = [p["multiple"] for p in peers if p.get("multiple")]
     last_year = max(int(y) for y in cites["annual"].get("revenue", {"0": None}))
-    guidance, guidance_cite = guidance_growth(db, company, last_year, sp.revenue)
+    # La guía de ingresos no es la de un valor contable: con la base pb no se usa.
+    guidance, guidance_cite = guidance_growth(db, company, last_year, sp.revenue) if sp.basis != "pb" else (None, None)
     cites["guidance"] = guidance_cite
     fp = fingerprint(sp, hist, peers, guidance)
     rate = rate_source = None
@@ -397,4 +606,4 @@ def value_company(db: Session, company: Company, *, today: date | None = None,
     return out
 
 
-__all__ = ["choose_method", "company_facts", "fingerprint", "run_valuation", "starting_point", "value_company"]
+__all__ = ["KIND_METHODS", "choose_method", "company_facts", "company_kind", "runway", "fingerprint", "run_valuation", "starting_point", "value_company"]
