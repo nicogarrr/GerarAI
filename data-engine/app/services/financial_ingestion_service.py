@@ -255,7 +255,9 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # 5 (8-nov-2026): filers IFRS sin minoritarios: ProfitLoss/Equity de respaldo; ``total_debt`` = Borrowings.
 # 6 (8-nov-2026): ``net_income_total`` (ProfitLoss) y ``finance_income_cost``, para el EBITDA por componentes.
 # 7 (8-nov-2026): minoritarios: ``minority_interest`` IFRS (NoncontrollingInterests) y ``net_income_minority``.
-SEC_INGESTION_RULES_VERSION = 7
+# 8 (8-nov-2026): acciones y BPA «básico y diluido» (WeightedAverageNumberOfShareOutstandingBasicAndDiluted,
+#    EarningsPerShareBasicAndDiluted), que etiquetan las empresas con pérdidas.
+SEC_INGESTION_RULES_VERSION = 8
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("revenue",           ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax", "RegulatedAndUnregulatedOperatingRevenue"],  "USD"),
@@ -277,13 +279,15 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # "reported_cost_of_debt" antes de derivarlo de gasto/deuda.
     ("cost_of_debt",       ["DebtWeightedAverageInterestRate"],                 "pure"),
     ("net_income",        ["NetIncomeLoss", "ProfitLoss"],                                                          "USD"),
-    ("eps_diluted",       ["EarningsPerShareDiluted"],                                                              "USD/share"),
+    # «básico y diluido» en un único concepto: lo usan los emisores con pérdidas (sin dilución posible)
+    ("eps_diluted",       ["EarningsPerShareDiluted", "EarningsPerShareBasicAndDiluted"],                           "USD/share"),
     # PROMEDIO ponderado de acciones (un denominador de duracion). El saldo
     # puntual CommonStockSharesOutstanding es otra magnitud (un instantaneo) y
     # vive en su propia metrica: mezclarlos hacia que el saldo ganara el
     # colapso de aliases por `filed` mas reciente y se publicara como divisor
     # del DCF (fix FIX5-8).
-    ("shares_diluted",    ["WeightedAverageNumberOfDilutedSharesOutstanding"],                                      "shares"),
+    ("shares_diluted",    ["WeightedAverageNumberOfDilutedSharesOutstanding",
+                           "WeightedAverageNumberOfShareOutstandingBasicAndDiluted"],                               "shares"),
     ("shares_outstanding", ["CommonStockSharesOutstanding"],                                                         "shares"),
     # Fallback (WWW, 25/9): el tag combinado incluye caja
     # restringida -> deuda neta fresca pero algo optimista. Va el ULTIMO y es
