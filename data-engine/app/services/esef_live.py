@@ -44,6 +44,7 @@ from typing import Any
 import httpx
 
 from app.services.connectors.esef import (
+    ESEF_BASE_URL,
     EsefClient,
     EsefError,
     filings_per_lei,
@@ -51,6 +52,13 @@ from app.services.connectors.esef import (
     gleif_lei_records,
     merge_facts,
     normalize_xbrl_json,
+)
+from app.services.connectors.fca_nsm import (
+    ANNUAL_REPORT_TYPE,
+    NSM_SOURCE,
+    NsmClient,
+    NsmError,
+    tagged_annual_reports,
 )
 
 logger = logging.getLogger(__name__)
@@ -121,6 +129,7 @@ async def resolve_issuer(
     *,
     esef: EsefClient,
     http: httpx.AsyncClient,
+    nsm: NsmClient | None = None,
 ) -> tuple[IssuerIdentity | None, str]:
     """LEI del emisor de ``company`` con su prueba de identidad, o (None, motivo)."""
     isin = _company_isin(company)
@@ -164,18 +173,40 @@ async def resolve_issuer(
         and _name_identity_ok(company.name, r[1])
     ]
     with_filings: list[tuple[str, str]] = []
+    uk_listing = jurisdiction == "GB"
     for lei, name, _, _ in candidates:
         try:
             if await esef.list_filings_for_lei(lei):
                 with_filings.append((lei, name))
+                continue
         except EsefError as exc:
             return None, f"esef_error: {type(exc).__name__}"
+        if uk_listing and nsm is not None:
+            # El indice no tiene a todas las emisoras britanicas (Georgia
+            # Capital PLC: 0 entidades). Su informe anual depositado en el
+            # NSM de la FCA prueba igual que el LEI es de un emisor cotizado.
+            try:
+                if await nsm.list_filings_for_lei(lei):
+                    with_filings.append((lei, name))
+            except NsmError:
+                pass
     if len(with_filings) == 1:
         lei, name = with_filings[0]
         return IssuerIdentity(lei=lei, legal_name=name, method="name_gleif"), "ok"
     if len(with_filings) > 1:
         return None, f"nombre_ambiguo: {len(with_filings)} emisores con filings para {company.name!r}"
-    return None, "sin_emisor_esef: ningun LEI con filings en el indice para este nombre/ISIN"
+    return None, "sin_emisor_esef: ningun LEI con filings en el indice (ni en el NSM de la FCA) para este nombre/ISIN"
+
+
+def _nsm_applies(company: Any, index_filings: list[Any]) -> bool:
+    """El NSM (FCA) solo guarda emisoras con valores en mercados del Reino
+    Unido: se consulta para un ticker de Londres, para un emisor cuyo indice
+    ya es britanico (country GB) o cuando el indice no tiene nada."""
+    if SUFFIX_JURISDICTION.get(_ticker_suffix(getattr(company, "ticker", "") or "")) == "GB":
+        return True
+    if not any(getattr(f, "json_url", None) for f in index_filings):
+        return True
+    return any(str(getattr(f, "country", "") or "").upper() == "GB" for f in index_filings)
 
 
 async def fetch_live_snapshot(
@@ -183,14 +214,27 @@ async def fetch_live_snapshot(
     *,
     esef: EsefClient | None = None,
     http: httpx.AsyncClient | None = None,
+    nsm: NsmClient | None = None,
     max_filings: int = 5,
 ) -> tuple[dict[str, Any] | None, str]:
-    """Snapshot ESEF del emisor (misma forma que build_esef_snapshots) o (None, motivo)."""
+    """Snapshot ESEF del emisor (misma forma que build_esef_snapshots) o (None, motivo).
+
+    Dos fuentes oficiales y gratuitas, por LEI:
+    1. filings.xbrl.org (render xBRL-JSON) — UE/EEE y parte del Reino Unido;
+    2. el NSM de la FCA (paquete ESEF/UKSEF con iXBRL, ``connectors.fca_nsm``)
+       para emisoras del Reino Unido: completa los ejercicios que el indice
+       aun no tiene (ABF FY2026, depositado el 2026-11-05) o que no tiene
+       nunca. Si un ejercicio esta en las dos, gana el indice (ya validado).
+    ``filing_sources`` guarda, por ejercicio, la URL del documento, su fecha
+    de deposito y su sha256: cada hecho es citable."""
     own_http = http is None
     http = http or gleif_http_client()
     esef = esef or EsefClient()
+    # Mismo cliente HTTP que GLEIF (URLs absolutas): en tests comparte el
+    # MockTransport y nunca sale a red.
+    nsm = nsm or NsmClient(client=http)
     try:
-        identity, reason = await resolve_issuer(company, esef=esef, http=http)
+        identity, reason = await resolve_issuer(company, esef=esef, http=http, nsm=nsm)
         if identity is None:
             return None, reason
         try:
@@ -198,35 +242,88 @@ async def fetch_live_snapshot(
         except EsefError as exc:
             return None, f"esef_error: {type(exc).__name__}"
         chosen = filings_per_lei(filings, max_filings).get(identity.lei, [])
-        if not chosen:
+        nsm_filings: list[Any] = []
+        nsm_note = ""
+        if _nsm_applies(company, filings):
+            try:
+                nsm_all = await nsm.list_filings_for_lei(identity.lei)
+            except NsmError as exc:
+                nsm_all = []
+                nsm_note = f"nsm_error: {exc}"
+            index_periods = {f.period_end for f in chosen}
+            nsm_filings = [f for f in tagged_annual_reports(nsm_all, max_filings) if f.period_end not in index_periods]
+            if not nsm_filings and not chosen:
+                annual = [f for f in nsm_all if f.filing_type == ANNUAL_REPORT_TYPE]
+                if annual:
+                    latest_doc = max(annual, key=lambda f: f.submitted_date)
+                    nsm_note = (
+                        f"nsm_sin_etiquetar: {len(annual)} informes anuales en el NSM de la FCA, "
+                        f"ninguno con iXBRL (ultimo {latest_doc.submitted_date}, "
+                        f"{latest_doc.document_format}: {latest_doc.url})"
+                    )
+        # Ejercicios mas recientes primero; en empate, el indice.
+        plan: list[tuple[str, int, Any]] = [(f.period_end or "", 0, f) for f in chosen]
+        plan += [(f.period_end or "", 1, f) for f in nsm_filings]
+        plan.sort(key=lambda row: (row[0], -row[1]), reverse=True)
+        selected: list[tuple[str, int, Any]] = []
+        for row in plan:
+            if len(selected) >= max_filings or any(r[0] == row[0] for r in selected):
+                continue
+            selected.append(row)
+        if not selected:
+            if nsm_note:
+                return None, nsm_note
             return None, f"sin_filings_json: LEI {identity.lei} sin render xBRL-JSON en el indice"
         normalized: list[dict[str, Any]] = []
-        for filing in chosen:
+        sources: list[dict[str, Any]] = []
+        for period_end, kind, filing in selected:
             try:
-                normalized.append(normalize_xbrl_json(await esef.fetch_filing_json(filing)))
-            except EsefError as exc:
+                if kind == 0:
+                    normalized.append(normalize_xbrl_json(await esef.fetch_filing_json(filing)))
+                    sources.append({
+                        "period_end": period_end, "origin": "filings.xbrl.org",
+                        "url": ESEF_BASE_URL + str(filing.json_url),
+                        "fxo_id": filing.fxo_id, "sha256": filing.sha256,
+                    })
+                else:
+                    got = await nsm.fetch_tagged_facts(filing)
+                    normalized.append(got["facts"])
+                    sources.append({
+                        "period_end": period_end, "origin": "fca_nsm",
+                        "url": got["source_url"], "submitted_date": got["submitted_date"],
+                        "fxo_id": f"NSM-{got['disclosure_id']}", "sha256": got["sha256"],
+                        "report_path": got["report_path"],
+                    })
+            except (EsefError, NsmError) as exc:
                 # Un ejercicio ilegible no tumba los demas; queda contado.
-                logger.info("filing %s ilegible: %s", filing.fxo_id, type(exc).__name__)
+                logger.info("filing %s ilegible: %s", period_end, exc)
         if not normalized:
             return None, "filings_ilegibles"
-        latest = chosen[0]
-        try:
-            entity_name = await esef.get_entity_name(identity.lei)
-        except EsefError:
-            entity_name = identity.legal_name
+        latest = sources[0]
+        entity_name = identity.legal_name
+        if chosen:
+            try:
+                entity_name = await esef.get_entity_name(identity.lei) or identity.legal_name
+            except EsefError:
+                entity_name = identity.legal_name
+        origins = {src["origin"] for src in sources}
+        source_label = " + ".join(
+            label for origin, label in (("filings.xbrl.org", LIVE_SOURCE), ("fca_nsm", NSM_SOURCE)) if origin in origins
+        )
         return (
             {
                 "lei": identity.lei,
                 "ticker": company.ticker.upper(),
                 "entity_name": entity_name or identity.legal_name,
-                "period_end": latest.period_end,
-                "periods": [f.period_end for f in chosen],
-                "fxo_id": latest.fxo_id,
-                "sha256": latest.sha256,
+                "period_end": latest["period_end"],
+                "periods": [src["period_end"] for src in sources],
+                "fxo_id": latest["fxo_id"],
+                "sha256": latest["sha256"],
                 "fetched_at": datetime.now(UTC).isoformat(),
                 "facts": merge_facts(normalized),
                 "origin": "live",
-                "source": LIVE_SOURCE,
+                "source": source_label,
+                "filing_sources": sources,
                 "identity": {
                     "method": identity.method,
                     "isin": identity.isin,
