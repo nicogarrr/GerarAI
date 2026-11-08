@@ -133,3 +133,16 @@ def test_se_guarda_como_dato_oficial_citado_y_llega_a_los_expertos(db):
     assert len(guide) == 1
     assert guide[0].data["low"] == 150.0 and guide[0].data["high"] == 200.0
     assert guide[0].data["unit"] == "millones de USD" and guide[0].source["url"] == new.source_url
+
+
+
+def test_la_metrica_de_otra_cifra_o_una_perdida_de_segmento_no_es_guia():
+    """META 10-Q (29-oct-2026): «operating profit» es de los 12,78 mil M$ ya pasados y lo previsto son
+    las PÉRDIDAS de Reality Labs; antes se guardaba como beneficio operativo de la empresa (18.500 M$)."""
+    meta_rl = ("During the nine months ended September 30, 2026, our RL segment reduced our overall operating "
+               "profit by approximately $12.78 billion, and we expect our full-year 2026 RL operating losses to be "
+               "approximately $18 billion to $19 billion.")
+    assert extract_guidance(meta_rl, published=date(2026, 10, 29)) == []
+    ok = extract_guidance("We expect full-year 2026 operating income of $2.0 billion to $2.2 billion.",
+                          published=date(2026, 10, 29))
+    assert [(g.metric, g.period, g.base) for g in ok] == [("operating_income", "fy2026", Decimal("2100000000.0"))]
