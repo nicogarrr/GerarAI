@@ -298,3 +298,33 @@ def test_ingesta_sin_13f_validos_no_persiste_ni_marca_procesado():
     assert out["status"] == "sin_datos"
     assert db.query(PublicSourceDocument).count() == 0
     assert ih.institutional_holders(db, "AAPL")["status"] == "sin_datos"
+
+
+def test_ingesta_actual_sin_13f_validos_no_persiste_aunque_el_previo_sea_valido():
+    """ZIP actual con 1 fila de 40 declaradas (ningún 13F válido) + ZIP previo
+    válido: N/D, no «no aparece en este fichero», y no queda marcado procesado."""
+    db = _db()
+    cusips = ih.universe_cusips(db)
+    q2 = _zip(["I2\t15-AUG-2026\t13F-HR\t1\t30-JUN-2026"], ["I2\t30-JUN-2026\t\t\t\tAlpha"], [_info("I2", APPLE, 110)], ["I2\t0\t40"])
+    q1 = _zip(["P1\t15-MAY-2026\t13F-HR\t1\t31-MAR-2026"], ["P1\t31-MAR-2026\t\t\t\tAlpha"], [_info("P1", OTHER, 100)], ["P1\t0\t1"])
+    parses = [ds.parse_dataset(q2, set(cusips), url="https://www.sec.gov/files/x/q2.zip"),
+              ds.parse_dataset(q1, set(cusips), url="https://www.sec.gov/files/x/q1.zip")]
+    out = ih.ingest_parsed(db, parses, ["i2", "i1"], cusips)
+    assert out["status"] == "sin_datos"
+    assert db.query(PublicSourceDocument).count() == 0
+    assert ih.institutional_holders(db, "AAPL")["status"] == "sin_datos"
+
+
+def test_ingesta_previo_sin_13f_validos_no_persiste_aunque_el_actual_sea_valido():
+    """Simétrico: ZIP previo sin 13F válidos + ZIP actual válido. Comparar con
+    un trimestre vacío inventaría «nuevo»/«sin 13F previo» en todos: N/D."""
+    db = _db()
+    cusips = ih.universe_cusips(db)
+    q2 = _zip(["P2\t15-AUG-2026\t13F-HR\t1\t30-JUN-2026"], ["P2\t30-JUN-2026\t\t\t\tAlpha"], [_info("P2", OTHER, 110)], ["P2\t0\t1"])
+    q1 = _zip(["I1\t15-MAY-2026\t13F-HR\t1\t31-MAR-2026"], ["I1\t31-MAR-2026\t\t\t\tAlpha"], [_info("I1", APPLE, 100)], ["I1\t0\t40"])
+    parses = [ds.parse_dataset(q2, set(cusips), url="https://www.sec.gov/files/x/q2.zip"),
+              ds.parse_dataset(q1, set(cusips), url="https://www.sec.gov/files/x/q1.zip")]
+    out = ih.ingest_parsed(db, parses, ["i2", "i1"], cusips)
+    assert out["status"] == "sin_datos"
+    assert db.query(PublicSourceDocument).count() == 0
+    assert ih.institutional_holders(db, "AAPL")["status"] == "sin_datos"
