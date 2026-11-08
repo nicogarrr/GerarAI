@@ -86,7 +86,9 @@ SOTP_CONTRACT = (
     '"guidance_anchor": {mismo formato, "type": "guia"|"estimacion_analista"} | null (si el ancla no es una previsión '
     'y la empresa o un analista dan una cifra de ingresos futuros para ese segmento)}], '
     '"assets": [{"name": str, "status": ..., "value_millions": número copiado de la evidencia, "quote": str, '
-    '"citation": "ev-N", "why": str}], "dilution": [{"label": str, "shares_millions": número de acciones NUEVAS '
+    '"citation": "ev-N", "why": str, "mhz": número de MHz COPIADO de la evidencia | null (solo espectro: lo valora '
+    'el código con transacciones comparables), "band": "mss" (satélite, con o sin uso terrestre) | "terrestre" | '
+    'null}], "dilution": [{"label": str, "shares_millions": número de acciones NUEVAS '
     'copiado de la evidencia (otras clases canjeables, emisiones pactadas, warrants), "quote": str, "citation": '
     '"ev-N", "why": str}]}. No pongas probabilidades, márgenes, múltiplos, años de madurez ni tasas: los pone el '
     "código con tablas fijas. Un segmento sin cifra en la evidencia va con \"anchor\": null (queda «sin valorar»). "
@@ -197,6 +199,14 @@ def parse_classification(parsed: Any, ledger: EvidenceLedger, *, expert: str = S
             continue
         name = _text(raw.get("name"), 120)
         status = raw.get("status") if raw.get("status") in sotp_rules.STATUS_PROBABILITY else "idea"
+        # Espectro con sus MHz en la cita: lo valora el código por comparables (sotp_rules.spectrum_value).
+        if _num(raw.get("mhz")) is not None:
+            mhz, sources, quote, reason = _verified(raw, "mhz", ledger, expert)
+            if not reason and mhz is not None:
+                band = raw.get("band") if raw.get("band") in sotp_rules.SPECTRUM_BANDS else "mss"
+                assets.append({"name": name, "status": status, "value_millions": None, "mhz": mhz, "band": band,
+                               "quote": quote, "why": _text(raw.get("why"), 200), "sources": sources})
+                continue
         value, sources, quote, reason = _verified(raw, "value_millions", ledger, expert)
         if reason:
             unvalued.append({"name": name or "activo", "status": status, "reason": f"activo: {reason}"})
@@ -311,6 +321,21 @@ def build_model(classification: Mapping[str, Any], anchors: Mapping[str, Any]) -
     for asset in classification.get("assets") or []:
         probability = sotp_rules.STATUS_PROBABILITY[asset["status"]]
         quote = f" Cita: «{asset['quote']}»" if asset.get("quote") else ""
+        if asset.get("mhz"):
+            low, value, high, formula, comps = sotp_rules.spectrum_value(float(asset["mhz"]), asset.get("band") or "mss")
+            parts.append({
+                "group": "Activos",
+                "name": asset["name"],
+                "kind": "asset",
+                "value": value,
+                "discounted": False,
+                "probability": probability,
+                "why": {"value": _cut(f"Regla «espectro por comparables»: {formula}. Bajo {low:,.0f} M / alto "
+                                      f"{high:,.0f} M.{quote}", 600),
+                        "probability": f"Estado «{asset['status']}» → {sotp_rules.pct(probability)} (tabla fija)."},
+                "sources": (asset.get("sources") or []) + comps,
+            })
+            continue
         parts.append({
             "group": "Activos",
             "name": asset["name"],

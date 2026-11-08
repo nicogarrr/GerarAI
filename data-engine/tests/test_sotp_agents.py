@@ -85,7 +85,7 @@ def test_numbers_come_from_fixed_tables_and_cited_figures_with_a_formula_trace()
     assert problems == []
     # El código fija la tasa CAPM, las acciones SEC, el año de madurez y la caja menos deuda.
     assert model["discount_rate"] == 0.11 and model["shares_current"] == 300.0 and model["valuation_year"] == 2030
-    assert "CAPM" in model["discount_rate_source"] and model["rules_version"] == "sotp-rules-v3"
+    assert "CAPM" in model["discount_rate_source"] and model["rules_version"] == "sotp-rules-v4"
     cash = model["parts"][-1]
     assert cash["name"].startswith("Caja menos deuda") and cash["value"] == 600.0 and cash["discounted"] is False
     first = model["parts"][0]
