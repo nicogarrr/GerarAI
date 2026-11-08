@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { AnalystReportThesis } from '@/components/research/AnalystReportThesis';
 import { AnalystReportView } from '@/components/research/AnalystReportView';
 import PrintButton from '@/components/research/PrintButton';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
@@ -11,6 +12,7 @@ import { engineRangeFrom, getAnalystReport, getPublishedThesis, type ReportInput
 import { getFormat, getLocale, getT } from '@/lib/i18n/server';
 import { getKeyStats } from '@/lib/research/key-stats';
 import { getSotp } from '@/lib/research/sotp';
+import { getThesisV2 } from '@/lib/research/thesis-v2';
 import { impliedGrowthText, sbcAdjustmentText, trackRecordText } from '@/lib/research/valuation-method';
 import { baseRateText } from '@/lib/research/valuation-summary';
 
@@ -31,7 +33,7 @@ export default async function InformePage({ params }: { params: Promise<{ ticker
   await requireAuthenticatedUser();
   const ticker = (await params).ticker.toUpperCase();
   const [t, fmt, locale] = await Promise.all([getT(), getFormat(), getLocale()]);
-  const [report, card, summaries, thesis, sotp, valuation, keyStats, shorts] = await Promise.all([
+  const [report, card, summaries, thesis, sotp, valuation, keyStats, shorts, thesisV2] = await Promise.all([
     getAnalystReport(ticker),
     getDcaWatchCard(ticker),
     getValuationSummaries([ticker]).catch(() => ({} as Awaited<ReturnType<typeof getValuationSummaries>>)),
@@ -40,6 +42,7 @@ export default async function InformePage({ params }: { params: Promise<{ ticker
     getResearchValuationWorkspace(ticker).catch(() => null),
     getKeyStats(ticker),
     getPublicShorts(ticker).catch(() => null),
+    getThesisV2(ticker),
   ]);
   const summary = summaries[ticker] ?? null;
   const data: ReportInputs = {
@@ -64,6 +67,7 @@ export default async function InformePage({ params }: { params: Promise<{ ticker
     <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-3">
       <div className="flex justify-end print:hidden"><PrintButton /></div>
       <AnalystReportView data={data} t={t} fmt={fmt} locale={locale} />
+      <AnalystReportThesis thesis={thesisV2} t={t} />
     </main>
   );
 }

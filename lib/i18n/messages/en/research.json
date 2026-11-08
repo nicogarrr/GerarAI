@@ -2051,6 +2051,22 @@
     "fullThesis": "Full thesis",
     "footer": "Report built from GerarAI data on {date}. Thesis and breakdown figures are user assumptions.",
     "na": "N/A",
-    "link": "Analyst-style report"
+    "link": "Analyst-style report",
+    "tesis": {
+      "kicker": "GerarAI investment thesis · {date}",
+      "title": "{company} ({ticker}): investment thesis",
+      "price": "Price",
+      "irr5": "Weighted 5-year IRR",
+      "irr10": "Weighted 10-year IRR",
+      "base10": "Base 10-year IRR",
+      "coe": "Cost of equity (CAPM)",
+      "multiple": "Starting multiple",
+      "peers": "Peer median",
+      "probabilities": "Scenario probabilities: {reason}",
+      "stale": "The data changed since this was written: the figures are those of the calculation the text was written with; it is redone with the next thesis.",
+      "footer": "Every figure and table is computed by code from the cited filings; the expert agents write the text with those figures as markers and a validator rejects any hand-written number. This is analysis, not a buy or sell recommendation.",
+      "warnings": "Data warnings",
+      "sources": "Documents read: {list}"
+    }
   }
 }
