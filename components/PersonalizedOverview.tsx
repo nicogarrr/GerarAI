@@ -762,7 +762,9 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                             </div>
                             <p className="text-xs text-gray-500">
                                 {watchlistTotal > watchlist.length ? t('home.watchlist.lastNOfTotal', { n: watchlist.length, total: watchlistTotal }) : t('home.watchlist.totalCount', { total: watchlistTotal })} ·{' '}
-                                <Link href="/watchlist" className="inline-flex min-h-[44px] items-center text-yellow-400 hover:underline">
+                                {/* Enlace dentro de un párrafo: subrayado siempre (WCAG 2.2 SC 1.4.1),
+                                    no solo distinguible por el color amarillo. */}
+                                <Link href="/watchlist" className="inline-flex min-h-[44px] items-center text-yellow-400 underline underline-offset-2">
                                     {t('home.watchlist.seeFullList')}
                                 </Link>
                             </p>
