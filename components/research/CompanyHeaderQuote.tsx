@@ -183,7 +183,12 @@ export function CompanyHeaderQuote({
                         </div>
                     </div>
                 ) : null}
-                {useFallback ? <p className="mt-1 text-xs text-gray-500">{t('research.headerQuote.liveUnavailable')}</p> : null}
+                {/* N/D nunca silencioso (regla de Nico): con fallback se rotula
+                    la vela y, con o sin él, la cabecera declara por qué no hay
+                    precio en vivo. Sin la segunda rama, un listado cuya lectura
+                    falla y cuya escala no permite fallback (CGEO.L en prod,
+                    9-nov-2026) quedaba en «N/D» desnudo, sin motivo. */}
+                {useFallback || (settled && !showPrice) ? <p className="mt-1 text-xs text-gray-500">{t('research.headerQuote.liveUnavailable')}</p> : null}
             </div>
             {compact ? null : <div className="min-w-0 max-w-full">
                 <dl className="grid min-w-0 grid-cols-2 gap-x-3 border-y border-gray-800 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-gray-800" data-testid="company-metric-strip">
