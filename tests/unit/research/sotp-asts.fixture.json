@@ -1,0 +1,457 @@
+{
+ "ticker": "ASTS",
+ "available": true,
+ "origin": "example",
+ "label": "Supuestos del usuario, no validados contra histórico",
+ "validated": false,
+ "model": {
+  "version": "sotp-user-v1",
+  "currency": "USD",
+  "units": "millones",
+  "base_year": 2026,
+  "valuation_year": 2030,
+  "discount_years": 4.0,
+  "discount_rate": 0.125,
+  "shares_current": 389.1,
+  "dilution": [
+   {
+    "label": "Acciones entregadas a Firefly",
+    "shares": 12.0
+   },
+   {
+    "label": "Conversión de notas y compensación a empleados (≈44 M; 43,9 para cuadrar el total de 445 M)",
+    "shares": 43.9
+   }
+  ],
+  "parts": [
+   {
+    "name": "EE. UU. Comercial (AT&T / Verizon)",
+    "kind": "operating",
+    "group": "A · Mayorista D2D",
+    "note": null,
+    "probability": 1.0,
+    "revenue": 1350.0,
+    "ebitda": 1188.0,
+    "ebitda_margin": null,
+    "multiple": 18.0
+   },
+   {
+    "name": "Europa (JV Satellite Connect)",
+    "kind": "operating",
+    "group": "A · Mayorista D2D",
+    "note": null,
+    "probability": 1.0,
+    "revenue": 1030.0,
+    "ebitda": 885.0,
+    "ebitda_margin": null,
+    "multiple": 17.0
+   },
+   {
+    "name": "Japón y APAC (Rakuten + socios)",
+    "kind": "operating",
+    "group": "A · Mayorista D2D",
+    "note": null,
+    "probability": 1.0,
+    "revenue": 680.0,
+    "ebitda": 578.0,
+    "ebitda_margin": null,
+    "multiple": 16.0
+   },
+   {
+    "name": "Arabia Saudí, MENA y África (stc)",
+    "kind": "operating",
+    "group": "A · Mayorista D2D",
+    "note": null,
+    "probability": 1.0,
+    "revenue": 530.0,
+    "ebitda": 450.0,
+    "ebitda_margin": null,
+    "multiple": 15.0
+   },
+   {
+    "name": "Latinoamérica (Brasil, Chile…)",
+    "kind": "operating",
+    "group": "A · Mayorista D2D",
+    "note": null,
+    "probability": 1.0,
+    "revenue": 580.0,
+    "ebitda": 487.0,
+    "ebitda_margin": null,
+    "multiple": 14.0
+   },
+   {
+    "name": "AST Defense (radar, DoD, OTAN)",
+    "kind": "operating",
+    "group": "B · Defensa, cómputo y lanzamientos",
+    "note": null,
+    "probability": 1.0,
+    "revenue": 1450.0,
+    "ebitda": 1232.0,
+    "ebitda_margin": null,
+    "multiple": 24.0
+   },
+   {
+    "name": "Edge AI (AST5000) y hosted payloads",
+    "kind": "operating",
+    "group": "B · Defensa, cómputo y lanzamientos",
+    "note": null,
+    "probability": 1.0,
+    "revenue": 450.0,
+    "ebitda": 360.0,
+    "ebitda_margin": null,
+    "multiple": 22.0
+   },
+   {
+    "name": "Cohete Blacklift (ahorro de CapEx + vuelos)",
+    "kind": "operating",
+    "group": "B · Defensa, cómputo y lanzamientos",
+    "note": "Ingresos 250 M$ más 350 M$ de ahorro de CapEx; 542 M$ es FCF equivalente, no EBITDA contable.",
+    "probability": 1.0,
+    "revenue": 250.0,
+    "ebitda": 542.0,
+    "ebitda_margin": null,
+    "multiple": 18.0
+   },
+   {
+    "name": "Espectro L-Band (45 MHz) y 3.900 patentes",
+    "kind": "asset",
+    "group": "C · Balance",
+    "note": null,
+    "probability": 1.0,
+    "value": 3500.0,
+    "discounted": true
+   },
+   {
+    "name": "Caja neta 2030E (tras CapEx de 100 satélites y Firefly)",
+    "kind": "asset",
+    "group": "C · Balance",
+    "note": null,
+    "probability": 1.0,
+    "value": 1080.0,
+    "discounted": true
+   }
+  ],
+  "scenarios": [
+   {
+    "key": "pessimistic",
+    "label": "Pesimista: 18 meses de retraso, 480 M acciones, ingresos −65 %",
+    "note": null,
+    "revenue_factor": 0.35,
+    "multiple_factor": null,
+    "delay_years": 1.5,
+    "discount_rate": null,
+    "shares_total": 480.0,
+    "stated_value_per_share": 61.4
+   },
+   {
+    "key": "rate_15",
+    "label": "Tasa del 15 %",
+    "note": null,
+    "revenue_factor": null,
+    "multiple_factor": null,
+    "delay_years": null,
+    "discount_rate": 0.15,
+    "shares_total": null,
+    "stated_value_per_share": 142.5
+   },
+   {
+    "key": "optimistic",
+    "label": "Optimista: constelación militar «Blackbird» y adopción masiva",
+    "note": "El mensaje no da parámetros para este escenario: es una cifra declarada, no calculada.",
+    "revenue_factor": null,
+    "multiple_factor": null,
+    "delay_years": null,
+    "discount_rate": null,
+    "shares_total": null,
+    "stated_value_per_share": 341.5
+   }
+  ],
+  "author": "Nico",
+  "source": "Supuestos de Nico (mensaje del 8-nov-2026). Borrador de ejemplo: no son datos verificados ni la valoración de GerarAI.",
+  "stated_value_per_share": 155.81
+ },
+ "result": {
+  "rows": [
+   {
+    "name": "EE. UU. Comercial (AT&T / Verizon)",
+    "kind": "operating",
+    "group": "A · Mayorista D2D",
+    "revenue": 1350.0,
+    "ebitda": 1188.0,
+    "multiple": 18.0,
+    "probability": 1.0,
+    "ebitda_margin": 0.88,
+    "value_at_maturity": 21384.0,
+    "value_at_maturity_weighted": 21384.0,
+    "discount_factor": 1.601806640625,
+    "present_value": 13349.925925925925,
+    "value_per_share": 29.999833541406574
+   },
+   {
+    "name": "Europa (JV Satellite Connect)",
+    "kind": "operating",
+    "group": "A · Mayorista D2D",
+    "revenue": 1030.0,
+    "ebitda": 885.0,
+    "multiple": 17.0,
+    "probability": 1.0,
+    "ebitda_margin": 0.8592233009708737,
+    "value_at_maturity": 15045.0,
+    "value_at_maturity_weighted": 15045.0,
+    "discount_factor": 1.601806640625,
+    "present_value": 9392.51943301326,
+    "value_per_share": 21.106785242726428
+   },
+   {
+    "name": "Japón y APAC (Rakuten + socios)",
+    "kind": "operating",
+    "group": "A · Mayorista D2D",
+    "revenue": 680.0,
+    "ebitda": 578.0,
+    "multiple": 16.0,
+    "probability": 1.0,
+    "ebitda_margin": 0.85,
+    "value_at_maturity": 9248.0,
+    "value_at_maturity_weighted": 9248.0,
+    "discount_factor": 1.601806640625,
+    "present_value": 5773.48087181832,
+    "value_per_share": 12.974114318692855
+   },
+   {
+    "name": "Arabia Saudí, MENA y África (stc)",
+    "kind": "operating",
+    "group": "A · Mayorista D2D",
+    "revenue": 530.0,
+    "ebitda": 450.0,
+    "multiple": 15.0,
+    "probability": 1.0,
+    "ebitda_margin": 0.8490566037735849,
+    "value_at_maturity": 6750.0,
+    "value_at_maturity_weighted": 6750.0,
+    "discount_factor": 1.601806640625,
+    "present_value": 4213.991769547325,
+    "value_per_share": 9.469644425949046
+   },
+   {
+    "name": "Latinoamérica (Brasil, Chile…)",
+    "kind": "operating",
+    "group": "A · Mayorista D2D",
+    "revenue": 580.0,
+    "ebitda": 487.0,
+    "multiple": 14.0,
+    "probability": 1.0,
+    "ebitda_margin": 0.8396551724137931,
+    "value_at_maturity": 6818.0,
+    "value_at_maturity_weighted": 6818.0,
+    "discount_factor": 1.601806640625,
+    "present_value": 4256.443834781283,
+    "value_per_share": 9.565042325351198
+   },
+   {
+    "name": "AST Defense (radar, DoD, OTAN)",
+    "kind": "operating",
+    "group": "B · Defensa, cómputo y lanzamientos",
+    "revenue": 1450.0,
+    "ebitda": 1232.0,
+    "multiple": 24.0,
+    "probability": 1.0,
+    "ebitda_margin": 0.8496551724137931,
+    "value_at_maturity": 29568.0,
+    "value_at_maturity_weighted": 29568.0,
+    "discount_factor": 1.601806640625,
+    "present_value": 18459.156835848193,
+    "value_per_share": 41.48125131651279
+   },
+   {
+    "name": "Edge AI (AST5000) y hosted payloads",
+    "kind": "operating",
+    "group": "B · Defensa, cómputo y lanzamientos",
+    "revenue": 450.0,
+    "ebitda": 360.0,
+    "multiple": 22.0,
+    "probability": 1.0,
+    "ebitda_margin": 0.8,
+    "value_at_maturity": 7920.0,
+    "value_at_maturity_weighted": 7920.0,
+    "discount_factor": 1.601806640625,
+    "present_value": 4944.417009602194,
+    "value_per_share": 11.111049459780212
+   },
+   {
+    "name": "Cohete Blacklift (ahorro de CapEx + vuelos)",
+    "kind": "operating",
+    "group": "B · Defensa, cómputo y lanzamientos",
+    "revenue": 250.0,
+    "ebitda": 542.0,
+    "multiple": 18.0,
+    "probability": 1.0,
+    "ebitda_margin": 2.168,
+    "value_at_maturity": 9756.0,
+    "value_at_maturity_weighted": 9756.0,
+    "discount_factor": 1.601806640625,
+    "present_value": 6090.622770919067,
+    "value_per_share": 13.686792743638353
+   },
+   {
+    "name": "Espectro L-Band (45 MHz) y 3.900 patentes",
+    "kind": "asset",
+    "group": "C · Balance",
+    "revenue": null,
+    "ebitda": null,
+    "multiple": null,
+    "probability": 1.0,
+    "ebitda_margin": null,
+    "value_at_maturity": 3500.0,
+    "value_at_maturity_weighted": 3500.0,
+    "discount_factor": 1.601806640625,
+    "present_value": 2185.0327693949093,
+    "value_per_share": 4.910185998640245
+   },
+   {
+    "name": "Caja neta 2030E (tras CapEx de 100 satélites y Firefly)",
+    "kind": "asset",
+    "group": "C · Balance",
+    "revenue": null,
+    "ebitda": null,
+    "multiple": null,
+    "probability": 1.0,
+    "ebitda_margin": null,
+    "value_at_maturity": 1080.0,
+    "value_at_maturity_weighted": 1080.0,
+    "discount_factor": 1.601806640625,
+    "present_value": 674.238683127572,
+    "value_per_share": 1.5151431081518472
+   }
+  ],
+  "total_value_at_maturity": 111069.0,
+  "total_present_value": 69339.82990397805,
+  "total_revenue": 6320.0,
+  "total_ebitda": 5722.0,
+  "weighted_multiple": 18.61045089129675,
+  "shares_diluted": 445.0,
+  "discount_rate": 0.125,
+  "discount_years": 4.0,
+  "discount_factor": 1.601806640625,
+  "value_per_share": 155.81984248084956,
+  "price": 32.33,
+  "vs_price": 3.8196672589189475,
+  "stated_value_per_share": 155.81,
+  "stated_gap": -6.316577332421414e-05,
+  "price_covered_by": [
+   {
+    "name": "AST Defense (radar, DoD, OTAN)",
+    "value_per_share": 41.48125131651279,
+    "cumulative_per_share": 41.48125131651279,
+    "covers_price": true
+   }
+  ],
+  "scenarios": [
+   {
+    "key": "pessimistic",
+    "label": "Pesimista: 18 meses de retraso, 480 M acciones, ingresos −65 %",
+    "note": null,
+    "revenue_factor": 0.35,
+    "multiple_factor": null,
+    "delay_years": 1.5,
+    "discount_rate": null,
+    "shares_total": 480.0,
+    "stated_value_per_share": 61.4,
+    "computed": true,
+    "value_per_share": 46.58175082073667,
+    "vs_price": 0.44082124406856393,
+    "stated_vs_price": 0.8991648623569442,
+    "stated_gap": 0.31811275699552977
+   },
+   {
+    "key": "rate_15",
+    "label": "Tasa del 15 %",
+    "note": null,
+    "revenue_factor": null,
+    "multiple_factor": null,
+    "delay_years": null,
+    "discount_rate": 0.15,
+    "shares_total": null,
+    "stated_value_per_share": 142.5,
+    "computed": true,
+    "value_per_share": 142.7057555837587,
+    "vs_price": 3.4140351247682865,
+    "stated_vs_price": 3.4076708939065883,
+    "stated_gap": -0.0014418169955165983
+   },
+   {
+    "key": "optimistic",
+    "label": "Optimista: constelación militar «Blackbird» y adopción masiva",
+    "note": "El mensaje no da parámetros para este escenario: es una cifra declarada, no calculada.",
+    "revenue_factor": null,
+    "multiple_factor": null,
+    "delay_years": null,
+    "discount_rate": null,
+    "shares_total": null,
+    "stated_value_per_share": 341.5,
+    "computed": false,
+    "value_per_share": null,
+    "vs_price": null,
+    "stated_vs_price": 9.56294463346737,
+    "stated_gap": null
+   }
+  ],
+  "sensitivity": [
+   {
+    "key": "multiples_minus_30",
+    "label": "Múltiplos −30 %",
+    "value_per_share": 111.0014884686323,
+    "vs_base": -0.287629311509062,
+    "vs_price": 2.4333896835333224
+   },
+   {
+    "key": "delay_2y",
+    "label": "Ingresos 2 años más tarde",
+    "value_per_share": 124.4654384393807,
+    "vs_base": -0.20122215208452898,
+    "vs_price": 2.849843440747934
+   },
+   {
+    "key": "revenue_minus_50",
+    "label": "Ingresos −50 %",
+    "value_per_share": 81.12258579382082,
+    "vs_base": -0.4793821858484366,
+    "vs_price": 1.5092046332762394
+   },
+   {
+    "key": "rate_plus_5pp",
+    "label": "Tasa +5 puntos",
+    "value_per_share": 130.94272793099256,
+    "vs_base": -0.15965305928809692,
+    "vs_price": 3.050192636281861
+   },
+   {
+    "key": "combined",
+    "label": "Las tres a la vez: múltiplos −30 %, 2 años tarde y tasa +5 puntos",
+    "value_per_share": 69.05202215673604,
+    "vs_base": -0.5568470545384961,
+    "vs_price": 1.135849741934304
+   }
+  ],
+  "trace": {
+   "method": "sum_of_the_parts_user",
+   "version": "sotp-user-v1",
+   "formula": "Σ (EBITDA × múltiplo × probabilidad) / (1 + tasa)^años + activos / (1 + tasa)^años; ÷ acciones diluidas"
+  }
+ },
+ "price": 32.33,
+ "price_currency": "USD",
+ "price_as_of": "2026-11-06",
+ "base_rate": {
+  "applies": true,
+  "fiscal_year": 2025,
+  "cases": 2845,
+  "median_return_24m": -0.51,
+  "fell_over_half_24m_share": 0.5,
+  "doubled_24m_share": 0.11,
+  "beat_spy_24m_share": 0.21,
+  "stopped_filing_24m_share": 0.15,
+  "message_es": "Punto de partida: la empresa aún pierde dinero y quema caja. En el backtest (2.845 casos así en EE. UU., 2014–2026, contando las que desaparecieron), a 2 años la rentabilidad mediana fue -51 %: la mitad cayó más de un 50 %, el 11 % más que duplicó y solo el 21 % batió al S&P 500. No cambia esta cifra.",
+  "message_en": "Starting point: the company still loses money and burns cash. In the backtest (2,845 such US cases, 2014–2026, including those that disappeared), the median 2-year return was -51%: half fell more than 50%, 11% more than doubled and only 21% beat the S&P 500. It does not change this figure."
+ },
+ "saved": null
+}

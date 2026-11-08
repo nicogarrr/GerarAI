@@ -6396,6 +6396,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/valuation/{ticker}/sotp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get User Sotp
+         * @description Desglose por partes del usuario (o el borrador de ejemplo), con su aritmética,
+         *     escenarios, sensibilidad y la tasa base medida. Supuestos del usuario: no es el
+         *     valor justo de GerarAI.
+         */
+        get: operations["get_user_sotp_api_valuation__ticker__sotp_get"];
+        /**
+         * Put User Sotp
+         * @description Guarda una versión nueva del desglose (la anterior queda en el histórico).
+         */
+        put: operations["put_user_sotp_api_valuation__ticker__sotp_put"];
+        post?: never;
+        /** Delete User Sotp */
+        delete: operations["delete_user_sotp_api_valuation__ticker__sotp_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/valuation/{ticker}/what-to-believe": {
         parameters: {
             query?: never;
@@ -13706,6 +13733,39 @@ export interface components {
             updated_at?: string | null;
             /** Version */
             version?: number | null;
+        };
+        /** SotpModelIn */
+        SotpModelIn: {
+            /** Author */
+            author?: string | null;
+            /** Base Year */
+            base_year?: unknown;
+            /** Currency */
+            currency?: string | null;
+            /** Dilution */
+            dilution?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Discount Rate */
+            discount_rate?: unknown;
+            /** Discount Years */
+            discount_years?: unknown;
+            /** Parts */
+            parts?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Scenarios */
+            scenarios?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Shares Current */
+            shares_current?: unknown;
+            /** Source */
+            source?: string | null;
+            /** Stated Value Per Share */
+            stated_value_per_share?: unknown;
+            /** Valuation Year */
+            valuation_year?: unknown;
         };
         /** SourceCreate */
         SourceCreate: {
@@ -30718,6 +30778,138 @@ export interface operations {
                         [key: string]: unknown;
                     };
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_user_sotp_api_valuation__ticker__sotp_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_user_sotp_api_valuation__ticker__sotp_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SotpModelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_user_sotp_api_valuation__ticker__sotp_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

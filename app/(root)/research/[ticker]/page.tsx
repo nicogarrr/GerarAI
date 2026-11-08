@@ -77,6 +77,7 @@ import { AnalystHistorySkeleton } from '@/components/research/AnalystHistoryView
 import { WhatToBelieveSection } from '@/components/research/WhatToBelieveSection';
 import { WhatToBelieveSkeleton } from '@/components/research/WhatToBelieveView';
 import { DcaHitRatesSection } from '@/components/research/DcaHitRatesSection';
+import { SotpBreakdownSection } from '@/components/research/SotpBreakdownSection';
 import { NewsPreparingNotice } from '@/components/research/NewsPreparingNotice';
 import { getNewsPreparing } from '@/lib/research/news-preparing';
 import { TtmPanel } from '@/components/research/TtmPanel';
@@ -1705,6 +1706,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       <div className="space-y-6">
         <ValuationView valuation={await viewData('valuation')} currency={company.currency} ticker={ticker} />
         <div className="scroll-mt-6" id="que-hace-falta-creer"><Suspense fallback={<WhatToBelieveSkeleton />}><WhatToBelieveSection ticker={ticker} /></Suspense></div>
+        <div className="scroll-mt-6" id="desglose-partes"><Suspense fallback={null}><SotpBreakdownSection ticker={ticker} /></Suspense></div>
       </div>
     );
   };
