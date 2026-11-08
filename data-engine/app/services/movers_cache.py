@@ -14,8 +14,8 @@ backfill de historia y job F2 de propicks).
 - Varios procesos: el sync corre en el worker de dramatiq, no en el backend.
   Cada entrada guarda la versión de Redis leída ANTES de calcular; si otro
   proceso la sube, la siguiente petición recalcula. Sin Redis (o caído) la caché
-  degrada a TTL puro y Redis no se reintenta durante el backoff compartido
-  de `app.core.redis_client` (30 s).
+  degrada a TTL puro y Redis no se reintenta durante el backoff de su
+  propio circuito (helper de `app.core.redis_client`, 30 s).
 """
 
 from __future__ import annotations
