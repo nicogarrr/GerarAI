@@ -44,8 +44,9 @@ ALERT_TYPE = "queue_stuck"
 # Fallback estatico: todas las colas declaradas en app.workers (dramatiq_app +
 # knowledge_rag_actors). En prod se prefiere broker.get_declared_queues().
 DEFAULT_QUEUES = (
-    "default", "prices", "thesis", "kpis", "alerts", "gdelt",
-    "computed", "externa", "finnhub", "yahoo", "knowledge",
+    "alerts", "computed", "dca-manual", "default", "documents", "externa",
+    "finnhub", "gdelt", "ibkr-sync", "knowledge", "kpis", "official-closes",
+    "prices", "thesis", "yahoo",
 )
 
 _SAMPLE_PREFIX = "queue_watchdog:sample:"  # {ts, depth} del ultimo tick muestreador
