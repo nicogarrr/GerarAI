@@ -20,10 +20,10 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 #: Sube cuando cambie cualquier tabla o fórmula: invalida la caché de clasificaciones.
-RULES_VERSION = "sotp-rules-v3"
+RULES_VERSION = "sotp-rules-v4"
 #: Versión de lo que se pide y se valida al CLASIFICAR (entra en la huella de la caché).
 #: Las reglas numéricas (RULES_VERSION) no: el modelo se recalcula siempre con las vigentes.
-CLASSIFIER_VERSION = "sotp-classifier-v2"
+CLASSIFIER_VERSION = "sotp-classifier-v3"
 
 #: Años desde hoy hasta el año de madurez que se valora (fijo, no lo elige el modelo).
 HORIZON_YEARS = 4
@@ -63,6 +63,18 @@ BUSINESS_TABLE: dict[str, tuple[float, float, str]] = {
     "inmobiliario": (0.60, 15.0, "inmobiliario con rentas"),
     "otro": (0.20, 8.0, "otro (tabla por defecto)"),
 }
+
+#: Transacciones públicas de espectro EE. UU. de alcance nacional (fuentes-1, 8-nov-2026). El precio por
+#: MHz nacional (precio ÷ MHz) evita depender de una cifra de POPs: comparable y activo cubren el mismo
+#: país. Clase «mss»: banda de satélite con uso terrestre (el caso de AWS-4 o la banda L); «terrestre»:
+#: banda de uso flexible terrestre (vale más por MHz). Se amplía solo con transacciones citadas.
+SPECTRUM_COMPARABLES: tuple[dict[str, Any], ...] = (
+    {"deal": "SpaceX–EchoStar (AWS-4 + H-block)", "date": "2025-09-08", "mhz": 50.0, "price_millions": 17_000.0,
+     "band": "mss", "url": "https://ir.echostar.com/news-releases/news-release-details/echostar-announces-spectrum-sale-and-commercial-agreement-spacex"},
+    {"deal": "AT&T–EchoStar (3,45 GHz + 600 MHz)", "date": "2025-08-26", "mhz": 50.0, "price_millions": 23_000.0,
+     "band": "terrestre", "url": "https://about.att.com/story/2025/echostar.html"},
+)
+SPECTRUM_BANDS = ("mss", "terrestre")
 
 ANCHOR_TYPES = ("reportado", "guia", "backlog", "contrato", "estimacion_analista")
 #: Años en que se reparte un backlog o un contrato total cuando la cita no da el plazo.
@@ -340,6 +352,25 @@ def revenue_rule(anchor: Mapping[str, Any], status: str, *, base_year: int, valu
     return annual, f"{base_txt} en {year}, plano hasta {valuation_year} = {_fmt(annual)} M"
 
 
+def spectrum_value(mhz: float, band: str) -> tuple[float, float, float, str, list[dict[str, Any]]]:
+    """Valor de hoy de un espectro EE. UU. por comparables citados: (bajo, base, alto, fórmula, fuentes).
+
+    Base = MHz × mediana del precio por MHz de las transacciones de su clase; bajo y alto = la más barata
+    y la más cara de todas las transacciones de la tabla."""
+    band = band if band in SPECTRUM_BANDS else "mss"
+    per_mhz = {c["deal"]: c["price_millions"] / c["mhz"] for c in SPECTRUM_COMPARABLES}
+    own = sorted(per_mhz[c["deal"]] for c in SPECTRUM_COMPARABLES if c["band"] == band) or sorted(per_mhz.values())
+    mid = len(own) // 2
+    base_rate = own[mid] if len(own) % 2 else (own[mid - 1] + own[mid]) / 2
+    low, base, high = min(per_mhz.values()) * mhz, base_rate * mhz, max(per_mhz.values()) * mhz
+    comps = ", ".join(f"{c['deal']} {_fmt(c['price_millions'])} M ÷ {c['mhz']:g} MHz = {_fmt(per_mhz[c['deal']])} M/MHz"
+                      for c in SPECTRUM_COMPARABLES)
+    formula = (f"{mhz:g} MHz × {_fmt(base_rate)} M/MHz (mediana de la clase «{band}») = {_fmt(base)} M "
+               f"(rango {_fmt(low)}–{_fmt(high)} M). Comparables: {comps}")
+    sources = [{"label": c["deal"], "url": c["url"], "date": c["date"]} for c in SPECTRUM_COMPARABLES]
+    return low, base, high, formula, sources
+
+
 def historical_growth(revenue_actuals: Iterable[Mapping[str, Any]]) -> float | None:
     """CAGR de ingresos anuales SEC (hasta 3 años); None si no hay dos años positivos."""
     rows = sorted((r for r in revenue_actuals if (r.get("revenue_millions") or 0) > 0),
@@ -407,6 +438,8 @@ __all__ = [
     "SCENARIOS",
     "STATUS_GROWTH_CAP",
     "STATUS_ORDER",
+    "SPECTRUM_BANDS",
+    "SPECTRUM_COMPARABLES",
     "STATUS_PROBABILITY",
     "code_dilution",
     "conservative_status",
@@ -416,6 +449,7 @@ __all__ = [
     "fingerprint",
     "fingerprint_changes",
     "historical_growth",
+    "spectrum_value",
     "pct",
     "revenue_rule",
 ]
