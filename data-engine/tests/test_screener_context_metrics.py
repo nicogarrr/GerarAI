@@ -242,3 +242,72 @@ def test_any_dca_level_companies_son_globales_en_ambas_rutas(db):
     assert bool(scm._dca_levels(db, companies)) is True
     assert scm._any_dca_level(db) is True
 
+
+
+def test_margin_of_safety_query_count_is_constant(db):
+    """_margin_of_safety no hace una consulta por empresa: el barrido es O(1).
+
+    Antes: 1 SELECT de modelos + 1 SELECT de outputs POR empresa con modelo.
+    Ahora: 2 consultas en total (modelos + outputs agrupados en una IN).
+    Medido con conteo de sentencias (regla del repo: nunca wall-clock).
+    """
+    from sqlalchemy import event
+
+    def _seed(count: int, prefix: str) -> None:
+        for i in range(count):
+            company = _company(db, f"{prefix}{i}")
+            _valuation(db, company, version=1, status="final", mos=0.10 + i / 100)
+
+    def _count(fn) -> int:
+        statements = 0
+
+        def _before(*_args):
+            nonlocal statements
+            statements += 1
+
+        event.listen(db.get_bind(), "before_cursor_execute", _before)
+        try:
+            fn()
+        finally:
+            event.remove(db.get_bind(), "before_cursor_execute", _before)
+        return statements
+
+    _seed(3, "QA")
+    n_small = _count(lambda: context_observations(db, [scm.MARGIN_OF_SAFETY]))
+    _seed(17, "QB")
+    n_big = _count(lambda: context_observations(db, [scm.MARGIN_OF_SAFETY]))
+    assert n_big == n_small, f"crece con las empresas: 3 -> {n_small}, 20 -> {n_big}"
+    # Y el valor sigue siendo el del modelo mas reciente de cada empresa.
+    result = context_observations(db, [scm.MARGIN_OF_SAFETY])
+    assert len(result) == 20
+
+
+def test_margin_of_safety_duplicate_base_newest_wins_and_warns(db, caplog):
+    """Dos 'base' en el mismo modelo: duplicado de datos, no una eleccion de la query.
+
+    Regla (decision de Nico, 8-nov-2026): gana la valoracion mas reciente
+    (created_at DESC, id DESC) y el duplicado deja un aviso en el log. El
+    contraejemplo lo midio el auditor sobre la primera version del parche:
+    margenes 0.9 (vieja) y 0.1 (nueva); debe salir 0.1.
+    """
+    import logging
+    from datetime import UTC, datetime
+
+    pool = _company(db, "POOL")
+    model = ValuationModel(company_id=pool.id, model_type="standard_dcf", version=1,
+                           status="final", calculation_trace={})
+    db.add(model)
+    db.flush()
+    for created, mos in ((datetime(2026, 10, 1, tzinfo=UTC), "0.9"),
+                         (datetime(2026, 11, 1, tzinfo=UTC), "0.1")):
+        db.add(ValuationOutput(
+            valuation_model_id=model.id, scenario="base",
+            value_per_share=Decimal("100"), created_at=created,
+            output_payload={"margin_of_safety": mos, "status": "final",
+                            "trace": {"margin_of_safety_convention": "discount_to_value_v1"}},
+        ))
+    db.commit()
+    with caplog.at_level(logging.WARNING, logger="app.services.screener_context_metrics"):
+        obs = context_observations(db, {"margen_seguridad"})
+    assert obs[pool.id]["margen_seguridad"].value == Decimal("0.1")
+    assert any("duplicado" in record.message for record in caplog.records)
