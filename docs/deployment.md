@@ -97,14 +97,17 @@ Ejecutar las siguientes comprobaciones para garantizar que todos los subsistemas
 ```bash
 curl -f -s http://localhost:8000/api/health | jq .
 ```
-**Respuesta esperada:**
+**Respuesta esperada** (contrato real de `GET /api/health` en `app/api/routes/health.py`):
 ```json
 {
-  "status": "healthy",
-  "database": "connected",
-  "scheduler": { "enabled": true, "running": true }
+  "status": "ok",
+  "database": "ok",
+  "scheduler": { "enabled": false, "running": null, "jobs": 0 },
+  "version": "main-<sha>",
+  "schema": []
 }
 ```
+`status` es `ok` solo si la base de datos responde y el esquema está migrado al día; si no, es `degraded`. `database` es `ok` o `error:<Clase>` (solo la clase del error). En el servicio backend de producción el scheduler aparece con `enabled: false` y `running: null` porque corre en su propio servicio (`cavaai-scheduler`); `null` significa "este proceso no lo ejecuta", no "parado".
 
 ### 2. Comprobar Conectores y Fuentes de Datos
 ```bash
