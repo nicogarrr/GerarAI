@@ -1101,12 +1101,20 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
     from app.valuation.shareholder_irr_rules import PROBABILITY_SETS
 
     fp = thesis_fingerprint(ctx)
-    if cached and cached.get("fingerprint") == fp and cached.get("sections"):
+    resume: dict[str, str] = {}
+    if cached and cached.get("fingerprint") == fp and cached.get("sections") and cached.get("status") == "error":
+        # Una tesis que se cortó a medias (fallo del modelo en la 2.ª llamada) NO se sirve como hecha:
+        # se reanuda con lo ya aceptado y solo se piden las secciones que faltan.
+        resume = {k: v for k, v in dict(cached["sections"]).items() if v}
+    elif cached and cached.get("fingerprint") == fp and cached.get("sections"):
         return ThesisResult(status="cached", sections=dict(cached["sections"]), fingerprint=fp,
                             probability_choice=cached.get("probability_choice"),
                             probability_reason=cached.get("probability_reason"))
     markers = thesis_markers(ctx)
     out = ThesisResult(status="ok", fingerprint=fp)
+    if resume and cached:
+        out.probability_choice = cached.get("probability_choice")
+        out.probability_reason = cached.get("probability_reason")
     tabs = tables(ctx)
     if ctx.valuation.get("status") == "not_meaningful":
         system_note = ("La valoración por TIR NO se puede proyectar con los datos contables ({{valoracion.motivo}}): "
@@ -1127,7 +1135,10 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
     }
     stripped = False
     for part in ("a", "b"):
-        secs = [s for s in active_sections(ctx) if s[2] == part]
+        secs = [s for s in active_sections(ctx) if s[2] == part and s[0] not in resume]
+        out.sections.update({s[0]: resume[s[0]] for s in active_sections(ctx) if s[2] == part and s[0] in resume})
+        if not secs:
+            continue
         keys = [s[0] for s in secs]
         payload = {**base_payload, "secciones": [{"clave": k, "titulo": title,
                                                     "tablas_debajo": {n: tabs[n] for n in tn}} for k, title, _, tn in secs]}
