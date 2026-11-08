@@ -285,6 +285,28 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     return sp, hist, warnings, cites
 
 
+def guidance_growth(db: Session, company: Company, last_year: int, revenue_last: float | None
+                    ) -> tuple[float | None, dict[str, Any] | None]:
+    """Crecimiento de ingresos que da la propia empresa para el ejercicio siguiente al último cerrado
+    (guía citada de sus notas de resultados, ``company_guidance``: punto medio, con su frase y su URL)."""
+    from app.models.declared_input_value import DeclaredInputValue
+
+    if not revenue_last or revenue_last <= 0:
+        return None, None
+    row = db.scalars(select(DeclaredInputValue).where(
+        DeclaredInputValue.company_id == company.id,
+        DeclaredInputValue.input_key == f"guidance.revenue.fy{last_year + 1}",
+        DeclaredInputValue.superseded_at.is_(None)).order_by(desc(DeclaredInputValue.id))).first()
+    if row is None or row.base is None:
+        return None, None
+    growth = float(row.base) / 1_000_000.0 / revenue_last - 1
+    if not -0.5 < growth < 1.0:
+        return None, None
+    return growth, {"input_key": row.input_key, "base": float(row.base), "low": _f(row.low), "high": _f(row.high),
+                    "url": row.source_url, "quote": row.source_quote,
+                    "as_of": row.as_of.isoformat() if row.as_of else None}
+
+
 def fingerprint(sp: engine.StartingPoint, hist: rules.History, peers: Sequence[Mapping[str, Any]],
                 guidance: float | None) -> str:
     blob = json.dumps({"engine": engine.ENGINE_VERSION, "rules": rules.RULES_VERSION, "svc": SERVICE_VERSION,
@@ -346,7 +368,9 @@ def value_company(db: Session, company: Company, *, today: date | None = None,
                 "warnings": warnings}
     peers = _peer_multiples(db, company, sp.basis, today)
     multiples = [p["multiple"] for p in peers if p.get("multiple")]
-    guidance = None  # la guía citada de fuentes-1 entra aquí cuando esté en main (company_guidance)
+    last_year = max(int(y) for y in cites["annual"].get("revenue", {"0": None}))
+    guidance, guidance_cite = guidance_growth(db, company, last_year, sp.revenue)
+    cites["guidance"] = guidance_cite
     fp = fingerprint(sp, hist, peers, guidance)
     rate = rate_source = None
     try:
@@ -363,7 +387,8 @@ def value_company(db: Session, company: Company, *, today: date | None = None,
     except ValueError as exc:
         return {"status": "not_meaningful", "reason": redact_secrets(str(exc)), "ticker": company.ticker, "method": cites["method"],
                 "starting_point": {**asdict(sp), "market_cap": sp.market_cap, "net_debt": sp.net_debt,
-                                   "enterprise_value": sp.enterprise_value, "multiple": sp.multiple},
+                                   "enterprise_value": sp.enterprise_value, "multiple": sp.multiple,
+                                   "margin": sp.margin},
                 "citations": cites, "warnings": warnings, "fingerprint": fp}
     out["discount_rate_source"] = rate_source
     out.update({"status": "ok", "ticker": company.ticker, "as_of": today.isoformat(), "fingerprint": fp,

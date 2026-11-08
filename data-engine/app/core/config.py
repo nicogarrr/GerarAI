@@ -513,6 +513,8 @@ class Settings(BaseSettings):
     sotp_agents_readings: int = 1
     #: Tesis larga con marcadores sobre la propuesta (cifras del código, prosa de los expertos).
     sotp_agents_narrative_enabled: bool = True
+    # Tesis v2 de nivel comité (TIR para el accionista + 15 secciones) tras la tesis; nunca la bloquea.
+    thesis_v2_enabled: bool = True
     # Control de la valoración frente al consenso de analistas (>35 % exige
     # conciliación dato a dato). Independiente del equipo de expertos: sin
     # consenso se publica con la salvedad, con desviación no conciliada no.

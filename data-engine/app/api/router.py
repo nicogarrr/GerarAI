@@ -56,6 +56,7 @@ from app.api.routes import (
     thesis_projection,
     thesis_scenarios,
     thesis_track_record,
+    thesis_v2,
     valuation,
     watchlist,
     work_products,
@@ -81,6 +82,7 @@ api_router.include_router(company_events.router, prefix="/companies", tags=["com
 api_router.include_router(analyst_notes.router, prefix="/companies", tags=["companies"])
 api_router.include_router(analyst_report.router, prefix="/companies", tags=["companies"])
 api_router.include_router(estimates.router, prefix="/companies", tags=["companies"])
+api_router.include_router(thesis_v2.router, prefix="/companies", tags=["companies"])
 api_router.include_router(
     corporate_actions.router, prefix="/corporate-actions", tags=["corporate-actions"]
 )
