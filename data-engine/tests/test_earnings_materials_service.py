@@ -118,6 +118,16 @@ def test_cover_date_never_confirms_and_ended_context_wins():
     ) == "confirmado"
     # Solo periodo de otro año: contradice.
     assert svc.check_period("results for the quarter ended June 30, 2025", "Jun/2026") == "contradice"
+    # Repro: la comparativa del año previo NO tumba el titular que confirma el trimestre.
+    assert svc.check_period(
+        "<h1>Second quarter 2026 results</h1><p>Revenue grew 12% compared with the quarter ended June 30, 2025.</p>",
+        "Jun/2026",
+    ) == "confirmado"
+    # Un «ended» del MISMO año y otro mes es declaración estructurada de otro periodo:
+    # contradice aunque el titular diga el trimestre del cierre.
+    assert svc.check_period(
+        "Second quarter 2026 results. Results for the quarter ended March 31, 2026.", "Jun/2026"
+    ) == "contradice"
 
 
 def test_domestic_doc_with_cover_date_but_other_period_links_nothing():
