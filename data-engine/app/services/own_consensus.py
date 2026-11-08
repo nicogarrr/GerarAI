@@ -184,9 +184,11 @@ def actuals_from_facts(rows: Sequence[tuple[str, float, date | None, str | None]
     for end, kind, value, filed, url in sorted(parsed, key=lambda p: (p[0], p[3] or date.min)):
         if kind == "FY":
             key = f"fy{end.year if end.month >= 6 or fy_month == end.month else end.year}"
-        elif kind.startswith("Q") and kind[1:].isdigit():
-            q, fy = quarter_of(end, fy_month)
-            key = f"q{q}_{fy}"
+        elif kind in {"Q1", "Q2", "Q3", "Q4"}:
+            # El trimestre ya viene declarado por la fuente. En ejercicios de
+            # 52/53 semanas su cierre puede caer en el mes del trimestre siguiente.
+            _, fy = quarter_of(end, fy_month)
+            key = f"q{kind[1:]}_{fy}"
         else:
             continue
         out[key] = Actual(key, end, value, filed, url)

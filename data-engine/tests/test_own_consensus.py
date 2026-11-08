@@ -147,3 +147,24 @@ def test_seasonal_shares_split_the_remaining_year() -> None:
     acts = actuals_from_facts(_facts(SEASONAL), metric="revenue")
     shares = seasonal_shares(acts, 2026, [3, 4])
     assert shares is not None and abs(sum(shares.values()) - 1) < 1e-9 and shares[3] > shares[4]
+
+
+def test_reported_quarter_survives_52_53_week_calendar_boundary() -> None:
+    rows = [("2025-12-28:FY", 400.0, None, None),
+            ("2026-04-04:Q1", 110.0, date(2026, 5, 1), "https://example.test/q1")]
+    actuals = actuals_from_facts(rows, metric="revenue")
+    assert "q1_2026" in actuals and "q2_2026" not in actuals
+    assert actuals["q1_2026"].end == date(2026, 4, 4)
+    assert actuals["q1_2026"].value == 110.0
+    assert actuals["q1_2026"].url == "https://example.test/q1"
+
+
+def test_reported_quarter_keeps_noncalendar_fiscal_year() -> None:
+    rows = [("2026-06-27:FY", 400.0, None, None), ("2026-10-03:Q1", 110.0, None, None)]
+    actuals = actuals_from_facts(rows, metric="revenue")
+    assert "q1_2027" in actuals and "q2_2027" not in actuals
+
+
+def test_invalid_reported_quarters_are_not_reassigned_from_month() -> None:
+    rows = [(f"2026-04-04:{kind}", 110.0, None, None) for kind in ("Q0", "Q5", "Q12")]
+    assert actuals_from_facts(rows, metric="revenue") == {}
