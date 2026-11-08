@@ -80,7 +80,10 @@ PROMPT = (
     "los avisos de datos y pasajes de los informes de la empresa con su documento. Lo cualitativo (negocio, "
     "sector, ventaja, directivos) apóyalo en esos pasajes; si no hay pasaje, dilo como lectura general del "
     "sector, sin inventar hechos concretos de la empresa; cuando uses un pasaje, nombra el documento («según el "
-    "informe anual»). Los marcadores de múltiplo ya llevan la «x»: no añadas «veces» detrás."
+    "informe anual»). Los marcadores de múltiplo ya llevan la «x»: no añadas «veces» detrás. CITAS: lo que "
+    "pongas entre comillas como palabras de un documento se copia TAL CUAL del pasaje, en su idioma original "
+    "(normalmente inglés), y la traducción va al lado así: «original» (traducción: «…»). Nunca pongas entre "
+    "comillas una traducción ni un resumen tuyo; si no copias literal, escríbelo en estilo indirecto."
 )
 CONTRACT = (
     "Responde SOLO con JSON: {{\"sections\": {{{keys}}}{extra}}}. REGLA ABSOLUTA: toda cifra (precios, %, "
@@ -1142,11 +1145,13 @@ class FigureGuard:
     to_markers: list[dict[str, str]] = field(default_factory=list)  # cifra = valor de un marcador del código
     to_sources: list[dict[str, Any]] = field(default_factory=list)  # cifra literal de un documento citado
     removed: list[str] = field(default_factory=list)  # sin fuente: quitadas
+    unquoted: list[str] = field(default_factory=list)  # citas no literales que dejan de ir entre comillas
 
     def as_dict(self) -> dict[str, Any]:
         return {"a_marcador": len(self.to_markers), "a_documento": len(self.to_sources),
                 "quitadas": len(self.removed), "detalle_documento": self.to_sources[:20],
-                "detalle_quitadas": self.removed[:40]}
+                "detalle_quitadas": self.removed[:40], "citas_no_literales": len(self.unquoted),
+                "detalle_citas": [q[:160] for q in self.unquoted[:10]]}
 
 
 def recover_figures(text: str, markers: Mapping[str, str], passages: Sequence[Mapping[str, Any]],
@@ -1264,6 +1269,13 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
                                   else "no hay todavía rangos de analistas guardados para esta empresa: dilo así"),
         "insiders": ctx.insiders and {"ventanas": ctx.insiders.get("windows"), "nota": "cita con los marcadores insiders.*"},
     }
+    from app.services.expert_team.quote_check import evidence_texts, non_literal, unquote_non_literal
+
+    evidence = evidence_texts(ctx.passages, ctx.guidance, ctx.analysts, ctx.price_targets, ctx.insiders)
+
+    def rendered(text: str) -> str:
+        return render({"x": text}, {**markers, **out.figure_markers})["x"]
+
     stripped = False
     for part in ("a", "b"):
         secs = [s for s in active_sections(ctx) if s[2] == part and s[0] not in resume]
@@ -1310,6 +1322,11 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
                 loose = loose_numbers(body)
                 if loose:
                     issues.append(f"{k}: números sin marcador: {', '.join(loose[:6])}")
+                not_literal = non_literal(body, evidence, rendered)
+                if not_literal:
+                    issues.append(f"{k}: citas que no están literales en los pasajes (cópialas tal cual, en su idioma "
+                                  f"original, con la traducción al lado; o escríbelas sin comillas): "
+                                  + "; ".join(f"«{q[:90]}»" for q in not_literal[:3]))
                 bad = unknown_markers(body, {**markers, **out.figure_markers})
                 if bad:
                     issues.append(f"{k}: marcadores que no existen: {', '.join(bad[:6])}")
@@ -1337,7 +1354,10 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
                 if k in accepted:
                     continue
                 gone = loose_numbers(v)
-                guards.setdefault(k, FigureGuard()).removed.extend(f"{k}: {n}" for n in gone)
+                g = guards.setdefault(k, FigureGuard())
+                g.removed.extend(f"{k}: {n}" for n in gone)
+                v, touched = unquote_non_literal(v, evidence, rendered)
+                g.unquoted.extend(touched)
                 out.sections[k] = MARKER.sub(lambda mm: mm.group(0) if mm.group(1) in known else "", strip_loose(v))
     _finish_guard(out, guards, ctx.ticker)
     if not out.sections:
@@ -1359,9 +1379,12 @@ def _finish_guard(out: ThesisResult, guards: Mapping[str, FigureGuard], ticker: 
         total.to_markers.extend(g.to_markers)
         total.to_sources.extend(s for s in g.to_sources if s["marcador"] in out.figure_markers)
         total.removed.extend(g.removed)
+        total.unquoted.extend(g.unquoted)
     seen: set[str] = set()
     total.to_sources = [s for s in total.to_sources if not (s["marcador"] in seen or seen.add(s["marcador"]))]
     out.guard = total.as_dict()
+    if total.unquoted:
+        logger.info("tesis v2 %s: %d citas no literales sin comillas", ticker, len(total.unquoted))
     if total.removed:
         logger.info("tesis v2 %s: %d cifras sin fuente quitadas: %s", ticker, len(total.removed),
                     "; ".join(total.removed[:20]))
@@ -1374,7 +1397,8 @@ def guard_warning(guard: Mapping[str, Any] | None) -> str | None:
     linked = int(guard.get("a_marcador") or 0) + int(guard.get("a_documento") or 0)
     removed = list(guard.get("detalle_quitadas") or [])
     n_removed = int(guard.get("quitadas") or 0)
-    if not linked and not n_removed:
+    n_quotes = int(guard.get("citas_no_literales") or 0)
+    if not linked and not n_removed and not n_quotes:
         return None
     text = f"Guardia de cifras: {linked} cifras del texto enlazadas a su dato o documento"
     if n_removed:
@@ -1382,6 +1406,8 @@ def guard_warning(guard: Mapping[str, Any] | None) -> str | None:
         text += f"; {n_removed} quitadas por no tener fuente ({sample})"
     else:
         text += "; ninguna quitada"
+    if n_quotes:
+        text += f"; {n_quotes} citas que no estaban literales en el documento pasan a estilo indirecto"
     return text + "."
 
 
