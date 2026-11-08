@@ -1,0 +1,158 @@
+{
+ "symbol": "INTC",
+ "currency": "USD",
+ "currency_label": "$",
+ "data_source": "yfinance",
+ "available": true,
+ "official_timeframe": "month",
+ "current": {
+  "level": 4,
+  "key": "4x",
+  "label": "4X DCA",
+  "zone": "Zona de compra extrema",
+  "color": "#B400FF",
+  "fg": "#FFFFFF",
+  "status": "forming",
+  "period": "2026-11",
+  "signal_date": "2026-11-06",
+  "close": 56.279998779296875,
+  "months_in_zone": 2
+ },
+ "timeframes": [
+  {
+   "key": "week",
+   "short": "S",
+   "label": "Semanal",
+   "available": true,
+   "zone": {
+    "level": 4,
+    "key": "4x",
+    "label": "4X DCA",
+    "zone": "Zona de compra extrema",
+    "color": "#B400FF",
+    "fg": "#FFFFFF"
+   },
+   "status": "forming",
+   "period": "2026-W45",
+   "streak": 2
+  },
+  {
+   "key": "month",
+   "short": "M",
+   "label": "Mensual",
+   "available": true,
+   "zone": {
+    "level": 4,
+    "key": "4x",
+    "label": "4X DCA",
+    "zone": "Zona de compra extrema",
+    "color": "#B400FF",
+    "fg": "#FFFFFF"
+   },
+   "status": "forming",
+   "period": "2026-11",
+   "streak": 2
+  },
+  {
+   "key": "quarter",
+   "short": "T",
+   "label": "Trimestral",
+   "available": true,
+   "zone": {
+    "level": 4,
+    "key": "4x",
+    "label": "4X DCA",
+    "zone": "Zona de compra extrema",
+    "color": "#B400FF",
+    "fg": "#FFFFFF"
+   },
+   "status": "forming",
+   "period": "2026-Q4",
+   "streak": 1
+  },
+  {
+   "key": "year",
+   "short": "A",
+   "label": "Anual",
+   "available": true,
+   "zone": {
+    "level": 1,
+    "key": "1x",
+    "label": "1X DCA",
+    "zone": "Zona de aportacion normal",
+    "color": "#FFFFFF",
+    "fg": "#000000"
+   },
+   "status": "forming",
+   "period": "2026",
+   "streak": 1
+  }
+ ],
+ "last_change": {
+  "from": {
+   "level": 1,
+   "key": "1x",
+   "label": "1X DCA",
+   "zone": "Zona de aportacion normal",
+   "color": "#FFFFFF",
+   "fg": "#000000"
+  },
+  "to": {
+   "level": 4,
+   "key": "4x",
+   "label": "4X DCA",
+   "zone": "Zona de compra extrema",
+   "color": "#B400FF",
+   "fg": "#FFFFFF"
+  },
+  "period": "2026-09",
+  "signal_date": "2026-09-30",
+  "close": 120.2300033569336,
+  "change": -0.5318972202619402
+ },
+ "risk": {
+  "key": "high",
+  "label": "Riesgo alto",
+  "reasons": [
+   {
+    "key": "volatility",
+    "value": 0.828525
+   }
+  ]
+ },
+ "why": {
+  "signal": "combined",
+  "binding": "drawdown",
+  "close": 56.279998779296875,
+  "drawdown": 0.596935,
+  "high": 139.630005,
+  "high_lookback_months": 36,
+  "dd_thresholds": [
+   0.15,
+   0.25,
+   0.4
+  ],
+  "sma": 46.749701,
+  "sma_months": 30,
+  "sma_gap": -0.203858,
+  "adj_gap": -0.073815,
+  "gap_thresholds": [
+   0.0,
+   0.1,
+   0.2
+  ],
+  "vol": 0.828525,
+  "vol_ratio": 2.761752,
+  "vol_ref": 0.3,
+  "level_drawdown": 4,
+  "level_sma_gap": 1,
+  "rsi": 49.0136,
+  "months_of_history": 561,
+  "level_prices": {
+   "2x": 118.685504,
+   "3x": 104.722504,
+   "4x": 83.778003
+  },
+  "params_version": "nico-v2"
+ }
+}

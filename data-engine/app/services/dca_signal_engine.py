@@ -138,6 +138,7 @@ def _trailing_vol(
     i: int,
     params: DcaParams,
     log_returns: Sequence[float] | None = None,
+    periods_per_year: float = 12.0,
 ) -> float | None:
     """Vol anualizada de rentabilidades log mensuales de los meses ANTERIORES a i.
 
@@ -153,7 +154,7 @@ def _trailing_vol(
         return None
     mean = sum(rets) / len(rets)
     var = sum((x - mean) ** 2 for x in rets) / (len(rets) - 1)
-    return math.sqrt(var) * math.sqrt(12.0)
+    return math.sqrt(var) * math.sqrt(periods_per_year)
 
 
 @dataclass(frozen=True)
@@ -178,6 +179,44 @@ class MonthlyVerdict:
         data["signal_date"] = self.signal_date.isoformat()
         data["zone"] = self.zone
         return data
+
+
+# Agrupaciones del mismo motor (tarjeta de la watchlist): la señal oficial, los
+# avisos y el plan son SIEMPRE mensuales; semana/trimestre/año aplican la misma
+# fórmula con los mismos umbrales contados en periodos de ese tamaño (SMA de 30
+# periodos, máximo de 36...), y la vol se anualiza con los periodos del año.
+PERIODS_PER_YEAR: dict[str, float] = {"week": 52.0, "month": 12.0, "quarter": 4.0, "year": 1.0}
+
+
+def period_key(day: date, period: str = "month") -> str:
+    """Clave ordenable del periodo de una fecha: 2026-W45, 2026-11, 2026-Q4, 2026."""
+    if period == "month":
+        return f"{day.year:04d}-{day.month:02d}"
+    if period == "week":
+        iso = day.isocalendar()
+        return f"{iso[0]:04d}-W{iso[1]:02d}"
+    if period == "quarter":
+        return f"{day.year:04d}-Q{(day.month - 1) // 3 + 1}"
+    if period == "year":
+        return f"{day.year:04d}"
+    raise ValueError(f"periodo desconocido: {period!r}")
+
+
+def period_closes(bars: Iterable[DailyBar], period: str = "month") -> list[tuple[str, date, float, float]]:
+    """Como ``monthly_closes`` para cualquier periodo: (clave, último día, cierre, mínimo)."""
+    if period == "month":
+        return monthly_closes(bars)
+    groups: dict[str, list[DailyBar]] = {}
+    for bar in sorted(bars, key=lambda b: b.day):
+        if bar.close is None or not math.isfinite(bar.close) or bar.close <= 0:
+            continue
+        groups.setdefault(period_key(bar.day, period), []).append(bar)
+    out = []
+    for key in sorted(groups):
+        items = groups[key]
+        lows = [b.low if (b.low is not None and math.isfinite(b.low) and b.low > 0) else b.close for b in items]
+        out.append((key, items[-1].day, float(items[-1].close), float(min(lows))))
+    return out
 
 
 def monthly_closes(bars: Iterable[DailyBar]) -> list[tuple[str, date, float, float]]:
@@ -239,13 +278,19 @@ def evaluate_series(
     params: DcaParams = DEFAULT_PARAMS,
     today: date | None = None,
     month_complete: bool | None = None,
+    period: str = "month",
 ) -> list[MonthlyVerdict]:
     """Veredicto de cada mes con historia suficiente.
 
     El ultimo mes es ``forming`` salvo que ``month_complete`` diga lo contrario o
     ``today`` ya este en un mes posterior al de la ultima barra.
+
+    ``period`` (``"week"``, ``"quarter"``, ``"year"``) aplica la misma fórmula a
+    cierres de ese periodo para la tarjeta de la watchlist; por defecto
+    ``"month"``, la señal oficial (idéntica a antes).
     """
-    months = monthly_closes(bars)
+    months = period_closes(bars, period)
+    periods_per_year = PERIODS_PER_YEAR[period]
     if not months:
         return []
     closes = [m[2] for m in months]
@@ -260,7 +305,7 @@ def evaluate_series(
             month_complete = False
         else:
             last_key = months[-1][0]
-            month_complete = f"{today.year:04d}-{today.month:02d}" > last_key
+            month_complete = period_key(today, period) > last_key
     for i, (key, day, close, low) in enumerate(months):
         if i + 1 < params.min_months:
             continue
@@ -272,7 +317,12 @@ def evaluate_series(
         n_sma = min(params.sma_months, i + 1)
         long_sma = _sma(closes, i, n_sma) if n_sma >= min_sma else None
         long_gap = (1.0 - close / long_sma) if long_sma else None
-        vol = _trailing_vol(closes, i, params, log_returns) if params.vol_beta else None
+        if not params.vol_beta:
+            vol = None
+        elif period == "month":
+            vol = _trailing_vol(closes, i, params, log_returns)
+        else:
+            vol = _trailing_vol(closes, i, params, log_returns, periods_per_year)
         vol_ratio = 1.0
         if vol is not None:
             if vol >= params.vol_min_reliable:

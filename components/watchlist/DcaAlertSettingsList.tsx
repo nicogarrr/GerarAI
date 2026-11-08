@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import {
     LazyDcaHitRatesPopover as DcaHitRatesPopover,
+    LazyDcaWatchCardToggle as DcaWatchCardToggle,
 } from '@/components/watchlist/LazyDcaControls';
 import type { DcaSignalItem } from '@/lib/dca/types';
 import { useT } from '@/lib/i18n/client';
@@ -41,6 +42,7 @@ export default function DcaAlertSettingsList({ items }: { items: DcaSignalItem[]
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             {item.state ? <DcaHitRatesPopover symbol={item.symbol} /> : <span className="text-xs text-gray-400">{t('watchlist.dca.list.notEvaluated')}</span>}
                         </div>
+                        {item.state ? <DcaWatchCardToggle symbol={item.symbol} /> : null}
                     </li>
                 ))}
             </ul>

@@ -6,6 +6,7 @@ import type { DcaSignalItem, DcaSignalsResponse } from '@/lib/dca/types';
 vi.mock('@/components/watchlist/LazyDcaControls', () => ({
     LazyDcaEvaluateButton: () => <button>Ejecutar pendientes ahora</button>,
     LazyDcaHitRatesPopover: ({ symbol }: { symbol: string }) => <button aria-label={`Histórico de señales DCA de ${symbol}`}>Histórico</button>,
+    LazyDcaWatchCardToggle: ({ symbol }: { symbol: string }) => <button aria-label={`Tarjeta DCA de ${symbol}`}>Tarjeta DCA</button>,
 }));
 import DcaSignalsPanel from '@/components/watchlist/DcaSignalsPanel';
 import DcaAlertSettingsList from '@/components/watchlist/DcaAlertSettingsList';

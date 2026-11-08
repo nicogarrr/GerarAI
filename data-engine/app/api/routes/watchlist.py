@@ -1121,3 +1121,43 @@ def home_attention_thesis(db: Session = Depends(get_db)) -> dict:
     # One extra row lets the UI state that this bounded inbox is truncated.
     items = pending_thesis_changes(db, limit=100)
     return {"items": items[:99], "truncated": len(items) > 99}
+
+
+@router.get("/dca-signals/{symbol}/card")
+def dca_watch_card(symbol: str, db: Session = Depends(get_db)) -> dict:
+    """Tarjeta DCA de la watchlist: nivel por semana/mes/trimestre/año, meses en zona,
+    riesgo, «¿por qué?» y movimiento desde el último cambio de nivel.
+
+    Misma serie que la señal diaria (Yahoo, cierre ajustado, sin la barra del día
+    en curso) y mismo motor; la señal oficial es la mensual.
+    """
+    from zoneinfo import ZoneInfo
+
+    from app.services import dca_signal_service as svc
+    from app.services.dca_alert_copy import currency_label
+    from app.services.dca_watch_card import build_watch_card
+
+    key = symbol.strip().upper()
+    if not key or len(key) > 24:
+        raise HTTPException(status_code=422, detail=ui_error(400, "ticker_invalid").detail)
+    company = db.scalar(select(Company).where(Company.ticker == key))
+    yahoo = key
+    if company is not None:
+        from app.services.propicks_price_service import yahoo_symbol
+
+        yahoo = yahoo_symbol(company) or key
+    try:
+        fetched = svc.fetch_yahoo_history_cached(yahoo)
+    except Exception as exc:  # proveedor caido o ticker desconocido: se dice, no se inventa
+        raise HTTPException(status_code=502, detail=ui_error(502, "history_download_failed", key=key).detail) from exc
+    now = datetime.now(UTC)
+    bars, _factor = svc.build_bars(svc.settled_rows(fetched.rows, now))
+    if not bars:
+        return {"symbol": key, "available": False, "reason": "Sin histórico de precios para este ticker", "timeframes": []}
+    today = now.astimezone(ZoneInfo("America/New_York")).date()
+    _age, stale = _dca_staleness(bars[-1].day, today)
+    pre_revenue = (getattr(company, "valuation_model", "") or "") == "pre_revenue"
+    card = build_watch_card(bars, today=today, pre_revenue=pre_revenue, stale=stale)
+    currency = fetched.currency or (company.currency if company is not None else None)
+    return {"symbol": key, "currency": currency, "currency_label": currency_label(currency),
+            "data_source": "yfinance", **card}
