@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { IR_REGISTRY, irLinksFor, type IrAssetKind } from '@/lib/ir-registry';
+import { IR_REGISTRY, irLinksFor, type IrAssetKind, type IrSectionLabelKey } from '@/lib/ir-registry';
 
 const ASSET_KINDS: readonly IrAssetKind[] = ['presentacion', 'webcast', 'directo', 'grabacion', 'transcripcion'];
+const SECTION_LABEL_KEYS: readonly IrSectionLabelKey[] = [
+    'investorEvents',
+    'quarterlyResults',
+    'documentsAndEvents',
+    'eventsAndPresentations',
+    'resultsAndReports',
+    'pressReleases',
+    'investorRelations',
+];
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 describe('IR_REGISTRY hygiene', () => {
@@ -11,7 +20,7 @@ describe('IR_REGISTRY hygiene', () => {
             expect(ticker, ticker).toBe(ticker.toUpperCase());
             expect(entry.name.trim(), ticker).not.toBe('');
             expect(entry.section.url, ticker).toMatch(/^https:\/\//);
-            expect(entry.section.label.trim(), ticker).not.toBe('');
+            expect(SECTION_LABEL_KEYS, ticker).toContain(entry.section.labelKey);
             expect(entry.verifiedOn, ticker).toMatch(ISO_DATE);
         }
     });

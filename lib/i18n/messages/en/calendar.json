@@ -73,6 +73,15 @@
     "irTipGeneral": " It is the general section, not this event's page.",
     "irEvent": "Event {period} in IR",
     "irSection": "{label} (IR)",
+    "irLabels": {
+      "investorEvents": "Investor events",
+      "quarterlyResults": "Quarterly results",
+      "documentsAndEvents": "Documents and events",
+      "eventsAndPresentations": "Events and presentations",
+      "resultsAndReports": "Results and reports",
+      "pressReleases": "Press releases",
+      "investorRelations": "Investor relations"
+    },
     "irAssetTip": "Official file · verified on {date}",
     "assetPresentacion": "Presentation",
     "assetDirecto": "Live",

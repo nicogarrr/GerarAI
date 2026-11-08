@@ -10,7 +10,7 @@ type TiFn = (key: TranslationKey, vars?: TranslationVars) => string;
 const esT: TiFn = t;
 import type { FollowedEarningsEvent } from '@/lib/actions/catalysts.actions';
 import type { EventMaterials, MaterialDocument } from '@/lib/earnings-materials';
-import { irLinksFor } from '@/lib/ir-registry';
+import { irLinksFor, type IrSectionLabelKey } from '@/lib/ir-registry';
 
 
 /** "Sep/2026" -> "T. Sep 2026"; formato desconocido: se muestra tal cual, nunca se reinterpreta. */
@@ -77,6 +77,16 @@ const ASSET_KEY = {
     transcripcion: 'calendar.earnings.assetTranscripcion',
 } as const;
 
+const IR_SECTION_LABEL: Record<IrSectionLabelKey, TranslationKey> = {
+    investorEvents: 'calendar.earnings.irLabels.investorEvents',
+    quarterlyResults: 'calendar.earnings.irLabels.quarterlyResults',
+    documentsAndEvents: 'calendar.earnings.irLabels.documentsAndEvents',
+    eventsAndPresentations: 'calendar.earnings.irLabels.eventsAndPresentations',
+    resultsAndReports: 'calendar.earnings.irLabels.resultsAndReports',
+    pressReleases: 'calendar.earnings.irLabels.pressReleases',
+    investorRelations: 'calendar.earnings.irLabels.investorRelations',
+};
+
 /** Enlaces oficiales de IR (registro verificado): pagina del evento si la fecha coincide, si no la seccion general. */
 export function IrLine({ ticker, date, ti = esT }: { ticker: string; date: string; ti?: TiFn }) {
     const links = irLinksFor(ticker, date);
@@ -92,7 +102,7 @@ export function IrLine({ ticker, date, ti = esT }: { ticker: string; date: strin
                 </a>
             ) : (
                 <a href={links.section.url} target="_blank" rel="noopener noreferrer" title={`${tip}${ti('calendar.earnings.irTipGeneral')}`} className={chip}>
-                    {ti('calendar.earnings.irSection', { label: links.section.label })}
+                    {ti('calendar.earnings.irSection', { label: ti(IR_SECTION_LABEL[links.section.labelKey]) })}
                     <ExternalLink aria-hidden="true" className="h-3 w-3" />
                 </a>
             )}
