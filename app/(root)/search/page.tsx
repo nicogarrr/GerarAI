@@ -74,7 +74,7 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
       // (backend caído O error de la consulta) pinta el estado local
       // accionable, no un crash de página: el detalle queda en los logs.
       if (!isBackendUnavailableError(error)) {
-        console.error('[search] fallo en la búsqueda universal', error);
+        console.error('[search] universal search request failed', error);
       }
       return <BackendOffline feature={t('search.title')} retryHref={currentHref} />;
     }
