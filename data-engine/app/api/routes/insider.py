@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.tenancy import tenant_filters
 from app.models.entities import Company, Document, InsiderFiling, InsiderTransaction
-from app.services import insider_feed, insider_operations, insider_service
+from app.services import insider_feed, insider_operations, insider_service, insider_summary
 from app.services.ticker_ownership_signals import ownership_signals
 
 logger = logging.getLogger(__name__)
@@ -97,6 +97,20 @@ def insider_feed_route(
             "c_suite_buys": [],
             "big_buys": [],
         }
+
+
+@router.get("/summary")
+def insider_summary_route(
+    ticker: str = Query(min_length=1, max_length=20),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Insiders del ticker con agregados deterministas (sin red, sin modelo).
+
+    Compra neta en mercado a 3/6/12 meses (solo P/S), compras en grupo,
+    compra como % de lo que tenia el insider, primera compra en N anos y
+    retraso de presentacion de cada Form 4. Cada fila enlaza a su filing.
+    """
+    return insider_summary.insider_summary(db, ticker)
 
 
 @router.get("/ownership-signals")
@@ -235,7 +249,7 @@ def insider_filings(
                             # divisa queda None (nunca se asume).
                             "currency": ((tx.data_quality or {}).get("currency")
                             if isinstance(tx.data_quality, dict) else None)
-                            or ("USD" if tx.form in ("4", "4/A") else None),
+                            or ("USD" if tx.form in ("4", "4/A", "5", "5/A") else None),
                             "value": tx.value,
                             "tx_date": tx.tx_date,
                             "source_url": tx.source_url,

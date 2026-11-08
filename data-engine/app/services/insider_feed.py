@@ -68,7 +68,7 @@ def _tx_dict(row: InsiderTransaction, filing: InsiderFiling, line: int) -> dict[
         # falta (93/307 en el feed real), None -> UI: "divisa no informada".
         "currency": ((row.data_quality or {}).get("currency")
         if isinstance(row.data_quality, dict) else None)
-        or ("USD" if row.form in ("4", "4/A") else None),
+        or ("USD" if row.form in ("4", "4/A", "5", "5/A") else None),
         "value": row.value,
         "date": row.tx_date or filing.filing_date,
         "is_derivative": bool(row.is_derivative),
@@ -107,7 +107,7 @@ def _tx_dict_from_row(row: Any, line: int) -> dict[str, Any]:
         # falta (93/307 en el feed real), None -> UI: "divisa no informada".
         "currency": ((data_quality or {}).get("currency")
         if isinstance(data_quality, dict) else None)
-        or ("USD" if tx_form in ("4", "4/A") else None),
+        or ("USD" if tx_form in ("4", "4/A", "5", "5/A") else None),
         "value": row["value"],
         "date": row["tx_date"] or row["filing_date"],
         "is_derivative": bool(row["is_derivative"]),
@@ -233,7 +233,7 @@ def build_feed(
     # Canada (currency=None) y PDMR (GBP/EUR/USD/sin divisa) se listan con su
     # divisa declarada pero jamas se suman a cabeceras en USD ni alimentan
     # senales pensadas para Form 4 (umbrales en USD, 10b5-1, clusters SEC).
-    form4 = [t for t in txs if t["form"] in ("4", "4/A") and t["currency"] == "USD"]
+    form4 = [t for t in txs if t["form"] in ("4", "4/A", "5", "5/A") and t["currency"] == "USD"]
     signals = insider_service.detect_signals(form4)
     clusters = [s for s in signals if s["signal"] == "cluster_buy"]
     c_suite = [s for s in signals if s["signal"] == "c_suite_buy"]

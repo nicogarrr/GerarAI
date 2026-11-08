@@ -149,7 +149,7 @@ def insider_operations(db: Session, days: int = 365) -> dict[str, Any]:
     rows = db.execute(
         select(InsiderTransaction, InsiderFiling)
         .join(InsiderFiling, InsiderTransaction.filing_id == InsiderFiling.id)
-        .where(InsiderTransaction.form.in_(("4", "4/A")))
+        .where(InsiderTransaction.form.in_(("4", "4/A", "5", "5/A")))
         .where(
             or_(
                 InsiderTransaction.issuer_ticker.in_(matched_raw),

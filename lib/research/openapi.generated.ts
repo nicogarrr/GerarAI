@@ -2521,6 +2521,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/insider/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Insider Summary Route
+         * @description Insiders del ticker con agregados deterministas (sin red, sin modelo).
+         *
+         *     Compra neta en mercado a 3/6/12 meses (solo P/S), compras en grupo,
+         *     compra como % de lo que tenia el insider, primera compra en N anos y
+         *     retraso de presentacion de cada Form 4. Cada fila enlaza a su filing.
+         */
+        get: operations["insider_summary_route_api_insider_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/investors": {
         parameters: {
             query?: never;
@@ -20799,6 +20823,50 @@ export interface operations {
                 cik?: string | null;
                 limit?: number;
                 notify?: boolean;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    insider_summary_route_api_insider_summary_get: {
+        parameters: {
+            query: {
+                ticker: string;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
