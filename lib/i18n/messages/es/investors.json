@@ -15,7 +15,8 @@
   "nav": {
     "aria": "Secciones de Inversores",
     "investors": "Inversores",
-    "learn": "Aprender"
+    "learn": "Aprender",
+    "politicians": "Políticos"
   },
   "sync": {
     "label": "Sincronizar carteras ahora",

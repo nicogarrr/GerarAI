@@ -2068,5 +2068,67 @@
       "warnings": "Data warnings",
       "sources": "Documents read: {list}"
     }
+  },
+  "insidersV2": {
+    "title": "Insiders (Forms 4 and 5)",
+    "empty": "No insider transactions stored for {ticker}. They are downloaded from the SEC for the companies in your portfolio and watchlist.",
+    "loadError": "Could not load the insider summary right now.",
+    "netTitle": "Net open-market buying (P purchases and S sales only)",
+    "colWindow": "Period",
+    "months": "{n} months",
+    "buys": "Buys",
+    "sells": "Sells",
+    "net": "Net",
+    "tradesValue": "{trades} · {value}",
+    "planned": "{count} under a 10b5-1 plan",
+    "notCovered": "data since {date}",
+    "excludedTitle": "Not counted in the net (12 months):",
+    "nature": {
+      "compraMercado": "Buy",
+      "ventaMercado": "Sale",
+      "ejercicio": "Option exercise",
+      "concesion": "Award",
+      "retencionFiscal": "Tax withholding",
+      "regalo": "Gift",
+      "otra": "Other"
+    },
+    "clustersTitle": "Cluster buys (3 or more insiders within 30 days)",
+    "cluster": "{start} – {end}: {insiders} insiders, {value}",
+    "firstBuysTitle": "First buys in years",
+    "firstBuy": "{insider}: first buy in {years} years ({date})",
+    "firstBuyNoPrior": "{insider}: no earlier buy in {years} years of data ({date})",
+    "lateLine": "{late} of {filings} Form 4 filings were late (more than 2 business days).",
+    "recentTitle": "Latest transactions",
+    "row": "{shares} sh. at {price}",
+    "pctHoldings": "+{pct}% of prior holdings",
+    "plan": "10b5-1 plan",
+    "derivative": "Derivative",
+    "indirect": "Indirect",
+    "filedOnTime": "Filed {date}",
+    "filedLate": "Filed {date}, {days} business days late",
+    "filing": "View {form}",
+    "footer": "{source}. {filings} filings since {from}. Code P includes private purchases. Net excludes exercises, awards, tax withholding and gifts.",
+    "showing": "Showing {shown} of {total}.",
+    "recentMarketTitle": "Latest open-market buys and sales"
+  },
+  "politicos": {
+    "title": "Politicians",
+    "empty": "No House member has disclosed trades in {ticker} in the stored PTRs.",
+    "loadError": "Could not load politicians' trades right now.",
+    "summary": "{trades} trades by {members} politicians: {buys} buys and {sells} sales.",
+    "buysSells": "{buys} buys · {sells} sales · last {date}",
+    "tradeDates": "Traded {tx} · disclosed {filed}",
+    "late": "{days} days late",
+    "onTime": "on time",
+    "ptr": "View PTR",
+    "type": {
+      "compra": "Buy",
+      "venta": "Sale",
+      "ventaParcial": "Partial sale",
+      "canje": "Exchange",
+      "otra": "Other"
+    },
+    "seeAll": "See all politicians",
+    "footer": "US House (Clerk, STOCK Act PTRs: 45 days to disclose). Amounts in ranges, as the law requires. Senate unavailable: its site blocks automated access."
   }
 }

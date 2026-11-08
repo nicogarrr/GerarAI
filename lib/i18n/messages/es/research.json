@@ -2068,5 +2068,67 @@
       "warnings": "Avisos de datos",
       "sources": "Documentos leídos: {list}"
     }
+  },
+  "insidersV2": {
+    "title": "Insiders (Form 4 y 5)",
+    "empty": "Sin operaciones de insiders guardadas para {ticker}. Se descargan de la SEC para las empresas de tu cartera y watchlist.",
+    "loadError": "No se pudo cargar el resumen de insiders ahora mismo.",
+    "netTitle": "Compra neta en mercado (solo compras P y ventas S)",
+    "colWindow": "Periodo",
+    "months": "{n} meses",
+    "buys": "Compras",
+    "sells": "Ventas",
+    "net": "Neto",
+    "tradesValue": "{trades} · {value}",
+    "planned": "{count} con plan 10b5-1",
+    "notCovered": "datos desde {date}",
+    "excludedTitle": "No cuentan en el neto (12 meses):",
+    "nature": {
+      "compraMercado": "Compra",
+      "ventaMercado": "Venta",
+      "ejercicio": "Ejercicio de opciones",
+      "concesion": "Concesión",
+      "retencionFiscal": "Retención fiscal",
+      "regalo": "Regalo",
+      "otra": "Otra"
+    },
+    "clustersTitle": "Compras en grupo (3 o más insiders en 30 días)",
+    "cluster": "{start} – {end}: {insiders} insiders, {value}",
+    "firstBuysTitle": "Primeras compras en años",
+    "firstBuy": "{insider}: primera compra en {years} años ({date})",
+    "firstBuyNoPrior": "{insider}: sin compras previas en {years} años de datos ({date})",
+    "lateLine": "{late} de {filings} Form 4 presentados tarde (más de 2 días hábiles).",
+    "recentTitle": "Últimas operaciones",
+    "row": "{shares} acc. a {price}",
+    "pctHoldings": "+{pct} % de lo que tenía",
+    "plan": "Plan 10b5-1",
+    "derivative": "Derivado",
+    "indirect": "Indirecta",
+    "filedOnTime": "Presentado el {date}",
+    "filedLate": "Presentado el {date}, {days} días hábiles tarde",
+    "filing": "Ver {form}",
+    "footer": "{source}. {filings} filings desde {from}. El código P incluye compras privadas. Neto sin ejercicios, concesiones, retenciones ni regalos.",
+    "showing": "Mostrando {shown} de {total}.",
+    "recentMarketTitle": "Últimas compras y ventas en mercado"
+  },
+  "politicos": {
+    "title": "Políticos",
+    "empty": "Ningún miembro de la Cámara ha declarado operaciones con {ticker} en los PTR guardados.",
+    "loadError": "No se pudieron cargar las operaciones de políticos ahora mismo.",
+    "summary": "{trades} operaciones de {members} políticos: {buys} compras y {sells} ventas.",
+    "buysSells": "{buys} compras · {sells} ventas · última {date}",
+    "tradeDates": "Operación {tx} · declarada {filed}",
+    "late": "{days} días tarde",
+    "onTime": "a tiempo",
+    "ptr": "Ver PTR",
+    "type": {
+      "compra": "Compra",
+      "venta": "Venta",
+      "ventaParcial": "Venta parcial",
+      "canje": "Canje",
+      "otra": "Otra"
+    },
+    "seeAll": "Ver todos los políticos",
+    "footer": "Cámara de EE. UU. (Clerk, PTR del STOCK Act: 45 días para declarar). Importes en rangos, como exige la ley. Senado no disponible: su web bloquea el acceso automatizado."
   }
 }

@@ -4,6 +4,7 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest } from '@/lib/research/client';
 import { cachedFetch } from '@/lib/cache/memoryTTL';
 import type { OwnershipSignals } from '@/lib/research/ownership-signals';
+import type { InsiderSummary } from '@/lib/research/insiders-politicians';
 
 export type InsiderSignal = Record<string, unknown>;
 
@@ -263,6 +264,18 @@ export async function getOwnershipSignals(ticker: string): Promise<OwnershipSign
     return cachedFetch(
         `insider:user:${userId}:ownership:${clean}`,
         () => researchRequest<OwnershipSignals>(`/api/insider/ownership-signals?${params.toString()}`, { fast: true }),
+        60,
+    );
+}
+
+/** GET /api/insider/summary — insiders del ticker con agregados deterministas (Form 4/5). */
+export async function getInsiderSummary(ticker: string): Promise<InsiderSummary> {
+    const { id: userId } = await requireAuthenticatedUser();
+    const clean = ticker.trim().toUpperCase();
+    const params = new URLSearchParams({ ticker: clean });
+    return cachedFetch(
+        `insider:user:${userId}:summary:${clean}`,
+        () => researchRequest<InsiderSummary>(`/api/insider/summary?${params.toString()}`, { fast: true }),
         60,
     );
 }

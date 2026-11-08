@@ -150,5 +150,51 @@
     "noDate": "s/d",
     "persistedOf": "{ticker}: {count} de {scanned} Form 4 desde filings persistidos (último filing: {latest}); la lectura en vivo de SEC EDGAR falló. Los datos son los de esos filings, no de hoy.",
     "persisted": "{ticker}: {count} Form 4 desde filings persistidos (último filing: {latest}); la lectura en vivo de SEC EDGAR falló. Los datos son los de esos filings, no de hoy."
+  },
+  "politicians": {
+    "metaTitle": "Políticos · operaciones declaradas",
+    "metaDescription": "Operaciones en bolsa declaradas por los miembros de la Cámara de EE. UU. (STOCK Act), con su retraso.",
+    "title": "Operaciones de políticos",
+    "intro": "Lo que declaran los miembros de la Cámara de EE. UU. en sus PTR: cada operación, su rango de importe y si se declaró dentro de los 45 días que da la ley.",
+    "chamber": "Cámara",
+    "chambers": {
+      "all": "Todos",
+      "house": "Representantes",
+      "senate": "Senado",
+      "executive": "Ejecutivo"
+    },
+    "party": "Partido",
+    "parties": {
+      "all": "Todos",
+      "D": "Demócrata",
+      "R": "Republicano",
+      "I": "Independiente"
+    },
+    "sort": "Orden",
+    "sorts": {
+      "trades": "Más operaciones",
+      "late": "Más declaradas tarde",
+      "recent": "Más recientes",
+      "onTime": "Más puntuales"
+    },
+    "search": "Buscar político o estado",
+    "searchButton": "Buscar",
+    "unavailable": "{chamber}: no disponible. {reason}",
+    "senateReason": "La web del Senado (eFD) bloquea el acceso automatizado al aceptar sus condiciones.",
+    "executiveReason": "La Oficina de Ética (OGE 278-T) no publica una descarga masiva gratuita.",
+    "houseLabel": "Representante",
+    "tradesTickers": "{trades} operaciones · {tickers} tickers",
+    "lastTrade": "Última operación: {date}",
+    "lateCounts": "{late} declaradas tarde, {late30} más de 30 días tarde",
+    "onTime": "{pct} % a tiempo",
+    "noDates": "sin fechas",
+    "topTickers": "Más operados",
+    "volume": "Volumen declarado: {range}",
+    "scanned": "{count} PTR en papel escaneado sin leer",
+    "coverage": "{filings} PTR de {years}; {scanned} en papel escaneado (se enlazan, sus importes no se leen de forma fiable).",
+    "count": "{total} políticos",
+    "more": "Ver más",
+    "empty": "Aún no hay declaraciones guardadas. Se descargan del Clerk de la Cámara cada 6 horas.",
+    "legal": "Fuente: Clerk of the House. La ley (5 U.S.C. §13107) prohíbe usar estas declaraciones con fines comerciales, salvo para difundirlas al público general."
   }
 }

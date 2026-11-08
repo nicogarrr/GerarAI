@@ -166,7 +166,10 @@ import ThesisApproveButton from '@/components/research/ThesisApproveButton';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
 import { createFormatters, formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, formatPrice, isValidCurrencyCode, naFor } from '@/lib/format';
-import { getInsiderFilings, getOwnershipSignals } from '@/lib/actions/insider.actions';
+import { getInsiderFilings, getInsiderSummary, getOwnershipSignals } from '@/lib/actions/insider.actions';
+import { getPoliticianTickerTrades } from '@/lib/actions/politicians.actions';
+import { InsidersSection } from '@/components/research/InsidersSection';
+import { PoliticiansSection } from '@/components/research/PoliticiansSection';
 import { OwnershipSignalsPanel } from '@/components/research/OwnershipSignalsPanel';
 import { insiderName, insiderRole } from '@/lib/insider/format';
 import { glossaryFor, moatGlossaryKey } from '@/lib/glossary';
@@ -647,6 +650,8 @@ type ViewWorkspaces = {
   supuestos: Awaited<ReturnType<typeof getDriverAssumptions>>;
   directiva: Awaited<ReturnType<typeof getManagementCredibility>> | null;
   lecciones: Awaited<ReturnType<typeof getDecisionLessons>>;
+  insiders: Awaited<ReturnType<typeof getInsiderSummary>> | null;
+  politicos: Awaited<ReturnType<typeof getPoliticianTickerTrades>> | null;
 };
 
 /**
@@ -687,6 +692,8 @@ const EMPTY_VIEW_DATA: { [K in keyof ViewWorkspaces]: ViewWorkspaces[K] } = {
   supuestos: [],
   directiva: null,
   lecciones: { lessons: [], taxonomy: [] },
+  insiders: null,
+  politicos: null,
 };
 
 /**
@@ -730,6 +737,8 @@ function launchTabData(
       tasks.push({ key: 'holders', promise: withResearchTelemetry('company-holders', () => getCompanyHolders(ticker)) });
       tasks.push({ key: 'directiva', promise: withResearchTelemetry('management-credibility', () => getManagementCredibility(ticker)) });
       tasks.push({ key: 'lecciones', promise: withResearchTelemetry('decision-lessons', () => getDecisionLessons(ticker)) });
+      tasks.push({ key: 'insiders', promise: withResearchTelemetry('insider-summary', () => getInsiderSummary(ticker)) });
+      tasks.push({ key: 'politicos', promise: withResearchTelemetry('politician-ticker-trades', () => getPoliticianTickerTrades(ticker)) });
       // Solo ASTS tiene orbitales: pedirlo para otro ticker sería una
       // llamada segura de quedar sin usar.
       if (ticker === 'ASTS') {
@@ -1511,6 +1520,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     );
   };
 
+  const buildInsidersSection = async (): Promise<React.ReactNode> => (
+    <InsidersSection locale={locale} summary={await viewData('insiders')} ticker={ticker} />
+  );
+  const buildPoliticosSection = async (): Promise<React.ReactNode> => (
+    <PoliticiansSection data={await viewData('politicos')} locale={locale} ticker={ticker} />
+  );
   const buildHoldersSection = async (): Promise<React.ReactNode> => {
     const t = await getT();
     const fmt = await getFormat();
@@ -1898,6 +1913,8 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     sections = [
       { id: 'cambios', title: t('research.fichaSecCambios'), node: await buildChangesContent() },
       await optionalSection('superinversores', t('research.fichaSecSuperinversores'), buildHoldersSection),
+      await optionalSection('insiders', t('research.insidersV2.title'), buildInsidersSection),
+      await optionalSection('politicos', t('research.politicos.title'), buildPoliticosSection),
       await optionalSection('directiva', t('research.fichaSecDirectiva'), buildDirectivaSection),
       await optionalSection('lecciones', t('research.fichaSecLecciones'), buildLeccionesSection),
       ...(ticker === 'ASTS' ? [await optionalSection('satellites', t('research.fichaSecSatelites'), buildSatellitesSection)] : []),
