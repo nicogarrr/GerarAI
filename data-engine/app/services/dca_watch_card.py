@@ -11,7 +11,7 @@ cierres de ese periodo, como contexto. Puro: sin DB ni red.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, timedelta
 
 from app.services.dca_signal_engine import (
     DEFAULT_PARAMS,
@@ -40,16 +40,40 @@ def _zone(level: int) -> dict:
     return {"level": level, **ZONES[level]}
 
 
-def _streak(verdicts: Sequence[MonthlyVerdict]) -> int:
-    """Periodos seguidos (incluido el último) con el mismo nivel que el último."""
+def _previous_key(key: str, period: str) -> str:
+    """Clave del periodo inmediatamente anterior (2026-11 -> 2026-10, 2026-W01 -> 2025-W52...)."""
+    if period == "month":
+        total = int(key[:4]) * 12 + int(key[5:7]) - 2
+        return f"{total // 12:04d}-{total % 12 + 1:02d}"
+    if period == "quarter":
+        total = int(key[:4]) * 4 + int(key[6]) - 2
+        return f"{total // 4:04d}-Q{total % 4 + 1}"
+    if period == "year":
+        return f"{int(key) - 1:04d}"
+    if period == "week":
+        monday = date.fromisocalendar(int(key[:4]), int(key[6:8]), 1)
+        iso = (monday - timedelta(days=7)).isocalendar()
+        return f"{iso[0]:04d}-W{iso[1]:02d}"
+    raise ValueError(f"periodo desconocido: {period!r}")
+
+
+def _streak(verdicts: Sequence[MonthlyVerdict], period: str = "month") -> int:
+    """Periodos OBSERVADOS seguidos (incluido el último) con el mismo nivel que el último.
+
+    Como en ``zone_visits``: si falta un periodo en el historico (valor
+    suspendido, hueco del proveedor), lo que paso en el es desconocido y la
+    racha no se une a traves del hueco; solo cuenta lo que esta probado.
+    """
     if not verdicts:
         return 0
     level = verdicts[-1].level
     count = 0
+    expected: str | None = None
     for verdict in reversed(verdicts):
-        if verdict.level != level:
+        if verdict.level != level or (expected is not None and verdict.period != expected):
             break
         count += 1
+        expected = _previous_key(verdict.period, period)
     return count
 
 
@@ -60,7 +84,9 @@ def _last_change(verdicts: Sequence[MonthlyVerdict]) -> dict | None:
     current = verdicts[-1]
     run = _streak(verdicts)
     for verdict in reversed(verdicts[: len(verdicts) - run]):
-        if verdict.status != "confirmed":
+        # Con un hueco la racha se corta sin cambio de nivel: el cambio es el
+        # ultimo mes confirmado con OTRO nivel.
+        if verdict.status != "confirmed" or verdict.level == current.level:
             continue
         return {
             "from": _zone(verdict.level),
@@ -144,7 +170,7 @@ def build_watch_card(
         timeframes.append({
             "key": key, "short": short, "label": label, "available": True,
             "zone": _zone(last.level), "status": last.status, "period": last.period,
-            "streak": _streak(series),
+            "streak": _streak(series, key),
         })
     if not monthly:
         return {"available": False, "reason": f"hacen falta {params.min_months} meses de historia",
