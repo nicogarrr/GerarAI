@@ -13,7 +13,7 @@
     "piotroski": "Financial health · Piotroski",
     "piotroskiPartial": "Not assessable ({count}/9 points with data)",
     "fiscalYear": "Fiscal year ended {date}",
-    "details": "See points, sources and Altman Z''",
+    "details": "See points, sources and Altman Z",
     "pending": "Missing data: {item}",
     "altmanNote": "Book equity, no emerging-markets adjustment.",
     "profitNote": "Profit is reported net income; missing extraordinary items are not rebuilt.",

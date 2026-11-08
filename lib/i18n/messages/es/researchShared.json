@@ -13,7 +13,7 @@
     "piotroski": "Salud financiera · Piotroski",
     "piotroskiPartial": "No evaluable ({count}/9 puntos con datos)",
     "fiscalYear": "Ejercicio cerrado {date}",
-    "details": "Ver puntos, fuentes y Altman Z''",
+    "details": "Ver puntos, fuentes y Altman Z",
     "pending": "Dato pendiente: {item}",
     "altmanNote": "Patrimonio contable, sin ajuste de mercados emergentes.",
     "profitNote": "El beneficio es el neto reportado; no se reconstruyen partidas extraordinarias ausentes.",
