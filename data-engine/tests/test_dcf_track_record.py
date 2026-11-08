@@ -25,15 +25,15 @@ def test_standard_dcf_value_carries_the_measured_track_record():
     assert record is not None
     assert record["horizon_months"] == 12
     assert (record["price_to_value_p10"], record["price_to_value_p50"], record["price_to_value_p90"]) == (
-        0.63,
-        1.65,
-        3.69,
+        0.36,
+        0.97,
+        2.57,
     )
     assert record["undervalued_beat_spy_share"] == 0.49
     assert record["message_es"] == (
         "Fiabilidad del método: en el backtest, 8 de cada 10 veces el precio a 12 meses quedó "
-        "entre 0,63x y 3,69x este valor (mediana 1,65x; el método suele quedarse corto). Sirve para "
-        "comparar empresas entre sí, sobre todo a 2 años, no como precio objetivo."
+        "entre 0,36x y 2,57x este valor (mediana 0,97x). Es un punto de partida con mucho margen "
+        "de error, no un precio objetivo."
     )
     assert record["message_en"].startswith("Method track record: in the backtest, 8 times out of 10")
 
@@ -55,7 +55,7 @@ def test_value_company_attaches_it_for_a_standard_dcf(db):
     result = ValuationService().value_company(db, company)
     assert result["trace"]["engine"] == "standard_dcf"
     assert result["expected_value"] and result["expected_value"] > 0
-    assert result["track_record"]["price_to_value_p50"] == 1.65
+    assert result["track_record"]["price_to_value_p50"] == 0.97
 
 
 def test_api_schema_keeps_the_track_record():

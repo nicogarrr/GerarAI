@@ -953,6 +953,8 @@ class ValuationResponse(BaseModel):
     fair_value_range: dict | None = None
     # Fiabilidad historica del DCF estandar (app/valuation/track_record.py).
     track_record: dict | None = None
+    # Valor si se restaran los pagos en acciones (app/valuation/sbc_note.py); informativo.
+    sbc_adjustment: dict | None = None
     reverse_dcf: dict = {}
     sensitivity: dict = {}
     moat: dict = {}

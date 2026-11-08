@@ -169,6 +169,7 @@ export type ResearchValuation = {
   fair_value_range?: ValuationMethodLike['fair_value_range'];
   /** Fiabilidad histórica del DCF estándar: cuánto se alejó el precio del valor en el backtest. */
   track_record?: TrackRecordLike;
+  sbc_adjustment?: TrackRecordLike;
   reverse_dcf: {
     status?: string;
     out_of_bounds?: boolean;

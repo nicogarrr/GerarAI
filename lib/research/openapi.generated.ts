@@ -14631,6 +14631,10 @@ export interface components {
             reverse_dcf: {
                 [key: string]: unknown;
             };
+            /** Sbc Adjustment */
+            sbc_adjustment?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Scenario Notes
              * @default {}

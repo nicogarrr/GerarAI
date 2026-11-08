@@ -64,3 +64,9 @@ export function trackRecordText(record: TrackRecordLike | undefined, locale: str
   const text = locale === 'en' ? record.message_en ?? record.message_es : record.message_es;
   return typeof text === 'string' && text ? text : null;
 }
+
+/** Línea informativa de pagos en acciones (data-engine app/valuation/sbc_note.py).
+ * Solo llega cuando el SBC pesa ≥ 10 % del FCF; nunca cambia el valor publicado. */
+export function sbcAdjustmentText(note: TrackRecordLike | undefined, locale: string): string | null {
+  return trackRecordText(note, locale);
+}
