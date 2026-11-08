@@ -134,7 +134,25 @@
     "canadaSourcePre": "Fuente no oficial; la verdad oficial es ",
     "canadaSourcePost": " (consulta manual)",
     "sideBuyLabel": "Compra",
-    "sideSellLabel": "Venta"
+    "sideSellLabel": "Venta",
+    "codeUnknown": "Código {code}",
+    "codeLabels": {
+      "A": "Concesión",
+      "C": "Conversión de derivado",
+      "D": "Disposición al emisor",
+      "E": "Expiración de derivado",
+      "F": "Retención fiscal",
+      "G": "Donación",
+      "H": "Expiración de derivado",
+      "I": "Transacción discrecional",
+      "J": "Otra operación",
+      "K": "Swap de equity",
+      "M": "Ejercicio de opción",
+      "O": "Ejercicio de opción",
+      "U": "Disposición por OPA",
+      "W": "Herencia",
+      "X": "Ejercicio de opción"
+    }
   },
   "statusCopy": {
     "reason": {

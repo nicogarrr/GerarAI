@@ -31,6 +31,48 @@ describe('Insider: etiqueta de lado internacionalizada', () => {
     assert.match(signals, /\{insiderCodeLabel\(tx\.code, ti\)\}/);
     assert.doesNotMatch(signals, /\{insiderCodeLabel\(tx\.code\)\}/);
   });
+  it('los códigos Form 4 no P/S tienen clave i18n en es y en', () => {
+    const codes = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'M', 'O', 'U', 'W', 'X'];
+    for (const c of codes) {
+      assert.equal(typeof es.feed.codeLabels[c], 'string', `es ${c}`);
+      assert.equal(typeof en.feed.codeLabels[c], 'string', `en ${c}`);
+      assert.notEqual(es.feed.codeLabels[c], en.feed.codeLabels[c], `es/en ${c} no deben coincidir`);
+    }
+    assert.equal(es.feed.codeLabels.A, 'Concesión');
+    assert.equal(en.feed.codeLabels.A, 'Grant or award');
+    assert.equal(es.feed.codeLabels.M, 'Ejercicio de opción');
+    assert.equal(en.feed.codeLabels.M, 'Option exercise');
+    assert.equal(es.feed.codeUnknown, 'Código {code}');
+    assert.equal(en.feed.codeUnknown, 'Code {code}');
+  });
+  it('la ficha etiqueta el código con insiderCodeLabel y el traductor (sin código crudo)', () => {
+    const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
+    assert.match(page, /\{insiderCodeLabel\(tx\.code, t\)\}/);
+    assert.doesNotMatch(page, /tx\.code \?\? '—'/);
+    assert.match(page, /import \{ insiderCodeLabel, insiderName, insiderRole \} from '@\/lib\/insider\/format';/);
+  });
+  it('fichaTxBuy/fichaTxSell se retiran al quedar sin uso (sin huérfanas nuevas)', () => {
+    const resEs = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8'));
+    const resEn = JSON.parse(readFileSync('lib/i18n/messages/en/research.json', 'utf8'));
+    assert.equal(resEs.fichaTxBuy, undefined);
+    assert.equal(resEs.fichaTxSell, undefined);
+    assert.equal(resEn.fichaTxBuy, undefined);
+    assert.equal(resEn.fichaTxSell, undefined);
+  });
+  it('insiderCodeLabel con t traduce por clave; sin t mantiene el legacy es', async () => {
+    const { insiderCodeLabel: label } = await import('../lib/insider/format.ts');
+    const en = (p, vars) =>
+      p === 'insider.feed.codeLabels.A' ? 'Grant or award'
+        : p === 'insider.feed.codeLabels.M' ? 'Option exercise'
+          : p === 'insider.feed.codeUnknown' ? `Code ${vars.code}`
+            : p;
+    assert.equal(label('A', en), 'Grant or award');
+    assert.equal(label('m', en), 'Option exercise');
+    assert.equal(label('Z', en), 'Code Z');
+    assert.equal(label('A'), 'Concesión');
+    assert.equal(label('Z'), 'Código Z');
+    assert.equal(label(''), '—');
+  });
   it('sideLabel e insiderCodeLabel aceptan el traductor y usan las claves', () => {
     assert.match(format, /export function sideLabel\(side: string \| null \| undefined, t\?: TranslateFn\)/);
     assert.match(format, /t\('insider\.feed\.sideBuyLabel'\)/);

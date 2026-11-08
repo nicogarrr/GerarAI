@@ -106,8 +106,6 @@
   "fichaNoInsiderTrades": "No insider trades persisted for this ticker.",
   "fichaAmendmentSuffix": " (amendment)",
   "fichaOriginalForm4": "Original Form 4",
-  "fichaTxBuy": "Buy",
-  "fichaTxSell": "Sell",
   "fichaTxSharesSuffix": " · {count} shares",
   "fichaTxNoCurrencySuffix": " · currency not reported",
   "fichaTxShown": "Showing 6 of {total} transactions from this form.",
