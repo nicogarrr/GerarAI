@@ -16,10 +16,19 @@
 export type IrAssetKind = 'presentacion' | 'webcast' | 'directo' | 'grabacion' | 'transcripcion';
 /** Enlace directo verificado a un archivo del evento; `source` es la pagina oficial donde se anuncia. */
 export type IrAsset = { kind: IrAssetKind; url: string; source: string };
+/** Clave i18n de la etiqueta de la seccion (calendar.earnings.irLabels.*): el texto vive en lib/i18n/messages. */
+export type IrSectionLabelKey =
+    | 'investorEvents'
+    | 'quarterlyResults'
+    | 'documentsAndEvents'
+    | 'eventsAndPresentations'
+    | 'resultsAndReports'
+    | 'pressReleases'
+    | 'investorRelations';
 export type IrEventPage = { date: string; period: string; url: string; assets?: IrAsset[] };
 export type IrEntry = {
     name: string;
-    section: { url: string; label: string };
+    section: { url: string; labelKey: IrSectionLabelKey };
     events: IrEventPage[];
     verifiedOn: string;
 };
@@ -27,7 +36,7 @@ export type IrEntry = {
 export const IR_REGISTRY: Record<string, IrEntry> = {
     META: {
         name: 'Meta Platforms',
-        section: { url: 'https://investor.atmeta.com/investor-events/', label: 'Eventos de inversores' },
+        section: { url: 'https://investor.atmeta.com/investor-events/', labelKey: 'investorEvents' },
         events: [
             {
                 date: '2026-10-21',
@@ -53,7 +62,7 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     },
     BN: {
         name: 'Brookfield Corporation',
-        section: { url: 'https://bn.brookfield.com/reports-filings/quarterly-results', label: 'Resultados trimestrales' },
+        section: { url: 'https://bn.brookfield.com/reports-filings/quarterly-results', labelKey: 'quarterlyResults' },
         events: [
             { date: '2026-11-12', period: 'T3 2026', url: 'https://bn.brookfield.com/events/bn-q3-2026-conference-call-webcast' },
             {
@@ -70,67 +79,67 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     },
     TSLA: {
         name: 'Tesla',
-        section: { url: 'https://ir.tesla.com/', label: 'Documentos y eventos' },
+        section: { url: 'https://ir.tesla.com/', labelKey: 'documentsAndEvents' },
         events: [],
         verifiedOn: '2026-10-21',
     },
     ASTS: {
         name: 'AST SpaceMobile',
-        section: { url: 'https://investors.ast-science.com/', label: 'Resultados trimestrales' },
+        section: { url: 'https://investors.ast-science.com/', labelKey: 'quarterlyResults' },
         events: [],
         verifiedOn: '2026-10-21',
     },
     ZETA: {
         name: 'Zeta Global',
-        section: { url: 'https://investors.zetaglobal.com/events-and-presentations/default.aspx', label: 'Eventos y presentaciones' },
+        section: { url: 'https://investors.zetaglobal.com/events-and-presentations/default.aspx', labelKey: 'eventsAndPresentations' },
         events: [],
         verifiedOn: '2026-11-08',
     },
     'CGEO.L': {
         name: 'Georgia Capital',
-        section: { url: 'https://georgiacapital.ge/investor-relations/financial-results', label: 'Resultados e informes' },
+        section: { url: 'https://georgiacapital.ge/investor-relations/financial-results', labelKey: 'resultsAndReports' },
         events: [],
         verifiedOn: '2026-11-08',
     },
     KRKNF: {
         name: 'Kraken Robotics',
-        section: { url: 'https://krakenrobotics.com/investors/press-releases/', label: 'Notas de prensa' },
+        section: { url: 'https://krakenrobotics.com/investors/press-releases/', labelKey: 'pressReleases' },
         events: [],
         verifiedOn: '2026-11-08',
     },
     BABA: {
         name: 'Alibaba Group',
-        section: { url: 'https://www.alibabagroup.com/en-US/ir-financial-reports-quarterly-results', label: 'Resultados trimestrales' },
+        section: { url: 'https://www.alibabagroup.com/en-US/ir-financial-reports-quarterly-results', labelKey: 'quarterlyResults' },
         events: [],
         verifiedOn: '2026-11-08',
     },
     BWMX: {
         name: 'Betterware de México',
-        section: { url: 'https://www.befra.com/financials/quarterly-results', label: 'Resultados trimestrales' },
+        section: { url: 'https://www.befra.com/financials/quarterly-results', labelKey: 'quarterlyResults' },
         events: [],
         verifiedOn: '2026-11-08',
     },
     KKR: {
         name: 'KKR & Co.',
-        section: { url: 'https://ir.kkr.com/', label: 'Eventos y presentaciones' },
+        section: { url: 'https://ir.kkr.com/', labelKey: 'eventsAndPresentations' },
         events: [],
         verifiedOn: '2026-11-08',
     },
     POOL: {
         name: 'Pool Corporation',
-        section: { url: 'https://ir.poolcorp.com/', label: 'Relación con inversores' },
+        section: { url: 'https://ir.poolcorp.com/', labelKey: 'investorRelations' },
         events: [],
         verifiedOn: '2026-11-08',
     },
     CB: {
         name: 'Chubb',
-        section: { url: 'https://investors.chubb.com/', label: 'Relación con inversores' },
+        section: { url: 'https://investors.chubb.com/', labelKey: 'investorRelations' },
         events: [],
         verifiedOn: '2026-11-08',
     },
     CPT: {
         name: 'Camden Property Trust',
-        section: { url: 'https://investors.camdenliving.com/', label: 'Relación con inversores' },
+        section: { url: 'https://investors.camdenliving.com/', labelKey: 'investorRelations' },
         events: [],
         verifiedOn: '2026-11-08',
     },
@@ -138,7 +147,7 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
 
 export type IrLinks = {
     eventPage: { url: string; period: string; assets: IrAsset[] } | null;
-    section: { url: string; label: string };
+    section: { url: string; labelKey: IrSectionLabelKey };
     verifiedOn: string;
 };
 
