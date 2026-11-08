@@ -11,9 +11,13 @@ Reglas (comprobadas con 8-K reales de TSLA, META y ASTS el 21-oct-2026):
   la nota, ASTS nota en 99.1 y deck en 99.2): se clasifica por el encabezado real.
 - Solo se enlaza un documento si su propio texto confirma el periodo del evento; si lo
   contradice o no lo confirma, ante la duda no hay enlace.
+- Emisores extranjeros (6-K/20-F/40-F, sin Item 2.02): se empareja el 6-K de la ventana
+  D..D+2 y el periodo lo confirma el propio documento, igual que con el 8-K. Como el 6-K
+  de resultados es voluntario, si no hay 6-K en ventana o ningun documento confirma el
+  periodo no se afirma nada (``sin_cobertura_sec``, no ``sin_filing``).
 - Estados: ``ok``, ``sin_filing`` (leido bien, emisor domestico, nada en D..D+2),
   ``no_disponible`` (fallo de red/SEC: NO es ausencia), ``sin_cobertura_sec`` (emisor
-  extranjero, ticker sin CIK o fecha estimada) y ``periodo_no_coincide``.
+  extranjero sin 6-K verificado, ticker sin CIK o fecha estimada) y ``periodo_no_coincide``.
 """
 
 from __future__ import annotations
@@ -102,17 +106,29 @@ def is_foreign_private_issuer(submissions: dict[str, Any]) -> bool:
     return bool(forms & {"6-K", "20-F", "40-F"}) and not (forms & {"8-K", "10-Q", "10-K"})
 
 
-def pick_results_filing(submissions: dict[str, Any], event_date: date) -> dict[str, str] | None:
-    """8-K con Item 2.02 presentado entre ``event_date`` y +2 dias (el mas cercano; 8-K gana a 8-K/A)."""
+def pick_results_filing(
+    submissions: dict[str, Any],
+    event_date: date,
+    *,
+    forms: tuple[str, ...] = ("8-K", "8-K/A"),
+    require_results_item: bool = True,
+) -> dict[str, str] | None:
+    """Filing de resultados entre ``event_date`` y +2 dias (el mas cercano; la forma base gana a la /A).
+
+    Emisores domesticos: 8-K con Item 2.02. Extranjeros (``forms=("6-K", "6-K/A)",
+    require_results_item=False``): el 6-K no lleva items; la ventana de fechas solo
+    candidata y la confirmacion del periodo la hace el texto del propio documento.
+    """
     recent = (submissions.get("filings") or {}).get("recent") or {}
     best: dict[str, str] | None = None
     last = event_date + timedelta(days=MATCH_WINDOW_AFTER_DAYS)
     for index, form in enumerate(recent.get("form") or []):
-        if form not in ("8-K", "8-K/A"):
+        if form not in forms:
             continue
-        items = [i.strip() for i in str(_col(recent, "items", index) or "").split(",")]
-        if "2.02" not in items:
-            continue
+        if require_results_item:
+            items = [i.strip() for i in str(_col(recent, "items", index) or "").split(",")]
+            if "2.02" not in items:
+                continue
         try:
             filed = date.fromisoformat(str(_col(recent, "filingDate", index)))
         except ValueError:
@@ -121,7 +137,7 @@ def pick_results_filing(submissions: dict[str, Any], event_date: date) -> dict[s
         if not accession or not event_date <= filed <= last:
             continue
         if best is None or filed.isoformat() < best["filed_at"] or (
-            filed.isoformat() == best["filed_at"] and form == "8-K"
+            filed.isoformat() == best["filed_at"] and form == forms[0]
         ):
             best = {"accession": accession, "filed_at": filed.isoformat(), "form": str(form)}
     return best
@@ -199,11 +215,16 @@ async def resolve_materials(
     # Reconstruccion parcial (EFTS) sin items/formas completos: no se puede afirmar nada.
     if not isinstance(submissions, dict) or submissions.get("_fallback"):
         return _result("no_disponible")
-    if is_foreign_private_issuer(submissions):
-        return _result("sin_cobertura_sec")
-    filing = pick_results_filing(submissions, event_date)
+    foreign = is_foreign_private_issuer(submissions)
+    filing = (
+        pick_results_filing(submissions, event_date, forms=("6-K", "6-K/A"), require_results_item=False)
+        if foreign
+        else pick_results_filing(submissions, event_date)
+    )
     if filing is None:
-        return _result("sin_filing")
+        # Domestico sin 8-K 2.02 en ventana: ausencia real. Extranjero sin 6-K: el
+        # furnish de resultados es voluntario, asi que no se afirma ni presencia ni ausencia.
+        return _result("sin_cobertura_sec" if foreign else "sin_filing")
     base = sec.filing_index_url(cik, filing["accession"])
     index_url = f"{base}{filing['accession']}-index.htm"
     try:
@@ -230,6 +251,10 @@ async def resolve_materials(
     if incomplete and not documents:
         return None
     if not documents:
+        if foreign:
+            # Habia un 6-K en la ventana pero ningun documento confirma el periodo: no se
+            # puede afirmar que ese 6-K fuera (ni que no fuera) el de los resultados.
+            return _result("sin_cobertura_sec", filed_at=filing["filed_at"], filing_url=index_url)
         return _result("periodo_no_coincide", filed_at=filing["filed_at"], filing_url=index_url)
     return _result("ok", filed_at=filing["filed_at"], filing_url=index_url, documents=documents)
 
