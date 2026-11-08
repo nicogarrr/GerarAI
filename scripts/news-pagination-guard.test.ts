@@ -4,6 +4,9 @@ import { test } from 'node:test';
 
 const flow = readFileSync('components/research/NewsEventsFlow.tsx', 'utf8');
 const page = readFileSync('app/(root)/research/news/page.tsx', 'utf8');
+// El feed se extrajo de page.tsx a NewsFeedSection (#4895): la paginación
+// vive en el componente; la página conserva el contrato de searchParams.
+const section = readFileSync('app/(root)/research/news/NewsFeedSection.tsx', 'utf8');
 const actions = readFileSync('lib/actions/research.actions.ts', 'utf8');
 const flowEs = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).flow;
 const route = readFileSync('data-engine/app/api/routes/news.py', 'utf8');
@@ -22,9 +25,10 @@ test('el flujo de noticias pagina dentro de la pagina, sin scroll infinito', () 
 test('la pagina pide al servidor la ventana de ?pagina y un evento extra para saber si hay siguiente', () => {
   assert.match(page, /pagina\?: string/);
   assert.match(page, /ticker\?: string/);
-  assert.match(page, /getResearchNews\(\s*lane,\s*\(page - 1\) \* NEWS_PAGE_SIZE,\s*NEWS_PAGE_SIZE \+ 1,\s*ticker,\s*paraTiTickers,?\s*\)/);
-  assert.match(page, /fetched\.length > NEWS_PAGE_SIZE/);
-  assert.doesNotMatch(page, /events\.filter\(/);
+  assert.match(page, /page=\{page\}/, 'la página pasa la ventana pedida al componente del feed');
+  assert.match(section, /getResearchNews\(\s*lane,\s*\(page - 1\) \* NEWS_PAGE_SIZE,\s*NEWS_PAGE_SIZE \+ 1,\s*ticker,\s*paraTiTickers,?\s*\)/);
+  assert.match(section, /fetched\.length > NEWS_PAGE_SIZE/);
+  assert.doesNotMatch(section, /events\.filter\(/);
 });
 
 test('el carril cambia de pagina conservando lane y la API acota limit/offset en SQL', () => {

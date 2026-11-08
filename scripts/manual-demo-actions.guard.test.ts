@@ -8,6 +8,7 @@
  */
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash, createHmac } from 'node:crypto';
 import { register } from 'node:module';
 
 register('./manual-demo-guard.loader.mjs', import.meta.url);
@@ -663,6 +664,10 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
     let listing: Array<{ symbol: string; currency: string }> | 'fail';
     let listingCalls = 0;
     let urls: string[] = [];
+    // Backend propio (cotización Yahoo para símbolos fuera del listado US):
+    // se registran path y cabeceras para verificar la identidad firmada.
+    let backend: Record<string, unknown> = {};
+    let backendCalls: Array<{ path: string; headers: Record<string, string> }> = [];
     const realNow = Date.now;
     let skewMs = 0;
     beforeEach(() => {
@@ -675,10 +680,22 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
         urls = [];
         listingCalls = 0;
         listing = [{ symbol: 'BBVA', currency: 'USD' }, { symbol: 'T00', currency: 'USD' }];
+        backend = {};
+        backendCalls = [];
         process.env.FINNHUB_API_KEY = 'guard-key';
-        globalThis.fetch = (async (input: RequestInfo | URL) => {
+        globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
             const url = String(input);
             urls.push(url);
+            if (url.startsWith('http://backend.invalid')) {
+                const u = new URL(url);
+                backendCalls.push({ path: u.pathname, headers: (init?.headers ?? {}) as Record<string, string> });
+                const symbol = decodeURIComponent(u.pathname.split('/').pop() ?? '');
+                const b = backend[symbol];
+                if (b instanceof Error) throw b;
+                if (b instanceof Response) return b;
+                if (!b) return new Response('{}', { status: 404 });
+                return new Response(JSON.stringify(b), { status: 200 });
+            }
             if (url.includes('/stock/symbol')) {
                 listingCalls++;
                 if (listing === 'fail') return new Response('no', { status: 500 });
@@ -700,6 +717,8 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
         Date.now = realNow;
         globalThis.fetch = realFetch;
         delete process.env.FINNHUB_API_KEY;
+        delete process.env.FMP_BACKEND_URL;
+        delete process.env.RESEARCH_AUTH_SECRET;
     });
 
     it('sin sesión devuelve error y no consulta cotizaciones ni base de datos', async () => {
@@ -810,16 +829,61 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
         assert.equal(listingCalls, 1);
     });
 
-    it('causas distintas: símbolo ausente del listado vs proveedor de cotización caído', async () => {
+    it('ausente del listado US: cotización del backend propio con identidad firmada (nunca Finnhub)', async () => {
         await actions.placeManualOrder(buyAccion());
         await actions.placeManualOrder(buyAccion({ instrument: { kind: 'accion', symbol: 'DOWN', name: 'Down' } }));
         listing = [{ symbol: 'DOWN', currency: 'EUR' }];
         g.__GUARD_QUOTES__ = { DOWN: new Error('proveedor caido') };
+        process.env.FMP_BACKEND_URL = 'http://backend.invalid';
+        const secret = 'guard-research-secret-0123456789abcdef';
+        process.env.RESEARCH_AUTH_SECRET = secret;
+        backend = { 'BBVA.MC': { c: 12, d: 0, dp: 0, h: 12, l: 12, o: 12, pc: 11, cd: '2026-11-06', currency: 'EUR' } };
         const r = (await actions.getManualDemoValuation()) as unknown as VResult;
-        const byNote = r.valuation.rows.map((x) => x.note);
-        assert.ok(byNote.includes('No se pudo verificar la divisa de la cotización.'), 'ausente del listado');
-        assert.ok(byNote.some((n) => n.startsWith('Sin cotización disponible')), 'proveedor caído con divisa verificada');
-        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, ['DOWN'], 'solo se pide la cotización con divisa verificable');
+        const rows = r.valuation.rows;
+        // BBVA.MC no está en el listado US: lo valora el backend (divisa declarada EUR).
+        assert.equal(rows[0].status, 'valorada', 'el backend declara EUR y la posición es EUR');
+        assert.equal(rows[0].marketValue, 120, '10 acciones x 12 EUR del backend');
+        assert.ok(rows[1].note.startsWith('Sin cotización disponible'), 'proveedor caído con divisa verificada');
+        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, ['DOWN'], 'BBVA.MC nunca se pide a Finnhub');
+        assert.equal(backendCalls.length, 1, 'una sola llamada al backend');
+        const call = backendCalls[0];
+        assert.equal(call.path, '/api/market/quote/BBVA.MC');
+        // Identidad firmada REAL (research-identity sin stub): la firma HMAC
+        // se recomputa aquí con el mismo secreto y debe coincidir byte a byte.
+        assert.equal(call.headers['X-CavaAI-User'], USER.id);
+        assert.equal(call.headers['X-CavaAI-Tenant'], USER.id);
+        assert.equal(call.headers['X-CavaAI-Method'], 'GET');
+        assert.equal(call.headers['X-CavaAI-Path'], '/api/market/quote/BBVA.MC');
+        const bodyHash = createHash('sha256').update('').digest('hex');
+        const signed = `${USER.id}:${USER.id}:${call.headers['X-CavaAI-Timestamp']}:${call.headers['X-CavaAI-Nonce']}:GET:/api/market/quote/BBVA.MC:${bodyHash}`;
+        assert.equal(call.headers['X-CavaAI-Body-Hash'], bodyHash);
+        assert.equal(call.headers['X-CavaAI-Signature'], createHmac('sha256', secret).update(signed).digest('hex'), 'firma ligada a método, path y cuerpo');
+        const emailSigned = `${USER.id}:${USER.id}:${call.headers['X-CavaAI-Timestamp']}:${call.headers['X-CavaAI-Nonce']}:email:${USER.email}`;
+        assert.equal(call.headers['X-CavaAI-Email'], USER.email);
+        assert.equal(call.headers['X-CavaAI-Email-Signature'], createHmac('sha256', secret).update(emailSigned).digest('hex'));
+    });
+
+    it('ausente del listado US SIN secreto de firma: N/D y NINGUNA petición sale sin firmar', async () => {
+        await actions.placeManualOrder(buyAccion());
+        listing = [{ symbol: 'OTRO', currency: 'USD' }];
+        process.env.FMP_BACKEND_URL = 'http://backend.invalid';
+        delete process.env.RESEARCH_AUTH_SECRET;
+        const r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r.valuation.rows[0].status, 'sin-cotizacion', 'sin firma no hay cotización del backend');
+        assert.equal(r.valuation.rows[0].note, 'Sin cotización disponible de las fuentes admitidas (no se usa el precio de tus operaciones).');
+        assert.deepEqual(backendCalls, [], 'ninguna petición al backend sale sin identidad firmada');
+        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, [], 'tampoco se pide a Finnhub');
+    });
+
+    it('ausente del listado US SIN backend configurado: N/D sin fuga (fetchFailed)', async () => {
+        await actions.placeManualOrder(buyAccion());
+        listing = [{ symbol: 'OTRO', currency: 'USD' }];
+        delete process.env.FMP_BACKEND_URL;
+        const r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r.valuation.rows[0].status, 'sin-cotizacion');
+        assert.equal(r.quoteFetchFailed, true, 'el intento al backend cuenta como fallo transitorio');
+        assert.deepEqual(backendCalls, []);
+        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, []);
     });
 
     it('quoteFetchFailed: solo si TODAS las cotizaciones verificables fallan; Retry-After propagado', async () => {
