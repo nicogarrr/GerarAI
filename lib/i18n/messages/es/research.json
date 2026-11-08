@@ -2162,6 +2162,7 @@
   "institucionales": {
     "title": "Todos los gestores 13F",
     "summary": "{holders} gestores declaran {shares} acciones a {period} (el trimestre anterior, {prior}).",
+    "notInDataset": "Esta acción no aparece en los 13F de {period}: ningún gestor la declara ni este trimestre ni el anterior.",
     "net": "Neto de los gestores que presentaron ambos trimestres frente a {prior}: {net} acciones.",
     "countsLabel": "Movimientos del trimestre",
     "top": "Mayores tenedores",
@@ -2194,6 +2195,7 @@
     "noCusip": "Sin CUSIP verificado: no se puede cruzar con las carteras N-PORT.",
     "empty": "Aún no hay carteras N-PORT sincronizadas para esta acción.",
     "summary": "{funds} fondos y ETF de EE. UU. declaran {shares} acciones ({value}) en el fichero N-PORT {dataset}.",
+    "notInDataset": "Esta acción no aparece en el fichero N-PORT {dataset}: ningún fondo o ETF registrado en EE. UU. la declara en este fichero.",
     "top": "Más acciones",
     "byWeight": "Donde más pesa",
     "weightOfFund": "{pct} del fondo",

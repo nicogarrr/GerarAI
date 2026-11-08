@@ -283,3 +283,18 @@ def test_job_reprocesa_cuando_el_universo_crece():
     assert view["status"] == "ok" and view["period"] == "2026-06-30" and view["totals"]["holders"] >= 1
     third = ih.refresh_institutional_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
     assert third["status"] == "sin_cambios"  # universo completo ya procesado
+
+
+def test_ingesta_sin_13f_validos_no_persiste_ni_marca_procesado():
+    """Todos los 13F ignorados (incompletos: 1 fila de 40 declaradas): N/D, no
+    «0 gestores», y el fichero NO queda procesado (el reintento no se congela)."""
+    db = _db()
+    cusips = ih.universe_cusips(db)
+    q2 = _zip(["I2\t15-AUG-2026\t13F-HR\t1\t30-JUN-2026"], ["I2\t30-JUN-2026\t\t\t\tAlpha"], [_info("I2", APPLE, 110)], ["I2\t0\t40"])
+    q1 = _zip(["I1\t15-MAY-2026\t13F-HR\t1\t31-MAR-2026"], ["I1\t31-MAR-2026\t\t\t\tAlpha"], [_info("I1", APPLE, 100)], ["I1\t0\t40"])
+    parses = [ds.parse_dataset(q2, set(cusips), url="https://www.sec.gov/files/x/q2.zip"),
+              ds.parse_dataset(q1, set(cusips), url="https://www.sec.gov/files/x/q1.zip")]
+    out = ih.ingest_parsed(db, parses, ["i2", "i1"], cusips)
+    assert out["status"] == "sin_datos"
+    assert db.query(PublicSourceDocument).count() == 0
+    assert ih.institutional_holders(db, "AAPL")["status"] == "sin_datos"

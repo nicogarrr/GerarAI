@@ -178,3 +178,14 @@ def test_job_reprocesa_cuando_el_universo_crece_aunque_el_fichero_ya_estaba():
     assert view["totals"] == {"funds": 1, "shares": 500.0, "value_usd": 60000.0}
     third = fh.refresh_fund_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
     assert third["status"] == "sin_cambios"  # universo completo ya procesado
+
+
+def test_ingesta_sin_informes_validos_no_persiste_ni_marca_procesado():
+    """Parser que devuelve {} (cabeceras o fechas cambiadas, sin lanzar): N/D,
+    no «0 fondos», y el fichero NO queda procesado (el reintento no se congela)."""
+    db = _db()
+    cusips = fh.universe_cusips(db)
+    out = fh.ingest_reports(db, {}, REF, "x9", cusips)
+    assert out["status"] == "sin_datos" and out["companies"] == 0 and out["series"] == 0
+    assert db.query(PublicSourceDocument).count() == 0
+    assert fh.fund_holders(db, "AAPL")["status"] == "sin_datos"

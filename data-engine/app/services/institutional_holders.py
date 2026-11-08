@@ -290,6 +290,12 @@ def ingest_parsed(db: Session, parses: list[ds.DatasetParse], checksums: list[st
     if current is None or prior is None or prior >= current:
         return {"status": "sin_datos", "reason": "periodos no comparables"}
     periods, ignored = ds.resolve_periods(parses)
+    if not periods.get(current) and not periods.get(prior):
+        # Ningún 13F válido en los dos periodos (todos ignorados: incompletos o
+        # cabeceras cambiadas): N/D sin persistir; guardar ceros aquí sería
+        # inventar ausencia de gestores y marcaría el fichero como procesado.
+        return {"status": "sin_datos", "reason": "los ficheros no traen 13F válidos", "period": current.isoformat(),
+                "prior": prior.isoformat(), "companies": 0, "filings_skipped": ignored}
     checksum = hashlib.sha256("|".join(checksums).encode()).hexdigest()
     stored = 0
     for cusip, company in cusips.items():

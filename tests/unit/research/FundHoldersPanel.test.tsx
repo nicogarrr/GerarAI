@@ -50,4 +50,17 @@ describe('FundHoldersPanel', () => {
     expect(columns.length).toBeGreaterThan(1);
     columns.forEach((column) => expect(column).toHaveClass('min-w-0'));
   });
+
+  it('cero observado: la acción no aparece en el fichero, no «0 fondos declaran 0 acciones»', () => {
+    const zero: FundHolders = { ...data, totals: { funds: 0, shares: 0, value_usd: 0 }, top_funds: [], by_weight: [] };
+    render(<FundHoldersPanel data={zero} locale="es" />);
+    expect(screen.getByRole('status')).toHaveTextContent(/no aparece en el fichero N-PORT 3T 2026/);
+    expect(screen.queryByText(/0 fondos y ETF/)).not.toBeInTheDocument();
+  });
+
+  it('cero observado en inglés', () => {
+    const zero: FundHolders = { ...data, totals: { funds: 0, shares: 0, value_usd: 0 }, top_funds: [], by_weight: [] };
+    render(<FundHoldersPanel data={zero} locale="en" />);
+    expect(screen.getByRole('status')).toHaveTextContent(/does not appear in the Q3 2026 N-PORT file/);
+  });
 });

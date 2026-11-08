@@ -151,6 +151,13 @@ def fund_holders(db: Session, ticker: str) -> dict[str, Any] | None:
 def ingest_reports(db: Session, reports: dict[str, nport.FundReport], dataset: nport.NportDatasetRef, checksum: str,
                    cusips: dict[str, Company]) -> dict[str, Any]:
     latest = nport.latest_by_series(reports)
+    if not latest:
+        # Sin informes válidos no se guarda nada: un parser que devuelve {}
+        # (cabeceras o fechas cambiadas, sin lanzar) no puede convertirse en
+        # «0 fondos» ni marcar el fichero como procesado (congelaría el
+        # reintento). N/D y a reintentar en la próxima pasada.
+        return {"status": "sin_datos", "reason": "el fichero no trae informes N-PORT válidos", "dataset": dataset.label,
+                "series": 0, "companies": 0}
     stored = 0
     for cusip, company in cusips.items():
         summary = summarize(latest, cusip)
