@@ -8,6 +8,11 @@ ejecutada (se declara), ni ``run_from_any_context``/``run_in_threadpool``
 reales (doblados). Los esquemas de salida CompanyOut y
 CompanySnapshotsBatchOut van doblados donde validar exigía una Company
 completa: se prueba la logica de la ruta, no el contrato pydantic.
+
+Declaracion de la medicion propia: el modulo tiene 735 sentencias y 176
+ramas; este archivo deja 108 sentencias sin ejecutar (84,19% de cobertura
+propia). Nada de HTTP, SQL ejecutada ni validacion pydantic real en estos
+tests.
 """
 
 import asyncio
@@ -19,6 +24,15 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 import app.api.routes.companies as c
+
+
+@pytest.fixture(autouse=True)
+def _estado_de_dobles_limpio():
+    # Los dobles con registro de instancias no acumulan estado entre tests
+    # ni lo dejan para otros archivos de la suite.
+    yield
+    _JournalService.instancias.clear()
+    _LearningService.instancias.clear()
 
 
 class _Scalars:
@@ -214,12 +228,16 @@ def test_extended_quote_divisas_incompatibles_no_mezcla(monkeypatch):
     assert salida.close_change is None
 
 
-def test_snapshots_batch_deduplica_y_normaliza(monkeypatch):
-    # Rama 225->223: entradas vacias o repetidas se saltan; se pide una vez.
-    monkeypatch.setattr(
-        c, "resolve_companies",
-        lambda db, requested: ([SimpleNamespace(id=1, ticker="ASTS")], ["FALTA"]),
-    )
+def test_snapshots_batch_deduplica_y_pide_cada_ticker_una_vez(monkeypatch):
+    # Rama 225->223: entradas vacias o repetidas se saltan; el resolver
+    # recibe cada ticker normalizado UNA sola vez y en orden de llegada.
+    pedidos = []
+
+    def resolver(db, requested):
+        pedidos.append(list(requested))
+        return ([SimpleNamespace(id=1, ticker="ASTS")], ["FALTA"])
+
+    monkeypatch.setattr(c, "resolve_companies", resolver)
     monkeypatch.setattr(
         c, "CompanySnapshotService",
         lambda: SimpleNamespace(build_many=lambda db, comps: {1: "snap-asts"}),
@@ -231,6 +249,7 @@ def test_snapshots_batch_deduplica_y_normaliza(monkeypatch):
     snapshots, missing = c.company_snapshots_batch(
         tickers="asts, ,ASTS,,falta", db=MagicMock(),
     )
+    assert pedidos == [["ASTS", "FALTA"]]
     assert snapshots == {"ASTS": "snap-asts"}
     assert missing == ["FALTA"]
 
@@ -472,6 +491,15 @@ def test_identity_lookup_proveedor_caido(monkeypatch):
     assert error == "proveedor_no_disponible"
 
 
+def _run_cerrando(resultado):
+    """run_from_any_context doblado que CIERRA la corutina recibida (si no,
+    queda 'coroutine was never awaited')."""
+    def fake(coro):
+        coro.close()
+        return resultado
+    return fake
+
+
 def _verdict(**kw):
     base = dict(verified=False, reasons=["proveedor_sin_perfil"], sec=None,
                 provider=None)
@@ -502,7 +530,7 @@ def test_identity_verdict_error_proveedor_reemplaza_razon(monkeypatch):
     # Lineas 555-556: proveedor caido sustituye la razon generica.
     monkeypatch.setattr(c, "resolve_company", lambda db, ticker: None)
     monkeypatch.setattr(
-        c, "run_from_any_context", lambda coro: (None, None, "proveedor_no_disponible"),
+        c, "run_from_any_context", _run_cerrando((None, None, "proveedor_no_disponible")),
     )
     monkeypatch.setattr(
         "app.services.company_identity_verification.compare_identities",
@@ -518,7 +546,7 @@ def test_identity_verdict_verificado_sin_homonimo(monkeypatch):
     monkeypatch.setattr(c, "resolve_company", lambda db, ticker: None)
     monkeypatch.setattr(
         c, "run_from_any_context",
-        lambda coro: ({"name": "AST"}, {"name": "AST"}, None),
+        _run_cerrando(({"name": "AST"}, {"name": "AST"}, None)),
     )
     monkeypatch.setattr(
         "app.services.company_identity_verification.compare_identities",
@@ -535,7 +563,7 @@ def test_identity_verdict_homonimo_rechaza(monkeypatch):
     # Lineas 559-568.
     monkeypatch.setattr(c, "resolve_company", lambda db, ticker: None)
     monkeypatch.setattr(
-        c, "run_from_any_context", lambda coro: ({"name": "A"}, {"name": "A"}, None),
+        c, "run_from_any_context", _run_cerrando(({"name": "A"}, {"name": "A"}, None)),
     )
     monkeypatch.setattr(
         "app.services.company_identity_verification.compare_identities",
@@ -633,14 +661,26 @@ def test_like_escape_escapa_comodines():
     assert c._like_escape("a\\b%c_d") == "a\\\\b\\%c\\_d"
 
 
-def test_search_companies_orden_y_salida(monkeypatch):
-    # Lineas 684-705: ranking y mapeo a CompanySearchItemOut (SQL construida,
-    # no ejecutada: el scalars va doblado).
+def test_search_companies_construye_query_con_ranking_y_escape(monkeypatch):
+    # Lineas 684-705. La SQL va CONSTRUIDA pero NO ejecutada (scalars
+    # doblado): lo que se comprueba es la query compilada (ranking CASE de
+    # exacto/prefijo, ORDER BY, escape literal de % y _ del termino) y el
+    # mapeo a CompanySearchItemOut.
+    capturadas = []
+
+    def scalars(query):
+        capturadas.append(query)
+        return _Scalars([
+            SimpleNamespace(ticker="ASTS", name="AST", exchange="NASDAQ",
+                            currency="USD"),
+        ])
+
     db = MagicMock()
-    db.scalars.return_value = _Scalars([
-        SimpleNamespace(ticker="ASTS", name="AST", exchange="NASDAQ", currency="USD"),
-    ])
+    db.scalars.side_effect = scalars
     salida = c.search_companies(q="as%_ts", limit=5, db=db)
+    sql = str(capturadas[0].compile(compile_kwargs={"literal_binds": True}))
+    assert "CASE" in sql and "ORDER BY" in sql
+    assert "%as\\%\\_ts%" in sql  # termino escapado: comodines literales
     assert salida.results[0].ticker == "ASTS"
     assert salida.results[0].name == "AST"
 
