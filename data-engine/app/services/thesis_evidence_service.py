@@ -33,6 +33,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -304,6 +305,47 @@ class ThesisEvidenceService:
         return _await_sync(
             lambda: sec_edgar_connector.recent_filings(cik, forms=FILING_FORMS, limit=FILING_LOOKUP_LIMIT)
         )
+
+    def _fetch_non_sec_reports(self, company: Company) -> tuple[list[Any], str]:
+        from app.services.issuer_reports import discover_reports
+
+        return _await_sync(lambda: discover_reports(company), timeout=60.0)
+
+    def _enqueue_report(self, db: Session, company: Company, link: Any, published: str | None) -> None:
+        from app.workers.dramatiq_app import process_document
+
+        kind = "annual_report" if link.kind == "annual" else "interim_report"
+        process_document.send(
+            company.ticker, link.title, link.url, kind, published,
+            db.info.get("tenant_id"), db.info.get("user_id"),
+            filing_metadata={"form": kind, "provider": link.source, "report_date_hint": link.date},
+        )
+
+    def _non_sec_reports(self, db: Session, company: Company) -> dict[str, Any]:
+        """Último informe anual y último periódico de un emisor sin SEC (``issuer_reports``).
+
+        Se encolan con ``process_document`` (texto troceado, citable con su URL
+        y fecha); uno ya ingerido no se vuelve a pedir."""
+        try:
+            links, reason = self._fetch_non_sec_reports(company)
+        except Exception as exc:  # noqa: BLE001 - best-effort: la tesis sigue
+            _log_source_failure("informes del emisor (sin SEC)", company.ticker, exc)
+            return {"status": "pending", "reason": f"{type(exc).__name__}"}
+        items: list[dict[str, Any]] = []
+        for link in links:
+            item = {"kind": link.kind, "url": link.url, "date": link.date, "source": link.source}
+            if annual_report_has_text(db, company.id, link.url):
+                items.append({**item, "text": "ingested"})
+                continue
+            published = link.date if re.fullmatch(r"\d{4}-\d{2}-\d{2}", link.date or "") else None
+            try:
+                self._enqueue_report(db, company, link, published)
+            except Exception as exc:  # noqa: BLE001
+                _log_source_failure("informes del emisor (sin SEC)", company.ticker, exc)
+                items.append({**item, "text": "pending"})
+                continue
+            items.append({**item, "text": "queued"})
+        return {"status": "ok" if items else "pending", "reason": reason, "items": items}
 
     def _enqueue_annual_report_text(self, db: Session, company: Company, filing: dict[str, Any]) -> None:
         """Encola la descarga + troceado del texto del informe anual (worker).
@@ -886,7 +928,10 @@ class ThesisEvidenceService:
         self, db: Session, company: Company, cik: str | None
     ) -> dict[str, Any]:
         if not cik:
-            return _pending("SEC EDGAR submissions", "Sin CIK no hay filings.")
+            pending = _pending("SEC EDGAR submissions", "Sin CIK no hay filings.")
+            # Emisor sin SEC (Canadá, Reino Unido…): sus informes del registro
+            # oficial del mercado o de su web, por la ingesta normal de documentos.
+            return {**pending, "non_sec_reports": self._non_sec_reports(db, company)}
         try:
             filings = self._fetch_filings(cik) or []
         except Exception as exc:  # noqa: BLE001 - best-effort
