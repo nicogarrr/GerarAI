@@ -252,7 +252,8 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # nueva.
 # 3 (8-nov-2026): ``acquisitions`` (PaymentsToAcquireBusinesses…), que el motor de TIR necesita.
 # 4 (8-nov-2026): ``gain_on_sale_real_estate`` (plusvalías por ventas de inmuebles), para el FFO de un REIT.
-SEC_INGESTION_RULES_VERSION = 4
+# 5 (8-nov-2026): filers IFRS sin minoritarios: ProfitLoss/Equity de respaldo; ``total_debt`` = Borrowings.
+SEC_INGESTION_RULES_VERSION = 5
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("revenue",           ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax", "RegulatedAndUnregulatedOperatingRevenue"],  "USD"),
@@ -386,6 +387,7 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
 # Semantica alineada con us-gaap: beneficio y patrimonio ATRIBUIBLES a la
 # dominante (NetIncomeLoss/StockholdersEquity), nunca el total con
 # minoritarios (ProfitLoss/Equity), que en un holding como BN es ~2,5x.
+SEC_IFRS_DEBT_CONCEPTS = ("Borrowings",)
 SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("revenue",           ["Revenue", "RevenueFromContractsWithCustomers"],                            "USD"),
     ("gross_profit",      ["GrossProfit"],                                                             "USD"),
@@ -408,7 +410,50 @@ SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("dividends_paid",    ["DividendsPaidClassifiedAsFinancingActivities", "DividendsPaid"],          "USD"),
     ("acquisitions",      ["CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities"], "USD"),
     ("common_stock_repurchased", ["PaymentsToAcquireOrRedeemEntitysShares"],                            "USD"),
+    # Deuda financiera total (IAS 32/IFRS 7: «Borrowings» = corriente + no corriente; CNQ FY2025:
+    # 441 + 16.176 = 16.617 M CAD). Sin ella la deuda neta salía 0 con aviso.
+    ("total_debt",        list(SEC_IFRS_DEBT_CONCEPTS),                                                "USD"),
 ]
+
+# Conceptos de minoritarios (IAS 1.81B/54q). Si el filer no etiqueta NINGUNO, no tiene minoritarios
+# y el total coincide con lo atribuible a la dominante: ProfitLoss y Equity sirven como respaldo
+# (CNQ, 40-F: solo etiqueta ProfitLoss/Equity y se quedaba sin beneficio ni patrimonio). Con
+# minoritarios (BN) el respaldo NO se activa: el total sería ~2,5x lo del accionista.
+SEC_IFRS_NCI_CONCEPTS = (
+    "ProfitLossAttributableToNoncontrollingInterests",
+    "NoncontrollingInterests",
+    "EquityAttributableToNoncontrollingInterests",
+    "ComprehensiveIncomeAttributableToNoncontrollingInterests",
+)
+SEC_IFRS_NO_NCI_FALLBACKS = {"net_income": "ProfitLoss", "total_equity": "Equity"}
+
+
+def _ifrs_annual_values(ifrs_facts: dict[str, Any], concept: str) -> dict[tuple[str, str], float]:
+    """{(inicio, fin): valor} de los hechos anuales (FY) de un concepto IFRS, en cualquier unidad."""
+    out: dict[tuple[str, str], float] = {}
+    for rows in ((ifrs_facts.get(concept) or {}).get("units") or {}).values():
+        for row in rows or []:
+            if row.get("fp") == "FY" and row.get("start") and row.get("end") and row.get("val") is not None:
+                out[(str(row["start"]), str(row["end"]))] = float(row["val"])
+    return out
+
+
+def _ifrs_parent_differs_from_total(ifrs_facts: dict[str, Any]) -> bool:
+    """Hay minoritarios aunque no se etiqueten como tales: el beneficio atribuible a la dominante
+    (ProfitLossAttributableToOwnersOfParent) difiere del total (ProfitLoss) en algún ejercicio común
+    (BN 40-F FY2025: 1.307 M frente a 3.235 M). Entonces Equity también incluye minoritarios."""
+    parent = _ifrs_annual_values(ifrs_facts, "ProfitLossAttributableToOwnersOfParent")
+    total = _ifrs_annual_values(ifrs_facts, "ProfitLoss")
+    return any(abs(parent[k] - total[k]) > 0.5 for k in parent.keys() & total.keys())
+
+
+def sec_ifrs_metric_map_for(ifrs_facts: dict[str, Any]) -> list[tuple[str, list[str], str]]:
+    """SEC_IFRS_METRIC_MAP para ESTE filer: añade ProfitLoss/Equity detrás de lo atribuible solo si
+    no etiqueta minoritarios en ningún periodo (entonces total = dominante, por definición)."""
+    if any(ifrs_facts.get(c) for c in SEC_IFRS_NCI_CONCEPTS) or _ifrs_parent_differs_from_total(ifrs_facts):
+        return SEC_IFRS_METRIC_MAP
+    return [(m, [*concepts, SEC_IFRS_NO_NCI_FALLBACKS[m]] if m in SEC_IFRS_NO_NCI_FALLBACKS else concepts, unit)
+            for m, concepts, unit in SEC_IFRS_METRIC_MAP]
 
 
 # Version de las REGLAS de ingesta ESEF; forma parte de la huella del
@@ -888,6 +933,8 @@ def _merge_for_metric(
         }
     if is_summed_component(metric):
         return _sum_disjoint_components(by_concept)
+    if metric == "total_debt" and by_concept and set(by_concept) <= set(SEC_IFRS_DEBT_CONCEPTS):
+        return _collapse_aliases(by_concept)  # IFRS: «Borrowings» ya es el total (corriente + no corriente)
     if metric == "total_debt":
         return _compose_total_debt(by_concept)
     if metric in NESTED_SCOPE_METRICS:
@@ -1933,7 +1980,7 @@ class FinancialIngestionService:
         taxonomy = "us-gaap"
         if not us_gaap and facts_data.get("facts", {}).get("ifrs-full"):
             us_gaap = facts_data["facts"]["ifrs-full"]
-            metric_map = SEC_IFRS_METRIC_MAP
+            metric_map = sec_ifrs_metric_map_for(us_gaap)
             taxonomy = "ifrs-full"
         # Divisa de reporte del filer (10-K: USD; 20-F en US GAAP: CNY, TWD...).
         # Cada hecho monetario se guarda con ELLA como unidad.
