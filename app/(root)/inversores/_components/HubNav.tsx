@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useT } from "@/lib/i18n/client";
 
-// Barra final del hub Inversores/Señales: 4 destinos, decidido por Nico
+// Barra final del hub Inversores/Señales: 4 destinos (+ Políticos, nov-2026), decidido por Nico
 // (WhatsApp 2026-10-20 00:59, Opción A). En móvil UNA sola fila con scroll
 // horizontal si no cabe: "la mitad es menú" (Nico, WhatsApp 2026-10-20 01:15),
 // la doble barra envuelta ocupaba ~7 filas antes del contenido.
@@ -12,6 +12,7 @@ const SECTIONS = [
   ["/inversores"],
   ["/ownership", "13F"],
   ["/insider", "Insiders"],
+  ["/politicos"],
   ["/inversores/aprender"],
 ] as const;
 
@@ -46,7 +47,7 @@ export function HubNav() {
           href={href}
           key={href}
         >
-          {fixed ?? (href === '/inversores' ? t('investors.nav.investors') : t('investors.nav.learn'))}
+          {fixed ?? (href === '/inversores' ? t('investors.nav.investors') : href === '/politicos' ? t('investors.nav.politicians') : t('investors.nav.learn'))}
         </Link>
       ))}
     </nav>

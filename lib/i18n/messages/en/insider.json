@@ -150,5 +150,51 @@
     "noDate": "n/a",
     "persistedOf": "{ticker}: {count} of {scanned} Form 4s from saved filings (latest filing: {latest}); the live SEC EDGAR read failed. The data comes from those filings, not from today.",
     "persisted": "{ticker}: {count} Form 4s from saved filings (latest filing: {latest}); the live SEC EDGAR read failed. The data comes from those filings, not from today."
+  },
+  "politicians": {
+    "metaTitle": "Politicians · disclosed trades",
+    "metaDescription": "Stock trades disclosed by members of the US House (STOCK Act), with their delay.",
+    "title": "Politicians' trades",
+    "intro": "What members of the US House disclose in their PTRs: every trade, its amount range and whether it was disclosed within the 45 days the law allows.",
+    "chamber": "Chamber",
+    "chambers": {
+      "all": "All",
+      "house": "House",
+      "senate": "Senate",
+      "executive": "Executive"
+    },
+    "party": "Party",
+    "parties": {
+      "all": "All",
+      "D": "Democrat",
+      "R": "Republican",
+      "I": "Independent"
+    },
+    "sort": "Sort",
+    "sorts": {
+      "trades": "Most trades",
+      "late": "Most filed late",
+      "recent": "Most recent",
+      "onTime": "Most punctual"
+    },
+    "search": "Search politician or state",
+    "searchButton": "Search",
+    "unavailable": "{chamber}: unavailable. {reason}",
+    "senateReason": "The Senate site (eFD) blocks automated access when accepting its terms.",
+    "executiveReason": "The Office of Government Ethics (OGE 278-T) publishes no free bulk download.",
+    "houseLabel": "Representative",
+    "tradesTickers": "{trades} trades · {tickers} tickers",
+    "lastTrade": "Last trade: {date}",
+    "lateCounts": "{late} filed late, {late30} more than 30 days late",
+    "onTime": "{pct}% on time",
+    "noDates": "no dates",
+    "topTickers": "Most traded",
+    "volume": "Disclosed volume: {range}",
+    "scanned": "{count} scanned paper PTRs not read",
+    "coverage": "{filings} PTRs from {years}; {scanned} scanned on paper (linked; their amounts cannot be read reliably).",
+    "count": "{total} politicians",
+    "more": "See more",
+    "empty": "No disclosures stored yet. They are downloaded from the House Clerk every 6 hours.",
+    "legal": "Source: Clerk of the House. The law (5 U.S.C. §13107) forbids using these reports for commercial purposes, except dissemination to the general public."
   }
 }

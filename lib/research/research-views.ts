@@ -49,6 +49,8 @@ export const MODULES = [
   { key: 'moat', label: 'Foso', tab: 'valoracion', anchor: 'foso' },
   { key: 'changes', label: 'Cambios y revisiones', tab: 'seguimiento' },
   { key: 'holders', label: 'Superinversores', tab: 'seguimiento', anchor: 'superinversores' },
+  { key: 'insiders', label: 'Insiders', tab: 'seguimiento', anchor: 'insiders' },
+  { key: 'politicos', label: 'Políticos', tab: 'seguimiento', anchor: 'politicos' },
   { key: 'directiva', label: 'Credibilidad de la directiva', tab: 'seguimiento', anchor: 'directiva', path: 'management-credibility' },
   { key: 'lecciones', label: 'Lecciones de decisiones', tab: 'seguimiento', anchor: 'lecciones', path: 'decision-lessons' },
   { key: 'satellites', label: 'Satélites AST', tab: 'seguimiento', anchor: 'satellites' },
