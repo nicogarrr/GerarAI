@@ -43,6 +43,8 @@ from app.api.routes import screeners as s
 
 @pytest.fixture(autouse=True)
 def _caches_limpias():
+    # Limpia ANTES y DESPUES: el ultimo test del archivo no puede dejar caches
+    # falsas que contaminen otros archivos de la suite (orden de pytest).
     for nombre in (
         "_real_quote_cache", "_real_profile_cache", "_real_items_cache",
         "_real_response_cache", "_real_refresh_futures", "_real_refresh_generations",
@@ -50,6 +52,12 @@ def _caches_limpias():
     ):
         getattr(s, nombre).clear()
     yield
+    for nombre in (
+        "_real_quote_cache", "_real_profile_cache", "_real_items_cache",
+        "_real_response_cache", "_real_refresh_futures", "_real_refresh_generations",
+        "_real_refresh_last_attempt", "_profile_singleflight", "_finnhub_call_times",
+    ):
+        getattr(s, nombre).clear()
 
 
 def _db(tenant=1):
@@ -398,14 +406,25 @@ def test_fetch_profile_leader_guarda_y_libera(monkeypatch):
     assert "fake:ASTS" not in s._profile_singleflight
 
 
-def test_fetch_profile_follower_espera_y_lee_cache(monkeypatch):
+def test_fetch_profile_follower_espera_al_lider_y_lee_cache(monkeypatch):
+    # La cache empieza VACIA: el follower no puede salir por cache-hit inicial;
+    # solo obtiene el dato porque la espera del singleflight vuelve con el
+    # lider ya publicado.
     vendor = _vendor_falso(profile={"name": "X"})
     monkeypatch.setattr(s, "resolve_screener_vendor", lambda v=None: vendor)
-    listo = threading.Event()
-    listo.set()
-    s._profile_singleflight["fake:ASTS"] = listo
-    s._real_profile_cache["fake:ASTS"] = {"at": time.monotonic(), "data": {"name": "DEL LIDER"}}
+    esperas = []
+
+    class LiderFalso:
+        def wait(self, timeout=None):
+            esperas.append(timeout)
+            s._real_profile_cache["fake:ASTS"] = {
+                "at": time.monotonic(), "data": {"name": "DEL LIDER"},
+            }
+            return True
+
+    s._profile_singleflight["fake:ASTS"] = LiderFalso()
     assert s._fetch_profile(Mock(), "ASTS") == {"name": "DEL LIDER"}
+    assert esperas == [s._REAL_REQUEST_TIMEOUT_SECONDS]
     vendor.fetch_profile.assert_not_called()
 
 
@@ -444,7 +463,9 @@ def test_refresh_background_traga_el_fallo(monkeypatch):
         raise ConnectionError("vendor caido")
 
     monkeypatch.setattr(s, "_refetch_real_items", roto)
-    s._real_refresh_real_items_background = None  # no-op por si acaso
+    # raising=False: el atributo puede no existir; monkeypatch lo retira al
+    # terminar el test en cualquier caso (nada de globales sin restaurar).
+    monkeypatch.setattr(s, "_real_refresh_real_items_background", None, raising=False)
     s._refresh_real_items_background("yahoo", 1, 1)  # no lanza
 
 
@@ -799,12 +820,16 @@ def test_endpoint_cache_hit_con_items_frescos_no_reprograma(monkeypatch):
 
 
 def test_endpoint_carga_fria_espera_lo_minimo_y_declara_no_disponible(monkeypatch):
+    # La espera del cold start va doblada (result() no espera de verdad, asi
+    # que la duracion real del test es cero); lo que se comprueba es el
+    # timeout exacto con el que la ruta espera al futuro.
     monkeypatch.setattr(s, "get_settings", _settings)
     futuro = Mock()
     futuro.done.return_value = False
     futuro.result.side_effect = TimeoutError("sigue sin datos")
     monkeypatch.setattr(s, "_schedule_real_refresh", lambda v, t: futuro)
     result = s.real_time_screener(marketCapMoreThan=None, sector=None, limit=25, db=_db())
+    futuro.result.assert_called_once_with(timeout=s._COLD_START_WAIT_SECONDS)
     assert result["refreshing"] is True
     assert result["unavailable"] is True
     assert result["screener"] == []
