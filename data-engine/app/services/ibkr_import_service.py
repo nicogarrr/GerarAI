@@ -196,6 +196,22 @@ def _symbol_problem(symbol: str | None) -> str | None:
     return None
 
 
+def _flex_raw_payload(element) -> dict:
+    """Atributos XML crudos (prueba fiscal), con los códigos del bróker aparte.
+
+    Flex ``notes`` no son notas del usuario: son códigos de la leyenda oficial
+    del extracto (O = Opening Trade, P = Partial Execution, C = Closing Trade,
+    Ca = Cancelled...; ibkrguides.com/reportingreference/reportguide/codes_default.htm).
+    Se conservan como ``ibkr_notes`` para no ocupar ``notes``, el campo de
+    notas del usuario (el alta/edición manual escriben ahí y la API lo sirve
+    como nota).
+    """
+    payload = dict(element.attrib)
+    if "notes" in payload:
+        payload["ibkr_notes"] = payload.pop("notes")
+    return payload
+
+
 def _shown_symbol(symbol: str) -> str:
     shown = "".join(char if char.isprintable() else "?" for char in symbol)
     return shown if len(shown) <= 30 else shown[:30] + "…"
@@ -1908,7 +1924,7 @@ class IBKRImportService:
                             fees=abs(_decimal(_attr(element, "ibCommission", "commission", "fees"))),
                             currency=_attr(element, "currency") or cancel_company.currency,
                             external_id=external_id,
-                            raw_payload={**dict(element.attrib), "cancels": original.external_id},
+                            raw_payload={**_flex_raw_payload(element), "cancels": original.external_id},
                         )
                     )
                     if external_id:
@@ -1938,7 +1954,7 @@ class IBKRImportService:
                     fees=abs(_decimal(_attr(element, "ibCommission", "commission", "fees"))),
                     currency=_attr(element, "currency") or company.currency,
                     external_id=external_id,
-                    raw_payload=dict(element.attrib),
+                    raw_payload=_flex_raw_payload(element),
                 )
                 if external_id:
                     # F364: se registra SOLO tras validar y crear la fila; un id
@@ -2029,7 +2045,7 @@ class IBKRImportService:
                     fees=Decimal("0"),
                     currency=_attr(element, "currency") or "USD",
                     external_id=external_id,
-                    raw_payload=dict(element.attrib),
+                    raw_payload=_flex_raw_payload(element),
                 )
                 if external_id:
                     # F364: se registra SOLO tras validar y crear la fila; un id
@@ -2081,7 +2097,7 @@ class IBKRImportService:
                     fees=Decimal("0"),
                     currency=_attr(element, "currency") or "USD",
                     external_id=external_id,
-                    raw_payload=dict(element.attrib),
+                    raw_payload=_flex_raw_payload(element),
                 )
                 if external_id:
                     # F364: se registra SOLO tras validar y crear la fila; un id

@@ -65,7 +65,9 @@ def test_adding_a_note_keeps_ibkr_provenance(db):
 
     stored = db.get(Transaction, trade.id)
     assert stored is not None
-    assert stored.raw_payload == {**IBKR_PAYLOAD, "notes": "revisar comisión"}
+    assert stored.raw_payload == {
+        **IBKR_PAYLOAD, "notes": "revisar comisión", "notes_author": "user",
+    }
     assert stored.external_id == "487001"
 
 
@@ -89,7 +91,11 @@ def test_manual_trade_still_stores_only_the_note(db):
     db.commit()
 
     _edit(db, trade.id, "nota")
-    assert db.get(Transaction, trade.id).raw_payload == {"notes": "nota"}  # type: ignore[union-attr]
+    # La nota editada a mano queda marcada como del usuario: la API nunca la
+    # confunde con un codigo de maquina del broker aunque el texto coincida.
+    assert db.get(Transaction, trade.id).raw_payload == {  # type: ignore[union-attr]
+        "notes": "nota", "notes_author": "user",
+    }
 
     _edit(db, trade.id, None)
     assert db.get(Transaction, trade.id).raw_payload == {}  # type: ignore[union-attr]

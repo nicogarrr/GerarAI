@@ -16721,6 +16721,20 @@
             "title": "Fees",
             "type": "number"
           },
+          "ibkr_note_codes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ibkr Note Codes"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -16902,6 +16916,20 @@
           "fees": {
             "title": "Fees",
             "type": "number"
+          },
+          "ibkr_note_codes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ibkr Note Codes"
           },
           "id": {
             "title": "Id",

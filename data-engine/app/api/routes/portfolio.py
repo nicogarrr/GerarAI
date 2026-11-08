@@ -343,7 +343,73 @@ class FXRateInput(BaseModel):
     _rate_date_not_future = field_validator("rate_date")(_not_in_the_future)
 
 
+# Códigos de la leyenda del extracto IBKR publicada en su Reporting
+# Reference (Codes - Default Activity Statement, sitio de guias con marca
+# Interactive Brokers LLC: ibkrguides.com/reportingreference/reportguide/
+# codes_default.htm, actualizada 2025-03-20), unidos con las variantes que
+# recoge el análisis de tipos ib-flex (github.com/clifton/ib-flex,
+# TYPES_ANALYSIS.md). Ambos documentan el campo Flex Trade.notes como códigos
+# de máquina (O = Opening Trade, P = Partial Execution...), con ";".
+_IBKR_NOTE_CODES = frozenset({
+    # Leyenda oficial (ibkrguides)
+    "A", "AEx", "Adj", "Al", "Aw", "B", "Bo", "C", "CD", "CP", "Ca",
+    "Co", "Cx", "ETF", "Ep", "Ex", "G", "GEA", "HC", "HFI", "HFR",
+    "I", "IA", "INV", "L", "LD", "LI", "LT", "Lo", "M", "MEx", "ML",
+    "MLG", "MLL", "MSG", "MSL", "O", "P", "PI", "Po", "Pr", "R", "Rb",
+    "RED", "Re", "Ri", "RI", "SI", "SL", "SO", "SS", "ST", "SY", "T",
+    # Variantes ib-flex (distinta capitalización y códigos extra, p. ej. W)
+    "Ae", "Af", "Cd", "Cp", "Cr", "Cs", "D", "Et", "Hc", "Hi", "Hr",
+    "Ia", "Iv", "Li", "Ln", "Lt", "Ml", "Mn", "Ms", "Mi", "Mx", "Pt",
+    "Fr", "Fp", "Pi", "Pa", "Rd", "Rv", "Si", "Sp", "So", "Ss", "St",
+    "Sy", "W",
+})
+
+# Identidad de bróker en raw_payload: la fila vino de un extracto, no del alta
+# manual (mismos marcadores que usa la conciliación de costes IBKR).
+_BROKER_IDENTITY_KEYS = ("tradeID", "ibExecID", "transactionID")
+
+
+def _user_notes_and_broker_codes(raw: dict) -> tuple:
+    """Separa la nota del usuario de los códigos de máquina del bróker.
+
+    Las importaciones Flex nuevas guardan los códigos en ``ibkr_notes``; las
+    filas históricas los llevan volcados en ``notes``, el campo del usuario.
+    Una fila con identidad de bróker cuyo ``notes`` son solo códigos de la
+    leyenda oficial no tiene nota del usuario: la API sirve notes=None y
+    expone los códigos aparte (el front pintaba una «P» a pelo). Un texto
+    cualquiera, aunque la fila sea del bróker, es nota del usuario y se sirve.
+    Autoría explícita: el alta y la edición manual marcan
+    ``notes_author="user"`` y su nota no se suprime nunca, ni aunque sea un
+    código de la leyenda (caso límite: una nota histórica "P" sin marcar en
+    fila de bróker sigue ocultándose; basta editarla una vez para fijarla).
+    """
+    notes = raw.get("notes")
+    if raw.get("notes_author") == "user":
+        codes_raw = raw.get("ibkr_notes")
+        codes = (
+            [part.strip() for part in codes_raw.split(";") if part.strip()]
+            if isinstance(codes_raw, str) and codes_raw.strip()
+            else None
+        )
+        return notes, codes
+    codes_raw = raw.get("ibkr_notes")
+    codes = None
+    if isinstance(codes_raw, str) and codes_raw.strip():
+        codes = [part.strip() for part in codes_raw.split(";") if part.strip()]
+    elif (
+        isinstance(notes, str)
+        and notes.strip()
+        and any(raw.get(key) for key in _BROKER_IDENTITY_KEYS)
+    ):
+        parts = [part.strip() for part in notes.split(";") if part.strip()]
+        if parts and all(part in _IBKR_NOTE_CODES for part in parts):
+            codes = parts
+            notes = None
+    return notes, codes
+
+
 def _transaction_payload(transaction: Transaction, company: Company) -> dict:
+    notes, broker_codes = _user_notes_and_broker_codes(transaction.raw_payload or {})
     return {
         "id": transaction.id,
         "ticker": company.ticker,
@@ -353,7 +419,8 @@ def _transaction_payload(transaction: Transaction, company: Company) -> dict:
         "fees": float(transaction.fees),
         "currency": transaction.currency,
         "trade_date": transaction.trade_date.isoformat(),
-        "notes": (transaction.raw_payload or {}).get("notes"),
+        "notes": notes,
+        "ibkr_note_codes": broker_codes,
         # Compra a precio 0 aceptada pero marcada para revisión (regalo / spin-off).
         "review_flag": ZERO_COST_REVIEW_LABEL if is_zero_cost_buy(transaction) else None,
         "created_at": transaction.created_at.isoformat(),
@@ -1240,7 +1307,11 @@ def create_transaction_batch(
                     fees=tx_input.fees,
                     currency=canonical_currency_code(tx_input.currency),
                     external_id=f"manual-{uuid4().hex}",
-                    raw_payload={"notes": tx_input.notes} if tx_input.notes else {},
+                    raw_payload=(
+                        {"notes": tx_input.notes, "notes_author": "user"}
+                        if tx_input.notes
+                        else {}
+                    ),
                 )
                 db.add(transaction)
                 db.flush()
@@ -1424,9 +1495,16 @@ def update_transaction(
     # Solo «notes» es del usuario: el resto del rastro (tradeID, accountId,
     # identidad del CSV...) se conserva; sin el, la conciliacion de costes de
     # IBKR tomaba la compra por no nativa y ocultaba coste y plusvalia.
-    raw_payload = {key: value for key, value in (transaction.raw_payload or {}).items() if key != "notes"}
+    raw_payload = {
+        key: value
+        for key, value in (transaction.raw_payload or {}).items()
+        if key not in ("notes", "notes_author")
+    }
     if payload.notes:
         raw_payload["notes"] = payload.notes
+        # Autoria: una nota escrita por el usuario no se suprime jamas como
+        # codigo de broker, aunque el texto sea un codigo de la leyenda IBKR.
+        raw_payload["notes_author"] = "user"
     transaction.raw_payload = raw_payload
     try:
         # La sesion va con autoflush=False: sin volcar el cambio, la consulta
