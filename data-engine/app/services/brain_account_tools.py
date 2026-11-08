@@ -2232,6 +2232,109 @@ def _lessons_answer(db: Session, tenant: int) -> ChatResponse:
     return _response("\n".join(lines), sources, "account_lessons")
 
 
+#: «¿Me da el efectivo para comprar 10 acciones de META?», «¿tengo suficiente
+#: dinero para comprar POOL?»: una cuenta con tus datos, no una orden.
+_AFFORD = re.compile(
+    r"\b(?:me\s+(?:da|llega|alcanza|basta)n?|(?:tengo|hay)\s+(?:suficiente|bastante)|puedo\s+permitirme"
+    r"|do\s+i\s+have\s+enough|can\s+i\s+afford)\b[^.?!\n]{0,60}?\b(?:para\s+)?(?:comprar|adquirir|buy)\b"
+    r"|\bcan\s+i\s+afford\b"
+)
+_AFFORD_QTY = re.compile(r"\b(\d+(?:[.,]\d+)?)\s+(?:acciones|titulos|shares)\b")
+
+
+def asks_affordability(question: str) -> bool:
+    return bool(_AFFORD.search(_fold(question)))
+
+
+def affordability_answer(db: Session, company, question: str) -> ChatResponse | None:
+    """Efectivo guardado frente al precio guardado de ``company`` (y la cantidad pedida).
+
+    Solo lectura y del tenant. Convierte con el tipo de cambio guardado; si no
+    lo hay, da las dos cifras sin compararlas. Nunca dice «compra».
+    """
+    from app.models import CashBalance, MarketPrice
+    from app.services.portfolio_fx_service import PortfolioFXService
+    from app.valuation.currency import normalize_currency
+
+    tenant = _tenant(db)
+    if tenant is None or company is None:
+        return None
+    english = _english()
+    rows = list(db.scalars(select(CashBalance).where(CashBalance.tenant_id == tenant)
+                           .order_by(CashBalance.currency)))
+    price_row = db.scalar(select(MarketPrice).where(MarketPrice.company_id == company.id, MarketPrice.close > 0)
+                          .order_by(MarketPrice.date.desc()).limit(1))
+    if not rows:
+        text = ("You have no cash balance saved, so I can't compare it with the price. You can add it in Portfolio."
+                if english else "No tienes efectivo guardado, así que no puedo compararlo con el precio. "
+                "Puedes añadirlo en Cartera.")
+        return _response(text, [], "account_affordability")
+    totals: dict[str, Decimal] = {}
+    for row in rows:
+        if row.balance is not None:
+            totals[row.currency] = totals.get(row.currency, Decimal("0")) + Decimal(row.balance)
+    cash_day = max(row.as_of for row in rows)
+    cash_text = ", ".join(_money(float(v), c, english=english) for c, v in sorted(totals.items()))
+    lines = [(f"Your saved cash (as of {_date_en(cash_day)}): {cash_text}." if english
+              else f"Tu efectivo guardado (a {fecha_es(cash_day)}): {cash_text}.")]
+    sources = [_source("cash_balance", rows[0].id, "Efectivo", "/portfolio")]
+    if price_row is None:
+        lines.append(f"I have no saved price for {company.ticker}." if english
+                     else f"No tengo precio guardado de {company.ticker}.")
+        return _response("\n".join(lines), sources, "account_affordability")
+    major, divisor = normalize_currency(company.currency or "USD")
+    price_cur = major or (company.currency or "USD")
+    price = Decimal(price_row.close) / Decimal(divisor)
+    day = _date_en(price_row.date) if english else fecha_es(price_row.date)
+    sources.append(_source("market_price", price_row.id, f"{company.ticker} {day}", f"/companies/{company.ticker}"))
+    qty_match = _AFFORD_QTY.search(_fold(question))
+    qty = Decimal(qty_match.group(1).replace(",", ".")) if qty_match else None
+    price_text = _money(float(price), price_cur, english=english)
+    if qty is not None:
+        cost = price * qty
+        lines.append(f"{company.ticker} closed at {price_text} on {day}: {_num_en(float(qty), 0)} shares are "
+                     f"{_money(float(cost), price_cur, english=english)} before fees." if english
+                     else f"{company.ticker} cerró a {price_text} el {day}: {num_es(float(qty), 0)} acciones son "
+                     f"{_money(float(cost), price_cur)} antes de comisiones.")
+    else:
+        cost = price
+        lines.append(f"{company.ticker} closed at {price_text} on {day}." if english
+                     else f"{company.ticker} cerró a {price_text} el {day}.")
+    # Efectivo en la divisa del precio: misma divisa tal cual; si no, tipo guardado.
+    fx = PortfolioFXService()
+    available = Decimal("0")
+    missing_fx = False
+    for currency, amount in totals.items():
+        if (normalize_currency(currency)[0] or currency) == price_cur:
+            available += amount
+            continue
+        rate = fx.rate(db, quote_currency=currency, base_currency=price_cur, as_of=local_today())
+        if rate is None:
+            missing_fx = True
+            continue
+        available += amount * Decimal(rate)
+    if missing_fx and not available:
+        lines.append("I have no saved exchange rate to compare both amounts." if english
+                     else "No tengo tipo de cambio guardado para comparar las dos cifras.")
+    elif qty is not None:
+        gap = available - cost
+        avail = _money(float(available), price_cur, english=english)
+        if gap >= 0:
+            lines.append(f"Your cash is about {avail}: it covers it, with {_money(float(gap), price_cur, english=english)} left."
+                         if english else f"Tu efectivo son unos {avail}: te llega y sobran {_money(float(gap), price_cur)}.")
+        else:
+            lines.append(f"Your cash is about {avail}: it falls short by {_money(float(-gap), price_cur, english=english)}."
+                         if english else f"Tu efectivo son unos {avail}: no te llega, faltan {_money(float(-gap), price_cur)}.")
+    else:
+        whole = int(available // cost) if cost > 0 else 0
+        lines.append(f"With about {_money(float(available), price_cur, english=english)} it covers {whole} shares before fees."
+                     if english else f"Con unos {_money(float(available), price_cur)} te llega para {num_es(float(whole), 0)} "
+                     "acciones antes de comisiones.")
+    lines.append("It's a calculation with your saved data, not an order: GerarAI doesn't trade at your broker." if english
+                 else "Es una cuenta con tus datos guardados, no una orden: GerarAI no opera en tu bróker.")
+    return _response("\n".join(lines), sources, "account_affordability")
+
+
 def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     """Respuesta de datos de la cuenta, o None si la pregunta no es de este módulo."""
     tenant = _tenant(db)
@@ -2294,4 +2397,4 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     return None
 
 
-__all__ = ["answer_account_question"]
+__all__ = ["affordability_answer", "answer_account_question", "asks_affordability"]
