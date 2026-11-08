@@ -855,7 +855,8 @@ function getUsListing(): Promise<Map<string, string> | null> {
  * Cotización del BACKEND propio (GET /api/market/quote/{symbol}: Yahoo chart
  * API saneada en data-engine, caché de 60 s allí) para símbolos que el listado
  * US de Finnhub no cubre (.MC, .PA, .DE...). La divisa la DECLARA el backend
- * (meta de Yahoo, normalizada a ISO 4217 en data-engine); sin divisa declarada
+ * (meta.currency de Yahoo, copiada tal cual por data-engine en market.py, sin
+ * normalizar a ISO 4217); sin divisa declarada
  * la fila queda N/D en la valoración, nunca se infiere. fetchFailed distingue
  * el fallo transitorio del dato genuinamente ausente, como finnhubOnlyQuote.
  */
@@ -878,9 +879,11 @@ async function backendYahooQuote(symbol: string, signal?: AbortSignal): Promise<
 }
 
 /**
- * Valoración BAJO DEMANDA de las posiciones abiertas con cotizaciones reales
- * (Finnhub /quote directo, validada por frescura; sin fallback a Yahoo ni a
- * getStockQuote). Las cotizaciones pasan por valuationQuoteCache (dedupe por
+ * Valoración BAJO DEMANDA de las posiciones abiertas con cotizaciones reales:
+ * Finnhub /quote directo (validada por frescura) para los símbolos del listado
+ * US, y la cotización del backend propio (Yahoo saneada en data-engine) para
+ * los mercados que Finnhub free no cubre; sin fallback a getStockQuote. Las
+ * cotizaciones pasan por valuationQuoteCache (dedupe por
  * símbolo, TTL 20 s, revalidación de frescura al servir, backoff compartido
  * tras fallos): una ráfaga de valoraciones en la misma ventana comparte los
  * fetches; la hora de cada fila sigue siendo la del proveedor (quote.t).

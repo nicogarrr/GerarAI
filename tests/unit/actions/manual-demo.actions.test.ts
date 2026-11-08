@@ -32,7 +32,10 @@ vi.mock('@/lib/market/quote-cache', () => ({
     createQuoteCache: () => ({ getQuote: cacheGetQuote }),
     combineAbortSignals: (s: AbortSignal) => s,
 }));
-vi.mock('@/lib/market/quote-freshness', () => ({ sanitizeFinnhubQuote: (q: unknown) => q }));
+vi.mock('@/lib/market/quote-freshness', async (importActual) => ({
+    ...(await importActual<typeof import('@/lib/market/quote-freshness')>()),
+    sanitizeFinnhubQuote: (q: unknown) => q,
+}));
 
 import { instrumentKey } from '@/lib/paper-trading/types';
 
@@ -93,6 +96,8 @@ beforeEach(() => {
     accountCreate.mockResolvedValue([{}] as never);
     accountFindOneAndUpdate.mockResolvedValue({ userId: 'user-1', version: 2 });
     delete process.env.FINNHUB_API_KEY;
+    delete process.env.FMP_BACKEND_URL;
+    delete process.env.RESEARCH_AUTH_SECRET;
 });
 
 describe('auth primero', () => {
@@ -497,7 +502,7 @@ describe('getManualDemoValuation: cotización real o N/D', () => {
     const bbvaPosition = {
         instrumentKey: 'A:BBVA.MC', name: 'BBVA', kind: 'accion', currency: 'EUR', quantity: 100, avgCost: 9, realizedPnl: 0,
     };
-    const usOnlyListing = () => vi.stubGlobal('fetch', vi.fn<(...args: any[]) => any>(async () => ({ ok: true, json: async () => [{ symbol: 'AAPL', currency: 'USD' }] } as Response)));
+    const usOnlyListing = () => vi.stubGlobal('fetch', vi.fn(async (..._args: Parameters<typeof fetch>): Promise<Response> => ({ ok: true, json: async () => [{ symbol: 'AAPL', currency: 'USD' }] } as Response)));
 
     it('fuera del listado US con divisa declarada por el backend -> valorada con base backend-yahoo', async () => {
         state = stateWith(100000, 0, [bbvaPosition]);
@@ -525,6 +530,86 @@ describe('getManualDemoValuation: cotización real o N/D', () => {
         expect(valuation.coverage).toEqual({ valued: 0, total: 1 });
         expect(valuation.rows[0]).toMatchObject({ status: 'divisa-no-coincide', marketValue: null });
         expect(String(valuation.rows[0].note)).toContain('Divisa no declarada por la fuente de cotización');
+        vi.unstubAllGlobals();
+    });
+
+    // Ramas del callback REAL backendYahooQuote: el cache mock invoca el
+    // fetcher de verdad y fetch se rutea entre el listado Finnhub y la
+    // /api/market/quote/ del backend propio.
+    const realBackendCallback = () => {
+        cacheGetQuote.mockImplementation(async (symbol: string, fetcher: (s: string) => Promise<{ quote: unknown; fetchFailed: boolean; retryAfterSeconds: number | null }>) => {
+            const attempt = await fetcher(symbol);
+            return { quote: attempt.quote, fetchFailed: attempt.fetchFailed, retryAfterSeconds: attempt.retryAfterSeconds, fetchedAt: attempt.quote ? 111 : null, saturated: false };
+        });
+    };
+    const backendFetch = (responder: () => Promise<Response>) => vi.stubGlobal('fetch', vi.fn(async (...args: Parameters<typeof fetch>): Promise<Response> => {
+        if (String(args[0]).includes('/api/market/quote/')) return responder();
+        return { ok: true, json: async () => [{ symbol: 'AAPL', currency: 'USD' }] } as Response;
+    }));
+    const backendEnv = () => {
+        process.env.FINNHUB_API_KEY = 'key';
+        process.env.FMP_BACKEND_URL = 'https://backend.test';
+        process.env.RESEARCH_AUTH_SECRET = 's'.repeat(32);
+    };
+
+    it('callback real del backend con divisa EUR declarada -> valorada 1050 (backend-yahoo)', async () => {
+        state = stateWith(100000, 0, [bbvaPosition]);
+        backendEnv();
+        backendFetch(async () => ({ ok: true, json: async () => ({ c: 10.5, pc: 10.4, currency: 'EUR', cd: '2026-11-06' }) } as Response));
+        realBackendCallback();
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(result).toMatchObject({ ok: true, listingUnavailable: false, quoteFetchFailed: false, asOf: 111 });
+        const valuation = (result as { valuation: { coverage: { valued: number; total: number }; rows: Array<Record<string, unknown>> } }).valuation;
+        expect(valuation.coverage).toEqual({ valued: 1, total: 1 });
+        expect(valuation.rows[0]).toMatchObject({ status: 'valorada', marketValue: 1050, currencyBasis: 'backend-yahoo' });
+        vi.unstubAllGlobals();
+    });
+
+    it('callback real del backend SIN divisa -> N/D, nunca inferida', async () => {
+        state = stateWith(100000, 0, [bbvaPosition]);
+        backendEnv();
+        backendFetch(async () => ({ ok: true, json: async () => ({ c: 10.5, pc: 10.4, cd: '2026-11-06' }) } as Response));
+        realBackendCallback();
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(result).toMatchObject({ ok: true, quoteFetchFailed: false });
+        const valuation = (result as { valuation: { coverage: { valued: number; total: number }; rows: Array<Record<string, unknown>> } }).valuation;
+        expect(valuation.coverage).toEqual({ valued: 0, total: 1 });
+        expect(valuation.rows[0]).toMatchObject({ status: 'divisa-no-coincide', marketValue: null });
+        vi.unstubAllGlobals();
+    });
+
+    it.each([
+        ['503 del backend', async () => ({ ok: false, status: 503 } as Response)],
+        ['fallo de red al backend', async () => { throw new TypeError('fetch failed'); }],
+    ])('callback real: %s -> sin cotización y quoteFetchFailed', async (_nombre, responder) => {
+        state = stateWith(100000, 0, [bbvaPosition]);
+        backendEnv();
+        backendFetch(responder);
+        realBackendCallback();
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(result).toMatchObject({ ok: true, listingUnavailable: false, quoteFetchFailed: true, retryAfterSeconds: null });
+        const valuation = (result as { valuation: { coverage: { valued: number; total: number }; rows: Array<Record<string, unknown>> } }).valuation;
+        expect(valuation.coverage).toEqual({ valued: 0, total: 1 });
+        expect(valuation.rows[0]).toMatchObject({ status: 'sin-cotizacion', marketValue: null });
+        vi.unstubAllGlobals();
+    });
+
+    it('callback real sin FMP_BACKEND_URL -> sin llamada, sin cotización y quoteFetchFailed', async () => {
+        state = stateWith(100000, 0, [bbvaPosition]);
+        process.env.FINNHUB_API_KEY = 'key';
+        const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>): Promise<Response> => ({ ok: true, json: async () => [{ symbol: 'AAPL', currency: 'USD' }] } as Response));
+        vi.stubGlobal('fetch', fetchMock);
+        realBackendCallback();
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(result).toMatchObject({ ok: true, listingUnavailable: false, quoteFetchFailed: true, retryAfterSeconds: null });
+        expect(fetchMock.mock.calls.filter((c) => String(c[0]).includes('/api/market/quote/'))).toEqual([]);
+        const valuation = (result as { valuation: { coverage: { valued: number; total: number }; rows: Array<Record<string, unknown>> } }).valuation;
+        expect(valuation.coverage).toEqual({ valued: 0, total: 1 });
+        expect(valuation.rows[0]).toMatchObject({ status: 'sin-cotizacion', marketValue: null });
         vi.unstubAllGlobals();
     });
 });
