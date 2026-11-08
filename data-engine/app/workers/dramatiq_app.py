@@ -4326,6 +4326,16 @@ def collect_analyst_estimates(
                         res = refresh_press_estimates(db, company, tenant_id, max_articles=15, timeout=120.0)
                     db.commit()
                     done[company.ticker] = len(res.get("stored") or [])
+                    # Historial de la guía desde 8-K antiguos (una vez) y foto diaria del consenso
+                    # propio: así cada estimación queda congelada antes de su resultado.
+                    from app.services.estimate_accuracy import freeze_consensus
+                    from app.services.guidance_backfill import ensure_backfill
+                    from app.services.own_consensus import build_company_consensus
+
+                    with db.begin_nested():
+                        ensure_backfill(db, company, tenant_id)
+                        freeze_consensus(db, company, tenant_id, build_company_consensus(db, company, tenant_id))
+                    db.commit()
                 except Exception as exc:  # noqa: BLE001 - una empresa no para a las demás
                     db.rollback()
                     done[company.ticker] = type(exc).__name__

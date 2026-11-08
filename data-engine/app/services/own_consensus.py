@@ -619,6 +619,13 @@ def build_company_consensus(db: Any, company: Any, tenant_id: int, *, today: dat
         analyst = aggregate(history_for(db, company, tenant_id), reported_revenue(db, company))
     except Exception:  # noqa: BLE001 - sin analistas el consenso sigue con el resto de fuentes
         analyst = []
+    if measured_errors is None:
+        try:
+            from app.services.estimate_accuracy import company_accuracy
+
+            measured_errors = company_accuracy(db, company, tenant_id)["measured_errors"]
+        except Exception:  # noqa: BLE001 - sin medición la confianza queda «bajo · muestra pequeña»
+            measured_errors = {}
     guidance = _guidance_rows(db, company, tenant_id, current_only=True)
     history = _guidance_rows(db, company, tenant_id, current_only=False)
     out: dict[str, Any] = {"ticker": company.ticker, "as_of": today.isoformat(), "version": CONSENSUS_VERSION,
