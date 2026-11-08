@@ -493,4 +493,38 @@ describe('getManualDemoValuation: cotización real o N/D', () => {
         expect(result).toMatchObject({ ok: true, quoteFetchFailed: true, retryAfterSeconds: 30 });
         vi.unstubAllGlobals();
     });
+
+    const bbvaPosition = {
+        instrumentKey: 'A:BBVA.MC', name: 'BBVA', kind: 'accion', currency: 'EUR', quantity: 100, avgCost: 9, realizedPnl: 0,
+    };
+    const usOnlyListing = () => vi.stubGlobal('fetch', vi.fn<(...args: any[]) => any>(async () => ({ ok: true, json: async () => [{ symbol: 'AAPL', currency: 'USD' }] } as Response)));
+
+    it('fuera del listado US con divisa declarada por el backend -> valorada con base backend-yahoo', async () => {
+        state = stateWith(100000, 0, [bbvaPosition]);
+        process.env.FINNHUB_API_KEY = 'key';
+        usOnlyListing();
+        cacheGetQuote.mockResolvedValue({ quote: { c: 10.5, pc: 10.4, t: null, kind: 'close', source: 'Yahoo Finance', currency: 'EUR', closeDate: '2026-11-06' }, fetchFailed: false, retryAfterSeconds: null, fetchedAt: 111, saturated: false });
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(result).toMatchObject({ ok: true, listingUnavailable: false, quoteFetchFailed: false, asOf: 111 });
+        const valuation = (result as { valuation: { coverage: { valued: number; total: number }; rows: Array<Record<string, unknown>> } }).valuation;
+        expect(valuation.coverage).toEqual({ valued: 1, total: 1 });
+        expect(valuation.rows[0]).toMatchObject({ status: 'valorada', marketValue: 1050, currencyBasis: 'backend-yahoo' });
+        vi.unstubAllGlobals();
+    });
+
+    it('fuera del listado US SIN divisa declarada por el backend -> N/D con aviso, nunca se infiere', async () => {
+        state = stateWith(100000, 0, [bbvaPosition]);
+        process.env.FINNHUB_API_KEY = 'key';
+        usOnlyListing();
+        cacheGetQuote.mockResolvedValue({ quote: { c: 10.5, pc: 10.4, t: null, kind: 'close', source: 'Yahoo Finance', closeDate: '2026-11-06' }, fetchFailed: false, retryAfterSeconds: null, fetchedAt: 111, saturated: false });
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(result).toMatchObject({ ok: true, listingUnavailable: false, quoteFetchFailed: false });
+        const valuation = (result as { valuation: { coverage: { valued: number; total: number }; rows: Array<Record<string, unknown>> } }).valuation;
+        expect(valuation.coverage).toEqual({ valued: 0, total: 1 });
+        expect(valuation.rows[0]).toMatchObject({ status: 'divisa-no-coincide', marketValue: null });
+        expect(String(valuation.rows[0].note)).toContain('Divisa no declarada por la fuente de cotización');
+        vi.unstubAllGlobals();
+    });
 });

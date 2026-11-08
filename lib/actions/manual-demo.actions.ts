@@ -36,7 +36,8 @@ import {
 } from '@/database/models/manual-demo.model';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { formatNumber } from '@/lib/format';
-import { sanitizeFinnhubQuote } from '@/lib/market/quote-freshness';
+import { mapBackendYahooQuote, sanitizeFinnhubQuote } from '@/lib/market/quote-freshness';
+import { researchIdentityHeaders } from '@/lib/auth/research-identity';
 import { combineAbortSignals, createQuoteCache, type CachedQuote, type QuoteFetchAttempt } from '@/lib/market/quote-cache';
 import { parseListingCurrencies, symbolFromKey, valuePositions, type DemoValuation, type ValuationQuote } from '@/lib/market/demo-valuation';
 import { requestLocale } from '@/lib/research/backend-error-locale';
@@ -851,6 +852,32 @@ function getUsListing(): Promise<Map<string, string> | null> {
 }
 
 /**
+ * Cotización del BACKEND propio (GET /api/market/quote/{symbol}: Yahoo chart
+ * API saneada en data-engine, caché de 60 s allí) para símbolos que el listado
+ * US de Finnhub no cubre (.MC, .PA, .DE...). La divisa la DECLARA el backend
+ * (meta de Yahoo, normalizada a ISO 4217 en data-engine); sin divisa declarada
+ * la fila queda N/D en la valoración, nunca se infiere. fetchFailed distingue
+ * el fallo transitorio del dato genuinamente ausente, como finnhubOnlyQuote.
+ */
+async function backendYahooQuote(symbol: string, signal?: AbortSignal): Promise<QuoteAttempt> {
+    const backendUrl = process.env.FMP_BACKEND_URL;
+    if (!backendUrl) return { quote: null, fetchFailed: true, retryAfterSeconds: null };
+    try {
+        const path = `/api/market/quote/${encodeURIComponent(symbol)}`;
+        const identityHeaders = await researchIdentityHeaders({ method: 'GET', path });
+        const response = await fetch(`${backendUrl}${path}`, {
+            headers: identityHeaders,
+            cache: 'no-store',
+            signal: signal ? combineAbortSignals(signal, 8_000) : AbortSignal.timeout(8_000),
+        });
+        if (!response.ok) return { quote: null, fetchFailed: true, retryAfterSeconds: null };
+        return { quote: mapBackendYahooQuote(await response.json()), fetchFailed: false, retryAfterSeconds: null };
+    } catch {
+        return { quote: null, fetchFailed: true, retryAfterSeconds: null };
+    }
+}
+
+/**
  * Valoración BAJO DEMANDA de las posiciones abiertas con cotizaciones reales
  * (Finnhub /quote directo, validada por frescura; sin fallback a Yahoo ni a
  * getStockQuote). Las cotizaciones pasan por valuationQuoteCache (dedupe por
@@ -897,25 +924,33 @@ export async function getManualDemoValuation(): Promise<ManualDemoValuationResul
         // cotizaciones (serian inutiles: sin divisa verificada la fila es N/D).
         const listing = symbols.length > 0 ? await getUsListing() : null;
         const verifiable = listing ? symbols.filter((s) => listing.has(s)) : [];
+        // Fuera del listado US de Finnhub (.MC, .PA, .DE...): cotización del
+        // backend propio, que declara la divisa. Listado caído => no se puede
+        // distinguir US de no-US: N/D para todos, como antes (listingUnavailable).
+        const backendSymbols = listing ? symbols.filter((s) => !listing.has(s)) : [];
         const settled = await Promise.allSettled(verifiable.map((symbol) => valuationQuoteCache.getQuote(symbol, finnhubOnlyQuote)));
+        const backendSettled = await Promise.allSettled(backendSymbols.map((symbol) => valuationQuoteCache.getQuote(symbol, backendYahooQuote)));
         for (const symbol of symbols) quotes[symbol] = null;
-        const currencyUnverified = new Set(symbols.filter((s) => !verifiable.includes(s)));
+        const currencyUnverified = new Set<string>(listing ? [] : symbols);
         let fetchFailures = 0;
         let retryAfterSeconds: number | null = null;
         let oldestQuoteAt: number | null = null;
-        verifiable.forEach((symbol, i) => {
-            const r = settled[i];
-            const attempt: CachedQuote =
-                r.status === 'fulfilled'
-                    ? r.value
-                    : { quote: null, fetchFailed: true, retryAfterSeconds: null, fetchedAt: null, saturated: false };
-            quotes[symbol] = attempt.quote ? { ...attempt.quote, currency: listing?.get(symbol) ?? null } : null;
+        const applyAttempt = (symbol: string, attempt: CachedQuote, currency: string | null) => {
+            quotes[symbol] = attempt.quote ? { ...attempt.quote, currency } : null;
             if (attempt.quote && attempt.fetchedAt !== null) oldestQuoteAt = Math.min(oldestQuoteAt ?? Infinity, attempt.fetchedAt);
             if (attempt.fetchFailed) {
                 fetchFailures += 1;
                 if (attempt.retryAfterSeconds !== null) retryAfterSeconds = Math.max(retryAfterSeconds ?? 0, attempt.retryAfterSeconds);
             }
+        };
+        const settleOf = (r: PromiseSettledResult<CachedQuote>): CachedQuote =>
+            r.status === 'fulfilled' ? r.value : { quote: null, fetchFailed: true, retryAfterSeconds: null, fetchedAt: null, saturated: false };
+        verifiable.forEach((symbol, i) => applyAttempt(symbol, settleOf(settled[i]), listing?.get(symbol) ?? null));
+        backendSymbols.forEach((symbol, i) => {
+            const attempt = settleOf(backendSettled[i]);
+            applyAttempt(symbol, attempt, typeof attempt.quote?.currency === 'string' ? attempt.quote.currency : null);
         });
+        const queried = verifiable.length + backendSymbols.length;
         return {
             ok: true,
             valuation: valuePositions(positions, quotes, { notQueried, currencyUnverified, locale: await requestLocale() }),
@@ -923,7 +958,7 @@ export async function getManualDemoValuation(): Promise<ManualDemoValuationResul
             // de semántica documentado arriba: antes era Date.now() siempre).
             asOf: oldestQuoteAt ?? Date.now(),
             listingUnavailable: symbols.length > 0 && listing === null,
-            quoteFetchFailed: verifiable.length > 0 && fetchFailures === verifiable.length,
+            quoteFetchFailed: queried > 0 && fetchFailures === queried,
             retryAfterSeconds,
         };
     } catch (error) {

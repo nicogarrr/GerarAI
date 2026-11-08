@@ -10,15 +10,19 @@
  *   de mercado. Sin cotizacion => N/D, no un valor imputado.
  * - Cada fila lleva su etiqueta: proveedor + hora de la cotizacion ("en
  *   vivo") o fecha del cierre.
- * - Fuente aprobada: SOLO Finnhub. La accion no llama a Yahoo; ademas, como
- *   defensa, una cotizacion de otra fuente que llegara aqui sale N/D y no
- *   cuenta como valorada.
+ * - Fuente aprobada: Finnhub (/quote directo, frescura validada) para los
+ *   símbolos del listado US, o la cotización del BACKEND propio (Yahoo chart
+ *   API saneada en data-engine, con la divisa declarada por el backend) para
+ *   los mercados que Finnhub free no cubre (.MC, .PA, .DE...). Una cotización
+ *   de cualquier otra fuente — o una del backend SIN divisa declarada — sale
+ *   N/D y no cuenta como valorada.
  * - Divisa: NUNCA se infiere del simbolo ni del sufijo. La divisa debe venir
  *   en ValuationQuote.currency, que la accion rellena SOLO con la divisa de
  *   cotizacion del listado US de Finnhub (/stock/symbol?exchange=US, campo
- *   currency). Solo 'EUR' y 'USD' exactos se valoran. Sin divisa verificada
- *   => N/D. Si no coincide con la divisa de la posicion => N/D (sin
- *   conversion).
+ *   currency) o con la divisa declarada por el backend (meta de Yahoo
+ *   normalizada a ISO 4217 en data-engine). Solo 'EUR' y 'USD' exactos se
+ *   valoran. Sin divisa verificada => N/D. Si no coincide con la divisa de
+ *   la posicion => N/D (sin conversion).
  * - Opciones: la cotizacion del subyacente NO es la prima del contrato, asi
  *   que no se valoran. Se listan como "no valorada" con el motivo.
  * - Los totales suman SOLO las posiciones valoradas, por divisa, y se
@@ -71,7 +75,7 @@ export type ValuedPosition = {
     /** Coste medio por unidad con el que se valoro (para detectar valoracion caducada). */
     avgCost: number;
     /** Origen de la divisa de la cotizacion; null si no hay valoracion. */
-    currencyBasis: 'finnhub-listado' | null;
+    currencyBasis: 'finnhub-listado' | 'backend-yahoo' | null;
     /** Etiqueta de fuente/hora por fila; null si no hay cotizacion. */
     quoteLabel: string | null;
     /** Motivo legible cuando no esta valorada. */
@@ -97,15 +101,20 @@ export function symbolFromKey(instrumentKey: string): string | null {
     return instrumentKey.startsWith('A:') && instrumentKey.length > 2 ? instrumentKey.slice(2) : null;
 }
 
-export type QuoteCurrency = { currency: ValuationCurrency | null; basis: 'finnhub-listado' | null; reason: string | null };
+export type QuoteCurrency = { currency: ValuationCurrency | null; basis: 'finnhub-listado' | 'backend-yahoo' | null; reason: string | null };
 
-/** Divisa de la cotizacion SOLO si viene verificada en quote.currency; nunca por sufijo ni por ausencia de el. */
+/** Divisa de la cotizacion SOLO si viene declarada por la fuente admitida (listado US de Finnhub o backend propio); nunca por sufijo ni por ausencia de ella. */
 export function resolveQuoteCurrency(quote: ValuationQuote, locale: Locale = DEFAULT_LOCALE): QuoteCurrency {
     const declared = typeof quote.currency === 'string' ? quote.currency.trim() : '';
-    if (declared === 'EUR' || declared === 'USD') return { currency: declared, basis: 'finnhub-listado', reason: null };
+    const basis = quote.source === 'Yahoo Finance' ? 'backend-yahoo' : 'finnhub-listado';
+    if (declared === 'EUR' || declared === 'USD') return { currency: declared, basis, reason: null };
     const t = createTranslator(locale);
-    if (declared) return { currency: null, basis: null, reason: t('paperTrading.valuation.rowNotes.listingCurrency', { currency: declared }) };
-    return { currency: null, basis: null, reason: t('paperTrading.valuation.rowNotes.currencyNotVerifiedListing') };
+    if (declared) {
+        const key = quote.source === 'Yahoo Finance' ? 'paperTrading.valuation.rowNotes.backendCurrency' : 'paperTrading.valuation.rowNotes.listingCurrency';
+        return { currency: null, basis: null, reason: t(key, { currency: declared }) };
+    }
+    const key = quote.source === 'Yahoo Finance' ? 'paperTrading.valuation.rowNotes.currencyNotVerifiedBackend' : 'paperTrading.valuation.rowNotes.currencyNotVerifiedListing';
+    return { currency: null, basis: null, reason: t(key) };
 }
 
 /** Mapa simbolo -> divisa del listado US de Finnhub (/stock/symbol); ignora entradas sin simbolo o divisa. */
@@ -204,7 +213,13 @@ export function valuePositions(
             return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.noQuote'));
         }
         const label = quoteLabel(quote, locale);
-        if (quote.source !== 'Finnhub') {
+        const declaredCurrency = typeof quote.currency === 'string' && quote.currency.trim() !== '';
+        if (quote.source === 'Yahoo Finance' && !declaredCurrency) {
+            // Cotizacion del backend SIN divisa declarada: N/D con aviso; la
+            // divisa nunca se infiere del simbolo ni del sufijo.
+            return unvalued(position, 'divisa-no-coincide', t('paperTrading.valuation.rowNotes.currencyNotVerifiedBackend'), label);
+        }
+        if (quote.source !== 'Finnhub' && quote.source !== 'Yahoo Finance') {
             return unvalued(
                 position,
                 'fuente-no-aprobada',
