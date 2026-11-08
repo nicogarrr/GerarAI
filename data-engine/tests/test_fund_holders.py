@@ -24,7 +24,7 @@ URL = "https://www.sec.gov/files/dera/data/form-n-port-data-sets/2026q3_nport.zi
 REF = nport.NportDatasetRef(URL, 2026, 3)
 
 
-def _zip() -> io.BytesIO:
+def _zip(extra_holdings: list[str] | None = None) -> io.BytesIO:
     sub = ["ACCESSION_NUMBER\tFILING_DATE\tFILE_NUM\tSUB_TYPE\tREPORT_ENDING_PERIOD\tREPORT_DATE\tIS_LAST_FILING",
            "A1\t20-AUG-2026\t\tNPORT-P\t31-DEC-2026\t30-JUN-2026\tN",   # Big Index: 1000 acc (2 filas)
            "A0\t20-MAY-2026\t\tNPORT-P\t31-DEC-2026\t31-MAR-2026\tN",   # Big Index, informe anterior: no cuenta
@@ -45,7 +45,7 @@ def _zip() -> io.BytesIO:
             f"B2\t5\tApple\t\tCOM\t{APPLE}\t60\tNS\t\tUSD\t12000\t\t9.0\tLong",
             f"C1\t6\tApple\t\tBOND\t{APPLE}\t1000\tPA\t\tUSD\t1000\t\t50\tLong",
             f"C1\t7\tApple\t\tCOM\t{APPLE}\t10\tNS\t\tUSD\t10\t\t1\tShort",
-            f"D1\t8\tApple\t\tCOM\t{APPLE}\t77\tNS\t\tUSD\t10\t\t1\tLong"]
+            f"D1\t8\tApple\t\tCOM\t{APPLE}\t77\tNS\t\tUSD\t10\t\t1\tLong", *(extra_holdings or [])]
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         for name, lines in (("SUBMISSION.tsv", sub), ("REGISTRANT.tsv", reg), ("FUND_REPORTED_INFO.tsv", info), ("FUND_REPORTED_HOLDING.tsv", hold)):
@@ -117,3 +117,64 @@ def test_job_descarga_solo_si_hay_fichero_nuevo():
     assert db.query(PublicSourceDocument).filter(PublicSourceDocument.provider == fh.PROVIDER).count() == 1
     assert isinstance(db.query(PublicSourceDocument).first().fetched_at, datetime)
     assert date(2026, 6, 30)
+
+
+MSFT = "594918104"
+REF4 = nport.NportDatasetRef("https://www.sec.gov/files/dera/data/form-n-port-data-sets/2026q4_nport.zip", 2026, 4)
+
+
+def test_ingesta_guarda_snapshot_vacio_y_no_sirve_el_trimestre_anterior():
+    """Bug auditado: si el dataset nuevo no tiene el CUSIP en ningún fondo no se
+    guardaba nada, y la ficha seguía sirviendo el trimestre anterior como actual."""
+    db = _db()
+    cusips = fh.universe_cusips(db)
+    assert fh.ingest_reports(db, nport.parse_dataset(_zip(), set(cusips)), REF, "x1", cusips)["companies"] == 1
+    out = fh.ingest_reports(db, nport.parse_dataset(_zip_con_solo_msft(), set(cusips)), REF4, "x2", cusips)
+    assert out["companies"] == 1  # snapshot vacío: la empresa queda procesada para este fichero
+    view = fh.fund_holders(db, "AAPL")
+    assert view["status"] == "ok" and view["dataset"] == "2026q4"
+    assert view["totals"] == {"funds": 0, "shares": 0.0, "value_usd": 0.0}
+    assert view["top_funds"] == [] and view["by_weight"] == []
+    assert view["source"]["dataset_url"] == REF4.url
+
+
+def _zip_con_solo_msft() -> io.BytesIO:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("SUBMISSION.tsv", "\n".join([
+            "ACCESSION_NUMBER\tFILING_DATE\tFILE_NUM\tSUB_TYPE\tREPORT_ENDING_PERIOD\tREPORT_DATE\tIS_LAST_FILING",
+            "E1\t20-NOV-2026\t\tNPORT-P\t31-DEC-2026\t30-SEP-2026\tN"]) + "\n")
+        zf.writestr("REGISTRANT.tsv", "ACCESSION_NUMBER\tCIK\tREGISTRANT_NAME\nE1\t900\tOther Trust\n")
+        zf.writestr("FUND_REPORTED_INFO.tsv", "\n".join([
+            "ACCESSION_NUMBER\tSERIES_NAME\tSERIES_ID\tSERIES_LEI\tTOTAL_ASSETS\tTOTAL_LIABILITIES\tNET_ASSETS",
+            "E1\tOther Fund\tS000000009\t\t1\t0\t1000"]) + "\n")
+        zf.writestr("FUND_REPORTED_HOLDING.tsv", "\n".join([
+            "ACCESSION_NUMBER\tHOLDING_ID\tISSUER_NAME\tISSUER_LEI\tISSUER_TITLE\tISSUER_CUSIP\tBALANCE\tUNIT\tOTHER_UNIT_DESC\tCURRENCY_CODE\tCURRENCY_VALUE\tEXCHANGE_RATE\tPERCENTAGE\tPAYOFF_PROFILE",
+            f"E1\t1\tMicrosoft\t\tCOM\t{MSFT}\t500\tNS\t\tUSD\t60000\t\t3.0\tLong"]) + "\n")
+    buf.seek(0)
+    return buf
+
+
+def test_job_reprocesa_cuando_el_universo_crece_aunque_el_fichero_ya_estaba():
+    """Bug auditado: bastaba UN documento del fichero para dar el trimestre por
+    procesado; una empresa añadida al universo después se saltaba todo el trimestre."""
+    html = '<a href="/files/dera/data/form-n-port-data-sets/2026q3_nport.zip">b</a>'
+    body = _zip([f"A1\t9\tMicrosoft\t\tCOM\t{MSFT}\t500\tNS\t\tUSD\t60000\t\t3.0\tLong"]).getvalue()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=html) if str(request.url) == nport.DATASETS_PAGE else httpx.Response(200, content=body)
+
+    db = _db()
+    out = fh.refresh_fund_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
+    assert out["status"] == "ok" and out["companies"] == 1
+    # MSFT entra en el universo DESPUÉS de procesar el trimestre (su CUSIP está en el ZIP)
+    db.add(Company(ticker="MSFT", name="Microsoft", exchange="NASDAQ", company_type="mature", valuation_model="dcf",
+                   isin="US5949181045"))
+    db.commit()
+    again = fh.refresh_fund_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
+    assert again["status"] == "ok" and again["companies"] == 1  # solo MSFT; AAPL ya estaba
+    view = fh.fund_holders(db, "MSFT")
+    assert view["status"] == "ok" and view["dataset"] == "2026q3"
+    assert view["totals"] == {"funds": 1, "shares": 500.0, "value_usd": 60000.0}
+    third = fh.refresh_fund_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
+    assert third["status"] == "sin_cambios"  # universo completo ya procesado
