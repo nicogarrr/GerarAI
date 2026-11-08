@@ -106,6 +106,21 @@ def _es(value: float, decimals: int = 1) -> str:
     return text.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def price_target_stats(targets: list[dict[str, Any]]) -> tuple[str, list[float], str]:
+    """(divisa, objetivos en esa divisa, lo apartado). Los objetivos se resumen en UNA divisa, la más
+    repetida; los de otra divisa o sin divisa no se mezclan ni se cuentan como dólares: se dicen aparte."""
+    counts: dict[str, int] = {}
+    for p in targets:
+        if p.get("currency"):
+            counts[p["currency"]] = counts.get(p["currency"], 0) + 1
+    ccy = max(sorted(counts), key=lambda c: counts[c]) if counts else ""
+    vals = [float(p["target"]) for p in targets if ccy and p.get("currency") == ccy]
+    other = sum(1 for p in targets if p.get("currency") and p.get("currency") != ccy)
+    missing = sum(1 for p in targets if not p.get("currency"))
+    bits = ([f"{other} en otra divisa"] if other else []) + ([f"{missing} sin divisa en la fuente"] if missing else [])
+    return ccy, vals, ", ".join(bits)
+
+
 def money(value: float | None, ccy: str, decimals: int = 2) -> str:
     if value is None:
         return "N/D"
@@ -727,12 +742,11 @@ def _insider_markers(m: dict[str, str], ctx: ThesisContext) -> None:
         m["insiders.form4"] = str(late.get("filings", 0))
         m["insiders.tarde"] = str(late.get("late", 0))
     if ctx.price_targets:
-        vals = [p["target"] for p in ctx.price_targets]
-        ccy = ctx.price_targets[0].get("currency") or "USD"
-        m["analistas.firmas_precio"] = str(len(vals))
-        m["analistas.precio_min"] = money(min(vals), ccy)
-        m["analistas.precio_mediana"] = money(statistics.median(vals), ccy)
-        m["analistas.precio_max"] = money(max(vals), ccy)
+        ccy, vals, apart = price_target_stats(ctx.price_targets)
+        m["analistas.firmas_precio"] = str(len(vals)) + (f" (aparte, sin mezclar divisas: {apart})" if apart else "")
+        m["analistas.precio_min"] = money(min(vals), ccy) if vals else "N/D"
+        m["analistas.precio_mediana"] = money(statistics.median(vals), ccy) if vals else "N/D"
+        m["analistas.precio_max"] = money(max(vals), ccy) if vals else "N/D"
     by: dict[tuple[str, int], list[float]] = {}
     for a in ctx.analysts:
         if a.get("year"):
@@ -966,7 +980,7 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
                       "head": ["Firma", "Métrica", "Año", "Estimación", "Fecha"],
                       "rows": [[a["firm"], str(a["metric"]), str(a.get("year") or ""), millions(a["value"], "USD"), a["as_of"]]
                                for a in ctx.analysts]
-                      + [[p["firm"], "precio objetivo", "", money(p["target"], p.get("currency") or "USD"), p["date"]]
+                      + [[p["firm"], "precio objetivo", "", (money(p["target"], p["currency"]) if p.get("currency") else f"{_es(p['target'], 2)} (sin divisa en la fuente)"), p["date"]]
                          for p in ctx.price_targets],
                       "links": [source_link({"url": a.get("url")}, None) for a in ctx.analysts]
                       + [source_link({"url": p.get("url")}, None) for p in ctx.price_targets]}

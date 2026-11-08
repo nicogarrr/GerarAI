@@ -95,8 +95,8 @@ _METRICS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("revenue", re.compile(r"\brevenues?\b|\bsales\b|\btop line\b", re.I)),
 )
 _PRICE_TARGET = re.compile(
-    r"\$\s?(?P<a>\d{1,5}(?:\.\d{1,2})?)\s(?:share\s)?price target|price target (?:of|to|at|is)\s\$\s?(?P<b>\d{1,5}(?:\.\d{1,2})?)"
-    r"|target (?:to|of)\s\$\s?(?P<c>\d{1,5}(?:\.\d{1,2})?)", re.I)
+    r"\$\s?(?P<a>\d{1,5}(?:\.\d{1,2})?)\s(?:share\s)?price target|price target (?:of|to|at|is)\s(?:[A-Z]{1,3})?\$\s?(?P<b>\d{1,5}(?:\.\d{1,2})?)"
+    r"|target (?:to|of)\s(?:[A-Z]{1,3})?\$\s?(?P<c>\d{1,5}(?:\.\d{1,2})?)", re.I)
 _ACTIONS = (("upgrade", re.compile(r"\bupgrad", re.I)), ("downgrade", re.compile(r"\bdowngrad", re.I)),
             ("initiate", re.compile(r"\binitiat", re.I)), ("reiterate", re.compile(r"\breiterat", re.I)),
             ("maintain", re.compile(r"\bmaintain", re.I)))
@@ -116,11 +116,12 @@ class Estimate:
     firm: str
     metric: str
     year: int
-    amount: Decimal  # dólares (o por acción en price_target)
+    amount: Decimal  # en la divisa del «$» (o por acción en price_target)
     quote: str
     url: str
     published: date
     paragraph: int
+    marked_currency: str | None = None  # «US$», «C$», «A$»… escrito en el texto; None si es un «$» a secas
 
 
 @dataclass
@@ -160,6 +161,34 @@ def firms_in(text: str, extra: Sequence[str] = ()) -> list[str]:
         if name not in out:
             out.append(name)
     return out
+
+
+# «$» con marca de país delante: US$, C$/CA$/CDN$, A$/AU$, HK$, NZ$, S$, NT$.
+_DOLLAR_MARKS = {"US": "USD", "C": "CAD", "CA": "CAD", "CDN": "CAD", "A": "AUD", "AU": "AUD", "HK": "HKD",
+                 "NZ": "NZD", "S": "SGD", "NT": "TWD"}
+#: divisas que también se escriben «$»: con una de ellas, un «$» a secas no dice cuál es
+DOLLAR_CURRENCIES = frozenset({"USD", "CAD", "AUD", "HKD", "NZD", "SGD", "TWD", "MXN"})
+
+
+def marked_currency(sentence: str, start: int) -> str | None:
+    """La divisa escrita junto al «$» del importe que empieza en ``start`` (None si es un «$» a secas)."""
+    i = sentence.find("$", start, start + 6)
+    if i < 0:
+        return None
+    m = re.search(r"([A-Za-z]{1,3})\$$", sentence[max(0, i - 3):i + 1])
+    return _DOLLAR_MARKS.get(m.group(1).upper()) if m else None
+
+
+def resolve_currency(marked: str | None, base: str | None) -> str | None:
+    """Divisa de un importe en «$». Con marca (US$, C$…), la marca. A secas: dólares de EE. UU. si la
+    empresa informa (o cotiza) en USD o en una divisa que no se escribe «$» (EUR, GBP: un «$» no son
+    euros); None si la empresa usa otro dólar (CAD, AUD…), porque entonces el «$» es ambiguo."""
+    if marked:
+        return marked
+    base = (base or "USD").upper()
+    if base == "USD" or base not in DOLLAR_CURRENCIES:
+        return "USD"
+    return None
 
 
 def _amount(num: str, scale: str) -> Decimal:
@@ -241,7 +270,8 @@ def read_article(article: Article, *, extra_firms: Sequence[str] = (), company: 
                         continue
                     seen.add((metric, year))
                     reading.estimates.append(Estimate(firm, metric, year, _amount(m.group("num1"), m.group("scale1")),
-                                                      sentence.strip()[:600], article.url, article.published, p_index))
+                                                      sentence.strip()[:600], article.url, article.published, p_index,
+                                                      marked_currency(sentence, m.start("num1") - 4)))
             for m in _RELATIVE.finditer(sentence):
                 rel = (m.group("rel") or m.group("rel2") or "").lower()
                 num, scale = (m.group("num1"), m.group("scale1")) if m.group("num1") else (m.group("num2"), m.group("scale2"))
@@ -250,13 +280,17 @@ def read_article(article: Article, *, extra_firms: Sequence[str] = (), company: 
                 if metric is None or (metric, year) in seen or rel == "the year":
                     continue
                 seen.add((metric, year))
+                num_start = m.start("num1") if m.group("num1") else m.start("num2")
                 reading.estimates.append(Estimate(firm, metric, year, _amount(num, scale), sentence.strip()[:600],
-                                                  article.url, article.published, p_index))
+                                                  article.url, article.published, p_index,
+                                                  marked_currency(sentence, num_start - 4)))
             if firm != CONSENSUS_FIRM:
                 for m in _PRICE_TARGET.finditer(sentence):
                     value = Decimal(m.group("a") or m.group("b") or m.group("c"))
+                    num_start = m.start("a") if m.group("a") else (m.start("b") if m.group("b") else m.start("c"))
                     reading.targets.append(Estimate(firm, "price_target", article.published.year, value,
-                                                    sentence.strip()[:600], article.url, article.published, p_index))
+                                                    sentence.strip()[:600], article.url, article.published, p_index,
+                                                    marked_currency(sentence, num_start - 4)))
                     break
     return reading
 
@@ -420,6 +454,16 @@ def estimate_key(metric: str, year: int, firm: str) -> str:
     return f"analyst.{metric}.fy{year}.{_slug(firm)}"
 
 
+def _reporting_currency(db: Any, company: Any) -> str | None:
+    """Divisa de los informes (la de los hechos SEC/ESEF de ingresos o caja); None si no se sabe."""
+    try:
+        from app.services.expert_team.sotp_valuer import _reporting_currency as rc
+
+        return rc(db, company)
+    except Exception:  # noqa: BLE001 - sin hechos: se trata como desconocida (→ USD solo si cotiza en USD)
+        return None
+
+
 def store_readings(db: Any, company: Any, tenant_id: int, readings: Sequence[tuple[Article, ArticleReading]]) -> dict[str, Any]:
     from sqlalchemy import select
 
@@ -430,6 +474,8 @@ def store_readings(db: Any, company: Any, tenant_id: int, readings: Sequence[tup
     service = DeclaredInputService()
     stored: list[dict[str, Any]] = []
     skipped: list[str] = []
+    reporting = _reporting_currency(db, company)  # las estimaciones se comparan con los informes
+    listing = (str(getattr(company, "currency", "") or "").strip().upper() or None)  # el objetivo, con el precio
     for article, reading in sorted(readings, key=lambda r: r[0].published):
         by_firm: dict[str, list[Estimate]] = {}
         for est in (*reading.estimates, *reading.targets):
@@ -440,6 +486,10 @@ def store_readings(db: Any, company: Any, tenant_id: int, readings: Sequence[tup
                 if est.metric == "price_target":
                     continue
                 key = estimate_key(est.metric, est.year, firm)
+                ccy = resolve_currency(est.marked_currency, reporting)
+                if ccy is None:
+                    skipped.append(f"{key}: divisa ambigua: «$» sin marca en una empresa que informa en {reporting}")
+                    continue
                 current = db.scalars(select(DeclaredInputValue).where(
                     DeclaredInputValue.tenant_id == tenant_id, DeclaredInputValue.company_id == company.id,
                     DeclaredInputValue.input_key == key, DeclaredInputValue.superseded_at.is_(None))).first()
@@ -447,11 +497,13 @@ def store_readings(db: Any, company: Any, tenant_id: int, readings: Sequence[tup
                     skipped.append(f"{key}: hay una cifra más reciente ({current.as_of})")
                     continue
                 item = DeclaredInput(
-                    input_key=key, base=est.amount, unit="USD", method="analyst", analyst_firm=firm,
+                    input_key=key, base=est.amount, unit=ccy, method="analyst", analyst_firm=firm,
                     source_url=est.url, source_quote=est.quote, as_of=est.published,
                     metadata={"kind": "analyst_press", "metric": est.metric, "year": est.year, "firm": firm,
                               "paragraph": est.paragraph, "extractor": EXTRACTOR_VERSION,
-                              "consensus": firm == CONSENSUS_FIRM},
+                              "consensus": firm == CONSENSUS_FIRM, "currency": ccy,
+                              "currency_rule": "marcada en el texto" if est.marked_currency else
+                                               "«$» a secas en una empresa que no usa otro dólar"},
                 )
                 problems = service.validate(item)
                 if problems:
@@ -464,14 +516,20 @@ def store_readings(db: Any, company: Any, tenant_id: int, readings: Sequence[tup
             if firm == CONSENSUS_FIRM:
                 continue
             target = next((e for e in items if e.metric == "price_target"), None)
+            target_ccy = resolve_currency(target.marked_currency, listing) if target else None
+            if target is not None and target_ccy is None:
+                skipped.append(f"objetivo {firm}: divisa ambigua: «$» sin marca en una acción que cotiza en {listing}")
+                target = None
             quote = (target or items[0]).quote
             try:
                 analyst_note_service.upsert(db, tenant_id, AnalystNoteInput(
                     ticker=company.ticker, firm=firm, note_date=article.published,
                     action=reading.actions.get(firm, "other"), source_type="news", company_id=company.id,
-                    pt_new=target.amount if target else None, currency="USD" if target else None,
+                    pt_new=target.amount if target else None, currency=target_ccy if target else None,
                     quote=quote, source_url=article.url, estimates={k: v for k, v in estimates.items()},
                     extras={"kind": "analyst_press", "extractor": EXTRACTOR_VERSION, "estimates_unit": "millones",
+                            "estimates_currency": sorted({resolve_currency(e.marked_currency, reporting) or "?"
+                                                          for e in items if e.metric != "price_target"}),
                             "collected_on": datetime.now(UTC).date().isoformat()},
                 ))
             except AnalystNoteError as exc:
