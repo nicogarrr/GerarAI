@@ -12,8 +12,10 @@ Para cada fecha ``t`` (30-jun y 31-dic, 2010–2024) y cada empresa:
      parecidas en ingresos, con su múltiplo de partida en ``t``;
   4. TIR base/bajista/alcista a 5 y 10 años con ``run_valuation`` del producto (sin guía);
   5. SOLO para puntuar: rentabilidad total anual realizada a 1, 3 y 5 años (cierre ajustado, con dividendos).
-Con ``--pit-base-rates`` las tasas base se recalculan en cada ``t`` con lo publicado antes de ``t`` (las del
-producto usan finales hasta 2019, así que antes de 2019 llevan información futura).
+Las tasas base nunca llevan información posterior a ``t``: la tabla del producto (ingresos hasta 2019,
+``rules.base_rates_known_at``) solo se usa después; antes se recalculan con lo publicado antes de ``t`` y, sin
+observaciones suficientes, la regla usa su respaldo sin datos (0 / 3 / 6 %). Con ``--pit-base-rates`` se
+recalculan en todas las fechas.
 """
 from __future__ import annotations
 
@@ -142,8 +144,12 @@ def pit_base_rates(rows_t: list[dict], min_n: int = 20) -> dict[str, dict[str, f
 
 def value_date(args: tuple[str, list[dict], bool]) -> list[dict]:
     t, rows, pit_rates = args
+    # La tabla del producto usa ingresos hasta 2019: en fechas anteriores llevaría información futura. Ahí se
+    # recalcula con lo publicado antes de t y, si aún no hay observaciones suficientes, la regla usa su
+    # respaldo sin datos (tabla vacía → 0 / 3 / 6 %, con aviso), nunca la tabla del producto.
+    leaky = rules.base_rates_known_at(date.fromisoformat(t)) is None
     shipped = dict(rules.BASE_RATES)
-    rates = pit_base_rates(rows) if pit_rates else None
+    rates = pit_base_rates(rows) if (pit_rates or leaky) else None
     ok = [r for r in rows if r.get("status") == "ok"]
     out = []
     for r in rows:
@@ -160,13 +166,16 @@ def value_date(args: tuple[str, list[dict], bool]) -> list[dict]:
         peers.sort(key=lambda p: abs(math.log(p["revenue"] / rv)))
         mult = [p["multiple"] for p in peers[:8]]
         r["n_peers"] = len(mult)
-        if pit_rates:
-            if rates is None:
-                r["status"] = "sin_tasa_base_pit"
-                out.append(r)
-                continue
+        if pit_rates and rates is None:
+            r["status"] = "sin_tasa_base_pit"
+            out.append(r)
+            continue
+        if pit_rates or leaky:
+            r["base_rates"] = "pit" if rates is not None else "sin_datos_previos"
             rules.BASE_RATES.clear()
-            rules.BASE_RATES.update(rates)
+            rules.BASE_RATES.update(rates or {})
+        else:
+            r["base_rates"] = "producto"
         try:
             v = bt.value(inp, peer_multiples=mult)
             r.update({k: v[k] for k in ("bear", "base", "bull", "bear_10", "base_10", "bull_10", "weighted")})
@@ -214,7 +223,7 @@ def main() -> None:
         dated = list(ex.map(value_date, [(t, rows, a.pit_base_rates) for t, rows in sorted(by_t.items())]))
     cols = ["ticker", "t", "status", "sic", "financial", "currency", "method", "basis", "price", "market_cap",
             "revenue", "multiple", "n_peers", "fy_end", "max_filed", "bear", "base", "bull", "bear_10", "base_10",
-            "bull_10", "weighted", "tsr1", "tsr3", "tsr5"]
+            "bull_10", "weighted", "base_rates", "tsr1", "tsr3", "tsr5"]
     with open(a.out, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore")
         w.writeheader()
