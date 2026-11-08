@@ -28,6 +28,7 @@
     "sellCount": "Ventas (nº)",
     "overSell": "Ventas sin compras que las cubran",
     "costUnknown": "Ventas con coste heredado desconocido",
+    "cancelledLot": "Ventas con lote cancelado",
     "method": "Método de valoración",
     "securitiesFxCriterion": "Criterio FX en valores",
     "currencyLedgerCriterion": "Criterio libro de divisas",

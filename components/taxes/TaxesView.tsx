@@ -92,6 +92,7 @@ const TAX_LABEL_KEYS: Record<string, string> = {
     sell_count: 'taxes.labels.sellCount',
     over_sell: 'taxes.labels.overSell',
     cost_unknown: 'taxes.labels.costUnknown',
+    cancelled_lot: 'taxes.labels.cancelledLot',
     method: 'taxes.labels.method',
     securities_fx_criterion: 'taxes.labels.securitiesFxCriterion',
     currency_ledger_criterion: 'taxes.labels.currencyLedgerCriterion',
@@ -170,7 +171,7 @@ function humanizeTaxReport(summary: DataRecord, i18n: TaxI18n): DataRecord {
         'net_taxable_base',
         'unattributed_dividends_base',
     ]);
-    const listKeys = new Set(['wash_sale_window_open', 'over_sell', 'cost_unknown', 'missing_fx', 'unattributed_tickers', 'ambiguous_cash']);
+    const listKeys = new Set(['wash_sale_window_open', 'over_sell', 'cost_unknown', 'cancelled_lot', 'missing_fx', 'unattributed_tickers', 'ambiguous_cash']);
     // La causa del null importa: con FX presente pero una fila de caja
     // ambigua sin resolver, decir "faltan tipos de cambio" miente. Se
     // declaran ambas causas si coexisten.
