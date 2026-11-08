@@ -12,7 +12,7 @@ name: user-flows E2E (smoke, no bloquea)
 #
 # NO bloquea: job aparte (continue-on-error) que no está en el gate. El job
 # «Browser E2E» de ci.yml no la corre (exige E2E_USER_FLOWS=1). Antes del
-# primer test, e2e/user-flows/global-setup.ts compila en serie cada ruta de la
+# primer test, e2e/global-setup.ts compila en serie cada ruta de la
 # suite en `next dev` (sin eso, la primera compilación caía dentro de los
 # tests: timeouts y 500 «Manifest file is empty»). Presupuesto: ~5 min de
 # tests + calentamiento; el paso tiene timeout-minutes: 10 porque la suite ya

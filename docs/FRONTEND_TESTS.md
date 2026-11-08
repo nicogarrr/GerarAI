@@ -48,7 +48,7 @@ El runner arranca él mismo los dos servidores (webServer de
 nueva (`data-engine/cavaai_ui_e2e.db`) y `SCREENER_QUOTE_VENDOR=offline`, y el
 frontend Next en `127.0.0.1:3100` con `APP_ENV=test` y bypass de auth e2e. No
 hace falta red externa ni claves. Antes del primer test,
-`e2e/user-flows/global-setup.ts` compila en serie cada ruta (sin ese
+`e2e/global-setup.ts` compila en serie cada ruta (sin ese
 calentamiento, la primera compilación de `next dev` cae dentro de los tests).
 
 Requisitos locales (los mismos que el workflow
