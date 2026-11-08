@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { trackRecordText, valuationMethodView } from '@/lib/research/valuation-method';
+import { sbcAdjustmentText, trackRecordText, valuationMethodView } from '@/lib/research/valuation-method';
 
 describe('valuationMethodView', () => {
   it('devuelve null sin etiqueta, aviso ni rango (la ficha no cambia)', () => {
@@ -51,5 +51,18 @@ describe('trackRecordText', () => {
     expect(trackRecordText(null, 'es')).toBeNull();
     expect(trackRecordText(undefined, 'es')).toBeNull();
     expect(trackRecordText({ message_es: '' }, 'es')).toBeNull();
+  });
+});
+
+describe('sbcAdjustmentText', () => {
+  it('la línea de pagos en acciones solo cuando el motor la manda', () => {
+    const note = {
+      message_es: 'Si se restan los pagos en acciones (25 % del FCF de 2025), el valor sería ~80 $.',
+      message_en: 'If stock-based pay (25% of 2025 FCF) is deducted, the value would be ~80.00.',
+    };
+    expect(sbcAdjustmentText(note, 'es')).toBe(note.message_es);
+    expect(sbcAdjustmentText(note, 'en')).toBe(note.message_en);
+    expect(sbcAdjustmentText(null, 'es')).toBeNull();
+    expect(sbcAdjustmentText(undefined, 'en')).toBeNull();
   });
 });

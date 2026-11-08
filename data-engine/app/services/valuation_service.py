@@ -41,12 +41,14 @@ from app.valuation.engines.base import (
 from app.valuation.engines.registry import declared_engine_fallback
 from app.valuation.engines.scenario_engine import SCENARIO_FALLBACK_REASONS
 from app.valuation.margin_convention import MARGIN_OF_SAFETY_CONVENTION
+from app.valuation.normalized_fcf import fy_history
 from app.valuation.point_in_time import (
     PRECISION_UNKNOWN,
     assert_period_no_lookahead,
     resolve_as_of,
 )
 from app.valuation.pre_revenue_track_record import pre_revenue_track_record
+from app.valuation.sbc_note import SBC_HISTORY_METRICS, sbc_adjustment
 from app.valuation.track_record import dcf_track_record
 
 
@@ -829,6 +831,17 @@ class ValuationService:
         track_record = dcf_track_record(result) or pre_revenue_track_record(result)
         if track_record is not None:
             result["track_record"] = track_record
+            # Línea informativa: valor si se restaran los pagos en acciones (SBC).
+            # Nunca cambia el valor publicado ni tumba la valoración.
+            try:
+                sbc = sbc_adjustment(
+                    result, fy_history(db, company.id, as_of, metrics=SBC_HISTORY_METRICS)
+                )
+            except Exception:  # noqa: BLE001 - informativo, no puede romper la valoración
+                logger.warning("sbc_adjustment failed company_id=%s", getattr(company, "id", None), exc_info=True)
+                sbc = None
+            if sbc is not None:
+                result["sbc_adjustment"] = sbc
 
         # Ensure contract fields always present for API / thesis consumers.
         result.setdefault("status", "ok")

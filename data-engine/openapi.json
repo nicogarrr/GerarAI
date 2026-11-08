@@ -24014,6 +24014,18 @@
             "title": "Reverse Dcf",
             "type": "object"
           },
+          "sbc_adjustment": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sbc Adjustment"
+          },
           "scenario_notes": {
             "additionalProperties": {
               "type": "string"
