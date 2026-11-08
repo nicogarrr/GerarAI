@@ -216,6 +216,17 @@ def implied_growth(sp: Any, drivers: Any, rate: float, years: int = 10) -> float
     return (lo + hi) / 2
 
 
+LEVERAGE_FLOOR = 2.5  # deuda neta / EBITDA a partir de la que el balance deja de ser palanca
+LEVERAGE_JUMP = 1.0  # o un salto de una vuelta de EBITDA sobre el ejercicio anterior
+
+
+def leverage_limit(prev_row: Mapping[str, Any]) -> float:
+    """Umbral del kill switch de apalancamiento, fijado con el ejercicio ANTERIOR (no con el dato de hoy,
+    que es el que se compara: «máx(2,5; hoy + 1)» nunca podía saltar): máx(2,5×; anterior + 1×)."""
+    prev = prev_row.get("net_debt_to_ebitda") if prev_row else None
+    return max(LEVERAGE_FLOOR, prev + LEVERAGE_JUMP) if prev is not None else LEVERAGE_FLOOR
+
+
 def kill_switches(val: Mapping[str, Any], hist_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Umbrales falsables sobre métricas que GerarAI vuelve a leer con cada informe. Derivados del propio
     escenario bajista: si la realidad cae por debajo de lo que ya suponía el bajista, la tesis está rota."""
@@ -263,8 +274,9 @@ def kill_switches(val: Mapping[str, Any], hist_rows: Sequence[Mapping[str, Any]]
         add("crecimiento", "Crecimiento anual de ingresos", "< 0 % dos ejercicios seguidos", pct(g_now),
             g_now is not None and (prev.get("growth") or 0) < 0 and g_now < 0, "revisar", "el negocio encoge")
         if lev is not None:
-            add("apalancamiento", "Deuda neta / EBITDA", f"> {times(max(2.5, lev + 1.0))}", times(lev),
-                lev > max(2.5, lev + 1.0), "reducir", "el balance pasa a ser un riesgo")
+            lim = leverage_limit(prev)
+            add("apalancamiento", "Deuda neta / EBITDA", f"> {times(lim)}", times(lev), lev > lim,
+                "reducir", "el balance pasa a ser un riesgo")
         return out
     add("crecimiento", f"{labels['growth']} anual" + (" por acción" if pb else ""), f"< {pct(thr)} dos ejercicios seguidos",
         pct(g_now), g_now is not None and g_prev is not None and g_now < thr and g_prev < thr,
@@ -287,7 +299,7 @@ def kill_switches(val: Mapping[str, Any], hist_rows: Sequence[Mapping[str, Any]]
             pct(c_now), c_now is not None and c_now < bear["cash_conversion"], "revisar capex y circulante",
             "menos caja para dividendo, recompras y deuda")
     lev = (sp["net_debt"] / sp["ebitda"]) if (sp.get("ebitda") and sp.get("basis") == "ev_ebitda") else None
-    lim = max(2.5, (lev or 0) + 1.0)
+    lim = leverage_limit(prev)
     if lev is not None:
         add("apalancamiento", "Deuda neta / EBITDA", f"> {times(lim)}", times(lev), lev > lim,
             "reducir", "el balance deja de ser una palanca y pasa a ser un riesgo")
@@ -331,7 +343,7 @@ def history_rows(cites: Mapping[str, Any], basis: str, points: Mapping[str, Mapp
         ni = v("net_income_attributable", y)
         ni = ni if ni is not None else v("net_income", y)
         ocf, capex = v("operating_cash_flow", y), v("capital_expenditure", y)
-        fcf = (ocf - abs(capex or 0.0)) if ocf is not None else None
+        fcf = (ocf - abs(capex)) if ocf is not None and capex is not None else None  # sin capex: N/D, no 0
         sh_raw = v("shares_diluted", y)
         if basis == "pe" and earnings_label == "FFO" and ni is not None:
             ni_ffo = ni + abs(da or 0.0) - (v("gain_on_sale_real_estate", y) or 0.0)
@@ -355,6 +367,8 @@ def history_rows(cites: Mapping[str, Any], basis: str, points: Mapping[str, Mapp
             "dividends": abs(v("dividends_paid", y) or 0.0) or None,
             "buybacks": abs(v("common_stock_repurchased", y) or 0.0) or None,
             "acquisitions": abs(v("acquisitions", y) or 0.0) or None, "roic": roic,
+            "net_debt_to_ebitda": ((debt - (cash or 0.0)) / ebitda) if (debt is not None and ebitda and ebitda > 0)
+                                  else None,
         })
         prev_rev = rev
     return rows
@@ -565,13 +579,22 @@ def company_guidance_rows(db: Session, company: Company) -> list[dict[str, Any]]
     return out
 
 
+def guidance_currency(g: Mapping[str, Any]) -> str:
+    """Divisa de una guía según su unidad («EUR», «USD/share»); «» si la fuente no la da."""
+    return str(g.get("unit") or "").split("/")[0].strip().upper()
+
+
 def _guidance_value(g: Mapping[str, Any], value: float | None) -> str:
     if value is None:
         return "N/D"
     unit = str(g.get("unit") or "")
+    ccy = guidance_currency(g)
+    if not ccy:  # sin divisa en la fuente: la cifra, sin inventarle una (antes salía en USD)
+        per_share = unit.endswith("/share")
+        return f"{_es(value if per_share else value / 1e6, 2 if per_share else 0)}{'' if per_share else ' M'} (sin divisa en la fuente)"
     if unit.endswith("/share"):
-        return money(value, unit.split("/")[0])
-    return millions(value / 1e6, unit or "USD")
+        return money(value, ccy)
+    return millions(value / 1e6, ccy)
 
 
 # --------------------------------------------------------------------------------------------- marcadores
@@ -850,9 +873,15 @@ def estimate_switches(guidance: Sequence[Mapping[str, Any]], ccy: str,
         low = g.get("low") if g.get("low") is not None else (g["base"] * 0.95 if g.get("base") else None)
         if low is None:
             continue
+        g_ccy = guidance_currency(g)
+        comparable = bool(g_ccy) and (not ccy or g_ccy == ccy.upper())
         out.append({"key": f"guia.{g['metric']}.{g['period']}", "metric": f"{g['metric']} {g['period']} frente a la guía",
-                    "threshold": f"< {_guidance_value(g, low)}", "current": "pendiente de publicar",
-                    "status": "pendiente", "action": "revisar la credibilidad de la dirección",
+                    "threshold": f"< {_guidance_value(g, low)}",
+                    "current": "pendiente de publicar" if comparable else
+                               (f"no comparable: guía en {g_ccy}, informes en {ccy}" if g_ccy
+                                else f"no comparable: la guía no dice su divisa (informes en {ccy})"),
+                    "status": "pendiente" if comparable else "no_comparable",
+                    "action": "revisar la credibilidad de la dirección",
                     "why": "la empresa no cumple lo que ella misma anunció" + ("" if g.get("low") is not None
                                                                               else " (sin rango: 5 % bajo el punto medio)")})
     return out
@@ -1507,23 +1536,41 @@ def generate_thesis_v2(db: Session, company: Company, *, reasoner: Reasoner | No
             company_id=company.id, input_key=INPUT_KEY, segment_key="", base=Decimal(str(round(weighted or 0.0, 6))),
             unit="ratio", status="derivado", method="derive", as_of=today, model_family=THESIS_V2_VERSION,
             fingerprint=res.fingerprint, source_quote="Tesis v2 de los agentes expertos sobre la TIR determinista",
-            metadata_={"thesis": doc, "markers": markers, "valuation_fingerprint": ctx.valuation.get("fingerprint")},
+            metadata_={"thesis": doc, "markers": markers, "valuation_fingerprint": ctx.valuation.get("fingerprint"),
+                       # lo que se pinta junto al texto, congelado con él: si la valoración cambia, la tesis
+                       # guardada se sirve entera con sus cifras, no texto viejo con tablas de hoy
+                       "tables": tables(ctx), "valuation_as_of": ctx.valuation.get("as_of"),
+                       "warnings": list(ctx.valuation.get("warnings") or [])},
         ))
         db.commit()
     return present(ctx, doc, markers)
 
 
-def present(ctx: ThesisContext, doc: Mapping[str, Any], markers: Mapping[str, str]) -> dict[str, Any]:
+def present(ctx: ThesisContext, doc: Mapping[str, Any], markers: Mapping[str, str], *,
+            saved: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """``saved``: la fila guardada de una tesis cuya valoración ya cambió (stale). Entonces todo lo que
+    se pinta (texto, tablas, fecha, avisos) sale de lo guardado; si la fila es anterior a guardar las
+    tablas, las de hoy se marcan como tales en vez de mezclarse en silencio con el texto viejo."""
     markers = {**dict(doc.get("figure_markers") or {}), **markers}
     rendered = render(doc.get("sections") or {}, markers)
     warnings = list(ctx.valuation.get("warnings") or [])
-    line = guard_warning(doc.get("guard"))
-    if line:
-        warnings.append(line)
     tabs = tables(ctx)
+    as_of = ctx.valuation.get("as_of")
+    if saved is not None:
+        if saved.get("tables"):
+            tabs = {**tabs, **dict(saved["tables"])}
+            as_of = saved.get("valuation_as_of") or as_of
+            warnings = list(saved.get("warnings") or [])
+        warnings.insert(0, "tesis desactualizada: el texto" + (" y las tablas son" if saved.get("tables") else " es")
+                        + " del cálculo guardado" + (f" a {saved['valuation_as_of']}" if saved.get("valuation_as_of") else "")
+                        + ("" if saved.get("tables") else "; las tablas son las de hoy y pueden no cuadrar con el texto")
+                        + "; hay que regenerarla")
+    line = guard_warning(doc.get("guard"))
+    if line and line not in warnings:
+        warnings.append(line)
     return {
         "status": doc.get("status"), "ticker": ctx.ticker, "company": ctx.company, "version": THESIS_V2_VERSION,
-        "as_of": ctx.valuation.get("as_of"), "fingerprint": doc.get("fingerprint"),
+        "as_of": as_of, "fingerprint": doc.get("fingerprint"),
         "probability_choice": doc.get("probability_choice"), "probability_reason": doc.get("probability_reason"),
         "sections": [{"key": k, "title": _title(k, title, ctx), "text": rendered.get(k, ""),
                       "tables": [tabs[n] for n in tn if n != "expertos" or tabs[n]["rows"]]}
@@ -1558,7 +1605,7 @@ def read_thesis_v2(db: Session, company: Company, *, today: date | None = None) 
         return None
     same = meta.get("valuation_fingerprint") == ctx.valuation.get("fingerprint")
     markers = thesis_markers(ctx) if same else dict(meta.get("markers") or {})
-    out = present(ctx, meta.get("thesis") or {}, markers)
+    out = present(ctx, meta.get("thesis") or {}, markers, saved=None if same else meta)
     out["stale"] = not same
     return out
 
