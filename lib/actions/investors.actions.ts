@@ -3,6 +3,7 @@
 import { researchRequest } from '@/lib/research/client';
 import { AppError } from '@/lib/types/errors';
 
+import type { FundHolders } from '@/lib/research/fund-holders';
 import type { InstitutionalHolders } from '@/lib/research/institutional-holders';
 import type { InvestorVideo } from '@/lib/ui/youtube-video';
 
@@ -244,4 +245,14 @@ export async function getInvestorPortfolio(
   slug: string,
 ): Promise<InvestorPortfolio> {
   return requestJson<InvestorPortfolio>(`/api/investors/${encodeURIComponent(slug)}/portfolio`);
+}
+
+/** Fondos y ETF que tienen la acción (SEC Form N-PORT Data Sets); null si el ticker no existe. */
+export async function getFundHolders(ticker: string): Promise<FundHolders | null> {
+  try {
+    return await requestJson<FundHolders>(`/api/ownership/funds/${encodeURIComponent(ticker)}`);
+  } catch (error) {
+    if (error instanceof AppError && error.code === 'RESEARCH_API_ERROR' && error.statusCode === 404) return null;
+    throw error;
+  }
 }

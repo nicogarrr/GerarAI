@@ -140,7 +140,8 @@ import {
   getResearchNews,
 } from '@/lib/actions/research.actions';
 import { getCompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
-import { getCompanyHolders, getInstitutionalHolders } from '@/lib/actions/investors.actions';
+import { getCompanyHolders, getFundHolders, getInstitutionalHolders } from '@/lib/actions/investors.actions';
+import { FundHoldersPanel } from '@/components/research/FundHoldersPanel';
 import { InstitutionalHoldersPanel } from '@/components/research/InstitutionalHoldersPanel';
 import { getShareCapital } from '@/lib/actions/share-capital.actions';
 import { getDecisionLessons, getDriverAssumptions, getFinancialTerminal, getManagementCredibility } from '@/lib/actions/research-tools.actions';
@@ -1534,12 +1535,14 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     // Propietarios = 13F (gestores) + insiders (Form 4, SEC EDGAR, gratis).
     // Los Form 4 persistidos se leen del backend; sin red ni proveedor de
     // pago. Best-effort: cualquier fallo degrada a panel vacio honesto.
-    const [insiderFilings, participation, institutions] = await Promise.all([
+    const [insiderFilings, participation, institutions, funds] = await Promise.all([
       getInsiderFilings(ticker, 8).catch(() => null),
       getParticipationFilings(ticker).catch(() => null),
       // Todos los gestores 13F (no solo los superinversores): best-effort, un
       // fallo degrada a su propio estado vacío honesto.
       getInstitutionalHolders(ticker).catch(() => null),
+      // Fondos y ETF (N-PORT): mismo trato best-effort.
+      getFundHolders(ticker).catch(() => null),
     ]);
     return (
       <div className="space-y-6">
@@ -1583,6 +1586,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           </Panel>
         )}
         <InstitutionalHoldersPanel data={institutions} locale={locale} />
+        <FundHoldersPanel data={funds} locale={locale} />
         <Panel title={t('research.fichaInsidersPanel')}>
           {insiderFilings === null || insiderFilings.status !== 'ok' || insiderFilings.filings.length === 0 ? (
             insiderFilings?.foreign_issuer ? (

@@ -85,6 +85,18 @@ def institutional_holders_route(ticker: str, db: Session = Depends(get_db)) -> d
     return result
 
 
+@router.get("/funds/{ticker}")
+def fund_holders_route(ticker: str, db: Session = Depends(get_db)) -> dict:
+    """Fondos y ETF de EE. UU. que tienen la acción, con su peso (SEC Form N-PORT
+    Data Sets): los de más acciones y aquellos donde más pesa."""
+    from app.services.fund_holders import fund_holders
+
+    result = fund_holders(db, ticker)
+    if result is None:
+        raise HTTPException(status_code=404, detail="company not found")
+    return result
+
+
 @router.get("/schedule-13dg", response_model=Schedule13DGResponseOut)
 def schedule_13dg(
     ticker: str = Query(min_length=1, max_length=20),

@@ -9,6 +9,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 
 from app.core.config import get_settings
 from app.services.etf_holdings import refresh_etf_holdings
+from app.services.fund_holders import refresh_fund_holders
 from app.services.institutional_holders import refresh_institutional_holders
 from app.services.retention_service import run_retention
 from app.services.thesis_job_service import reconcile_thesis_dispatches
@@ -266,6 +267,9 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # mira la página una vez por semana y solo descarga si hay ZIP nuevo.
     _register(scheduler, refresh_institutional_holders, "cron", job_id="institutional_holders_refresh",
               day_of_week="wed", hour=6, minute=40)
+    # N-PORT: la SEC publica un ZIP por trimestre (~460 MB); solo se descarga si hay uno nuevo.
+    _register(scheduler, refresh_fund_holders, "cron", job_id="fund_holders_refresh",
+              day_of_week="thu", hour=6, minute=40)
     # instrument_references (nombres 13F por CUSIP, gems smart-money, resolver
     # de renombres por FIGI): semanal; sin el refresco la tabla queda congelada
     # al seed manual y los consumidores degradan en silencio.
