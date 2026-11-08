@@ -21,10 +21,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const EMPTY: CalendarFeedState = { active: false, scope: null, created_at: null, last_used_at: null };
 
-const DEFAULT_ORIGIN = 'https://gerarai.duckdns.org';
+const PRODUCTION_HOST = 'gerarai.duckdns.org';
+const DEFAULT_ORIGIN = `https://${PRODUCTION_HOST}`;
 // Dominio propio detrás de Caddy + hosts locales de desarrollo. Otro despliegue
 // debe fijar NEXT_PUBLIC_SITE_URL.
-const TRUSTED_HOSTS = new Set(['gerarai.duckdns.org', 'localhost', 'localhost:3000', '127.0.0.1', '127.0.0.1:3000']);
+const TRUSTED_HOSTS = new Set([PRODUCTION_HOST, 'localhost', 'localhost:3000', '127.0.0.1', '127.0.0.1:3000']);
 
 export default async function CalendarSubscriptionPage() {
     const ti = await getT();
@@ -59,7 +60,16 @@ export default async function CalendarSubscriptionPage() {
         const rawProto = headerList.get('x-forwarded-proto') ?? 'https';
         const protoFirst = rawProto.split(',')[0].trim().toLowerCase();
         const proto = protoFirst === 'http' || protoFirst === 'https' ? protoFirst : 'https';
-        origin = TRUSTED_HOSTS.has(host) ? `${proto}://${host}` : DEFAULT_ORIGIN;
+        if (!TRUSTED_HOSTS.has(host)) {
+            origin = DEFAULT_ORIGIN;
+        } else if (host === PRODUCTION_HOST) {
+            // El dominio propio va siempre en https (Caddy termina TLS): el
+            // enlace con token nunca sale en claro aunque la cabecera mienta.
+            origin = `https://${PRODUCTION_HOST}`;
+        } else {
+            // Desarrollo local: se respeta el proto de la cabecera (http).
+            origin = `${proto}://${host}`;
+        }
     }
 
     return (

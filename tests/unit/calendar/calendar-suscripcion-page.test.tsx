@@ -69,6 +69,12 @@ describe('página de suscripción al calendario', () => {
         expect(managerProps.origin).toBe('https://gerarai.duckdns.org');
     });
 
+    it('al dominio propio se le fuerza https aunque la cabecera forwarded diga http', async () => {
+        headerValues = { 'x-forwarded-host': 'gerarai.duckdns.org', 'x-forwarded-proto': 'http' };
+        render(await CalendarSubscriptionPage());
+        expect(managerProps.origin).toBe('https://gerarai.duckdns.org');
+    });
+
     it('localhost de desarrollo sí entra en la lista de confianza', async () => {
         headerValues = { host: 'localhost:3000', 'x-forwarded-proto': 'http' };
         render(await CalendarSubscriptionPage());
