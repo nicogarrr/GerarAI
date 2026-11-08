@@ -2,7 +2,6 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CompanyNavigation } from '@/components/research/CompanyNavigation';
-import { TABS } from '@/lib/research/research-views';
 vi.mock('next/link', () => ({ default: ({ children, scroll, ...props }: React.ComponentProps<'a'> & { scroll?: boolean }) => <a data-scroll={scroll === undefined ? 'default' : String(scroll)} {...props}>{children}</a> }));
 describe('CompanyNavigation', () => {
   it('una sola fila con las seis pestañas, cada una a un toque', () => {
@@ -10,7 +9,7 @@ describe('CompanyNavigation', () => {
     const nav = screen.getByTestId('company-navigation');
     const links = nav.querySelectorAll('a');
     expect(links).toHaveLength(6);
-    expect([...links].map((link) => link.textContent)).toEqual(TABS.map((tab) => tab.label));
+    expect([...links].map((link) => link.textContent)).toEqual(['Resumen', 'Tesis', 'Finanzas', 'Valoración', 'Seguimiento', 'Fuentes']);
     // Destinos canónicos: el Resumen es la ficha desnuda; el resto ?view=.
     expect(screen.getByRole('link', { name: 'Resumen' })).toHaveAttribute('href', '/research/ASTS');
     expect(screen.getByRole('link', { name: 'Tesis' })).toHaveAttribute('href', '/research/ASTS?view=tesis');
@@ -30,8 +29,8 @@ describe('CompanyNavigation', () => {
 
   it('todas las pestañas conservan el scroll (misma ruta, otro ?view=)', () => {
     render(<CompanyNavigation ticker="ASTS" activeView="overview" />);
-    for (const tab of TABS) {
-      expect(screen.getByRole('link', { name: tab.label })).toHaveAttribute('data-scroll', 'false');
+    for (const name of ['Resumen', 'Tesis', 'Finanzas', 'Valoración', 'Seguimiento', 'Fuentes']) {
+      expect(screen.getByRole('link', { name })).toHaveAttribute('data-scroll', 'false');
     }
   });
 

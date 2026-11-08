@@ -17,12 +17,12 @@
  * tests/unit/lib/research/research-views.test.ts.
  */
 export const TABS = [
-  { key: 'resumen', label: 'Resumen', entry: 'overview' },
-  { key: 'tesis', label: 'Tesis', entry: 'thesis' },
-  { key: 'finanzas', label: 'Finanzas', entry: 'financials' },
-  { key: 'valoracion', label: 'Valoración', entry: 'valuation' },
-  { key: 'seguimiento', label: 'Seguimiento', entry: 'changes' },
-  { key: 'fuentes', label: 'Fuentes', entry: 'documents' },
+  { key: 'resumen', entry: 'overview' },
+  { key: 'tesis', entry: 'thesis' },
+  { key: 'finanzas', entry: 'financials' },
+  { key: 'valoracion', entry: 'valuation' },
+  { key: 'seguimiento', entry: 'changes' },
+  { key: 'fuentes', entry: 'documents' },
 ] as const;
 
 export type TabKey = (typeof TABS)[number]['key'];
@@ -35,28 +35,28 @@ export type TabKey = (typeof TABS)[number]['key'];
  * módulo: esa URL redirige a la sección (ver `subrouteRedirect`).
  */
 export const MODULES = [
-  { key: 'overview', label: 'Vista general', tab: 'resumen' },
-  { key: 'noticias', label: 'Noticias', tab: 'resumen', anchor: 'noticias' },
-  { key: 'thesis', label: 'Tesis', tab: 'tesis' },
-  { key: 'financials', label: 'Financieros', tab: 'finanzas' },
-  { key: 'terminal', label: 'Terminal financiero', tab: 'finanzas', anchor: 'terminal', path: 'financial-terminal' },
-  { key: 'capital', label: 'Dilución y recompras', tab: 'finanzas', anchor: 'dilucion', path: 'share-capital' },
-  { key: 'valuation', label: 'Valoración', tab: 'valoracion' },
-  { key: 'model', label: 'Modelo a largo plazo', tab: 'valoracion', anchor: 'modelo' },
-  { key: 'supuestos', label: 'Supuestos de drivers', tab: 'valoracion', anchor: 'supuestos', path: 'driver-assumptions' },
-  { key: 'market-opportunity', label: 'Oportunidad de mercado', tab: 'valoracion', anchor: 'oportunidad' },
-  { key: 'peers', label: 'Comparables', tab: 'valoracion', anchor: 'comparables' },
-  { key: 'moat', label: 'Foso', tab: 'valoracion', anchor: 'foso' },
-  { key: 'changes', label: 'Cambios y revisiones', tab: 'seguimiento' },
-  { key: 'holders', label: 'Superinversores', tab: 'seguimiento', anchor: 'superinversores' },
-  { key: 'insiders', label: 'Insiders', tab: 'seguimiento', anchor: 'insiders' },
-  { key: 'politicos', label: 'Políticos', tab: 'seguimiento', anchor: 'politicos' },
-  { key: 'directiva', label: 'Credibilidad de la directiva', tab: 'seguimiento', anchor: 'directiva', path: 'management-credibility' },
-  { key: 'lecciones', label: 'Lecciones de decisiones', tab: 'seguimiento', anchor: 'lecciones', path: 'decision-lessons' },
-  { key: 'satellites', label: 'Satélites AST', tab: 'seguimiento', anchor: 'satellites' },
-  { key: 'documents', label: 'Documentos', tab: 'fuentes' },
-  { key: 'sources', label: 'Fuentes', tab: 'fuentes', anchor: 'fuentes' },
-  { key: 'chat', label: 'Chat con fuentes', tab: 'fuentes', anchor: 'chat' },
+  { key: 'overview', tab: 'resumen' },
+  { key: 'noticias', tab: 'resumen', anchor: 'noticias' },
+  { key: 'thesis', tab: 'tesis' },
+  { key: 'financials', tab: 'finanzas' },
+  { key: 'terminal', tab: 'finanzas', anchor: 'terminal', path: 'financial-terminal' },
+  { key: 'capital', tab: 'finanzas', anchor: 'dilucion', path: 'share-capital' },
+  { key: 'valuation', tab: 'valoracion' },
+  { key: 'model', tab: 'valoracion', anchor: 'modelo' },
+  { key: 'supuestos', tab: 'valoracion', anchor: 'supuestos', path: 'driver-assumptions' },
+  { key: 'market-opportunity', tab: 'valoracion', anchor: 'oportunidad' },
+  { key: 'peers', tab: 'valoracion', anchor: 'comparables' },
+  { key: 'moat', tab: 'valoracion', anchor: 'foso' },
+  { key: 'changes', tab: 'seguimiento' },
+  { key: 'holders', tab: 'seguimiento', anchor: 'superinversores' },
+  { key: 'insiders', tab: 'seguimiento', anchor: 'insiders' },
+  { key: 'politicos', tab: 'seguimiento', anchor: 'politicos' },
+  { key: 'directiva', tab: 'seguimiento', anchor: 'directiva', path: 'management-credibility' },
+  { key: 'lecciones', tab: 'seguimiento', anchor: 'lecciones', path: 'decision-lessons' },
+  { key: 'satellites', tab: 'seguimiento', anchor: 'satellites' },
+  { key: 'documents', tab: 'fuentes' },
+  { key: 'sources', tab: 'fuentes', anchor: 'fuentes' },
+  { key: 'chat', tab: 'fuentes', anchor: 'chat' },
 ] as const;
 
 export type View = (typeof MODULES)[number]['key'];

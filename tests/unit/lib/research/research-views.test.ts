@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import researchEs from '@/lib/i18n/messages/es/research.json';
 import {
   MODULES,
   TABS,
@@ -15,7 +16,9 @@ import {
 describe('TABS: una fila de seis pestañas', () => {
     it('son las seis acordadas, en orden, cada una con su módulo de entrada', () => {
         expect(TABS.map((t) => t.key)).toEqual(['resumen', 'tesis', 'finanzas', 'valoracion', 'seguimiento', 'fuentes']);
-        expect(TABS.map((t) => t.label)).toEqual(['Resumen', 'Tesis', 'Finanzas', 'Valoración', 'Seguimiento', 'Fuentes']);
+        // Los nombres visibles viven en el diccionario (research.tabs.*, los pinta
+        // CompanyNavigation via TAB_LABEL_KEYS): aquí se fijan esos valores.
+        expect(TABS.map((t) => researchEs.tabs[t.key])).toEqual(['Resumen', 'Tesis', 'Finanzas', 'Valoración', 'Seguimiento', 'Fuentes']);
         expect(TABS.map((t) => t.entry)).toEqual(['overview', 'thesis', 'financials', 'valuation', 'changes', 'documents']);
     });
     it('todo módulo cuelga de una pestaña existente y las entradas no llevan ancla', () => {
