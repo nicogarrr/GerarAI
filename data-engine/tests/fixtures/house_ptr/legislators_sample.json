@@ -1,0 +1,87 @@
+[
+ {
+  "id": {
+   "bioguide": "D000617"
+  },
+  "name": {
+   "last": "DelBene",
+   "first": "Suzan"
+  },
+  "terms": [
+   {
+    "type": "rep",
+    "state": "WA",
+    "district": 1,
+    "party": "Democrat"
+   }
+  ]
+ },
+ {
+  "id": {
+   "bioguide": "K000389"
+  },
+  "name": {
+   "last": "Khanna",
+   "first": "Ro"
+  },
+  "terms": [
+   {
+    "type": "rep",
+    "state": "CA",
+    "district": 17,
+    "party": "Democrat"
+   }
+  ]
+ },
+ {
+  "id": {
+   "bioguide": "G000583"
+  },
+  "name": {
+   "last": "Gottheimer",
+   "first": "Josh"
+  },
+  "terms": [
+   {
+    "type": "rep",
+    "state": "NJ",
+    "district": 5,
+    "party": "Democrat"
+   }
+  ]
+ },
+ {
+  "id": {
+   "bioguide": "H001082"
+  },
+  "name": {
+   "last": "Hern",
+   "first": "Kevin"
+  },
+  "terms": [
+   {
+    "type": "rep",
+    "state": "OK",
+    "district": 1,
+    "party": "Republican"
+   }
+  ]
+ },
+ {
+  "id": {
+   "bioguide": "T000490"
+  },
+  "name": {
+   "last": "Taylor",
+   "first": "David"
+  },
+  "terms": [
+   {
+    "type": "rep",
+    "state": "OH",
+    "district": 2,
+    "party": "Republican"
+   }
+  ]
+ }
+]

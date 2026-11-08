@@ -31,6 +31,7 @@ from app.workers.dramatiq_app import (
     ingest_ca_insider_yahoo,
     ingest_class_shares_outstanding,
     ingest_corporate_splits,
+    ingest_house_ptr,
     ingest_sec_bottleneck_filings,
     ingest_spy_daily,
     ingest_uk_pdmr_filings,
@@ -254,6 +255,9 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # Insiders Canada (Yahoo quoteSummary, no oficial): 2 GET por corrida cada 6 h.
     _register(scheduler, partial(enqueue_for_all_tenants, ingest_ca_insider_yahoo),
               "interval", job_id="ca_insider_yahoo", hours=6)
+    # Politicos (PTR de la Camara, STOCK Act): el Clerk publica a diario; cada 6 h.
+    _register(scheduler, partial(enqueue_for_all_tenants, ingest_house_ptr),
+              "interval", job_id="house_ptr", hours=6)
     _register(scheduler, partial(coalesced_send, refresh_macro_context), "cron", job_id="macro_context_refresh", hour=23, minute=10)
     # Holdings oficiales de ETFs tematicos (UFO, NASA): 1 descarga por ETF y semana.
     _register(scheduler, refresh_etf_holdings, "cron", job_id="etf_holdings_refresh", day_of_week="mon", hour=7, minute=20)

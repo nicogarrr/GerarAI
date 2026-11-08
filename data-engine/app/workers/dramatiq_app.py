@@ -5327,3 +5327,46 @@ def dispatch_source_health_watchdog(
             )
         if db is not None:
             db.close()
+
+
+@dramatiq.actor(max_retries=2, min_backoff=30_000)
+@_coalesce_on_success("ingest_house_ptr", 6 * 60 * 60, ("tenant_id",))
+def ingest_house_ptr(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+    max_new: int = 120,
+) -> dict[str, Any]:
+    """Operaciones de politicos: PTR de la Camara (indice XML + PDF), gratis.
+
+    Ano en curso y anterior; como mucho ``max_new`` PDF nuevos por corrida
+    (peticiones espaciadas, User-Agent de contacto). Sin modelo.
+    """
+    actor_name = "ingest_house_ptr"
+    db = None
+    lease = None
+    try:
+        from app.services import politician_trades
+
+        db = _session(tenant_id, user_id)
+        lease = acquire_job_lease(f"ingest_house_ptr:{tenant_id}", ttl_seconds=1800, redis_url=_lease_redis_url())
+        if lease is None:
+            return {"status": "skipped", "actor": actor_name, "reason": "lease_held"}
+        year = datetime.now(UTC).year
+        stats = []
+        budget = max_new
+        for target in (year, year - 1):
+            result = politician_trades.ingest_year(db, target, tenant_id=tenant_id, max_new=budget)
+            budget -= result["new"] - result["scanned"]
+            stats.append(result)
+            if budget <= 0:
+                break
+        return {"status": "ok", "actor": actor_name, "years": stats}
+    except Exception as exc:
+        if db is not None:
+            _rollback(db)
+        return _handle_actor_error(actor_name, exc, tenant_id=tenant_id)
+    finally:
+        if lease is not None:
+            release_job_lease(f"ingest_house_ptr:{tenant_id}", lease, redis_url=_lease_redis_url())
+        if db is not None:
+            db.close()

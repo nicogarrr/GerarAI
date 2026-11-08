@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FinancialDisclosure>
+<Member>
+    <Prefix>Hon.</Prefix>
+    <Last>DelBene</Last>
+    <First>Suzan K.</First>
+    <Suffix />
+    <FilingType>P</FilingType>
+    <StateDst>WA01</StateDst>
+    <Year>2026</Year>
+    <FilingDate>1/12/2026</FilingDate>
+    <DocID>20033766</DocID>
+  </Member>
+  <Member>
+    <Prefix>Hon.</Prefix>
+    <Last>Gottheimer</Last>
+    <First>Josh</First>
+    <Suffix />
+    <FilingType>P</FilingType>
+    <StateDst>NJ05</StateDst>
+    <Year>2026</Year>
+    <FilingDate>1/14/2026</FilingDate>
+    <DocID>20033756</DocID>
+  </Member>
+  <Member>
+    <Prefix>Hon.</Prefix>
+    <Last>Hern</Last>
+    <First>Kevin</First>
+    <Suffix />
+    <FilingType>P</FilingType>
+    <StateDst>OK01</StateDst>
+    <Year>2026</Year>
+    <FilingDate>1/22/2026</FilingDate>
+    <DocID>20033829</DocID>
+  </Member>
+  <Member>
+    <Prefix>Hon.</Prefix>
+    <Last>Khanna</Last>
+    <First>Rohit</First>
+    <Suffix />
+    <FilingType>P</FilingType>
+    <StateDst>CA17</StateDst>
+    <Year>2026</Year>
+    <FilingDate>5/11/2026</FilingDate>
+    <DocID>9115822</DocID>
+  </Member>
+  <Member>
+    <Prefix>Hon.</Prefix>
+    <Last>Taylor</Last>
+    <First>David J.</First>
+    <Suffix />
+    <FilingType>P</FilingType>
+    <StateDst>OH02</StateDst>
+    <Year>2026</Year>
+    <FilingDate>1/21/2026</FilingDate>
+    <DocID>20033845</DocID>
+  </Member>
+  <Member>
+    <Prefix />
+    <Last>Abdulle</Last>
+    <First>Abdisallam</First>
+    <Suffix />
+    <FilingType>C</FilingType>
+    <StateDst>MN02</StateDst>
+    <Year>2026</Year>
+    <FilingDate>6/11/2026</FilingDate>
+    <DocID>10078673</DocID>
+  </Member>
+  </FinancialDisclosure>

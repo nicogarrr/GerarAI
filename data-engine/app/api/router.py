@@ -34,6 +34,7 @@ from app.api.routes import (
     ownership,
     paper_trading,
     plan,
+    politicians,
     portfolio,
     portfolio_images,
     portfolio_moves,
@@ -84,6 +85,7 @@ api_router.include_router(
 api_router.include_router(earnings.router, prefix="/earnings", tags=["earnings"])
 api_router.include_router(export.router, prefix="/export", tags=["export"])
 api_router.include_router(insider.router, prefix="/insider", tags=["insider"])
+api_router.include_router(politicians.router, prefix="/politicians", tags=["politicians"])
 api_router.include_router(portfolio.router, prefix="/portfolio", tags=["portfolio"])
 api_router.include_router(portfolio_images.router, prefix="/portfolio", tags=["portfolio"])
 api_router.include_router(portfolio_moves.router, prefix="/portfolio", tags=["portfolio"])
