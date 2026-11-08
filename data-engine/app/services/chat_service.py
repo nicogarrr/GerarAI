@@ -2227,6 +2227,17 @@ class ChatService:
         # con el broker. Antes caia en el volcado de datos de la empresa como
         # si se hubiera preguntado por ella. Las preguntas de IRPF al vender
         # ya salieron por _sale_tax_route / _sale_tax_answer.
+        # «¿Me da el efectivo para comprar 10 acciones de META?»: la cuenta con
+        # tu efectivo y el precio guardado. Antes contestaba «No ejecuto
+        # órdenes» (benchmark Cerebro 2026-11-08).
+        if company is not None and _ORDER_VERB_RE.search(question or ""):
+            from app.services.brain_account_tools import affordability_answer, asks_affordability
+
+            if asks_affordability(question or ""):
+                afford = affordability_answer(db, company, question or "")
+                if afford is not None:
+                    afford.context = context_echo
+                    return afford
         if (
             company is not None
             and _ORDER_VERB_RE.search(question or "")
