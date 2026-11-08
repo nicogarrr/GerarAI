@@ -43,13 +43,17 @@ def parse_dsn(dsn: str | None) -> tuple[str, str] | None:
         return None
     try:
         parts = urlsplit(dsn.strip())
+        # ``parts.port`` lanza ValueError con puerto no numerico o fuera de
+        # rango: un DSN mal configurado devuelve None (el seguimiento nunca
+        # rompe el handler 500), no una excepcion que el llamador trague.
+        port = parts.port
     except ValueError:
         return None
     project = parts.path.strip("/").rsplit("/", 1)[-1]
     if parts.scheme not in ("https", "http") or not parts.hostname or not parts.username or not project.isdigit():
         return None
     prefix = parts.path.strip("/").rsplit("/", 1)[0] if "/" in parts.path.strip("/") else ""
-    host = parts.hostname + (f":{parts.port}" if parts.port else "")
+    host = parts.hostname + (f":{port}" if port else "")
     base = f"{parts.scheme}://{host}" + (f"/{prefix}" if prefix else "")
     auth = f"Sentry sentry_version=7, sentry_client=gerarai-min/1.0, sentry_key={parts.username}"
     return f"{base}/api/{project}/store/", auth
