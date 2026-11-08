@@ -19,6 +19,7 @@ criterio o formula de ranking:
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -30,6 +31,8 @@ from sqlalchemy.orm import Session
 from app.core.tenancy import tenant_filters
 from app.models import Company, ThesisVersion, ValuationModel, ValuationOutput
 from app.valuation.margin_convention import MARGIN_OF_SAFETY_CONVENTION, margin_convention_known
+
+logger = logging.getLogger(__name__)
 
 MARGIN_OF_SAFETY = "margen_seguridad"
 HAS_THESIS = "tiene_tesis"
@@ -68,10 +71,9 @@ def _margin_of_safety(db: Session) -> dict[int, Any]:
     # Una sola consulta de outputs para todos los modelos: antes era una por
     # empresa (5 sentencias con 3 empresas, 22 con 20; ver
     # tests/test_screener_context_metrics.py::test_margin_of_safety_query_count_is_constant).
-    # ORDER BY (modelo, id) fija el mismo orden de lectura que tenian las
-    # consultas por modelo (orden de insercion), y el sort estable por
-    # escenario mantiene la misma eleccion: el primer output "base" con
-    # convencion conocida y margen no nulo.
+    # ORDER BY (modelo, id) da un orden de lectura estable por modelo; la
+    # eleccion del margen se hace en memoria ("base" mas reciente primero,
+    # ver el bucle de abajo).
     candidates = {
         company_id: model
         for company_id, model in latest.items()
@@ -92,9 +94,23 @@ def _margin_of_safety(db: Session) -> dict[int, Any]:
     result: dict[int, Any] = {}
     for company_id, model in candidates.items():
         outputs = outputs_by_model.get(model.id, [])
-        outputs.sort(key=lambda row: row.scenario != "base")
+        # Desempate determinista (decision de Nico, 8-nov-2026): dos outputs
+        # "base" en un mismo modelo son un duplicado de datos, no algo que
+        # decida en silencio el orden de la query. Entre "base" gana la
+        # valoracion mas reciente (created_at DESC, id DESC) y se registra un
+        # aviso por el duplicado; el resto de escenarios queda como fallback
+        # en orden de insercion cuando ningun "base" trae margen usable.
+        base_outputs = [row for row in outputs if row.scenario == "base"]
+        if len(base_outputs) > 1:
+            logger.warning(
+                "margen_seguridad: modelo %s (empresa %s) tiene %d outputs 'base'; "
+                "duplicado de datos, gana la valoracion mas reciente",
+                model.id, company_id, len(base_outputs),
+            )
+        base_outputs.sort(key=lambda row: (row.created_at, row.id), reverse=True)
+        others = [row for row in outputs if row.scenario != "base"]
         value = None
-        for output in outputs:
+        for output in [*base_outputs, *others]:
             payload = output.output_payload or {}
             if not margin_convention_known(payload.get("trace")):
                 continue

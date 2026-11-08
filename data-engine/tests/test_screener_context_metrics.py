@@ -280,3 +280,34 @@ def test_margin_of_safety_query_count_is_constant(db):
     # Y el valor sigue siendo el del modelo mas reciente de cada empresa.
     result = context_observations(db, [scm.MARGIN_OF_SAFETY])
     assert len(result) == 20
+
+
+def test_margin_of_safety_duplicate_base_newest_wins_and_warns(db, caplog):
+    """Dos 'base' en el mismo modelo: duplicado de datos, no una eleccion de la query.
+
+    Regla (decision de Nico, 8-nov-2026): gana la valoracion mas reciente
+    (created_at DESC, id DESC) y el duplicado deja un aviso en el log. El
+    contraejemplo lo midio el auditor sobre la primera version del parche:
+    margenes 0.9 (vieja) y 0.1 (nueva); debe salir 0.1.
+    """
+    import logging
+    from datetime import UTC, datetime
+
+    pool = _company(db, "POOL")
+    model = ValuationModel(company_id=pool.id, model_type="standard_dcf", version=1,
+                           status="final", calculation_trace={})
+    db.add(model)
+    db.flush()
+    for created, mos in ((datetime(2026, 10, 1, tzinfo=UTC), "0.9"),
+                         (datetime(2026, 11, 1, tzinfo=UTC), "0.1")):
+        db.add(ValuationOutput(
+            valuation_model_id=model.id, scenario="base",
+            value_per_share=Decimal("100"), created_at=created,
+            output_payload={"margin_of_safety": mos, "status": "final",
+                            "trace": {"margin_of_safety_convention": "discount_to_value_v1"}},
+        ))
+    db.commit()
+    with caplog.at_level(logging.WARNING, logger="app.services.screener_context_metrics"):
+        obs = context_observations(db, {"margen_seguridad"})
+    assert obs[pool.id]["margen_seguridad"].value == Decimal("0.1")
+    assert any("duplicado" in record.message for record in caplog.records)
