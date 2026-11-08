@@ -10,6 +10,22 @@ const view = readFileSync('components/taxes/TaxesView.tsx', 'utf8');
 const es = JSON.parse(readFileSync('lib/i18n/messages/es/taxes.json', 'utf8'));
 const en = JSON.parse(readFileSync('lib/i18n/messages/en/taxes.json', 'utf8'));
 
+// El contrato con TaxesView es la PERTENENCIA de cada clave a su Set
+// (moneyKeys / listKeys), no el orden ni la adyacencia: #4827 inserto
+// cancelled_lot entre cost_unknown y missing_fx y el guard hermano
+// (taxes-cost-unknown-guard) fallo sin que faltara ninguna clave.
+function clavesDeSet(componente: string, nombre: string): string[] {
+    const match = componente.match(new RegExp(`const ${nombre} = new Set\\(\\[([^\\]]*)\\]\\)`));
+    assert.ok(match, `no se encontro const ${nombre} = new Set([...]) en TaxesView`);
+    return [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+}
+
+function assertContiene(keys: string[], requeridas: string[]): void {
+    for (const clave of requeridas) {
+        assert.ok(keys.includes(clave), `el Set de TaxesView debe incluir '${clave}'`);
+    }
+}
+
 test('F330: las claves de sin-atribuir y el metodo tienen etiqueta en el diccionario', () => {
     // El resumen fiscal llega con claves internas (unattributed_tickers,
     // unattributed_dividends_base) y el id del metodo en minusculas: la UI
@@ -18,8 +34,8 @@ test('F330: las claves de sin-atribuir y el metodo tienen etiqueta en el diccion
     assert.equal(es.labels.unattributedDividendsBase, 'Dividendos sin atribuir');
     assert.match(view, /unattributed_tickers: 'taxes.labels.unattributedTickers'/);
     assert.match(view, /unattributed_dividends_base: 'taxes.labels.unattributedDividendsBase'/);
-    assert.match(view, /'unattributed_dividends_base',\s*\n?\s*\]\);/);
-    assert.match(view, /'unattributed_tickers', 'ambiguous_cash'\]\)/);
+    assertContiene(clavesDeSet(view, 'moneyKeys'), ['unattributed_dividends_base']);
+    assertContiene(clavesDeSet(view, 'listKeys'), ['unattributed_tickers', 'ambiguous_cash']);
     assert.equal(es.values.methodFifo, 'FIFO');
     assert.match(view, /key === 'method'/);
 });
@@ -54,5 +70,19 @@ test('cancelled_lot: la clave del resumen tiene etiqueta y se lista como tickers
     assert.equal(es.labels.cancelledLot, 'Ventas con lote cancelado');
     assert.equal(en.labels.cancelledLot, 'Sales with cancelled lot');
     assert.match(view, /cancelled_lot: 'taxes\.labels\.cancelledLot'/);
-    assert.match(view, /'cancelled_lot', 'missing_fx'/);
+    assertContiene(clavesDeSet(view, 'listKeys'), ['cancelled_lot', 'missing_fx']);
+});
+
+test('el guard rechaza la omision de cualquier clave requerida', () => {
+    // Controles negativos: si TaxesView pierde cualquiera de estas claves,
+    // el guard tiene que fallar nombrando la clave que falta.
+    const money = clavesDeSet(view, 'moneyKeys');
+    assert.throws(
+        () => assertContiene(money.filter((k) => k !== 'unattributed_dividends_base'), ['unattributed_dividends_base']),
+        /unattributed_dividends_base/,
+    );
+    const list = clavesDeSet(view, 'listKeys');
+    for (const omitida of ['unattributed_tickers', 'ambiguous_cash', 'cancelled_lot', 'missing_fx']) {
+        assert.throws(() => assertContiene(list.filter((k) => k !== omitida), [omitida]), new RegExp(omitida));
+    }
 });
