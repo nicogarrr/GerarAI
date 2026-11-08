@@ -1107,9 +1107,9 @@ services:
           cpus: "0.10"
           memory: 128M
 
-  # El frontend NO va aqui: Vercel sirve la app. Tenerlo en el compose
-  # consumia CPU/RAM de la VM y no publicaba puertos utiles. Si algun dia se
-  # sirve desde la VM, anadelo como servicio con perfil explicito y su limite.
+  # El frontend NO va aqui: se despliega aparte en la misma VM con
+  # docker-compose.frontend.yml (ver docs/frontend-oracle.md). Tenerlo en este
+  # compose consumia CPU/RAM de la VM y no publicaba puertos utiles.
 
 volumes:
   postgres_data:

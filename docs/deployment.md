@@ -11,7 +11,7 @@ Este documento detalla el procedimiento operativo estándar para el despliegue, 
 - **Infraestructura**:
   - VM ARM64 con Docker Engine 24+ y Docker Compose v2.
   - Red aislada Docker con persistencia en volúmenes locales montados.
-  - Frontend servido en Vercel Edge con variables de entorno de conexión.
+  - Frontend servido en la misma VM Oracle con `docker-compose.frontend.yml` (runbook: `docs/frontend-oracle.md`); la configuración de Vercel se conserva como vía de respaldo.
   - MongoDB Atlas (M0 Free Tier) exclusivo para auth y sesiones de usuario.
 - **Fichero Compose**: `docker-compose.prod.yml`
 - **Fichero de Entorno**: `.env.production` (con permisos `chmod 600`).
