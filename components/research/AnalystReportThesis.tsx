@@ -1,4 +1,4 @@
-import { hasRows, thesisParagraphs, type ThesisV2, type ThesisV2Table } from '@/lib/research/thesis-v2';
+import { hasRows, safeLink, thesisParagraphs, type ThesisV2, type ThesisV2Table } from '@/lib/research/thesis-v2';
 import type { TranslateFn } from '@/lib/i18n/translate';
 
 /**
@@ -69,13 +69,22 @@ function ThesisTable({ table }: { table: ThesisV2Table }) {
           <tr>{table.head.map((c, i) => <th className={`py-1 pl-2 font-medium ${i === 0 ? 'text-left' : ''}`} key={`${c}-${i}`} scope="col">{c}</th>)}</tr>
         </thead>
         <tbody>
-          {table.rows.map((row, r) => (
-            <tr className="border-t border-gray-800" key={r}>
-              {row.map((cell, i) => i === 0
-                ? <th className="py-1 text-left font-normal text-gray-300" key={i} scope="row">{cell}</th>
-                : <td className="whitespace-nowrap py-1 pl-2 text-gray-100" key={i}>{cell}</td>)}
-            </tr>
-          ))}
+          {table.rows.map((row, r) => {
+            const href = safeLink(table.links?.[r]);
+            return (
+              <tr className="border-t border-gray-800" key={r}>
+                {row.map((cell, i) => {
+                  if (i === 0) return <th className="py-1 text-left font-normal text-gray-300" key={i} scope="row">{cell}</th>;
+                  const last = i === row.length - 1;
+                  return (
+                    <td className="whitespace-nowrap py-1 pl-2 text-gray-100" key={i}>
+                      {last && href ? <a className="text-teal-300 underline" href={href} target="_blank" rel="noopener noreferrer">{cell || href}</a> : cell}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

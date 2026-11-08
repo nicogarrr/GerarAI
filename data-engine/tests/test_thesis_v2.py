@@ -191,3 +191,37 @@ def test_prosa_sin_operador_ni_veces_duplicado():
     assert T.tables(ctx)["vigilar"]["rows"][0][1].startswith("<")
     out = T.render({"a": "cotiza a {{punto.multiplo}} veces el EBITDA"}, {"punto.multiplo": "15,8x"})
     assert out["a"] == "cotiza a 15,8x el EBITDA"
+
+
+def test_enlace_de_un_clic_al_filing():
+    cite = {"source_type": "SEC", "accession": "0001628280-26-003942", "url": "https://www.sec.gov/cgi-bin/browse-edgar?x"}
+    assert T.source_link(cite, "1326801") == "https://www.sec.gov/Archives/edgar/data/1326801/000162828026003942/"
+    assert T.source_link({"source_type": "ESEF", "url": None}, None) is None
+    assert T.source_link({"url": "https://filings.xbrl.org/x.zip"}, None) == "https://filings.xbrl.org/x.zip"
+
+
+def test_supuestos_con_fuente_y_confianza_y_percentil():
+    ctx = _ctx()
+    tabs = T.tables(ctx)
+    rows = {r[0]: r for r in tabs["supuestos"]["rows"]}
+    assert rows["Margen objetivo"][-1] in ("alta", "media", "baja")
+    assert "tasa base" in rows["Crecimiento orgánico años 1–5"][4]
+    assert len(tabs["partida"]["links"]) == len(tabs["partida"]["rows"])
+    assert T.implied_percentile(0.03, {"p25": 0.01, "p50": 0.04, "p75": 0.08}) == "entre los percentiles 25 y 50"
+    assert tabs["descuenta"]["rows"][0][1] == T.pct(0.03)
+
+
+def test_kill_switch_sobre_la_guia():
+    g = [{"metric": "revenue", "period": "fy2026", "unit": "USD", "low": 9e9, "base": 9.5e9, "high": 1e10},
+         {"metric": "eps", "period": "fy2026", "unit": "USD/share", "low": None, "base": 10.0, "high": None},
+         {"metric": "capex", "period": "fy2026", "unit": "USD", "low": 1e9, "base": 1e9, "high": 1e9}]
+    sw = T.estimate_switches(g, "USD")
+    assert [s["key"] for s in sw] == ["guia.revenue.fy2026", "guia.eps.fy2026"]
+    assert sw[0]["threshold"] == "< 9.000 M$" and sw[1]["threshold"] == "< 9,50 $"
+
+
+def test_guia_inverosimil_no_crea_kill_switch():
+    g = [{"metric": "operating_income", "period": "fy2026", "unit": "USD", "low": None, "base": 18.5e9, "high": None}]
+    annual = {"operating_income": {"2025": {"value": 83e9}}}
+    assert T.estimate_switches(g, "USD", annual) == []
+    assert T.plausible_guidance({**g[0], "base": 90e9}, annual)
