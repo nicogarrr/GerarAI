@@ -31,6 +31,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import date
 from statistics import median
 from typing import Any
 
@@ -68,6 +69,16 @@ BASE_RATES: dict[str, dict[str, float]] = {
     "10-20 %": {"p25": 0.0183, "p50": 0.073, "p75": 0.1134, "n": 91},
     "> 20 %": {"p25": 0.0202, "p50": 0.0631, "p75": 0.2053, "n": 60},
 }
+#: Último cierre cuya cifra entra en la tabla: observaciones con inicio 2010–2014 y resultado a 5 años, así que
+#: la tabla usa ingresos hasta el ejercicio 2019. Valorar una fecha anterior con ella es mirar al futuro.
+BASE_RATE_OUTCOMES_THROUGH = date(2019, 12, 31)
+
+
+def base_rates_known_at(as_of: date) -> dict[str, dict[str, float]] | None:
+    """La tabla de tasas base si ya era conocida en ``as_of``; None si lleva información posterior."""
+    return BASE_RATES if as_of > BASE_RATE_OUTCOMES_THROUGH else None
+
+
 BASE_RATE_SOURCE = (
     "SEC companyfacts (10-K, primera cifra publicada por ejercicio) de 200 valores del S&P 500 elegidos con "
     "semilla fija 20261108, sin financieras (SIC 6000–6799): 161 empresas y 483 observaciones con inicio "
