@@ -1,4 +1,4 @@
-"""Cliente Redis perezoso con backoff compartido.
+"""Helper compartido de cliente Redis perezoso con backoff.
 
 core/cache.py y services/movers_cache.py llevaban la misma conexion copiada:
 estado por modulo ``{"client": None, "down_until": 0.0}``, backoff de 30 s

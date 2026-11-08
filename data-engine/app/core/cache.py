@@ -47,9 +47,9 @@ _cache_stats: dict[str, dict[str, int]] = {
 }
 _stats_lock = threading.Lock()
 
-# Cliente Redis con backoff (estado propio del modulo; la conexion es la
-# compartida de app.core.redis_client: misma conexion perezosa que tenian
-# copiada cache y movers_cache).
+# Cliente Redis con backoff (estado propio del modulo: cliente y circuito
+# independientes; solo la implementacion es compartida, en
+# app.core.redis_client).
 _redis_state: dict[str, Any] = {
     "client": None,
     "down_until": 0.0,
