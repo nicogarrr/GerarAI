@@ -41,10 +41,10 @@
         "adr_ratio": null,
         "trace_engine": "standard_dcf",
         "closed_form": {
-          "bear_value": 5.8144429602,
-          "base_value": 20.3198221011,
-          "bull_value": 46.9442096379,
-          "expected_value": 22.6308778827
+          "bear_value": 8.20292457976,
+          "base_value": 29.8863683836,
+          "bull_value": 72.9152931746,
+          "expected_value": 34.3325944267
         }
       },
       "applies_to": [
@@ -63,7 +63,7 @@
       ],
       "price": 25,
       "wacc": 0.09,
-      "hand_calculation": "revenue 2000, FCF 300 -> margin 0.15; growth 0.08 de facts; WACC 0.09 de CalculatedMetric (wacc_source=calculated_metric); terminal 0.03; net_debt 400; 200 acciones. bear=(0.00, 0.09, 0.11), base=(0.08, 0.15, 0.09), bull=(0.16, 0.21, 0.08) sobre DCF de 5 anos + Gordon; bear=8.202925 base=29.886368 bull=72.915293; expected=sum(p*v). terminal_share=0.7712 < 0.95 -> sin blockers. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.000, m 0.090, wacc 0.135) → 5.814443; base=(g 0.080, m 0.150, wacc 0.115) → 20.319822; bull=(g 0.160, m 0.210, wacc 0.105) → 46.944210; expected=Σp·v con las probabilidades de la traza → 22.630878."
+      "hand_calculation": "revenue 2000, FCF 300 -> margin 0.15; growth 0.08 de facts; WACC 0.09 de CalculatedMetric (wacc_source=calculated_metric); terminal 0.03; net_debt 400; 200 acciones. bear=(0.00, 0.09, 0.11), base=(0.08, 0.15, 0.09), bull=(0.16, 0.21, 0.08) sobre DCF de 5 anos + Gordon; bear=8.202925 base=29.886368 bull=72.915293; expected=sum(p*v). terminal_share=0.7712 < 0.95 -> sin blockers."
     },
     {
       "id": "evdcf02_net_cash_increases_equity",
@@ -92,10 +92,10 @@
         "adr_ratio": null,
         "trace_engine": "standard_dcf",
         "closed_form": {
-          "bear_value": 9.3144429602,
-          "base_value": 23.8198221011,
-          "bull_value": 50.4442096379,
-          "expected_value": 26.1308778827
+          "bear_value": 11.7029245798,
+          "base_value": 33.3863683836,
+          "bull_value": 76.4152931746,
+          "expected_value": 37.8325944267
         }
       },
       "applies_to": [
@@ -114,7 +114,7 @@
       ],
       "price": 25,
       "wacc": 0.09,
-      "hand_calculation": "identico a evdcf01 con net_debt -300 (caja neta): el puente de equity es EV - net_debt, asi que la caja SUMA. base=33.386368 = base evdcf01 (29.886368) + 700/200 = +3.5 exacto. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.000, m 0.090, wacc 0.135) → 9.314443; base=(g 0.080, m 0.150, wacc 0.115) → 23.819822; bull=(g 0.160, m 0.210, wacc 0.105) → 50.444210; expected=Σp·v con las probabilidades de la traza → 26.130878."
+      "hand_calculation": "identico a evdcf01 con net_debt -300 (caja neta): el puente de equity es EV - net_debt, asi que la caja SUMA. base=33.386368 = base evdcf01 (29.886368) + 700/200 = +3.5 exacto."
     },
     {
       "id": "evdcf03_tag_default_wacc_is_not_publishable",
@@ -428,10 +428,10 @@
         "adr_ratio": 8,
         "trace_engine": "standard_dcf",
         "closed_form": {
-          "bear_value": 5.8144429602,
-          "base_value": 20.3198221011,
-          "bull_value": 46.9442096379,
-          "expected_value": 22.6308778827
+          "bear_value": 8.20292457976,
+          "base_value": 29.8863683836,
+          "bull_value": 72.9152931746,
+          "expected_value": 34.3325944267
         }
       },
       "applies_to": [
@@ -450,7 +450,7 @@
       ],
       "price": 200,
       "wacc": 0.09,
-      "hand_calculation": "el DCF corre en la base de acciones ordinarias; con adr:8 la cotizacion 200/8=25 se convierte a base ordinaria antes del margen de seguridad y listed_share_values = valor x 8. bear/base/bull NO cambian: el ratio solo afecta a la comparacion con el precio. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.000, m 0.090, wacc 0.135) → 5.814443; base=(g 0.080, m 0.150, wacc 0.115) → 20.319822; bull=(g 0.160, m 0.210, wacc 0.105) → 46.944210; expected=Σp·v con las probabilidades de la traza → 22.630878."
+      "hand_calculation": "el DCF corre en la base de acciones ordinarias; con adr:8 la cotizacion 200/8=25 se convierte a base ordinaria antes del margen de seguridad y listed_share_values = valor x 8. bear/base/bull NO cambian: el ratio solo afecta a la comparacion con el precio."
     },
     {
       "id": "evdcf09_negative_free_cash_flow_refuses",
@@ -566,10 +566,10 @@
         "adr_ratio": null,
         "trace_engine": "standard_dcf",
         "closed_form": {
-          "bear_value": 7.9997635884,
-          "base_value": 23.7187174813,
-          "bull_value": 51.7887924035,
-          "expected_value": 26.1742076543
+          "bear_value": 11.0322330099,
+          "base_value": 34.6838196489,
+          "bull_value": 80.2232520872,
+          "expected_value": 39.4176730689
         }
       },
       "applies_to": [
@@ -588,7 +588,7 @@
       ],
       "price": 30,
       "wacc": 0.09,
-      "hand_calculation": "margen FCF 0.18 como fact en vez de FCF/ingresos: mismo motor, margen=0.18 directo. base=34.683820. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g -0.010, m 0.120, wacc 0.135) → 7.999764; base=(g 0.070, m 0.180, wacc 0.115) → 23.718717; bull=(g 0.150, m 0.240, wacc 0.105) → 51.788792; expected=Σp·v con las probabilidades de la traza → 26.174208."
+      "hand_calculation": "margen FCF 0.18 como fact en vez de FCF/ingresos: mismo motor, margen=0.18 directo. base=34.683820."
     },
     {
       "id": "evdcf12_fcf_margin_ceiling_clamped",
@@ -617,10 +617,10 @@
         "adr_ratio": null,
         "trace_engine": "standard_dcf",
         "closed_form": {
-          "bear_value": 36.203943361,
-          "base_value": 72.3994070035,
-          "bull_value": 114.5338324711,
-          "expected_value": 77.7206238351
+          "bear_value": 47.8809646122,
+          "base_value": 104.287894612,
+          "bull_value": 176.36974565379788,
+          "expected_value": 114.8957920077723
         }
       },
       "applies_to": [
@@ -639,7 +639,7 @@
       ],
       "price": 60,
       "wacc": 0.09,
-      "hand_calculation": "margen 0.62 > techo 0.50: el motor acota a 0.50 y lo deja escrito en trace.fcf_margin_clamped_from. base=104.287895 con margen 0.50, no 0.62. Contrato monotono corregido #3008: bull conserva margen 0.50 (nunca baja al antiguo techo0.45), crecimiento0.16/WACC0.08/g terminal0.03. Forma cerrada independiente: EV=sum(2000*1.16^t*0.50/1.08^t,t=1..5)+(2000*1.16^5*0.50*1.03/(0.08-0.03))/1.08^5; (EV-400)/200=176.369745653. Pesos bear/base/bull0.132864/0.616/0.251136: esperado114.895792008. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.000, m 0.440, wacc 0.135) → 36.203943; base=(g 0.080, m 0.500, wacc 0.115) → 72.399407; bull=(g 0.160, m 0.500, wacc 0.105) → 114.533832; expected=Σp·v con las probabilidades de la traza → 77.720624."
+      "hand_calculation": "margen 0.62 > techo 0.50: el motor acota a 0.50 y lo deja escrito en trace.fcf_margin_clamped_from. base=104.287895 con margen 0.50, no 0.62. Contrato monotono corregido #3008: bull conserva margen 0.50 (nunca baja al antiguo techo0.45), crecimiento0.16/WACC0.08/g terminal0.03. Forma cerrada independiente: EV=sum(2000*1.16^t*0.50/1.08^t,t=1..5)+(2000*1.16^5*0.50*1.03/(0.08-0.03))/1.08^5; (EV-400)/200=176.369745653. Pesos bear/base/bull0.132864/0.616/0.251136: esperado114.895792008."
     },
     {
       "id": "evdcf13_negative_control_wrong_status",
@@ -748,10 +748,10 @@
         "adr_ratio": null,
         "trace_engine": "standard_dcf",
         "closed_form": {
-          "bear_value": 45.5699253682,
-          "base_value": 149.453417018,
-          "bull_value": 357.1035641076,
-          "expected_value": 193.3023983176
+          "bear_value": 65.217610732,
+          "base_value": 232.244784774,
+          "bull_value": 592.16581495,
+          "expected_value": 309.7500272
         }
       },
       "applies_to": [
@@ -770,7 +770,7 @@
       ],
       "price": 40,
       "wacc": 0.09,
-      "hand_calculation": "crecimiento 0.95 de facts, acotado a 0.45 por el motor: trace.growth_clamped_from=0.95. Crecimiento >= 10 % de hechos -> DCF multietapa (normalized_fcf): anos 1-5 al crecimiento del escenario y anos 6-10 bajando linealmente hasta el 3 % terminal, Gordon sobre el FCF del ano 10. bear=(0.37, 0.09, 0.11) -> 65.217611; base=(0.45, 0.15, 0.09) -> 232.244785; bull=(0.53, 0.21, 0.08) -> 592.165815 (calculado a mano fuera del motor); expected=sum(p*v) con las probabilidades del motor (sin cambios) = 309.750027. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información); bear/base/bull siguen el plan multietapa 5+5 a ese WACC; valores regenerados con el motor tras la banda (antes con WACC 0,09: bear_value=65.217611, base_value=232.244785, bull_value=592.165815, expected_value=309.750027)."
+      "hand_calculation": "crecimiento 0.95 de facts, acotado a 0.45 por el motor: trace.growth_clamped_from=0.95. Crecimiento >= 10 % de hechos -> DCF multietapa (normalized_fcf): anos 1-5 al crecimiento del escenario y anos 6-10 bajando linealmente hasta el 3 % terminal, Gordon sobre el FCF del ano 10. bear=(0.37, 0.09, 0.11) -> 65.217611; base=(0.45, 0.15, 0.09) -> 232.244785; bull=(0.53, 0.21, 0.08) -> 592.165815 (calculado a mano fuera del motor); expected=sum(p*v) con las probabilidades del motor (sin cambios) = 309.750027."
     },
     {
       "id": "evbnk01_justified_price_to_book",
@@ -6224,10 +6224,10 @@
         "adr_ratio": null,
         "trace_engine": "scenario",
         "closed_form": {
-          "bear_value": 12.2108806521,
-          "base_value": 20.3198221011,
-          "bull_value": 30.7364855841,
-          "expected_value": 20.8967526096
+          "bear_value": 18.167846540590734,
+          "base_value": 29.886368383617572,
+          "bull_value": 45.045682395933184,
+          "expected_value": 30.746566425939765
         }
       },
       "applies_to": [
@@ -6246,7 +6246,7 @@
       ],
       "price": 25,
       "wacc": 0.09,
-      "hand_calculation": "Motor de escenarios, juego declarado del caso (declared_scenarios: 25/50/25 con las cifras del antiguo juego por defecto, ya fijas como datos) sobre el DCF de 5 años + Gordon del caso evdcf01_happy_path_traceable_wacc: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=18.167847 base=29.886368 bull=45.045682; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.040, m 0.112, wacc 0.115) → 12.210881; base=(g 0.080, m 0.150, wacc 0.115) → 20.319822; bull=(g 0.120, m 0.188, wacc 0.115) → 30.736486; expected=Σp·v con las probabilidades de la traza → 20.896753.",
+      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf01_happy_path_traceable_wacc: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=18.167847 base=29.886368 bull=45.045682; expected=0.25*bear+0.5*base+0.25*bull.",
       "note": "Clon de evdcf01_happy_path_traceable_wacc con modelo declarado de escenarios (motor scenario).",
       "declared_scenarios": {
         "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
@@ -6300,10 +6300,10 @@
         "adr_ratio": null,
         "trace_engine": "scenario",
         "closed_form": {
-          "bear_value": 15.7108806521,
-          "base_value": 23.8198221011,
-          "bull_value": 34.2364855841,
-          "expected_value": 24.3967526096
+          "bear_value": 21.667846540590734,
+          "base_value": 33.38636838361757,
+          "bull_value": 48.545682395933184,
+          "expected_value": 34.24656642593976
         }
       },
       "applies_to": [
@@ -6322,7 +6322,7 @@
       ],
       "price": 25,
       "wacc": 0.09,
-      "hand_calculation": "Motor de escenarios, juego declarado del caso (declared_scenarios: 25/50/25 con las cifras del antiguo juego por defecto, ya fijas como datos) sobre el DCF de 5 años + Gordon del caso evdcf02_net_cash_increases_equity: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=21.667847 base=33.386368 bull=48.545682; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.040, m 0.112, wacc 0.115) → 15.710881; base=(g 0.080, m 0.150, wacc 0.115) → 23.819822; bull=(g 0.120, m 0.188, wacc 0.115) → 34.236486; expected=Σp·v con las probabilidades de la traza → 24.396753.",
+      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf02_net_cash_increases_equity: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=21.667847 base=33.386368 bull=48.545682; expected=0.25*bear+0.5*base+0.25*bull.",
       "note": "Clon de evdcf02_net_cash_increases_equity con modelo declarado de escenarios (motor scenario).",
       "declared_scenarios": {
         "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
@@ -6731,10 +6731,10 @@
         "adr_ratio": 8,
         "trace_engine": "scenario",
         "closed_form": {
-          "bear_value": 12.2108806521,
-          "base_value": 20.3198221011,
-          "bull_value": 30.7364855841,
-          "expected_value": 20.8967526096
+          "bear_value": 18.167846540590734,
+          "base_value": 29.886368383617572,
+          "bull_value": 45.045682395933184,
+          "expected_value": 30.746566425939765
         }
       },
       "applies_to": [
@@ -6753,7 +6753,7 @@
       ],
       "price": 200,
       "wacc": 0.09,
-      "hand_calculation": "Motor de escenarios, juego declarado del caso (declared_scenarios: 25/50/25 con las cifras fijas como datos; ya no existe juego por defecto) sobre el DCF de 5 años + Gordon del caso evdcf08_adr_with_ratio_converts_basis: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=18.167847 base=29.886368 bull=45.045682; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.040, m 0.112, wacc 0.115) → 12.210881; base=(g 0.080, m 0.150, wacc 0.115) → 20.319822; bull=(g 0.120, m 0.188, wacc 0.115) → 30.736486; expected=Σp·v con las probabilidades de la traza → 20.896753.",
+      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf08_adr_with_ratio_converts_basis: base g=0.0800 m=0.1500 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=18.167847 base=29.886368 bull=45.045682; expected=0.25*bear+0.5*base+0.25*bull.",
       "note": "Clon de evdcf08_adr_with_ratio_converts_basis con modelo declarado de escenarios (motor scenario).",
       "declared_scenarios": {
         "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
@@ -6942,10 +6942,10 @@
         "adr_ratio": null,
         "trace_engine": "scenario",
         "closed_form": {
-          "bear_value": 14.7028487899,
-          "base_value": 23.7187174813,
-          "bull_value": 35.0147129288,
-          "expected_value": 24.2887491703
+          "bear_value": 21.683526750951316,
+          "base_value": 34.683819648939746,
+          "bull_value": 51.0799042900305,
+          "expected_value": 35.53276758471533
         }
       },
       "applies_to": [
@@ -6964,7 +6964,7 @@
       ],
       "price": 30,
       "wacc": 0.09,
-      "hand_calculation": "Motor de escenarios, juego declarado del caso (declared_scenarios: 25/50/25 con las cifras fijas como datos; ya no existe juego por defecto) sobre el DCF de 5 años + Gordon del caso evdcf11_fcf_margin_as_sourced_fact: base g=0.0700 m=0.1800 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=21.683527 base=34.683820 bull=51.079904; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.035, m 0.135, wacc 0.115) → 14.702849; base=(g 0.070, m 0.180, wacc 0.115) → 23.718717; bull=(g 0.105, m 0.225, wacc 0.115) → 35.014713; expected=Σp·v con las probabilidades de la traza → 24.288749.",
+      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf11_fcf_margin_as_sourced_fact: base g=0.0700 m=0.1800 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=21.683527 base=34.683820 bull=51.079904; expected=0.25*bear+0.5*base+0.25*bull.",
       "note": "Clon de evdcf11_fcf_margin_as_sourced_fact con modelo declarado de escenarios (motor scenario).",
       "declared_scenarios": {
         "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
@@ -7018,10 +7018,10 @@
         "adr_ratio": null,
         "trace_engine": "scenario",
         "closed_form": {
-          "bear_value": 45.3696021735,
-          "base_value": 72.3994070035,
-          "bull_value": 85.297294891,
-          "expected_value": 68.8664277679
+          "bear_value": 65.22615513530245,
+          "base_value": 104.2878946120586,
+          "bull_value": 123.4551530558218,
+          "expected_value": 99.31427435381036
         }
       },
       "applies_to": [
@@ -7040,7 +7040,7 @@
       ],
       "price": 60,
       "wacc": 0.09,
-      "hand_calculation": "Motor de escenarios, juego declarado del caso (declared_scenarios: 25/50/25 con las cifras fijas como datos; ya no existe juego por defecto) sobre el DCF de 5 años + Gordon del caso evdcf12_fcf_margin_ceiling_clamped: base g=0.0800 m=0.5000 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=65.226155 base=104.287895 bull=123.455153; expected=0.25*bear+0.5*base+0.25*bull. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g 0.040, m 0.375, wacc 0.115) → 45.369602; base=(g 0.080, m 0.500, wacc 0.115) → 72.399407; bull=(g 0.120, m 0.500, wacc 0.115) → 85.297295; expected=Σp·v con las probabilidades de la traza → 68.866428.",
+      "hand_calculation": "Motor de escenarios, juego por defecto 25/50/25 sobre el DCF de 5 años + Gordon del caso evdcf12_fcf_margin_ceiling_clamped: base g=0.0800 m=0.5000 WACC=0.0900 g_terminal=0.0300; bear g-max(0.5|g|,0.03), m-max(0.25|m|,0.02); bull simétrico (topes 0.45 / 0.50); WACC y g terminal intactos. bear=65.226155 base=104.287895 bull=123.455153; expected=0.25*bear+0.5*base+0.25*bull.",
       "note": "Clon de evdcf12_fcf_margin_ceiling_clamped con modelo declarado de escenarios (motor scenario).",
       "declared_scenarios": {
         "source": "eval: juego declarado del caso (cifras fijas de prueba, no de una empresa real)",
@@ -7225,10 +7225,10 @@
         "adr_ratio": null,
         "trace_engine": "standard_dcf",
         "closed_form": {
-          "bear_value": 5.8144429602,
-          "base_value": 20.3198221011,
-          "bull_value": 46.9442096379,
-          "expected_value": 22.6308778827
+          "bear_value": 8.20292457976,
+          "base_value": 29.8863683836,
+          "bull_value": 72.9152931746,
+          "expected_value": 34.3325944267
         }
       },
       "applies_to": [
@@ -7247,7 +7247,7 @@
       ],
       "price": 25,
       "wacc": 0.09,
-      "hand_calculation": "Sin declared_scenarios: respaldo al DCF estándar (motivo scenario_set_missing, «escenarios pendientes: sin escenarios con fuente»). Los valores son los de evdcf01_happy_path_traceable_wacc (mismos hechos, precio y WACC).",
+      "hand_calculation": "Sin escenarios declarados: respaldo al DCF estandar con los mismos inputs CAPM 9 % y valores manuales de evdcf01. Conserva scenario_set_missing y no publicable.",
       "note": "Sin escenarios con fuente el respaldo corre, pero NO es publicable: el modelo declarado (escenarios) no ha corrido (dato ausente = N/D). La ficha lo muestra como orientacion degradada con el motivo; los numeros son los del DCF base (evdcf01)."
     },
     {
@@ -7329,10 +7329,10 @@
         "adr_ratio": null,
         "trace_engine": "standard_dcf",
         "closed_form": {
-          "bear_value": 5.4998226913,
-          "base_value": 19.4322645677,
-          "bull_value": 45.0651933531,
-          "expected_value": 21.5724063379
+          "bear_value": 7.7741747574,
+          "base_value": 28.5698497074,
+          "bull_value": 69.9453455763,
+          "expected_value": 32.7121651606
         }
       },
       "applies_to": [
@@ -7351,7 +7351,7 @@
       ],
       "price": 25,
       "wacc": 0.09,
-      "hand_calculation": "El crecimiento FY2024 queda fuera del snapshot, pero el crecimiento NO es obligatorio: el motor cae a default_growth(tags) = 0.07 y lo declara como growth_source=tag_default. La exclusion del cruce de ejercicio es real; que el valor siga publicandose como orientacion con WACC trazable es lo que hace falta que se vea. base = 28.569850 con crecimiento 0.07, no 0.08. Banda de WACC por tamaño (owner 4-nov-2026): precio 25 × 200 acciones = 5.000 (< 10.000 M$) → WACC 11,5 % (el CalculatedMetric queda como wacc_capm, solo información). Recalculado a mano con DCF de 5 años + Gordon: bear=(g -0.010, m 0.090, wacc 0.135) → 5.499823; base=(g 0.070, m 0.150, wacc 0.115) → 19.432265; bull=(g 0.150, m 0.210, wacc 0.105) → 45.065193; expected=Σp·v con las probabilidades de la traza → 21.572406."
+      "hand_calculation": "El crecimiento FY2024 queda fuera del snapshot, pero el crecimiento NO es obligatorio: el motor cae a default_growth(tags) = 0.07 y lo declara como growth_source=tag_default. La exclusion del cruce de ejercicio es real; que el valor siga publicandose como orientacion con WACC trazable es lo que hace falta que se vea. base = 28.569850 con crecimiento 0.07, no 0.08."
     },
     {
       "id": "evanc03_pre_revenue_cross_year_margin_excluded",
@@ -7485,8 +7485,8 @@
       },
       "expected": {
         "engine_key": "standard_dcf",
-        "status": "ok",
-        "publishable": true,
+        "status": "partial",
+        "publishable": false,
         "missing_inputs": [],
         "publication_blockers": [],
         "adr_ratio": null,
@@ -7494,7 +7494,7 @@
         "closed_form": {
           "bear_value": null,
           "base_value": null,
-          "bull_value": 233.8527016237,
+          "bull_value": 685.0168397549436,
           "expected_value": null
         }
       },
@@ -7509,7 +7509,7 @@
       ],
       "price": 260,
       "wacc": 0.09,
-      "hand_calculation": "CHTR (bateria de 7): revenue 55.000 M$, FCF 3.900 M$ -> margen 0,0709; crecimiento 0,01; deuda neta 93.000 M$; 145 M acciones; precio 260 $. Banda de WACC por tamano: 260 x 145 = 37.700 (< 10.000 M$) -> 11,5 % (el CalculatedMetric 0,09 queda como wacc_capm, solo informacion); terminal 0,03. DCF de 5 anos + Gordon por escenario. bear = (g min(0,01, max(-0,07, -0,05)) = -0,05; m 0,0709 - 0,06 = 0,0109; wacc 0,135) -> equity 33.217 - 93.000 -> vps bruto -612,18: N/D (deuda y obligaciones superan el valor del negocio; el bruto queda en la traza). base = (g 0,01; m 0,0709; wacc 0,115) -> EV 43.457 - 93.000 -> vps bruto -341,68: N/D. bull = (g 0,09; m 0,1309; wacc max(0,105, 0,04) = 0,105) -> vps 233,8527016237, unico publicable. Probabilidades (confianza 0,90): direccion = (0,01-0,115)*3 + (0,0709-0,10)*2 = -0,3732 -> upside 0,4254; base 0,616; bull 0,384 x 0,4254 = 0,1633; bear 0,2207. Esperado BRUTO = sum(p*v) = -307,36 <= 0 -> N/D: el bear y el base negativos SI cuentan en el ponderado (excluirlos inflaria el esperado). Puertas de banda/esperado/probabilidades no aplican: con escenarios N/D no hay banda completa que ordenar (convencion d2656966: una cifra <= 0 no es una valoracion publicable; se publica N/D explicado, nunca el negativo)."
+      "hand_calculation": "CAPM trazable 0.09, terminal 0.03. FCFF por escenario = revenue*(1+growth)^ano*margin; EV=sum(FCFF/(1+WACC)^ano)+FCFF5*(1+terminal)/(WACC-terminal)/(1+WACC)^5; equity=EV-net_debt; dividir por shares. Triples (growth,margin,wacc): [(-0.05, 0.01090909090909091, 0.11), (0.01, 0.07090909090909091, 0.09), (0.09, 0.13090909090909092, 0.08)]. Brutos bear/base/bull: [-603.628099894805, -218.36804986673658, 685.0168397549436]. Probabilidades bear/base/bull: [0.21490036363636364, 0.616, 0.16909963636363637]. Ponderado bruto -148.39851838090223; <=0 se publica N/D, partial/no publicable. Calculo independiente, sin importar el motor."
     },
     {
       "id": "evb7_chtr_sin_net_debt_nd",
@@ -7591,10 +7591,10 @@
         "adr_ratio": null,
         "trace_engine": "standard_dcf",
         "closed_form": {
-          "bear_value": 3.2345602574,
-          "base_value": 398.3685131545,
-          "bull_value": 1215.7534942526,
-          "expected_value": 459.419597931
+          "bear_value": 18.920588221968675,
+          "base_value": 588.0256862694974,
+          "bull_value": 1881.7061415280018,
+          "expected_value": 707.1154845848582
         }
       },
       "applies_to": [
@@ -7613,7 +7613,7 @@
       ],
       "price": 310,
       "wacc": 0.09,
-      "hand_calculation": "UNH (bateria de 7): revenue 400.000 M$, FCF 30.000 M$ -> margen 0,075; crecimiento 0,06; deuda neta 45.000 M$; 920 M acciones; precio 310 $. industry = Health Care (managed care, no aseguradora de riesgo): el routing NO lleva al motor insurer. Banda de WACC: 310 x 920 = 285.200 (< 10.000 M$ en las unidades toy del dataset) -> 11,5 % (CalculatedMetric 0,09 = wacc_capm informativo); terminal 0,03. DCF 5 anos + Gordon: bear = (g -0,02; m 0,015; wacc 0,135) -> 3,2345602574; base = (g 0,06; m 0,075; wacc 0,115) -> 398,3685131545; bull = (g 0,14; m 0,135; wacc 0,105) -> 1.215,7534942526. Probabilidades (confianza 0,90): direccion = (0,06-0,115)*3 + (0,075-0,10)*2 = -0,215 -> upside 0,457; base 0,616; bull 0,1755; bear 0,2085. Esperado = sum(p*v) = 459,4195979310, dentro de la banda. Margen de seguridad vs 310 $: (459,42-310)/459,42 = 32,5 %."
+      "hand_calculation": "CAPM trazable 0.09, terminal 0.03. FCFF por escenario = revenue*(1+growth)^ano*margin; EV=sum(FCFF/(1+WACC)^ano)+FCFF5*(1+terminal)/(WACC-terminal)/(1+WACC)^5; equity=EV-net_debt; dividir por shares. Triples (growth,margin,wacc): [(-0.020000000000000004, 0.015, 0.11), (0.06, 0.075, 0.09), (0.14, 0.135, 0.08)]. Brutos bear/base/bull: [18.920588221968675, 588.0256862694974, 1881.7061415280018]. Probabilidades bear/base/bull: [0.20275200000000002, 0.616, 0.181248]. Ponderado bruto 707.1154845848582; <=0 se publica N/D, partial/no publicable. Calculo independiente, sin importar el motor."
     },
     {
       "id": "evb7_unh_sin_fcf_nd",

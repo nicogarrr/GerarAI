@@ -2,9 +2,8 @@
 
 Supuestos: DCF a 5 años sobre ``revenue`` y ``fcf_margin`` del snapshot
 coherente (margen = FCF/ingresos si falta, acotado a [1%, 50%]); crecimiento
-de ingresos de facts o ``default_growth`` acotado a [-15%, +45%]; WACC por
-banda de capitalización en USD (``app/valuation/wacc_band.py``; sin precio o
-sin tipo de cambio, el de ``resolve_rates`` con el motivo en la traza) y
+de ingresos de facts o ``default_growth`` acotado a [-15%, +45%]; WACC de
+``resolve_rates`` (CAPM trazable, o respaldo identificado no publicable) y
 terminal de ``default_terminal_growth`` o inferido; ``net_debt`` del snapshot (negativo = caja neta, suma a
 equity). Escenarios bear/base/bull mecánicos anclados a facts
 (±8pp crecimiento, ±6pp margen, WACC +2pp/−1pp) con probabilidades
@@ -16,7 +15,6 @@ from __future__ import annotations
 
 from datetime import date
 
-from app.services.inferred_input_service import pick_rate_pair
 from app.valuation.cyclical_midcycle import cyclical_midcycle
 from app.valuation.dcf_fcff import DCFInputs, run_dcf
 from app.valuation.engines.base import (
@@ -28,7 +26,6 @@ from app.valuation.engines.base import (
     apply_publication_blockers,
     clamp_fcf_margin,
     default_growth,
-    default_terminal_growth,
     insufficient_from_context,
     is_adr_without_ratio,
     margin_of_safety,
@@ -53,7 +50,6 @@ from app.valuation.scenario_definitions import mechanical_dcf_scenarios, own_his
 from app.valuation.scenario_model import Scenario, probability_weighted_value
 from app.valuation.sensitivity import sensitivity_grid
 from app.valuation.wacc_band import (
-    WACC_SOURCE_MARKET_CAP_BAND,
     BandWacc,
     resolve_band_wacc,
 )
@@ -298,7 +294,7 @@ class StandardDCFEngine(ValuationEngine):
     """DCF FCFF estándar sobre snapshot coherente.
 
     Supuestos: margen FCF acotado a [1%, 50%], crecimiento a [-15%, +45%],
-    WACC por banda de capitalización (ver ``wacc_band``); caja neta
+    WACC de resolve_rates (CAPM trazable); caja neta
     (``net_debt`` negativo) aumenta el equity. Expone bear/base/bull,
     grid de sensibilidad crecimiento × WACC y reverse DCF.
     """
@@ -465,27 +461,10 @@ class StandardDCFEngine(ValuationEngine):
         wacc, wacc_source, terminal, terminal_source, dropped_inferred = resolve_rates(
             context.db, company, as_of=context.as_of
         )
-        # Tasa de descuento: banda por capitalización en USD (owner 4-nov-2026,
-        # backtests point-in-time; ver app/valuation/wacc_band.py). El WACC de
-        # siempre (CAPM trazable / inferido / por defecto) queda en la traza
-        # como información y es el respaldo cuando la banda no se puede aplicar.
+        # Use the traceable CAPM policy again. The experimental size band
+        # stays in the trace for comparison, never as the discount rate.
         wacc_capm_rate, wacc_capm_source = wacc, wacc_source
         band = _resolve_band(context, company, snapshot, shares)
-        if band.wacc is not None:
-            wacc, wacc_source = band.wacc, WACC_SOURCE_MARKET_CAP_BAND
-            # Mismo criterio que resolve_rates con el WACC FINAL: una g inferida
-            # que no deja el margen mínimo se ignora; la de por defecto no.
-            _wacc, terminal, dropped_band = pick_rate_pair(
-                wacc=wacc,
-                wacc_inferred=False,
-                terminal=terminal,
-                terminal_inferred=terminal_source == "inferred_input",
-                default_wacc_value=wacc,
-                default_terminal_value=default_terminal_growth(company),
-            )
-            if "terminal_growth" in dropped_band:
-                terminal_source = "tag_default"
-                dropped_inferred = [*dropped_inferred, "terminal_growth"]
         invalid_rates = wacc_not_above_terminal_result(
             context,
             wacc=wacc,
@@ -689,6 +668,11 @@ class StandardDCFEngine(ValuationEngine):
                 "una cifra negativa."
             )
 
+        # An explained N/D is not a publishable valuation. Keep the raw
+        # scenarios and notes, but make the state match the displayed result.
+        publishable = expected is not None
+        result_status = "ok" if publishable else "partial"
+
         # Terminal value share guard: a DCF where >80% of the EV is the terminal
         # value is not a 5-year forecast, it is a perpetuity assumption.
 
@@ -717,9 +701,7 @@ class StandardDCFEngine(ValuationEngine):
             )
 
         publication_blockers: list[str] = []
-        if wacc_source not in {"calculated_metric", WACC_SOURCE_MARKET_CAP_BAND}:
-            # La banda es un WACC fechado y con fuente (precio y acciones a la
-            # fecha del precio): no es un supuesto sin trazar.
+        if wacc_source != "calculated_metric":
             publication_blockers.append("traceable_wacc")
         if terminal_share is not None and terminal_share > 0.95:
             publication_blockers.append("forecast_is_not_the_driver")
@@ -739,8 +721,8 @@ class StandardDCFEngine(ValuationEngine):
             {
             "ticker": company.ticker,
             "model_type": company.valuation_model,
-            "status": "ok",
-            "publishable": True,
+            "status": result_status,
+            "publishable": publishable,
             "current_price": current_price,
             "bear_value": bear,
             "base_value": base,
@@ -773,8 +755,8 @@ class StandardDCFEngine(ValuationEngine):
                 "method": company.valuation_model,
                 "engine": self.key,
                 "input_source": "financial_facts",
-                "publishable": True,
-                "status": "ok",
+                "publishable": publishable,
+                "status": result_status,
                 "model_version": MODEL_VERSION,
                 "revenue_base": revenue_base.trace(),
                 "growth_source": growth_source,
@@ -801,10 +783,10 @@ class StandardDCFEngine(ValuationEngine):
                 "terminal_source": terminal_source,
                 "inferred_inputs_ignored": dropped_inferred,
                 "wacc": wacc,
-                "wacc_policy": band.trace()["policy"],
+                "wacc_policy": "capm_traceable",
                 "wacc_band": band.trace(),
-                # CAPM/beta (o el WACC inferido/por defecto): solo información
-                # cuando manda la banda. Valor solo si era un cálculo trazable.
+                # Only a calculated CAPM is labelled traceable; a fallback
+                # keeps its source and publication blocker.
                 "wacc_capm": wacc_capm_rate if wacc_capm_source == "calculated_metric" else None,
                 "wacc_capm_source": wacc_capm_source,
                 "wacc_previous_policy_rate": wacc_capm_rate,
