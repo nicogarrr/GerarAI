@@ -14,7 +14,8 @@ backfill de historia y job F2 de propicks).
 - Varios procesos: el sync corre en el worker de dramatiq, no en el backend.
   Cada entrada guarda la versión de Redis leída ANTES de calcular; si otro
   proceso la sube, la siguiente petición recalcula. Sin Redis (o caído) la caché
-  degrada a TTL puro y Redis no se reintenta durante `_REDIS_BACKOFF_S`.
+  degrada a TTL puro y Redis no se reintenta durante el backoff compartido
+  de `app.core.redis_client` (30 s).
 """
 
 from __future__ import annotations
@@ -27,11 +28,11 @@ from typing import Any
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 
+from app.core.redis_client import redis_client_with_backoff, redis_down
+
 TTL_SECONDS = 60.0
 VERSION_KEY = "market_prices:version"
 _SESSION_FLAG = "market_prices_written"
-_REDIS_BACKOFF_S = 30.0
-
 _lock = threading.Lock()
 _compute_lock = threading.Lock()
 _entry: dict[str, Any] | None = None
@@ -41,32 +42,11 @@ _redis_state: dict[str, Any] = {"client": None, "down_until": 0.0}
 
 def _redis():
     """Cliente Redis con timeouts cortos; None sin URL o en backoff tras un fallo."""
-    if time.monotonic() < _redis_state["down_until"]:
-        return None
-    if _redis_state["client"] is not None:
-        return _redis_state["client"]
-    try:
-        import redis as _redis_lib
-
-        from app.core.config import get_settings
-        from app.core.redis_retry import no_retry
-
-        url = get_settings().redis_url
-        if not url:
-            return None
-        client = _redis_lib.from_url(
-            url, socket_connect_timeout=0.25, socket_timeout=0.25, retry=no_retry()
-        )
-    except Exception:
-        _redis_down()
-        return None
-    _redis_state["client"] = client
-    return client
+    return redis_client_with_backoff(_redis_state, connect_timeout=0.25, socket_timeout=0.25)
 
 
 def _redis_down() -> None:
-    _redis_state["client"] = None
-    _redis_state["down_until"] = time.monotonic() + _REDIS_BACKOFF_S
+    redis_down(_redis_state)
 
 
 def _read_version() -> str | None:

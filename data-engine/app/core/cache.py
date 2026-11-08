@@ -17,11 +17,12 @@ import hashlib
 import json
 import logging
 import threading
-import time
 from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, ParamSpec, TypeVar, cast
+
+from app.core.redis_client import redis_client_with_backoff, redis_down
 
 logger = logging.getLogger(__name__)
 
@@ -46,45 +47,30 @@ _cache_stats: dict[str, dict[str, int]] = {
 }
 _stats_lock = threading.Lock()
 
-# Cliente Redis con backoff
+# Cliente Redis con backoff (estado propio del modulo; la conexion es la
+# compartida de app.core.redis_client: misma conexion perezosa que tenian
+# copiada cache y movers_cache).
 _redis_state: dict[str, Any] = {
     "client": None,
     "down_until": 0.0,
 }
-_REDIS_BACKOFF_S = 30.0
 
 
 def _redis_client():
     """Cliente Redis con timeouts cortos; None sin URL o en backoff tras un fallo."""
-    if time.monotonic() < _redis_state["down_until"]:
-        return None
-    if _redis_state["client"] is not None:
-        return _redis_state["client"]
-    try:
-        import redis as _redis_lib
-
-        from app.core.config import get_settings
-        from app.core.redis_retry import no_retry
-
-        url = get_settings().redis_url
-        if not url:
-            return None
-        client = _redis_lib.from_url(
-            url, socket_connect_timeout=0.5, socket_timeout=0.5, retry=no_retry()
-        )
-        client.ping()  # Verificar conectividad
-    except Exception as exc:
-        logger.warning(f"Redis unavailable for caching: {exc}")
-        _redis_down()
-        return None
-    _redis_state["client"] = client
-    return client
+    return redis_client_with_backoff(
+        _redis_state,
+        connect_timeout=0.5,
+        socket_timeout=0.5,
+        verify_ping=True,
+        unavailable_log="Redis unavailable for caching",
+        log_logger=logger,
+    )
 
 
 def _redis_down() -> None:
     """Marca Redis como caido y activa el backoff."""
-    _redis_state["client"] = None
-    _redis_state["down_until"] = time.monotonic() + _REDIS_BACKOFF_S
+    redis_down(_redis_state)
 
 
 def _tenant_from_db(db) -> int | None:
