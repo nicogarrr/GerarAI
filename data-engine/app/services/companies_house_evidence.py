@@ -107,7 +107,12 @@ class GroupMember:
 class _Walk:
     client: CompaniesHouseClient
     token: str | None
+    target: str = ""  # nombre normalizado del holding
+    #: personas que dirigen o fundaron el holding según datos verificados (Wikidata P169/P488/P112)
+    people: tuple[str, ...] = ()
     members: dict[str, GroupMember] = field(default_factory=dict)
+    #: candidatas que no llegaron al grupo por PSC: se enseñan (con por qué), nunca se usan sus cifras
+    unverified: dict[str, dict[str, str]] = field(default_factory=dict)
     psc_cache: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
 
     async def pscs(self, number: str) -> list[dict[str, Any]]:
@@ -125,6 +130,25 @@ def _hint_match(item: dict[str, Any], key: str) -> bool:
     """La pista es el comienzo del nombre actual o de uno anterior (``snippet`` de la busqueda)."""
     names = [item.get("title")] + str(item.get("snippet") or "").split("\u00b7")
     return any((normalize_name(n) + " ").startswith(key + " ") for n in names if n)
+
+
+def _person_tokens(name: Any) -> set[str]:
+    words = normalize_name(name).split()
+    return {w for w in words if w not in {"MR", "MRS", "MS", "MISS", "DR", "SIR", "DAME", "LORD", "LADY"}}
+
+
+def _psc_person_of_holding(walk: _Walk, pscs: list[dict[str, Any]]) -> str | None:
+    """Nombre del PSC persona física que es quien dirige o fundó el holding (todas las palabras del
+    nombre verificado están en el del PSC: «Prem Watsa» en «Mr Vivian Prem Watsa»), o None."""
+    for psc in pscs:
+        if _corporate(psc):
+            continue
+        tokens = _person_tokens(psc.get("name"))
+        for person in walk.people:
+            want = _person_tokens(person)
+            if len(want) >= 2 and want <= tokens:
+                return str(psc.get("name"))
+    return None
 
 
 def _corporate(psc: dict[str, Any]) -> bool:
@@ -154,7 +178,9 @@ async def _verify_chain(walk: _Walk, number: str, name: str, via: str) -> bool:
                 return True
         for psc in corporate:
             psc_name = str(psc.get("name") or "")
-            if walk.token and walk.token in normalize_name(psc_name).split():
+            # La controladora tiene que SER el holding (mismo nombre normalizado), no un homónimo que solo
+            # comparte la palabra propia («FAIRFAX PROPERTIES LTD» no es Fairfax Financial Holdings).
+            if walk.target and normalize_name(psc_name) == walk.target:
                 reg = _uk_registered(psc)
                 if reg:
                     top = GroupMember(reg, psc_name, 0, f"controladora con el nombre del holding ({psc_name})")
@@ -170,9 +196,19 @@ async def _verify_chain(walk: _Walk, number: str, name: str, via: str) -> bool:
             if reg and next_hop is None:
                 next_hop = (reg, psc_name)
         if next_hop is None or any(n == next_hop[0] for n, _ in chain):
+            homonyms = [str(p.get("name")) for p in corporate
+                        if walk.token and _has_token(p.get("name"), walk.token)
+                        and normalize_name(p.get("name")) != walk.target]
+            walk.unverified.setdefault(number, {
+                "company_number": number, "company_name": name, "via": via,
+                "why": (f"su PSC «{homonyms[0]}» comparte el nombre propio pero no es el holding" if homonyms
+                        else "su cadena de PSC no llega al grupo"),
+            })
             return False
         chain.append(next_hop)
         current = next_hop[0]
+    walk.unverified.setdefault(number, {"company_number": number, "company_name": name, "via": via,
+                                        "why": f"cadena de PSC de más de {MAX_CHAIN_HOPS} saltos"})
     return False
 
 
@@ -190,9 +226,12 @@ def _add_chain(walk: _Walk, chain: list[tuple[str, str]], top: GroupMember, via:
 
 
 async def discover_group(client: CompaniesHouseClient, *, holding_name: str, hints: list[str] | tuple[str, ...] = (),
-                         max_members: int = DEFAULT_MAX_MEMBERS) -> tuple[list[GroupMember], str]:
-    """(miembros verificados, motivo). Orden: profundidad y numero (determinista)."""
-    walk = _Walk(client=client, token=distinctive_token(holding_name))
+                         max_members: int = DEFAULT_MAX_MEMBERS, unverified: list[dict[str, str]] | None = None,
+                         people: list[str] | tuple[str, ...] = ()) -> tuple[list[GroupMember], str]:
+    """(miembros verificados, motivo). Orden: profundidad y numero (determinista). ``unverified`` recoge
+    las candidatas que no se pudieron unir al grupo por PSC, con su motivo (se enseñan, no se usan)."""
+    walk = _Walk(client=client, token=distinctive_token(holding_name), target=normalize_name(holding_name),
+                 people=tuple(p for p in people if p))
     target = normalize_name(holding_name)
     if target:
         for item in await client.search_companies(holding_name, items=10):
@@ -218,14 +257,23 @@ async def discover_group(client: CompaniesHouseClient, *, holding_name: str, hin
             number = normalize_company_number(item.get("company_number"))
             if not number or number in walk.members:
                 continue
-            if _has_token(item.get("title"), walk.token):
-                # Dos señales: responde a la pista (nombre actual o anterior) y lleva el nombre del holding.
-                walk.members[number] = GroupMember(number, str(item.get("title")), 0,
-                                                   f"pista «{hint}» y nombre del holding",
-                                                   status=item.get("company_status"))
-                continue
-            await _verify_chain(walk, number, str(item.get("title")), f"pista «{hint}»")
+            # Responder a la pista y llevar el nombre del holding no prueba que sea del grupo (un homónimo
+            # también lo hace): hace falta su PSC. Vale una cadena de PSC que llegue al holding o, si su
+            # PSC es una persona, que sea quien dirige o fundó el holding según datos verificados.
+            named = _has_token(item.get("title"), walk.token)
+            if named:
+                person = _psc_person_of_holding(walk, await walk.pscs(number))
+                if person:
+                    walk.members[number] = GroupMember(
+                        number, str(item.get("title")), 0,
+                        f"pista «{hint}», nombre del holding y PSC {person}, que dirige el holding",
+                        status=item.get("company_status"))
+                    continue
+            via = f"pista «{hint}»" + (" y nombre del holding" if named else "")
+            await _verify_chain(walk, number, str(item.get("title")), via)
     if not walk.members:
+        if unverified is not None:
+            unverified.extend(v for k, v in sorted(walk.unverified.items()))
         return [], "sin_sociedad_britanica: ni el nombre exacto ni las pistas llevan a una sociedad verificada"
 
     candidates: dict[str, str] = {}
@@ -253,6 +301,8 @@ async def discover_group(client: CompaniesHouseClient, *, holding_name: str, hin
             if number not in walk.members:
                 await _verify_chain(walk, number, name, "administrador comun")
     members = sorted(walk.members.values(), key=lambda m: (m.depth, m.number))[:max_members]
+    if unverified is not None:
+        unverified.extend(v for k, v in sorted(walk.unverified.items()) if k not in walk.members)
     return members, "ok"
 
 
@@ -402,13 +452,16 @@ def queue_scanned_reads(result: dict[str, Any] | None, ticker: str | None) -> in
 
 
 async def group_accounts(client: CompaniesHouseClient, *, holding_name: str, hints: list[str] | tuple[str, ...] = (),
-                         max_members: int = DEFAULT_MAX_MEMBERS) -> dict[str, Any]:
+                         max_members: int = DEFAULT_MAX_MEMBERS, people: list[str] | tuple[str, ...] = ()
+                         ) -> dict[str, Any]:
     """{status, reason, members:[cuentas de cada sociedad verificada], requests_used}."""
+    unverified: list[dict[str, str]] = []
     try:
         members, reason = await discover_group(client, holding_name=holding_name, hints=hints,
-                                               max_members=max_members)
+                                               max_members=max_members, unverified=unverified, people=people)
     except CompaniesHouseError as exc:
-        return {"status": "error", "reason": type(exc).__name__, "members": [], "requests_used": client.requests_used}
+        return {"status": "error", "reason": type(exc).__name__, "members": [], "requests_used": client.requests_used,
+                "unverified": unverified}
     rows: list[dict[str, Any]] = []
     status = "ok" if members else "empty"
     for member in members:
@@ -420,7 +473,8 @@ async def group_accounts(client: CompaniesHouseClient, *, holding_name: str, hin
         rows.append(accounts or {**asdict(member), "company_number": member.number, "company_name": member.name,
                                  "company_url": public_company_url(member.number), "figures": [],
                                  "accounts_type": None})
-    return {"status": status, "reason": reason, "members": rows, "requests_used": client.requests_used}
+    return {"status": status, "reason": reason, "members": rows, "requests_used": client.requests_used,
+            "unverified": unverified}
 
 
 # -- uso sincrono con cache por proceso --------------------------------------------
@@ -430,11 +484,13 @@ _CACHE_LOCK = threading.Lock()
 
 
 def collect_group_accounts(holding_name: str, hints: list[str] | tuple[str, ...] = (), *,
-                           client: CompaniesHouseClient | None = None) -> dict[str, Any] | None:
+                           client: CompaniesHouseClient | None = None,
+                           people: list[str] | tuple[str, ...] = ()) -> dict[str, Any] | None:
     """Version sincrona (herramientas del SOTP). None si la funcion esta apagada (sin clave)."""
     from app.services.connectors.companies_house import client_from_settings
 
-    key = (normalize_name(holding_name), tuple(sorted({normalize_name(h) for h in hints if h})))
+    key = (normalize_name(holding_name), tuple(sorted({normalize_name(h) for h in hints if h})),
+           tuple(sorted({normalize_name(p) for p in people if p})))
     now = time.monotonic()
     with _CACHE_LOCK:
         hit = _CACHE.get(key)
@@ -449,7 +505,7 @@ def collect_group_accounts(holding_name: str, hints: list[str] | tuple[str, ...]
 
     async def run() -> dict[str, Any]:
         try:
-            return await group_accounts(ch, holding_name=holding_name, hints=list(hints))
+            return await group_accounts(ch, holding_name=holding_name, hints=list(hints), people=list(people))
         finally:
             if client is None:
                 await ch.aclose()
@@ -501,6 +557,19 @@ def subsidiary_hints(db: Any, company: Any, tenant_id: int | None) -> list[str]:
     return out[:MAX_HINTS]
 
 
+def holding_people(db: Any, company: Any) -> list[str]:
+    """Quién dirige o fundó la empresa según sus alias verificados (Wikidata: consejero delegado P169,
+    presidente P488, fundador P112). Sirve de señal positiva cuando el PSC de una filial es esa persona."""
+    try:
+        from app.services.company_alias_sources import VERIFIED, load_cached
+
+        record = load_cached(db).get(str(company.ticker or "").upper())
+    except Exception:  # noqa: BLE001 - sin caché de alias no hay señal de personas
+        return []
+    return [a.termino for a in (record.aliases if record else [])
+            if a.tipo == "persona" and a.etiqueta == VERIFIED][:MAX_HINTS]
+
+
 def subsidiary_reports(result: dict[str, Any], *, limit: int = 2) -> list[dict[str, Any]]:
     """Cuentas de filiales que merece la pena leer enteras: primero las consolidadas
     (``group``: recogen todo lo que cuelga debajo), si no las completas mas arriba en el
@@ -533,6 +602,7 @@ __all__ = [
     "GroupMember",
     "collect_group_accounts",
     "discover_group",
+    "holding_people",
     "distinctive_token",
     "figures_from_ixbrl",
     "group_accounts",

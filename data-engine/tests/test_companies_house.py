@@ -55,6 +55,10 @@ class Replay(httpx.AsyncBaseTransport):
         return httpx.Response(entry["status"], json=entry.get("json"))
 
 
+# Quién dirige Fairfax según Wikidata (P169/P488/P112): el PSC de FAIRFAX UK HOLDINGS es esa persona.
+FFH_PEOPLE = ["Prem Watsa"]
+
+
 def _client(log: dict | None = None, documents: dict[str, bytes] | None = None, **kw) -> tuple[ch.CompaniesHouseClient, Replay]:
     transport = Replay(_replay() if log is None else log, documents)
     return ch.CompaniesHouseClient(FAKE_KEY, client=httpx.AsyncClient(transport=transport), **kw), transport
@@ -153,11 +157,13 @@ def test_cifras_de_unas_cuentas_completas_en_ixbrl():
 def test_fairfax_grupo_britanico_por_la_cadena_de_psc():
     client, _ = _client()
     result = asyncio.run(ev.group_accounts(client, holding_name="Fairfax Financial Holdings Limited",
-                                           hints=["Brit", "Allied World"]))
+                                           hints=["Brit", "Allied World"], people=FFH_PEOPLE))
     rows = {r["company_number"]: r for r in result["members"]}
     assert result["status"] == "ok"
-    # La pista «Brit» (nombre anterior) lleva a FAIRFAX UK HOLDINGS, con el nombre del holding.
+    # La pista «Brit» (nombre anterior) lleva a FAIRFAX UK HOLDINGS, con el nombre del holding y su PSC
+    # (Prem Watsa, que dirige Fairfax): el nombre solo ya no basta.
     assert rows["08821629"]["depth"] == 0 and "nombre del holding" in rows["08821629"]["via"]
+    assert "Prem Watsa" in rows["08821629"]["via"]
     assert rows["15884169"]["parent"] == "08821629"  # BRIT GROUP HOLDINGS
     assert rows["03121594"]["parent"] == "15884169"  # BRIT INSURANCE HOLDINGS
     assert rows["00824611"]["parent"] == "03121594"  # BRIT SYNDICATES
@@ -181,7 +187,7 @@ def test_georgia_capital_raiz_por_nombre_exacto_sin_filiales_britanicas():
 def test_lo_que_se_lee_entero_es_la_consolidada_del_grupo():
     client, _ = _client()
     result = asyncio.run(ev.group_accounts(client, holding_name="Fairfax Financial Holdings Limited",
-                                           hints=["Brit", "Allied World"]))
+                                           hints=["Brit", "Allied World"], people=FFH_PEOPLE))
     picked = ev.subsidiary_reports(result)
     assert [p["company_number"] for p in picked] == ["15884169"]
 
@@ -199,7 +205,7 @@ def test_salidas_del_sotp_citan_companies_house():
     assert "companies_house" in SOTP_VALUER_TOOLS
     client, _ = _client()
     result = asyncio.run(ev.group_accounts(client, holding_name="Fairfax Financial Holdings Limited",
-                                           hints=["Brit", "Allied World"]))
+                                           hints=["Brit", "Allied World"], people=FFH_PEOPLE))
     outs = companies_house_outputs(result)
     assert len(outs) == len(result["members"])
     brit = next(o for o in outs if o.data["numero"] == "15884169")
@@ -257,9 +263,9 @@ def test_la_tesis_encola_la_consolidada_de_la_filial_con_su_nombre(monkeypatch):
 
     client, _ = _client()
     result = asyncio.run(ev.group_accounts(client, holding_name="Fairfax Financial Holdings Limited",
-                                           hints=["Brit", "Allied World"]))
+                                           hints=["Brit", "Allied World"], people=FFH_PEOPLE))
     sent = []
-    monkeypatch.setattr(ThesisEvidenceService, "_fetch_uk_group", lambda self, company, hints: result)
+    monkeypatch.setattr(ThesisEvidenceService, "_fetch_uk_group", lambda self, company, hints, people=None: result)
     monkeypatch.setattr(ev, "subsidiary_hints", lambda db, company, tenant: ["Brit"])
     monkeypatch.setattr("app.services.thesis_evidence_service.annual_report_has_text", lambda db, cid, url: False)
     import app.workers.dramatiq_app as actors

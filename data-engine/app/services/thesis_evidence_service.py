@@ -348,10 +348,11 @@ class ThesisEvidenceService:
         items.extend(self._uk_subsidiary_reports(db, company))
         return {"status": "ok" if items else "pending", "reason": reason, "items": items}
 
-    def _fetch_uk_group(self, company: Company, hints: list[str]) -> dict[str, Any] | None:
+    def _fetch_uk_group(self, company: Company, hints: list[str], people: list[str] | None = None
+                        ) -> dict[str, Any] | None:
         from app.services.companies_house_evidence import collect_group_accounts
 
-        return collect_group_accounts(company.name, hints)
+        return collect_group_accounts(company.name, hints, people=people or [])
 
     def _uk_subsidiary_reports(self, db: Session, company: Company) -> list[dict[str, Any]]:
         """Cuentas consolidadas de las filiales britanicas (Companies House) para leerlas enteras.
@@ -360,6 +361,7 @@ class ThesisEvidenceService:
         pagina, con el nombre de la filial en el titulo para que nadie las tome por las del
         holding. Apagado sin ``COMPANIES_HOUSE_API_KEY``; nunca tumba la tesis."""
         from app.services.companies_house_evidence import (
+            holding_people,
             queue_scanned_reads,
             subsidiary_hints,
             subsidiary_reports,
@@ -369,7 +371,7 @@ class ThesisEvidenceService:
             return []
         try:
             hints = subsidiary_hints(db, company, db.info.get("tenant_id"))
-            result = self._fetch_uk_group(company, hints)
+            result = self._fetch_uk_group(company, hints, holding_people(db, company))
             # Las escaneadas (sin iXBRL ni texto) se leen por OCR en el worker: cifras con pagina.
             queue_scanned_reads(result, company.ticker)
         except Exception as exc:  # noqa: BLE001 - best-effort
