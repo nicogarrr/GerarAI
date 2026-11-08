@@ -104,15 +104,21 @@ Tras desplegar (a mano, 10 minutos, con tu usuario):
 Referencia completa: `.env.production.example` y `docker.env.example`. Ninguna
 se versiona con valor real.
 
-### Vercel (frontend Next.js)
+### Frontend Next.js (VM Oracle; Vercel como respaldo)
+
+En producción las variables del frontend van en `.env.frontend.production` de la
+VM (runbook: `docs/frontend-oracle.md`). `FMP_BACKEND_URL` NO hace falta:
+`docker-compose.frontend.yml` la fuerza a `http://backend:8000` (red interna).
+Si se despliega la vía de respaldo en Vercel, las mismas variables van en el
+proyecto de Vercel.
 
 | Variable | Obligatoria | Nota |
 |---|---|---|
 | `BETTER_AUTH_SECRET` | sí | **nueva tras la rotación** (`openssl rand -base64 32`) |
-| `BETTER_AUTH_URL` | sí | URL pública de la app |
+| `BETTER_AUTH_URL` | sí | URL pública de la app (`https://gerarai.duckdns.org` en la instalación actual) |
 | `MONGODB_URI` | sí | **nueva tras la rotación** de la contraseña de Atlas |
-| `RESEARCH_AUTH_SECRET` | sí | **el mismo valor que en Render** (firma las llamadas al data-engine) |
-| `FMP_BACKEND_URL` | sí | URL pública del data-engine en Render |
+| `RESEARCH_AUTH_SECRET` | sí | **el mismo valor que en el backend** (firma las llamadas al data-engine) |
+| `FMP_BACKEND_URL` | solo en la vía Vercel | URL pública del backend (`BACKEND_DOMAIN`); en la VM la fuerza el compose a `http://backend:8000` |
 | `FINNHUB_API_KEY`, `FINNHUB_BASE_URL` | sí | clave **rotada** |
 | `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SUPPORT_EMAIL` | sí | nuevas desde la 0.9 |
 | `APP_ENV` | sí | `production` |
@@ -120,24 +126,27 @@ se versiona con valor real.
 | `ALPHA_VANTAGE_API_KEY`, `FRED_API_KEY`, `NEWSAPI_KEY`, `MARKETAUX_API_KEY` | opcionales | sin ellas el panel muestra «sin datos» |
 | `E2E_AUTH_BYPASS` | **nunca** en producción | solo tests |
 
-### Render (data-engine, `render.yaml`)
+### Backend data-engine (VM Oracle, `.env.production`)
+
+Producción usa `docker-compose.prod.yml` con `.env.production` en la VM
+(`docs/oracle-setup.md`). `render.yaml` es experimental y sin soporte.
 
 | Variable | Obligatoria | Nota |
 |---|---|---|
 | `APP_ENV` | sí | `production` (activa las validaciones de arranque) |
-| `RESEARCH_AUTH_SECRET` | sí | igual que en Vercel |
+| `RESEARCH_AUTH_SECRET` | sí | igual que en el frontend |
 | `DATABASE_URL` | sí | Postgres con usuario y contraseña propios (SQLite y credenciales por defecto se rechazan al arrancar) |
 | `REDIS_URL`, `QDRANT_URL` | sí | |
 | `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` | sí | en producción los originales van a MinIO; claves por defecto rechazadas |
-| `CORS_ORIGINS` | según uso | por defecto solo `localhost`; pon el dominio de Vercel si el navegador llama directo al data-engine (Next lo llama desde el servidor con firma). `*` se rechaza. No está en `render.yaml` |
-| `SEC_USER_AGENT` | sí | nombre + correo real (la SEC bloquea sin contacto; `example.com` se rechaza). **No está en `render.yaml`** |
-| `FINNHUB_API_KEY`, `FMP_API_KEY` | sí | claves **rotadas** (`FMP_API_KEY` no está en `render.yaml`) |
+| `CORS_ORIGINS` | según uso | por defecto solo `localhost`; pon el dominio del frontend si el navegador llama directo al data-engine (Next lo llama desde el servidor con firma). `*` se rechaza |
+| `SEC_USER_AGENT` | sí | nombre + correo real (la SEC bloquea sin contacto; `example.com` se rechaza) |
+| `FINNHUB_API_KEY`, `FMP_API_KEY` | sí | claves **rotadas** |
 | `LLM_ENABLED`, `LLM_PROVIDER`, `OPENCODE_GO_API_KEY`, `OPENCODE_GO_BASE_URL`, `OPENCODE_GO_MODEL` | sí, si hay IA | solo modelos aprobados de 0 €; el arranque rechaza los demás |
 | `GEMINI_API_KEY`, `GROQ_API_KEY`, `GEMINI_CHAT_FALLBACK_ENABLED`, `GROQ_CHAT_FALLBACK_ENABLED` | opcionales | respaldos del chat; Gemini con la clave **rotada** |
 | `LLM_SETTINGS_ENCRYPTION_KEY` | recomendada | cifra las claves LLM que guarda cada usuario en Ajustes |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | opcionales | avisos por Telegram |
 | `SMTP_*`, `ALERT_EMAIL_TO`, `DCA_ALERTS_*` | si se mergea #2310 | avisos DCA por correo |
-| `WORKERS_ENABLED` | sí | `false` en el plan gratuito de Render (sin workers) |
+| `WORKERS_ENABLED` | sí | `true` en la VM (workers y scheduler activos) |
 | `RETENTION_JOB_ENABLED`, `RETENTION_DRY_RUN`, `ACCESS_REQUEST_RETENTION_DAYS` | recomendadas | retención de datos (privacidad) |
 
 ### Servidor propio (docker compose)
@@ -145,8 +154,8 @@ se versiona con valor real.
 Las mismas variables de ambos bloques en `docker.env`, más las de
 `docker-compose.prod.yml`. Recarga con `docker compose --env-file docker.env up -d`.
 
-- [ ] Vercel: Production y Preview actualizados, *Redeploy* hecho.
-- [ ] Render: variables que faltan en `render.yaml` añadidas en el panel (`SEC_USER_AGENT`, `FMP_API_KEY`, `LLM_*`, y `CORS_ORIGINS` si hace falta).
+- [ ] Frontend VM: `docker compose -p gerarai-front -f docker-compose.frontend.yml --env-file .env.frontend.production up -d --build --wait` y verificación del runbook (`docs/frontend-oracle.md`). La vía de respaldo en Vercel no se redepliega salvo que se use.
+- [ ] Backend VM: `.env.production` al día en la VM y `./scripts/deploy.sh` en verde (`docs/oracle-setup.md`).
 - [ ] El data-engine arranca sin errores de validación en los logs.
 
 ## 5. Preparar el siguiente despliegue
