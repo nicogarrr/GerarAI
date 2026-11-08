@@ -79,6 +79,10 @@ def test_chat_ocupado_cuando_el_tope_de_hilos_esta_lleno(monkeypatch):
 
 def test_timeout_propio_del_servicio_es_total_deadline(monkeypatch):
     """wait_for salta casi al instante: no es el muro, se re-lanza (linea 111)."""
+    # Reloj doblado a cero: la espera medida es 0, siempre por debajo del
+    # muro, sin depender del reloj real ni de lo que tarde el event loop.
+    monkeypatch.setattr(chat_route.time, "monotonic", lambda: 0.0)
+    monkeypatch.setattr(chat_route, "record_chat_event", lambda **kw: None)
     monkeypatch.setattr(
         chat_route.anyio.to_thread, "run_sync", _run_sync_lanza(TimeoutError())
     )
@@ -135,7 +139,11 @@ def test_hueco_liberado_si_el_hilo_nunca_arranco(monkeypatch):
 def test_camino_feliz_delega_en_el_servicio(monkeypatch):
     """El hilo ejecuta _work y la respuesta pasa por clasificacion y telemetria."""
     eventos = []
-    monkeypatch.setattr(chat_route, "run_from_any_context", lambda coro: _respuesta())
+    def _servicio_doblado(coro):
+        coro.close()  # la corutina del servicio doblado no se descarta viva
+        return _respuesta()
+
+    monkeypatch.setattr(chat_route, "run_from_any_context", _servicio_doblado)
     monkeypatch.setattr(chat_route, "classify_response", lambda r: ("chat", False))
     monkeypatch.setattr(
         chat_route, "record_chat_event", lambda **kw: eventos.append(kw)
