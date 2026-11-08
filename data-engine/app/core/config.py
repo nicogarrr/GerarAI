@@ -200,6 +200,13 @@ class Settings(BaseSettings):
     # 'development' se quedaban sin limite real (10000/min) mientras si
     # exigian Redis. Ahora es un valor explicito y la prediccion es una sola.
     rate_limit_local_request_floor: int = Field(default=10000, ge=0)
+    # Allowlist de proxies cuya X-Forwarded-For se acepta para clavear el
+    # limite de 401 por IP (CIDRs o IPs separados por comas). Mismo valor que
+    # el --forwarded-allow-ips de uvicorn en Dockerfile.prod: solo esos peers
+    # pueden aportar la IP real del cliente; cualquier otro peer (p. ej. un
+    # cliente directo en la red interna) cuenta por su propia IP y no puede
+    # rotar su cubo falsificando la cabecera.
+    forwarded_allow_ips: str = "172.16.0.0/12"
     financial_document_retention_days: int = Field(default=2555, ge=1)
     # Retencion de la pregunta cruda de chat (chat_telemetry_events). El
     # evento agregado (ruta/modelo/latencia) no se publica fuera del tenant.

@@ -354,8 +354,50 @@ async def enforce_public_ip_rate_limit(request: Request) -> None:
 # lanza ANTES de contar nada: un cliente sin credenciales podia martillear la
 # API sin limite. Este middleware cuenta por IP solo las respuestas 401 y
 # corta con 429 cuando una IP supera AUTH_FAILURE_LIMIT en la ventana.
+#
+# La IP NO es el peer crudo del socket: detras de Caddy ese peer es siempre
+# la IP privada del proxy, asi que TODO el trafico compartia un unico cubo y
+# 30 respuestas 401 en un minuto en toda la instalacion (sesiones caducadas
+# de cualquier usuario, sondas, bots) dejaban en 429 a todo el trafico no
+# firmado durante la ventana. Pero tampoco se acepta X-Forwarded-For de
+# cualquier peer privado: un cliente directo en la red interna podria rotar
+# la cabecera y saltarse su cubo. Solo un proxy de la allowlist
+# ``forwarded_allow_ips`` (la misma que arranca uvicorn con
+# --forwarded-allow-ips en Dockerfile.prod) puede aportar la IP real por
+# XFF; cualquier otro peer cuenta por su propia IP. Cuando uvicorn ya aplica
+# --proxy-headers, scope["client"] llega sustituido por la IP real y el peer
+# publico resultante tampoco mira la cabecera.
 
 AUTH_FAILURE_LIMIT = 30
+
+
+def _trusted_proxy_peer(peer: str, settings) -> bool:
+    """True si el peer es un proxy de confianza cuya X-Forwarded-For se acepta.
+
+    Misma allowlist que el ``--forwarded-allow-ips`` de uvicorn
+    (``FORWARDED_ALLOW_IPS``, por defecto 172.16.0.0/12): solo un proxy de
+    esa lista puede haber anadido la ultima entrada de XFF. Con cualquier
+    otro peer la cabecera la controla el cliente y no se mira.
+    """
+    import ipaddress
+
+    try:
+        peer_ip = ipaddress.ip_address(peer)
+    except ValueError:
+        return False
+    for raw in str(getattr(settings, "forwarded_allow_ips", "") or "").split(","):
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            if "/" in raw:
+                if peer_ip in ipaddress.ip_network(raw, strict=False):
+                    return True
+            elif peer_ip == ipaddress.ip_address(raw):
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 async def _count_hits(key: str, *, use_redis: bool, redis_url: str) -> int:
@@ -461,7 +503,14 @@ class AuthFailureLimitMiddleware:
             await self.app(scope, receive, send)
             return
         client = scope.get("client")
-        ip = client[0] if client else "unknown"
+        peer = client[0] if client else "unknown"
+        # XFF solo la aporta un proxy de la allowlist (o la IP real que ya
+        # dejo uvicorn --proxy-headers en scope["client"], que no es proxy
+        # confiable y por tanto cae al peer tal cual).
+        if _trusted_proxy_peer(peer, settings):
+            ip = public_client_ip(Request(scope))
+        else:
+            ip = peer
         key = "cavaai:authfail:" + hashlib.sha256(ip.encode()).hexdigest()
         use_redis = not settings.is_local_environment
         try:
