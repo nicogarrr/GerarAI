@@ -116,3 +116,37 @@ def test_put_divisa_mezclada_422_y_original_intacta(monkeypatch) -> None:
     assert res.status_code == 422, res.text
     stored = _stored(client, tenant, user, buy2_id)
     assert stored["currency"] == "EUR"
+
+
+def test_put_sin_firma_403_y_fila_completa_intacta(monkeypatch) -> None:
+    client, tenant, user = _client(monkeypatch)
+    ticker = _company(tenant)
+    tx_id = _post(client, tenant, user, ticker, "buy", "10")
+    antes = _stored(client, tenant, user, tx_id)
+
+    res = client.put(
+        f"/api/portfolio/transactions/{tx_id}",
+        json={
+            "ticker": ticker, "action": "buy", "quantity": "99", "price": "1",
+            "trade_date": "2026-10-30", "currency": "EUR",
+        },
+    )
+    assert res.status_code == 403
+    assert _stored(client, tenant, user, tx_id) == antes
+
+
+def test_put_de_otro_tenant_404_y_fila_completa_intacta(monkeypatch) -> None:
+    client, tenant, user = _client(monkeypatch)
+    ticker = _company(tenant)
+    tx_id = _post(client, tenant, user, ticker, "buy", "10")
+    antes = _stored(client, tenant, user, tx_id)
+
+    db = SessionLocal()
+    other_ext = f"portfolio-tx-put-other-{uuid4().hex[:8]}"
+    db.add(Tenant(external_id=other_ext, name="Otro tenant"))
+    db.commit()
+    db.close()
+
+    res = _put(client, other_ext, "intruso", tx_id, ticker, "buy", "99")
+    assert res.status_code == 404
+    assert _stored(client, tenant, user, tx_id) == antes
