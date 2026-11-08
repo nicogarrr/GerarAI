@@ -2294,37 +2294,64 @@ def affordability_answer(db: Session, company, question: str) -> ChatResponse | 
     day = _date_en(price_row.date) if english else fecha_es(price_row.date)
     sources.append(_source("market_price", price_row.id, f"{company.ticker} {day}", f"/companies/{company.ticker}"))
     qty_match = _AFFORD_QTY.search(_fold(question))
-    qty = Decimal(qty_match.group(1).replace(",", ".")) if qty_match else None
+    qty_raw = qty_match.group(1) if qty_match else None
+    qty = Decimal(qty_raw.replace(",", ".")) if qty_raw else None
     price_text = _money(float(price), price_cur, english=english)
     if qty is not None:
+        # La cantidad tal como la escribió el usuario: «0,5 acciones», no «0».
+        decimals = len(re.split(r"[.,]", qty_raw)[1]) if qty_raw and re.search(r"[.,]", qty_raw) else 0
+        qty_text = _num_en(float(qty), decimals) if english else num_es(float(qty), decimals)
+        noun = ("share" if qty == 1 else "shares") if english else ("acción" if qty == 1 else "acciones")
         cost = price * qty
-        lines.append(f"{company.ticker} closed at {price_text} on {day}: {_num_en(float(qty), 0)} shares are "
-                     f"{_money(float(cost), price_cur, english=english)} before fees." if english
-                     else f"{company.ticker} cerró a {price_text} el {day}: {num_es(float(qty), 0)} acciones son "
-                     f"{_money(float(cost), price_cur)} antes de comisiones.")
+        lines.append(f"{company.ticker} closed at {price_text} on {day}: {qty_text} {noun} "
+                     f"{'is' if qty == 1 else 'are'} {_money(float(cost), price_cur, english=english)} before fees." if english
+                     else f"{company.ticker} cerró a {price_text} el {day}: {qty_text} {noun} "
+                     f"{'es' if qty == 1 else 'son'} {_money(float(cost), price_cur)} antes de comisiones.")
     else:
         cost = price
         lines.append(f"{company.ticker} closed at {price_text} on {day}." if english
                      else f"{company.ticker} cerró a {price_text} el {day}.")
-    # Efectivo en la divisa del precio: misma divisa tal cual; si no, tipo guardado.
+    # Efectivo en la divisa del precio: la misma divisa tal cual; otra, con el
+    # tipo oficial guardado (BCE) y su fecha. Sin tipo, se dice qué saldo no se
+    # pudo convertir y no se concluye nada: nunca se descarta un saldo en silencio.
     fx = PortfolioFXService()
     available = Decimal("0")
-    missing_fx = False
-    for currency, amount in totals.items():
+    unconverted: list[tuple[str, Decimal]] = []
+    rates_used: list[str] = []
+    for currency, amount in sorted(totals.items()):
         if (normalize_currency(currency)[0] or currency) == price_cur:
             available += amount
             continue
-        rate = fx.rate(db, quote_currency=currency, base_currency=price_cur, as_of=local_today())
-        if rate is None:
-            missing_fx = True
+        found = fx.rate_with_provenance(db, quote_currency=currency, base_currency=price_cur, as_of=local_today())
+        if found is None or not found.get("rate"):
+            unconverted.append((currency, amount))
             continue
-        available += amount * Decimal(rate)
-    if missing_fx and not available:
-        lines.append("I have no saved exchange rate to compare both amounts." if english
-                     else "No tengo tipo de cambio guardado para comparar las dos cifras.")
+        rate = Decimal(found["rate"])
+        available += amount * rate
+        when = found.get("rate_date")
+        when_text = (_date_en(when) if english else fecha_es(when)) if when else ("undated" if english else "sin fecha")
+        src = "ECB" if "ecb" in str(found.get("source") or "").lower() else (found.get("source") or ("saved" if english else "guardado"))
+        src_es = "BCE" if src == "ECB" else src
+        rates_used.append(
+            f"1 {currency} = {_num_en(float(rate), 4)} {price_cur} ({src}, {when_text})" if english
+            else f"1 {_symbol(currency)} = {num_es(float(rate), 4)} {price_cur} ({src_es}, {when_text})"
+        )
+    if rates_used:
+        lines.append(("Exchange rate used: " if english else "Tipo de cambio usado: ") + "; ".join(rates_used) + ".")
+    avail = _money(float(available), price_cur, english=english)
+    if unconverted:
+        missing = ", ".join(_money(float(v), c, english=english) for c, v in unconverted)
+        lines.append(
+            f"I couldn't convert {missing} to {price_cur}: there is no official exchange rate saved for it, "
+            "so I can't tell whether your cash covers it." if english
+            else f"No pude convertir {missing} a {price_cur}: no hay tipo de cambio oficial guardado, "
+            "así que no puedo decirte si te llega."
+        )
+        if available > 0:
+            lines.append(f"Counting only what is already in {price_cur} ({avail})." if english
+                         else f"Lo que ya está en {price_cur} son {avail}.")
     elif qty is not None:
         gap = available - cost
-        avail = _money(float(available), price_cur, english=english)
         if gap >= 0:
             lines.append(f"Your cash is about {avail}: it covers it, with {_money(float(gap), price_cur, english=english)} left."
                          if english else f"Tu efectivo son unos {avail}: te llega y sobran {_money(float(gap), price_cur)}.")
@@ -2333,8 +2360,8 @@ def affordability_answer(db: Session, company, question: str) -> ChatResponse | 
                          if english else f"Tu efectivo son unos {avail}: no te llega, faltan {_money(float(-gap), price_cur)}.")
     else:
         whole = int(available // cost) if cost > 0 else 0
-        lines.append(f"With about {_money(float(available), price_cur, english=english)} it covers {whole} shares before fees."
-                     if english else f"Con unos {_money(float(available), price_cur)} te llega para {num_es(float(whole), 0)} "
+        lines.append(f"With about {avail} it covers {whole} shares before fees."
+                     if english else f"Con unos {avail} te llega para {num_es(float(whole), 0)} "
                      "acciones antes de comisiones.")
     lines.append("It's a calculation with your saved data, not an order: GerarAI doesn't trade at your broker." if english
                  else "Es una cuenta con tus datos guardados, no una orden: GerarAI no opera en tu bróker.")
