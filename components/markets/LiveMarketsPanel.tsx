@@ -175,6 +175,18 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                             <p className="mb-2 text-xs text-gray-500">{t(tab.note)}</p>
                             {group ? (
                                 <table className="w-full text-sm">
+                                    {/* Caption y cabeceras solo para lectores de pantalla: la tabla
+                                        no tenía nombre ni cabeceras de columna, y un lector leía
+                                        números sueltos sin saber qué eran. sr-only: el diseño visual
+                                        no cambia. */}
+                                    <caption className="sr-only">{t('markets.live.tableCaption', { group: t(tab.label) })}</caption>
+                                    <thead className="sr-only">
+                                        <tr>
+                                            <th scope="col">{t('markets.live.columns.instrument')}</th>
+                                            <th scope="col">{t('markets.live.columns.price')}</th>
+                                            <th scope="col">{t('markets.live.columns.change')}</th>
+                                        </tr>
+                                    </thead>
                                     <tbody>
                                         {resolveGroupRows(tab.key, group.quotes).map(({ spec, quote }) => (
                                             <QuoteRow key={spec.symbol} spec={spec} quote={quote} fetchedAt={data?.fetchedAt ?? 0} />
