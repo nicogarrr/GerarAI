@@ -46,6 +46,7 @@ from app.valuation.point_in_time import (
     assert_period_no_lookahead,
     resolve_as_of,
 )
+from app.valuation.pre_revenue_track_record import pre_revenue_track_record
 from app.valuation.track_record import dcf_track_record
 
 
@@ -823,8 +824,9 @@ class ValuationService:
             if key not in {"price_to_reporting", "reporting_to_listing"}
         }
 
-        # Cuánto pesar el número: historial medido del DCF estándar (solo ese motor).
-        track_record = dcf_track_record(result)
+        # Cuánto pesar el número: historial medido del DCF estándar o, en una
+        # empresa que quema caja (motor pre_revenue), por qué no hay valor fiable.
+        track_record = dcf_track_record(result) or pre_revenue_track_record(result)
         if track_record is not None:
             result["track_record"] = track_record
 
