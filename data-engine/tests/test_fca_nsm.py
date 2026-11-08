@@ -263,6 +263,20 @@ def test_paquete_de_otra_entidad_se_descarta():
     assert snap is None and reason == "filings_ilegibles"
 
 
+@pytest.mark.parametrize("identifier", ["", "   ", None])
+def test_paquete_sin_identificador_de_entidad_se_descarta(identifier):
+    report = _ixbrl(LEI, "2026-09-12", "2025-09-14", "1", "1", "1")
+    original = (
+        '<xbrli:identifier scheme="http://standards.iso.org/iso/17442">'
+        f"{LEI}</xbrli:identifier>"
+    ).encode()
+    replacement = b"" if identifier is None else original.replace(LEI.encode(), identifier.encode())
+    report = report.replace(original, replacement)
+    packages = {key: _package(LEI, "2026-09-12", report) for key in ABF_PACKAGES}
+    snap, reason = _snapshot(_company(), _handler(nsm_hits=ABF_HITS, index_rows=[], packages=packages))
+    assert snap is None and reason == "filings_ilegibles"
+
+
 def test_georgia_capital_solo_sin_etiquetar_da_motivo_con_la_url():
     snap, reason = _snapshot(
         _company("CGEO.L", "Georgia Capital PLC"),
