@@ -22,6 +22,7 @@ import hashlib
 import json
 import logging
 import re
+import statistics
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
@@ -48,12 +49,12 @@ SECTIONS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
     ("introduccion", "1. Introducción: qué estamos comprando realmente", "a", ("partida",)),
     ("sector_estrategia", "2. Sector y estrategia", "a", ()),
     ("ventaja_competitiva", "3. Ventaja competitiva: por qué podría perdurar", "a", ()),
-    ("directivos_capital", "4. Directivos, cultura y asignación de capital", "a", ("capital",)),
+    ("directivos_capital", "4. Directivos, cultura y asignación de capital", "a", ("capital", "insiders")),
     ("contabilidad", "5. Cómo leer la contabilidad", "a", ("ajustes",)),
     ("historial", "6. Historial: diez años en cifras", "a", ("historial",)),
     ("comparables", "7. Comparables calculados", "a", ("comparables",)),
     ("deuda_balance", "8. Balance y deuda", "a", ()),
-    ("consenso_guia", "8 bis. Guía de la empresa y consenso", "a", ("guia",)),
+    ("consenso_guia", "8 bis. Guía de la empresa y consenso", "a", ("guia", "analistas")),
     ("metodo", "9. Por qué este método", "b", ("metodos",)),
     ("valoracion", "10. Valoración: qué rentabilidad esperamos y de dónde sale", "b",
      ("escenarios", "supuestos", "descomposicion", "sensibilidad")),
@@ -427,6 +428,58 @@ class ThesisContext:
     optional: dict[str, str] = field(default_factory=dict)  # sección opcional → por qué entra
     guidance: list[dict[str, Any]] = field(default_factory=list)
     cik: str | None = None
+    insiders: dict[str, Any] | None = None  # insider_summary (#4751): Form 4 de la SEC, deterministas
+    analysts: list[dict[str, Any]] = field(default_factory=list)  # estimaciones citadas de prensa (#4753)
+    price_targets: list[dict[str, Any]] = field(default_factory=list)
+
+
+def insider_block(db: Session, company: Company, today: date) -> dict[str, Any] | None:
+    """Resumen determinista de insiders (Form 4/5 de la SEC, #4751), o None si no hay datos."""
+    try:
+        from app.services.insider_summary import insider_summary
+
+        s = insider_summary(db, company.ticker, as_of=today)
+    except Exception as exc:  # noqa: BLE001 - sin insiders la tesis sigue y lo dice
+        logger.info("thesis v2 insiders: %s", type(exc).__name__)
+        return None
+    return s if s.get("status") != "sin_datos" and s.get("windows") else None
+
+
+def analyst_estimates(db: Session, company: Company, today: date) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """(estimaciones por firma, métrica y año; precios objetivo) citadas de la prensa gratuita (#4753).
+    Solo las vigentes; los precios objetivo de los últimos 12 meses, el último de cada firma."""
+    from datetime import timedelta
+
+    from app.models.declared_input_value import DeclaredInputValue
+
+    out: list[dict[str, Any]] = []
+    try:
+        rows = db.scalars(select(DeclaredInputValue).where(
+            DeclaredInputValue.company_id == company.id, DeclaredInputValue.method == "analyst",
+            DeclaredInputValue.input_key.like("analyst.%"), DeclaredInputValue.superseded_at.is_(None))
+            .order_by(DeclaredInputValue.input_key)).all()
+    except Exception:  # noqa: BLE001
+        rows = []
+    for r in rows:
+        meta = r.metadata_ or {}
+        if r.base is None or meta.get("consensus"):
+            continue
+        out.append({"firm": r.analyst_firm or meta.get("firm") or "", "metric": meta.get("metric") or r.input_key.split(".")[1],
+                    "year": meta.get("year"), "value": float(r.base) / 1e6, "as_of": r.as_of.isoformat() if r.as_of else "",
+                    "url": r.source_url, "quote": r.source_quote})
+    targets: dict[str, dict[str, Any]] = {}
+    try:
+        from app.models import AnalystNote
+
+        notes = db.scalars(select(AnalystNote).where(
+            AnalystNote.ticker == company.ticker, AnalystNote.pt_new.is_not(None),
+            AnalystNote.note_date >= today - timedelta(days=365)).order_by(AnalystNote.note_date)).all()
+    except Exception:  # noqa: BLE001
+        notes = []
+    for n in notes:
+        targets[n.firm] = {"firm": n.firm, "target": float(n.pt_new), "currency": n.currency or "",
+                           "date": n.note_date.isoformat(), "url": n.source_url}
+    return out, sorted(targets.values(), key=lambda x: x["target"])
 
 
 def build_context(db: Session, company: Company, *, today: date, tenant_id: int | None = None) -> ThesisContext:
@@ -458,8 +511,12 @@ def build_context(db: Session, company: Company, *, today: date, tenant_id: int 
     if guidance:
         optional["consenso_guia"] = "la empresa da previsiones citadas en sus notas de resultados"
     switches += estimate_switches(guidance, sp.get("currency") or "", (val.get("citations") or {}).get("annual"))
+    insiders = insider_block(db, company, today)
+    analysts, targets = analyst_estimates(db, company, today)
+    if (analysts or targets) and "consenso_guia" not in optional:
+        optional["consenso_guia"] = "hay estimaciones de analistas citadas de la prensa"
     return ThesisContext(company.ticker, name, val, hist, peers, switches, ig, passages, optional, guidance,
-                         getattr(company, "cik", None))
+                         getattr(company, "cik", None), insiders, analysts, targets)
 
 
 def display_name(name: str) -> str:
@@ -531,6 +588,7 @@ def thesis_markers(ctx: ThesisContext) -> dict[str, str]:
               "caja.meses": (_es(rw["months"], 0) + " meses") if rw.get("months") else "sin consumo",
               "caja.dilucion": pct(rw.get("dilution_cagr"), signed=True), "caja.ev_caja": times(rw.get("ev_to_cash")),
               "caja.ev_ingresos": times(rw.get("ev_to_revenue")), "caja.ejercicio": str(rw.get("year") or "")}
+    _insider_markers(m, ctx)
     if val.get("status") == "not_meaningful":
         m["valoracion.motivo"] = str(val.get("reason") or "")
         _history_markers(m, ctx, ccy)
@@ -597,6 +655,48 @@ def thesis_markers(ctx: ThesisContext) -> dict[str, str]:
         m[f"guia.{i}.bajo"] = _guidance_value(g, g["low"])
         m[f"guia.{i}.alto"] = _guidance_value(g, g["high"])
     return m
+
+
+def _usd_millions(v: float | None) -> str:
+    """Importe de insiders (dólares) en millones con un decimal: 2.700.000 → «2,7 M$»."""
+    return "N/D" if v is None else f"{_es(v / 1e6, 1)} M$"
+
+
+def _insider_markers(m: dict[str, str], ctx: ThesisContext) -> None:
+    """Insiders (Form 4, #4751) y estimaciones citadas de analistas (#4753) como marcadores."""
+    s = ctx.insiders or {}
+    for w in s.get("windows") or []:
+        n = {90: "3m", 180: "6m", 365: "12m"}.get(int(w.get("days") or 0))
+        if not n:
+            continue
+        m[f"insiders.{n}.compras"] = str(w["buys"]["trades"])
+        m[f"insiders.{n}.compras_valor"] = _usd_millions(w["buys"]["value"])
+        m[f"insiders.{n}.ventas"] = str(w["sells"]["trades"])
+        m[f"insiders.{n}.ventas_valor"] = _usd_millions(w["sells"]["value"])
+        m[f"insiders.{n}.ventas_plan"] = str(w["sells"]["planned_10b5_1"])
+        m[f"insiders.{n}.neto"] = _usd_millions(w["net_value"])
+    if s:
+        m["insiders.compras_grupo"] = str(len(s.get("clusters") or []))
+        late = s.get("late") or {}
+        m["insiders.form4"] = str(late.get("filings", 0))
+        m["insiders.tarde"] = str(late.get("late", 0))
+    if ctx.price_targets:
+        vals = [p["target"] for p in ctx.price_targets]
+        ccy = ctx.price_targets[0].get("currency") or "USD"
+        m["analistas.firmas_precio"] = str(len(vals))
+        m["analistas.precio_min"] = money(min(vals), ccy)
+        m["analistas.precio_mediana"] = money(statistics.median(vals), ccy)
+        m["analistas.precio_max"] = money(max(vals), ccy)
+    by: dict[tuple[str, int], list[float]] = {}
+    for a in ctx.analysts:
+        if a.get("year"):
+            by.setdefault((str(a["metric"]), int(a["year"])), []).append(float(a["value"]))
+    for (metric, year), vals in sorted(by.items()):
+        k = f"analistas.{metric}.{year}"
+        m[f"{k}.n"] = str(len(vals))
+        m[f"{k}.mediana"] = millions(statistics.median(vals), "USD")
+        if len(vals) > 1:
+            m[f"{k}.min"], m[f"{k}.max"] = millions(min(vals), "USD"), millions(max(vals), "USD")
 
 
 def _history_markers(m: dict[str, str], ctx: ThesisContext, ccy: str) -> None:
@@ -800,6 +900,24 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
         "Empresa", "Múltiplo", "Margen", "Crec. 3 años", "Deuda neta / EBITDA", "Nota"], "rows": [
         [f"{p.get('name') or p['ticker']} ({p['ticker']})", times(p.get("multiple")), pct(p.get("margin")),
          pct(p.get("growth")), times(p.get("leverage")), p.get("note") or ""] for p in ctx.peers]}
+    ins = ctx.insiders or {}
+    t["insiders"] = {"title": "Insiders: Form 4 de la SEC (compras y ventas en mercado; sin ejercicios, concesiones, retenciones ni regalos)",
+                     "head": ["Ventana", "Compras", "Importe compras", "Ventas", "Importe ventas", "Con plan 10b5-1", "Neto"],
+                     "rows": [[f"{w['days']} días", str(w["buys"]["trades"]), _usd_millions(w["buys"]["value"]),
+                               str(w["sells"]["trades"]), _usd_millions(w["sells"]["value"]), str(w["sells"]["planned_10b5_1"]),
+                               _usd_millions(w["net_value"])] for w in ins.get("windows") or []]}
+    if ins:
+        late = ins.get("late") or {}
+        t["insiders"]["rows"].append(["Compras en grupo (3 años)", str(len(ins.get("clusters") or [])), "", "Form 4 tarde",
+                                      f"{late.get('late', 0)} de {late.get('filings', 0)}", "", ""])
+    t["analistas"] = {"title": "Estimaciones de analistas citadas (prensa gratuita; cada fila con su artículo)",
+                      "head": ["Firma", "Métrica", "Año", "Estimación", "Fecha"],
+                      "rows": [[a["firm"], str(a["metric"]), str(a.get("year") or ""), millions(a["value"], "USD"), a["as_of"]]
+                               for a in ctx.analysts]
+                      + [[p["firm"], "precio objetivo", "", money(p["target"], p.get("currency") or "USD"), p["date"]]
+                         for p in ctx.price_targets],
+                      "links": [source_link({"url": a.get("url")}, None) for a in ctx.analysts]
+                      + [source_link({"url": p.get("url")}, None) for p in ctx.price_targets]}
     t["guia"] = {"title": "Guía de la propia empresa (notas de resultados)", "head": [
         "Métrica", "Periodo", "Bajo", "Punto medio", "Alto", "Fuente"], "rows": [
         [g["metric"], g["period"], _guidance_value(g, g["low"]), _guidance_value(g, g["base"]), _guidance_value(g, g["high"]),
@@ -1001,7 +1119,11 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
         "avisos_de_datos": ctx.valuation.get("warnings") or [],
         "metodo": ctx.valuation.get("method"), "pasajes": ctx.passages,
         "kill_switches": ctx.switches, "secciones_opcionales": ctx.optional, "guia": ctx.guidance,
-        "consenso_de_analistas": "no hay todavía rangos de analistas guardados para esta empresa: dilo así",
+        "consenso_de_analistas": ({"estimaciones_citadas": ctx.analysts, "precios_objetivo": ctx.price_targets,
+                                   "nota": "cita cada cifra con su marcador analistas.*; no promedies tú"}
+                                  if ctx.analysts or ctx.price_targets
+                                  else "no hay todavía rangos de analistas guardados para esta empresa: dilo así"),
+        "insiders": ctx.insiders and {"ventanas": ctx.insiders.get("windows"), "nota": "cita con los marcadores insiders.*"},
     }
     stripped = False
     for part in ("a", "b"):
