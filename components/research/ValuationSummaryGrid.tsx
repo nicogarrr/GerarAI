@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { getValuationSummaries } from '@/lib/actions/valuation-summary.actions';
-import { healthMissingLabel, piotroskiSignalText, safetyMargin, valuationSummaryText, type HealthEvidence, type ValuationSummary } from '@/lib/research/valuation-summary';
+import { baseRateText, healthMissingLabel, piotroskiSignalText, safetyMargin, valuationSummaryText, type HealthEvidence, type ValuationSummary } from '@/lib/research/valuation-summary';
 import { isValidCurrencyCode } from '@/lib/format';
 import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 import { intlLocale } from '@/lib/i18n/locale';
@@ -32,12 +32,14 @@ export function ValuationSummaryCard({ item, quote }: { item: ValuationSummary; 
   const p = health.piotroski;
   const z = health.altman;
   const r = item.reverse_dcf;
+  const baseRate = baseRateText(item.base_rate, locale);
   return <article className="min-w-0 rounded-xl border border-gray-800 bg-gray-900/40 p-4">
     <h3 className="font-semibold text-gray-100"><Link className="inline-flex min-h-[44px] items-center underline decoration-gray-700 underline-offset-4" href={`/research/${encodeURIComponent(item.ticker)}`}>{item.ticker}</Link></h3>
     <dl className="mt-3 space-y-3 text-sm">
       <div><dt className="text-gray-400">{t('researchShared.valuationSummary.fairValue')}</dt><dd className="text-gray-100">{fair.value != null && fair.currency && isValidCurrencyCode(fair.currency) ? formatPrice(fair.value, fair.currency) : na}</dd>
         <dd className="text-xs text-gray-400">{valuationSummaryText(fair.label, locale)}{fair.as_of ? ` · ${formatMarketDate(fair.as_of)}` : ''}{fair.stale ? ` · ${t('researchShared.valuationSummary.reviewAge')}` : ''}</dd>
-        {fair.value == null && fair.reason ? <dd className="text-xs text-gray-400">{valuationSummaryText(fair.reason, locale)}</dd> : null}</div>
+        {fair.value == null && fair.reason ? <dd className="text-xs text-gray-400">{valuationSummaryText(fair.reason, locale)}</dd> : null}
+        {baseRate ? <dd className="text-xs text-gray-500">{baseRate}</dd> : null}</div>
       <div><dt className="text-gray-400">{t('researchShared.valuationSummary.margin')}</dt><dd className="text-gray-100">{margin === null ? na : formatPercent(margin)}</dd><dd className="text-xs text-gray-500">{t('researchShared.valuationSummary.marginHelp')}</dd></div>
       <div><dt className="text-gray-400">{t('researchShared.valuationSummary.reverseDcf')}</dt><dd className="text-gray-100">{r.status === 'ok' && r.required_revenue_growth != null ? t('researchShared.valuationSummary.perYear', { pct: formatPercent(r.required_revenue_growth) }) : na}</dd>
         {r.as_of ? <dd className="text-xs text-gray-400">{valuationSummaryText(r.source, locale)} · {formatMarketDate(r.as_of)}{r.market_price != null && fair.currency && isValidCurrencyCode(fair.currency) ? t('researchShared.valuationSummary.modelPrice', { price: formatPrice(r.market_price, fair.currency) }) : ''}. {t('researchShared.valuationSummary.scenarioNote')}</dd> : null}

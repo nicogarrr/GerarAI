@@ -13,7 +13,16 @@ export type ValuationSummary = {
   fair_value: { value: number | null; currency: string | null; label: string; as_of: string | null; publishable: boolean; stale: boolean; reason?: string | null; missing_inputs?: string[] };
   reverse_dcf: { status: string; required_revenue_growth: number | null; as_of: string | null; source: string; market_price: number | null; model_version_id: number | null; reason?: string | null };
   health: FinancialHealth;
+  /** Empresa que quema caja: tasas base medidas (data-engine app/valuation/cash_burn_base_rate.py). */
+  base_rate?: { message_es?: string | null; message_en?: string | null } | null;
 };
+
+/** Una línea informativa junto al valor justo; no cambia la cifra. */
+export function baseRateText(rate: ValuationSummary['base_rate'], locale: string): string | null {
+  if (!rate) return null;
+  const text = locale === 'en' ? rate.message_en ?? rate.message_es : rate.message_es;
+  return typeof text === 'string' && text ? text : null;
+}
 
 /** Margin of safety is the discount to VALUE, not upside divided by price. */
 export function safetyMargin(price: number | null, currency: string | null, fair: ValuationSummary['fair_value']): number | null {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import ValuationSummaryGrid, { ValuationSummaryCard } from '@/components/research/ValuationSummaryGrid';
-import { healthMissingLabel, safetyMargin, type ValuationSummary } from '@/lib/research/valuation-summary';
+import { baseRateText, healthMissingLabel, safetyMargin, type ValuationSummary } from '@/lib/research/valuation-summary';
 import { getValuationSummaries } from '@/lib/actions/valuation-summary.actions';
 vi.mock('@/lib/actions/valuation-summary.actions', () => ({ getValuationSummaries: vi.fn() }));
 
@@ -15,6 +15,17 @@ export const item: ValuationSummary = {
 const quote = { symbol: 'DEMO', price: 80, currency: 'USD' };
 
 describe('shared valuation', () => {
+  it('shows the cash-burn base rate beside the fair value, only when present', () => {
+    const msg = 'Punto de partida: la empresa aún pierde dinero y quema caja.';
+    const { unmount } = render(<ValuationSummaryCard item={{ ...item, base_rate: { message_es: msg, message_en: 'Starting point.' } }} quote={quote} />);
+    expect(screen.getByText(msg)).toBeInTheDocument();
+    unmount();
+    render(<ValuationSummaryCard item={item} quote={quote} />);
+    expect(screen.queryByText(msg)).toBeNull();
+    expect(baseRateText({ message_es: 'es', message_en: 'en' }, 'en')).toBe('en');
+    expect(baseRateText({ message_es: 'es' }, 'en')).toBe('es');
+    expect(baseRateText(null, 'es')).toBeNull();
+  });
   it('distinguishes discount-to-value from upside and rejects mismatches', () => {
     expect(safetyMargin(80, 'USD', item.fair_value)).toBeCloseTo(.2);
     expect(safetyMargin(120, 'USD', item.fair_value)).toBeCloseTo(-.2);
