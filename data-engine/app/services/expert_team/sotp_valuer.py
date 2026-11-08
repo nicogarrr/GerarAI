@@ -968,6 +968,7 @@ def companies_house_tool(db: Session) -> ToolSpec:
 
         from app.services.companies_house_evidence import (
             collect_group_accounts,
+            holding_people,
             queue_scanned_reads,
             subsidiary_hints,
         )
@@ -980,7 +981,8 @@ def companies_house_tool(db: Session) -> ToolSpec:
         if company is None or not company.name or getattr(company, "cik", None):
             return []
         tenant = ctx.tenant_id if type(ctx.tenant_id) is int else None
-        result = collect_group_accounts(company.name, subsidiary_hints(db, company, tenant))
+        result = collect_group_accounts(company.name, subsidiary_hints(db, company, tenant),
+                                        people=holding_people(db, company))
         queue_scanned_reads(result, company.ticker)
         return companies_house_outputs(result)
 
