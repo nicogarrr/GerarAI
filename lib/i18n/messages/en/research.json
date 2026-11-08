@@ -2164,5 +2164,20 @@
       "sin13fPrevio": "No prior 13F"
     },
     "limits": "13F: only managers with over $100M in US equities, quarterly, up to 45 days late and long-only. One manager may report what another also reports: the sum is not shares outstanding. «No 13F yet» / «No prior 13F»: that quarter's 13F is not on file; not counted as a sale or a purchase."
+  },
+  "fondos": {
+    "title": "Funds and ETFs that hold it",
+    "loadError": "Could not load funds right now.",
+    "noCusip": "No verified CUSIP: cannot match against N-PORT portfolios.",
+    "empty": "No N-PORT portfolios synced for this stock yet.",
+    "summary": "{funds} US funds and ETFs report {shares} shares ({value}) in the {dataset} N-PORT file.",
+    "top": "Most shares",
+    "byWeight": "Biggest weight",
+    "weightOfFund": "{pct} of the fund",
+    "sharesValue": "{shares} shares · {value}",
+    "portfolioAt": "portfolio at {date}",
+    "netAssets": "net assets {value}",
+    "source": "Source:",
+    "limits": "N-PORT: US-registered funds and ETFs; quarterly portfolio up to 60 days late, each fund at its own date. Weight = % of net assets reported by the fund. Long equity positions only."
   }
 }
