@@ -31,6 +31,7 @@ from app.models import Company, FinancialFact
 from app.models.entities import MarketPrice
 from app.services.esef_fact_quarantine import fact_quarantine_reason
 from app.services.financial_ingestion_service import SOURCE_PRIORITY
+from app.services.holding_nav import latest_published_nav
 from app.services.split_adjustment import split_events_by_company
 from app.services.ttm_service import _is_segment, _period_end, compute_company_ttm
 from app.valuation.currency import normalize_currency
@@ -271,10 +272,22 @@ def build_company_report(db: Session, company: Company, *, today: date | None = 
             points=points,
         ),
         "estimates": build_estimates(_fact_rows(flow)),
+        # Holdings (p. ej. Georgia Capital): NAV por acción que publica la propia
+        # empresa en sus resultados (NSM / web de inversores) y descuento del
+        # precio sobre él, con documento, fecha y cita.
+        "nav": latest_published_nav(
+            db,
+            company,
+            price=float(last.close) if last is not None else None,
+            price_currency=currency,
+            price_date=last.date if last is not None else None,
+            today=today,
+        ),
         "notes": {
             "avg_volume": f"Media de las últimas {AVG_VOLUME_SESSIONS} sesiones con volumen en nuestros cierres.",
             "ebitda": "EBITDA = resultado operativo + amortizaciones del mismo periodo; si falta, el EBITDA de la fuente.",
             "q4": "Un Q4 sin 10-Q se deriva como ejercicio − Q1 − Q2 − Q3.",
             "user_estimates": "Las estimaciones del usuario salen de su desglose por partes y su tesis, etiquetadas como suyas.",
+            "nav": "NAV por acción tal como lo publica la empresa (último documento publicado); descuento = precio / NAV − 1.",
         },
     }

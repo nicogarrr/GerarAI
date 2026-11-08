@@ -1995,6 +1995,15 @@
     "narrativeHint": "Prosa de los agentes; cada cifra sale del cálculo de arriba (marcadores), nunca del modelo."
   },
   "informe": {
+    "nav": {
+      "label": "NAV por acción (publicado por la empresa)",
+      "discount": "cotiza con un descuento del {pct} sobre el NAV",
+      "premium": "cotiza con una prima del {pct} sobre el NAV",
+      "noFx": "sin descuento: el NAV no está en la divisa del precio y no hay tipo de cambio citado",
+      "noPrice": "sin descuento: falta el precio",
+      "source": "Fuente:",
+      "formula": "descuento = precio / NAV − 1"
+    },
     "metaTitle": "Informe de {ticker}",
     "kicker": "Informe GerarAI · {date}",
     "dcaLevel": "Nivel DCA (mensual)",
