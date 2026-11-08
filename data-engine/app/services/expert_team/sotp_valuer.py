@@ -385,9 +385,13 @@ def build_model(classification: Mapping[str, Any], anchors: Mapping[str, Any]) -
     cash = anchors.get("cash_millions")
     short_term = anchors.get("short_term_investments_millions")
     debt = anchors.get("debt_millions")
-    if cash is not None or debt is not None:
-        liquid = (cash or 0.0) + (short_term or 0.0)
-        liquid_text = f"caja {cash or 0:,.0f} M" + (f" + inversiones a corto {short_term:,.0f} M" if short_term else "")
+    if cash is None and debt is not None:
+        # Sin caja, «caja menos deuda» restaría la deuda contra una caja 0 inventada: no se calcula (N/D).
+        warnings.append(f"Falta la caja en los datos SEC: «caja menos deuda» no se calcula (N/D) y la deuda de "
+                        f"{debt:,.0f} M no entra en el valor por acción.")
+    if cash is not None:
+        liquid = cash + (short_term if short_term is not None else 0.0)
+        liquid_text = f"caja {cash:,.0f} M" + (f" + inversiones a corto {short_term:,.0f} M" if short_term else "")
         parts.append({
             "group": "Balance de hoy",
             "name": "Caja menos deuda (último balance SEC)",
@@ -408,6 +412,9 @@ def build_model(classification: Mapping[str, Any], anchors: Mapping[str, Any]) -
                 for d in classification.get("dilution") or []
                 if sotp_rules.dilution_reason(d.get("label"), d.get("quote")) is None]
     dilution += sotp_rules.code_dilution(anchors, sotp_rules.HORIZON_YEARS)
+    gap_unknown = sotp_rules.burn_gap_unknown(anchors)
+    if gap_unknown:
+        warnings.append("Dilución: " + gap_unknown + ".")
     if burns_cash and not any(d["shares"] > 0 for d in dilution):
         dilution.append({"label": "Sin dilución calculable", "shares": 0.0,
                          "why": {"shares": "La empresa quema caja pero no hay SBC ni hueco de financiación en los datos."}})

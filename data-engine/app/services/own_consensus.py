@@ -430,7 +430,9 @@ def build_cells(metric: str, actuals: Mapping[str, Actual], *, today: date,
                 "analista_citado", float(a["low"]) * scale, float(a["median"]) * scale, float(a["high"]) * scale,
                 f"mediana de {a.get('n_firms')} firmas citadas (bajo = mínimo, alto = máximo)",
                 [{"kind": "analista", "firm": f.get("firm"), "url": f.get("url"), "date": f.get("as_of"),
-                  "value": float(f.get("value_millions") or 0) * scale} for f in a.get("firms") or []]))
+                  # Una firma sin cifra es N/D, no 0.
+                  "value": float(f["value_millions"]) * scale if f.get("value_millions") is not None else None}
+                 for f in a.get("firms") or []]))
         # 5. modelo y 6. tasa base
         horizon_years = max(1, year - last_fy)
         if base_rate is not None:

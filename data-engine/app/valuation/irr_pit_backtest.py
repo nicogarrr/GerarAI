@@ -351,9 +351,13 @@ def build_inputs(facts: Sequence[Fact], *, t: date, price: float, splits: Sequen
     debt = max(tot or 0.0, (nc or 0.0) + (cu or 0.0)) + (stb or 0.0)
     if all(x is None for x in (tot, nc, cu)):
         warnings.append("deuda sin dato: se toma 0")
+    if cash is None:
+        # Sin caja la deuda neta sería deuda − 0: valor inventado. La observación se descarta con su motivo
+        # (el llamador lo cuenta, como «sin ingresos anuales»).
+        raise ValueError("caja sin dato en el último balance")
     sp = engine.StartingPoint(
         price=float(price), shares_diluted=shares, revenue=revenue[-1] or 0.0, ebitda=ebitda[-1],
-        net_income=net_income[-1], cash=(cash or 0.0) + (sti or 0.0), debt=debt, leases=leases or 0.0,
+        net_income=net_income[-1], cash=cash + (sti if sti is not None else 0.0), debt=debt, leases=leases or 0.0,
         minorities=(mi or 0.0) if basis != "pe" else 0.0, currency=currency, basis=basis,
     )
     ocf, capex_s, acq = s("operating_cash_flow"), s("capital_expenditure"), s("acquisitions")

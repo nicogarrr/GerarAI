@@ -30,7 +30,7 @@ import subprocess
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -752,7 +752,7 @@ def extract_from_pdf(data: bytes, *, ocr: Callable[..., str] | None = None,
     finally:
         pdf.close()
     result.update(page_count=count, extractor_version=EXTRACTOR_VERSION,
-                  extracted_at=datetime.utcnow().replace(microsecond=0).isoformat() + "Z")
+                  extracted_at=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"))
     if not any(candidates.values()):
         result.update(status="not_found", reason="no se encuentran la cuenta de resultados ni el balance por su titulo")
     elif result["figures"] and not result["rejected"]:

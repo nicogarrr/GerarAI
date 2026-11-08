@@ -116,6 +116,8 @@ def test_missing_diluted_shares_fall_back_to_net_income_over_diluted_eps_like_th
     payload = _payload(rows)
     payload["facts"]["us-gaap"]["EarningsPerShareDiluted"] = {"units": {"USD/shares": [
         {"start": "2015-01-01", "end": "2015-12-31", "val": 2.5, "filed": "2016-02-20", "form": "10-K"}]}}
+    payload["facts"]["us-gaap"]["CashAndCashEquivalentsAtCarryingValue"] = {"units": {"USD": [
+        {"end": "2015-12-31", "val": 20e6, "filed": "2016-02-20", "form": "10-K"}]}}  # sin caja se descarta la fecha
     t = date(2016, 6, 30)
     inp = bt.build_inputs(bt.as_of(bt.facts_from_companyfacts(payload), t), t=t, price=30.0, splits=[],
                           financial=True)
@@ -132,6 +134,8 @@ def test_shares_tagged_without_scale_are_caught_by_the_cover_page_filed_before_t
     payload["facts"]["dei"] = {"EntityCommonStockSharesOutstanding": {"units": {"shares": [
         {"end": "2016-02-20", "val": 9_650_000, "filed": "2016-03-01", "form": "10-K"},
         {"end": "2016-08-01", "val": 1, "filed": "2016-08-05", "form": "10-Q"}]}}}  # posterior a t
+    payload["facts"]["us-gaap"]["CashAndCashEquivalentsAtCarryingValue"] = {"units": {"USD": [
+        {"end": "2015-12-31", "val": 20e6, "filed": "2016-02-20", "form": "10-K"}]}}  # sin caja se descarta la fecha
     t = date(2016, 6, 30)
     inp = bt.build_inputs(bt.as_of(bt.facts_from_companyfacts(payload), t), t=t, price=30.0, splits=[],
                           financial=True)
