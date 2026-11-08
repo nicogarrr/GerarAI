@@ -1,0 +1,418 @@
+{
+ "_fuente": "Datos de mercado y cifras reales: endpoint /analyst-report sobre SEC companyfacts de ASTS (CIK 1780312) y cierres de Yahoo leídos el 8-nov-2026. Tarjeta DCA: /api/watchlist/dca-signals/ASTS/card real (dca-valor-6). Valor justo 24,4 $ de la tesis (última medida, 4-nov-2026, dca-valor-4). Texto de la tesis: el mensaje de Nico del 8-nov-2026, porque la tesis publicada de producción no se pudo leer (sin SSH). Líneas de honestidad: salida literal de pre_revenue_track_record y cash_burn_base_rate.",
+ "ticker": "ASTS",
+ "report": {
+  "ticker": "ASTS",
+  "company": "AST SpaceMobile, Inc.",
+  "version": "analyst-report-v1",
+  "market": {
+   "price": 32.33,
+   "price_date": "2026-11-06",
+   "currency": "USD",
+   "avg_volume": 13463811,
+   "avg_volume_sessions": 63,
+   "shares_outstanding": null,
+   "shares_diluted": {
+    "value": 299061662.0,
+    "unit": "shares",
+    "period_end": "2026-06-30",
+    "provenance": "OFICIAL"
+   },
+   "market_cap": 9668663532.46,
+   "market_cap_basis": "shares_diluted",
+   "cash": {
+    "value": 2288253000.0,
+    "unit": "USD",
+    "period_end": "2026-06-30",
+    "provenance": "OFICIAL"
+   },
+   "total_debt": {
+    "value": 2971916000.0,
+    "unit": "USD",
+    "period_end": "2026-06-30",
+    "provenance": "OFICIAL"
+   },
+   "enterprise_value": 10352326532.46,
+   "enterprise_value_reason": null
+  },
+  "estimates": {
+   "annual": [
+    {
+     "period_end": "2022-12-31",
+     "fiscal_quarter": "FY",
+     "revenue": {
+      "value": 13825000.0,
+      "unit": "USD",
+      "source": "SEC",
+      "reported": true,
+      "basis": "reported",
+      "derived_q4": false
+     },
+     "ebitda": null
+    },
+    {
+     "period_end": "2023-12-31",
+     "fiscal_quarter": "FY",
+     "revenue": {
+      "value": 0.0,
+      "unit": "USD",
+      "source": "SEC",
+      "reported": true,
+      "basis": "reported",
+      "derived_q4": false
+     },
+     "ebitda": null
+    },
+    {
+     "period_end": "2024-12-31",
+     "fiscal_quarter": "FY",
+     "revenue": {
+      "value": 4418000.0,
+      "unit": "USD",
+      "source": "SEC",
+      "reported": true,
+      "basis": "reported",
+      "derived_q4": false
+     },
+     "ebitda": null
+    },
+    {
+     "period_end": "2025-12-31",
+     "fiscal_quarter": "FY",
+     "revenue": {
+      "value": 70918000.0,
+      "unit": "USD",
+      "source": "SEC",
+      "reported": true,
+      "basis": "reported",
+      "derived_q4": false
+     },
+     "ebitda": null
+    }
+   ],
+   "quarterly": [
+    {
+     "period_end": "2025-03-31",
+     "fiscal_quarter": "Q1",
+     "revenue": {
+      "value": 718000.0,
+      "unit": "USD",
+      "source": "SEC",
+      "reported": true,
+      "basis": "reported",
+      "derived_q4": false
+     },
+     "ebitda": null
+    },
+    {
+     "period_end": "2025-06-30",
+     "fiscal_quarter": "Q2",
+     "revenue": {
+      "value": 1156000.0,
+      "unit": "USD",
+      "source": "SEC",
+      "reported": true,
+      "basis": "reported",
+      "derived_q4": false
+     },
+     "ebitda": null
+    },
+    {
+     "period_end": "2025-09-30",
+     "fiscal_quarter": "Q3",
+     "revenue": {
+      "value": 14739000.0,
+      "unit": "USD",
+      "source": "SEC",
+      "reported": true,
+      "basis": "reported",
+      "derived_q4": false
+     },
+     "ebitda": null
+    },
+    {
+     "period_end": "2025-12-31",
+     "fiscal_quarter": "Q4",
+     "revenue": {
+      "value": 54305000.0,
+      "unit": "USD",
+      "source": "SEC",
+      "reported": false,
+      "basis": "reported",
+      "derived_q4": true
+     },
+     "ebitda": null
+    },
+    {
+     "period_end": "2026-03-31",
+     "fiscal_quarter": "Q1",
+     "revenue": {
+      "value": 14735000.0,
+      "unit": "USD",
+      "source": "SEC",
+      "reported": true,
+      "basis": "reported",
+      "derived_q4": false
+     },
+     "ebitda": null
+    },
+    {
+     "period_end": "2026-06-30",
+     "fiscal_quarter": "Q2",
+     "revenue": {
+      "value": 31520000.0,
+      "unit": "USD",
+      "source": "SEC",
+      "reported": true,
+      "basis": "reported",
+      "derived_q4": false
+     },
+     "ebitda": null
+    }
+   ]
+  },
+  "notes": {
+   "avg_volume": "Media de las últimas 63 sesiones con volumen en nuestros cierres.",
+   "ebitda": "EBITDA = resultado operativo + amortizaciones del mismo periodo; si falta, el EBITDA de la fuente.",
+   "q4": "Un Q4 sin 10-Q se deriva como ejercicio − Q1 − Q2 − Q3.",
+   "user_estimates": "Las estimaciones del usuario salen de su desglose por partes y su tesis, etiquetadas como suyas."
+  }
+ },
+ "card": {
+  "symbol": "ASTS",
+  "currency": "USD",
+  "currency_label": "$",
+  "data_source": "yfinance",
+  "available": true,
+  "official_timeframe": "month",
+  "current": {
+   "level": 4,
+   "key": "4x",
+   "label": "4X DCA",
+   "zone": "Zona de compra extrema",
+   "color": "#B400FF",
+   "fg": "#FFFFFF",
+   "status": "forming",
+   "period": "2026-11",
+   "signal_date": "2026-11-06",
+   "close": 32.33000183105469,
+   "months_in_zone": 5
+  },
+  "timeframes": [
+   {
+    "key": "week",
+    "short": "S",
+    "label": "Semanal",
+    "available": true,
+    "zone": {
+     "level": 4,
+     "key": "4x",
+     "label": "4X DCA",
+     "zone": "Zona de compra extrema",
+     "color": "#B400FF",
+     "fg": "#FFFFFF"
+    },
+    "status": "forming",
+    "period": "2026-W45",
+    "streak": 12
+   },
+   {
+    "key": "month",
+    "short": "M",
+    "label": "Mensual",
+    "available": true,
+    "zone": {
+     "level": 4,
+     "key": "4x",
+     "label": "4X DCA",
+     "zone": "Zona de compra extrema",
+     "color": "#B400FF",
+     "fg": "#FFFFFF"
+    },
+    "status": "forming",
+    "period": "2026-11",
+    "streak": 5
+   },
+   {
+    "key": "quarter",
+    "short": "T",
+    "label": "Trimestral",
+    "available": true,
+    "zone": {
+     "level": 4,
+     "key": "4x",
+     "label": "4X DCA",
+     "zone": "Zona de compra extrema",
+     "color": "#B400FF",
+     "fg": "#FFFFFF"
+    },
+    "status": "forming",
+    "period": "2026-Q4",
+    "streak": 1
+   },
+   {
+    "key": "year",
+    "short": "A",
+    "label": "Anual",
+    "available": false,
+    "reason": "hacen falta 12 periodos de historia"
+   }
+  ],
+  "last_change": {
+   "from": {
+    "level": 2,
+    "key": "2x",
+    "label": "2X DCA",
+    "zone": "Zona de compra",
+    "color": "#00AA78",
+    "fg": "#FFFFFF"
+   },
+   "to": {
+    "level": 4,
+    "key": "4x",
+    "label": "4X DCA",
+    "zone": "Zona de compra extrema",
+    "color": "#B400FF",
+    "fg": "#FFFFFF"
+   },
+   "period": "2026-06",
+   "signal_date": "2026-06-30",
+   "close": 88.86000061035156,
+   "change": -0.6361692369008551
+  },
+  "risk": {
+   "key": "high",
+   "label": "Riesgo alto",
+   "reasons": [
+    {
+     "key": "volatility",
+     "value": 1.300107
+    },
+    {
+     "key": "pre_revenue",
+     "value": null
+    }
+   ]
+  },
+  "why": {
+   "signal": "combined",
+   "binding": "drawdown",
+   "close": 32.33000183105469,
+   "drawdown": 0.714928,
+   "high": 113.410004,
+   "high_lookback_months": 36,
+   "dd_thresholds": [
+    0.15,
+    0.25,
+    0.4
+   ],
+   "sma": 49.308334,
+   "sma_months": 30,
+   "sma_gap": 0.34433,
+   "adj_gap": 0.079454,
+   "gap_thresholds": [
+    0.0,
+    0.1,
+    0.2
+   ],
+   "vol": 1.300107,
+   "vol_ratio": 4.33369,
+   "vol_ref": 0.3,
+   "level_drawdown": 4,
+   "level_sma_gap": 2,
+   "rsi": 43.9327,
+   "months_of_history": 85,
+   "level_prices": {
+    "2x": 96.398503,
+    "3x": 85.057503,
+    "4x": 68.046002
+   },
+   "params_version": "nico-v2"
+  }
+ },
+ "fair": {
+  "value": 24.4,
+  "currency": "USD",
+  "label": "Tesis publicada",
+  "as_of": "2026-11-04",
+  "publishable": true
+ },
+ "thesis": {
+  "version": 1,
+  "status": "published",
+  "created_at": "2026-11-08",
+  "executive_summary": "Valoración por suma de las partes proyectada a madurez (2030E) y descontada a hoy: cada vertical de negocio y los activos estratégicos del balance, restando el CapEx pendiente y la dilución. A 32,33 $ (12.581 M$ de capitalización sobre 389,1 M de acciones) el mercado la valora solo como una promesa de teleco; tras los anuncios de noviembre ya tiene la estructura de un contratista de defensa, propietario de espectro y fabricante aeroespacial integrado.",
+  "hypothesis": "Solo el negocio de EE. UU. con AT&T y Verizon (30,00 $ por acción en el desglose) justifica casi toda la cotización actual; defensa, Europa, el cohete y el resto de regiones van gratis.",
+  "catalysts": [
+   {
+    "label": "Resultados del 3T 2026 (consenso de ingresos 44,4–45,7 M$)",
+    "date": "2026-11-09"
+   },
+   {
+    "label": "Activación comercial en Japón con Rakuten Mobile"
+   },
+   {
+    "label": "Guía de ingresos 2026 de 150–200 M$ y cartera contratada de 1.300 M$"
+   },
+   {
+    "label": "Unidad AST SpaceMobile Defense: radar espacial, alerta temprana de misiles y PNT"
+   }
+  ],
+  "invalidation_criteria": [
+   "Retrasos de 18 meses en el despliegue de la constelación",
+   "Dilución por encima de 480 M de acciones",
+   "Recorte del 65 % en los ingresos esperados",
+   "Quema de caja 2026–2028 mayor de lo previsto (~2.200 M$ en 100 satélites y ~900 M$ en efectivo a Firefly)"
+  ],
+  "narrative_sections": [
+   {
+    "titulo": "Bloque A: negocio mayorista D2D (reparto 50/50, sin coste de captación)",
+    "parrafos": [
+     "EE. UU. comercial y FirstNet con AT&T y Verizon: acceso a ~240 M de suscriptores en el mercado de mayor ARPU del mundo.",
+     "Satellite Connect Europe (JV al 50 % con Vodafone), Asia-Pacífico (Rakuten, Singtel, Telstra, Globe), Oriente Medio y África (stc, prepago comprometido de 175 M$) y Latinoamérica (Brasil y Chile)."
+    ]
+   },
+   {
+    "titulo": "Bloque B: defensa, cómputo y lanzamientos (ingreso directo)",
+    "parrafos": [
+     "AST SpaceMobile Defense para la U.S. Space Force, SDA y OTAN; Orbital Edge AI con el ASIC AST5000; >3.900 reclamaciones de patentes y 45 MHz de banda L; cohete reutilizable Blacklift."
+    ]
+   },
+   {
+    "titulo": "Bloque C: balance, CapEx 2026–2028 y dilución",
+    "parrafos": [
+     "~3.700 M$ de liquidez proforma frente a ~2.200 M$ para fabricar y lanzar 100 satélites y ~900 M$ a Firefly en 3 años. Base totalmente diluida en 2030E: 445 M de acciones en el escenario base."
+    ]
+   }
+  ],
+  "bear_value": null,
+  "base_value": 24.4,
+  "bull_value": null
+ },
+ "honesty": {
+  "trackRecord": "Sin valor justo fiable: la empresa aún quema caja. En el backtest (4.002 casos así en EE. UU., 2014–2026) ningún método acertó el nivel: el DCF para empresas jóvenes salió fuera de 0,2x–5x el precio la mitad de las veces. A 12 meses, 8 de cada 10 veces el precio quedó entre 0,24x y 1,95x el de partida (mediana 0,81x); solo el 31 % batió al S&P 500, y el 17 % dejó de presentar cuentas en 2 años.",
+  "sbc": null,
+  "baseRate": "Punto de partida: la empresa aún pierde dinero y quema caja. En el backtest (2.845 casos así en EE. UU., 2014–2026, contando las que desaparecieron), a 2 años la rentabilidad mediana fue -51 %: la mitad cayó más de un 50 %, el 11 % más que duplicó y solo el 21 % batió al S&P 500. No cambia esta cifra.",
+  "impliedGrowth": null
+ },
+ "engineRange": null,
+ "keyStats": {
+  "symbol": "ASTS",
+  "currency": "USD",
+  "range_52w": {
+   "low": 30.2,
+   "low_date": "2026-11-05",
+   "high": 133.09,
+   "high_date": "2026-05-28",
+   "sessions": 251,
+   "source": "Cierres propios"
+  },
+  "next_earnings": null,
+  "ex_dividend": null,
+  "beta": null,
+  "note": null,
+  "fetched_at": "2026-11-08T02:00:00Z"
+ },
+ "shorts": null,
+ "today": "2026-11-08"
+}

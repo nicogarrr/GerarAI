@@ -38,7 +38,7 @@ export async function SotpBreakdownSection({ ticker }: { ticker: string }) {
   return <SotpBreakdownView data={data} t={t} fmt={fmt} locale={locale} ticker={ticker} />;
 }
 
-export function SotpBreakdownView({ data, t, fmt, locale, ticker }: { data: SotpResponse; t: T; fmt: F; locale: 'es' | 'en'; ticker: string }) {
+export function SotpBreakdownView({ data, t, fmt, locale, ticker, editable = true }: { data: SotpResponse; t: T; fmt: F; locale: 'es' | 'en'; ticker: string; editable?: boolean }) {
   const model = data.model;
   const result = data.result;
   const baseRate = data.base_rate;
@@ -139,7 +139,7 @@ export function SotpBreakdownView({ data, t, fmt, locale, ticker }: { data: Sotp
           </div>
         </>
       ) : <p className="text-sm text-gray-400">{t('research.sotp.empty')}</p>}
-      <SotpEditor model={model} t={t} locale={locale} ticker={ticker} saved={data.origin === 'saved'} versions={data.saved?.versions ?? 0} />
+      {editable ? <SotpEditor model={model} t={t} locale={locale} ticker={ticker} saved={data.origin === 'saved'} versions={data.saved?.versions ?? 0} /> : null}
     </section>
   );
 }
