@@ -17,7 +17,11 @@ from typing import Any
 import httpx
 
 from app.core.config import get_settings
-from app.services.connectors.base import UpstreamRateLimited, get_with_retry
+from app.services.connectors.base import (
+    UpstreamRateLimited,
+    get_with_retry,
+    record_connector_http_failures,
+)
 from app.services.data_source_health import get_data_source_registry
 
 # Clave de este proveedor en el registry de salud de fuentes (ver yahoo.py:
@@ -59,30 +63,19 @@ class FREDClient:
         registry = get_data_source_registry()
         started = time.perf_counter()
         try:
-            if self.client is not None:
-                response = await get_with_retry(
-                    lambda: self.client.get(url, params=params, headers=self.headers)
-                )
-            else:
-                async with httpx.AsyncClient(timeout=30, headers=self.headers) as client:
-                    response = await get_with_retry(lambda: client.get(url, params=params))
-            payload = response.json()
+            with record_connector_http_failures(registry, REGISTRY_KEY):
+                if self.client is not None:
+                    response = await get_with_retry(
+                        lambda: self.client.get(url, params=params, headers=self.headers)
+                    )
+                else:
+                    async with httpx.AsyncClient(timeout=30, headers=self.headers) as client:
+                        response = await get_with_retry(lambda: client.get(url, params=params))
+                payload = response.json()
         except UpstreamRateLimited:
             # 429 agotado por get_with_retry: sin este except el fallo no se
             # registraba nunca (UpstreamRateLimited no es HTTPStatusError).
             registry.record_failure(REGISTRY_KEY, "HTTP 429: rate limit agotado")
-            raise
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code in (400, 404):
-                # Serie inexistente o peticion mal formada: la fuente respondio.
-                raise
-            registry.record_failure(REGISTRY_KEY, f"HTTP {exc.response.status_code}")
-            raise
-        except httpx.TransportError as exc:
-            registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
-            raise
-        except ValueError:
-            registry.record_failure(REGISTRY_KEY, "respuesta no JSON")
             raise
         registry.record_success(REGISTRY_KEY, (time.perf_counter() - started) * 1000)
         return payload
@@ -197,7 +190,7 @@ async def fetch_observations(
     }
     registry = get_data_source_registry()
     started = time.perf_counter()
-    try:
+    with record_connector_http_failures(registry, REGISTRY_KEY):
         if client is not None:
             response = await client.get(
                 f"{FREDClient.base_url}/series/observations",
@@ -209,18 +202,6 @@ async def fetch_observations(
                 response = await owned.get(f"{FREDClient.base_url}/series/observations", params=params)
         response.raise_for_status()
         data = response.json()
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code in (400, 404):
-            # Serie inexistente o peticion mal formada: la fuente respondio.
-            raise
-        registry.record_failure(REGISTRY_KEY, f"HTTP {exc.response.status_code}")
-        raise
-    except httpx.TransportError as exc:
-        registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
-        raise
-    except ValueError:
-        registry.record_failure(REGISTRY_KEY, "respuesta no JSON")
-        raise
     registry.record_success(REGISTRY_KEY, (time.perf_counter() - started) * 1000)
     data.setdefault("series_id", series_id)
     return data

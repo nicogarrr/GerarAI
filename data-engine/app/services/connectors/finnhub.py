@@ -5,7 +5,11 @@ from typing import Any
 import httpx
 
 from app.core.config import get_settings
-from app.services.connectors.base import UpstreamRateLimited, get_with_retry
+from app.services.connectors.base import (
+    UpstreamRateLimited,
+    get_with_retry,
+    record_connector_http_failures,
+)
 from app.services.connectors.global_pacing import GlobalPacer
 from app.services.data_source_health import get_data_source_registry
 
@@ -90,33 +94,22 @@ class FinnhubClient:
         # Jitter en esos reintentos: sin el, los workers que reciben 429 a la
         # vez reintentan en el mismo segundo.
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            with record_connector_http_failures(registry, REGISTRY_KEY):
+                async with httpx.AsyncClient(timeout=30) as client:
 
-                async def _paced_attempt():
-                    await _pacer.wait()
-                    return await client.get(url, params=query)
+                    async def _paced_attempt():
+                        await _pacer.wait()
+                        return await client.get(url, params=query)
 
-                response = await get_with_retry(
-                    _paced_attempt, jitter=True, **retry_kwargs
-                )
-                payload = response.json()
+                    response = await get_with_retry(
+                        _paced_attempt, jitter=True, **retry_kwargs
+                    )
+                    payload = response.json()
         except UpstreamRateLimited as exc:
             registry.record_failure(REGISTRY_KEY, "HTTP 429: cuota/rate limit agotada")
             # La ventana que pidio Finnhub la respetan TODOS los procesos, no
             # solo esta corrida (suelo 60s si no mando Retry-After util).
             _pacer.cool_down(exc.retry_after or 60.0)
-            raise
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code in (400, 404):
-                # Ticker sin dato: la fuente respondio; no se degrada.
-                raise
-            registry.record_failure(REGISTRY_KEY, f"HTTP {exc.response.status_code}")
-            raise
-        except httpx.TransportError as exc:
-            registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
-            raise
-        except ValueError:
-            registry.record_failure(REGISTRY_KEY, "respuesta no JSON")
             raise
         # Finnhub responde a clave inválida o símbolo con error como un 200
         # {"error": "..."}: es un dict y colaría como payload válido.

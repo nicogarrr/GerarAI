@@ -3,7 +3,11 @@ import time
 import httpx
 
 from app.core.config import get_settings
-from app.services.connectors.base import UpstreamRateLimited, get_with_retry
+from app.services.connectors.base import (
+    UpstreamRateLimited,
+    get_with_retry,
+    record_connector_http_failures,
+)
 from app.services.data_source_health import get_data_source_registry
 
 # Clave en el registry de salud de fuentes. 400/404 son dato por ticker y
@@ -49,25 +53,13 @@ class FMPClient:
         registry = get_data_source_registry()
         started = time.perf_counter()
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                retry_kwargs = {} if max_retries is None else {"max_retries": max_retries}
-                response = await get_with_retry(lambda: client.get(url, params=merged), **retry_kwargs)
-                payload = response.json()
+            with record_connector_http_failures(registry, REGISTRY_KEY, passthrough_statuses=(400, 402, 404)):
+                async with httpx.AsyncClient(timeout=30) as client:
+                    retry_kwargs = {} if max_retries is None else {"max_retries": max_retries}
+                    response = await get_with_retry(lambda: client.get(url, params=merged), **retry_kwargs)
+                    payload = response.json()
         except UpstreamRateLimited:
             registry.record_failure(REGISTRY_KEY, "HTTP 429: cuota diaria/rate limit agotada")
-            raise
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code in (400, 402, 404):
-                # 400/404: ticker sin dato. 402: endpoint fuera de plan
-                # (entitlement por endpoint, no fuente caida).
-                raise
-            registry.record_failure(REGISTRY_KEY, f"HTTP {exc.response.status_code}")
-            raise
-        except httpx.TransportError as exc:
-            registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
-            raise
-        except ValueError:
-            registry.record_failure(REGISTRY_KEY, "respuesta no JSON")
             raise
         registry.record_success(REGISTRY_KEY, (time.perf_counter() - started) * 1000)
         return payload
