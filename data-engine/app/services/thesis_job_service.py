@@ -943,6 +943,13 @@ def run_thesis_job(run_id: int) -> None:
                 attach_to_thesis_run(db, run_id, payload["ticker"], thesis.id)
             except (Exception, TimeLimitExceeded):  # noqa: BLE001 - la tesis ya está confirmada
                 logger.warning("propuesta SOTP de los agentes omitida tras la tesis %s", thesis.id)
+            # Tesis v2 (TIR para el accionista, nivel comité): misma regla, nunca bloquea la tesis.
+            try:
+                from app.services.expert_team.thesis_v2 import attach_to_thesis_run
+
+                attach_to_thesis_run(db, run_id, payload["ticker"])
+            except (Exception, TimeLimitExceeded):  # noqa: BLE001 - la tesis ya está confirmada
+                logger.warning("tesis v2 omitida tras la tesis %s", thesis.id)
         except (Exception, TimeLimitExceeded) as exc:
             # The rollback discards the step rows flushed by on_phase, so the
             # in-memory `open_step` is expunged and its identity is gone. The
