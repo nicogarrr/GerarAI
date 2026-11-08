@@ -11,7 +11,6 @@ from app.services.news_headline_translation import fingerprint, original_headlin
 from app.services.news_story_cluster import (
     CONTAINMENT_MIN,
     JACCARD_MIN,
-    WINDOW,
     _company_tokens,
     distinctive,
     event_signature,
@@ -28,13 +27,17 @@ def _sig(*tokens: str) -> set[str]:
 
 
 class TestSameStoryVentana:
+    # La ventana documentada es de 48 h: el literal fija la regla y rompe el
+    # test si alguien cambia WINDOW en el módulo.
+    VENTANA_48H = timedelta(hours=48)
+
     def test_dentro_de_la_ventana_agrupa(self):
         sig = _sig("fotovoltaica", "desplome", "aranceles")
-        assert same_story(sig, sig, NOW, NOW - (WINDOW - timedelta(minutes=1)))
+        assert same_story(sig, sig, NOW, NOW - (self.VENTANA_48H - timedelta(minutes=1)))
 
     def test_fuera_de_la_ventana_no_agrupa_aunque_la_firma_sea_identica(self):
         sig = _sig("fotovoltaica", "desplome", "aranceles")
-        assert not same_story(sig, sig, NOW, NOW - (WINDOW + timedelta(minutes=1)))
+        assert not same_story(sig, sig, NOW, NOW - (self.VENTANA_48H + timedelta(minutes=1)))
 
 
 class TestSameStoryFirmaMinima:
@@ -72,7 +75,7 @@ class TestSameStoryUmbrales:
         assert same_story(sig_a, sig_b, NOW, NOW)
 
     def test_contencion_justo_por_debajo_no_agrupa(self):
-        # 12/20 = 0.60 < 0.65 y Jaccard 12/31 < 0.50, sin distintivos.
+        # 12/19 ~= 0.63 < 0.65 y Jaccard 12/31 < 0.50, sin distintivos.
         shared = {f"s{i:02d}" for i in range(12)}
         sig_a = shared | {f"a{i:02d}" for i in range(12)}
         sig_b = shared | {f"b{i:02d}" for i in range(7)}
