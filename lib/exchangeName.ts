@@ -9,6 +9,8 @@ const EXCHANGE_ALIASES: Array<[RegExp, string]> = [
     [/NASDAQ/i, 'NASDAQ'],
     [/NEW YORK STOCK EXCHANGE|^NYSE$/i, 'NYSE'],
     [/NYSE\s*(MKT|AMERICAN)/i, 'NYSE American'],
+    [/NYSE\s*ARCA/i, 'NYSE Arca'],
+    [/BATS|CBOE|BZX/i, 'Cboe'],
     [/BME|BOLSA DE MADRID/i, 'BME'],
     [/TORONTO/i, 'TSX'],
     [/SWISS/i, 'SIX'],
