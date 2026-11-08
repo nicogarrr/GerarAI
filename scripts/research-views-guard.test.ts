@@ -1,13 +1,17 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { loadMessages } from './i18n-messages.mjs';
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
 import { MODULES, TABS, asView, canonicalViewUrl, legacyResearchRedirect, moduleHref, subrouteRedirect, tabHref, type View } from '../lib/research/research-views.ts';
 
 describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
     it('las seis pestañas abren su módulo de entrada', () => {
         assert.equal(TABS.length, 6);
-        assert.deepEqual(TABS.map((t) => t.label), ['Resumen', 'Tesis', 'Finanzas', 'Valoración', 'Seguimiento', 'Fuentes']);
+        // Los nombres visibles viven en el diccionario (research.tabs.*, los pinta
+        // CompanyNavigation via TAB_LABEL_KEYS): aquí se fijan esos valores.
+        const tabsEs = (loadMessages('es').dict as Record<string, Record<string, Record<string, string>>>).research.tabs;
+        assert.deepEqual(TABS.map((t) => tabsEs[t.key]), ['Resumen', 'Tesis', 'Finanzas', 'Valoración', 'Seguimiento', 'Fuentes']);
         assert.equal(asView('resumen'), 'overview');
         assert.equal(asView('tesis'), 'thesis');
         assert.equal(asView('finanzas'), 'financials');
