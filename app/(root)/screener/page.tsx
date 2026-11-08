@@ -88,9 +88,13 @@ async function VistaTabs({ vista }: { vista: Vista }) {
     regimen: t('screener.vistas.regimen'),
   };
   return (
-    <nav aria-label={t('screener.vistasAria')} className="flex flex-nowrap gap-1.5 overflow-x-auto">
+    // flex-wrap como en LiveMarketsPanel (fix del 21-oct): con nowrap +
+    // overflow-x-auto la 4ª pestaña salía cortada a 390 px ("Acti…") sin
+    // pista de que había scroll; al envolver se ven las cinco y ninguna
+    // queda a medio pintar. min-h-11 = diana táctil de 44 px.
+    <nav aria-label={t('screener.vistasAria')} className="flex flex-wrap gap-1.5">
       {VISTAS.map((v) => (
-        <Button key={v.id} asChild variant={vista === v.id ? 'default' : 'outline'} size="sm" className="min-h-[36px] shrink-0 rounded-md px-3 text-sm">
+        <Button key={v.id} asChild variant={vista === v.id ? 'default' : 'outline'} size="sm" className="min-h-11 shrink-0 rounded-md px-3 text-sm">
           <Link aria-current={vista === v.id ? 'page' : undefined} href={v.href} scroll={false}>{labels[v.id]}</Link>
         </Button>
       ))}
