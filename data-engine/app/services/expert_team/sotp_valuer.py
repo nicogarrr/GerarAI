@@ -807,11 +807,39 @@ def analyst_estimates_tool(db: Session) -> ToolSpec:
                 ))
             out.extend(_company_guidance_outputs(db, company, ctx.tenant_id))
             out.extend(_analyst_consensus_outputs(db, company, ctx.tenant_id))
+            out.extend(_own_consensus_outputs(db, company, ctx.tenant_id))
         return out
 
     return ToolSpec(name="analyst_estimates", fn=analyst_estimates,
                     description="Precios objetivo y estimaciones de analistas guardados, con firma y fuente, "
                                 "y la guía de la propia empresa citada de sus notas de resultados")
+
+
+def _own_consensus_outputs(db: Session, company: Company, tenant_id: int) -> list[ToolOutput]:
+    """Consenso propio por celda (``own_consensus``): la primera fuente del orden fijo que
+    pasa las puertas de cordura, con bajo/medio/alto, fórmula, cita y confianza medida.
+    Sin red ni modelo; los expertos lo leen como ancla «consenso_propio»."""
+    from app.services.own_consensus import build_company_consensus
+
+    try:
+        result = build_company_consensus(db, company, tenant_id)
+    except Exception as exc:  # noqa: BLE001 - sin consenso propio siguen las demás anclas
+        logger.warning("consenso propio no disponible para %s: %s", company.ticker, type(exc).__name__)
+        return []
+    out: list[ToolOutput] = []
+    for cell in result["cells"]:
+        if cell["status"] != "estimado":
+            continue
+        first = (cell.get("citations") or [{}])[0]
+        out.append(ToolOutput(
+            source={"table": "own_consensus", "id": cell["key"],
+                    "title": f"Consenso propio {cell['metric']} {cell['period']} ({cell['source']})",
+                    "url": first.get("url") or "", "date": first.get("date") or result["as_of"]},
+            data={"kind": "own_consensus", **{k: cell[k] for k in (
+                "metric", "period", "period_end", "source", "low", "mid", "high", "formula", "flags",
+                "confidence", "version")}},
+        ))
+    return out
 
 
 def _analyst_consensus_outputs(db: Session, company: Company, tenant_id: int) -> list[ToolOutput]:
