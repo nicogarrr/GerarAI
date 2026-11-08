@@ -99,9 +99,22 @@ def is_drop(dca: dict[str, Any]) -> bool:
     return dca.get("direction") == "down"
 
 
+def is_trim(dca: dict[str, Any]) -> bool:
+    """Entrada (o subida) en una zona de recorte (-1/-2): un aviso informativo, no una orden."""
+    try:
+        return int(dca.get("level")) < 0  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False
+
+
 def title(dca: dict[str, Any], language: str = "es") -> str:
     label = level_label(dca["label"], language)
     previous = level_label(dca.get("previous_label"), language) or None
+    if is_trim(dca) and not is_drop(dca):
+        # Sin verbo de accion: es una nota (ver trim_note).
+        if _en(language):
+            return f"{dca['symbol']}: {label} zone (for information)"
+        return f"{dca['symbol']}: zona {label} (aviso informativo)"
     if is_drop(dca):
         if _en(language):
             suffix = f" (from {previous})" if previous else ""
@@ -123,6 +136,33 @@ def drop_note(dca: dict[str, Any], language: str = "es") -> str | None:
         return f"For your information: the level drops{origin} to {label}."
     origin = f" desde {previous}" if previous else ""
     return f"Aviso informativo: el nivel baja{origin} a {label}."
+
+
+def trim_note(dca: dict[str, Any], language: str = "es") -> str | None:
+    """Nota de un aviso de zona de recorte: informa, no manda recortar.
+
+    Backtest gerarai-dcavalor3 (7-nov-2026, 491 valores del S&P 500, nivel
+    confirmado del motor nico-v2, rentabilidad a 12 meses frente al SPY):
+    los valores que entraron en recorte rindieron DE MEDIA mas que 1X en los dos
+    periodos (1996-2012: recorte ligero +46,4 y fuerte +47,3 puntos frente a
+    +6,7 de 1X; 2013-2025: +58,7 y +60,3 frente a +2,0), con mucha dispersion
+    (mediana del fuerte en 1996-2012: -1,3 frente a +3,7 de 1X) y pocos casos
+    (55-174). Nada respalda un «recorta»: se dice que esta extendido y que el
+    plan no le da dinero nuevo. Bajadas de nivel y compras: nada.
+    """
+    if not is_trim(dca) or is_drop(dca):
+        return None
+    if _en(language):
+        return (
+            "For information, not an instruction: the price is well above its average. In the backtest "
+            "(S&P 500, 1996–2025) stocks entering this zone went on to beat the S&P 500 on average over the "
+            "next 12 months, with wide dispersion. The plan split gives it no new money while it stays here."
+        )
+    return (
+        "Aviso informativo, no una orden: el precio está muy por encima de su media. En el backtest "
+        "(S&P 500, 1996–2025), los valores que entraron en esta zona batieron de media al S&P 500 en los "
+        "12 meses siguientes, con mucha dispersión. Mientras siga aquí, el reparto del plan no le da dinero nuevo."
+    )
 
 
 # Mismo umbral que el reparto del plan (plan_contribution_split.LOW_VOLATILITY_THRESHOLD).
@@ -224,7 +264,7 @@ def message_text(dca: dict[str, Any], language: str = "es") -> str:
     if dca.get("company_name"):
         lines.append(str(dca["company_name"]))
     lines.append("")
-    note = drop_note(dca, language)
+    note = drop_note(dca, language) or trim_note(dca, language)
     if note:
         lines += [note, ""]
     lines += [f"{label}: {value}" for label, value in detail_rows(dca, language)]
@@ -264,6 +304,11 @@ def email_content(dca: dict[str, Any], language: str = "es") -> EmailContent:
         + f"<span style=\"display:inline-block;padding:6px 14px;border-radius:999px;background:{escape(color)};"
         f"color:{escape(fg)};font-weight:700;border:1px solid #d0d0d0\">{escape(level_label(dca['label'], language))}</span>"
         + (f"<p style=\"margin:12px 0 0;color:#555\">{escape(drop_note(dca, language) or '')}</p>" if is_drop(dca) else "")
+        + (
+            f"<p style=\"margin:12px 0 0;color:#555\">{escape(trim)}</p>"
+            if (trim := trim_note(dca, language))
+            else ""
+        )
         + f"<table style=\"margin-top:16px;border-collapse:collapse\">{rows_html}</table>"
         + (
             f"<p style=\"font-size:12px;color:#555;margin:12px 0 0\">{escape(low_vol_note)}</p>"
