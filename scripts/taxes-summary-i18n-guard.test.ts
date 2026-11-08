@@ -46,3 +46,13 @@ test('F-bug6: el criterio FX de valores tiene etiqueta y traduccion en el diccio
     assert.match(view, /key === 'securities_fx_criterion'/);
     assert.equal(typeof en.values.securitiesFxDgt, 'string');
 });
+
+test('cancelled_lot: la clave del resumen tiene etiqueta y se lista como tickers', () => {
+    // El resumen incluye cancelled_lot (ventas con lote cancelado: el coste
+    // heredado no es fiable). La vista lo humanizaba en crudo («Cancelled
+    // lot», spanglish) y mostraba el array sin traducir.
+    assert.equal(es.labels.cancelledLot, 'Ventas con lote cancelado');
+    assert.equal(en.labels.cancelledLot, 'Sales with cancelled lot');
+    assert.match(view, /cancelled_lot: 'taxes\.labels\.cancelledLot'/);
+    assert.match(view, /'cancelled_lot', 'missing_fx'/);
+});

@@ -28,6 +28,7 @@
     "sellCount": "Sales (count)",
     "overSell": "Sales without covering purchases",
     "costUnknown": "Sales with unknown inherited cost",
+    "cancelledLot": "Sales with cancelled lot",
     "method": "Valuation method",
     "securitiesFxCriterion": "Securities FX criterion",
     "currencyLedgerCriterion": "Currency ledger criterion",
