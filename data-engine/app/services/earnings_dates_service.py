@@ -245,14 +245,29 @@ def refresh_earnings_dates(
     except Exception as exc:  # noqa: BLE001 - idem NASDAQ
         logger.warning("earnings_dates: nasdaq fallo por completo: %s", exc)
         nasdaq = {}
+    # Una sola lectura para toda la corrida: antes cada ticker costaba un
+    # SELECT por la fila manual, otro por la futura automatica y un DELETE
+    # propio (~3 sentencias por ticker; medido en
+    # tests/test_earnings_dates_refresh_querycount.py: 11 vs 74 para 3 vs 24
+    # tickers). Ahora el barrido es O(1) y solo crecen los INSERT, que son
+    # inherentes (una fila nueva por ticker con fecha futura).
+    tickers = list(followed)
+    known_rows = db.scalars(
+        select(EarningsDate).where(EarningsDate.ticker.in_(tickers or [""]))
+    ).all()
+    manual_future = {
+        r.ticker for r in known_rows if r.source == "manual" and r.event_date >= today
+    }
+    auto_future = {
+        r.ticker for r in known_rows if r.source != "manual" and r.event_date >= today
+    }
+    by_key = {(r.ticker, r.event_date, r.source): r for r in known_rows}
+
     written, missing, disagree = 0, [], 0
+    reset_tickers: list[str] = []
+    new_rows: list[EarningsDate] = []
     for ticker in followed:
-        manual = db.scalar(
-            select(EarningsDate.id).where(
-                EarningsDate.ticker == ticker, EarningsDate.source == "manual",
-                EarningsDate.event_date >= today,
-            )
-        )
+        manual = ticker in manual_future
         candidate = merge_candidate(yahoo.get(ticker), nasdaq.get(ticker))
         if yahoo.get(ticker) and nasdaq.get(ticker) and yahoo[ticker]["date"] != nasdaq[ticker]["date"]:
             disagree += 1
@@ -268,27 +283,15 @@ def refresh_earnings_dates(
             # uq_earnings_date_ticker_day_source, el commit de TODA la corrida
             # reventaba y ningun ticker se renovaba (repro 22 oct 2026:
             # tests/test_earnings_dates_refresh_repro.py).
-            future_row = db.scalar(
-                select(EarningsDate.id).where(
-                    EarningsDate.ticker == ticker, EarningsDate.source != "manual",
-                    EarningsDate.event_date >= today,
-                )
-            )
-            if future_row is None and not manual:
+            if ticker not in auto_future and not manual:
                 missing.append(ticker)
-            existing = db.scalar(
-                select(EarningsDate).where(
-                    EarningsDate.ticker == ticker,
-                    EarningsDate.event_date == candidate["date"],
-                    EarningsDate.source == candidate["source"],
-                )
-            )
+            existing = by_key.get((ticker, candidate["date"], candidate["source"]))
             if existing is not None:
                 # El proveedor confirma que sigue mostrando esa fecha: se
                 # renueva fetched_at (is_fresh la usa en la watchlist).
                 existing.fetched_at = datetime.now(UTC)
             else:
-                db.add(
+                new_rows.append(
                     EarningsDate(
                         ticker=ticker, event_date=candidate["date"], session=candidate["session"],
                         fiscal_label=candidate["fiscal"], confirmed=candidate["confirmed"],
@@ -298,13 +301,8 @@ def refresh_earnings_dates(
                 )
                 written += 1
             continue
-        db.execute(
-            delete(EarningsDate).where(
-                EarningsDate.ticker == ticker, EarningsDate.source != "manual",
-                EarningsDate.event_date >= today,
-            )
-        )
-        db.add(
+        reset_tickers.append(ticker)
+        new_rows.append(
             EarningsDate(
                 ticker=ticker, event_date=candidate["date"], session=candidate["session"],
                 fiscal_label=candidate["fiscal"], confirmed=candidate["confirmed"],
@@ -313,6 +311,18 @@ def refresh_earnings_dates(
             )
         )
         written += 1
+    # El borrado va ANTES de los inserts y agrupado en una sola sentencia:
+    # borra solo filas automaticas futuras, asi nunca toca las nuevas (que
+    # aun no existen) ni las manuales ni la historia pasada.
+    if reset_tickers:
+        db.execute(
+            delete(EarningsDate).where(
+                EarningsDate.ticker.in_(reset_tickers), EarningsDate.source != "manual",
+                EarningsDate.event_date >= today,
+            )
+        )
+    for row in new_rows:
+        db.add(row)
     db.commit()
     return {
         "followed": len(followed), "written": written, "without_date": sorted(missing),
