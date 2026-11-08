@@ -13,6 +13,7 @@ from typing import Any
 
 import httpx
 
+from app.services.connectors.base import record_connector_http_failures
 from app.services.data_source_health import get_data_source_registry
 
 # Clave en el registry de salud de fuentes. 400/404 (job mal formado) y un
@@ -45,7 +46,7 @@ class OpenFIGIClient:
             job["exchCode"] = exch_code.strip().upper()
         registry = get_data_source_registry()
         started = time.perf_counter()
-        try:
+        with record_connector_http_failures(registry, REGISTRY_KEY):
             if self.client is None:
                 async with httpx.AsyncClient(timeout=20) as client:
                     response = await client.post(self.base_url, json=[job])
@@ -53,18 +54,6 @@ class OpenFIGIClient:
                 response = await self.client.post(self.base_url, json=[job])
             response.raise_for_status()
             payload = response.json()
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code in (400, 404):
-                # Job mal formado: la fuente respondio; no se degrada.
-                raise
-            registry.record_failure(REGISTRY_KEY, f"HTTP {exc.response.status_code}")
-            raise
-        except httpx.TransportError as exc:
-            registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
-            raise
-        except ValueError:
-            registry.record_failure(REGISTRY_KEY, "respuesta no JSON")
-            raise
         if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
             registry.record_failure(REGISTRY_KEY, "payload de mapeo invalido")
             raise RuntimeError("OpenFIGI returned an invalid mapping response")

@@ -6,10 +6,13 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 from tenacity import (
     AsyncRetrying,
     RetryCallState,
@@ -249,6 +252,40 @@ dentro de la misma corrida.
         )
     response.raise_for_status()
     return response
+
+
+# ---------------- Registro de fallos HTTP de conectores ----------------
+
+
+@contextmanager
+def record_connector_http_failures(
+    registry,
+    registry_key: str,
+    *,
+    passthrough_statuses: tuple[int, ...] = (400, 404),
+) -> Iterator[None]:
+    """Registra en el registry de salud los fallos HTTP/red de un conector.
+
+    Los status de ``passthrough_statuses`` (400/404 por defecto) son dato por
+    elemento (ticker o serie sin dato): la fuente respondio, asi que se
+    relanzan SIN registrar. El resto de status, los errores de red y las
+    respuestas no JSON se registran con el mismo texto que llevaba cada
+    conector en su propio bloque except, y se relanzan. Una sola copia:
+    finnhub, fred, openfigi y fmp traian esta cascada duplicada.
+    """
+    try:
+        yield
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code in passthrough_statuses:
+            raise
+        registry.record_failure(registry_key, f"HTTP {exc.response.status_code}")
+        raise
+    except httpx.TransportError as exc:
+        registry.record_failure(registry_key, f"error de red: {type(exc).__name__}")
+        raise
+    except ValueError:
+        registry.record_failure(registry_key, "respuesta no JSON")
+        raise
 
 
 @dataclass(slots=True)
