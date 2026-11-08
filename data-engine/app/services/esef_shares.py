@@ -34,7 +34,9 @@ BPA en AED: fuera); BPA != 0; signos coherentes; cota de redondeo del BPA
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal
+
+from app.services.number_parsing import parse_finite_decimal
 
 MAX_REL_ERROR = Decimal("0.02")
 
@@ -77,16 +79,6 @@ class ShareSkip:
     reason: str
 
 
-def _dec(value: object) -> Decimal | None:
-    if value is None:
-        return None
-    try:
-        out = Decimal(str(value))
-    except (InvalidOperation, ValueError):
-        return None
-    return out if out.is_finite() else None
-
-
 def _eps_decimals(entry: dict) -> int | None:
     raw = entry.get("decimals")
     if raw is None or str(raw).upper() in {"INF", "INFINITY"}:
@@ -106,8 +98,8 @@ def _derive_period(
     concept = DILUTED_EPS_CONCEPT if lane == "diluted" else BASIC_EPS_CONCEPT
     if reviewed_eps_conflict(str(eps_entry.get("lei") or ""), period, concept, eps_entry.get("val")):
         return ShareSkip(period, lane, "bpa_esef_conflicto_escala_fuente_primaria")
-    profit = _dec(profit_entry.get("val"))
-    eps = _dec(eps_entry.get("val"))
+    profit = parse_finite_decimal(profit_entry.get("val"))
+    eps = parse_finite_decimal(eps_entry.get("val"))
     if profit is None:
         return ShareSkip(period, lane, "beneficio_atribuido_no_numerico")
     if eps is None:
@@ -168,7 +160,7 @@ def derive_shares(
             continue
         basic_entry = basic_eps_by_period.get(period)
         if basic_entry is not None:
-            basic_eps = _dec(basic_entry.get("val"))
+            basic_eps = parse_finite_decimal(basic_entry.get("val"))
             if basic_eps is not None and _beyond_rounding(
                 result.eps, result.eps_decimals, basic_eps, _eps_decimals(basic_entry)
             ):
