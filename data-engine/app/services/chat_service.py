@@ -1623,11 +1623,17 @@ class ChatService:
         text = question or ""
         if not history:
             return None
-        if not (_COMPANY_CUE_RE.search(text) or _question_metrics(text) or _VALUATION_FOLLOWUP_RE.search(text)):
+        # «¿Debería comprar más?» tras hablar de META pide opinión sobre META:
+        # antes caía en la vía general sin datos y se abstenía (benchmark
+        # Cerebro 2026-11-08). Una orden sin opinión («compra más») no se arrastra.
+        advice = bool(_ADVICE_QUESTION_RE.search(text))
+        if not (
+            _COMPANY_CUE_RE.search(text) or _question_metrics(text) or _VALUATION_FOLLOWUP_RE.search(text) or advice
+        ):
             return None
         if (
             _PORTFOLIO_SELF_RE.search(text)
-            or _ORDER_VERB_RE.search(text)
+            or (_ORDER_VERB_RE.search(text) and not advice)
             or _is_doctrine_question(text)
         ):
             return None
