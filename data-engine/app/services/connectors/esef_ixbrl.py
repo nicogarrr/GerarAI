@@ -78,11 +78,13 @@ def _transform_numeric(raw: str, fmt: str | None) -> Decimal | None:
     if not text:
         return None
     fmt_local = (fmt or "num-dot-decimal").rsplit(":", 1)[-1]
-    if fmt_local in {"fixed-zero", "numdash", "num-dash"} or text in {"-", "—", "–"}:
+    if fmt_local in {"fixed-zero", "numdash", "num-dash", "zerodash"} or text in {"-", "—", "–"}:
         return Decimal(0)
-    if fmt_local in {"num-dot-decimal", "numdotdecimal"}:
+    # TR1 (ixt 2010-04-20, el que usan casi todas las cuentas de Companies House):
+    # numcommadot = 1,234.56 y numdotcomma = 1.234,56; mismas reglas que TR3/TR4.
+    if fmt_local in {"num-dot-decimal", "numdotdecimal", "numcommadot"}:
         text = text.replace(",", "")
-    elif fmt_local in {"num-comma-decimal", "numcommadecimal"}:
+    elif fmt_local in {"num-comma-decimal", "numcommadecimal", "numdotcomma"}:
         text = text.replace(".", "").replace(",", ".")
     elif fmt_local in {"num-space-dot", "numspacedot"}:
         text = text.replace(" ", "").replace(" ", "")

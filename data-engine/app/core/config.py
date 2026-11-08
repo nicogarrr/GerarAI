@@ -534,6 +534,10 @@ class Settings(BaseSettings):
     langfuse_host: str = "https://cloud.langfuse.com"
     langfuse_sample_rate: float = Field(default=0.1, ge=0.0, le=1.0)
     fmp_api_key: str | None = None
+    # Companies House (registro mercantil del Reino Unido, gratis): filiales britanicas
+    # que no cotizan y respaldo de informes de emisores britanicos. Basic con la clave
+    # como usuario. Vacio = apagado. Env: COMPANIES_HOUSE_API_KEY.
+    companies_house_api_key: str | None = Field(default=None, repr=False)
     fred_api_key: str | None = None
     # Referencia de instrumentos: seed FinanceDatabase + normalizacion OpenFIGI.
     # Sin key por defecto (25 req/min); key gratuita opcional via env.

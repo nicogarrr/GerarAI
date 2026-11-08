@@ -10,6 +10,9 @@ la tesis y el desglose por partes no tenian nada que citar («sin datos SEC»).
   la pagina de inversores (``company.ir_url``) enlaza los PDF del informe
   anual y de los trimestrales (Fairfax: «Fairfax-Financial-2025-Annual-
   Report», «FFH-2026-Q3-Interim-Report»).
+- Reino Unido, respaldo: si el NSM no da informe anual (sin LEI, caido o sin
+  informe), las ultimas cuentas depositadas en Companies House por el propio
+  emisor (nombre exacto), con su URL publica (``companies_house_report``).
 - Reino Unido: el NSM de la FCA (``connectors.fca_nsm``) guarda por LEI los
   informes regulados; los de Georgia Capital van sin etiquetar (xhtml de 21
   MB convertido de PDF), pero sus anuncios RNS de resultados («3rd Quarter
@@ -126,6 +129,33 @@ def pick_nsm_reports(filings: list[Any]) -> list[ReportLink]:
     return out
 
 
+async def companies_house_report(company: Any) -> ReportLink | None:
+    """Ultimas cuentas anuales depositadas en Companies House por el propio emisor (nombre exacto).
+
+    Respaldo general para un emisor britanico cuando el NSM no da su informe (sin LEI,
+    NSM caido o sin informe anual): son las cuentas oficiales, citables por su URL publica.
+    None si la funcion esta apagada (sin ``COMPANIES_HOUSE_API_KEY``) o no hay cuentas."""
+    from app.services.companies_house_evidence import issuer_annual_accounts
+    from app.services.connectors.companies_house import CompaniesHouseError, client_from_settings
+
+    name = str(getattr(company, "name", "") or "").strip()
+    client = client_from_settings(max_requests=12)
+    if client is None or not name:
+        return None
+    try:
+        accounts = await issuer_annual_accounts(client, name)
+    except CompaniesHouseError:
+        return None
+    finally:
+        await client.aclose()
+    if not accounts or not accounts.get("document_url"):
+        return None
+    made_up = accounts.get("made_up_to") or ""
+    return ReportLink(kind="annual", url=str(accounts["document_url"]),
+                      title=f"{accounts['company_name']} — cuentas anuales a {made_up} (Companies House)",
+                      date=str(accounts.get("filed_on") or made_up), source="Companies House")
+
+
 async def discover_reports(company: Any) -> tuple[list[ReportLink], str]:
     """(enlaces, motivo). Reino Unido -> NSM por LEI; si no, la pagina de inversores."""
     from app.services import esef_live
@@ -141,15 +171,22 @@ async def discover_reports(company: Any) -> tuple[list[ReportLink], str]:
         try:
             identity, reason = await esef_live.resolve_issuer(company, esef=EsefClient(), http=http, nsm=nsm)
             if identity is None:
-                return [], f"sin_lei: {reason}"
-            try:
-                filings = await nsm.list_filings_for_lei(identity.lei, filing_type=None, size=200)
-            except NsmError as exc:
-                return [], f"nsm_error: {exc}"
-            links = pick_nsm_reports(filings)
-            return links, "ok" if links else "nsm_sin_informes"
+                links, reason = [], f"sin_lei: {reason}"
+            else:
+                try:
+                    filings = await nsm.list_filings_for_lei(identity.lei, filing_type=None, size=200)
+                    links = pick_nsm_reports(filings)
+                    reason = "ok" if links else "nsm_sin_informes"
+                except NsmError as exc:
+                    links, reason = [], f"nsm_error: {exc}"
         finally:
             await http.aclose()
+        if not any(link.kind == "annual" for link in links):
+            # Sin informe anual del NSM: las cuentas oficiales del registro mercantil.
+            ch = await companies_house_report(company)
+            if ch is not None:
+                return [*links, ch], (reason if links else f"companies_house ({reason})")
+        return links, reason
     ir_url = str(getattr(company, "ir_url", "") or "").strip()
     if not ir_url:
         return [], "sin_ir_url: la ficha no tiene la web de inversores"
