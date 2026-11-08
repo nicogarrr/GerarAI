@@ -11,13 +11,13 @@ forecast): _published_thesis_by_company, _publishable_model_by_company,
 _validated_probabilities, _scenario_returns, _intrinsic_for_comparison y
 todo /forecast (lineas 1765-fin del modulo).
 
-MEDICION propia (este archivo solo, 84 tests, pytest --cov sobre el
-modulo): in-scope (lineas < 1765) 707 sentencias cubiertas, 3 sin
-ejecutar (412-413, 1333) = 99,58%; ramas parciales in-scope
+MEDICION propia (este archivo solo, 86 tests, pytest --cov sobre el
+modulo): in-scope (lineas < 1765) 708 sentencias cubiertas, 2 sin
+ejecutar (412-413) = 99,72%; ramas parciales in-scope
 declaradas: 436->438, 462->465, 477->480, 1276->1291, 1323->1325,
-1332->1333, 1367->1374, 1374->1391, 1394->1391, 1516->1522 (todas en
+1367->1374, 1374->1391, 1394->1391, 1516->1522 (todas en
 caminos de colas dobladas o ramas de tenant). Total del modulo con el
-bloque excluido: 81,00%.
+bloque excluido: 81,11%.
 """
 
 from datetime import date
@@ -912,10 +912,11 @@ def test_batch_valida_todo_antes_de_insertar(monkeypatch):
     db.rollback.assert_called_once()
 
 
-def test_batch_feliz_atomico(monkeypatch):
+def test_batch_feliz_un_solo_commit(monkeypatch):
     # Lineas 1266-1413: inserta sin rebuild por fila, reconstruye una vez por
-    # company, UN commit, y post-procesa (diario, backfill, analisis) con el
-    # DCA doblado (NADA de DCA real).
+    # company, UN solo commit (del doble: la atomicidad real de la BD NO se
+    # prueba), y post-procesa (diario, backfill, analisis) con el DCA
+    # doblado (NADA de DCA real).
     auto_link = _dobles_batch(monkeypatch)
     monkeypatch.setattr(p, "PortfolioLedgerService", _LedgerBatch)
     db = _db_batch()
@@ -1799,6 +1800,25 @@ def test_batch_value_error_es_400(monkeypatch):
             _batch_payload(_tx_input(action="sell")), db=db,
         )
     assert exc.value.status_code == 400
+    assert "Transaction 0" in exc.value.detail
+    db.rollback.assert_called_once()
+
+
+def test_batch_divisa_mixta_es_422(monkeypatch):
+    # Linea 1333: una divisa mixta en una fila -> 422 con el indice.
+    _dobles_batch(monkeypatch)
+
+    class Mixta(_LedgerBatch):
+        def _held_quantity(self, db, company_id):
+            raise p.PortfolioMixedCurrencyError("mixta")
+
+    monkeypatch.setattr(p, "PortfolioLedgerService", Mixta)
+    db = _db_batch()
+    with pytest.raises(p.HTTPException) as exc:
+        p.create_transaction_batch(
+            _batch_payload(_tx_input(action="sell")), db=db,
+        )
+    assert exc.value.status_code == 422
     assert "Transaction 0" in exc.value.detail
     db.rollback.assert_called_once()
 
