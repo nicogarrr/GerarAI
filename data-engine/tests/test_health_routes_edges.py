@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import app.core.cache as cache_mod
+import app.services.provider_brake as brakes_mod
 from app.api.routes import health as mod
 
 
@@ -67,18 +69,40 @@ class _FakeRegistry:
         }
 
 
-def test_data_sources_health_inyecta_cuota_y_frenos_fail_open(monkeypatch):
+def _dobla_fuentes(monkeypatch):
     monkeypatch.setattr(mod, "get_data_source_registry", _FakeRegistry)
     monkeypatch.setattr(
         mod,
         "get_alpha_vantage_client",
         lambda: SimpleNamespace(quota_status=lambda: {"remaining": 25}),
     )
+
+
+def test_data_sources_health_inyecta_cuota_solo_en_alpha_vantage(monkeypatch):
+    _dobla_fuentes(monkeypatch)
+    frenos = [{"provider": "gdelt", "ttl_seconds": 120}]
+    monkeypatch.setattr(cache_mod, "_redis_client", lambda: SimpleNamespace())
+    monkeypatch.setattr(brakes_mod, "open_brakes", lambda client: frenos)
+
     out = mod.data_sources_health()
     alpha = next(s for s in out["sources"] if s["name"] == "Alpha Vantage")
     assert alpha["quota"] == {"remaining": 25}
     # La cuota solo se inyecta en Alpha Vantage.
     sec = next(s for s in out["sources"] if s["name"] == "SEC")
     assert "quota" not in sec
-    # Sin Redis real los frenos no tumban el health: lista vacia.
-    assert out["provider_brakes"] == []
+    assert out["provider_brakes"] == frenos
+
+
+def test_data_sources_health_frenos_rotos_es_fail_open(monkeypatch):
+    _dobla_fuentes(monkeypatch)
+
+    def _boom(client):
+        raise RuntimeError("redis caido")
+
+    # Redis responde pero la lectura de frenos falla: la rama except es la
+    # que se ejerce, no un Redis ausente en el entorno del test.
+    monkeypatch.setattr(cache_mod, "_redis_client", lambda: SimpleNamespace())
+    monkeypatch.setattr(brakes_mod, "open_brakes", _boom)
+    # Un Redis con frenos o caido nunca tumba el health: lista vacia,
+    # deterministico (colaboradores doblados, no depende del entorno).
+    assert mod.data_sources_health()["provider_brakes"] == []
