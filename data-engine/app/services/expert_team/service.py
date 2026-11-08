@@ -42,6 +42,11 @@ def provider_reasoner(
         budget = BudgetController() if db is not None else None
         if budget is not None and db is not None and not budget.can_spend(db, SPEND_PER_CALL_EUR):
             raise BudgetExceededError("LLM budget exhausted")
+        if commit_usage and db is not None:
+            # La llamada puede durar minutos. Con la transacción de la consulta de gasto abierta, Postgres corta
+            # la conexión a los idle_in_transaction_session_timeout_ms (120 s) y al anotar el gasto la respuesta
+            # ya recibida se pierde (tesis v2 de POOL: 125 s y error). Quien pide commit_usage acepta commits.
+            db.commit()
 
         def tally(resp: Any) -> None:
             if budget is None or db is None:
