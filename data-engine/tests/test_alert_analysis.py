@@ -5,8 +5,22 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from app.models.entities import AlertAnalysis, Base, Company, NewsEvent, Position, ResearchAlert, Tenant
-from app.services.alert_analysis_service import analyze_alert, queue_analysis, read_analysis
+from app.models.entities import (
+    AlertAnalysis,
+    Base,
+    Company,
+    NewsEvent,
+    Position,
+    ResearchAlert,
+    Tenant,
+    WatchItem,
+)
+from app.services.alert_analysis_service import (
+    analyze_alert,
+    queue_analysis,
+    read_analysis,
+    reconcile_missing_analyses,
+)
 from app.services.tracked_news_alerts import evaluate
 
 NOW = datetime(2026, 9, 27, 12, tzinfo=UTC)
@@ -413,3 +427,157 @@ def test_llm_step_skipped_when_flag_disabled(db, monkeypatch):
                         lambda db_, event, *, use_llm=False: calls.append(1) or _canned_second_order(event.id))
     assert analyze_alert(session, alert.id)["status"] == "insufficient_data"
     assert calls == []
+
+
+def test_queue_analysis_requires_tenant_tracked_news_alert(db):
+    """El gate rechaza sin ambigüedad: sin tenant, tenant ajeno o tipo que
+    no es tracked_news levanta ValueError, no un silencio."""
+    session, tenants, company = db
+    alert, _article = _alert_with_article(session, tenants[0].id, company, fingerprint="gate-tenant")
+    session.info.pop("tenant_id")
+    with pytest.raises(ValueError):
+        queue_analysis(session, alert)
+    session.info["tenant_id"] = tenants[1].id
+    with pytest.raises(ValueError):
+        queue_analysis(session, alert)
+    session.info["tenant_id"] = tenants[0].id
+    alert.alert_type = "price"
+    session.commit()
+    with pytest.raises(ValueError):
+        queue_analysis(session, alert)
+
+
+def test_reconcile_and_analyze_require_tenant_context(db):
+    session, tenants, company = db
+    alert, _article = _alert_with_article(session, tenants[0].id, company, fingerprint="gate-tenant-2")
+    session.info.pop("tenant_id")
+    with pytest.raises(ValueError):
+        reconcile_missing_analyses(session)
+    with pytest.raises(ValueError):
+        analyze_alert(session, alert.id)
+
+
+def test_reconcile_transient_failure_counts_unqueueable_and_marks_nothing(db, monkeypatch):
+    """Un fallo transitorio (excepción) jamás deja marca durable: solo la
+    marca es para fallos deterministas del gate con el evento presente."""
+    session, tenants, company = db
+    article = NewsEvent(tenant_id=tenants[0].id, company_id=company.id,
+                        title="ASTS ITU filing", source="Publisher",
+                        url="https://publisher.example/itu", date=NOW,
+                        metadata_={"connector": "rss", "date_source": "source",
+                                   "source_headline": "ASTS ITU filing submitted"})
+    session.add(article)
+    session.flush()
+    alert = ResearchAlert(tenant_id=tenants[0].id, company_id=company.id,
+                          alert_type="tracked_news", title="Article", message="News",
+                          fingerprint="gate-transient", metadata_={"news_event_id": article.id})
+    session.add(alert)
+    session.commit()
+
+    import app.services.alert_analysis_service as service
+
+    def boom(_db, _alert):
+        raise RuntimeError("fallo transitorio")
+
+    monkeypatch.setattr(service, "queue_analysis", boom)
+    stats = service.reconcile_missing_analyses(session)
+
+    assert stats["unqueueable"] == 1
+    assert stats["marked"] == 0
+    assert stats["queued"] == 0
+    fresh = session.get(ResearchAlert, alert.id)
+    assert "analysis_excluded_url" not in (fresh.metadata_ or {})
+
+
+def test_analyze_marks_insufficient_when_event_breaks_after_queue(db):
+    """El evento se rompe DESPUÉS de encolar (titular en blanco): el análisis
+    es honesto y no inventa secciones."""
+    session, tenants, company = db
+    alert, article = _alert_with_article(session, tenants[0].id, company, fingerprint="gate-broken")
+    article.metadata_ = {"connector": "rss", "date_source": "source", "source_headline": "   "}
+    session.commit()
+
+    out = analyze_alert(session, alert.id)
+
+    assert out["status"] == "insufficient_data"
+    row = session.scalar(select(AlertAnalysis).where(AlertAnalysis.alert_id == alert.id))
+    assert row.result["sections"][0]["key"] == "insufficient_data"
+    assert "No hay titular original" in row.result["sections"][0]["body"]
+    assert row.result["citations"] == []
+
+
+def test_read_analysis_unknown_alert_is_lookup_error(db):
+    session, _tenants, _company = db
+    with pytest.raises(LookupError):
+        read_analysis(session, 999999)
+
+
+def test_second_order_note_is_appended_to_the_block(db, monkeypatch):
+    """Con nota (modo degradado), el cuerpo del bloque la muestra: sin ella
+    el lector no sabría que el paso LLM no corrió."""
+    session, tenants, company = db
+    alert, article = _alert_with_article(session, tenants[0].id, company, fingerprint="llm-note")
+    import app.services.alert_analysis_service as service
+    monkeypatch.setenv("SECOND_ORDER_LLM_ENABLED", "1")
+    monkeypatch.setattr(
+        service, "analyze_second_order",
+        lambda db_, event, *, use_llm=False: {
+            **_canned_second_order(event.id),
+            "note": "LLM sin cuota; modo determinista",
+        },
+    )
+
+    analyze_alert(session, alert.id)
+
+    row = session.scalar(select(AlertAnalysis).where(AlertAnalysis.alert_id == alert.id))
+    body = [s for s in row.result["sections"] if s["key"] == "second_order"][0]["body"]
+    assert "Nota: LLM sin cuota; modo determinista" in body
+    assert row.result["second_order"]["note"] == "LLM sin cuota; modo determinista"
+
+
+def test_watchlist_scope_normalizes_symbol_and_skips_empty(db, monkeypatch):
+    """Símbolo en minúsculas en la watchlist casa con el ticker; un símbolo
+    vacío no rompe el barrido ni casa con nada."""
+    session, tenants, company = db
+    session.delete(session.scalar(select(Position)))  # sin cartera: si casa, es watchlist
+    session.add_all([
+        WatchItem(tenant_id=tenants[0].id, symbol=""),
+        WatchItem(tenant_id=tenants[0].id, symbol="asts"),
+    ])
+    session.commit()
+    alert, article = _alert_with_article(session, tenants[0].id, company, fingerprint="llm-watchlist")
+    import app.services.alert_analysis_service as service
+    calls = []
+    monkeypatch.setenv("SECOND_ORDER_LLM_ENABLED", "1")
+    monkeypatch.setattr(service, "analyze_second_order",
+                        lambda db_, event, *, use_llm=False: calls.append(event.id)
+                        or _canned_second_order(event.id))
+
+    analyze_alert(session, alert.id)
+
+    row = session.scalar(select(AlertAnalysis).where(AlertAnalysis.alert_id == alert.id))
+    assert calls == [article.id]
+    assert row.result["second_order"]["scope"] == "watchlist"
+
+
+def test_company_without_ticker_has_no_scope(db, monkeypatch):
+    """Empresa huérfana de ticker: sin scope, el paso LLM no corre aunque el
+    flag esté activo."""
+    session, tenants, company = db
+    ghost = Company(ticker="", name="Sin ticker", exchange="NASDAQ", currency="USD",
+                    company_type="holding", valuation_model="unassigned")
+    session.add(ghost)
+    session.commit()
+    alert, _article = _alert_with_article(session, tenants[0].id, ghost, fingerprint="llm-ghost")
+    import app.services.alert_analysis_service as service
+    calls = []
+    monkeypatch.setenv("SECOND_ORDER_LLM_ENABLED", "1")
+    monkeypatch.setattr(service, "analyze_second_order",
+                        lambda db_, event, *, use_llm=False: calls.append(event.id)
+                        or _canned_second_order(event.id))
+
+    analyze_alert(session, alert.id)
+
+    assert calls == []
+    row = session.scalar(select(AlertAnalysis).where(AlertAnalysis.alert_id == alert.id))
+    assert "second_order" not in row.result
