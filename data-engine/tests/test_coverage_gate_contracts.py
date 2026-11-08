@@ -499,3 +499,48 @@ def test_format_report_marca_paquetes_sin_baseline_y_exempt():
     assert "FAIL" in text
     # El motivo de la exencion sale en el informe, no se queda en el JSON.
     assert "motivo declarado para app/workers" in text
+
+
+# --------------------------- 7. red anti-skips silenciosos del carril de colas
+
+
+_JUNIT_CON_SKIP = """<?xml version="1.0" encoding="utf-8"?>
+<testsuite name="pytest" tests="3" skipped="1">
+  <testcase classname="tests.test_queue_watchdog" name="test_mide_profundidad">
+    <skipped message="could not import 'fakeredis'">skip</skipped>
+  </testcase>
+  <testcase classname="tests.test_queue_watchdog" name="test_otro"/>
+  <testcase classname="tests.test_provider_lanes" name="test_ajeno">
+    <skipped message="skip ajeno al carril">skip</skipped>
+  </testcase>
+</testsuite>
+"""
+
+
+def test_skip_guard_caza_el_skip_silencioso_del_carril(tmp_path):
+    junit = tmp_path / "junit.xml"
+    junit.write_text(_JUNIT_CON_SKIP, encoding="utf-8")
+    failures = gate.skipped_guard_failures(junit)
+    assert failures == ["tests.test_queue_watchdog::test_mide_profundidad"]
+
+
+def test_skip_guard_ignora_skips_fuera_de_la_lista(tmp_path):
+    junit = tmp_path / "junit.xml"
+    junit.write_text(
+        """<?xml version="1.0"?>
+<testsuite><testcase classname="tests.test_provider_lanes" name="t">
+<skipped message="x">s</skipped></testcase></testsuite>""",
+        encoding="utf-8",
+    )
+    assert gate.skipped_guard_failures(junit) == []
+
+
+def test_skip_guard_falla_cerrado_sin_junit(tmp_path):
+    with pytest.raises(gate.GateConfigError):
+        gate.skipped_guard_failures(tmp_path / "no-existe.xml")
+
+
+def test_el_gate_escribe_junit_para_la_red():
+    """Sin --junitxml en el comando, la red no tiene de donde leer."""
+    cmd = gate._pytest_command(extra=None)
+    assert any(arg.startswith("--junitxml=") for arg in cmd)

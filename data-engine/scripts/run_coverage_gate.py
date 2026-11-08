@@ -50,6 +50,20 @@ ENGINE_ROOT = Path(__file__).resolve().parents[1]
 BASELINE_PATH = ENGINE_ROOT / "coverage_baseline.json"
 REPORT_DIR = ENGINE_ROOT / "htmlcov"
 JSON_REPORT = REPORT_DIR / "coverage.json"
+JUNIT_REPORT = REPORT_DIR / "junit.xml"
+
+# Red anti-skips silenciosos (hueco medido 9-nov: queue_watchdog.py al 39,4%
+# en CI porque sus tests hacian importorskip("fakeredis") y fakeredis no
+# estaba declarado en el extra test — skip sin ruido, cobertura hundida).
+# Ficheros del carril de colas cuyos tests NO PUEDEN saltarse en el gate:
+# si alguno aparece como skipped en el JUnit de la corrida, el gate falla
+# con los nodeids. Un fichero entra aqui cuando su skip esporadico dejaria
+# ciega la medicion (deps opt-in del extra test), no cuando el skip es el
+# diseno del test (p. ej. servicios ausentes: esos se auto-excluyen).
+SKIP_GUARD_FILES: tuple[str, ...] = (
+    "tests/test_queue_watchdog.py",
+    "tests/test_ingest_load_lab.py",
+)
 
 BASELINE_VERSION = 1
 
@@ -531,9 +545,35 @@ def _load_json_report(path: Path) -> dict[str, Any]:
 
 def _pytest_command(*, extra: list[str] | None) -> list[str]:
     cmd = [sys.executable, "-m", "pytest", "--cov", f"--cov-report=json:{JSON_REPORT}"]
-    cmd += ["--cov-report=term:skip-covered"]
+    cmd += ["--cov-report=term:skip-covered", f"--junitxml={JUNIT_REPORT}"]
     cmd += extra or []
     return cmd
+
+
+def skipped_guard_failures(junit_path: Path | str = JUNIT_REPORT) -> list[str]:
+    """Nodeids de SKIP_GUARD_FILES que aparecen como skipped en el JUnit.
+
+    Fail-closed como el resto del gate: JUnit ausente o corrupto es un
+    GateConfigError (pytest no llego a escribirlo: la corrida no es fiable).
+    """
+    from defusedxml import ElementTree
+
+    path = Path(junit_path)
+    if not path.is_file():
+        raise GateConfigError(f"no existe el informe JUnit de la corrida: {path}")
+    try:
+        root = ElementTree.parse(str(path)).getroot()
+    except Exception as exc:
+        raise GateConfigError(f"informe JUnit ilegible: {path}: {exc}") from exc
+    failures: list[str] = []
+    for testcase in root.iter("testcase"):
+        if testcase.find("skipped") is None:
+            continue
+        classname = str(testcase.get("classname") or "")
+        file_path = classname.replace(".", "/") + ".py"
+        if file_path in SKIP_GUARD_FILES:
+            failures.append(f"{classname}::{testcase.get('name')}")
+    return failures
 
 
 def run_pytest(*, extra: list[str] | None = None) -> int:
@@ -629,6 +669,15 @@ def gate(*, report: bool = False, update: bool = False, extra: list[str] | None 
         if code != 0:
             print(f"\n(recordatorio: pytest devolvio {code}; --report no gatea)")
         return 0
+    skip_failures = skipped_guard_failures()
+    if skip_failures:
+        print(
+            "\nGATE ERROR: tests del carril de colas saltados en la corrida "
+            "(skip silencioso: la cobertura mediria de menos):\n  "
+            + "\n  ".join(skip_failures),
+            file=sys.stderr,
+        )
+        return 1
     if not result.ok:
         return 1
     return code
