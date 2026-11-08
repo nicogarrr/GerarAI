@@ -618,7 +618,7 @@ class LongTermModelService:
         driver_preview = (
             DriverOperatingModel().build(
                 framework,
-                fact_cache,
+                self._with_derived_series(fact_cache),
                 latest_year=latest_year,
                 horizon=horizon,
                 scenario="base",
@@ -1120,6 +1120,45 @@ class LongTermModelService:
                 }
             )
         return drivers
+
+    def _with_derived_series(
+        self, fact_cache: dict[str, list[FinancialFact]]
+    ) -> dict[str, list[FinancialFact]]:
+        """La fórmula del marco ve los drivers derivados igual que la ficha.
+
+        Un REIT sin NOI etiquetado lo tiene derivado en la ficha (lease_income −
+        gastos de inmuebles − IBI), pero la fórmula solo miraba ``fact_cache`` y lo
+        daba por ausente en cuanto había ingresos con los que proyectar. Aquí se
+        añade la serie derivada, año a año, con las mismas reglas (mismo ejercicio,
+        misma unidad, sin completar nada); los hechos son transitorios, no se guardan."""
+        out = dict(fact_cache)
+        for key, (_formula, inputs, signs) in DERIVED_DRIVERS.items():
+            if out.get(key):
+                continue
+            by_year = [self._annual_by_year(fact_cache.get(metric) or []) for metric in inputs]
+            common = set(by_year[0]).intersection(*by_year[1:]) if by_year else set()
+            series: list[FinancialFact] = []
+            for year in sorted(common):
+                facts = [annual[year] for annual in by_year]
+                values = [_float(fact.value) for fact in facts]
+                if len({fact.unit for fact in facts}) != 1 or any(v is None for v in values):
+                    continue
+                series.append(
+                    FinancialFact(
+                        company_id=facts[0].company_id,
+                        metric=key,
+                        value=Decimal(str(sum(sign * float(v) for sign, v in zip(signs, values) if v is not None))),
+                        unit=facts[0].unit,
+                        period=facts[0].period,
+                        fiscal_year=year,
+                        fiscal_quarter="FY",
+                        source_type="derived",
+                        is_reported=False,
+                    )
+                )
+            if series:
+                out[key] = series
+        return out
 
     def _derived_driver(
         self, key: str, fact_cache: dict[str, list[FinancialFact]]

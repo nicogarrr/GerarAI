@@ -257,9 +257,15 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # 7 (8-nov-2026): minoritarios: ``minority_interest`` IFRS (NoncontrollingInterests) y ``net_income_minority``.
 # 8 (8-nov-2026): acciones y BPA «básico y diluido» (WeightedAverageNumberOfShareOutstandingBasicAndDiluted,
 #    EarningsPerShareBasicAndDiluted), que etiquetan las empresas con pérdidas.
-SEC_INGESTION_RULES_VERSION = 8
+# 9 (8-nov-2026): ingresos de arrendadores (OperatingLeaseLeaseIncome): en la misma presentación gana el mayor
+#    entre ese concepto y el de contratos con clientes (CPT 12,97 M -> 1.573,5 M).
+SEC_INGESTION_RULES_VERSION = 9
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
+    # Arrendadores (REIT): su ingreso principal es el del arrendamiento (ASC 842),
+    # que NO entra en «revenue from contracts with customers» (ASC 606): sus
+    # conceptos se añaden al recolectar (_revenue_concepts_for) y en la misma
+    # presentación gana el mayor (LESSOR_REVENUE_CONCEPTS).
     ("revenue",           ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax", "RegulatedAndUnregulatedOperatingRevenue"],  "USD"),
     ("gross_profit",      ["GrossProfit"],                                                                          "USD"),
     ("operating_income",  ["OperatingIncomeLoss"],                                                                  "USD"),
@@ -964,11 +970,34 @@ def _merge_for_metric(
         return _collapse_aliases(by_concept)  # IFRS: «Borrowings» ya es el total (corriente + no corriente)
     if metric == "total_debt":
         return _compose_total_debt(by_concept)
+    if metric == "revenue":
+        return _revenue_with_lessor_income(by_concept)
     if metric in NESTED_SCOPE_METRICS:
         return widest_in_same_filing(by_concept, _collapse_by_scope(by_concept))
     if metric in SCOPE_PRIORITY_METRICS:
         return _collapse_by_scope(by_concept)
     return _collapse_aliases(by_concept)
+
+
+# Ingresos por arrendamiento (ASC 842). Un arrendador (REIT) puede etiquetar
+# solo una partida residual como «revenue from contracts with customers»
+# (Camden 2025: 12,97 M) y su ingreso real como OperatingLeaseLeaseIncome
+# (1.573,5 M). No se suman (pueden solaparse: el emisor no siempre lo
+# desglosa); en la MISMA presentación gana el mayor, igual que la TIR
+# (ingresos = máx(revenue, lease_income)).
+LESSOR_REVENUE_CONCEPTS = ("OperatingLeaseLeaseIncome", "OperatingLeasesIncomeStatementLeaseRevenue")
+
+
+def _revenue_with_lessor_income(
+    by_concept: dict[str, dict[str, dict[str, Any]]],
+) -> dict[str, dict[str, Any]]:
+    lessor = {c: e for c, e in by_concept.items() if c in LESSOR_REVENUE_CONCEPTS}
+    other = {c: e for c, e in by_concept.items() if c not in LESSOR_REVENUE_CONCEPTS}
+    base = _collapse_aliases(other)
+    if not lessor:
+        return base
+    lease = _collapse_aliases(lessor)
+    return widest_in_same_filing({"revenue": base, "lease": lease}, {**lease, **base})
 
 
 def _negate_entry(entry: dict[str, Any]) -> dict[str, Any]:
@@ -1055,7 +1084,7 @@ def _revenue_concepts_for(concepts: list[str], bank_like: bool) -> list[str]:
     ES el revenue total y no se toca nada.
     """
     if not bank_like:
-        return concepts
+        return [*concepts, *(c for c in LESSOR_REVENUE_CONCEPTS if c not in concepts)]
     return [c for c in concepts if c not in BANK_REVENUE_SUBTOTAL_TAGS]
 
 
