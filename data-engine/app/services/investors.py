@@ -71,6 +71,12 @@ INVESTORS: tuple[Investor, ...] = (
     Investor("abrams-bison", "Abrams Bison", "Abrams Bison Investments", "0001317588", "firm"),
     Investor("ako", "AKO Capital", "AKO Capital", "0001376879", "firm"),
     Investor("roepers", "Alex Roepers", "Atlantic Investment Management", "0001063296"),
+    # Nico, 8-nov-2026 (AITerminal): superinversores con 13F que faltaban.
+    Investor("dalio", "Ray Dalio", "Bridgewater Associates", "0001350694"),
+    Investor("icahn", "Carl Icahn", "Icahn Enterprises", "0000921669"),
+    Investor("soros", "George Soros", "Soros Fund Management", "0001029160"),
+    Investor("laffont", "Philippe Laffont", "Coatue Management", "0001135730"),
+    Investor("halvorsen", "Andreas Halvorsen", "Viking Global Investors", "0001103804"),
     # Sin 13F: cartas, videos y conceptos; cartera "Sin datos".
     Investor("mark-leonard", "Mark Leonard", "Constellation Software", None),
     Investor("bezos", "Jeff Bezos", "Amazon", None),

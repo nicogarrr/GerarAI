@@ -24,6 +24,11 @@ const MANAGER_NAMES: Record<string, string> = {
   '0001317588': 'Abrams Bison Investments',
   '0001376879': 'AKO Capital',
   '0001063296': 'Atlantic Investment Management',
+  '0001350694': 'Bridgewater Associates',
+  '0000921669': 'Carl Icahn',
+  '0001029160': 'Soros Fund Management',
+  '0001135730': 'Coatue Management',
+  '0001103804': 'Viking Global Investors',
 };
 
 export function ownershipManagerName(cik: string, officialName: string): string {
