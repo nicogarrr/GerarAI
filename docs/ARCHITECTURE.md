@@ -93,15 +93,16 @@ erDiagram
     COMPANIES ||--o{ DCA_SIGNALS : evaluated_by
 
     TENANTS {
-        string id PK
-        string email
-        string plan_tier
+        int id PK
+        string external_id UK
+        string name
+        string status
         datetime created_at
     }
 
     PORTFOLIOS {
-        uuid id PK
-        string tenant_id FK
+        int id PK
+        int tenant_id FK
         string name
         string base_currency
         boolean is_default
@@ -121,9 +122,9 @@ erDiagram
     }
 
     TRANSACTIONS {
-        uuid id PK
-        string tenant_id FK
-        uuid portfolio_id FK
+        int id PK
+        int tenant_id FK
+        int portfolio_id FK
         int company_id FK
         date trade_date
         string action
@@ -134,9 +135,9 @@ erDiagram
     }
 
     POSITIONS {
-        uuid id PK
-        string tenant_id FK
-        uuid portfolio_id FK
+        int id PK
+        int tenant_id FK
+        int portfolio_id FK
         int company_id FK
         decimal quantity
         decimal average_cost
@@ -168,7 +169,7 @@ erDiagram
 
 ## 5. Estrategia de Rendimiento y Escalabilidad
 
-- **Pool de Conexiones**: SQLAlchemy gestiona un pool con reciclaje automático (`pool_pre_ping=True`, tamaño 10, overflow 20).
+- **Pool de Conexiones**: SQLAlchemy gestiona un pool con reciclaje automático (`pool_pre_ping=True`). Defaults de código 10+10, configurables por proceso con `DB_POOL_SIZE` / `DB_MAX_OVERFLOW`; el compose de producción los fija en 20+10 para el backend, 8+2 para el worker principal (`WORKER_DB_POOL_SIZE`) y 4+2 para el resto de workers.
 - **Qdrant Client Pool**: Los clientes Qdrant se reutilizan de forma thread-safe evitando desconexiones y re-aperturas de sockets gRPC/HTTP.
 - **Redis Multi-Layer Caching**: Claves deterministas SHA256 para cotizaciones (TTL 5 min), valoraciones de cartera (TTL 10 min) y señales DCA (TTL 5 min), con invalidación reactiva mediante eventos SQLAlchemy.
 - **Generación PDF Zero-Cost**: Procesamiento asíncrono y en memoria de PDFs mediante matplotlib y pypdf, sin dependencias externas pesadas como Chromium/Puppeteer.
