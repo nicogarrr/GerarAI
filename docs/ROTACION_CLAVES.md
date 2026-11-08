@@ -63,15 +63,16 @@ redespliega → comprueba que funciona → revoca la antigua.**
 1. cloud.mongodb.com → tu proyecto → *Security → Database Access*.
 2. Edita el usuario que aparece en la URI filtrada → *Edit Password* → genera una
    contraseña nueva (o crea un usuario nuevo y **borra** el antiguo).
-3. *Security → Network Access*: quita `0.0.0.0/0` si está; deja solo las IPs de
-   Render/Vercel/tu servidor (o usa el acceso por integración de Vercel).
+3. *Security → Network Access*: quita `0.0.0.0/0` si está; deja solo la IP de
+   la VM (y las de Vercel si usas la vía de respaldo).
 4. Revisa *Project → Activity Feed* / logs de acceso por si hubo conexiones raras.
 5. No borres usuarios ni clusters por su nombre antiguo. Verifica consumidores,
    dependencias y backup; cualquier retirada requiere un plan propio.
 
 ### 2. Better Auth (`BETTER_AUTH_SECRET`)
 1. Si se confirma que el secreto activo esta expuesto, genera y guarda uno nuevo en el gestor de secretos.
-2. Ponlo en Vercel (y en tu `.env` local). **Efecto:** todas las sesiones abiertas
+2. Ponlo en el frontend de producción (`.env.frontend.production` en la VM; en la
+   vía de respaldo, también en el proyecto de Vercel) y en tu `.env` local. **Efecto:** todas las sesiones abiertas
    se invalidan y hay que volver a iniciar sesión. Es lo esperado.
 3. Si produccion usa otro valor, no invalides sesiones por rutina. Comprueba
    que el valor historico no sigue en despliegues accesibles u otros consumidores.
@@ -86,7 +87,8 @@ redespliega → comprueba que funciona → revoca la antigua.**
 
 ### 4. Finnhub (`FINNHUB_API_KEY`)
 finnhub.io → *Dashboard* → regenera la API key (la anterior deja de valer).
-Se usa en Vercel (rutas de Next) **y** en Render (`render.yaml`).
+Se usa en el backend (`.env.production`) y, de forma opcional, en las rutas
+de Next del frontend (`.env.frontend.production`; modo degradado).
 
 ### 5. Financial Modeling Prep (`FMP_API_KEY`)
 site.financialmodelingprep.com → *Dashboard → API Keys* → regenerar.
@@ -108,18 +110,23 @@ Si alguna de 6–9 ya no se usa en la app, basta con revocarla y no poner ningun
 
 ## 3. Dónde cambiar cada variable
 
-| Variable | Vercel (frontend Next) | Render (data-engine) | Servidor propio / docker |
-|---|---|---|---|
-| `MONGODB_URI` | sí | — | `docker.env` |
-| `BETTER_AUTH_SECRET` | sí | — | `docker.env` |
-| `FINNHUB_API_KEY` | sí | sí (`render.yaml`) | `docker.env` |
-| `ALPHA_VANTAGE_API_KEY` | sí, si la usas | — | `docker.env` |
-| `GEMINI_API_KEY`, `FMP_API_KEY` | — | sí, si están configuradas | `docker.env` |
+| Variable | Frontend prod (VM, `.env.frontend.production`) | Backend prod (VM, `.env.production`) | Respaldo Vercel | Local (`docker.env`) |
+|---|---|---|---|---|
+| `MONGODB_URI` | sí | sí (figura en `.env.production.example`) | sí | sí |
+| `BETTER_AUTH_SECRET` | sí | sí (figura en `.env.production.example`) | sí | sí |
+| `FINNHUB_API_KEY` | opcional (rutas Next en modo degradado) | sí | opcional | sí |
+| `ALPHA_VANTAGE_API_KEY` | opcional | — | opcional | sí |
+| `GEMINI_API_KEY`, `FMP_API_KEY` | — | sí, si están configuradas | — | sí |
 
-- **Vercel:** Project → *Settings → Environment Variables* (Production **y**
+- **VM (producción):** edita `.env.frontend.production` (frontend) y
+  `.env.production` (backend) en la VM. Frontend: `docker compose -p
+  gerarai-front -f docker-compose.frontend.yml --env-file
+  .env.frontend.production up -d` (rebuild solo si cambian `NEXT_PUBLIC_*`).
+  Backend: `./scripts/deploy.sh` (`docs/oracle-setup.md`).
+- **Vercel (solo si se usa la vía de respaldo):** Project → *Settings → Environment Variables* (Production **y**
   Preview) → guardar → *Deployments → Redeploy* del último de `main`.
-- **Render:** servicio → *Environment* → guardar (redespliega solo).
-- **docker compose:** edita `docker.env` y `docker compose --env-file docker.env up -d`.
+- **Render:** `render.yaml` es experimental y sin soporte; no es un destino de producción.
+- **Local (docker compose de desarrollo):** edita `docker.env` y `docker compose --env-file docker.env up -d`.
 - Comprueba: login en la web (Better Auth + Mongo), una ficha con cotización
   (Finnhub) y los logs del data-engine sin errores 401/403 de proveedores.
 
