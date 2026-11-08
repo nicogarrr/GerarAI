@@ -779,10 +779,53 @@ def analyst_estimates_tool(db: Session) -> ToolSpec:
                           "base": _num(row.base), "high": _num(row.high), "unit": row.unit,
                           "firm": row.analyst_firm, "quote": (row.source_quote or "")[:400]},
                 ))
+            out.extend(_company_guidance_outputs(db, company, ctx.tenant_id))
         return out
 
     return ToolSpec(name="analyst_estimates", fn=analyst_estimates,
-                    description="Precios objetivo y estimaciones de analistas guardados, con firma y fuente")
+                    description="Precios objetivo y estimaciones de analistas guardados, con firma y fuente, "
+                                "y la guía de la propia empresa citada de sus notas de resultados")
+
+
+def _company_guidance_outputs(db: Session, company: Company, tenant_id: int) -> list[ToolOutput]:
+    """Guía de la empresa (``company_guidance``): dato oficial con su frase literal, URL y fecha.
+
+    Es lo que un segmento aún no comercial puede usar como ``guidance_anchor``
+    («guia»); sin ella queda «infravalorado por falta de estimaciones»."""
+    from sqlalchemy import select
+
+    from app.models.declared_input_value import DeclaredInputValue
+
+    rows = db.scalars(
+        select(DeclaredInputValue).where(
+            DeclaredInputValue.tenant_id == tenant_id, DeclaredInputValue.company_id == company.id,
+            DeclaredInputValue.method == "extract", DeclaredInputValue.input_key.like("guidance.%"),
+            DeclaredInputValue.superseded_at.is_(None))
+        .order_by(DeclaredInputValue.input_key).limit(20)
+    ).all()
+    out: list[ToolOutput] = []
+    for row in rows:
+        meta = row.metadata_ or {}
+        if meta.get("kind") != "company_guidance":
+            continue
+        per_share = str(row.unit or "").endswith("/share")
+        scale = 1.0 if per_share else 1e6
+
+        def amount(value: Any, scale: float = scale) -> float | None:
+            number = _num(value)
+            return None if number is None else round(number / scale, 6)
+
+        out.append(ToolOutput(
+            source={"table": "declared_input_values", "id": str(row.id),
+                    "title": f"guía de la empresa: {meta.get('metric')} {meta.get('period')}",
+                    "url": row.source_url or "", "date": row.as_of.isoformat() if row.as_of else ""},
+            data={"kind": "guia", "metric": meta.get("metric"), "period": meta.get("period"),
+                  "period_read": meta.get("period_read"),
+                  "unit": row.unit if per_share else f"millones de {row.unit}",
+                  "low": amount(row.low), "base": amount(row.base), "high": amount(row.high),
+                  "quote": (row.source_quote or "")[:600]},
+        ))
+    return out
 
 
 def build_sotp_tools(db: Session, anchors: Mapping[str, Any]) -> dict[str, ToolSpec]:
@@ -1012,6 +1055,15 @@ def generate_sotp_proposal(
     lookup = _cache_lookup(db, company, tenant_id)
     if readings is None:
         readings = max(1, int(getattr(get_settings(), "sotp_agents_readings", 1) or 1))
+    try:
+        # Guía de la empresa citada de sus notas de resultados (sin modelo): evidencia
+        # para los segmentos que aún no facturan. Un fallo no toca la valoración.
+        from app.services.company_guidance import refresh_company_guidance
+
+        with db.begin_nested():
+            refresh_company_guidance(db, company, tenant_id, today=today)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("guía de la empresa no disponible para %s: %s", company.ticker, type(exc).__name__)
     try:
         result = run_from_any_context(
             run_sotp_valuer(db, ctx=ctx, reasoner=reasoner, today=today, cached=lookup if use_cache else None,
