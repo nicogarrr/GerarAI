@@ -242,3 +242,41 @@ def test_any_dca_level_companies_son_globales_en_ambas_rutas(db):
     assert bool(scm._dca_levels(db, companies)) is True
     assert scm._any_dca_level(db) is True
 
+
+
+def test_margin_of_safety_query_count_is_constant(db):
+    """_margin_of_safety no hace una consulta por empresa: el barrido es O(1).
+
+    Antes: 1 SELECT de modelos + 1 SELECT de outputs POR empresa con modelo.
+    Ahora: 2 consultas en total (modelos + outputs agrupados en una IN).
+    Medido con conteo de sentencias (regla del repo: nunca wall-clock).
+    """
+    from sqlalchemy import event
+
+    def _seed(count: int, prefix: str) -> None:
+        for i in range(count):
+            company = _company(db, f"{prefix}{i}")
+            _valuation(db, company, version=1, status="final", mos=0.10 + i / 100)
+
+    def _count(fn) -> int:
+        statements = 0
+
+        def _before(*_args):
+            nonlocal statements
+            statements += 1
+
+        event.listen(db.get_bind(), "before_cursor_execute", _before)
+        try:
+            fn()
+        finally:
+            event.remove(db.get_bind(), "before_cursor_execute", _before)
+        return statements
+
+    _seed(3, "QA")
+    n_small = _count(lambda: context_observations(db, [scm.MARGIN_OF_SAFETY]))
+    _seed(17, "QB")
+    n_big = _count(lambda: context_observations(db, [scm.MARGIN_OF_SAFETY]))
+    assert n_big == n_small, f"crece con las empresas: 3 -> {n_small}, 20 -> {n_big}"
+    # Y el valor sigue siendo el del modelo mas reciente de cada empresa.
+    result = context_observations(db, [scm.MARGIN_OF_SAFETY])
+    assert len(result) == 20

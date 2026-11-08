@@ -65,18 +65,33 @@ def _margin_of_safety(db: Session) -> dict[int, Any]:
         select(ValuationModel).where(*tenant_filters(db, ValuationModel)).order_by(ValuationModel.company_id, desc(ValuationModel.version))
     ).all():
         latest.setdefault(model.company_id, model)
-    result: dict[int, Any] = {}
-    for company_id, model in latest.items():
-        if model.status == "insufficient_data":
-            continue
-        outputs = list(
-            db.scalars(
-                select(ValuationOutput).where(
-                    *tenant_filters(db, ValuationOutput),
-                    ValuationOutput.valuation_model_id == model.id,
-                )
-            ).all()
+    # Una sola consulta de outputs para todos los modelos: antes era una por
+    # empresa (5 sentencias con 3 empresas, 22 con 20; ver
+    # tests/test_screener_context_metrics.py::test_margin_of_safety_query_count_is_constant).
+    # ORDER BY (modelo, id) fija el mismo orden de lectura que tenian las
+    # consultas por modelo (orden de insercion), y el sort estable por
+    # escenario mantiene la misma eleccion: el primer output "base" con
+    # convencion conocida y margen no nulo.
+    candidates = {
+        company_id: model
+        for company_id, model in latest.items()
+        if model.status != "insufficient_data"
+    }
+    if not candidates:
+        return {}
+    outputs_by_model: dict[int, list[ValuationOutput]] = {}
+    for output in db.scalars(
+        select(ValuationOutput)
+        .where(
+            *tenant_filters(db, ValuationOutput),
+            ValuationOutput.valuation_model_id.in_([m.id for m in candidates.values()]),
         )
+        .order_by(ValuationOutput.valuation_model_id, ValuationOutput.id)
+    ).all():
+        outputs_by_model.setdefault(output.valuation_model_id, []).append(output)
+    result: dict[int, Any] = {}
+    for company_id, model in candidates.items():
+        outputs = outputs_by_model.get(model.id, [])
         outputs.sort(key=lambda row: row.scenario != "base")
         value = None
         for output in outputs:
