@@ -768,7 +768,8 @@ def analyst_estimates_tool(db: Session) -> ToolSpec:
                 select(DeclaredInputValue).where(
                     DeclaredInputValue.tenant_id == ctx.tenant_id, DeclaredInputValue.company_id == company.id,
                     DeclaredInputValue.method == "analyst", DeclaredInputValue.superseded_at.is_(None))
-                .limit(40)
+                .order_by(DeclaredInputValue.as_of.desc().nulls_last(), DeclaredInputValue.id.desc())
+                .limit(80)
             ).all()
             for row in rows:
                 out.append(ToolOutput(
@@ -780,11 +781,35 @@ def analyst_estimates_tool(db: Session) -> ToolSpec:
                           "firm": row.analyst_firm, "quote": (row.source_quote or "")[:400]},
                 ))
             out.extend(_company_guidance_outputs(db, company, ctx.tenant_id))
+            out.extend(_analyst_consensus_outputs(db, company, ctx.tenant_id))
         return out
 
     return ToolSpec(name="analyst_estimates", fn=analyst_estimates,
                     description="Precios objetivo y estimaciones de analistas guardados, con firma y fuente, "
                                 "y la guía de la propia empresa citada de sus notas de resultados")
+
+
+def _analyst_consensus_outputs(db: Session, company: Company, tenant_id: int) -> list[ToolOutput]:
+    """Agregado de estimaciones por métrica y año (``analyst_consensus``): cada firma con
+    fecha y URL, bajo/mediana/alto, revisiones y el estado de la ponderación por
+    precisión (regla prerregistrada). El código no elige: eligen los expertos, con razón."""
+    from app.services.analyst_consensus import aggregate, history_for, reported_revenue
+
+    try:
+        items = aggregate(history_for(db, company, tenant_id), reported_revenue(db, company))
+    except Exception as exc:  # noqa: BLE001 - sin agregado los expertos siguen con las filas sueltas
+        logger.warning("agregado de analistas no disponible para %s: %s", company.ticker, type(exc).__name__)
+        return []
+    out: list[ToolOutput] = []
+    for item in items[:24]:
+        first = (item["firms"] or [{}])[0]
+        out.append(ToolOutput(
+            source={"table": "analyst_notes", "id": f"consenso:{item['metric']}:{item['year']}",
+                    "title": f"Estimaciones de analistas {item['metric']} {item['year']} ({item['n_firms']} firmas)",
+                    "url": first.get("url") or "", "date": first.get("as_of") or ""},
+            data={"kind": "analyst_consensus", "unit": "millones", **item},
+        ))
+    return out
 
 
 def _company_guidance_outputs(db: Session, company: Company, tenant_id: int) -> list[ToolOutput]:
@@ -1064,6 +1089,18 @@ def generate_sotp_proposal(
             refresh_company_guidance(db, company, tenant_id, today=today)
     except Exception as exc:  # noqa: BLE001
         logger.warning("guía de la empresa no disponible para %s: %s", company.ticker, type(exc).__name__)
+    # Estimaciones de analistas citadas en prensa (sin modelo): si la recogida diaria no ha
+    # pasado por esta empresa en los últimos días, se encola para ella (sin red en esta ruta;
+    # entra en la próxima propuesta). Un fallo no toca la valoración.
+    try:
+        from app.services.analyst_press_estimates import press_estimates_stale
+
+        if press_estimates_stale(db, company, tenant_id, today=today):
+            from app.workers.dramatiq_app import collect_analyst_estimates
+
+            collect_analyst_estimates.send(tenant_id, str(db.info.get("user_id") or "") or None, company.ticker)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("estimaciones de prensa no disponibles para %s: %s", company.ticker, type(exc).__name__)
     try:
         result = run_from_any_context(
             run_sotp_valuer(db, ctx=ctx, reasoner=reasoner, today=today, cached=lookup if use_cache else None,

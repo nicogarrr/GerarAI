@@ -63,6 +63,7 @@ ACTOR_CLASS: dict[str, str] = {
     "backfill_document_kpis": INGESTA,
     "backfill_finnhub_profiles": INGESTA,
     "backfill_sec_fundamentals": INGESTA,
+    "collect_analyst_estimates": INGESTA,  # prensa con estimaciones de analistas (red, sin LLM)
     "discover_bottlenecks": INGESTA,
     "ingest_ca_insider_yahoo": INGESTA,
     "ingest_class_shares_outstanding": INGESTA,
