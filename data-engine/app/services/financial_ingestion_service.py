@@ -250,7 +250,8 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # SEC_METRIC_MAP, puertas de signo, prioridades de alcance, derivadas...):
 # sin subirla, una empresa cuyo payload no cambia nunca recogeria la regla
 # nueva.
-SEC_INGESTION_RULES_VERSION = 2
+# 3 (8-nov-2026): ``acquisitions`` (PaymentsToAcquireBusinesses…), que el motor de TIR necesita.
+SEC_INGESTION_RULES_VERSION = 3
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("revenue",           ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax", "RegulatedAndUnregulatedOperatingRevenue"],  "USD"),
@@ -347,6 +348,7 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("shares_repurchased", ["StockRepurchasedDuringPeriodShares"], "shares"),
     ("stock_based_compensation", ["ShareBasedCompensation"], "USD"),
     ("dividends_paid",    ["PaymentsOfDividends", "PaymentsOfDividendsCommonStock"],                                "USD"),
+    ("acquisitions",      ["PaymentsToAcquireBusinessesNetOfCashAcquired", "PaymentsToAcquireBusinessesGross"],      "USD"),
     # Drivers obligatorios de los marcos de tesis que SI estan en us-gaap y no
     # se leian (la tesis los daba por ausentes con el dato en el 10-K):
     # - aseguradoras: primas devengadas netas (Chubb FY2025: 53.014 M$);
@@ -399,6 +401,8 @@ SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("capital_expenditure", ["PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"],    "USD"),
     ("depreciation_amortization", ["DepreciationAndAmortisationExpense"],                              "USD"),
     ("dividends_paid",    ["DividendsPaidClassifiedAsFinancingActivities", "DividendsPaid"],          "USD"),
+    ("acquisitions",      ["CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities"], "USD"),
+    ("common_stock_repurchased", ["PaymentsToAcquireOrRedeemEntitysShares"],                            "USD"),
 ]
 
 
@@ -407,7 +411,9 @@ SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
 # cualquier regla que altere el resultado de reingerir el MISMO snapshot
 # (ESEF_METRIC_MAP, fusion de alias, cuarentena, derivadas): sin subirla,
 # un emisor cuyo snapshot no cambia nunca recogeria la regla nueva.
-ESEF_INGESTION_RULES_VERSION = 1
+# 2 (8-nov-2026): ``acquisitions`` (CashFlowsUsedInObtainingControlOfSubsidiaries…) y recompras
+# (PaymentsToAcquireOrRedeemEntitysShares).
+ESEF_INGESTION_RULES_VERSION = 2
 
 ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # RevenueFromContractsWithCustomers: emisores que solo etiquetan la cifra
@@ -454,6 +460,9 @@ ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
                              "ifrs-full:PurchaseOfPropertyPlantAndEquipmentIntangibleAssetsOtherThanGoodwillInvestmentPropertyAndOtherNoncurrentAssets"],
                                                                                                         "iso4217:EUR"),
     ("dividends_paid",    ["ifrs-full:DividendsPaidClassifiedAsFinancingActivities"],                    "iso4217:EUR"),
+    ("acquisitions",      ["ifrs-full:CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities"],
+                                                                                                        "iso4217:EUR"),
+    ("common_stock_repurchased", ["ifrs-full:PaymentsToAcquireOrRedeemEntitysShares"],                 "iso4217:EUR"),
 ]
 
 
