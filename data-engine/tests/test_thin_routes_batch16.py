@@ -36,10 +36,15 @@ from app.api.routes import market as m
 
 @pytest.fixture(autouse=True)
 def _caches_limpias():
+    # Limpia ANTES y DESPUES: el ultimo test del archivo no puede dejar caches
+    # falsas que contaminen otros archivos de la suite (orden de pytest).
     m._quote_cache.clear()
     m._candles_cache.clear()
     m._cache.update({"at": 0.0, "items": [], "fetched_at": None})
     yield
+    m._quote_cache.clear()
+    m._candles_cache.clear()
+    m._cache.update({"at": 0.0, "items": [], "fetched_at": None})
     m.close_shared_yahoo_client()
 
 
