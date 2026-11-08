@@ -40,6 +40,8 @@ for (const width of [1440, 390]) {
         response = { status: 'unavailable' };
         await page.clock.fastForward(1800000);
         await expect(header.locator('.text-4xl')).toHaveText('N/D');
+        // N/D siempre con motivo (regla de Nico; CGEO.L en prod quedaba desnudo).
+        await expect(header.getByText('Cotización en vivo no disponible ahora', { exact: true })).toBeVisible();
         expect(calls).toBe(initialCalls + 3);
         await page.screenshot({ path: `test-results/extended-quote-nd-${width}.png`, fullPage: true });
         const beforeHidden = calls;
