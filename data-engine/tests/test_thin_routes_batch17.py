@@ -24,6 +24,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 import app.api.routes.companies as c
+from app.models import DecisionLesson, ManagementPromise
 
 
 @pytest.fixture(autouse=True)
@@ -1000,7 +1001,9 @@ def test_propose_decision_lessons_404_y_delega(monkeypatch):
 
 
 def _lesson(company_id=1):
-    return SimpleNamespace(company_id=company_id)
+    # Modelo ORM real en vez de SimpleNamespace (regla orm-fake-simplenamespace);
+    # db y servicios siguen doblados: se prueba la logica de la ruta.
+    return DecisionLesson(company_id=company_id)
 
 
 def _payload_lesson():
@@ -1141,7 +1144,9 @@ def test_reconcile_management_promises_404_y_feliz(monkeypatch):
 def test_update_management_explanation_404s_y_feliz(monkeypatch):
     # Lineas 1336-1343.
     db = MagicMock()
-    db.get.return_value = SimpleNamespace(company_id=1)
+    # Modelos ORM reales (ManagementPromise) en vez de SimpleNamespace (regla
+    # orm-fake-simplenamespace); el db sigue doblado: se prueba la logica de la ruta.
+    db.get.return_value = ManagementPromise(company_id=1)
     monkeypatch.setattr(c, "resolve_company", lambda db, ticker: None)
     with pytest.raises(c.HTTPException) as exc:
         c.update_management_explanation(
@@ -1150,12 +1155,12 @@ def test_update_management_explanation_404s_y_feliz(monkeypatch):
         )
     assert exc.value.status_code == 404
     monkeypatch.setattr(c, "resolve_company", lambda db, ticker: SimpleNamespace(id=1))
-    db.get.return_value = SimpleNamespace(company_id=2)
+    db.get.return_value = ManagementPromise(company_id=2)
     with pytest.raises(c.HTTPException):
         c.update_management_explanation(
             "ASTS", 1, c.ManagementExplanationUpdate(explanation="contexto"), db=db,
         )
-    db.get.return_value = SimpleNamespace(company_id=1)
+    db.get.return_value = ManagementPromise(company_id=1)
     monkeypatch.setattr(c, "ManagementCredibilityService", _Credibilidad)
     salida = c.update_management_explanation(
         "ASTS", 1, c.ManagementExplanationUpdate(explanation="contexto"), db=db,

@@ -29,6 +29,7 @@ from fastapi import HTTPException
 from app.api.routes import corporate_actions as ca_route
 from app.api.routes import knowledge_rag as rag_route
 from app.api.routes import plan as plan_route
+from app.models import CorporateAction
 
 
 def run_async(coro):
@@ -66,7 +67,9 @@ def test_ingesta_de_splits_pasa_por_el_servicio(monkeypatch):
 
 def test_apply_correcto_devuelve_el_payload(monkeypatch):
     servicio = Mock()
-    servicio.apply_action.return_value = SimpleNamespace(company_id=9)
+    # Modelo ORM real en vez de SimpleNamespace (regla orm-fake-simplenamespace);
+    # el db y el servicio siguen doblados: se prueba la logica de la ruta.
+    servicio.apply_action.return_value = CorporateAction(company_id=9)
     monkeypatch.setattr(ca_route, "CorporateActionService", lambda: servicio)
     monkeypatch.setattr(ca_route, "_payload", lambda action, ticker: {"t": ticker})
     db = _db()
