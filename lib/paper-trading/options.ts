@@ -171,7 +171,9 @@ export function buildOptionFill(input: OptionOrderInput): Result<Fill> {
     }
 
     if (sellClose && input.contracts > input.heldContracts) {
-        return fail(`No se pueden cerrar ${input.contracts} contratos: solo hay ${input.heldContracts} abiertos.`);
+        const noun = input.contracts === 1 ? 'contrato' : 'contratos';
+        const heldNoun = input.heldContracts === 1 ? 'abierto' : 'abiertos';
+        return fail(`No se pueden cerrar ${input.contracts} ${noun}: solo hay ${input.heldContracts} ${heldNoun}.`);
     }
     if (sellClose) {
         // Sin sobregiro: la comision del cierre tambien debe caber en el cash

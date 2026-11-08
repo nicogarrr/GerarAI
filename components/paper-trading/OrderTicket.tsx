@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import { Label } from '@/components/ui/label';
 import { useLocale, useT, useFormat } from '@/lib/i18n/client';
-import { paperTradingMessage } from '@/lib/paper-trading/messages-en';
+import { paperTradingMessage, paperTradingReason } from '@/lib/paper-trading/messages-en';
 import { useRouter } from 'next/navigation';
 import type { Currency, OptionContract } from '@/lib/paper-trading/types';
 import { expirationState, isRealDate } from '@/lib/paper-trading/options';
@@ -197,11 +197,11 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                 } else if (result.outcome === 'duplicate') {
                     setDuplicate(
                         result.reason
-                            ? ti('paperTrading.ticket.duplicateRejected', { reason: paperTradingMessage(result.reason, locale) })
+                            ? ti('paperTrading.ticket.duplicateRejected', { reason: paperTradingReason(result.reason, locale) })
                             : ti('paperTrading.ticket.duplicateFill'),
                     );
                 } else {
-                    setSubmitError(ti('paperTrading.ticket.rejected', { reason: result.reason ? paperTradingMessage(result.reason, locale) : ti('paperTrading.ticket.reasonMissing') }));
+                    setSubmitError(ti('paperTrading.ticket.rejected', { reason: result.reason ? paperTradingReason(result.reason, locale) : ti('paperTrading.ticket.reasonMissing') }));
                 }
                 // Rechazo confirmado o duplicado de rechazo: id nuevo para el
                 // próximo intento; duplicado de fill: id conservado (ver helper).
