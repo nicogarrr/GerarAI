@@ -363,6 +363,13 @@ def snapshot_trace(snapshot: FinancialSnapshot) -> dict:
             if getattr(snapshot, "source_checks", None)
             else {}
         ),
+        # Media diluida del ejercicio cuando las acciones son de un informe
+        # posterior (10-Q): las dos cifras quedan en la traza.
+        **(
+            {"shares_fiscal_year": dict(snapshot.shares_fiscal_year or {})}
+            if getattr(snapshot, "shares_fiscal_year", None)
+            else {}
+        ),
         # Recuento de acciones declarado en miles/millones y corregido, con
         # la referencia del contraste. Solo si lo hay.
         **(

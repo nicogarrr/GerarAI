@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
@@ -66,6 +67,9 @@ class FinancialSnapshot:
     income_statement: str | None = None
     balance_sheet: str | None = None
     shares_period: str | None = None
+    # Media diluida del ejercicio cuando las acciones salen de un informe
+    # posterior (10-Q): se conserva para que la traza diga las dos cifras.
+    shares_fiscal_year: dict | None = None
     facts: dict[str, FinancialFact] = field(default_factory=dict)
     missing_inputs: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -124,6 +128,14 @@ class FinancialSnapshot:
 
     def periods(self) -> dict[str, str | None]:
         return {metric: fact.period for metric, fact in self.facts.items()}
+
+
+def _period_end(period: str | None) -> date | None:
+    """Fecha de cierre de un periodo ``YYYY-MM-DD:...``; None si no la lleva."""
+    try:
+        return date.fromisoformat(str(period or "")[:10])
+    except ValueError:
+        return None
 
 
 def _period_type(period: str | None, fiscal_quarter: str | None) -> str:
@@ -822,6 +834,7 @@ class FinancialSnapshotBuilder:
                         }
                     )
 
+        self._latest_share_count(db, company, snapshot, facts_for, price_as_of or as_of)
         self._derive_net_debt(
             snapshot,
             anchor,
@@ -913,6 +926,112 @@ class FinancialSnapshotBuilder:
         snapshot.missing_inputs = missing
         snapshot.coherent = not missing
         return snapshot
+
+    @staticmethod
+    def _latest_share_count(
+        db: Session,
+        company: Company,
+        snapshot: FinancialSnapshot,
+        facts_for: Callable[[str], list[FinancialFact]],
+        price_cutoff: date | None,
+    ) -> None:
+        """Acciones del ULTIMO informe, no la media diluida del ejercicio.
+
+        El valor por accion divide el patrimonio de HOY. Regla, solo con
+        hechos de la MISMA fuente que la cifra anual (no se mezcla una serie
+        SEC de acciones ordinarias con una de ADS de otro proveedor) y
+        presentados en o antes del corte (``facts_for`` filtra por ``filed``):
+
+        1. la media diluida del 10-Q mas reciente posterior al cierre anual
+           (recoge ampliaciones y recompras: ASTS 256 -> 299 M, CB 401,5 -> 389,4);
+        2. si ese trimestre tiene perdidas, su «diluida» es la basica (los
+           convertibles y opciones son antidilutivos y se excluyen), asi que
+           no baja de la diluida anual;
+        3. nunca por debajo de las acciones EN CIRCULACION de una portada o
+           balance posterior (TSLA: 3.541 M de media frente a 3.953 M en
+           circulacion; RXRX 543 frente a 623).
+
+        La cifra anual queda en la traza (``shares_fiscal_year``) y el aviso
+        dice de donde salen y por que.
+        """
+        annual = snapshot.facts.get("shares_diluted")
+        if annual is None or annual.value is None or float(annual.value) <= 0:
+            return
+        annual_end = _period_end(annual.period)
+        if annual_end is None:
+            return
+        source = annual.source_type or ""
+
+        def later(metric: str, *, quarterly_only: bool) -> list[FinancialFact]:
+            return [
+                fact
+                for fact in facts_for(metric)
+                if (fact.source_type or "") == source
+                and (not quarterly_only or _period_type(fact.period, fact.fiscal_quarter) == "Q")
+                and (end := _period_end(fact.period)) is not None
+                and end > annual_end
+                and fact.value is not None
+                and float(fact.value) > 0
+            ]
+
+        def newest(facts: list[FinancialFact]) -> FinancialFact | None:
+            return max(facts, key=lambda f: (_period_end(f.period) or date.min, f.filed or date.min), default=None)
+
+        quarter = newest(later("shares_diluted", quarterly_only=True))
+        outstanding = newest(later("shares_outstanding", quarterly_only=False))
+        if quarter is None and outstanding is None:
+            return
+        chosen, reason = annual, "media diluida del ejercicio"
+        if quarter is not None:
+            loss = next(
+                (
+                    float(f.value) < 0
+                    for f in facts_for("net_income")
+                    if f.period == quarter.period and f.value is not None
+                ),
+                False,
+            )
+            if loss and float(quarter.value) < float(annual.value):
+                reason = (
+                    f"el 10-Q {quarter.period} tiene pérdidas (su diluida es la básica, "
+                    f"{float(quarter.value):,.0f}): se mantiene la diluida del ejercicio"
+                )
+            else:
+                chosen, reason = quarter, f"media diluida del informe más reciente ({quarter.period})"
+        if outstanding is not None and float(outstanding.value) > float(chosen.value):
+            chosen, reason = outstanding, (
+                f"acciones en circulación del informe más reciente ({outstanding.period}), "
+                f"por encima de la {reason}"
+            )
+        if chosen is annual:
+            if reason != "media diluida del ejercicio":
+                snapshot.warnings.append(f"shares_diluted: {reason}.")
+            return
+        ratio = float(chosen.value) / float(annual.value)
+        if not 0.1 <= ratio <= 10:
+            # Un salto de un orden de magnitud es de unidades (miles), no de
+            # acciones nuevas: no se sustituye y se dice.
+            snapshot.warnings.append(
+                f"shares_diluted {chosen.period} ({float(chosen.value):,.0f}) no sustituye a la anual "
+                f"{annual.period} ({float(annual.value):,.0f}): escala incompatible."
+            )
+            return
+        factor = float(
+            split_factor_for_fact(
+                db, company.id, period=chosen.period, filed=chosen.filed, cutoff=price_cutoff or date.today()
+            )
+        )
+        snapshot.shares_fiscal_year = {"period": annual.period, "value": float(annual.value), "fact_id": annual.id}
+        snapshot.facts["shares_diluted"] = chosen
+        snapshot.shares_period = chosen.period
+        if factor != 1.0:
+            snapshot.split_factors["shares_diluted"] = factor
+        else:
+            snapshot.split_factors.pop("shares_diluted", None)
+        snapshot.warnings.append(
+            f"shares_diluted {float(chosen.value):,.0f}: {reason}; media del ejercicio {annual.period}: "
+            f"{float(annual.value):,.0f}."
+        )
 
     @staticmethod
     def _apply_share_scale(
