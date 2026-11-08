@@ -88,7 +88,7 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     },
     'CGEO.L': {
         name: 'Georgia Capital',
-        section: { url: 'https://georgiacapital.ge/investor-relations/results-and-reports', label: 'Resultados e informes' },
+        section: { url: 'https://georgiacapital.ge/investor-relations/financial-results', label: 'Resultados e informes' },
         events: [],
         verifiedOn: '2026-11-08',
     },
