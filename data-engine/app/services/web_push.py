@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -56,10 +55,10 @@ def is_configured(settings) -> bool:
 
 def preference_for(db: Session, alert: ResearchAlert) -> PushPreference | None:
     """Preferencia de push que cubre esta alerta, o None. Mismas garantias que Telegram."""
-    from app.services.outbound_alerts import event_type
+    from app.services.outbound_alerts import alert_after_opt_in, alert_category
 
-    category = event_type(db, alert)
-    if not category or alert.tenant_id is None or alert.tenant_id != db.info.get("tenant_id"):
+    category = alert_category(db, alert)
+    if category is None:
         return None
     user = db.info.get("user_id")
     row = db.scalar(select(PushPreference).where(
@@ -70,12 +69,7 @@ def preference_for(db: Session, alert: ResearchAlert) -> PushPreference | None:
     ))
     if row is None:
         return None
-    created, since = alert.created_at, row.enabled_at
-    if created.tzinfo is None:
-        created = created.replace(tzinfo=UTC)
-    if since.tzinfo is None:
-        since = since.replace(tzinfo=UTC)
-    return row if created >= since else None
+    return row if alert_after_opt_in(alert.created_at, row.enabled_at) else None
 
 
 def devices_for(db: Session, tenant_id: int, user_id: str) -> list[PushSubscription]:
