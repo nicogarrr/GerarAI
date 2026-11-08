@@ -11,7 +11,7 @@ forecast): _published_thesis_by_company, _publishable_model_by_company,
 _validated_probabilities, _scenario_returns, _intrinsic_for_comparison y
 todo /forecast (lineas 1765-fin del modulo).
 
-MEDICION propia (este archivo solo, 86 tests, pytest --cov sobre el
+MEDICION propia (este archivo solo, 84 tests, pytest --cov sobre el
 modulo): in-scope (lineas < 1765) 708 sentencias cubiertas, 2 sin
 ejecutar (412-413) = 99,72%; ramas parciales in-scope
 declaradas: 436->438, 462->465, 477->480, 1276->1291, 1323->1325,

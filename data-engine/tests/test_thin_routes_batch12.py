@@ -9,7 +9,9 @@ jobs (lista, get), principios (lista, action con merge/decide/409, revision
 con 400/422/409) y el validador de espacios.
 
 Refuerzo (deuda del auditor): el alta del job de extraccion asserta los
-campos persistidos, los dos commit y el send al actor con tenant/user; el
+campos persistidos (objeto capturado en el Mock de db.add, NO una BD
+real), la cronologia add -> commit -> send con un spy de orden, los dos
+commit y el send al actor con tenant/user; el
 fallo de la cola asserta el job marcado "failed" con su error; las
 colecciones assertan la llamada al servicio con sus argumentos.
 
@@ -435,7 +437,16 @@ def test_extract_encola_job_nuevo(monkeypatch):
     db = _db()
     db.get.return_value = SimpleNamespace(id=5)
     db.scalar.return_value = None
+    orden = Mock()
+    orden.attach_mock(db.add, "add")
+    orden.attach_mock(db.commit, "commit")
+    orden.attach_mock(enviados.send, "send")
     result = k.extract_principles(5, db=db)
+    # Cronologia: el job queda commiteado ANTES de encolar; si el worker lo
+    # recoge al instante, el registro ya existe en BD.
+    secuencia = [llamada[0] for llamada in orden.mock_calls]
+    assert secuencia.index("add") < secuencia.index("commit")
+    assert secuencia.index("commit") < secuencia.index("send")
     # El job se persiste ANTES de encolar: estado y campos tal cual quedan.
     job = db.add.call_args.args[0]
     assert isinstance(job, k.ProcessingJob)
