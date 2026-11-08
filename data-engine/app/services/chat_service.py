@@ -1345,6 +1345,8 @@ _PAGE_CONTENT_RE = re.compile(
     r"|\b(?:esta|la)\s+(?:p[aá]gina|pantalla)\b[^.?!\n]{0,40}\b(?:hay|muestra|tiene|dice)\b"
     r"|\bqu[eé]\s+(?:hay|veo)\s+(?:aqu[ií]|en\s+pantalla)\b"
 )
+# «¿Qué porcentaje/peso de mi patrimonio es caja?»: el resumen añade el peso.
+_CASH_SHARE_RE = re.compile(r"(?i)\b(?:porcentaje|peso|proporci[oó]n|qu[eé]\s+parte|share|percent\w*)\b")
 _NET_WORTH_CUE_RE = re.compile(r"(?i)\b(?:patrimonio|caja|margen|neto)\b")
 
 
@@ -2319,7 +2321,7 @@ class ChatService:
             # síntesis, que recibe la biblioteca y las posiciones.
             and not doctrine_question
         ):
-            portfolio_answer = self._portfolio_overview(db)
+            portfolio_answer = self._portfolio_overview(db, cash_share=bool(_CASH_SHARE_RE.search(question or "")))
             if portfolio_answer is None and _tenant_without_open_positions(db):
                 # «¿cuántas posiciones tengo?» / «how many positions do I have?»
                 # con la cartera vacía caían al modelo general («No puedo
@@ -2569,7 +2571,7 @@ class ChatService:
         response.context = context_echo
         return response
 
-    def _portfolio_overview(self, db: Session, limit: int = 15) -> ChatResponse | None:
+    def _portfolio_overview(self, db: Session, limit: int = 15, *, cash_share: bool = False) -> ChatResponse | None:
         """Resumen de la cartera del usuario leido de la BD, sin LLM ni recomendaciones.
 
         Solo lo guardado (cantidad, coste medio, valor y fecha). Sin posiciones
@@ -2605,7 +2607,7 @@ class ChatService:
             answer = self._portfolio_overview_en(rows, _value, total, unvalued, mixed, base, as_of.isoformat(), limit)
             cash_line = self._cash_line(
                 db, tenant_id, base if not mixed else None,
-                positions_total=None if mixed or unvalued else total, english=True,
+                positions_total=None if mixed or unvalued else total, english=True, share=cash_share,
             )
             if cash_line:
                 answer += "\n\n" + cash_line
@@ -2657,7 +2659,7 @@ class ChatService:
         )
         cash_line = self._cash_line(
             db, tenant_id, base if not mixed else None,
-            positions_total=None if mixed or unvalued else total,
+            positions_total=None if mixed or unvalued else total, share=cash_share,
         )
         if cash_line:
             answer += "\n\n" + cash_line
@@ -3217,6 +3219,7 @@ class ChatService:
         *,
         positions_total: float | None = None,
         english: bool = False,
+        share: bool = False,
     ) -> str | None:
         """Bloque de caja/margen/neto leido de cash_balances del tenant.
 
@@ -3274,7 +3277,7 @@ class ChatService:
             else:
                 debt += -converted
         if english:
-            return self._cash_text_en(assets, debt, base, positions_total, missing, native)
+            return self._cash_text_en(assets, debt, base, positions_total, missing, native, share=share)
         line = ""
         pieces: list[str] = []
         if assets:
@@ -3286,6 +3289,10 @@ class ChatService:
             if positions_total is not None:
                 net = positions_total + assets - debt
                 line += f"; patrimonio neto {_fmt_money_es(net)} {_currency_display(base)}"
+                # «¿Qué porcentaje de mi patrimonio está en liquidez?»: el peso
+                # de la caja, no solo su importe (benchmark Cerebro 2026-11-08).
+                if share and assets and net > 0:
+                    line += f" (la caja es el {_fmt_number_es(assets / net * 100, 1)} % del patrimonio)"
             line += "."
         if missing:
             detalle = ", ".join(f"{_fmt_money_es(native[c])} {_currency_display(c)}" for c in missing)
@@ -3298,7 +3305,7 @@ class ChatService:
     @staticmethod
     def _cash_text_en(
         assets: float, debt: float, base: str, positions_total: float | None,
-        missing: list[str], native: dict[str, float],
+        missing: list[str], native: dict[str, float], *, share: bool = False,
     ) -> str | None:
         """El bloque de caja/margen/neto de _cash_line, redactado en inglés."""
         line = ""
@@ -3312,6 +3319,8 @@ class ChatService:
             if positions_total is not None:
                 net = positions_total + assets - debt
                 line += f"; net worth {_fmt_money_en(net)} {_currency_display(base)}"
+                if share and assets and net > 0:
+                    line += f" (cash is {_fmt_number_en(assets / net * 100, 1)}% of net worth)"
             line += "."
         if missing:
             detail = ", ".join(f"{_fmt_money_en(native[c])} {_currency_display(c)}" for c in missing)

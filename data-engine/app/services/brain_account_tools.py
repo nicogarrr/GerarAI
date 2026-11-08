@@ -750,8 +750,14 @@ _CASH_PLAN = re.compile(
 )
 
 
+#: «¿Qué porcentaje de mi patrimonio está en liquidez?»: el peso de la caja lo
+#: da el resumen de cartera (caja + patrimonio neto), no el saldo suelto.
+_CASH_SHARE = re.compile(r"\b(?:porcentaje|peso|proporcion|que\s+parte|share|percent\w*)\b")
+
+
 def _asks_cash(text: str, question: str) -> bool:
     return bool(_CASH.search(text) and _CASH_ASK.search(text) and not _CASH_NOT.search(text)
+                and not (_CASH_SHARE.search(text) and re.search(r"\b(?:patrimonio|cartera|net\s+worth|portfolio)\b", text))
                 and not _CASH_PLAN.search(text)
                 and not _tickers_in(question)
                 and not (_CASH_THIRD.search(text) and not _CASH_MINE.search(text)))
