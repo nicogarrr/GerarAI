@@ -1995,6 +1995,15 @@
     "narrativeHint": "Prose by the agents; every figure comes from the calculation above (markers), never from the model."
   },
   "informe": {
+    "nav": {
+      "label": "NAV per share (published by the company)",
+      "discount": "trades at a {pct} discount to NAV",
+      "premium": "trades at a {pct} premium to NAV",
+      "noFx": "no discount: NAV is not in the price currency and no cited FX rate",
+      "noPrice": "no discount: price missing",
+      "source": "Source:",
+      "formula": "discount = price / NAV − 1"
+    },
     "metaTitle": "{ticker} report",
     "kicker": "GerarAI report · {date}",
     "dcaLevel": "DCA level (monthly)",

@@ -3,6 +3,7 @@ import { chartPriceUnit } from '@/lib/market/chart-price-units';
 
 import DcaWatchCard from '@/components/watchlist/DcaWatchCard';
 import { SotpBreakdownView } from '@/components/research/SotpBreakdownSection';
+import { AnalystReportNav, publishedNav } from '@/components/research/AnalystReportNav';
 import { fairValueRange, thesisRisks, userEstimates, reportVsPrice, type ReportCell, type ReportInputs, type ReportPeriod } from '@/lib/research/analyst-report';
 import { thesisCatalystLabel } from '@/lib/research/catalyst-label';
 import { cleanThesisText } from '@/lib/research/thesis-text';
@@ -107,6 +108,7 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
           <Item label={t('research.informe.sharesDiluted')} value={count(market?.shares_diluted?.value)} note={sotp?.result?.shares_diluted ? t('research.informe.sharesSotp', { n: fmt.formatNumber(sotp.result.shares_diluted, { maximumFractionDigits: 1 }) }) : undefined} />
           <Item label={t('research.informe.cash')} value={big(market?.cash?.value, market?.cash?.unit)} />
           <Item label={t('research.informe.debt')} value={big(market?.total_debt?.value, market?.total_debt?.unit)} />
+          <AnalystReportNav nav={publishedNav(report)} t={t} fmt={fmt} />
         </dl>
       </section>
 
