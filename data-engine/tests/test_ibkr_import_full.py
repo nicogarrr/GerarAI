@@ -3,8 +3,7 @@
 Tercer lote de huecos de ibkr_import_service: el camino de importacion
 completa (sin trades_only). Los trabajos en segundo plano que ese camino
 encola (backfill de precios y señal DCA) quedan DOBLADOS: se registra la
-llamada y no se ejecuta nada (aprobado por el propietario del bucle: sin
-DCA real). El resto (posiciones, caja, filas crudas, snapshot diario) se
+llamada y no se ejecuta nada. El resto (posiciones, caja, filas crudas, snapshot diario) se
 ejerce de verdad contra SQLite en memoria.
 
 - OpenPosition + CashReport: posicion y saldo persistidos con cantidad,
