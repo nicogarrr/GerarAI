@@ -8,6 +8,8 @@ import { AppError, ValidationError, isNextRedirectError } from '@/lib/types/erro
 import { assertPositiveInt } from '@/lib/validation/pathParams';
 import { knowledgeTickerFormValue, libraryReadingsPath } from '@/lib/knowledge/document-ticker';
 import { backendMessageForRequest } from '@/lib/research/backend-error-locale';
+import { toUniversalSearchResponse } from '@/lib/research/universal-search';
+import type { UniversalSearchResponse, UniversalSearchWire } from '@/lib/research/universal-search';
 import type { components } from '@/lib/research/openapi.generated';
 import type { ScreenCriterion, ScreenResult } from '@/lib/screener-types';
 
@@ -88,30 +90,7 @@ export type KnowledgeChunk = {
   source_locator: Record<string, unknown>;
 };
 
-export type UniversalSearchResult = {
-  entity_type: string;
-  entity_id: number;
-  title: string;
-  text: string;
-  ticker: string | null;
-  collection: string | null;
-  status: string;
-  source_type: string;
-  source_tier: string;
-  source_trust: number;
-  as_of: string | null;
-  citation: string;
-  scores: { lexical: number; vector: number; rrf: number; reranker: number };
-};
-
-export type UniversalSearchResponse = {
-  query: string;
-  status?: string;
-  filters?: Record<string, unknown>;
-  retrieval: Record<string, unknown>;
-  total: number;
-  results: UniversalSearchResult[];
-};
+export type { UniversalSearchResponse, UniversalSearchResult } from '@/lib/research/universal-search';
 
 export type CustomMetric = components['schemas']['ScreenerCustomMetricOut'];
 
@@ -545,26 +524,6 @@ export async function searchResearchLibrary(input: {
     }),
   });
   return toUniversalSearchResponse(raw);
-}
-
-// POST /api/search responde paginado ({ items, page_info, ... }) desde la
-// paginación de endpoints; la página /search lee `results` y `total`. Sin este
-// adaptador `results` llegaba undefined y la página reventaba al pintar.
-type UniversalSearchWire = Partial<UniversalSearchResponse> & {
-  items?: UniversalSearchResult[];
-  page_info?: { total_items?: number };
-};
-
-function toUniversalSearchResponse(raw: UniversalSearchWire): UniversalSearchResponse {
-  const results = raw.results ?? raw.items ?? [];
-  return {
-    query: raw.query ?? '',
-    ...(raw.status !== undefined ? { status: raw.status } : {}),
-    ...(raw.filters !== undefined ? { filters: raw.filters } : {}),
-    retrieval: raw.retrieval ?? {},
-    total: raw.total ?? raw.page_info?.total_items ?? results.length,
-    results,
-  };
 }
 
 function criteriaFromForm(formData: FormData): ScreenCriterion[] {

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import BackendOffline from '@/components/system/BackendOffline';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { searchResearchLibrary } from '@/lib/actions/research-tools.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { formatDate, formatNumber, formatPercent } from '@/lib/format';
@@ -69,11 +70,13 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
     } catch (error) {
       // Antes el error subía al ErrorBoundary global: el usuario veía «Se
       // produjo un error inesperado» y no podía saber si había escrito mal la
-      // consulta o el motor estaba apagado.
-      if (isBackendUnavailableError(error)) {
-        return <BackendOffline feature={t('search.title')} retryHref={currentHref} />;
+      // consulta o el motor estaba apagado. Cualquier fallo de la búsqueda
+      // (backend caído O error de la consulta) pinta el estado local
+      // accionable, no un crash de página: el detalle queda en los logs.
+      if (!isBackendUnavailableError(error)) {
+        console.error('[search] universal search request failed', error);
       }
-      throw error;
+      return <BackendOffline feature={t('search.title')} retryHref={currentHref} />;
     }
   }
 
@@ -109,6 +112,10 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
       </form>
 
       {response ? (
+        // Un 200 con forma inesperada no puede volver a llevarse la página
+        // entera (ref 760826059): el fallo de pintado se queda en la sección
+        // de resultados con el mismo estado local accionable.
+        <ErrorBoundary fallback={<BackendOffline as="section" feature={t('search.title')} retryHref={currentHref} />}>
         <section className="grid min-w-0 grid-cols-1 gap-4">
           <div className="flex min-w-0 flex-col gap-3 rounded-xl border border-gray-800 bg-surface-1 p-4 md:flex-row md:items-center">
             <div><div className="text-sm font-semibold text-gray-100">{t('search.resultsFor', { count: formatNumber(response.total, { maximumFractionDigits: 0 }, undefined, locale), query: response.query })}</div><div className="mt-1 text-xs text-gray-500">{t('search.rankingNote')}</div></div>
@@ -145,6 +152,7 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
           ))}
           {!response.results.length ? <div className="rounded-xl border border-dashed border-gray-800 p-8 text-center text-sm text-gray-500">{t('search.noEvidence')}</div> : null}
         </section>
+        </ErrorBoundary>
       ) : (
         <section className="rounded-xl border border-dashed border-gray-800 p-10 text-center"><SearchIcon aria-hidden="true" className="mx-auto h-8 w-8 text-gray-500" /><h2 className="mt-3 font-semibold text-gray-300">{t('search.emptyTitle')}</h2><p className="mt-2 text-sm text-gray-500">{t('search.emptyExamples')}</p></section>
       )}
