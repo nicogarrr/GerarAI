@@ -242,15 +242,17 @@ def test_primer_tick_solo_guarda_muestra(db, redis_client):
 # --- Punto 4: lista de colas completa ------------------------------------------
 
 def test_default_queues_cubre_todas_las_declaradas():
+    # La fuente de verdad es el broker en vivo: importar dramatiq_app registra
+    # todos los actores (incl. knowledge_rag_actors y thesis_track_record_actors,
+    # que el propio modulo importa) y con ellos sus colas. La lista manual que
+    # habia aqui se quedo en 11 colas mientras nacian documents, official-closes,
+    # dca-manual e ibkr-sync: el fallback estatico no las vigilaba y el test
+    # pasaba igual. Igualdad exacta (no subconjunto): una cola borrada del
+    # broker tambien debe salir del fallback.
     import app.workers.dramatiq_app as dapp
-    import app.workers.knowledge_rag_actors as rag
 
-    declared = {
-        dapp.KPI_QUEUE_NAME, dapp.ALERT_QUEUE_NAME, dapp.GDELT_QUEUE_NAME,
-        dapp.COMPUTED_QUEUE_NAME, dapp.EXTERNA_QUEUE_NAME, dapp.FINNHUB_QUEUE_NAME,
-        dapp.YAHOO_QUEUE_NAME, rag.KNOWLEDGE_QUEUE_NAME, "default", "prices", "thesis",
-    }
-    assert declared <= set(wd.DEFAULT_QUEUES)
+    declared = set(dapp.broker.get_declared_queues())
+    assert declared == set(wd.DEFAULT_QUEUES)
 
 
 # --- Punto 5: Redis caído o lectura fallida = fail-open ------------------------
