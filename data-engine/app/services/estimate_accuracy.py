@@ -18,6 +18,7 @@ funciones que leen o escriben la BD.
 """
 from __future__ import annotations
 
+import math
 import statistics
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -36,10 +37,30 @@ from app.services.own_consensus import (
 )
 
 ACCURACY_VERSION = "acierto_estimaciones v1"
-# Un caso con el dato real a más de 3 veces (o menos de un tercio) de la estimación es
-# una lectura errónea (escala, otra métrica), no un fallo de previsión: se aparta con su
-# motivo y no entra en el resumen.
-IMPLAUSIBLE_RATIO = 3.0
+# Solo se aparta un caso cuando la cifra real y la estimada no pueden estar en la misma unidad:
+# una está ~1.000 o ~1.000.000 de veces la otra (miles frente a unidades, millones frente a
+# unidades). Todo lo demás es un fallo (o un acierto) de previsión y cuenta, aunque sea grande o
+# cambie de signo (una pérdida cuando se esperaba beneficio es el peor fallo, no una lectura
+# inverosímil). Lo apartado se ve en el caso, con su motivo, y se cuenta en el resumen.
+SCALE_FACTORS = (1e3, 1e6)
+SCALE_TOLERANCE_DECADES = 0.5  # ±0,5 órdenes de magnitud alrededor de ×1.000 o ×1.000.000
+# Error extremo: se marca (visible), pero cuenta. En los ingresos (no cambian de signo ni se
+# multiplican por tres en un año frente a la guía) un real a más de 3 veces, o menos de un tercio,
+# de la estimación es una lectura errónea: se aparta con su motivo (y se cuenta en el resumen).
+EXTREME_RATIO = 3.0
+STABLE_METRICS = frozenset({"revenue"})
+
+
+def scale_mismatch(actual: float, estimate: float) -> str | None:
+    """Motivo si la cifra real y la estimada parecen estar en unidades distintas (×1.000, ×1.000.000)."""
+    if not actual or not estimate:
+        return None
+    gap = abs(math.log10(abs(actual / estimate)))
+    for factor in SCALE_FACTORS:
+        if abs(gap - math.log10(factor)) <= SCALE_TOLERANCE_DECADES:
+            return (f"escala_distinta: el dato real es {actual / estimate:,.0f} veces la estimación "
+                    f"(≈×{factor:,.0f}: miles o millones frente a unidades)").replace(",", ".")
+    return None
 
 
 @dataclass(frozen=True)
@@ -76,30 +97,47 @@ def cases(estimates: Sequence[Estimate], actuals: Mapping[str, Mapping[str, Actu
             continue
         end = period_end(period, fy_month.get(metric, 12))
         ratio = real.value / e.mid
-        excluded = None
-        if ratio <= 0 or ratio > IMPLAUSIBLE_RATIO or ratio < 1 / IMPLAUSIBLE_RATIO:
+        excluded = scale_mismatch(real.value, e.mid)
+        if not excluded and metric in STABLE_METRICS and not (1 / EXTREME_RATIO <= ratio <= EXTREME_RATIO):
             excluded = f"lectura_inverosímil: el dato real es {ratio:.2f} veces la estimación"
+        flags = []
+        if not excluded and ratio < 0:
+            flags.append("signo_contrario: el dato real tiene el signo opuesto a la estimación")
+        elif not excluded and (ratio == 0 or ratio > EXTREME_RATIO or ratio < 1 / EXTREME_RATIO):
+            flags.append(f"error_extremo: el dato real es {ratio:.2f} veces la estimación")
         inside = None
         if e.low is not None and e.high is not None:
             inside = e.low <= real.value <= e.high
         out.append({"source": source, "metric": metric, "period": period, "as_of": e.as_of.isoformat(),
                     "horizon": horizon_of(end, e.as_of), "estimate": e.mid, "low": e.low, "high": e.high,
                     "actual": real.value, "actual_derived": real.derived, "error": real.value / e.mid - 1.0,
-                    "inside_range": inside, "url": e.url, "actual_url": real.url, "excluded": excluded})
+                    "inside_range": inside, "url": e.url, "actual_url": real.url, "excluded": excluded,
+                    "flags": flags})
     return out
 
 
 def summarize(items: Sequence[Mapping[str, Any]], *, by: str = "source") -> list[dict[str, Any]]:
     groups: dict[tuple[str, str, str], list[Mapping[str, Any]]] = {}
+    apart: dict[tuple[str, str, str], list[Mapping[str, Any]]] = {}
     for c in items:
-        if c.get("excluded"):
-            continue
-        groups.setdefault((str(c[by]), str(c["metric"]), str(c["horizon"])), []).append(c)
+        k = (str(c[by]), str(c["metric"]), str(c["horizon"]))
+        (apart if c.get("excluded") else groups).setdefault(k, []).append(c)
     out = []
-    for (key, metric, horizon), rows in sorted(groups.items()):
+    for (key, metric, horizon) in sorted(groups.keys() | apart.keys()):
+        rows = groups.get((key, metric, horizon), [])
+        left = apart.get((key, metric, horizon), [])
+        if not rows:  # todo apartado: se ve igual, con n = 0 y por qué
+            out.append({by: key, "metric": metric, "horizon": horizon, "n": 0, "median_abs_error": None,
+                        "median_bias": None, "inside_range": None, "n_ranged": 0, "n_excluded": len(left),
+                        "excluded_reasons": sorted({str(c["excluded"]).split(":")[0] for c in left}),
+                        "n_extreme": 0})
+            continue
         errs = [float(r["error"]) for r in rows]
         ranged = [r for r in rows if r.get("inside_range") is not None]
         out.append({by: key, "metric": metric, "horizon": horizon, "n": len(rows),
+                    "n_excluded": len(left),
+                    "excluded_reasons": sorted({str(c["excluded"]).split(":")[0] for c in left}),
+                    "n_extreme": sum(1 for r in rows if r.get("flags")),
                     "median_abs_error": float(statistics.median(abs(e) for e in errs)),
                     "median_bias": float(statistics.median(errs)),
                     "inside_range": (sum(1 for r in ranged if r["inside_range"]) / len(ranged)) if ranged else None,
