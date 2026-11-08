@@ -1556,6 +1556,14 @@ class ChatService:
             named = companies_named_in(question, companies)
             if len(named.companies) == 1 and not named.ambiguous:
                 return named.companies[0]
+            if not named.companies and len(named.ambiguous) == 1:
+                # «¿Cuántas acciones tengo de Brookfield?» con BN en cartera y BAM
+                # en el maestro: si solo UNO de los candidatos es tuyo (posición o
+                # lista de seguimiento), el nombre se refiere a ese.
+                own_ids = {c.id for c in self._own_companies(db, companies)}
+                mine = [c for c in named.ambiguous[0][1] if c.id in own_ids]
+                if len(mine) == 1:
+                    return mine[0]
             if not named.companies and not named.ambiguous:
                 misspelled = self._misspelled_own_company(db, question, companies)
                 if misspelled is not None:
@@ -1571,11 +1579,19 @@ class ChatService:
         """
         if not (_TYPO_CUE_RE.search(question) or _COMPANY_CUE_RE.search(question) or _question_metrics(question)):
             return None
+        own = self._own_companies(db, companies)
+        if not own:
+            return None
+        from app.services.company_names import company_misspelled_in
+
+        return company_misspelled_in(question, own, skip_words=_TYPO_SKIP_WORDS)
+
+    def _own_companies(self, db: Session, companies: list[Company]) -> list[Company]:
+        """Empresas que tienes en cartera o sigues en tu lista (solo tu tenant)."""
         tenant_id = db.info.get("tenant_id")
         if type(tenant_id) is not int or tenant_id <= 0:
-            return None
+            return []
         from app.models.entities import WatchItem
-        from app.services.company_names import company_misspelled_in
 
         held = set(db.scalars(
             select(Position.company_id).where(Position.tenant_id == tenant_id, Position.quantity > 0)
@@ -1583,8 +1599,7 @@ class ChatService:
         watched = {s.upper() for s in db.scalars(
             select(WatchItem.symbol).where(WatchItem.tenant_id == tenant_id)
         ).all() if s}
-        own = [c for c in companies if c.id in held or (c.ticker or "").upper() in watched]
-        return company_misspelled_in(question, own, skip_words=_TYPO_SKIP_WORDS)
+        return [c for c in companies if c.id in held or (c.ticker or "").upper() in watched]
 
     def _history_company(
         self, db: Session, question: str, history: list[ChatTurn] | None
