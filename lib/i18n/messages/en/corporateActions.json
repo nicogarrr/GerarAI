@@ -7,6 +7,7 @@
   "header": {
     "eyebrow": "Corporate events",
     "title": "Corporate actions",
+    "countOne": "{n} event",
     "count": "{n} events"
   },
   "backToTicker": "Back to {ticker}",

@@ -7,6 +7,7 @@
   "header": {
     "eyebrow": "Eventos corporativos",
     "title": "Acciones corporativas",
+    "countOne": "{n} evento",
     "count": "{n} eventos"
   },
   "backToTicker": "Volver a {ticker}",

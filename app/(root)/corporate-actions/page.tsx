@@ -71,7 +71,7 @@ export default async function CorporateActionsPage({ searchParams }: PageProps) 
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
                     <Building2 className="h-4 w-4 text-teal-300" />
-                    {t('corporateActions.header.count', { n: f.formatNumber(visibleCount, { maximumFractionDigits: 0 }) })}
+                    {t(visibleCount === 1 ? 'corporateActions.header.countOne' : 'corporateActions.header.count', { n: f.formatNumber(visibleCount, { maximumFractionDigits: 0 }) })}
                 </div>
             </header>
 

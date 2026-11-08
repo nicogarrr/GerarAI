@@ -46,13 +46,13 @@ describe('página de acciones corporativas', () => {
         expect(screen.queryByText(/0 eventos/)).not.toBeInTheDocument();
     });
 
-    it('la cuenta de la cabecera respeta el filtro ?ticker (sin distinguir mayúsculas)', async () => {
+    it('la cuenta de la cabecera respeta el filtro ?ticker y pluraliza bien', async () => {
         getCorporateActions.mockResolvedValue([{ ticker: 'TSLA' }, { ticker: 'AAPL' }]);
         const { unmount } = render(await CorporateActionsPage({ searchParams: params() }));
         expect(screen.getByText('2 eventos')).toBeInTheDocument();
         unmount();
         render(await CorporateActionsPage({ searchParams: params('tsla') }));
-        expect(screen.getByText('1 eventos')).toBeInTheDocument();
+        expect(screen.getByText('1 evento')).toBeInTheDocument();
         expect(viewProps.ticker).toBe('TSLA');
     });
 
