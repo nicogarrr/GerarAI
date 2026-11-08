@@ -181,6 +181,9 @@ _PAST = re.compile(
     re.I,
 )
 WINDOW_BEFORE = 220
+# Otra cantidad con moneda entre la métrica y la cifra: la métrica es de esa otra cantidad.
+_OTHER_AMOUNT = re.compile(r"(?:US\$|C\$|A\$|\$|€|£)\s?\d")
+_LOSS = re.compile(r"\blosses?\b", re.I)
 HEADING_REACH = 8  # viñetas bajo «Fourth Quarter 2026 Guidance»
 WINDOW_AFTER = 100
 
@@ -238,6 +241,10 @@ def extract_guidance(text: str, *, published: date) -> list[Guidance]:
                     r"\b(?:adjusted|non-gaap)\b", window[max(0, metric_end - 60):pos], re.I):
                 metric = f"adjusted_{metric}"
             between = window[metric_end:pos]
+            if _OTHER_AMOUNT.search(between) or _LOSS.search(between):
+                # la métrica es de otra cifra más cercana («operating profit by $12.78 billion, and we expect
+                # … RL operating losses of $18–19 billion»), o la cifra es una pérdida de otra línea
+                continue
             if _PAST.search(between) or re.match(r"\W*(?:was|were|has been)\b", sentence[m.end():m.end() + 20], re.I):
                 continue  # un resultado o un backlog, no una previsión
             cue = [c for c in _CUE.finditer(window) if c.start() < pos + len(m.group(0))]
