@@ -358,6 +358,11 @@ _NO_SECTOR_FALLBACK = frozenset({"standard_dcf", "pre_revenue", "relative_multip
 # Motores sobre flujo de caja libre con ingresos: llevan el contraste por
 # múltiplos de comparables (el de escenarios parte del mismo DCF).
 _RELATIVE_CROSS_CHECK_ENGINES = frozenset({"standard_dcf", "scenario"})
+# Motores sectoriales cuyos ingresos/EBITDA/FCF consolidados no son del
+# accionista (minoritarios, filiales cotizadas, reservas): su respaldo por
+# comparables solo admite multiplos sobre el beneficio atribuible.
+_CONSOLIDATED_FLOW_ENGINES = frozenset({"holding_company", "sotp", "insurer", "bank"})
+_EQUITY_LEVEL_MULTIPLES = frozenset({"pe", "pb"})
 
 
 def _scenario_engine_fallback(result: dict) -> dict | None:
@@ -429,6 +434,35 @@ def _sector_fallback(
         return insufficient
     if not any(cross.get(key) is not None for key in ("expected_value", "base_value")):
         return insufficient
+    sector_engine = (insufficient.get("trace") or {}).get("engine") or resolve_engine_key(company)
+    headline = cross.get("headline_multiple")
+    if sector_engine in _CONSOLIDATED_FLOW_ENGINES and headline not in _EQUITY_LEVEL_MULTIPLES:
+        # BN (8-nov-2026): EV/Ventas 6,3x sobre 75.100 M de ingresos
+        # CONSOLIDADOS daba 71/98/111 $ contra 41,38 $ de precio (bajista por
+        # encima del precio). En un holding, una aseguradora o un banco los
+        # ingresos, el EBITDA y el FCF consolidados incluyen lo que es de los
+        # minoritarios y de las filiales cotizadas: no son del accionista. Solo
+        # un multiplo sobre el beneficio o el patrimonio atribuibles (PER, P/VC)
+        # sirve de respaldo; el resto se retiene y se dice por que.
+        withheld = dict(insufficient)
+        withheld_trace = dict(insufficient.get("trace") or {})
+        withheld_trace["sector_engine_fallback_withheld"] = {
+            "headline_multiple": headline,
+            "peer_median": cross.get("peer_median"),
+            "sector_engine": sector_engine,
+            "allowed_multiples": sorted(_EQUITY_LEVEL_MULTIPLES),
+            "indicative_values": {
+                key: cross.get(key) for key in ("bear_value", "base_value", "bull_value")
+            },
+            "reason": (
+                f"Valor orientativo por {RANGE_MULTIPLE_LABELS.get(str(headline), headline)} retenido: "
+                f"en un {sector_engine} las cifras consolidadas incluyen la parte de "
+                "minoritarios y filiales; solo el PER o el P/VC sobre lo atribuible "
+                "sirven de respaldo."
+            ),
+        }
+        withheld["trace"] = withheld_trace
+        return withheld
     ratio = _indicative_value_to_price_ratio(cross.get("margin_of_safety"))
     if ratio is not None and ratio > INDICATIVE_MAX_PRICE_RATIO:
         withheld = dict(insufficient)
@@ -447,7 +481,6 @@ def _sector_fallback(
         }
         withheld["trace"] = withheld_trace
         return withheld
-    sector_engine = (insufficient.get("trace") or {}).get("engine") or resolve_engine_key(company)
     missing = list(insufficient.get("missing_inputs") or [])
     result = dict(insufficient)
     for key in ("bear_value", "base_value", "bull_value", "expected_value", "margin_of_safety",
