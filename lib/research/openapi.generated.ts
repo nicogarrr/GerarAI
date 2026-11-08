@@ -12576,6 +12576,8 @@ export interface components {
             currency: string;
             /** Fees */
             fees: number;
+            /** Ibkr Note Codes */
+            ibkr_note_codes?: string[] | null;
             /** Id */
             id: number;
             /** Notes */
@@ -12637,6 +12639,8 @@ export interface components {
             currency: string;
             /** Fees */
             fees: number;
+            /** Ibkr Note Codes */
+            ibkr_note_codes?: string[] | null;
             /** Id */
             id: number;
             /** Notes */
