@@ -1001,7 +1001,8 @@ def test_propose_decision_lessons_404_y_delega(monkeypatch):
 
 
 def _lesson(company_id=1):
-    # Modelo real, no SimpleNamespace: el gate de tenant/company se prueba de verdad.
+    # Modelo ORM real en vez de SimpleNamespace (regla orm-fake-simplenamespace);
+    # db y servicios siguen doblados: se prueba la logica de la ruta.
     return DecisionLesson(company_id=company_id)
 
 
@@ -1143,8 +1144,8 @@ def test_reconcile_management_promises_404_y_feliz(monkeypatch):
 def test_update_management_explanation_404s_y_feliz(monkeypatch):
     # Lineas 1336-1343.
     db = MagicMock()
-    # Modelos reales (ManagementPromise), no SimpleNamespace: el gate de
-    # company_id se prueba de verdad.
+    # Modelos ORM reales (ManagementPromise) en vez de SimpleNamespace (regla
+    # orm-fake-simplenamespace); el db sigue doblado: se prueba la logica de la ruta.
     db.get.return_value = ManagementPromise(company_id=1)
     monkeypatch.setattr(c, "resolve_company", lambda db, ticker: None)
     with pytest.raises(c.HTTPException) as exc:
