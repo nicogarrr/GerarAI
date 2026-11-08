@@ -8,7 +8,7 @@ import pytest
 
 from app.core.config import get_settings
 from app.services import thesis_service as thesis
-from app.services.expert_team import analyst_blend, recopilador, roster, service
+from app.services.expert_team import analyst_blend, esceptico, recopilador, roster, service
 
 
 def test_off_and_stored_do_not_enter_pipeline(monkeypatch):
@@ -45,14 +45,20 @@ def test_roster_specs_are_consumed_in_order_and_same_session(monkeypatch):
         await kw["load_history"]("TSLA")
         return SimpleNamespace(as_dict=lambda: {"status": "full_data"})
 
+    async def third(session, **kw):
+        assert calls == ["first", "second"] and session is db and kw["spec"] is specs[2]
+        calls.append("third")
+        return SimpleNamespace(beliefs=[], as_dict=lambda: {"status": "ok", "beliefs": []})
+
     monkeypatch.setattr(recopilador, "run_recopilador", first)
     monkeypatch.setattr(analyst_blend, "run_analyst_blend", second)
+    monkeypatch.setattr(esceptico, "run_esceptico", third)
     from app.services.analyst_history_service import analyst_history_service
     history = AsyncMock(return_value=SimpleNamespace(consensus=SimpleNamespace(mean=200), source_url="source"))
     monkeypatch.setattr(analyst_history_service, "get", history)
     monkeypatch.setattr(get_settings(), "expert_team_enabled", True)
     out = thesis._prepare_thesis_experts(db, "TSLA", stored_evidence_only=False)
-    assert calls == ["first", "second"]
+    assert calls == ["first", "second", "third"]
     assert [s["name"] for s in out["stages"]] == [s.name for s in specs]
     assert out["stages"][0]["stored"] == 1
     assert out["consensus"] == 200

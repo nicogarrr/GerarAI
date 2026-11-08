@@ -569,9 +569,15 @@ def valuation_method_lines(valuation: dict) -> list[str]:
         lines.append(f"- Qué descuenta el precio: {reverse['explanation_es']}")
     return lines
 
+#: Clave interna (no se guarda en la traza): etiquetas del escéptico para el contraste con el consenso.
+_SKEPTIC_LABELS = "_esceptico_labels"
+
+
 async def _run_thesis_experts(db: Session, ticker: str) -> dict:
     """Etapas del roster, en orden, en la misma sesión y transacción de la tesis."""
     from app.services.expert_team.analyst_blend import run_analyst_blend
+    from app.services.expert_team.analyst_notes_source import analyst_notes_source
+    from app.services.expert_team.esceptico import labels_for_reconciliation, run_esceptico
     from app.services.expert_team.recopilador import run_recopilador
     from app.services.expert_team.roster import pipeline_experts
     from app.services.expert_team.service import provider_reasoner, run_context
@@ -591,13 +597,23 @@ async def _run_thesis_experts(db: Session, ticker: str) -> dict:
         return history
 
     stages = []
+    labels: dict = {}
+    # Notas de analista verificadas (#4582): evidencia extra de la mezcla y del escéptico.
+    notes = [analyst_notes_source(db)]
     for spec in pipeline_experts():
         if spec.name == "recopilador":
             result = await run_recopilador(db, ctx=ctx, reasoner=reasoner, spec=spec, enabled=True)
         elif spec.name == "mezcla_analistas":
             result = await run_analyst_blend(
                 db, ctx=ctx, reasoner=reasoner, spec=spec, enabled=True, load_history=load_history,
+                extra_sources=notes,
             )
+        elif spec.name == "esceptico":
+            # Tras el Recopilador (inventario) y la mezcla: juzga cada impulsor con cita literal.
+            result = await run_esceptico(
+                db, ctx=ctx, reasoner=reasoner, spec=spec, enabled=True, extra_sources=notes,
+            )
+            labels = labels_for_reconciliation(result.beliefs)
         else:
             raise ValueError(f"Etapa de tesis no soportada: {spec.name}")
         stages.append({"name": spec.name, **result.as_dict()})
@@ -605,13 +621,19 @@ async def _run_thesis_experts(db: Session, ticker: str) -> dict:
     try:
         reference = await load_history(ticker)
     except Exception as exc:  # diagnóstico opcional; no inventar consenso si falla la fuente
-        return {"stages": stages, "consensus": None, "consensus_error": type(exc).__name__}
+        failed = {"stages": stages, "consensus": None, "consensus_error": type(exc).__name__}
+        if labels:
+            failed[_SKEPTIC_LABELS] = labels
+        return failed
     consensus = reference.consensus
-    return {
+    out = {
         "stages": stages,
         "consensus": consensus.mean if consensus is not None else None,
         "consensus_source": reference.source_url,
     }
+    if labels:
+        out[_SKEPTIC_LABELS] = labels
+    return out
 
 
 def _expert_inputs_from_pipeline(pipeline: dict | None) -> dict:
@@ -658,10 +680,11 @@ def _apply_thesis_consensus(valuation: dict, pipeline: dict | None) -> None:
         return
     from app.valuation.consensus_sanity import apply_consensus_sanity, consensus_sanity_for_dcf
 
+    labels = pipeline.pop(_SKEPTIC_LABELS, None) or None
     valuation.setdefault("trace", {})["expert_pipeline"] = pipeline
     sanity = consensus_sanity_for_dcf(
         valuation, consensus=pipeline.get("consensus"), our_value=valuation.get("base_value"),
-        consensus_source=pipeline.get("consensus_source"),
+        consensus_source=pipeline.get("consensus_source"), labels=labels,
     )
     # La tesis pide contraste, no autorización para despublicar ni topar escenarios.
     apply_consensus_sanity(valuation, sanity, enabled=True, block_publication=False)

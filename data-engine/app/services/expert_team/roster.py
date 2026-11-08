@@ -148,6 +148,24 @@ def sotp_valuer_expert() -> ExpertSpec:
     )
 
 
+def esceptico_expert() -> ExpertSpec:
+    """«Escéptico»: qué hace falta creer por impulsor y si lo compramos.
+
+    Etapa del pipeline de la tesis tras la mezcla de analistas y el contraste
+    con el consenso. No entra en ``default_experts``. La corre
+    ``expert_team.esceptico.run_esceptico`` (con EXPERT_TEAM_ENABLED).
+    """
+    from app.services.expert_team.esceptico import ESCEPTICO_NAME, ESCEPTICO_TOOLS
+
+    return ExpertSpec(
+        name=ESCEPTICO_NAME,
+        typical_s=20.0,
+        prompt_name="expert_esceptico",
+        tools=ESCEPTICO_TOOLS,
+        max_tokens=6000,
+    )
+
+
 def pipeline_experts() -> list[ExpertSpec]:
-    """Roles del pipeline automático de la tesis, en orden: Recopilador y mezcla de analistas."""
-    return [recopilador_expert(), analyst_blend_expert()]
+    """Roles del pipeline automático de la tesis, en orden: Recopilador, mezcla de analistas y escéptico."""
+    return [recopilador_expert(), analyst_blend_expert(), esceptico_expert()]

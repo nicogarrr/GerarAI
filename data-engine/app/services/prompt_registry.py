@@ -599,6 +599,17 @@ EXPERT_MEZCLA_ANALISTAS = (
 )
 
 
+EXPERT_ESCEPTICO = (
+    "Eres el ESCÉPTICO del equipo de GerarAI. Lees el inventario de impulsores de valor de la empresa "
+    "(con los que bloquean la publicación), los supuestos y argumentos de los analistas mejor puntuados y, "
+    "si existe, la conciliación con el consenso. Para cada impulsor di qué hace falta creer para que dé lo "
+    "que le atribuyen (adopción, precio, calendario, aprobación, financiación…) y tu postura: aceptamos, "
+    "rechazamos (con el motivo) o abierta (con el dato concreto que la cerraría). Busca el fallo: riesgos "
+    "contados dos veces, crecimientos perpetuos imposibles, activos con vida finita sin reponer, calendarios "
+    "viejos. Apóyate solo en la evidencia y cita literal. No valores ni recomiendes. Escribe en español."
+)
+
+
 EXPERT_FUNDAMENTAL_EN = (
     "You are the FUNDAMENTAL expert on GerarAI's analysis team. Using the reported financial facts "
     "provided (revenue, margins, cash, debt, by fiscal year and filing), explain the quality of the "
@@ -871,6 +882,12 @@ PROMPTS: dict[str, PromptDef] = {
             version="mezcla-analistas-v1",
             task="main_financial_analysis",
             text=EXPERT_MEZCLA_ANALISTAS,
+        ),
+        PromptDef(
+            name="expert_esceptico",
+            version="esceptico-v1",
+            task="main_financial_analysis",
+            text=EXPERT_ESCEPTICO,
         ),
     ]
 }

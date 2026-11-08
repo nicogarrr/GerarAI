@@ -215,7 +215,7 @@ def _rows(db, tenant=T1):
 # ------------------------------------------------------------------ registro
 def test_rol_registrado_con_prompt_versionado() -> None:
     spec = analyst_blend_expert()
-    assert [s.name for s in pipeline_experts()] == ["recopilador", "mezcla_analistas"]
+    assert [s.name for s in pipeline_experts()][:2] == ["recopilador", "mezcla_analistas"]
     definition = prompt_registry.PROMPTS[spec.prompt_name]
     assert definition.version == "mezcla-analistas-v1"
     assert "huecos" in definition.text
