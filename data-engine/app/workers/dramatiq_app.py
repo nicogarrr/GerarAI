@@ -4941,7 +4941,8 @@ if __name__ == "__main__":
 # Cola dedicada (F359): los jobs de tesis los dispara el USUARIO y son
 # interactivos; en "default" quedaban hambreados detras de la ingesta por
 # lotes (7476 mensajes acumulados, 5276 de ellos veneno SEC imposible desde
-# OCI). El worker los escucha con -Q default prices thesis.
+# OCI). Los consume worker-thesis (-Q thesis); el mapa cola -> worker
+# vive en docs/workers-colas.md.
 # Plazo explícito: sin él Dramatiq corta a los 10 min por defecto, y el job encadena la tesis, el desglose
 # SOTP, el equipo de expertos (tope 300 s) y la tesis v2 (llamada de hasta 600 s, CALL_TIMEOUT_SECONDS).
 GENERATE_THESIS_JOB_TIME_LIMIT_MS = 40 * 60 * 1000
