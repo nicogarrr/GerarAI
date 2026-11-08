@@ -268,6 +268,81 @@ def _peer_multiples(db: Session, company: Company, basis: str, today: date) -> l
     return out
 
 
+_FILING_SOURCES = ("sec", "esef")
+
+
+def _is_filing(cite: Mapping[str, Any] | None) -> bool:
+    return str((cite or {}).get("source_type") or "").lower().startswith(_FILING_SOURCES)
+
+
+def _to_listed_share_basis(company: Any, annual: dict[str, dict[int, dict]], point: dict[str, dict],
+                           warnings: list[str], cites: dict[str, Any]) -> None:
+    """Emisor con ADR: todos los recuentos y el BPA en la unidad que cotiza (el ADS), como el precio.
+
+    Los 20-F dan acciones ORDINARIAS y BPA por ordinaria; un agregador puede dar ADS (TSM: 25.930 M de
+    ordinarias en la SEC frente a 5.186 M de ADS el último año, 1 ADS = 5). Se clasifica cada cifra frente
+    al dato oficial más cercano (``share_units.count_basis``) y se pasa a ADS; lo que no cuadra con
+    ninguna de las dos unidades no se toca. Sin ratio conocido no cambia nada."""
+    from types import SimpleNamespace
+
+    from app.valuation.engines.base import adr_ratio
+    from app.valuation.share_units import count_basis, nearest_reference
+
+    ratio = adr_ratio(SimpleNamespace(factor_tags=getattr(company, "factor_tags", None),  # type: ignore[arg-type]
+                                      ticker=getattr(company, "ticker", "") or ""))
+    if not ratio or ratio <= 1:
+        return
+    converted: list[dict[str, Any]] = []
+    unresolved: list[str] = []
+
+    def refs(metric: str) -> dict[int, float]:
+        return {y: v for y, c in (annual.get(metric) or {}).items()
+                if _is_filing(c) and (v := _f((c or {}).get("value"))) and v > 0}
+
+    share_refs = refs("shares_diluted")
+    eps_refs = refs("eps_diluted")
+
+    def convert(metric: str, key: str, cite: dict, ref: float | None, per_share: bool) -> dict:
+        value = _f(cite.get("value"))
+        if value is None or value == 0:
+            return cite
+        if _is_filing(cite):
+            basis = "ordinary"
+        elif per_share:
+            # BPA por ADS = BPA por ordinaria × ratio: se compara al revés que un recuento.
+            flipped = count_basis(ref, abs(value), ratio) if ref else None
+            basis = {"ads": "ordinary", "ordinary": "ads"}.get(flipped) if flipped else None
+        else:
+            basis = count_basis(value, ref, ratio)
+        if basis is None:
+            unresolved.append(f"{metric} {key}")
+            return cite
+        if basis == "ads":
+            return cite
+        new = value * ratio if per_share else value / ratio
+        converted.append({"metric": metric, "period": key, "from": value, "to": new, "source_type": cite.get("source_type")})
+        return {**cite, "value": new, "share_basis": f"convertido de ordinarias a ADS (1 ADS = {ratio:g})"}
+
+    for metric, per_share, references in (("shares_diluted", False, share_refs), ("eps_diluted", True, eps_refs)):
+        slot = annual.get(metric) or {}
+        for y in list(slot):
+            ref = nearest_reference(y, references)
+            slot[y] = convert(metric, str(y), slot[y], abs(ref) if ref else None, per_share)
+    if point.get("shares_outstanding"):
+        end = _end(str(point["shares_outstanding"].get("period") or ""))
+        try:
+            year = int(end[:4])
+        except ValueError:
+            year = max(share_refs) if share_refs else 0
+        point["shares_outstanding"] = convert("shares_outstanding", end, point["shares_outstanding"],
+                                              nearest_reference(year, share_refs), False)
+    cites["adr_share_basis"] = {"ordinary_per_ads": ratio, "converted": converted, "unresolved": unresolved}
+    if converted:
+        warnings.append(f"ADR: acciones y BPA en ADS (1 ADS = {ratio:g} ordinarias), la unidad del precio")
+    if unresolved:
+        warnings.append("ADR: recuentos que no cuadran ni en ordinarias ni en ADS, sin convertir: " + ", ".join(unresolved))
+
+
 def starting_point(db: Session, company: Company, *, today: date, basis: str | None = None,
                    include_leases: bool | None = None
                    ) -> tuple[engine.StartingPoint, rules.History, list[str], dict[str, Any]]:
@@ -277,6 +352,7 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     annual, point = company_facts(db, company)
     warnings: list[str] = []
     cites: dict[str, Any] = {}
+    _to_listed_share_basis(company, annual, point, warnings, cites)
     kind, kind_reason = company_kind(company, annual)
     if kind == "real_estate":
         # Un REIT etiqueta a menudo solo el arrendamiento (Camden: «Revenues» hasta 2016 y después
