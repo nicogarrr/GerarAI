@@ -335,6 +335,30 @@ def _walk_strings(value: Any) -> Iterable[str]:
             yield from _walk_strings(item)
 
 
+#: Campos de una respuesta JSON que llevan la cita LITERAL de un documento: van en el idioma del documento
+#: (un 10-K en inglés), no se juzgan como prosa del modelo. Antes, el Recopilador (8-nov-2026, POOL) salía
+#: rechazado dos veces por «inglés» por sus ``source_quote`` y su inventario se perdía.
+_LITERAL_KEYS = ("quote", "cita", "citation", "excerpt", "verbatim", "literal")
+
+
+def _is_literal_key(key: Any) -> bool:
+    k = str(key or "").casefold()
+    return any(part in k for part in _LITERAL_KEYS)
+
+
+def _walk_prose(value: Any, literal: bool = False) -> Iterable[str]:
+    """Como ``_walk_strings`` pero sin los valores de campos de cita literal (ni lo que cuelga de ellos)."""
+    if isinstance(value, str):
+        if not literal:
+            yield value
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            yield from _walk_prose(item, literal or _is_literal_key(key))
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _walk_prose(item, literal)
+
+
 def _is_free_text(value: str) -> bool:
     """Los ids, enums y claves cortas (``facts``, ``financial_fact:12``) no son
     prosa: sin espacios no hay texto libre que juzgar."""
@@ -367,7 +391,7 @@ def inspect_response_text(
                 if reason not in reasons:
                     reasons.append(reason)
         if english == "strict" or expected_language == "en":
-            prose = " . ".join(v for v in values if _is_free_text(v))
+            prose = " . ".join(v for v in _walk_prose(parsed) if _is_free_text(v))
             for reason in inspect_text(prose, english=english, expected_language=expected_language):
                 if reason not in reasons:
                     reasons.append(reason)

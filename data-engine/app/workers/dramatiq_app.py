@@ -4942,7 +4942,12 @@ if __name__ == "__main__":
 # interactivos; en "default" quedaban hambreados detras de la ingesta por
 # lotes (7476 mensajes acumulados, 5276 de ellos veneno SEC imposible desde
 # OCI). El worker los escucha con -Q default prices thesis.
-@dramatiq.actor(max_retries=2, min_backoff=15_000, queue_name="thesis")
+# Plazo explícito: sin él Dramatiq corta a los 10 min por defecto, y el job encadena la tesis, el desglose
+# SOTP, el equipo de expertos (tope 300 s) y la tesis v2 (llamada de hasta 600 s, CALL_TIMEOUT_SECONDS).
+GENERATE_THESIS_JOB_TIME_LIMIT_MS = 40 * 60 * 1000
+
+
+@dramatiq.actor(max_retries=2, min_backoff=15_000, queue_name="thesis", time_limit=GENERATE_THESIS_JOB_TIME_LIMIT_MS)
 def generate_thesis_job(run_id: int) -> None:
     """Execute one queued async thesis generation job (durable envelope)."""
     from app.services.thesis_job_service import run_thesis_job

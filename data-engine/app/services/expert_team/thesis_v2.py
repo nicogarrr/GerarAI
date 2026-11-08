@@ -35,6 +35,12 @@ from sqlalchemy.orm import Session
 from app.models import Company
 from app.services.expert_team.experts import Reasoner
 from app.services.expert_team.sotp_narrative import MARKER, free_numbers, strip_free_numbers, unknown_markers
+from app.services.expert_team.thesis_v2_experts import (
+    block_fingerprint,
+    expert_markers,
+    expert_payload,
+    experts_table,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +68,7 @@ SECTIONS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
     ("valoracion", "10. Valoración: qué rentabilidad esperamos y de dónde sale", "b",
      ("escenarios", "supuestos", "descomposicion", "sensibilidad")),
     ("que_descuenta", "11. Qué descuenta el precio", "b", ("descuenta",)),
-    ("riesgos", "12. Riesgos y kill switches", "b", ()),
+    ("riesgos", "12. Riesgos y kill switches", "b", ("expertos",)),
     ("que_vigilar", "13. Qué vigilar", "b", ("vigilar",)),
     ("pre_mortem", "14. Pre-mortem: la inversión mirada desde dentro de cinco años", "b", ()),
     ("conclusion", "15. Conclusión: ¿empresa excelente? ¿oportunidad al precio?", "b", ()),
@@ -437,6 +443,7 @@ class ThesisContext:
     insiders: dict[str, Any] | None = None  # insider_summary (#4751): Form 4 de la SEC, deterministas
     analysts: list[dict[str, Any]] = field(default_factory=list)  # estimaciones citadas de prensa (#4753)
     price_targets: list[dict[str, Any]] = field(default_factory=list)
+    experts: dict[str, Any] | None = None  # trabajo del equipo de expertos (thesis_v2_experts.expert_block)
 
 
 def insider_block(db: Session, company: Company, today: date) -> dict[str, Any] | None:
@@ -521,8 +528,17 @@ def build_context(db: Session, company: Company, *, today: date, tenant_id: int 
     analysts, targets = analyst_estimates(db, company, today)
     if (analysts or targets) and "consenso_guia" not in optional:
         optional["consenso_guia"] = "hay estimaciones de analistas citadas de la prensa"
+    experts = None
+    try:
+        from app.services.expert_team.thesis_v2_experts import expert_block
+
+        tid = tenant_id if tenant_id is not None else db.info.get("tenant_id")
+        experts = expert_block(db, company, tid if type(tid) is int else None)
+    except Exception as exc:  # noqa: BLE001 - sin el equipo la tesis sigue, pero se registra
+        logger.warning("tesis v2 %s: no se pudo leer el trabajo del equipo de expertos (%s)", company.ticker,
+                       type(exc).__name__)
     return ThesisContext(company.ticker, name, val, hist, peers, switches, ig, passages, optional, guidance,
-                         getattr(company, "cik", None), insiders, analysts, targets)
+                         getattr(company, "cik", None), insiders, analysts, targets, experts)
 
 
 def display_name(name: str) -> str:
@@ -660,6 +676,7 @@ def thesis_markers(ctx: ThesisContext) -> dict[str, str]:
         m[f"guia.{i}.base"] = _guidance_value(g, g["base"])
         m[f"guia.{i}.bajo"] = _guidance_value(g, g["low"])
         m[f"guia.{i}.alto"] = _guidance_value(g, g["high"])
+    m |= expert_markers(ctx.experts)
     return m
 
 
@@ -971,6 +988,7 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
         t["descuenta"] = {"title": "", "head": [], "rows": []}
         t["vigilar"] = {"title": "Qué vigilar: kill switches", "head": ["Métrica", "Umbral", "Hoy", "Estado", "Acción", "Por qué"],
                         "rows": [[s["metric"], s["threshold"], s["current"], s["status"], s["action"], s["why"]] for s in ctx.switches]}
+        t["expertos"] = experts_table(ctx.experts)
         return t
     t["escenarios"] = {"title": "Escenarios", "head": [
         "Escenario", "Prob.", "Crec. 1–5", "Margen año 5", "Conversión", "Múltiplo salida", "TIR 5 a", "TIR 10 a",
@@ -1011,6 +1029,7 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
                          "rows": [[pct(g)] + [pct(c) for c in row] for g, row in zip(sens["growths"], sens["irr"], strict=True)]}
     t["vigilar"] = {"title": "Qué vigilar: kill switches", "head": ["Métrica", "Umbral", "Hoy", "Estado", "Acción", "Por qué"],
                     "rows": [[s["metric"], s["threshold"], s["current"], s["status"], s["action"], s["why"]] for s in ctx.switches]}
+    t["expertos"] = experts_table(ctx.experts)
     return t
 
 
@@ -1039,10 +1058,12 @@ class ThesisResult:
 
 
 def thesis_fingerprint(ctx: ThesisContext) -> str:
-    blob = json.dumps({"v": THESIS_V2_VERSION, "val": ctx.valuation.get("fingerprint"),
-                       "markers": sorted(thesis_markers(ctx)), "optional": sorted(ctx.optional),
-                       "passages": [hashlib.sha256((p["text"] or "").encode()).hexdigest()[:12] for p in ctx.passages]},
-                      sort_keys=True, ensure_ascii=False)
+    parts: dict[str, Any] = {"v": THESIS_V2_VERSION, "val": ctx.valuation.get("fingerprint"),
+                             "markers": sorted(thesis_markers(ctx)), "optional": sorted(ctx.optional),
+                             "passages": [hashlib.sha256((p["text"] or "").encode()).hexdigest()[:12] for p in ctx.passages]}
+    if ctx.experts:  # el trabajo nuevo del equipo rehace la tesis (sin equipo, la huella no cambia)
+        parts["experts"] = block_fingerprint(ctx.experts)
+    blob = json.dumps(parts, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(blob.encode()).hexdigest()
 
 
@@ -1268,10 +1289,11 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
                                   if ctx.analysts or ctx.price_targets
                                   else "no hay todavía rangos de analistas guardados para esta empresa: dilo así"),
         "insiders": ctx.insiders and {"ventanas": ctx.insiders.get("windows"), "nota": "cita con los marcadores insiders.*"},
+        "equipo_de_expertos": expert_payload(ctx.experts),
     }
     from app.services.expert_team.quote_check import evidence_texts, non_literal, unquote_non_literal
 
-    evidence = evidence_texts(ctx.passages, ctx.guidance, ctx.analysts, ctx.price_targets, ctx.insiders)
+    evidence = evidence_texts(ctx.passages, ctx.guidance, ctx.analysts, ctx.price_targets, ctx.insiders, ctx.experts)
 
     def rendered(text: str) -> str:
         return render({"x": text}, {**markers, **out.figure_markers})["x"]
@@ -1500,7 +1522,8 @@ def present(ctx: ThesisContext, doc: Mapping[str, Any], markers: Mapping[str, st
         "status": doc.get("status"), "ticker": ctx.ticker, "company": ctx.company, "version": THESIS_V2_VERSION,
         "as_of": ctx.valuation.get("as_of"), "fingerprint": doc.get("fingerprint"),
         "probability_choice": doc.get("probability_choice"), "probability_reason": doc.get("probability_reason"),
-        "sections": [{"key": k, "title": _title(k, title, ctx), "text": rendered.get(k, ""), "tables": [tabs[n] for n in tn]}
+        "sections": [{"key": k, "title": _title(k, title, ctx), "text": rendered.get(k, ""),
+                      "tables": [tabs[n] for n in tn if n != "expertos" or tabs[n]["rows"]]}
                      for k, title, _, tn in active_sections(ctx)],
         "headline": {"price": markers.get("punto.precio"), "tir5": markers.get("pond.tir5"),
                      "tir10": markers.get("pond.tir10"), "base_tir10": markers.get("esc.base.tir10"),

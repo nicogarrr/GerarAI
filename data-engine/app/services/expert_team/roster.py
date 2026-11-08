@@ -105,7 +105,9 @@ def recopilador_expert() -> ExpertSpec:
         typical_s=25.0,
         prompt_name="expert_recopilador",
         tools=RECOPILADOR_TOOLS,
-        max_tokens=8000,
+        # Medido en POOL (8-nov-2026) con el modelo de la app: con 8.000 el razonamiento se comió todo y la
+        # respuesta llegó vacía (58 s y error); mismo margen que el valorador SOTP.
+        max_tokens=16000,
     )
 
 
@@ -123,7 +125,7 @@ def analyst_blend_expert() -> ExpertSpec:
         typical_s=20.0,
         prompt_name="expert_mezcla_analistas",
         tools=BLEND_TOOLS,
-        max_tokens=6000,
+        max_tokens=16000,  # razonamiento + JSON (con 6.000 el razonamiento puede dejar la respuesta vacía)
     )
 
 
@@ -162,7 +164,7 @@ def esceptico_expert() -> ExpertSpec:
         typical_s=20.0,
         prompt_name="expert_esceptico",
         tools=ESCEPTICO_TOOLS,
-        max_tokens=6000,
+        max_tokens=16000,  # razonamiento + JSON (con 6.000 el razonamiento puede dejar la respuesta vacía)
     )
 
 

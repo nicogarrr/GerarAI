@@ -573,7 +573,7 @@ def valuation_method_lines(valuation: dict) -> list[str]:
 _SKEPTIC_LABELS = "_esceptico_labels"
 
 
-async def _run_thesis_experts(db: Session, ticker: str) -> dict:
+async def _run_thesis_experts(db: Session, ticker: str, *, reasoner=None) -> dict:
     """Etapas del roster, en orden, en la misma sesión y transacción de la tesis."""
     from app.services.expert_team.analyst_blend import run_analyst_blend
     from app.services.expert_team.analyst_notes_source import analyst_notes_source
@@ -583,7 +583,8 @@ async def _run_thesis_experts(db: Session, ticker: str) -> dict:
     from app.services.expert_team.service import provider_reasoner, run_context
 
     ctx = run_context(db, ticker=ticker, mode="thesis")
-    reasoner = provider_reasoner(db=db, commit_usage=False)
+    if reasoner is None:
+        reasoner = provider_reasoner(db=db, commit_usage=False)
     history = None
     history_loaded = False
 
@@ -654,7 +655,18 @@ def _expert_inputs_from_pipeline(pipeline: dict | None) -> dict:
     return {"status": "ok", "recopilador": recopilador, "analista": analista, "errors": []}
 
 
+def _experts_timeout() -> float:
+    """Plazo de las tres etapas juntas: la suma de sus plazos más margen (antes 120 s fijos, menos que una etapa
+    con reintento en el proveedor de la app)."""
+    from app.services.expert_team import roster
+
+    specs = (roster.recopilador_expert(), roster.analyst_blend_expert(), roster.esceptico_expert())
+    return sum(float(spec.timeout_s) for spec in specs) + 60.0
+
+
 def _prepare_thesis_experts(db: Session, ticker: str, *, stored_evidence_only: bool) -> dict | None:
+    """Equipo de expertos ANTES de valorar, dentro de la transacción de la tesis (solo con EXPERT_TEAM_ENABLED).
+    Un fallo o un plazo vencido no rompe la tesis: queda como ``error`` en la traza."""
     from app.core.config import get_settings
 
     if not get_settings().expert_team_enabled or stored_evidence_only:
@@ -666,13 +678,88 @@ def _prepare_thesis_experts(db: Session, ticker: str, *, stored_evidence_only: b
     try:
         asyncio.get_running_loop()
     except RuntimeError:
+        timeout = _experts_timeout()
+
         async def bounded():
-            return await asyncio.wait_for(_run_thesis_experts(db, ticker), timeout=120.0)
+            return await asyncio.wait_for(_run_thesis_experts(db, ticker), timeout=timeout)
 
         from app.services.async_bridge import run_from_any_context
 
-        return run_from_any_context(bounded())
+        try:
+            return run_from_any_context(bounded())
+        except Exception as exc:  # noqa: BLE001 - el equipo no bloquea la tesis
+            logger.warning("equipo de expertos de la tesis %s omitido: %s", ticker, type(exc).__name__)
+            return {"stages": [], "error": type(exc).__name__, "consensus": None}
     raise RuntimeError("La generación de tesis con expertos debe ejecutarse fuera del event loop")
+
+
+#: Tope del equipo tras confirmar la tesis (tres etapas; la tesis v2 y el desglose SOTP van en el mismo job).
+AFTER_COMMIT_TIMEOUT_S = 300.0
+
+
+def run_thesis_experts_after_commit(db: Session, ticker: str, *, ran_before: bool = False) -> dict | None:
+    """Equipo de expertos de la tesis DESPUÉS de confirmarla, para la tesis v2 (THESIS_EXPERTS_ENABLED, defecto
+    encendido). Así su trabajo no se pierde aunque EXPERT_TEAM_ENABLED (chat y paso previo) siga apagado, también
+    en las tesis de seguimiento, y nunca pone en riesgo la tesis ya guardada:
+
+    - corre fuera de su transacción y confirma antes de cada llamada al modelo (una llamada larga con la
+      transacción abierta la corta Postgres a los ``idle_in_transaction_session_timeout_ms``);
+    - un fallo o un plazo vencido se registran y devuelven ``error``; nunca lanza.
+
+    ``ran_before`` = el paso previo ya corrió en esta tesis y guardó su salida: no se repite.
+    """
+    from app.core.config import get_settings
+
+    if not get_settings().thesis_experts_enabled or ran_before:
+        return None
+    import asyncio
+
+    from app.services.async_bridge import run_from_any_context
+    from app.services.expert_team.service import provider_reasoner
+    from app.services.expert_team.thesis_v2_experts import store_pipeline
+
+    db.commit()
+    base = provider_reasoner(db=db, commit_usage=True)
+
+    async def reasoner(system, user, max_tokens, task):
+        db.commit()  # sin transacción abierta mientras el modelo piensa
+        return await base(system, user, max_tokens, task)
+
+    async def bounded():
+        # Tope propio: va antes de la tesis v2 dentro del mismo job (límite de 10 min del worker).
+        return await asyncio.wait_for(_run_thesis_experts(db, ticker, reasoner=reasoner), timeout=AFTER_COMMIT_TIMEOUT_S)
+
+    try:
+        pipeline = run_from_any_context(bounded())
+    except Exception as exc:  # noqa: BLE001 - la tesis ya está confirmada
+        db.rollback()
+        logger.warning("equipo de expertos tras la tesis %s omitido: %s", ticker, type(exc).__name__)
+        return {"stages": [], "error": type(exc).__name__}
+    pipeline.pop(_SKEPTIC_LABELS, None)
+    try:
+        from app.services.company_resolver import resolve_company
+
+        company = resolve_company(db, ticker)
+        if company is not None:
+            store_pipeline(db, company.id, pipeline)
+        db.commit()
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        logger.warning("salida del equipo de expertos de %s no guardada (%s)", ticker, type(exc).__name__)
+    return pipeline
+
+
+def _store_thesis_experts(db: Session, company, pipeline: dict | None) -> None:
+    """Deja la salida del equipo (también la del escéptico, que no escribe) para la tesis v2."""
+    if not pipeline or not pipeline.get("stages"):
+        return
+    try:
+        from app.services.expert_team.thesis_v2_experts import store_pipeline
+
+        with db.begin_nested():
+            store_pipeline(db, company.id, pipeline)
+    except Exception as exc:  # noqa: BLE001 - nunca rompe la tesis
+        logger.warning("salida del equipo de expertos no guardada (%s)", type(exc).__name__)
 
 
 def _apply_thesis_consensus(valuation: dict, pipeline: dict | None) -> None:
@@ -1054,6 +1141,7 @@ class ThesisService:
         _phase("run_valuation")
         valuation = self.valuation_service.value_company(db, company)
         _apply_thesis_consensus(valuation, expert_pipeline)
+        _store_thesis_experts(db, company, expert_pipeline)
         # Los KPIs operativos del marco sin dato ya no despublican la
         # valoracion: se declaran «sin dato (motivo)» en el memo (seccion 3)
         # y siguen en la traza. Solo los inputs centrales del modelo

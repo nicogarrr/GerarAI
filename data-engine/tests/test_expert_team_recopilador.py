@@ -276,14 +276,16 @@ def _bad(mutator):
         (lambda d: d[1].update(driver_key=d[0]["driver_key"]), "repetida"),
     ],
 )
-def test_salida_invalida_no_escribe_nada(db, mutator, fragment) -> None:
+def test_salida_invalida_no_escribe_el_impulsor_malo(db, mutator, fragment) -> None:
+    """Fail-closed por impulsor: tras el reintento, el mal citado no se escribe y los demás (que pasan todas
+    las comprobaciones) sí; antes se perdía el inventario entero («que no se pierda ningún dato»)."""
     llm = FakeLLM([_bad(mutator)])
     result = _run(db, llm)
-    assert result.status == "rejected"
+    assert result.status == "stored"
     assert any(fragment in p for p in result.problems), result.problems
     assert result.llm_calls == 2  # un reintento con los problemas
     assert "problems_previous_answer" in json.loads(llm.calls[1][1])
-    assert db.query(ValueDriver).count() == 0
+    assert db.query(ValueDriver).count() == 2
 
 
 @pytest.mark.parametrize("answer", ["no es json", json.dumps({"otra": 1}), json.dumps({"drivers": "x"})])
