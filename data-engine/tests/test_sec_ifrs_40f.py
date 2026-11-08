@@ -128,8 +128,9 @@ def test_bn_40f_ifrs_se_ingiere_con_semantica_us_gaap(db, monkeypatch):
     assert _annual(db, company, "operating_cash_flow")[2025] == 10_958_000_000.0
     # Patrimonio total con minoritarios NO se usa como patrimonio de la dominante.
     assert _annual(db, company, "total_equity") == {}
-    # Hay prestamos: la deuda neta no se publica como -caja.
-    assert _annual(db, company, "net_debt") == {}
+    # Hay prestamos: la deuda neta no se publica como -caja, sino Borrowings - caja
+    # (FY2025: 14.301 - 16.242 = -1.941 M; FY2024: 14.232 - 15.051 = -819 M).
+    assert _annual(db, company, "net_debt") == {2024: -819_000_000.0, 2025: -1_941_000_000.0}
 
     document = db.scalars(
         select(Document).where(Document.company_id == company.id, Document.source_type == "SEC")
