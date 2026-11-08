@@ -1,0 +1,60 @@
+{
+ "_nota": "Entradas de la nota por módulo (8-nov-2026). Cada número lleva su fuente; provisional hasta las tesis finales.",
+ "valor_intrinseco": {
+  "ic5_holdout": 0.006,
+  "sesgo_nivel_pp": 5.5,
+  "cobertura_bajista_alcista": 0.58,
+  "datos_ok": 24,
+  "datos_total": 53,
+  "metodo_ok": 21,
+  "metodo_total": 22,
+  "_fuente": "backtest-tir-1 REPORT.md (#4767; sesgo y cobertura, 5 años) e IC 5 años del holdout 2010–14 sin la fuga de tasas base (metodo-1, aviso 19:39); AUDIT.md de auditoria-valor-1 (filas de dato, main 81aa6cf41); método: tesis v2 de este lote (nota_tesis)",
+  "_contexto": {
+   "ic1": 0.024,
+   "ic3": 0.033,
+   "ic5_2010_24": 0.067,
+   "ic5_2015_24_pit": 0.087,
+   "q1_previsto": -0.006,
+   "q5_previsto": 0.195,
+   "q1_real": 0.126,
+   "q5_real": 0.144
+  }
+ },
+ "dca": {
+  "ventaja_mediana_pp": 0.61,
+  "ic95_bajo_pp": -0.31,
+  "ic95_alto_pp": 2.5,
+  "tests_ok": 33,
+  "tests_total": 33,
+  "_fuente": "dca-bench-1 REPORT.md: 450 carteras 2010–24, TIR s/ aportado app 15,13 % / plano 14,66 % / comprar y mantener 15,02 % / SPY 14,12 %; gana en 74 %; caída máx −26,1 % vs −23,7 %; universo de supervivientes",
+  "_contexto": {
+   "app": 0.1513,
+   "plano": 0.1466,
+   "byh": 0.1502,
+   "spy": 0.1412,
+   "gana": 0.74,
+   "dd_app": -0.261,
+   "dd_plano": -0.237,
+   "t2020_24": 2.14,
+   "t2020_24_ic": [
+    0.72,
+    5.64
+   ]
+  }
+ },
+ "cerebro": {
+  "aciertos": 75,
+  "casos": 80,
+  "juez_5": 3.51,
+  "p95_s": 16.4,
+  "cifras_inventadas": 0,
+  "_fuente": "cerebro-bench-1 REPORT.md (antes 66/80, 1 cifra inventada, p50 7,4 s, p95 21,2 s; después 75/80, 0, 5,5 s, 16,4 s; juez 3,17 → 3,51)"
+ },
+ "equipo": {
+  "roles_con_aporte": 1,
+  "roles_evaluados": 7,
+  "tesis_en_suelo": null,
+  "tesis_juzgadas": null,
+  "_fuente": "expertos-bench-1 REPORT.md: ablación (pasajes 5/5 p=0,06; guía 1-1-2; insiders 1-2-1; analistas sin datos; recopilador y mezcla apagados; escéptico no está en main) + juez de esta nota contra Numantia"
+ }
+}
