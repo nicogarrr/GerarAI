@@ -12,6 +12,7 @@ from app.core.tenancy import tenant_filters
 from app.models import Company, FinancialFact, FundamentalModelVersion, FundamentalValuationSnapshot
 from app.services.fair_value_service import resolve_fair_values
 from app.services.financial_health import HealthFact, calculate_health
+from app.valuation.cash_burn_base_rate import cash_burn_base_rate, latest_fiscal_year_values
 
 HEALTH_METRICS = {
     "net_income", "total_assets", "operating_cash_flow", "long_term_debt",
@@ -107,11 +108,14 @@ def build_summaries(db: Session, companies: list[Company], *, today: date | None
             "model_version_id": snapshot.model_version_id if snapshot else None,
             "market_price": _number(snapshot.current_price) if snapshot else None,
             "reason": reverse_reason}
+        company_facts = [entry[1] for key, entry in selected.items() if key[0] == company.id]
         out[company.ticker.upper()] = {
             "ticker": company.ticker.upper(), "fair_value": reading,
             "margin_convention": "discount_to_value_v1",
             "reverse_dcf": reverse_summary,
-            "health": calculate_health([entry[1] for key, entry in selected.items()
-                if key[0] == company.id], sector=company.sector, company_type=company.company_type, today=today),
+            "health": calculate_health(company_facts, sector=company.sector,
+                company_type=company.company_type, today=today),
+            # Empresa que quema caja: de dónde parte (tasas base medidas), sin tocar la cifra.
+            "base_rate": cash_burn_base_rate(latest_fiscal_year_values(company_facts), reading),
         }
     return out
