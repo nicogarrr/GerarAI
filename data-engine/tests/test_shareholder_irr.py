@@ -99,7 +99,12 @@ def test_base_pe_sin_deuda():
     assert sp.multiple == pytest.approx(16.0)
     h = E.evaluate(sp, E.Drivers(organic_growth=0.05, organic_growth_late=0.05, cash_conversion=0.5,
                                  dividend_payout=0.5, exit_multiple=16.0))[5]
-    assert h.components["deuda"] == pytest.approx(0.0, abs=1e-12)
+    # La deuda de partida (5.000, de las filiales) no se resta: el paso «deuda» es solo la caja que el
+    # accionista retiene (la mitad del flujo que no va a dividendo), que suma.
+    rows = E.project(sp, E.Drivers(organic_growth=0.05, organic_growth_late=0.05, cash_conversion=0.5,
+                                   dividend_payout=0.5, exit_multiple=16.0), 5)
+    assert rows[0].net_debt == pytest.approx(-0.5 * 0.5 * 250.0 * 1.05)
+    assert h.components["deuda"] > 0
     assert sum(h.components.values()) == pytest.approx(h.irr, abs=1e-12)
 
 
