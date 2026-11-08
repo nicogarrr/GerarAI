@@ -52,6 +52,9 @@ FORM4_TX_KEYS: tuple[str, ...] = (
     # form4.parse_form4_xml lo emite entre is_derivative y rule_10b5_1.
     "security_title",
     "rule_10b5_1",
+    # Form 4/5: acciones tras la operacion y D/I (insiders-1, nov-2026).
+    "shares_owned_after",
+    "direct_indirect",
 )
 
 FORM4_TOP_KEYS: tuple[str, ...] = (
@@ -174,6 +177,8 @@ def transactions_from_edgartools_dataframe(
                 # pie: desconocidos (None), igual que el conector cuando faltan.
                 "security_title": None,
                 "rule_10b5_1": None,
+                "shares_owned_after": None,
+                "direct_indirect": None,
             }
         )
     return {

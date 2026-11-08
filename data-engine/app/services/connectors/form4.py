@@ -74,6 +74,9 @@ def _get_text(url: str, client: httpx.Client | None) -> str:
     return edgar_common.get_text(url, client, headers=default_headers(), throttle=_throttle, sleep=_sleep)
 
 
+FORM4_FAMILY = frozenset({"4", "4/A", "5", "5/A"})
+
+
 def recent_form4_filings(
     cik: str | int,
     *,
@@ -82,10 +85,12 @@ def recent_form4_filings(
 ) -> list[dict]:
     """Filings Form 4 recientes desde el submissions JSON (sincrono)."""
     # Form 4 y sus enmiendas (4/A). Las enmiendas corrigen un filing previo;
-    # excluirlas dejaba correcciones invisibles.
+    # excluirlas dejaba correcciones invisibles. Form 5 (y 5/A) es la
+    # declaracion anual de lo que no se declaro en un Form 4 (regalos,
+    # operaciones exentas o declaradas tarde): mismo XML <ownershipDocument>.
     return edgar_common.recent_filings(
         cik,
-        forms={"4", "4/A"},
+        forms=FORM4_FAMILY,
         limit=limit,
         client=client,
         headers=default_headers(),
@@ -268,6 +273,8 @@ def parse_form4_xml(source: str | bytes) -> dict:
                 "is_officer": _flag(rel, "isOfficer"),
                 "is_ten_percent_owner": _flag(rel, "isTenPercentOwner"),
                 "officer_title": _text(rel, "officerTitle"),
+                "is_other": _flag(rel, "isOther"),
+                "other_text": _text(rel, "otherText"),
             }
         )
 
@@ -280,6 +287,11 @@ def parse_form4_xml(source: str | bytes) -> dict:
             parts.append(f"officer ({title})" if title else "officer")
         if rep["is_ten_percent_owner"]:
             parts.append("10% owner")
+        if rep.get("is_other"):
+            # «Other» del Form 4 (p. ej. socio de un acuerdo de voto o miembro de
+            # un grupo 13D): se muestra su texto, no un «insider» generico.
+            other = rep.get("other_text")
+            parts.append(f"other ({other})" if other else "other")
         return ", ".join(parts) or "insider"
 
     transactions: list[dict] = []
@@ -307,6 +319,12 @@ def parse_form4_xml(source: str | bytes) -> dict:
             if shares is not None and price is not None:
                 value = shares * price
             tx_date = _date(node, "transactionDate")
+            # Acciones que el insider conserva tras la operacion (base de «la
+            # compra es un X % de lo que tenia») y naturaleza de la tenencia
+            # (D directa / I indirecta: trust, familia, sociedad).
+            post = node.find("postTransactionAmounts")
+            owned_after = _decimal(post, "sharesOwnedFollowingTransaction")
+            nature = (_text(node.find("ownershipNature"), "directOrIndirectOwnership") or "").strip().upper() or None
             transactions.append(
                 {
                     "ticker": ticker,
@@ -335,6 +353,8 @@ def parse_form4_xml(source: str | bytes) -> dict:
                     # RSU vs PSU: dos concesiones del mismo tamano no son duplicados.
                     "security_title": (_text(node, "securityTitle/value") or "").strip() or None,
                     "rule_10b5_1": _rule_10b5_1(node, footnotes),
+                    "shares_owned_after": float(owned_after) if owned_after is not None else None,
+                    "direct_indirect": nature,
                 }
             )
 

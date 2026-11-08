@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.models.entities import InsiderFiling, InsiderTransaction
 
-PARSER_VERSION = "1.2"  # 1.2: rule_10b5_1 (planes 10b5-1 via notas al pie/checkbox)
+PARSER_VERSION = "1.3"  # 1.2: rule_10b5_1 (planes 10b5-1 via notas al pie/checkbox); 1.3: acciones tras la operacion + D/I
 
 
 def transaction_fingerprint(accession: str, row_index: int, tx: dict) -> str:
@@ -49,6 +49,11 @@ def _data_quality(tx: dict) -> dict:
     title = str(tx.get("security_title") or "").strip()
     if title:
         quality["security_title"] = title[:120]
+    # Sin columna propia (sin migracion): viajan en data_quality, que ya es JSON.
+    if tx.get("shares_owned_after") is not None:
+        quality["holdings_after"] = float(tx["shares_owned_after"])
+    if tx.get("direct_indirect") in ("D", "I"):
+        quality["ownership"] = tx["direct_indirect"]
     return quality
 
 
@@ -104,7 +109,7 @@ def persist_filing(
         created_filing = True
 
     existing = {
-        row.fingerprint
+        row.fingerprint: row
         for row in db.scalars(
             select(InsiderTransaction).where(
                 InsiderTransaction.filing_id == record.id
@@ -112,10 +117,20 @@ def persist_filing(
         )
     }
     created_tx = 0
+    enriched_tx = 0
     transactions = parsed.get("transactions", [])
     for row_index, tx in enumerate(transactions):
         fp = transaction_fingerprint(accession, row_index, tx)
         if fp in existing:
+            # Fila guardada por un parser anterior (sin acciones tras la
+            # operacion): se completa SOLO ese dato; el resto no se toca.
+            row = existing[fp]
+            fresh = _data_quality(tx)
+            current = dict(row.data_quality or {})
+            missing = {k: v for k, v in fresh.items() if k in ("holdings_after", "ownership") and k not in current}
+            if missing:
+                row.data_quality = {**current, **missing}
+                enriched_tx += 1
             continue
         db.add(
             InsiderTransaction(
@@ -149,5 +164,6 @@ def persist_filing(
         "accession_number": accession,
         "filing_created": created_filing,
         "transactions_created": created_tx,
+        "transactions_enriched": enriched_tx,
         "transactions_seen": len(transactions),
     }
