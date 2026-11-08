@@ -91,6 +91,7 @@ rules:
     include:
     - /data-engine/app/
     # edgar_common: moved existing reviewed form4/form13dg transport; callers restrict SEC hosts.
+    # house_ptr / politician_trades: hosts fijos (disclosures-clerk.house.gov, unitedstates.github.io), sin redirecciones.
     # subtel: fixed HTTPS registry and exact official-host/path validation, no redirects, 5MB cap.
     exclude:
     - /data-engine/app/api/routes/companies.py
@@ -130,6 +131,7 @@ rules:
     - /data-engine/app/services/connectors/form4.py
     - /data-engine/app/services/connectors/fred.py
     - /data-engine/app/services/connectors/gdelt.py
+    - /data-engine/app/services/connectors/house_ptr.py
     - /data-engine/app/services/connectors/ibkr.py
     - /data-engine/app/services/connectors/ir.py
     - /data-engine/app/services/connectors/macro_calendar.py
@@ -154,6 +156,7 @@ rules:
     - /data-engine/app/services/manager_holding_ingestion_service.py
     - /data-engine/app/services/market_observation_service.py
     - /data-engine/app/services/money_flows.py
+    - /data-engine/app/services/politician_trades.py
     - /data-engine/app/services/notification_service.py
     - /data-engine/app/services/public_fetch.py
     - /data-engine/app/services/sec_bottleneck_filings.py

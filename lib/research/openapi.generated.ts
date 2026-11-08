@@ -4097,6 +4097,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/politicians": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Politicians List
+         * @description Una ficha por politico: operaciones, tickers, ultima operacion, % a tiempo,
+         *     presentadas tarde (>45 dias) y mas de 30 dias tarde, tickers mas operados.
+         */
+        get: operations["politicians_list_api_politicians_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/politicians/member/{member_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Politicians Member */
+        get: operations["politicians_member_api_politicians_member__member_key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/politicians/ticker/{ticker}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Politicians Ticker
+         * @description Quien opero el ticker, con cada operacion enlazada a su PTR.
+         */
+        get: operations["politicians_ticker_api_politicians_ticker__ticker__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portfolio": {
         parameters: {
             query?: never;
@@ -24975,6 +25033,143 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SavingsProjectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    politicians_list_api_politicians_get: {
+        parameters: {
+            query?: {
+                chamber?: string;
+                party?: string | null;
+                sort?: string;
+                q?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    politicians_member_api_politicians_member__member_key__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path: {
+                member_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    politicians_ticker_api_politicians_ticker__ticker__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

@@ -72147,6 +72147,690 @@
         ]
       }
     },
+    "/api/politicians": {
+      "get": {
+        "description": "Una ficha por politico: operaciones, tickers, ultima operacion, % a tiempo,\npresentadas tarde (>45 dias) y mas de 30 dias tarde, tickers mas operados.",
+        "operationId": "politicians_list_api_politicians_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "chamber",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "pattern": "^(all|house|senate|executive)$",
+              "title": "Chamber",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "party",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[DRI]$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Party"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "trades",
+              "pattern": "^(trades|late|recent|on_time)$",
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 60,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Politicians List Api Politicians Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Politicians List",
+        "tags": [
+          "politicians"
+        ]
+      }
+    },
+    "/api/politicians/member/{member_key}": {
+      "get": {
+        "operationId": "politicians_member_api_politicians_member__member_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "member_key",
+            "required": true,
+            "schema": {
+              "title": "Member Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Politicians Member Api Politicians Member  Member Key  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Politicians Member",
+        "tags": [
+          "politicians"
+        ]
+      }
+    },
+    "/api/politicians/ticker/{ticker}": {
+      "get": {
+        "description": "Quien opero el ticker, con cada operacion enlazada a su PTR.",
+        "operationId": "politicians_ticker_api_politicians_ticker__ticker__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-email-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Email-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Politicians Ticker Api Politicians Ticker  Ticker  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Politicians Ticker",
+        "tags": [
+          "politicians"
+        ]
+      }
+    },
     "/api/portfolio": {
       "get": {
         "operationId": "list_portfolios_api_portfolio_get",
