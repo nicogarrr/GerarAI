@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import contextlib
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from sqlalchemy import create_engine, delete, event
@@ -93,7 +93,7 @@ def db():
             period=f"{FY}-12-31:FY", fiscal_year=FY, status="ok",
             definition_version="WACC_STANDARD_V1",
             formula="ke*E/(D+E) + kd*(1-t)*D/(D+E)",
-            created_at=datetime(2026, 11, 3, tzinfo=timezone.utc),
+            created_at=datetime(2026, 11, 3, tzinfo=UTC),
         ))
         session.commit()
         session.info["tenant_id"] = 1
