@@ -63,6 +63,16 @@ export function FundHoldersPanel({ data, locale = DEFAULT_LOCALE }: { data: Fund
       </section>
     );
   }
+  if (data.totals.funds === 0) {
+    // Cero OBSERVADO: el fichero se procesó y la acción no está en él. No es
+    // «0 fondos declaran 0 acciones»: se dice que no aparece en este fichero.
+    return (
+      <section aria-label={t('research.fondos.title')} className="space-y-2 rounded-lg border border-gray-800 p-4" data-testid="fondos">
+        {title}
+        <p className="text-sm text-gray-400" role="status">{t('research.fondos.notInDataset', { dataset: datasetLabel(data.dataset, intl) })}</p>
+      </section>
+    );
+  }
   return (
     <section aria-label={t('research.fondos.title')} className="space-y-4 rounded-lg border border-gray-800 p-4" data-testid="fondos">
       <header className="space-y-1">

@@ -2162,6 +2162,7 @@
   "institucionales": {
     "title": "All 13F managers",
     "summary": "{holders} managers report {shares} shares as of {period} (prior quarter: {prior}).",
+    "notInDataset": "This stock does not appear in the {period} 13F filings: no manager reports it this quarter or the prior one.",
     "net": "Net of managers that filed both quarters vs {prior}: {net} shares.",
     "countsLabel": "Quarter moves",
     "top": "Largest holders",
@@ -2194,6 +2195,7 @@
     "noCusip": "No verified CUSIP: cannot match against N-PORT portfolios.",
     "empty": "No N-PORT portfolios synced for this stock yet.",
     "summary": "{funds} US funds and ETFs report {shares} shares ({value}) in the {dataset} N-PORT file.",
+    "notInDataset": "This stock does not appear in the {dataset} N-PORT file: no US-registered fund or ETF reports it in this file.",
     "top": "Most shares",
     "byWeight": "Biggest weight",
     "weightOfFund": "{pct} of the fund",

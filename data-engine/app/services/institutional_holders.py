@@ -290,12 +290,21 @@ def ingest_parsed(db: Session, parses: list[ds.DatasetParse], checksums: list[st
     if current is None or prior is None or prior >= current:
         return {"status": "sin_datos", "reason": "periodos no comparables"}
     periods, ignored = ds.resolve_periods(parses)
+    missing = [label for label, period in (("actual", current), ("previo", prior)) if not periods.get(period)]
+    if missing:
+        # Un trimestre sin 13F VÁLIDOS (todos ignorados: incompletos o cabeceras
+        # cambiadas) NO es ausencia observada: N/D sin persistir. Guardar ceros
+        # sería inventar «no aparece en este fichero», marcaría el fichero como
+        # procesado y congelaría el reintento del refresh semanal.
+        return {"status": "sin_datos", "reason": f"sin 13F válidos en el trimestre {' y '.join(missing)}",
+                "period": current.isoformat(), "prior": prior.isoformat(), "companies": 0, "filings_skipped": ignored}
     checksum = hashlib.sha256("|".join(checksums).encode()).hexdigest()
     stored = 0
     for cusip, company in cusips.items():
         summary = summarize(periods, cusip, current, prior)
-        if summary["totals"]["holders"] == 0 and summary["totals"]["holders_prior"] == 0:
-            continue
+        # Snapshot aunque no haya holders en ningún periodo: sin documento la
+        # ficha serviría el trimestre anterior como actual y el refresh no
+        # sabría que esta empresa ya está procesada para este fichero.
         if persist(db, company, summary, dataset_url=parses[0].url, prior_url=parses[1].url, checksum=checksum) is not None:
             stored += 1
     db.commit()
@@ -334,13 +343,16 @@ def refresh_institutional_holders(db: Session | None = None, client: httpx.Clien
         refs = ds.list_datasets(page.text)[:2]
         if len(refs) < 2:
             return {"status": "sin_datos", "reason": "la página de la SEC no lista dos ficheros"}
-        done = session.scalar(select(PublicSourceDocument.id).where(
-            PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.source_url == refs[0].url).limit(1))
-        if done is not None:
-            return {"status": "sin_cambios", "dataset": refs[0].url}
         cusips = universe_cusips(session)
         if not cusips:
             return {"status": "sin_datos", "reason": "ninguna empresa con CUSIP verificado"}
+        # Procesado = TODAS las empresas del universo tienen documento de este
+        # fichero; una sola sin procesar obliga a recalcular (persist es
+        # idempotente por empresa y checksum, así que solo se guardan las nuevas).
+        processed = set(session.scalars(select(PublicSourceDocument.company_id).where(
+            PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.source_url == refs[0].url)))
+        if all(company.id in processed for company in cusips.values()):
+            return {"status": "sin_cambios", "dataset": refs[0].url}
         parses, checksums = [], []
         for ref in refs:
             path, checksum = _download(http, ref.url)

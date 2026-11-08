@@ -77,6 +77,16 @@ export function InstitutionalHoldersPanel({ data, locale = DEFAULT_LOCALE }: { d
     );
   }
   const totals = data.totals;
+  if (totals.holders === 0 && totals.holders_prior === 0) {
+    // Cero OBSERVADO: el fichero se procesó y la acción no está en él (ni en
+    // el trimestre anterior). No es «0 gestores»: se dice que no aparece.
+    return (
+      <section aria-label={t('research.institucionales.title')} className="space-y-2 rounded-lg border border-gray-800 p-4" data-testid="institucionales">
+        {title}
+        <p className="text-sm text-gray-400" role="status">{t('research.institucionales.notInDataset', { period: fmtDate(data.period, intl) })}</p>
+      </section>
+    );
+  }
   const counts: [InstitutionalStatus, number][] = [
     ['nuevo', totals.nuevo], ['aumenta', totals.aumenta], ['reduce', totals.reduce], ['vende_todo', totals.vende_todo], ['sin_13f_aun', totals.sin_13f_aun], ['sin_13f_previo', totals.sin_13f_previo],
   ];

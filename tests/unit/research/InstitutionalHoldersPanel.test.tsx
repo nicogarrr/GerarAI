@@ -51,4 +51,25 @@ describe('InstitutionalHoldersPanel', () => {
     expect(columns.length).toBeGreaterThan(1);
     columns.forEach((column) => expect(column).toHaveClass('min-w-0'));
   });
+
+  it('cero observado: la acción no aparece en los 13F, no «0 gestores declaran 0 acciones»', () => {
+    const zero: InstitutionalHolders = {
+      ...data,
+      totals: { holders: 0, holders_prior: 0, shares: 0, shares_prior: 0, net_comparable: 0, nuevo: 0, aumenta: 0, reduce: 0, igual: 0, vende_todo: 0, sin_13f_aun: 0, sin_13f_previo: 0 },
+      top_holders: [], buyers: [], sellers: [],
+    };
+    render(<InstitutionalHoldersPanel data={zero} locale="es" />);
+    expect(screen.getByRole('status')).toHaveTextContent(/no aparece en los 13F de 30 jun 2026/);
+    expect(screen.queryByText(/0 gestores declaran/)).not.toBeInTheDocument();
+  });
+
+  it('cero observado en inglés', () => {
+    const zero: InstitutionalHolders = {
+      ...data,
+      totals: { holders: 0, holders_prior: 0, shares: 0, shares_prior: 0, net_comparable: 0, nuevo: 0, aumenta: 0, reduce: 0, igual: 0, vende_todo: 0, sin_13f_aun: 0, sin_13f_previo: 0 },
+      top_holders: [], buyers: [], sellers: [],
+    };
+    render(<InstitutionalHoldersPanel data={zero} locale="en" />);
+    expect(screen.getByRole('status')).toHaveTextContent(/does not appear in the Jun 30, 2026 13F filings/);
+  });
 });

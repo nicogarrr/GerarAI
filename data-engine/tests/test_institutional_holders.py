@@ -223,3 +223,108 @@ def test_no_cambia_el_limite_global_del_modulo_csv():
     importlib.reload(ds)
     ds.parse_dataset(_datasets()[0], {APPLE}, url="https://www.sec.gov/files/x/q.zip")
     assert csv.field_size_limit() == before
+
+
+def _datasets_sin_apple():
+    """Q3 y Q4 de 2026: los gestores presentan 13F, pero ninguno tiene Apple."""
+    q3 = _zip(
+        ["Q3-A\t10-NOV-2026\t13F-HR\t1\t30-SEP-2026", "Q3-B\t11-NOV-2026\t13F-HR\t2\t30-SEP-2026"],
+        ["Q3-A\t30-SEP-2026\t\t\t\tAlpha", "Q3-B\t30-SEP-2026\t\t\t\tBeta"],
+        [_info("Q3-A", OTHER, 100), _info("Q3-B", OTHER, 50)],
+    )
+    q4 = _zip(
+        ["Q4-A\t10-FEB-2027\t13F-HR\t1\t31-DEC-2026", "Q4-B\t11-FEB-2027\t13F-HR\t2\t31-DEC-2026"],
+        ["Q4-A\t31-DEC-2026\t\t\t\tAlpha", "Q4-B\t31-DEC-2026\t\t\t\tBeta"],
+        [_info("Q4-A", OTHER, 110), _info("Q4-B", OTHER, 40)],
+    )
+    return q4, q3
+
+
+def test_ingesta_guarda_snapshot_vacio_sin_holders_en_ningun_periodo():
+    """Bug auditado: si el CUSIP no aparece ni en el trimestre actual ni en el
+    anterior no se guardaba nada, y la ficha servía el trimestre viejo como actual."""
+    db = _db()
+    cusips = ih.universe_cusips(db)
+    assert ih.ingest_parsed(db, _parsed(), ["c2", "c1"], cusips)["companies"] == 1
+    q4, q3 = _datasets_sin_apple()
+    parses = [ds.parse_dataset(q4, set(cusips), url="https://www.sec.gov/files/x/01sep2026-30nov2026_form13f.zip"),
+              ds.parse_dataset(q3, set(cusips), url="https://www.sec.gov/files/x/01jun2026-31aug2026_form13f.zip")]
+    out = ih.ingest_parsed(db, parses, ["c4", "c3"], cusips)
+    assert out["status"] == "ok" and out["companies"] == 1  # snapshot vacío persistido
+    view = ih.institutional_holders(db, "AAPL")
+    assert view["status"] == "ok" and view["period"] == "2026-12-31" and view["prior_period"] == "2026-09-30"
+    assert view["totals"]["holders"] == 0 and view["totals"]["holders_prior"] == 0
+    assert view["totals"]["shares"] == 0 and view["totals"]["shares_prior"] == 0
+    assert view["top_holders"] == [] and view["buyers"] == [] and view["sellers"] == []
+
+
+def test_job_reprocesa_cuando_el_universo_crece():
+    """Bug auditado: bastaba UN documento del ZIP reciente para darlo por hecho;
+    una empresa añadida al universo después se saltaba todo el trimestre."""
+    html = ('<a href="/files/a/01mar2026-31may2026_form13f.zip">x</a><a href="/files/a/01jun2026-31aug2026_form13f.zip">y</a>')
+    q2, q1 = _datasets()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url == ds.DATASETS_PAGE:
+            return httpx.Response(200, text=html)
+        return httpx.Response(200, content=(q2 if "jun2026" in url else q1).getvalue())
+
+    db = _db()
+    out = ih.refresh_institutional_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
+    assert out["status"] == "ok" and out["companies"] == 1
+    # MSFT entra en el universo DESPUÉS (su CUSIP, 594918104, sí está en los ZIP)
+    db.add(Company(ticker="MSFT", name="Microsoft", exchange="NASDAQ", company_type="mature", valuation_model="dcf",
+                   isin="US5949181045"))
+    db.commit()
+    again = ih.refresh_institutional_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
+    assert again["status"] == "ok" and again["companies"] == 1  # solo MSFT; AAPL ya estaba
+    view = ih.institutional_holders(db, "MSFT")
+    assert view["status"] == "ok" and view["period"] == "2026-06-30" and view["totals"]["holders"] >= 1
+    third = ih.refresh_institutional_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
+    assert third["status"] == "sin_cambios"  # universo completo ya procesado
+
+
+def test_ingesta_sin_13f_validos_no_persiste_ni_marca_procesado():
+    """Todos los 13F ignorados (incompletos: 1 fila de 40 declaradas): N/D, no
+    «0 gestores», y el fichero NO queda procesado (el reintento no se congela)."""
+    db = _db()
+    cusips = ih.universe_cusips(db)
+    q2 = _zip(["I2\t15-AUG-2026\t13F-HR\t1\t30-JUN-2026"], ["I2\t30-JUN-2026\t\t\t\tAlpha"], [_info("I2", APPLE, 110)], ["I2\t0\t40"])
+    q1 = _zip(["I1\t15-MAY-2026\t13F-HR\t1\t31-MAR-2026"], ["I1\t31-MAR-2026\t\t\t\tAlpha"], [_info("I1", APPLE, 100)], ["I1\t0\t40"])
+    parses = [ds.parse_dataset(q2, set(cusips), url="https://www.sec.gov/files/x/q2.zip"),
+              ds.parse_dataset(q1, set(cusips), url="https://www.sec.gov/files/x/q1.zip")]
+    out = ih.ingest_parsed(db, parses, ["i2", "i1"], cusips)
+    assert out["status"] == "sin_datos"
+    assert db.query(PublicSourceDocument).count() == 0
+    assert ih.institutional_holders(db, "AAPL")["status"] == "sin_datos"
+
+
+def test_ingesta_actual_sin_13f_validos_no_persiste_aunque_el_previo_sea_valido():
+    """ZIP actual con 1 fila de 40 declaradas (ningún 13F válido) + ZIP previo
+    válido: N/D, no «no aparece en este fichero», y no queda marcado procesado."""
+    db = _db()
+    cusips = ih.universe_cusips(db)
+    q2 = _zip(["I2\t15-AUG-2026\t13F-HR\t1\t30-JUN-2026"], ["I2\t30-JUN-2026\t\t\t\tAlpha"], [_info("I2", APPLE, 110)], ["I2\t0\t40"])
+    q1 = _zip(["P1\t15-MAY-2026\t13F-HR\t1\t31-MAR-2026"], ["P1\t31-MAR-2026\t\t\t\tAlpha"], [_info("P1", OTHER, 100)], ["P1\t0\t1"])
+    parses = [ds.parse_dataset(q2, set(cusips), url="https://www.sec.gov/files/x/q2.zip"),
+              ds.parse_dataset(q1, set(cusips), url="https://www.sec.gov/files/x/q1.zip")]
+    out = ih.ingest_parsed(db, parses, ["i2", "i1"], cusips)
+    assert out["status"] == "sin_datos"
+    assert db.query(PublicSourceDocument).count() == 0
+    assert ih.institutional_holders(db, "AAPL")["status"] == "sin_datos"
+
+
+def test_ingesta_previo_sin_13f_validos_no_persiste_aunque_el_actual_sea_valido():
+    """Simétrico: ZIP previo sin 13F válidos + ZIP actual válido. Comparar con
+    un trimestre vacío inventaría «nuevo»/«sin 13F previo» en todos: N/D."""
+    db = _db()
+    cusips = ih.universe_cusips(db)
+    q2 = _zip(["P2\t15-AUG-2026\t13F-HR\t1\t30-JUN-2026"], ["P2\t30-JUN-2026\t\t\t\tAlpha"], [_info("P2", OTHER, 110)], ["P2\t0\t1"])
+    q1 = _zip(["I1\t15-MAY-2026\t13F-HR\t1\t31-MAR-2026"], ["I1\t31-MAR-2026\t\t\t\tAlpha"], [_info("I1", APPLE, 100)], ["I1\t0\t40"])
+    parses = [ds.parse_dataset(q2, set(cusips), url="https://www.sec.gov/files/x/q2.zip"),
+              ds.parse_dataset(q1, set(cusips), url="https://www.sec.gov/files/x/q1.zip")]
+    out = ih.ingest_parsed(db, parses, ["i2", "i1"], cusips)
+    assert out["status"] == "sin_datos"
+    assert db.query(PublicSourceDocument).count() == 0
+    assert ih.institutional_holders(db, "AAPL")["status"] == "sin_datos"

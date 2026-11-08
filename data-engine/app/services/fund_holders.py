@@ -151,11 +151,19 @@ def fund_holders(db: Session, ticker: str) -> dict[str, Any] | None:
 def ingest_reports(db: Session, reports: dict[str, nport.FundReport], dataset: nport.NportDatasetRef, checksum: str,
                    cusips: dict[str, Company]) -> dict[str, Any]:
     latest = nport.latest_by_series(reports)
+    if not latest:
+        # Sin informes válidos no se guarda nada: un parser que devuelve {}
+        # (cabeceras o fechas cambiadas, sin lanzar) no puede convertirse en
+        # «0 fondos» ni marcar el fichero como procesado (congelaría el
+        # reintento). N/D y a reintentar en la próxima pasada.
+        return {"status": "sin_datos", "reason": "el fichero no trae informes N-PORT válidos", "dataset": dataset.label,
+                "series": 0, "companies": 0}
     stored = 0
     for cusip, company in cusips.items():
         summary = summarize(latest, cusip)
-        if summary["funds"] == 0:
-            continue
+        # Snapshot aunque no haya fondos: sin documento la ficha serviría el
+        # trimestre anterior como si fuera el actual, y el refresh no sabría
+        # que esta empresa ya está procesada para este fichero.
         if persist(db, company, cusip, summary, dataset=dataset, checksum=checksum) is not None:
             stored += 1
     db.commit()
@@ -180,12 +188,16 @@ def refresh_fund_holders(db: Session | None = None, client: httpx.Client | None 
         if not refs:
             return {"status": "sin_datos", "reason": "la página de la SEC no lista ficheros N-PORT"}
         ref = refs[0]
-        if session.scalar(select(PublicSourceDocument.id).where(PublicSourceDocument.provider == PROVIDER,
-                                                                PublicSourceDocument.source_url == ref.url).limit(1)) is not None:
-            return {"status": "sin_cambios", "dataset": ref.url}
         cusips = universe_cusips(session)
         if not cusips:
             return {"status": "sin_datos", "reason": "ninguna empresa con CUSIP verificado"}
+        # Procesado = TODAS las empresas del universo tienen documento de este
+        # fichero; una sola sin procesar obliga a recalcular (persist es
+        # idempotente por empresa y checksum, así que solo se guardan las nuevas).
+        processed = set(session.scalars(select(PublicSourceDocument.company_id).where(
+            PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.source_url == ref.url)))
+        if all(company.id in processed for company in cusips.values()):
+            return {"status": "sin_cambios", "dataset": ref.url}
         digest = hashlib.sha256()
         handle = tempfile.NamedTemporaryFile(prefix="secnport_", suffix=".zip", delete=False)  # noqa: SIM115 - se borra al final
         path = handle.name
