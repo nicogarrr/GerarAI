@@ -9,8 +9,10 @@ Reglas (comprobadas con 8-K reales de TSLA, META y ASTS el 21-oct-2026):
   del evento (presentado entre D y D+2), no por "el ultimo 2.02".
 - EX-99.1/99.2 no dicen si es nota o presentacion (Tesla trae el deck en 99.1, META solo
   la nota, ASTS nota en 99.1 y deck en 99.2): se clasifica por el encabezado real.
-- Solo se enlaza un documento si su propio texto confirma el periodo del evento; si lo
-  contradice o no lo confirma, ante la duda no hay enlace.
+- Solo se enlaza un documento si su propio texto confirma el periodo del evento en contexto
+  (cierre con "ended" o trimestre con año); una fecha suelta de portada no confirma y un
+  "ended" de otro periodo contradice aunque la portada lleve la fecha del cierre. Ante la
+  duda no hay enlace.
 - Emisores extranjeros (6-K/20-F/40-F, sin Item 2.02): se empareja el 6-K de la ventana
   D..D+2 y el periodo lo confirma el propio documento, igual que con el 8-K. Como el 6-K
   de resultados es voluntario, si no hay 6-K en ventana o ningun documento confirma el
@@ -166,8 +168,21 @@ def classify_exhibit(head_html: str) -> str:
     return "documento"
 
 
+_ENDED_RE = re.compile(
+    r"(?:quarter|period|months?|semester|year)\s+(?:ended|ending)\s+([a-z]+)\s+\d{1,2},?\s+(\d{4})",
+    re.IGNORECASE,
+)
+
+
 def check_period(doc_html: str, fiscal_label: str | None) -> str:
-    """``confirmado`` / ``contradice`` / ``no_verificado`` frente al cierre del calendario ("Sep/2026")."""
+    """``confirmado`` / ``contradice`` / ``no_verificado`` frente al cierre del calendario ("Sep/2026").
+
+    Confirma solo el periodo declarado en contexto: un "quarter/period/months ended ..." que
+    coincide con el cierre, o el nombre del trimestre con su año ("second quarter 2026"). Una
+    fecha suelta de portada o publicación ("June 5, 2026") NO confirma. Si el texto declara
+    "ended" de otro periodo y ninguno del cierre, contradice aunque la portada lleve una fecha
+    del mes del cierre; las comparativas de otros años no tumban una confirmación real.
+    """
     match = re.match(r"^([A-Za-z]{3})/(\d{4})$", fiscal_label or "")
     if not match:
         return "no_verificado"
@@ -178,15 +193,15 @@ def check_period(doc_html: str, fiscal_label: str | None) -> str:
     year = match.group(2)
     month = _MONTHS[month_index]
     text = _text(doc_html)[:6000].lower()
-    if re.search(rf"{month}\s+\d{{1,2}},?\s+{year}", text):
+    ended_matches = list(_ENDED_RE.finditer(text))
+    if any(m.group(1) == month and m.group(2) == year for m in ended_matches):
         return "confirmado"
+    if any(m.group(1) in _MONTHS for m in ended_matches):
+        return "contradice"
     if month_index % 3 == 2:
         quarter = month_index // 3
         if re.search(rf"\b{_ORDINALS[quarter]} quarter,? (?:of )?{year}\b|\bq{quarter + 1}\s*{year}\b", text):
             return "confirmado"
-    for ended in re.finditer(r"(?:quarter|period|months?)\s+(?:ended|ending)\s+([a-z]+)\s+\d{1,2},?\s+(\d{4})", text):
-        if ended.group(1) in _MONTHS and (ended.group(1) != month or ended.group(2) != year):
-            return "contradice"
     return "no_verificado"
 
 

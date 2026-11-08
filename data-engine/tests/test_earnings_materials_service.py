@@ -105,6 +105,30 @@ def test_period_confirms_contradicts_or_does_not_assert():
     assert svc.check_period("Highlights", None) == "no_verificado"
 
 
+def test_cover_date_never_confirms_and_ended_context_wins():
+    # Repro del auditor: portada de junio + trimestre cerrado en marzo NO es el T2.
+    assert svc.check_period(
+        "PRESS RELEASE June 5, 2026. Reports results for the quarter ended March 31, 2026.", "Jun/2026"
+    ) == "contradice"
+    # Una fecha suelta de portada/publicacion sin contexto no confirma nada.
+    assert svc.check_period("PRESS RELEASE June 5, 2026. Results attached.", "Jun/2026") == "no_verificado"
+    # Las comparativas de otros periodos no tumban una confirmacion real.
+    assert svc.check_period(
+        "results for the quarter ended June 30, 2026, compared with the quarter ended June 30, 2025", "Jun/2026"
+    ) == "confirmado"
+    # Solo periodo de otro año: contradice.
+    assert svc.check_period("results for the quarter ended June 30, 2025", "Jun/2026") == "contradice"
+
+
+def test_domestic_doc_with_cover_date_but_other_period_links_nothing():
+    sec = FakeSEC(TSLA, {
+        "0001628280-26-049213-index.htm": INDEX,
+        "exhibit991.htm": "PRESS RELEASE July 22, 2026. Production update for the quarter ended March 31, 2026.",
+        "deck.htm": "Highlights without any period",
+    })
+    assert _run(sec, date(2026, 7, 22))["status"] == "periodo_no_coincide"
+
+
 def test_ok_links_only_period_confirmed_documents():
     sec = FakeSEC(TSLA, {
         "0001628280-26-049213-index.htm": INDEX,
