@@ -19,7 +19,7 @@ tests ya existentes de la ruta). El reparto por nivel DCA de plan
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -210,8 +210,10 @@ def test_processing_abandonado_sin_updated_at_no_es_abandono():
 
 
 def test_processing_abandonado_fecha_naive_se_asume_utc():
+    # now fijo: el abandono se evalua contra un reloj doblado, no el real.
     source = SimpleNamespace(status="processing", updated_at=datetime(2020, 1, 1))
-    assert rag_route._processing_abandoned(source) is True
+    ahora = datetime(2026, 1, 1, tzinfo=UTC)
+    assert rag_route._processing_abandoned(source, now=ahora) is True
 
 
 def test_dispatch_sin_cola_es_503(monkeypatch):
