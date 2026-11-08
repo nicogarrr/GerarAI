@@ -97,6 +97,16 @@ npm run generate:openapi  # contrato OpenAPI: no debe dejar diff en git
 ```
 Más detalle de los tests del frontend en [FRONTEND_TESTS.md](FRONTEND_TESTS.md).
 
+### Diagnósticos del repositorio (solo lectura)
+
+```bash
+node scripts/find-dead-code.mjs              # detector de código muerto (el mismo que gatea CI)
+node scripts/repo-size.mjs                   # coste de clonado: árbol, archivos pesados y .git
+node scripts/measure-client-bundle.mjs       # JS de cliente por ruta (tras `npm run build`)
+node scripts/frontend-coverage-summary.mjs   # cobertura Vitest agrupada (tras `npm run test:coverage`)
+npm run diagnose:db                          # conectividad y estado de la base de datos local
+```
+
 ---
 
 ## 4. Resolución de Incidencias Frecuentes en el Entorno Local
