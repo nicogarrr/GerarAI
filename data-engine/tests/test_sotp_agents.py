@@ -174,7 +174,7 @@ def test_a_segment_without_estimates_is_flagged_and_guidance_shows_its_weight():
     model, _ = parse_proposal(raw, _ledger(), ANCHORS)
     flag = next(w for w in model["warnings"] if "infravalorado" in w)
     expected = 600 * 0.45 * 8 * 0.6 / 1.11**4 / 300
-    assert "con la guía de la empresa" in flag and f"{expected:,.2f} $/acción" in flag
+    assert "con la guía de la empresa" in flag and f"{expected:,.2f} USD/acción" in flag
     # Sin recuento por clase (solo la media diluida de la SEC): aviso en la ficha.
     model, _ = parse_proposal(_good(), _ledger(), {**ANCHORS, "shares_basis": "shares_diluted"})
     assert any(w.startswith("Faltan clases de acciones") for w in model["warnings"])

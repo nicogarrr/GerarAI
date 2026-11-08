@@ -81,7 +81,9 @@ SOTP_CONTRACT = (
     '"contratado"|"comercial", "why_status": str (por qué ese estado, con la cita), "business_type": uno de '
     + ", ".join(f'"{k}"' for k in sotp_rules.BUSINESS_TABLE)
     + ', "anchor": {"type": "reportado"|"guia"|"backlog"|"contrato"|"estimacion_analista", "amount_millions": '
-    'número (millones de la divisa, COPIADO de la evidencia), "period": "anual"|"trimestral"|"total", "year": '
+    'número (millones de la divisa, COPIADO de la evidencia), "currency": código ISO de la divisa de la cifra '
+    'tal como la da la cita ("USD", "CAD", "EUR"…) | null si la cita no la dice, '
+    '"period": "anual"|"trimestral"|"total", "year": '
     'entero|null (año al que se refiere la cifra), "years": entero|null (plazo de un contrato o backlog si la '
     'cita lo da), "quote": str (frase exacta de la evidencia que contiene la cifra), "citation": "ev-N"} | null, '
     '"guidance_anchor": {mismo formato, "type": "guia"|"estimacion_analista"} | null (si el ancla no es una previsión '
@@ -182,7 +184,7 @@ def parse_classification(parsed: Any, ledger: EvidenceLedger, *, expert: str = S
         years = _num(anchor_raw.get("years"))
         entry["anchor"] = {"type": kind, "amount_millions": amount, "period": period,
                            "year": int(year) if year else None, "years": int(years) if years else None,
-                           "quote": quote, "sources": sources}
+                           "quote": quote, "sources": sources, "currency": _iso(anchor_raw.get("currency"))}
         guidance = raw.get("guidance_anchor") if isinstance(raw.get("guidance_anchor"), dict) else None
         if guidance and guidance.get("type") in ("guia", "estimacion_analista"):
             g_amount, g_sources, g_quote, g_reason = _verified(guidance, "amount_millions", ledger, expert)
@@ -192,7 +194,8 @@ def parse_classification(parsed: Any, ledger: EvidenceLedger, *, expert: str = S
                 g_year = _num(guidance.get("year"))
                 entry["guidance_anchor"] = {"type": guidance["type"], "amount_millions": g_amount, "period": "anual",
                                             "year": int(g_year) if g_year else None, "years": None,
-                                            "quote": g_quote, "sources": g_sources}
+                                            "quote": g_quote, "sources": g_sources,
+                                            "currency": _iso(guidance.get("currency"))}
         segments.append(entry)
     assets: list[dict[str, Any]] = []
     for raw in (parsed.get("assets") or [])[:MAX_ASSET_PARTS]:
@@ -239,6 +242,26 @@ def parse_classification(parsed: Any, ledger: EvidenceLedger, *, expert: str = S
     }, []
 
 
+def _iso(value: Any) -> str | None:
+    code = str(value or "").strip().upper()
+    return code if len(code) == 3 and code.isalpha() else None
+
+
+def _anchor_currency_problem(anchor: Mapping[str, Any], model_ccy: str | None) -> str | None:
+    """Motivo por el que una cifra no entra en el modelo por su divisa, o None. Sin tipo de cambio en las
+    reglas, una cifra en otra divisa no se suma: se aparta con su motivo en vez de mezclar monedas."""
+    ccy = anchor.get("currency")
+    if ccy and model_ccy and ccy != model_ccy:
+        return f"cifra en {ccy} y el modelo en {model_ccy}: sin convertir, no se mezcla"
+    return None
+
+
+def _anchor_currency_note(anchor: Mapping[str, Any], model_ccy: str | None) -> str:
+    if anchor.get("currency"):
+        return f" Divisa: {anchor['currency']} (la de la cita)."
+    return f" Divisa: {model_ccy or 'N/D'} (la cita no la dice; se toma la de los informes)."
+
+
 def _cut(text: str, limit: int = 300) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
@@ -258,6 +281,8 @@ def build_model(classification: Mapping[str, Any], anchors: Mapping[str, Any]) -
     year = base_year + sotp_rules.HORIZON_YEARS
     growth = sotp_rules.historical_growth(anchors.get("revenue_actuals") or [])
     burns_cash = anchors.get("burns_cash") is True
+    model_ccy = _iso(anchors.get("currency"))
+    per_share = f"{model_ccy}/acción" if model_ccy else "por acción (divisa N/D)"
     parts: list[dict[str, Any]] = []
     warnings: list[str] = []
     unvalued = list(classification.get("unvalued") or [])
@@ -271,11 +296,15 @@ def build_model(classification: Mapping[str, Any], anchors: Mapping[str, Any]) -
         warnings.append("Sin CAPM calculable para esta empresa (faltan beta o tipos): se usa la tasa por defecto.")
     if anchors.get("shares_basis") != "shares_outstanding":
         warnings.append("Faltan clases de acciones: la SEC solo da la media diluida de la clase cotizada; "
-                        "si hay otras clases canjeables, el recuento diluido es más alto y el $/acción más bajo.")
+                        f"si hay otras clases canjeables, el recuento diluido es más alto y el valor {per_share} más bajo.")
     discount = (1 + float(anchors["discount_rate"])) ** (year - base_year)
     shares_total = float(anchors["shares_current_millions"])
     for seg in classification.get("segments") or []:
         status, btype, anchor = seg["status"], seg["business_type"], seg["anchor"]
+        ccy_problem = _anchor_currency_problem(anchor, model_ccy)
+        if ccy_problem:
+            unvalued.append({"name": seg["name"], "status": status, "reason": f"ancla {anchor['type']}: {ccy_problem}"})
+            continue
         # Las reglas vigentes también valen para una clasificación guardada (la cita se conserva).
         if anchor.get("quote"):
             # Al clasificar ya se exigió hablar de ingresos con el pasaje entero; aquí solo queda la cita.
@@ -290,16 +319,20 @@ def build_model(classification: Mapping[str, Any], anchors: Mapping[str, Any]) -
                                                    historical_growth=growth)
         if anchor["type"] in sotp_rules.NON_FORECAST_ANCHORS and status != "comercial":
             guidance = seg.get("guidance_anchor")
-            if guidance:
+            g_problem = _anchor_currency_problem(guidance, model_ccy) if guidance else None
+            if g_problem:
+                warnings.append(f"«{seg['name']}»: infravalorado por falta de estimaciones (ancla {anchor['type']}); "
+                                f"la guía citada no se usa: {g_problem}.")
+            elif guidance:
                 g_rev, g_formula = sotp_rules.revenue_rule(guidance, status, base_year=base_year, valuation_year=year,
                                                            historical_growth=growth)
                 g_ps = g_rev * margin * multiple * probability / discount / shares_total
                 warnings.append(f"«{seg['name']}»: infravalorado por falta de estimaciones (ancla {anchor['type']}); "
-                                f"con la guía de la empresa ({g_formula}) pesaría {g_ps:,.2f} $/acción antes de dilución.")
+                                f"con la guía de la empresa ({g_formula}) pesaría {g_ps:,.2f} {per_share} antes de dilución.")
             else:
                 warnings.append(f"«{seg['name']}»: infravalorado por falta de estimaciones: su ancla es {anchor['type']}, "
                                 "no una previsión de ingresos, y no hay guía de la empresa citada.")
-        quote = f" Cita: «{anchor['quote']}»" if anchor.get("quote") else ""
+        quote = _anchor_currency_note(anchor, model_ccy) + (f" Cita: «{anchor['quote']}»" if anchor.get("quote") else "")
         if period_note:
             quote = f" ({period_note}).{quote}"
         parts.append({
