@@ -34,6 +34,7 @@ from app.valuation.ebitda_components import (
     ebitda_from_components,
     pretax_income,
 )
+from app.valuation.share_units import rescale_shares
 
 logger = logging.getLogger(__name__)
 
@@ -394,6 +395,14 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     shares = _mill(annual.get("shares_diluted", {}).get(last))
     cover = point.get("shares_outstanding")
     cover_sh = _mill(cover)
+    eps_last = _f((annual.get("eps_diluted", {}).get(last) or {}).get("value"))
+    ni_last = ni_attr[-1] if ni_attr[-1] is not None else series("net_income")[-1]  # no el FFO de un REIT
+    implied = (ni_last / eps_last) if (eps_last and ni_last) else None
+    shares, rescaled = rescale_shares(shares, cover_sh, implied)
+    if rescaled:
+        warnings.append(rescaled)
+        cites["shares_scale"] = {"factor": 1000, "reason": rescaled,
+                                 "references": [x for x in (cover, annual.get("eps_diluted", {}).get(last)) if x]}
     fy_end = _end(str((annual.get("revenue", {}).get(last) or annual.get("net_income", {}).get(last) or {}).get("period") or ""))
     cover_end = _end(str((cover or {}).get("period") or ""))
     if cover_sh and cover_end > fy_end and (shares is None or 0.8 <= cover_sh / shares <= 1.2):
