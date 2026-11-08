@@ -362,7 +362,7 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) also checks dependen
 The repository includes the following deployment topology. It is not a statement that a particular installation is configured or healthy:
 
 - **Frontend on Oracle Cloud** (Always Free, Ampere ARM VM) with [`docker-compose.frontend.yml`](docker-compose.frontend.yml): a standalone Next.js server behind Caddy on `gerarai.duckdns.org`, with a loopback-only host port and 1 CPU / 2 GiB limits. Runbook: [docs/frontend-oracle.md](docs/frontend-oracle.md). The Vercel configuration ([`vercel.json`](vercel.json)) stays in the repo as a fallback path; recovery runbook: [docs/RUNBOOK_VERCEL_DEPLOY_RECOVERY.md](docs/RUNBOOK_VERCEL_DEPLOY_RECOVERY.md).
-- **Backend on the same Oracle VM** with [`docker-compose.prod.yml`](docker-compose.prod.yml): Caddy, PostgreSQL, Redis, Qdrant, MinIO, API, worker and scheduler, with health checks and automatic restarts. Setup: [docs/oracle-setup.md](docs/oracle-setup.md).
+- **Backend on the same Oracle VM, on its own hostname** (`BACKEND_DOMAIN` in `.env.production`, e.g. the `sslip.io` address in [`infra/caddy/Caddyfile`](infra/caddy/Caddyfile)) with [`docker-compose.prod.yml`](docker-compose.prod.yml): Caddy, PostgreSQL, Redis, Qdrant, MinIO, API, worker and scheduler, with health checks and automatic restarts. Setup: [docs/oracle-setup.md](docs/oracle-setup.md).
 
 Operational notes:
 

@@ -116,10 +116,13 @@ antes de subir su limite: el presupuesto global no debe pasar de 10 GiB.
    `.env.frontend.production` (modo 600); sigue el runbook de
    `docs/frontend-oracle.md`. Sin ellas el frontend no autentica ni firma
    contra el backend. Las claves son:
-   `FMP_BACKEND_URL=https://<tu-subdominio>.duckdns.org`,
+   `FMP_BACKEND_URL=https://<BACKEND_DOMAIN>` (el hostname del backend en
+   `.env.production`; en la instalacion actual, `https://51.170.37.134.sslip.io`),
    `RESEARCH_AUTH_SECRET` (el mismo valor que en la VM),
    `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL=https://gerarai.duckdns.org`,
    `MONGODB_URI` (Atlas M0), `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID`.
+   Ojo: front y back responden en hostnames distintos (`gerarai.duckdns.org` y
+   `BACKEND_DOMAIN`) aunque ambos estan en la misma VM.
    Si se usa la via de respaldo en Vercel, esas mismas variables van en el
    proyecto de Vercel con `BETTER_AUTH_URL=https://<tu-app>.vercel.app`.
 8. **Backups**: `crontab -e` y anade (horas UTC, sin solapar con el deploy):
@@ -147,7 +150,9 @@ antes de subir su limite: el presupuesto global no debe pasar de 10 GiB.
 
 ## Verificacion tras el despliegue
 
-- `curl -fsS https://<tu-subdominio>.duckdns.org/health/ready` responde OK.
+- `curl -fsS https://<BACKEND_DOMAIN>/health/ready` responde OK (en la VM,
+  no en `gerarai.duckdns.org`: `/health` en el hostname del front redirige a
+  `/sign-in` porque lo sirve el frontend).
 - `docker compose -f docker-compose.prod.yml --env-file .env.production ps`
   muestra todos los servicios `healthy` (incluido el scheduler).
 - En la app (frontend en la VM, `gerarai.duckdns.org`): /portfolio,
