@@ -10,7 +10,7 @@ Esta guía documenta la matriz de diagnósticos, soluciones rápidas y flujos de
 
 | Síntoma / Mensaje de Error | Causa Probable | Solución Inmediata |
 |---|---|---|
-| `401 Unauthorized: Firma criptográfica inválida` | El reloj del cliente Next.js y del backend difiere en >300s o `RESEARCH_AUTH_SECRET` no coincide. | Sincronizar NTP en el host (`chrony` o `ntpdate`) y verificar que `RESEARCH_AUTH_SECRET` en Vercel coincide exactamente con `.env.production`. |
+| `401 Unauthorized: Firma criptográfica inválida` | El reloj del cliente Next.js y del backend difiere en >300s o `RESEARCH_AUTH_SECRET` no coincide. | Sincronizar NTP en el host (`chrony` o `ntpdate`) y verificar que `RESEARCH_AUTH_SECRET` del frontend (`.env.frontend.production` en la VM; en la vía de respaldo, el proyecto de Vercel) coincide exactamente con `.env.production`. |
 | `409 Conflict: Cannot sell X shares; only Y shares are available` | Intento de registrar una venta que deja la posición en negativo (descubierto prohibido). | Verificar el orden cronológico de las compras y ventas del ticker mediante el extracto del bróker. |
 | `500 Internal Server Error: connection to server at postgres:5432 failed` | PostgreSQL se está iniciando, no está listo para aceptar conexiones o alcanzó `max_connections`. | Comprobar logs: `docker compose logs postgres`. Verificar pool de conexiones con `SELECT count(*) FROM pg_stat_activity;`. |
 | `Circuit breaker OPEN for source: FMP / Alpha Vantage` | La API externa ha superado el umbral de fallos consecutivos o el límite de peticiones (429 Too Many Requests). | El sistema conmuta automáticamente a caché o a la fuente secundaria. No reiniciar el contenedor; esperar al intervalo half-open (60 segundos). |
