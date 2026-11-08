@@ -21,6 +21,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const EMPTY: CalendarFeedState = { active: false, scope: null, created_at: null, last_used_at: null };
 
+const DEFAULT_ORIGIN = 'https://gerarai.duckdns.org';
+// Dominio propio detrás de Caddy + hosts locales de desarrollo. Otro despliegue
+// debe fijar NEXT_PUBLIC_SITE_URL.
+const TRUSTED_HOSTS = new Set(['gerarai.duckdns.org', 'localhost', 'localhost:3000', '127.0.0.1', '127.0.0.1:3000']);
+
 export default async function CalendarSubscriptionPage() {
     const ti = await getT();
     let state: CalendarFeedState;
@@ -42,15 +47,19 @@ export default async function CalendarSubscriptionPage() {
     if (envOrigin) {
         origin = envOrigin.replace(/\/+$/, '');
     } else {
+        // El enlace de suscripción lleva el token del feed en la URL: si el host
+        // saliera de una cabecera controlable por el cliente (Caddy reenvía el
+        // Host original), el enlace apuntaría a un dominio ajeno. Solo se acepta
+        // el dominio propio o un host local de desarrollo; cualquier otro cae al
+        // dominio propio.
         const headerList = await headers();
-        const rawHost = headerList.get('x-forwarded-host') ?? headerList.get('host') ?? 'gerarai.vercel.app';
-        const hostFirst = rawHost.split(',')[0].trim();
-        const host = /^[a-zA-Z0-9.-]+(:\d+)?$/.test(hostFirst) ? hostFirst : 'gerarai.vercel.app';
+        const rawHost = headerList.get('x-forwarded-host') ?? headerList.get('host') ?? '';
+        const host = rawHost.split(',')[0].trim().toLowerCase();
 
         const rawProto = headerList.get('x-forwarded-proto') ?? 'https';
         const protoFirst = rawProto.split(',')[0].trim().toLowerCase();
         const proto = protoFirst === 'http' || protoFirst === 'https' ? protoFirst : 'https';
-        origin = `${proto}://${host}`;
+        origin = TRUSTED_HOSTS.has(host) ? `${proto}://${host}` : DEFAULT_ORIGIN;
     }
 
     return (
