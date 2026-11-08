@@ -7,6 +7,13 @@ dispatch (404/feliz), canales (404/feliz con dedup), email-preferences (401),
 _push_identity, y todo el bloque push: config, status, registro de dispositivo
 (409/422/403/alta/actualizacion), baja y preferencias (409/403/alta/cambio).
 
+Refuerzo (deuda del auditor): las altas de suscripcion y preferencia
+assertan la fila completa (tenant, user, endpoint_hash, p256dh, auth,
+user_agent / event_type, enabled, enabled_at); los rechazos 409/422/403
+assertan que NO se llama a db.add ni db.commit; desactivar asserta con
+espias que no se consulta ni la config ni los dispositivos; y el listado
+de reglas inspecciona la SQL compilada con valores literales.
+
 Que NO se prueba aqui: nada de HTTP ni auth; ninguna base de datos real (las
 consultas SQL se construyen pero van contra una db doblada: el filtrado SQL
 real NO se prueba); AlertRuleService, ReviewAlertService, NotificationService,
@@ -67,6 +74,13 @@ def test_listar_reglas_con_ticker_y_activas(monkeypatch):
     db = _db()
     db.scalars.return_value.all.return_value = []
     assert a.list_alert_rules(ticker="ASTS", active=True, limit=10, offset=0, db=db) == []
+    # La SQL construida se inspecciona compilada (valores literales); NO se
+    # ejecuta contra ninguna base de datos.
+    stmt = db.scalars.call_args.args[0]
+    sql = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+    assert "company_id = 7" in sql
+    assert "active IS true" in sql
+    assert "ORDER BY" in sql and "created_at DESC" in sql and "id DESC" in sql
 
 
 def test_evaluar_reglas_delega(monkeypatch):
@@ -271,9 +285,12 @@ def test_registro_push_sin_configurar_es_409(monkeypatch):
 
     monkeypatch.setattr(web_push, "is_configured", lambda settings: False)
     monkeypatch.setattr(a, "get_settings", _settings)
+    db = _db()
     with pytest.raises(HTTPException) as exc:
-        a.register_push_device(_sub_payload(), db=_db())
+        a.register_push_device(_sub_payload(), db=db)
     assert exc.value.status_code == 409
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
 
 
 def test_registro_push_endpoint_no_soportado_es_422(monkeypatch):
@@ -282,9 +299,12 @@ def test_registro_push_endpoint_no_soportado_es_422(monkeypatch):
     monkeypatch.setattr(web_push, "is_configured", lambda settings: True)
     monkeypatch.setattr(web_push, "endpoint_is_allowed", lambda endpoint: False)
     monkeypatch.setattr(a, "get_settings", _settings)
+    db = _db()
     with pytest.raises(HTTPException) as exc:
-        a.register_push_device(_sub_payload(), db=_db())
+        a.register_push_device(_sub_payload(), db=db)
     assert exc.value.status_code == 422
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
 
 
 def test_registro_push_dispositivo_de_otro_es_403(monkeypatch):
@@ -299,6 +319,8 @@ def test_registro_push_dispositivo_de_otro_es_403(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         a.register_push_device(_sub_payload(), db=db)
     assert exc.value.status_code == 403
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
 
 
 def test_registro_push_alta_nueva(monkeypatch):
@@ -314,6 +336,15 @@ def test_registro_push_alta_nueva(monkeypatch):
     assert result == {"registered": True}
     db.add.assert_called_once()
     db.commit.assert_called_once()
+    # La fila de alta lleva TODOS los campos de la suscripcion.
+    fila = db.add.call_args.args[0]
+    assert fila.tenant_id == 1
+    assert fila.user_id == "u1"
+    assert fila.endpoint == "https://push.example.com/sub/abcdef"
+    assert fila.endpoint_hash == "h1"
+    assert fila.p256dh == "B" * 24
+    assert fila.auth_secret == "A" * 12
+    assert fila.user_agent == "agente"
 
 
 def test_registro_push_actualiza_existente(monkeypatch):
@@ -328,6 +359,9 @@ def test_registro_push_actualiza_existente(monkeypatch):
     db.scalar.return_value = fila
     a.register_push_device(_sub_payload(), db=db)
     assert fila.p256dh == "B" * 24
+    assert fila.auth_secret == "A" * 12
+    assert fila.user_agent == "agente"
+    db.commit.assert_called_once()
     db.add.assert_not_called()
 
 
@@ -358,9 +392,12 @@ def test_preferencia_push_activar_sin_configurar_es_409(monkeypatch):
 
     monkeypatch.setattr(web_push, "is_configured", lambda settings: False)
     monkeypatch.setattr(a, "get_settings", _settings)
+    db = _db()
     with pytest.raises(HTTPException) as exc:
-        a.set_push_preference("new_filing", a.PushPreferenceIn(enabled=True), db=_db())
+        a.set_push_preference("new_filing", a.PushPreferenceIn(enabled=True), db=db)
     assert exc.value.status_code == 409
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
 
 
 def test_preferencia_push_activar_sin_dispositivos_es_403(monkeypatch):
@@ -369,9 +406,12 @@ def test_preferencia_push_activar_sin_dispositivos_es_403(monkeypatch):
     monkeypatch.setattr(web_push, "is_configured", lambda settings: True)
     monkeypatch.setattr(web_push, "devices_for", lambda db, t, u: [])
     monkeypatch.setattr(a, "get_settings", _settings)
+    db = _db()
     with pytest.raises(HTTPException) as exc:
-        a.set_push_preference("new_filing", a.PushPreferenceIn(enabled=True), db=_db())
+        a.set_push_preference("new_filing", a.PushPreferenceIn(enabled=True), db=db)
     assert exc.value.status_code == 403
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
 
 
 def test_preferencia_push_alta_nueva(monkeypatch):
@@ -385,6 +425,13 @@ def test_preferencia_push_alta_nueva(monkeypatch):
     result = a.set_push_preference("new_filing", a.PushPreferenceIn(enabled=True), db=db)
     assert result["enabled"] is True
     db.add.assert_called_once()
+    # La fila de alta queda completa: tenant, user, evento, enabled y fecha.
+    fila = db.add.call_args.args[0]
+    assert fila.tenant_id == 1
+    assert fila.user_id == "u1"
+    assert fila.event_type == "new_filing"
+    assert fila.enabled is True
+    assert fila.enabled_at is not None
 
 
 def test_preferencia_push_reactivar_marca_fecha(monkeypatch):
@@ -404,9 +451,19 @@ def test_preferencia_push_reactivar_marca_fecha(monkeypatch):
 def test_preferencia_push_desactivar_no_pide_config_ni_dispositivos(monkeypatch):
     # enabled=False salta las comprobaciones de configuracion y dispositivos,
     # y sobre una fila existente no toca enabled_at.
+    from app.services import web_push
+
+    configurada = Mock(return_value=False)
+    dispositivos = Mock(return_value=[])
+    monkeypatch.setattr(web_push, "is_configured", configurada)
+    monkeypatch.setattr(web_push, "devices_for", dispositivos)
     fila = SimpleNamespace(enabled=True, enabled_at="ayer")
     db = _db()
     db.scalar.return_value = fila
     result = a.set_push_preference("new_filing", a.PushPreferenceIn(enabled=False), db=db)
     assert result["enabled"] is False
     assert fila.enabled_at == "ayer"
+    configurada.assert_not_called()
+    dispositivos.assert_not_called()
+    db.commit.assert_called_once()
+    db.add.assert_not_called()

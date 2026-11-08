@@ -8,6 +8,11 @@ chunks), extraccion de principios (404, job activo, dispatch y su fallo),
 jobs (lista, get), principios (lista, action con merge/decide/409, revision
 con 400/422/409) y el validador de espacios.
 
+Refuerzo (deuda del auditor): el alta del job de extraccion asserta los
+campos persistidos, los dos commit y el send al actor con tenant/user; el
+fallo de la cola asserta el job marcado "failed" con su error; las
+colecciones assertan la llamada al servicio con sus argumentos.
+
 Que NO se prueba aqui: nada de HTTP ni auth; ninguna base de datos real
 (las consultas SQL se construyen pero van contra una db doblada: el
 filtrado SQL real NO se prueba); KnowledgeLibraryService,
@@ -95,13 +100,16 @@ def test_chat_biblioteca_eco_del_contexto(monkeypatch):
 
 
 def test_instalar_colecciones_por_defecto(monkeypatch):
+    instaladas = Mock(return_value=[COLLECTION])
     monkeypatch.setattr(
         k,
         "KnowledgeLibraryService",
-        lambda: SimpleNamespace(ensure_default_collections=lambda db: [COLLECTION]),
+        lambda: SimpleNamespace(ensure_default_collections=instaladas),
     )
-    result = k.install_default_collections(db=_db())
+    db = _db()
+    result = k.install_default_collections(db=db)
     assert result[0]["slug"] == "cartas"
+    instaladas.assert_called_once_with(db)
 
 
 def test_lista_colecciones():
@@ -112,13 +120,20 @@ def test_lista_colecciones():
 
 
 def test_crear_coleccion(monkeypatch):
+    creada = Mock(return_value=COLLECTION)
     monkeypatch.setattr(
         k,
         "KnowledgeLibraryService",
-        lambda: SimpleNamespace(create_collection=lambda db, **kw: COLLECTION),
+        lambda: SimpleNamespace(create_collection=creada),
     )
-    payload = k.CollectionCreate(name="Cartas")
-    assert k.create_collection(payload, db=_db())["slug"] == "cartas"
+    payload = k.CollectionCreate(
+        name="Cartas", description="d", collection_type="custom",
+    )
+    db = _db()
+    assert k.create_collection(payload, db=db)["slug"] == "cartas"
+    creada.assert_called_once_with(
+        db, name="Cartas", description="d", collection_type="custom",
+    )
 
 
 def test_crear_coleccion_duplicada_es_409(monkeypatch):
@@ -414,17 +429,28 @@ def test_extract_con_job_activo_devuelve_el_job():
 def test_extract_encola_job_nuevo(monkeypatch):
     from app.workers import dramatiq_app
 
-    class ActorFalso:
-        def send(self, *a, **kw):
-            return SimpleNamespace(message_id="m9")
-
-    monkeypatch.setattr(dramatiq_app, "extract_knowledge_principles", ActorFalso())
+    enviados = Mock()
+    enviados.send.return_value = SimpleNamespace(message_id="m9")
+    monkeypatch.setattr(dramatiq_app, "extract_knowledge_principles", enviados)
     db = _db()
     db.get.return_value = SimpleNamespace(id=5)
     db.scalar.return_value = None
     result = k.extract_principles(5, db=db)
+    # El job se persiste ANTES de encolar: estado y campos tal cual quedan.
+    job = db.add.call_args.args[0]
+    assert isinstance(job, k.ProcessingJob)
+    assert job.job_type == "knowledge_principle_extraction"
+    assert job.entity_type == "knowledge_document"
+    assert job.entity_id == 5
+    assert job.status == "queued"
+    db.add.assert_called_once_with(job)
+    assert db.commit.call_count == 2  # alta del job + broker_message_id
+    assert db.refresh.call_count == 2
+    enviados.send.assert_called_once()
+    assert enviados.send.call_args.args == (job.id,)
+    assert enviados.send.call_args.kwargs == {"tenant_id": 1, "user_id": 2}
+    assert job.result == {"broker_message_id": "m9"}
     assert result["result"] == {"broker_message_id": "m9"}
-    assert db.add.call_count == 1
 
 
 def test_extract_sin_cola_marca_fallido_y_503(monkeypatch):
@@ -441,6 +467,12 @@ def test_extract_sin_cola_marca_fallido_y_503(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         k.extract_principles(5, db=db)
     assert exc.value.status_code == 503
+    # El fallo de la cola queda persistido en el job (lo lee GET /jobs/{id}).
+    job = db.add.call_args.args[0]
+    assert job.status == "failed"
+    assert job.error == "Queue dispatch failed: ConnectionError"
+    assert db.commit.call_count == 2  # alta + marcado de fallo
+    assert exc.value.detail["job_id"] == job.id
 
 
 def test_lista_jobs_devuelve_mapeo():
