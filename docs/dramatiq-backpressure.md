@@ -6,10 +6,12 @@ Los carriles ya estaban separados por proceso: default, prices, KPI (4
 hilos), thesis (2), alerts (2, colas alerts+computed), GDELT (2). Los hilos
 de default y prices son configurables con `WORKER_THREADS` (defectos 4 y 2 en
 `docker-compose.prod.yml`). Un proceso por servicio, con pool SQLAlchemy por
-proceso: `DB_POOL_SIZE` configurable (`WORKER_DB_POOL_SIZE`, defecto 4 en
-workers, 8 en el worker principal, 20 en backend) + 10 de overflow por
-defecto. No equivale a un presupuesto global fijo: la suma de procesos puede
-abrir mas conexiones.
+proceso segun `docker-compose.prod.yml`: workers 4+2 y worker principal 8+2
+(`WORKER_DB_POOL_SIZE` / `WORKER_DB_MAX_OVERFLOW`), backend 20+10
+(`DB_POOL_SIZE`; overflow 10 por defecto de `config.py`). Los defaults
+nativos de `config.py` (10+10) quedan sobrescritos por el compose. No
+equivale a un presupuesto global fijo: la suma de procesos puede abrir mas
+conexiones.
 Esta PR no sube procesos, hilos, memoria ni el pool. No demuestra capacidad
 fisica de la VM 2 OCPU / 12 GB: no ejecuta carga ni despliega en produccion.
 
