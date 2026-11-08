@@ -15,7 +15,7 @@ import { CHART_RANGES, type CompanyChartRange } from '@/lib/market/chart-ranges'
 import { normalizeChartPriceUnits } from '@/lib/market/chart-price-units';
 import { adx, cleanBars, dailyPivots, fibonacci, preferCandlesticks, rangeBars, sma, structure } from '@/lib/market/technical';
 import { getChartEvents, type ChartEvents } from '@/lib/actions/price-events.actions';
-import { barsSince, detectMovements, eventsInRange, movementEvents, markersByDay, targetDistancePercent, volumeSpikeFlags, type PriceEventKind } from '@/lib/market/price-events';
+import { barsSince, detectMovements, eventsInRange, markerSize, movementEvents, markersByDay, targetDistancePercent, volumeSpikeFlags, type PriceEventKind } from '@/lib/market/price-events';
 import { PriceEventsPanel } from '@/components/research/PriceEventsPanel';
 import { storedEventText } from '@/lib/market/price-events-text';
 
@@ -286,12 +286,14 @@ function PriceCanvas({ bars, levels, currency, candleMode = false, hourly = fals
         current.volume.setData(bars.flatMap((bar, index) => typeof bar.volume === 'number' && Number.isFinite(bar.volume) && bar.volume >= 0
             ? [{ time: timeOf(bar), value: bar.volume, color: spikes[index] ? 'rgba(251,113,133,0.85)' : bar.close >= (bars[index - 1]?.close ?? bar.close) ? 'rgba(45,212,191,0.35)' : 'rgba(248,113,113,0.35)' }]
             : []));
-        const known = new Set(bars.map((bar) => bar.date));
-        const seriesMarkers: SeriesMarker<Time>[] = hourly ? [] : markers.filter((marker) => known.has(marker.date)).map((marker) => ({ time: marker.date as Time, position: 'aboveBar', shape: 'circle', color: marker.color, text: marker.text, size: marker.count > 1 ? 1.4 : 1 }));
-        current.markers.setMarkers(candleMode ? [] : seriesMarkers);
-        current.candleMarkers.setMarkers(candleMode ? seriesMarkers : []);
         // En movil las etiquetas de precio de R/S taparian las del eje; los niveles exactos van en la tabla de pivotes.
         const wide = window.matchMedia('(min-width: 640px)').matches;
+        const known = new Set(bars.map((bar) => bar.date));
+        // Marcadores más pequeños en pantallas estrechas: a tamaño fijo se
+        // solapaban hasta ser ilegibles (markerSize, tests en price-events).
+        const seriesMarkers: SeriesMarker<Time>[] = hourly ? [] : markers.filter((marker) => known.has(marker.date)).map((marker) => ({ time: marker.date as Time, position: 'aboveBar', shape: 'circle', color: marker.color, text: marker.text, size: markerSize(marker.count, wide) }));
+        current.markers.setMarkers(candleMode ? [] : seriesMarkers);
+        current.candleMarkers.setMarkers(candleMode ? seriesMarkers : []);
         // Las líneas viven en la serie ACTIVA (línea o velas); al alternar de
         // modo hay que retirarlas de ambas (la que no las creó no-op).
         for (const level of current.levels) { current.line.removePriceLine(level); current.candles.removePriceLine(level); }

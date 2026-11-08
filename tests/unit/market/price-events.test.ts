@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { barsSince, detectMovements, eventsInRange, movementEvents, markersByDay, targetDistancePercent, volumeSpikeFlags, type PriceEvent } from '@/lib/market/price-events';
+import { barsSince, detectMovements, eventsInRange, markerSize, movementEvents, markersByDay, targetDistancePercent, volumeSpikeFlags, type PriceEvent } from '@/lib/market/price-events';
 
 const day = (i: number) => new Date(Date.UTC(2026, 0, 1) + i * 86_400_000).toISOString().slice(0, 10);
 
@@ -37,6 +37,18 @@ describe('Precio y eventos: cálculos del gráfico de la ficha', () => {
         expect(markers).toHaveLength(2);
         expect(markers[0]).toMatchObject({ date: '2026-03-01', count: 2, text: '2', kinds: ['results', 'news'] });
         expect(markersByDay(inRange, new Set(['news']))[0]).toMatchObject({ count: 1, text: 'R' });
+    });
+
+    it('tamaño de marcador: más pequeño en pantalla estrecha para que no se solapen', () => {
+        // Escritorio: tamaños históricos (1 / 1,4 con varios eventos en el día).
+        expect(markerSize(1, true)).toBe(1);
+        expect(markerSize(5, true)).toBe(1.4);
+        // Móvil (<640 px): el círculo se encoge para no tapar al vecino;
+        // el texto (letra o cuenta) y el color no cambian.
+        expect(markerSize(1, false)).toBe(0.6);
+        expect(markerSize(5, false)).toBe(0.9);
+        // Un día con muchos eventos nunca queda más pequeño que uno con uno.
+        expect(markerSize(5, false)).toBeGreaterThan(markerSize(1, false));
     });
 
     it('«Desde compra» empieza en la fecha de la primera compra', () => {
