@@ -21,6 +21,9 @@ Reglas (``RULES_VERSION``):
 * Múltiplo de salida: con ≥ 3 comparables calculados, base = media entre el propio y la mediana de los
   comparables; bajista = 0,9 × el menor de los dos; alcista = el mayor. Sin comparables: base = el propio
   (sin cambio de múltiplo), bajista 0,8×, alcista 1,2×. Acotado a [4, 25] (EV/EBITDA) o [6, 35] (PER).
+* Base ``pb`` (valor contable/NAV: aseguradoras, bancos, holdings): «ingresos» = valor contable atribuible,
+  «margen» = ROE; crecimiento = ROE × (1 − reparto) con el reparto mediano (dividendos + recompras sobre el
+  beneficio) de los tres últimos ejercicios; múltiplo P/VC acotado a [0,5; 5].
 * Probabilidades 25 / 50 / 25 (convención fija; el redactor puede elegir otra de ``PROBABILITY_SETS`` con
   su razón, y la TIR ponderada se recalcula).
 """
@@ -33,7 +36,7 @@ from typing import Any
 
 from app.valuation.shareholder_irr import Drivers, StartingPoint
 
-RULES_VERSION = "shareholder-irr-rules-v1"
+RULES_VERSION = "shareholder-irr-rules-v2"
 LONG_RUN_GROWTH = 0.04
 SCENARIOS = ("bear", "base", "bull")
 SCENARIO_LABELS = {"bear": "Bajista", "base": "Base", "bull": "Alcista"}
@@ -44,7 +47,7 @@ PROBABILITY_SETS: dict[str, dict[str, float]] = {
     "sesgo_alcista": {"bear": 0.15, "base": 0.45, "bull": 0.40},
 }
 DEFAULT_PROBABILITIES = "simetrico"
-MULTIPLE_BOUNDS = {"ev_ebitda": (4.0, 25.0), "pe": (6.0, 35.0)}
+MULTIPLE_BOUNDS = {"ev_ebitda": (4.0, 25.0), "pe": (6.0, 35.0), "pb": (0.5, 5.0)}
 MIN_PEERS = 3
 
 #: Tasas base: TCAC de ingresos de los 5 años SIGUIENTES (p25, p50, p75) según la TCAC de los 3 años
@@ -175,13 +178,24 @@ def build_scenarios(sp: StartingPoint, hist: History, *, peer_multiples: Sequenc
         mg = dict.fromkeys(SCENARIOS, margin0)
         out.warnings.append("sin margen histórico: margen constante")
     out.trace["margen"] = {"ultimos": margin_last3, "partida": margin0, "valores": mg}
-    lo_c, hi_c = (0.3, 1.5) if sp.basis == "pe" else (0.0, 1.2)
+    lo_c, hi_c = {"pe": (0.3, 1.5), "pb": (0.0, 1.0)}.get(sp.basis, (0.0, 1.2))
     if conv:
         cv = {"bear": min(conv), "base": median(conv), "bull": max(conv)}
     else:
         cv = dict.fromkeys(SCENARIOS, 0.5)
         out.warnings.append("sin flujo de caja operativo y capex: conversión supuesta del 50 %")
     cv = {k: _clamp(v, lo_c, hi_c) for k, v in cv.items()}
+    if sp.basis == "pb":
+        # Valor contable: lo que no se reparte se queda en el balance y compone al ROE. Un único reparto (el
+        # mediano) para los tres escenarios; el crecimiento del valor contable = ROE × (1 − reparto), así que
+        # el escenario cambia por el ROE, no por un crecimiento elegido aparte.
+        cv = dict.fromkeys(SCENARIOS, cv["base"])
+        growth = {k: mg[k] * (1 - cv[k]) for k in SCENARIOS}
+        late = {k: (v + LONG_RUN_GROWTH) / 2 for k, v in growth.items()}
+        out.trace["crecimiento"] |= {
+            "valores": growth, "anos_6_10": late, "tramo_tasa_base": None, "tasa_base": None,
+            "regla": "valor contable: ROE del escenario × (1 − reparto mediano de los tres últimos ejercicios)",
+        }
     out.trace["conversion"] = {"ultimos": conv, "valores": cv}
     mna = {"bear": mna_pct / 2, "base": mna_pct, "bull": mna_pct}
     out.trace["mna"] = {"gasto_pct_ingresos": mna_pct, "multiplo_pagado": m0, "valores": mna}

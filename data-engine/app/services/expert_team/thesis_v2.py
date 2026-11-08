@@ -134,6 +134,31 @@ def shares(value: float | None) -> str:
 
 # ----------------------------------------------------------------------------------------------- contexto
 
+KIND_LABELS = {"operating": "empresa operativa", "insurer": "aseguradora", "bank": "banco",
+               "holding": "holding o gestora", "real_estate": "inmobiliaria (REIT)",
+               "pre_revenue": "empresa sin beneficio (preingresos o quema caja)"}
+
+
+def basis_labels(sp: Mapping[str, Any]) -> dict[str, str]:
+    """Cómo se llama cada pieza según la base de la valoración (lo usan tablas, umbrales y marcadores)."""
+    basis = sp.get("basis")
+    if basis == "pb":
+        return {"earnings": "Valor contable atribuible", "earnings_formula": "patrimonio de la matriz − preferentes",
+                "multiple": "P/VC", "margin": "ROE", "conversion": "Reparto (dividendos + recompras) / beneficio",
+                "growth": "Crecimiento del valor contable"}
+    if basis == "pe" and sp.get("earnings_label") == "FFO":
+        return {"earnings": "FFO de partida", "earnings_formula": "beneficio neto + amortizaciones − plusvalías por ventas",
+                "multiple": "P/FFO", "margin": "Margen FFO", "conversion": "Conversión de caja (flujo libre / FFO)",
+                "growth": "Crecimiento de ingresos"}
+    if basis == "pe":
+        return {"earnings": "Beneficio de partida", "earnings_formula": "beneficio neto atribuible", "multiple": "PER",
+                "margin": "Margen neto", "conversion": "Conversión de caja (flujo libre / beneficio)",
+                "growth": "Crecimiento de ingresos"}
+    return {"earnings": "EBITDA de partida", "earnings_formula": "resultado operativo + amortizaciones del último ejercicio",
+            "multiple": "EV / EBITDA", "margin": "Margen EBITDA", "conversion": "Conversión de caja (flujo libre / EBITDA)",
+            "growth": "Crecimiento de ingresos"}
+
+
 def _point_by_year(db: Session, company: Company, metrics: Sequence[str]) -> dict[str, dict[int, float]]:
     """Datos de balance al cierre de cada ejercicio (millones), mejor fuente por cierre."""
     from app.models import FinancialFact
@@ -194,9 +219,27 @@ def kill_switches(val: Mapping[str, Any], hist_rows: Sequence[Mapping[str, Any]]
         out.append({"key": key, "metric": metric, "threshold": threshold_text, "current": current,
                     "status": "saltado" if broken else "ok", "action": action, "why": why})
 
+    labels = basis_labels(sp)
+    pb = sp.get("basis") == "pb"
     g_now = last.get("growth")
     g_prev = prev.get("growth")
+    if pb:  # el «crecimiento» del escenario es el del valor contable por acción
+        bv = [r.get("book_per_share") for r in hist_rows[-3:]]
+        g_now = (bv[-1] / bv[-2] - 1) if len(bv) >= 2 and bv[-1] and bv[-2] else None
+        g_prev = (bv[-2] / bv[-3] - 1) if len(bv) >= 3 and bv[-2] and bv[-3] else None
     thr = bear.get("organic_growth")
+    rw = val.get("runway") or {}
+    if rw:
+        months = rw.get("months")
+        add("runway", "Meses de caja al consumo del último ejercicio", "< 12 meses", _es(months, 0) + " meses" if months else "sin consumo",
+            months is not None and months < 12, "revisar: ampliación de capital o deuda a la vista",
+            "sin caja para llegar a los hitos, la financiación la pone el precio de la acción")
+        dil = rw.get("dilution_cagr")
+        add("dilucion_anual", "Dilución anual (TCAC de acciones diluidas, 3 años)", "> +10 % al año", pct(dil, signed=True),
+            dil is not None and dil > 0.10, "revisar", "cada ampliación reparte el valor futuro entre más acciones")
+        ev_cash = rw.get("ev_to_cash")
+        add("ev_caja", "Valor de empresa / caja", "≤ 1,0x (el mercado no paga nada por el negocio)", times(ev_cash),
+            ev_cash is not None and ev_cash <= 1.0, "ampliar", "a ese precio se compra la caja y el resto sale gratis")
     if thr is None:  # sin escenarios (valoración no proyectable): solo los umbrales que no dependen de ellos
         lev = (sp["net_debt"] / sp["ebitda"]) if sp.get("ebitda") else None
         sh_now, sh_prev = last.get("shares"), prev.get("shares")
@@ -210,21 +253,31 @@ def kill_switches(val: Mapping[str, Any], hist_rows: Sequence[Mapping[str, Any]]
             add("apalancamiento", "Deuda neta / EBITDA", f"> {times(max(2.5, lev + 1.0))}", times(lev),
                 lev > max(2.5, lev + 1.0), "reducir", "el balance pasa a ser un riesgo")
         return out
-    add("crecimiento", "Crecimiento anual de ingresos", f"< {pct(thr)} dos ejercicios seguidos",
+    add("crecimiento", f"{labels['growth']} anual" + (" por acción" if pb else ""), f"< {pct(thr)} dos ejercicios seguidos",
         pct(g_now), g_now is not None and g_prev is not None and g_now < thr and g_prev < thr,
         "revisar y, si se confirma, vender", "falla la palanca de crecimiento del escenario base")
     m_now = last.get("margin")
-    add("margen", "Margen (EBITDA o neto, según el método)", f"< {pct(bear['margin_target'])}",
+    add("margen", labels["margin"], f"< {pct(bear['margin_target'])}",
         pct(m_now), m_now is not None and m_now < bear["margin_target"], "revisar el foso",
         "pérdida de poder de precio o de eficiencia por debajo del peor de los tres últimos ejercicios")
     c_now = last.get("conversion")
-    add("conversion", "Conversión de caja (flujo libre / EBITDA)", f"< {pct(bear['cash_conversion'])}",
-        pct(c_now), c_now is not None and c_now < bear["cash_conversion"], "revisar capex y circulante",
-        "menos caja para dividendo, recompras y deuda")
-    lev = (sp["net_debt"] / sp["ebitda"]) if sp.get("ebitda") else None
+    if pb:
+        d_now = ((last.get("dividends") or 0.0) + (last.get("buybacks") or 0.0)) / last["net_income"] \
+            if last.get("net_income") and last["net_income"] > 0 else None
+        add("reparto", labels["conversion"], f"> {pct(1.0, 0)}", pct(d_now, 0), d_now is not None and d_now > 1.0,
+            "revisar", "repartir más de lo que se gana consume el valor contable que compone")
+        add("valor_contable", "Valor contable por acción", "cae en un ejercicio", pct(g_now, signed=True),
+            g_now is not None and g_now < 0, "revisar y, si se repite, vender",
+            "la tesis es que el valor contable compone; si encoge, falla la suscripción o la inversión")
+    else:
+        add("conversion", labels["conversion"], f"< {pct(bear['cash_conversion'])}",
+            pct(c_now), c_now is not None and c_now < bear["cash_conversion"], "revisar capex y circulante",
+            "menos caja para dividendo, recompras y deuda")
+    lev = (sp["net_debt"] / sp["ebitda"]) if (sp.get("ebitda") and sp.get("basis") == "ev_ebitda") else None
     lim = max(2.5, (lev or 0) + 1.0)
-    add("apalancamiento", "Deuda neta / EBITDA", f"> {times(lim)}", times(lev), lev is not None and lev > lim,
-        "reducir", "el balance deja de ser una palanca y pasa a ser un riesgo")
+    if lev is not None:
+        add("apalancamiento", "Deuda neta / EBITDA", f"> {times(lim)}", times(lev), lev > lim,
+            "reducir", "el balance deja de ser una palanca y pasa a ser un riesgo")
     sh_now, sh_prev = last.get("shares"), prev.get("shares")
     growth_sh = (sh_now / sh_prev - 1) if sh_now and sh_prev else None
     add("dilucion", "Variación anual de acciones diluidas", "> +2 % en un ejercicio", pct(growth_sh, signed=True),
@@ -240,13 +293,15 @@ def kill_switches(val: Mapping[str, Any], hist_rows: Sequence[Mapping[str, Any]]
             f"≤ {money(values['bear'], ccy)}", money(price, ccy), price <= values["bear"], "ampliar",
             "a ese precio incluso el escenario bajista rinde el coste del capital")
     if base.get("exit_multiple"):
-        add("multiplo", "Múltiplo de la propia empresa", f"> {times(val['scenarios']['bull']['drivers']['exit_multiple'])}",
+        add("multiplo", f"Múltiplo de la propia empresa ({labels['multiple']})", f"> {times(val['scenarios']['bull']['drivers']['exit_multiple'])}",
             times(sp.get("multiple")), (sp.get("multiple") or 0) > val["scenarios"]["bull"]["drivers"]["exit_multiple"],
             "recortar", "el mercado ya paga el múltiplo del escenario alcista")
     return out
 
 
-def history_rows(cites: Mapping[str, Any], basis: str, points: Mapping[str, Mapping[int, float]]) -> list[dict]:
+def history_rows(cites: Mapping[str, Any], basis: str, points: Mapping[str, Mapping[int, float]],
+                 earnings_label: str = "") -> list[dict]:
+    """Historial por ejercicio. «margin» sigue la base: EBITDA, neto, FFO (REIT) o ROE (valor contable)."""
     annual = cites.get("annual") or {}
 
     def v(metric: str, year: int) -> float | None:
@@ -265,7 +320,11 @@ def history_rows(cites: Mapping[str, Any], basis: str, points: Mapping[str, Mapp
         ocf, capex = v("operating_cash_flow", y), v("capital_expenditure", y)
         fcf = (ocf - abs(capex or 0.0)) if ocf is not None else None
         sh_raw = v("shares_diluted", y)
-        earnings = ni if basis == "pe" else ebitda
+        if basis == "pe" and earnings_label == "FFO" and ni is not None:
+            ni_ffo = ni + abs(da or 0.0) - (v("gain_on_sale_real_estate", y) or 0.0)
+        else:
+            ni_ffo = ni
+        earnings = ni_ffo if basis == "pe" else ebitda
         eq = (points.get("total_equity") or {}).get(y)
         debt = (points.get("total_debt") or {}).get(y)
         cash = (points.get("cash_and_equivalents") or {}).get(y)
@@ -275,7 +334,9 @@ def history_rows(cites: Mapping[str, Any], basis: str, points: Mapping[str, Mapp
         rows.append({
             "year": y, "revenue": rev, "growth": (rev / prev_rev - 1) if rev and prev_rev else None,
             "ebitda": ebitda, "net_income": ni,
-            "margin": (earnings / rev) if earnings is not None and rev else None,
+            "margin": ((ni / eq) if (ni is not None and eq) else None) if basis == "pb" else
+                      ((earnings / rev) if earnings is not None and rev else None),
+            "book": eq, "book_per_share": (eq / sh_raw) if (eq and sh_raw) else None,
             "fcf": fcf, "conversion": (fcf / ebitda) if fcf is not None and ebitda else None,
             "shares": sh_raw, "fcf_per_share": (fcf / sh_raw) if fcf is not None and sh_raw else None,
             "dividends": abs(v("dividends_paid", y) or 0.0) or None,
@@ -377,7 +438,8 @@ def build_context(db: Session, company: Company, *, today: date, tenant_id: int 
     if val.get("status") not in ("ok", "not_meaningful"):
         return ThesisContext(company.ticker, name, val, [], [], [], None, [])
     points = _point_by_year(db, company, ("total_equity", "total_debt", "cash_and_equivalents"))
-    hist = history_rows(val["citations"], val["starting_point"]["basis"], points)
+    hist = history_rows(val["citations"], val["starting_point"]["basis"], points,
+                        val["starting_point"].get("earnings_label") or "")
     peers = peer_rows(db, company, val, today)
     switches = kill_switches(val, hist)
     ig = None
@@ -389,7 +451,7 @@ def build_context(db: Session, company: Company, *, today: date, tenant_id: int 
         ig = implied_growth(sp, d, float(val["discount_rate"]))
     sp = val["starting_point"]
     optional = {}
-    if sp.get("ebitda") and sp.get("net_debt", 0) > 0 and sp["net_debt"] / sp["ebitda"] > 1.0:
+    if sp.get("basis") == "ev_ebitda" and sp.get("ebitda") and sp.get("net_debt", 0) > 0 and sp["net_debt"] / sp["ebitda"] > 1.0:
         optional["deuda_balance"] = "deuda neta superior a una vez el EBITDA"
     passages = evidence_passages(db, company, tenant_id)
     guidance = company_guidance_rows(db, company)
@@ -451,6 +513,24 @@ def thesis_markers(ctx: ThesisContext) -> dict[str, str]:
         "punto.margen": pct(sp["margin"]),
         "tasa.coste_capital": pct(val.get("discount_rate")),
     }
+    meth = val.get("method") or {}
+    lab = basis_labels(sp)
+    m |= {"metodo.tipo": KIND_LABELS.get(str(meth.get("kind") or "operating"), "empresa operativa"),
+          "metodo.regla": str(meth.get("kind_method") or ""), "metodo.motivo_tipo": str(meth.get("kind_reason") or ""),
+          "metodo.multiplo": lab["multiple"]}
+    if sp.get("basis") == "pb":
+        m["punto.valor_contable"] = millions(sp["revenue"], ccy)
+        m["punto.roe"] = pct(sp.get("margin"))
+        m["punto.vc_accion"] = money(sp["revenue"] / sp["shares_diluted"] if sp.get("shares_diluted") else None, ccy)
+    if sp.get("earnings_label") == "FFO":
+        m["punto.ffo"] = millions(sp["net_income"], ccy)
+        m["punto.ffo_accion"] = money(sp["net_income"] / sp["shares_diluted"] if sp.get("shares_diluted") else None, ccy)
+    rw = val.get("runway") or {}
+    if rw:
+        m |= {"caja.caja": millions(rw.get("cash"), ccy), "caja.consumo": millions(rw.get("burn"), ccy),
+              "caja.meses": (_es(rw["months"], 0) + " meses") if rw.get("months") else "sin consumo",
+              "caja.dilucion": pct(rw.get("dilution_cagr"), signed=True), "caja.ev_caja": times(rw.get("ev_to_cash")),
+              "caja.ev_ingresos": times(rw.get("ev_to_revenue")), "caja.ejercicio": str(rw.get("year") or "")}
     if val.get("status") == "not_meaningful":
         m["valoracion.motivo"] = str(val.get("reason") or "")
         _history_markers(m, ctx, ccy)
@@ -663,6 +743,7 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
     cites = val.get("citations") or {}
     pc = cites.get("price") or {}
     t: dict[str, dict[str, Any]] = {}
+    lab = basis_labels(sp)
     t["partida"] = {"title": "Punto de partida normalizado", "head": ["Concepto", "Valor", "Fuente / fórmula"], "rows": [
         ["Precio", money(sp["price"], ccy), f"{pc.get('document', '')} {pc.get('as_of') or ''} {pc.get('fx') or ''}".strip()],
         ["Acciones diluidas", shares(sp["shares_diluted"]), _cite_text(cites.get("shares"))],
@@ -674,10 +755,10 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
         ["Híbridos", millions(sp["hybrids"], ccy), "como deuda económica"],
         ["Minoritarios", millions(sp["minorities"], ccy), "por delante del accionista"],
         ["Valor de empresa (EV)", millions(sp["enterprise_value"], ccy), "capitalización + deuda neta + híbridos + minoritarios"],
-        ["EBITDA de partida" if sp["basis"] != "pe" else "Beneficio de partida",
-         millions(sp["ebitda"] if sp["basis"] != "pe" else sp["net_income"], ccy),
-         "resultado operativo + amortizaciones del último ejercicio" if sp["basis"] != "pe" else "beneficio neto atribuible"],
-        ["Múltiplo de partida", times(sp["multiple"]), "EV / EBITDA" if sp["basis"] != "pe" else "PER"],
+        [lab["earnings"],
+         millions({"pe": sp["net_income"], "pb": sp["revenue"]}.get(sp["basis"], sp["ebitda"]), ccy),
+         lab["earnings_formula"]],
+        ["Múltiplo de partida", times(sp["multiple"]), lab["multiple"]],
         ["Mediana de comparables", times(((val.get("trace") or {}).get("multiplo") or {}).get("mediana_comparables")),
          f"{((val.get('trace') or {}).get('multiplo') or {}).get('n_comparables', 0)} comparables calculados con la misma fórmula"],
     ]}
@@ -692,10 +773,23 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
         None, None, None, None, link((annual.get("operating_income") or {}).get(last_year)
                                      or (annual.get("net_income") or {}).get(last_year)), None, None]
     t["historial"] = {"title": "Historial (millones, ejercicio fiscal)", "head": [
-        "Año", "Ingresos", "Crec.", "Margen", "FCF", "Conv.", "FCF/acción", "Acciones", "ROIC"], "rows": [
+        "Año", "Ingresos", "Crec.", lab["margin"], "FCF", "Conv.", "FCF/acción", "Acciones", "ROIC"], "rows": [
         [str(r["year"]), millions(r["revenue"], ccy), pct(r["growth"], signed=True), pct(r["margin"]),
          millions(r["fcf"], ccy), pct(r["conversion"], 0), money(r["fcf_per_share"], ccy), shares(r["shares"]),
          pct(r["roic"])] for r in ctx.history[-10:]]}
+    if sp["basis"] == "pb":
+        t["historial"] = {"title": "Historial del valor contable (millones, ejercicio fiscal)", "head": [
+            "Año", "Ingresos", "Beneficio", "ROE", "Valor contable", "VC/acción", "Crec. VC/acción", "Acciones", "Reparto"],
+            "rows": []}
+        prev_bv = None
+        for r in ctx.history[-10:]:
+            bvps = r.get("book_per_share")
+            dist = ((r.get("dividends") or 0.0) + (r.get("buybacks") or 0.0))
+            t["historial"]["rows"].append([
+                str(r["year"]), millions(r["revenue"], ccy), millions(r.get("net_income"), ccy), pct(r["margin"]),
+                millions(r.get("book"), ccy), money(bvps, ccy), pct((bvps / prev_bv - 1) if bvps and prev_bv else None, signed=True),
+                shares(r["shares"]), pct(dist / r["net_income"], 0) if r.get("net_income") and r["net_income"] > 0 else "N/D"])
+            prev_bv = bvps
     t["historial"]["links"] = [link((annual.get("revenue") or {}).get(str(r["year"]))) for r in ctx.history[-10:]]
     t["capital"] = {"title": "Asignación de capital (millones)", "head": ["Año", "FCF", "Dividendos", "Recompras", "Adquisiciones"],
                     "rows": [[str(r["year"]), millions(r["fcf"], ccy), millions(r["dividends"], ccy),
@@ -716,14 +810,36 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
         "links": [source_link({"url": g.get("url")}, None) for g in ctx.guidance]}
     meth = val.get("method") or {}
     labels = {"tir_ev_ebitda": "TIR para el accionista sobre EV/EBITDA", "tir_per": "TIR para el accionista sobre PER",
-              "dcf": "DCF con WACC", "sotp": "Suma de partes"}
+              "tir_pb": "TIR sobre el valor contable (ROE y P/VC)", "tir_ffo": "TIR sobre el FFO (P/FFO)",
+              "caja_runway": "Caja, consumo y dilución (runway)", "dcf": "DCF con WACC", "sotp": "Suma de partes"}
     chosen = str(meth.get("chosen") or "")
-    rows = [[labels.get(chosen, chosen), "elegido", "cumple las condiciones de datos"]]
+    kind = str(meth.get("kind") or "")
+    why_chosen = "cumple las condiciones de datos"
+    if kind:
+        why_chosen = f"{KIND_LABELS.get(kind, kind)}: {meth.get('kind_method') or ''}" + (
+            f" ({meth['kind_reason']})" if meth.get("kind_reason") else "")
+    rows = [[labels.get(chosen, chosen), "elegido", why_chosen]]
     rows += [[labels.get(k, k), "descartado", why] for k, why in (meth.get("discarded") or {}).items()]
     t["metodos"] = {"title": "Métodos y por qué", "head": ["Método", "Uso", "Razón (la da el código)"], "rows": rows}
     if not val.get("scenarios"):
         note = {"title": "Valoración por TIR no proyectable", "head": ["Motivo (lo da el código)"],
                 "rows": [[str(val.get("reason") or "")]]}
+        rw = val.get("runway") or {}
+        if rw:
+            f = rw.get("formulas") or {}
+            note = {"title": f"Caja, consumo y dilución (ejercicio {rw.get('year') or ''})", "head": ["Concepto", "Valor", "Fórmula / fuente"], "rows": [
+                ["Caja e inversiones a corto", millions(rw.get("cash"), ccy), _cite_text(cites.get("cash_and_equivalents"))],
+                ["Deuda financiera", millions(rw.get("debt"), ccy), _cite_text(cites.get("total_debt"))],
+                ["Flujo de caja operativo", millions(rw.get("operating_cash_flow"), ccy), _cite_text((rw.get("sources") or {}).get("ocf"))],
+                ["Capex", millions(rw.get("capex"), ccy), _cite_text((rw.get("sources") or {}).get("capex"))],
+                ["Consumo anual de caja", millions(rw.get("burn"), ccy), f.get("consumo", "")],
+                ["Meses de margen (runway)", _es(rw["months"], 0) if rw.get("months") else "sin consumo", f.get("meses", "")],
+                ["Dilución anual", pct(rw.get("dilution_cagr"), signed=True), f.get("dilucion", "")],
+                ["Valor de empresa / caja", times(rw.get("ev_to_cash")), "EV / (caja + inversiones a corto)"],
+                ["Valor de empresa / ingresos", times(rw.get("ev_to_revenue")), "EV / ingresos del último ejercicio"],
+            ], "links": [link(cites.get("cash_and_equivalents")), link(cites.get("total_debt")),
+                         link((rw.get("sources") or {}).get("ocf")), link((rw.get("sources") or {}).get("capex")),
+                         None, None, None, None, None]}
         t["escenarios"] = note
         t["descomposicion"] = {"title": "", "head": [], "rows": []}
         t["sensibilidad"] = {"title": "", "head": [], "rows": []}

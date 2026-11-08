@@ -18,7 +18,12 @@ patrimonio en ≤ 0) y el dividendo es la TIR menos esa TCAC. Por construcción 
 Dos bases (``basis``):
 * ``ev_ebitda``: empresa operativa. EV = múltiplo × EBITDA; patrimonio = EV − deuda neta − híbridos − minoritarios.
 * ``pe``: holding/financiera (la deuda es de las filiales, el EBITDA consolidado no es del accionista):
-  precio = P/B° × beneficio por acción; no hay paso de deuda.
+  precio = PER × beneficio por acción; no hay paso de deuda. El «beneficio» puede ser el FFO de un REIT
+  (``earnings_label``), con la misma mecánica.
+* ``pb``: aseguradora, banco u holding: el valor contable (o el NAV) es lo que compone. ``revenue`` lleva el
+  valor contable atribuible al accionista, ``margin`` es el ROE, el beneficio = ROE × valor contable y el
+  precio = P/VC × valor contable por acción; no hay paso de deuda (la deuda es parte del balance que ya
+  descuenta el valor contable).
 """
 from __future__ import annotations
 
@@ -27,7 +32,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
-ENGINE_VERSION = "shareholder-irr-v1"
+ENGINE_VERSION = "shareholder-irr-v2"
 HORIZONS = (5, 10)
 COMPONENTS = ("organico", "margen", "mna", "multiplo", "deuda", "recompras", "dividendo")
 COMPONENT_LABELS = {
@@ -56,8 +61,9 @@ class StartingPoint:
     hybrids: float = 0.0  # capital híbrido tratado como deuda económica
     minorities: float = 0.0
     currency: str = "USD"
-    basis: str = "ev_ebitda"  # ev_ebitda | pe
+    basis: str = "ev_ebitda"  # ev_ebitda | pe | pb
     sources: Mapping[str, str] = field(default_factory=dict)
+    earnings_label: str = ""  # qué es el «beneficio» de la base pe (beneficio neto, FFO…); vacío = el de la base
 
     @property
     def market_cap(self) -> float:
@@ -78,14 +84,16 @@ class StartingPoint:
 
     @property
     def multiple(self) -> float | None:
-        """Múltiplo de partida: EV/EBITDA (ev_ebitda) o PER (pe)."""
+        """Múltiplo de partida: EV/EBITDA (ev_ebitda), PER (pe) o P/VC (pb)."""
+        if self.basis == "pb":
+            return self.market_cap / self.revenue if self.revenue and self.revenue > 0 else None
         if self.basis == "pe":
             return self.market_cap / self.net_income if self.net_income and self.net_income > 0 else None
         return self.enterprise_value / self.ebitda if self.ebitda and self.ebitda > 0 else None
 
     @property
     def margin(self) -> float | None:
-        base = self.net_income if self.basis == "pe" else self.ebitda
+        base = self.net_income if self.basis in ("pe", "pb") else self.ebitda
         return base / self.revenue if base is not None and self.revenue > 0 else None
 
 
@@ -140,7 +148,9 @@ def _interp(a: float, b: float, t: int, n: int) -> float:
     return a + (b - a) * min(t, n) / n
 
 
-def _equity(sp: StartingPoint, multiple: float, earnings: float, net_debt: float) -> float:
+def _equity(sp: StartingPoint, multiple: float, earnings: float, net_debt: float, book: float = 0.0) -> float:
+    if sp.basis == "pb":
+        return multiple * book
     if sp.basis == "pe":
         return multiple * earnings
     return multiple * earnings - net_debt - sp.claims
@@ -155,7 +165,7 @@ def project(sp: StartingPoint, d: Drivers, years: int = 10) -> list[YearRow]:
     margin0 = sp.margin or 0.0
     target = margin0 if d.margin_target is None else d.margin_target
     mna_mult = d.mna_multiple or m0
-    rev, net_debt, shares = sp.revenue, (0.0 if sp.basis == "pe" else sp.net_debt), sp.shares_diluted
+    rev, net_debt, shares = sp.revenue, (0.0 if sp.basis in ("pe", "pb") else sp.net_debt), sp.shares_diluted
     rows: list[YearRow] = []
     for t in range(1, years + 1):
         g = d.organic_growth if t <= 5 else d.organic_growth_late
@@ -168,11 +178,11 @@ def project(sp: StartingPoint, d: Drivers, years: int = 10) -> list[YearRow]:
         distributable = fcf - mna_spend
         dividends = max(distributable, 0.0) * d.dividend_payout
         buybacks = max(distributable, 0.0) * d.buyback_payout
-        if sp.basis != "pe":
+        if sp.basis not in ("pe", "pb"):
             net_debt = net_debt - (distributable - dividends - buybacks)
         multiple_t = _interp(m0, d.exit_multiple, t, years)
         shares_pre = shares * (1 + d.sbc_dilution)
-        price_t = _equity(sp, multiple_t, earnings, net_debt) / shares_pre if shares_pre > 0 else 0.0
+        price_t = _equity(sp, multiple_t, earnings, net_debt, rev) / shares_pre if shares_pre > 0 else 0.0
         bought = buybacks / price_t if price_t > 0 else 0.0
         shares = max(shares_pre - bought, shares_pre * 0.5)  # nunca se recompra más de media empresa en un año
         rows.append(YearRow(t, rev, margin, earnings, fcf, mna_spend, dividends, buybacks, net_debt, shares,
@@ -185,6 +195,8 @@ def irr(cashflows: Sequence[float]) -> float | None:
     def npv(r: float) -> float:
         return sum(cf / (1 + r) ** i for i, cf in enumerate(cashflows))
 
+    if cashflows and cashflows[0] < 0 and all(cf <= 0 for cf in cashflows[1:]):
+        return -1.0  # no se recupera nada: pérdida total (no hay tasa que iguale el VAN a cero)
     lo, hi = -0.99, 3.0
     f_lo, f_hi = npv(lo), npv(hi)
     if f_lo * f_hi > 0:
@@ -214,16 +226,17 @@ def decompose(sp: StartingPoint, d: Drivers, rows: Sequence[YearRow], n: int, to
     e_org = rev0 * org * margin0
     e_margin = rev0 * org * last.margin
     e_n = last.earnings
-    nd0 = 0.0 if sp.basis == "pe" else sp.net_debt
+    nd0 = 0.0 if sp.basis in ("pe", "pb") else sp.net_debt
     s0 = sp.shares_diluted
+    b_org = rev0 * org  # pb: el valor contable crece con el crecimiento; el ROE no lo mueve por sí solo
     chain = [
-        _equity(sp, m0, (sp.net_income if sp.basis == "pe" else sp.ebitda) or 0.0, nd0) / s0,
-        _equity(sp, m0, e_org, nd0) / s0,
-        _equity(sp, m0, e_margin, nd0) / s0,
-        _equity(sp, m0, e_n, nd0) / s0,
-        _equity(sp, d.exit_multiple, e_n, nd0) / s0,
-        _equity(sp, d.exit_multiple, e_n, last.net_debt) / s0,
-        _equity(sp, d.exit_multiple, e_n, last.net_debt) / last.shares,
+        _equity(sp, m0, (sp.net_income if sp.basis in ("pe", "pb") else sp.ebitda) or 0.0, nd0, rev0) / s0,
+        _equity(sp, m0, e_org, nd0, b_org) / s0,
+        _equity(sp, m0, e_margin, nd0, b_org) / s0,
+        _equity(sp, m0, e_n, nd0, last.revenue) / s0,
+        _equity(sp, d.exit_multiple, e_n, nd0, last.revenue) / s0,
+        _equity(sp, d.exit_multiple, e_n, last.net_debt, last.revenue) / s0,
+        _equity(sp, d.exit_multiple, e_n, last.net_debt, last.revenue) / last.shares,
     ]
     keys = ("organico", "margen", "mna", "multiplo", "deuda", "recompras")
     p0, pn = chain[0], chain[-1]
@@ -251,7 +264,7 @@ def evaluate(sp: StartingPoint, d: Drivers, horizons: Sequence[int] = HORIZONS) 
     for n in horizons:
         rows = project(sp, d, n)
         last = rows[-1]
-        exit_price = max(_equity(sp, d.exit_multiple, last.earnings, last.net_debt) / last.shares, 0.0)
+        exit_price = max(_equity(sp, d.exit_multiple, last.earnings, last.net_debt, last.revenue) / last.shares, 0.0)
         flows = [-sp.price] + [r.dividend_per_share for r in rows]
         flows[-1] += exit_price
         total = irr(flows)
@@ -293,7 +306,7 @@ def value_at_rate(sp: StartingPoint, d: Drivers, rate: float, years: int = 10) -
         return None
     rows = project(sp, d, years)
     last = rows[-1]
-    exit_price = max(_equity(sp, d.exit_multiple, last.earnings, last.net_debt) / last.shares, 0.0)
+    exit_price = max(_equity(sp, d.exit_multiple, last.earnings, last.net_debt, last.revenue) / last.shares, 0.0)
     pv = sum(r.dividend_per_share / (1 + rate) ** r.year for r in rows)
     return pv + exit_price / (1 + rate) ** years
 
