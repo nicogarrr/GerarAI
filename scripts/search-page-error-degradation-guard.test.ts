@@ -33,6 +33,7 @@ void test('/search: un fallo al PINTAR resultados queda contenido en la sección
     // try/catch: una barrera con el mismo estado local acota el daño.
     assert.match(src, /import \{ ErrorBoundary \} from '@\/components\/ErrorBoundary'/);
     assert.match(src, /<ErrorBoundary fallback=\{<BackendOffline/);
+    assert.match(src, /<BackendOffline as="section"/, 'el fallback de sección no puede anidar otro <main>');
 });
 
 void test('el adaptador del buscador vive en un módulo puro testeable', () => {

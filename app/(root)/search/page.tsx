@@ -115,7 +115,7 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
         // Un 200 con forma inesperada no puede volver a llevarse la página
         // entera (ref 760826059): el fallo de pintado se queda en la sección
         // de resultados con el mismo estado local accionable.
-        <ErrorBoundary fallback={<BackendOffline feature={t('search.title')} retryHref={currentHref} />}>
+        <ErrorBoundary fallback={<BackendOffline as="section" feature={t('search.title')} retryHref={currentHref} />}>
         <section className="grid min-w-0 grid-cols-1 gap-4">
           <div className="flex min-w-0 flex-col gap-3 rounded-xl border border-gray-800 bg-surface-1 p-4 md:flex-row md:items-center">
             <div><div className="text-sm font-semibold text-gray-100">{t('search.resultsFor', { count: formatNumber(response.total, { maximumFractionDigits: 0 }, undefined, locale), query: response.query })}</div><div className="mt-1 text-xs text-gray-500">{t('search.rankingNote')}</div></div>
