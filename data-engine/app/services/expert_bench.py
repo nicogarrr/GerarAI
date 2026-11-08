@@ -143,10 +143,6 @@ def method_fit(
 
 # ------------------------------------------------------------------------------------------- cifras libres
 
-#: Nombres de normas y planes que llevan dígitos y NO son cifras (los que el guardián de la app aún no enmascara).
-EXTRA_NAMES = re.compile(r"\b10b5-1\b|\bRule\s?10b5-1\b|\bForm\s?4\b|\bFormulario\s?4\b", re.I)
-
-
 def free_numbers_by_section(sections: Mapping[str, str]) -> dict[str, list[str]]:
     """Cifras sin marcador por sección, con el mismo detector que usa la tesis v2."""
     from app.services.expert_team.thesis_v2 import loose_numbers
@@ -165,12 +161,12 @@ _PROBLEM = re.compile(
 
 
 def classify_problems(problems: Iterable[str]) -> dict[str, Any]:
-    """Problemas que el guardián anotó en los intentos: cifras libres, marcadores inventados y falsos positivos.
+    """Problemas que el guardián anotó en los intentos: cifras libres y marcadores inventados.
 
-    Un falso positivo es un «número» que en realidad es el nombre de una norma o plan (``10b5-1``, ``Form 4``):
-    el texto se reintenta o se recorta sin que el modelo se equivocara.
+    Los nombres de norma o formulario (``plan 10b5-1``, ``Form 4``) ya no llegan aquí como cifras: el guardián de la
+    tesis v2 los enmascara desde #4861, así que no hay falsos positivos que descontar.
     """
-    free = unknown = false_pos = 0
+    free = unknown = 0
     sections: Counter[str] = Counter()
     for p in problems or ():
         m = _PROBLEM.match(str(p))
@@ -182,12 +178,9 @@ def classify_problems(problems: Iterable[str]) -> dict[str, Any]:
             unknown += len(items)
             continue
         free += len(items)
-        if items[:4] == ["4", "10", "5", "-1"] or items[:3] == ["10", "5", "-1"]:
-            false_pos += 1
     return {
         "free_numbers": free,
         "unknown_markers": unknown,
-        "false_positive_10b5_1": false_pos,
         "sections_flagged": dict(sections),
     }
 

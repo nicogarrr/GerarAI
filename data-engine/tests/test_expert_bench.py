@@ -35,7 +35,7 @@ def test_free_numbers_by_section_uses_thesis_guard():
     assert out["b"] == ["12 %"]
 
 
-def test_classify_problems_counts_free_unknown_and_10b5_1_false_positive():
+def test_classify_problems_counts_free_and_unknown_without_10b5_1_counter():
     problems = [
         "directivos_capital: números sin marcador: 4, 10, 5, -1",
         "introduccion: números sin marcador: 172, 58.555",
@@ -44,16 +44,32 @@ def test_classify_problems_counts_free_unknown_and_10b5_1_false_positive():
     out = eb.classify_problems(problems)
     assert out["free_numbers"] == 6
     assert out["unknown_markers"] == 1
-    assert out["false_positive_10b5_1"] == 1
+    # El guardián ya no confunde «10b5-1» con cifras (#4861): el benchmark no lleva contador de falsos positivos.
+    assert "false_positive_10b5_1" not in out
     assert out["sections_flagged"] == {"directivos_capital": 1, "introduccion": 1, "riesgos": 1}
 
 
-def test_app_guard_still_flags_rule_10b5_1_as_numbers():
-    """Hallazgo del benchmark: el guardián de la tesis v2 toma «Form 4» / «plan 10b5-1» por cifras libres.
-    Si alguien lo arregla, este test avisa para quitar el contador de falsos positivos del benchmark."""
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Vendió con un plan 10b5-1 según el formulario 4.",
+        "Ventas bajo la Rule 10b5-1, declaradas en el Form 4.",
+        "Lo comunicó en el Formulario 4 (plan 10b5-1).",
+    ],
+)
+def test_app_guard_does_not_take_rule_or_form_names_as_figures(text):
+    """#4861 arregló el falso positivo: «plan 10b5-1» y «Form 4» son nombres de norma, no cifras."""
     from app.services.expert_team.thesis_v2 import loose_numbers
 
-    assert loose_numbers("Vendió con un plan 10b5-1 según el formulario 4.") != []
+    assert loose_numbers(text) == []
+
+
+def test_app_guard_still_flags_real_figures_next_to_rule_names():
+    """Enmascarar el nombre de la norma no puede tapar una cifra de verdad en la misma frase."""
+    from app.services.expert_team.thesis_v2 import loose_numbers
+
+    assert loose_numbers("Vendió 12.000 acciones con un plan 10b5-1 según el Form 4.") == ["12.000"]
+    assert loose_numbers("Formulario 4: 3 ventas en el trimestre.") == ["3"]
 
 
 # ------------------------------------------------------------------------------------------- citas
