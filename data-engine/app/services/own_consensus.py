@@ -132,15 +132,34 @@ class Cell:
 
 
 # ---------------------------------------------------------------------- periodos
+# Calendarios de 52/53 semanas (AAPL, retail, semis): el periodo cierra un sábado o domingo a ±7 días
+# del fin de mes, así que un cierre el 3 de enero es el ejercicio de diciembre, no uno nuevo.
+WEEKLY_CALENDAR_DAYS = 7
+
+
+def nominal_month(end: date) -> tuple[int, int]:
+    """(año, mes) al que pertenece un cierre: el mismo mes, o el anterior si cae en sus primeros 7 días."""
+    if end.day <= WEEKLY_CALENDAR_DAYS:
+        prev = end.replace(day=1) - timedelta(days=1)
+        return prev.year, prev.month
+    return end.year, end.month
+
+
 def fy_end_month(fy_ends: Sequence[date]) -> int:
-    """Mes de cierre del ejercicio (el del último año presentado; diciembre si no hay)."""
-    return max(fy_ends).month if fy_ends else 12
+    """Mes de cierre del ejercicio (el del último año presentado; diciembre si no hay), por su mes nominal."""
+    return nominal_month(max(fy_ends))[1] if fy_ends else 12
+
+
+def fiscal_year_of(end: date) -> int:
+    """Ejercicio de un cierre anual: el año de su mes nominal (FY que cierra el 03-01-2026 → 2025)."""
+    return nominal_month(end)[0]
 
 
 def quarter_of(end: date, fy_month: int) -> tuple[int, int]:
-    """(número de trimestre fiscal, ejercicio) de un trimestre que cierra en ``end``."""
-    fy = end.year if end.month <= fy_month else end.year + 1
-    q = ((end.month - fy_month - 1) % 12) // 3 + 1
+    """(número de trimestre fiscal, ejercicio) de un trimestre que cierra en ``end`` (mes nominal)."""
+    year, month = nominal_month(end)
+    fy = year if month <= fy_month else year + 1
+    q = ((month - fy_month - 1) % 12) // 3 + 1
     return q, fy
 
 
@@ -183,10 +202,12 @@ def actuals_from_facts(rows: Sequence[tuple[str, float, date | None, str | None]
     out: dict[str, Actual] = {}
     for end, kind, value, filed, url in sorted(parsed, key=lambda p: (p[0], p[3] or date.min)):
         if kind == "FY":
-            key = f"fy{end.year if end.month >= 6 or fy_month == end.month else end.year}"
-        elif kind.startswith("Q") and kind[1:].isdigit():
-            q, fy = quarter_of(end, fy_month)
-            key = f"q{q}_{fy}"
+            key = f"fy{fiscal_year_of(end)}"
+        elif kind in {"Q1", "Q2", "Q3", "Q4"}:
+            # El trimestre ya viene declarado por la fuente. En ejercicios de
+            # 52/53 semanas su cierre puede caer en el mes del trimestre siguiente.
+            _, fy = quarter_of(end, fy_month)
+            key = f"q{kind[1:]}_{fy}"
         else:
             continue
         out[key] = Actual(key, end, value, filed, url)
