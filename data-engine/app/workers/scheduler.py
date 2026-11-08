@@ -17,6 +17,7 @@ from app.workers.dramatiq_app import (
     backfill_sec_fundamentals,
     backfill_watchlist_theses,
     coalesced_send,
+    collect_analyst_estimates,
     consolidate_memory,
     dispatch_earnings_reminders,
     dispatch_insider_alerts,
@@ -424,6 +425,18 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         job_id="watchlist_thesis_backfill",
         hour=6,
         minute=20,
+        jitter=600,
+    )
+    # Estimaciones de analistas citadas en prensa (fuentes-1, 8-nov-2026): una vez
+    # al día, antes de las tesis, para que el histórico por firma y año crezca y el
+    # backtest de precisión de cada firma tenga muestras.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, collect_analyst_estimates),
+        "cron",
+        job_id="analyst_press_estimates",
+        hour=5,
+        minute=50,
         jitter=600,
     )
     _register(

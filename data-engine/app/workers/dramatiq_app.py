@@ -4299,6 +4299,43 @@ def scan_contradictions(
         return _handle_actor_error(actor_name, exc, tenant_id=tenant_id, user_id=user_id)
 
 
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=1_500_000)
+@_coalesce_on_success("collect_analyst_estimates", 20 * 3600, ("tenant_id", "ticker"))
+def collect_analyst_estimates(
+    tenant_id: int | None = None, user_id: str | None = None, ticker: str | None = None
+) -> dict[str, Any]:
+    """Recogida diaria de estimaciones de analistas citadas en prensa para la watchlist
+    del tenant (``analyst_press_estimates``, sin modelo). Acumula el histórico por
+    firma y año con el que ``analyst_consensus`` mide la precisión de cada firma."""
+    from sqlalchemy import select
+
+    from app.models import Company, WatchItem
+    from app.services.analyst_press_estimates import refresh_press_estimates
+
+    try:
+        db = _session(tenant_id, user_id)
+        try:
+            if type(tenant_id) is not int:
+                return {"actor": "collect_analyst_estimates", "status": "skipped", "reason": "sin tenant"}
+            symbols = [ticker.upper()] if ticker else [w.symbol for w in db.scalars(
+                select(WatchItem).where(WatchItem.tenant_id == tenant_id).order_by(WatchItem.id)).all()]
+            done: dict[str, Any] = {}
+            for company in db.scalars(select(Company).where(Company.ticker.in_(symbols or ["-"]))).all():
+                try:
+                    with db.begin_nested():
+                        res = refresh_press_estimates(db, company, tenant_id, max_articles=15, timeout=120.0)
+                    db.commit()
+                    done[company.ticker] = len(res.get("stored") or [])
+                except Exception as exc:  # noqa: BLE001 - una empresa no para a las demás
+                    db.rollback()
+                    done[company.ticker] = type(exc).__name__
+            return {"actor": "collect_analyst_estimates", "status": "ok", "stored": done}
+        finally:
+            db.close()
+    except Exception as exc:
+        return _handle_actor_error("collect_analyst_estimates", exc, tenant_id=tenant_id)
+
+
 # Presupuesto por corrida de review_theses: una tesis por empresa con LLM;
 # cortar a los 6 min deja 4 min de margen hasta el TimeLimit por defecto para
 # la tesis en vuelo. El resto sigue en una continuacion con cursor.
