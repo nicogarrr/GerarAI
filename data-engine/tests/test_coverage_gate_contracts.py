@@ -606,3 +606,19 @@ def test_la_corrida_borra_el_junit_previo(monkeypatch, tmp_path):
     monkeypatch.setattr("subprocess.call", fake_call)
     assert gate.run_pytest(extra=None) == 0
     assert visto["existia_al_lanzar_pytest"] is False
+
+
+def test_skip_guard_funciona_con_junit_con_namespace(tmp_path):
+    """Un JUnit con namespace ({ns}testcase/{ns}skipped) no esconde skips:
+    raiz, testcase y skipped se comparan por nombre local."""
+    junit = tmp_path / "junit.xml"
+    junit.write_text(
+        """<?xml version="1.0"?>
+<testsuite xmlns="urn:junit">
+  <testcase classname="tests.test_queue_watchdog" name="t">
+    <skipped message="x">s</skipped>
+  </testcase>
+</testsuite>""",
+        encoding="utf-8",
+    )
+    assert gate.skipped_guard_failures(junit) == ["tests.test_queue_watchdog::t"]

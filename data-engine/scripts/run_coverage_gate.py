@@ -565,11 +565,18 @@ def _classname_vigilado(classname: str) -> bool:
     )
 
 
+def _local_name(tag: object) -> str:
+    """Nombre local de una etiqueta XML: "{urn:ns}tag" y "tag" dan "tag"."""
+    return str(tag).split("}")[-1]
+
+
 def skipped_guard_failures(junit_path: Path | str = JUNIT_REPORT) -> list[str]:
     """Nodeids de SKIP_GUARD_FILES que aparecen como skipped en el JUnit.
 
     JUnit ausente, corrupto o XML que no es JUnit (raiz distinta de
     testsuite/testsuites) es un GateConfigError: la corrida no es fiable.
+    Raiz, testcase y skipped se comparan por nombre local: un JUnit con
+    namespace no puede esconder skips.
     """
     from defusedxml import ElementTree
 
@@ -580,14 +587,16 @@ def skipped_guard_failures(junit_path: Path | str = JUNIT_REPORT) -> list[str]:
         root = ElementTree.parse(str(path)).getroot()
     except Exception as exc:
         raise GateConfigError(f"informe JUnit ilegible: {path}: {exc}") from exc
-    root_tag = str(root.tag).split("}")[-1]  # por si viene con namespace
+    root_tag = _local_name(root.tag)
     if root_tag not in ("testsuite", "testsuites"):
         raise GateConfigError(
             f"el informe no es JUnit (raiz <{root_tag}>): {path}"
         )
     failures: list[str] = []
-    for testcase in root.iter("testcase"):
-        if testcase.find("skipped") is None:
+    for testcase in root.iter():
+        if _local_name(testcase.tag) != "testcase":
+            continue
+        if not any(_local_name(child.tag) == "skipped" for child in testcase):
             continue
         classname = str(testcase.get("classname") or "")
         if _classname_vigilado(classname):
