@@ -59,8 +59,11 @@ def _child_rows(db: Session, snapshot_ids: list[int]) -> dict[str, list[dict[str
                 "snapshot_date": row.snapshot_date.isoformat(),
                 "currency": row.currency,
                 "balance_native": str(row.balance_native),
-                "fx_rate": str(row.fx_rate),
-                "balance_base": str(row.balance_base),
+                # NULL se guarda como null, nunca como la cadena 'None': restore
+                # hace Decimal(...) y una caja sin tipo de cambio (dia sin
+                # cobertura) rompia la restauracion con InvalidOperation.
+                "fx_rate": None if row.fx_rate is None else str(row.fx_rate),
+                "balance_base": None if row.balance_base is None else str(row.balance_base),
                 "source": row.source,
             }
             for row in db.scalars(
@@ -82,6 +85,8 @@ def _child_rows(db: Session, snapshot_ids: list[int]) -> dict[str, list[dict[str
                 "fx_rate": None if row.fx_rate is None else str(row.fx_rate),
                 "market_value_native": str(row.market_value_native),
                 "market_value_base": None if row.market_value_base is None else str(row.market_value_base),
+                "weight": None if row.weight is None else str(row.weight),
+                "source": row.source,
             }
             for row in db.scalars(
                 select(PositionDailySnapshot).where(
@@ -93,6 +98,17 @@ def _child_rows(db: Session, snapshot_ids: list[int]) -> dict[str, list[dict[str
         else []
     )
     return {"cash": cash, "positions": positions}
+
+
+def _decimal_or_none(value) -> Decimal | None:
+    """Lee un Decimal de un backup; tolera el null y el 'None' de backups v1.
+
+    Las primeras versiones escribian los NULL de caja como la cadena 'None';
+    esos backups existen y deben seguir restaurando.
+    """
+    if value is None or value == "None":
+        return None
+    return Decimal(value)
 
 
 def _snapshot_to_dict(row: PortfolioDailySnapshot) -> dict[str, Any]:
@@ -325,8 +341,8 @@ class TwrRebuildService:
                     snapshot_date=date.fromisoformat(cash["snapshot_date"]),
                     currency=cash["currency"],
                     balance_native=Decimal(cash["balance_native"]),
-                    fx_rate=Decimal(cash["fx_rate"]),
-                    balance_base=Decimal(cash["balance_base"]),
+                    fx_rate=_decimal_or_none(cash["fx_rate"]),
+                    balance_base=_decimal_or_none(cash["balance_base"]),
                     source=cash["source"],
                 )
             )
@@ -346,10 +362,15 @@ class TwrRebuildService:
                     currency=pos["currency"],
                     fx_rate=None if pos["fx_rate"] is None else Decimal(pos["fx_rate"]),
                     market_value_native=Decimal(pos["market_value_native"]),
-                    market_value_base=None
-                    if pos["market_value_base"] is None
-                    else Decimal(pos["market_value_base"]),
+                    market_value_base=_decimal_or_none(pos["market_value_base"]),
+                    weight=_decimal_or_none(pos.get("weight")),
+                    source=pos.get("source", "market_refresh"),
                 )
             )
         db.flush()
+        # La foto real posterior al rango quedo como base nueva al apply();
+        # con las fotos originales de vuelta se relinkea con la misma regla
+        # (solo pares desde 'last': las restauradas conservan su cadena del
+        # backup, nunca se recalculan).
+        PortfolioSnapshotService()._relink_following(db, portfolio_id, last)
         return {"status": "restored", "restored": restored, "deleted": len(current)}

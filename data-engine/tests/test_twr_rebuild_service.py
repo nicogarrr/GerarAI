@@ -280,3 +280,121 @@ def test_apply_does_not_leave_later_real_snapshot_chained_to_replaced_day(db, tm
     assert later.daily_return is None
     assert later.cumulative_twr is None
     assert later.metadata_["twr_base_after_scope_change"] is True
+
+
+def test_restore_handles_unvalued_cash_child_rows(db, tmp_path):
+    """Una caja sin tipo de cambio (fx_rate/balance_base NULL, día sin cobertura)
+    no puede romper la restauración: el backup la escribía como str(None)='None'
+    y restore() fallaba con Decimal('None') DESPUÉS de borrar las fotos."""
+    from app.models.entities import CashDailySnapshot
+
+    _world(db)
+    portfolio = db.scalars(select(Portfolio)).one()
+    legacy = PortfolioDailySnapshot(
+        portfolio_id=portfolio.id,
+        snapshot_date=D0 + timedelta(days=1),
+        base_currency="EUR",
+        positions_value_base=Decimal("999"),
+        cash_value_base=Decimal("0"),
+        total_value_base=Decimal("999"),
+        pricing_coverage=Decimal("0.5"),
+        source="market_refresh",
+    )
+    db.add(legacy)
+    db.flush()
+    db.add(
+        CashDailySnapshot(
+            portfolio_snapshot_id=legacy.id,
+            portfolio_id=portfolio.id,
+            snapshot_date=legacy.snapshot_date,
+            currency="USD",
+            balance_native=Decimal("100"),
+            fx_rate=None,
+            balance_base=None,
+            source="market_refresh",
+        )
+    )
+    db.commit()
+    service = TwrRebuildService()
+    service.apply(db, backup_path=tmp_path / "backup.json")
+    restored = service.restore_backup(db, backup_path=tmp_path / "backup.json")
+    assert restored["status"] == "restored"
+    row = db.scalars(select(CashDailySnapshot)).one()
+    assert row.fx_rate is None
+    assert row.balance_base is None
+    assert row.balance_native == Decimal("100")
+
+
+def test_restore_preserves_position_weight_and_source(db, tmp_path):
+    """La foto hija de posición restaurada perdía weight (NULL) y source
+    (volvía a 'market_refresh'): ni el backup los guardaba ni restore los ponía."""
+    from app.models.entities import PositionDailySnapshot
+
+    company = _world(db)
+    portfolio = db.scalars(select(Portfolio)).one()
+    legacy = PortfolioDailySnapshot(
+        portfolio_id=portfolio.id,
+        snapshot_date=D0 + timedelta(days=1),
+        base_currency="EUR",
+        positions_value_base=Decimal("999"),
+        cash_value_base=Decimal("1"),
+        total_value_base=Decimal("1000"),
+        pricing_coverage=Decimal("1"),
+        source="market_refresh",
+    )
+    db.add(legacy)
+    db.flush()
+    db.add(
+        PositionDailySnapshot(
+            portfolio_snapshot_id=legacy.id,
+            portfolio_id=portfolio.id,
+            company_id=company.id,
+            snapshot_date=legacy.snapshot_date,
+            quantity=Decimal("10"),
+            market_price_native=Decimal("10"),
+            currency="EUR",
+            fx_rate=Decimal("1"),
+            market_value_native=Decimal("999"),
+            market_value_base=Decimal("999"),
+            weight=Decimal("0.999"),
+            source="ibkr_flex",
+        )
+    )
+    db.commit()
+    service = TwrRebuildService()
+    service.apply(db, backup_path=tmp_path / "backup.json")
+    service.restore_backup(db, backup_path=tmp_path / "backup.json")
+    row = db.scalars(select(PositionDailySnapshot)).one()
+    assert row.weight == Decimal("0.999")
+    assert row.source == "ibkr_flex"
+
+
+def test_restore_relinks_real_snapshot_following_the_range(db, tmp_path):
+    """apply() deja la foto real posterior como base nueva (sin cadena).
+    restore() repone las fotos originales pero no la relinkeaba: se quedaba
+    rota para siempre pese a que su predecesora original volvió."""
+    _world(db)
+    service = PortfolioSnapshotService()
+    position = db.scalars(select(Position)).one()
+    service.capture(db, as_of=D0 + timedelta(days=3))
+    db.commit()
+    position.market_price = Decimal("12.5")
+    position.as_of = D0 + timedelta(days=4)
+    db.commit()
+    later = service.capture(db, as_of=D0 + timedelta(days=4))
+    db.commit()
+    original_return = later.daily_return
+    assert original_return is not None
+
+    service_rebuild = TwrRebuildService()
+    service_rebuild.apply(db, backup_path=tmp_path / "b.json")
+    db.commit()
+    db.refresh(later)
+    assert later.daily_return is None
+
+    service_rebuild.restore_backup(db, backup_path=tmp_path / "b.json")
+    db.commit()
+    db.refresh(later)
+    assert later.daily_return == pytest.approx(original_return)
+    assert later.cumulative_twr is not None
+    assert later.metadata_["twr_base_after_scope_change"] is False
