@@ -33,18 +33,20 @@ const UserDropdown = ({ user }: { user: User }) => {
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 {/* Sin aria-label: el nombre accesible sale del texto (WCAG 2.5.3,
-                    label-in-name). Con aria-label="Menú de usuario de X" el texto
-                    visible (inicial + nombre) no estaba dentro del nombre y quien
-                    navega por voz diciendo lo que ve no daba con el botón. En
-                    móvil el nombre se oculta a la vista pero no al lector. */}
+                    label-in-name). El nombre visible va aria-hidden y la etiqueta
+                    completa se interpola en UN solo span sr-only: con dos spans
+                    hermanos Chromium metia un espacio al calcular el nombre y
+                    quedaba "…borrable , menú de usuario" (espacio antes de la
+                    coma). En móvil el nombre se oculta a la vista pero no al
+                    lector… salvo que ahora el lector usa el span interpolado. */}
                 <Button className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700">
                     <Avatar aria-hidden="true" className="h-8 w-8">
                         <AvatarFallback className="bg-teal-500 text-gray-900 text-sm font-bold">
                             {user.name[0]}
                         </AvatarFallback>
                     </Avatar>
-                    <span className="sr-only text-sm font-medium text-gray-400 md:not-sr-only md:inline">{user.name}</span>
-                    <span className="sr-only">{t('shell.user.menuSuffix')}</span>
+                    <span aria-hidden="true" className="sr-only text-sm font-medium text-gray-400 md:not-sr-only md:inline">{user.name}</span>
+                    <span className="sr-only">{t('shell.user.menuLabel', { name: user.name })}</span>
                     <ChevronDown aria-hidden="true" className="hidden h-4 w-4 text-gray-500 md:inline" />
                 </Button>
             </DropdownMenuTrigger>

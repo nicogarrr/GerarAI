@@ -34,7 +34,7 @@
     "pagesAria": "GerarAI pages"
   },
   "user": {
-    "menuSuffix": ", user menu",
+    "menuLabel": "{name}, user menu",
     "aiModel": "AI model",
     "settings": "Settings",
     "security": "Security",
