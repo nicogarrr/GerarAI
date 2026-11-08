@@ -544,3 +544,65 @@ def test_el_gate_escribe_junit_para_la_red():
     """Sin --junitxml en el comando, la red no tiene de donde leer."""
     cmd = gate._pytest_command(extra=None)
     assert any(arg.startswith("--junitxml=") for arg in cmd)
+
+
+def test_skip_guard_caza_classname_con_clase(tmp_path):
+    """pytest escribe tests.modulo.Clase::test cuando el test vive en una
+    clase: el guard no puede depender de que el classname sea el modulo."""
+    junit = tmp_path / "junit.xml"
+    junit.write_text(
+        """<?xml version="1.0"?>
+<testsuite><testcase classname="tests.test_queue_watchdog.TestWatchdog" name="t">
+<skipped message="x">s</skipped></testcase></testsuite>""",
+        encoding="utf-8",
+    )
+    assert gate.skipped_guard_failures(junit) == ["tests.test_queue_watchdog.TestWatchdog::t"]
+
+
+def test_skip_guard_no_confunde_modulos_con_prefijo_comun(tmp_path):
+    junit = tmp_path / "junit.xml"
+    junit.write_text(
+        """<?xml version="1.0"?>
+<testsuite><testcase classname="tests.test_queue_watchdog_extra" name="t">
+<skipped message="x">s</skipped></testcase></testsuite>""",
+        encoding="utf-8",
+    )
+    assert gate.skipped_guard_failures(junit) == []
+
+
+def test_skip_guard_rechaza_xml_que_no_es_junit(tmp_path):
+    """Un XML valido pero ajeno (un HTML, un coverage.xml) no puede pasar
+    por 'sin skips': la corrida no es fiable y el gate falla."""
+    junit = tmp_path / "junit.xml"
+    junit.write_text("<html><body>no soy junit</body></html>", encoding="utf-8")
+    with pytest.raises(gate.GateConfigError):
+        gate.skipped_guard_failures(junit)
+
+
+def test_skip_guard_acepta_raiz_testsuites(tmp_path):
+    junit = tmp_path / "junit.xml"
+    junit.write_text(
+        """<?xml version="1.0"?>
+<testsuites><testsuite><testcase classname="tests.test_ingest_load_lab" name="t">
+<skipped message="x">s</skipped></testcase></testsuite></testsuites>""",
+        encoding="utf-8",
+    )
+    assert gate.skipped_guard_failures(junit) == ["tests.test_ingest_load_lab::t"]
+
+
+def test_la_corrida_borra_el_junit_previo(monkeypatch, tmp_path):
+    """Sin borrado previo, una corrida muerta dejaria al guard leyendo los
+    skips de ayer."""
+    junit = tmp_path / "junit.xml"
+    junit.write_text("<testsuite/>", encoding="utf-8")
+    monkeypatch.setattr(gate, "JUNIT_REPORT", junit)
+    visto = {}
+
+    def fake_call(cmd, cwd=None):
+        visto["existia_al_lanzar_pytest"] = junit.exists()
+        junit.write_text("<testsuite/>", encoding="utf-8")  # pytest lo reescribe
+        return 0
+
+    monkeypatch.setattr("subprocess.call", fake_call)
+    assert gate.run_pytest(extra=None) == 0
+    assert visto["existia_al_lanzar_pytest"] is False
