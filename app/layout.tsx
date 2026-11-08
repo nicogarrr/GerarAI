@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
     template: "%s | GerarAI"
   },
   description: t('shell.meta.description'),
-  metadataBase: new URL('https://gerarai.vercel.app'),
+  metadataBase: new URL('https://gerarai.duckdns.org'),
   openGraph: {
     siteName: 'GerarAI',
     title: t('shell.meta.title'),

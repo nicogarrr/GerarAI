@@ -27,7 +27,7 @@ export default {
       maxInputTokens: Number(process.env.E2E_MAX_INPUT_TOKENS ?? 10000),
     },
   },
-  targets: [{ engine: web(), app: { url: process.env.E2E_BASE_URL ?? 'https://gerarai.vercel.app' } }],
+  targets: [{ engine: web(), app: { url: process.env.E2E_BASE_URL ?? 'https://gerarai.duckdns.org' } }],
   workers: 1,
   // Sin trazas ni video: la pasada autenticada usa una sesion real y no debe dejar
   // en artefactos ni la contrasena tecleada ni datos de la cuenta.

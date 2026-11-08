@@ -33,7 +33,7 @@ type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 export type LookupLike = (hostname: string) => Promise<{ address: string; family: number }[]>;
 const realLookup: LookupLike = (hostname) => dnsLookup(hostname, { all: true, verbatim: true });
 
-const UA = 'Mozilla/5.0 (compatible; GerarAI-logo/1.0; +https://gerarai.vercel.app)';
+const UA = 'Mozilla/5.0 (compatible; GerarAI-logo/1.0; +https://gerarai.duckdns.org)';
 const TIMEOUT_MS = 8000;
 const MAX_HTML = 1024 * 1024;
 const MAX_IMAGE = 300 * 1024;
