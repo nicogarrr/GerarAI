@@ -12,7 +12,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models.entities import AlertRule, Base, Company, MarketPrice, NewsEvent, ResearchAlert
+from app.models.entities import AlertRule, Base, Company, FinancialFact, MarketPrice, NewsEvent, ResearchAlert
 from app.services.alert_rule_service import AlertRuleService
 
 
@@ -407,3 +407,78 @@ def test_triggered_alert_stays_spanish_by_default(db):
     alert = db.query(ResearchAlert).one()
     assert alert.message.startswith(f"AAPL: se cumplió la regla «{rule.name}» (valor observado: 210")
     assert "language" not in alert.metadata_
+
+
+def _financial_rule(db: Session, company: Company, *, operator: str, value: str, metric: str) -> AlertRule:
+    """Regla con target financial_metric (fuera de create(): llega de filas
+    legacy/seed; _target solo mapea los 5 tipos de la API)."""
+    service = AlertRuleService()
+    rule = service.create(db, company, rule_type="price_above", operator=">", value=1)
+    rule.target = {"kind": "financial_metric", "metric": metric}
+    rule.condition = {"operator": operator, "value": value}
+    rule.cooldown_seconds = 0
+    db.commit()
+    return rule
+
+
+def test_financial_metric_evalua_el_ultimo_ejercicio(db):
+    company = _company(db)
+    for year, revenue in ((2022, "80"), (2023, "150")):
+        db.add(FinancialFact(
+            company_id=company.id, metric="revenue", value=Decimal(revenue),
+            unit="USD", period="FY", fiscal_year=year,
+        ))
+    db.commit()
+    rule = _financial_rule(db, company, operator=">", value="100", metric="revenue")
+
+    result = AlertRuleService().evaluate(db, rule)
+
+    assert result["status"] == "triggered"
+    assert Decimal(str(result["observed"])) == Decimal("150")
+    assert result["observation"]["kind"] == "financial_metric"
+
+
+def test_financial_metric_sin_hecho_no_dispara_y_lo_declara(db):
+    company = _company(db)
+    rule = _financial_rule(db, company, operator=">", value="100", metric="revenue")
+
+    result = AlertRuleService().evaluate(db, rule)
+
+    assert result["status"] == "evaluated"
+    assert result["matched"] is False
+    assert result["observed"] is None
+    assert result["observation"]["status"] == "missing"
+
+
+def test_financial_metric_no_lee_el_hecho_de_otra_empresa(db):
+    company = _company(db)
+    otra = Company(
+        ticker="MSFT", name="Microsoft", exchange="NASDAQ", currency="USD",
+        sector="Tech", industry="Tech", company_type="holding",
+        valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(otra)
+    db.commit()
+    db.add(FinancialFact(
+        company_id=otra.id, metric="revenue", value=Decimal("999"),
+        unit="USD", period="FY", fiscal_year=2023,
+    ))
+    db.commit()
+    rule = _financial_rule(db, company, operator=">", value="100", metric="revenue")
+
+    result = AlertRuleService().evaluate(db, rule)
+
+    assert result["matched"] is False
+    assert result["observation"]["status"] == "missing"
+
+
+def test_target_no_soportado_se_declara_sin_disparar(db):
+    company = _company(db)
+    rule = _financial_rule(db, company, operator=">", value="1", metric="revenue")
+    rule.target = {"kind": "kind_inexistente"}
+    db.commit()
+
+    result = AlertRuleService().evaluate(db, rule)
+
+    assert result["matched"] is False
+    assert result["observation"]["status"] == "unsupported_target"
