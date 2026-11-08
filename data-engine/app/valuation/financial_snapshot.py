@@ -389,6 +389,97 @@ class FinancialSnapshotBuilder:
         snapshot.balance_sheet = debt.period
         snapshot.derived["net_debt"] = [i for i in (debt.id, cash.id) if i is not None]
 
+    @classmethod
+    def _prefer_primary_net_debt(
+        cls,
+        snapshot: FinancialSnapshot,
+        anchor: FinancialFact,
+        debt_candidates: list[FinancialFact],
+        cash_candidates: list[FinancialFact],
+    ) -> None:
+        """Deuda neta de la presentación oficial antes que la de un agregador.
+
+        Una deuda neta guardada de Yahoo/FMP ganaba aunque el filing del emisor
+        trajera deuda total y caja de un cierre compatible con el ancla (Eurofins:
+        neta de Yahoo de 2025 con la cuenta de resultados ESEF de 2024; Airbus,
+        BN, ABCL, IBRX: neta de Yahoo con deuda y caja oficiales del mismo
+        cierre). Si las dos partidas oficiales existen, la deuda neta se deriva
+        de ellas y la del agregador queda en ``excluded_present`` con su valor:
+        no se pierde, pero no se mezcla con el ejercicio oficial."""
+        current = snapshot.facts.get("net_debt")
+        if current is None or (current.source_type or "") in _PRIMARY_SOURCE_TYPES:
+            return
+        primary_debt = [f for f in debt_candidates if (f.source_type or "") in _PRIMARY_SOURCE_TYPES]
+        primary_cash = [f for f in cash_candidates if (f.source_type or "") in _PRIMARY_SOURCE_TYPES]
+        if not primary_debt or not primary_cash:
+            return
+        trial = FinancialSnapshot(
+            as_of_period=snapshot.as_of_period,
+            fiscal_year=snapshot.fiscal_year,
+            fiscal_quarter=snapshot.fiscal_quarter,
+            period_type=snapshot.period_type,
+            income_statement=snapshot.income_statement,
+            facts={},
+        )
+        cls._derive_net_debt(trial, anchor, primary_debt, primary_cash)
+        derived = trial.facts.get("net_debt")
+        if derived is None:
+            return
+        # Alcance: si la deuda oficial es menos de la mitad de la del agregador
+        # para el mismo ejercicio, no son la misma magnitud (BN: «Borrowings»
+        # corporativos 14.301 M frente a 259.612 M consolidados con la deuda sin
+        # recurso de las filiales). Ahí no se cambia nada y se avisa.
+        used_debt = next(
+            (f for f in primary_debt if f.id is not None and f.id in trial.derived.get("net_debt", [])), None
+        )
+        aggregator_debt = next(
+            (
+                f
+                for f in debt_candidates
+                if (f.source_type or "") == (current.source_type or "")
+                and f.fiscal_year == current.fiscal_year
+            ),
+            None,
+        )
+        try:
+            ratio = (
+                float(used_debt.value) / float(aggregator_debt.value)
+                if used_debt is not None and aggregator_debt is not None and float(aggregator_debt.value) > 0
+                else None
+            )
+        except (TypeError, ValueError):
+            ratio = None
+        if ratio is not None and ratio < 0.5:
+            snapshot.warnings.append(
+                f"net_debt: the issuer's total_debt ({used_debt.period if used_debt else '?'}) is "
+                f"{ratio:.0%} of {current.source_type}'s; different scope, aggregator figure kept."
+            )
+            return
+        snapshot.facts["net_debt"] = derived
+        snapshot.balance_sheet = trial.balance_sheet
+        snapshot.derived["net_debt"] = trial.derived.get("net_debt", [])
+        snapshot.warnings = [
+            w for w in snapshot.warnings if not w.startswith(f"net_debt period {current.period} is a different")
+        ]
+        try:
+            secondary_value: float | None = float(current.value)
+        except (TypeError, ValueError):
+            secondary_value = None
+        snapshot.excluded_present.append(
+            {
+                "metric": "net_debt",
+                "available_period": current.period,
+                "anchor_period": anchor.period,
+                "source_type": current.source_type,
+                "value": secondary_value,
+                "reason": "primary_source_available",
+            }
+        )
+        snapshot.warnings.append(
+            f"net_debt from {current.source_type} ({current.period}) replaced by total_debt − cash of the "
+            f"issuer's filing ({derived.period}); the aggregator figure stays in excluded_present."
+        )
+
     @staticmethod
     def _net_of_short_term_investments(
         snapshot: FinancialSnapshot,
@@ -835,6 +926,9 @@ class FinancialSnapshotBuilder:
                     )
 
         self._latest_share_count(db, company, snapshot, facts_for, price_as_of or as_of)
+        self._prefer_primary_net_debt(
+            snapshot, anchor, facts_for("total_debt"), facts_for("cash_and_equivalents")
+        )
         self._derive_net_debt(
             snapshot,
             anchor,
