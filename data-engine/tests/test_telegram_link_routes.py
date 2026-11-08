@@ -1,5 +1,8 @@
-"""Handlers HTTP de app/api/routes/telegram_link.py sin cubrir: POST
-/telegram-link (start) y POST /telegram-link/{id}/confirm."""
+"""Handlers de app/api/routes/telegram_link.py sin cubrir: POST
+/telegram-link (start) y POST /telegram-link/{id}/confirm.
+
+Llamadas directas al handler (sin HTTP real): el wiring de la ruta lo
+cubre la suite de integracion."""
 
 from app.api.routes import telegram_link as routes
 from app.services.telegram_link import receive_bot_link
