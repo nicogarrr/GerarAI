@@ -97,14 +97,17 @@ Ejecutar las siguientes comprobaciones para garantizar que todos los subsistemas
 ```bash
 curl -f -s http://localhost:8000/api/health | jq .
 ```
-**Respuesta esperada:**
+**Respuesta esperada** (contrato real de `GET /api/health` en `app/api/routes/health.py`):
 ```json
 {
-  "status": "healthy",
-  "database": "connected",
-  "scheduler": { "enabled": true, "running": true }
+  "status": "ok",
+  "database": "ok",
+  "scheduler": { "enabled": false, "running": null, "jobs": 0 },
+  "version": "main-<sha>",
+  "schema": []
 }
 ```
+`status` es `ok` solo si la base de datos responde y el esquema está migrado al día; si no, es `degraded`. `database` es `ok` o `error:<Clase>` (solo la clase del error). En el servicio backend de producción el scheduler aparece con `enabled: false` y `running: null` porque corre en su propio servicio (`cavaai-scheduler`); `null` significa "este proceso no lo ejecuta", no "parado".
 
 ### 2. Comprobar Conectores y Fuentes de Datos
 ```bash
@@ -134,10 +137,12 @@ docker compose -f docker-compose.prod.yml --env-file .env.production run --rm \
   backend uv run alembic downgrade -1
 ```
 
-### 2. Restaurar Backup de Base de Datos (En Caso de Corrupción)
+### 2. Restaurar Backup (En Caso de Corrupción)
 ```bash
-gunzip -c storage/backups/pg_dump_ULTIMO.sql.gz | docker exec -i gerarai-postgres psql -U portfolio -d cavaai_research
+./scripts/restore.sh backups/<AAAAMMDD-HHMMSS> --confirm-restore
 ```
+El script verifica los checksums del manifest antes de tocar los datos y usa
+`pg_restore` para el volcado `pg_dump -Fc`. Detalles: [BACKUP_RESTORE.md](BACKUP_RESTORE.md).
 
 ### 3. Volver a la Imagen / Commit Anterior
 ```bash
@@ -146,4 +151,4 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --bui
 ```
 
 ### 4. Confirmar Estabilización
-Verificar que `/api/health` vuelve a reportar `"status": "healthy"`.
+Verificar que `/api/health` vuelve a reportar `"status": "ok"`.
