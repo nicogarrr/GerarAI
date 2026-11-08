@@ -20,6 +20,7 @@ import { researchIdentityHeaders } from '@/lib/auth/research-identity';
 // convertiria en un Server Action invocable por HTTP con una URL arbitraria
 // (SSRF). Ver lib/upstream/finnhub.ts.
 import { fetchJSON } from '@/lib/upstream/finnhub';
+import { exchangeDisplayName } from '@/lib/exchangeName';
 
 const FINNHUB_BASE_URL = env.FINNHUB_BASE_URL;
 
@@ -407,7 +408,12 @@ async function searchMasterCompanies(query: string): Promise<StockWithWatchlistS
             .map((r) => ({
                 symbol: String(r.ticker).toUpperCase(),
                 name: String(r.name),
-                exchange: (r.exchange ?? '').trim(),
+                // El master guarda la bolsa en texto largo del proveedor
+                // («NASDAQ NMS - GLOBAL MARKET»); la UI mostraba ese slug
+                // crudo en ingles. exchangeDisplayName lo reduce al mercado
+                // legible; sin mapeo conserva la cadena original (honesta)
+                // y UNKNOWN/vacio queda como ausencia (''), no como dato.
+                exchange: exchangeDisplayName(r.exchange) ?? '',
                 type: 'Common Stock',
                 isInWatchlist: false,
             }));
