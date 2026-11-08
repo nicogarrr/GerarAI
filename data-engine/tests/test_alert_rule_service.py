@@ -482,3 +482,107 @@ def test_target_no_soportado_se_declara_sin_disparar(db):
 
     assert result["matched"] is False
     assert result["observation"]["status"] == "unsupported_target"
+
+
+def test_evaluate_all_salta_precio_con_bolsa_cerrada_y_evalua_lo_demas(db):
+    """Pasada periódica un día sin sesión: la regla de precio queda como
+    estaba (skipped_market_closed, sin evaluar); la de noticias se evalúa."""
+    company = _company(db)  # AAPL: NASDAQ
+    service = AlertRuleService()
+    price_rule = service.create(db, company, rule_type="price_above", operator=">", value=200)
+    # Segunda regla de precio de la MISMA empresa: su consulta de bolsa sale
+    # de la caché de companies de la pasada, no de otro SELECT.
+    price_rule_2 = service.create(db, company, rule_type="price_below", operator="<", value=50)
+    news_rule = service.create(db, company, rule_type="news", operator="==", value=5)
+    sabado = date(2026, 11, 7)  # NASDAQ cerrada
+
+    results = service.evaluate_all(db, skip_closed_markets=True, market_day=sabado)
+
+    by_rule = {r["rule_id"]: r for r in results}
+    assert by_rule[price_rule_2.id]["status"] == "skipped_market_closed"
+    skipped = by_rule[price_rule.id]
+    assert skipped["status"] == "skipped_market_closed"
+    assert skipped["matched"] is False
+    assert skipped["market_day"] == "2026-11-07"
+    # La regla NO pasó por evaluate(): last_result sigue tal cual lo dejó
+    # create() ({} por defecto, sin status) y no hubo disparo.
+    assert "status" not in (price_rule.last_result or {})
+    assert price_rule.trigger_count == 0
+    # Una regla que no es de precio se evalúa aunque la bolsa esté cerrada.
+    assert by_rule[news_rule.id]["status"] != "skipped_market_closed"
+    # Con la bolsa abierta el flag no salta nada: lunes con sesión en NASDAQ.
+    db.expire_all()
+    results_abierto = service.evaluate_all(db, skip_closed_markets=True, market_day=date(2026, 11, 9))
+    assert {r["rule_id"]: r for r in results_abierto}[price_rule.id]["status"] != "skipped_market_closed"
+    # Y sin el flag tampoco hay skip aunque la bolsa esté cerrada.
+    db.expire_all()
+    results_sin_flag = service.evaluate_all(db, skip_closed_markets=False, market_day=sabado)
+    assert {r["rule_id"]: r for r in results_sin_flag}[price_rule.id]["status"] != "skipped_market_closed"
+
+
+def test_regla_huerfana_se_desactiva_y_lo_declara(db):
+    """Empresa borrada: la regla se apaga sola en vez de fallar la pasada."""
+    company = _company(db)
+    service = AlertRuleService()
+    rule = service.create(db, company, rule_type="price_above", operator=">", value=200)
+    db.delete(company)
+    db.commit()
+
+    result = service.evaluate(db, rule)
+
+    assert result == {"rule_id": rule.id, "status": "disabled_missing_company"}
+    assert rule.active is False
+    assert rule.last_result == {"rule_id": rule.id, "status": "disabled_missing_company"}
+    assert db.query(ResearchAlert).count() == 0
+
+    # La pasada completa también la apaga (mismo camino con commit=False).
+    rule2 = service.create(db, _company(db), rule_type="price_above", operator=">", value=200)
+    db.delete(db.get(Company, rule2.company_id))
+    db.commit()
+    resultados = service.evaluate_all(db, skip_closed_markets=False, market_day=date(2026, 11, 9))
+    por_regla = {r["rule_id"]: r for r in resultados}
+    assert por_regla[rule2.id]["status"] == "disabled_missing_company"
+    assert rule2.active is False
+
+
+def test_financial_metric_desempata_mismo_ejercicio_por_el_mas_reciente(db):
+    """Mismo fiscal_year: gana el hecho cargado después (created_at), no el
+    primero que encuentre el barrido."""
+    company = _company(db)
+    viejo = FinancialFact(
+        company_id=company.id, metric="revenue", value=Decimal("80"),
+        unit="USD", period="FY", fiscal_year=2023,
+        created_at=datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    reciente = FinancialFact(
+        company_id=company.id, metric="revenue", value=Decimal("150"),
+        unit="USD", period="FY", fiscal_year=2023,
+        created_at=datetime(2024, 6, 1, tzinfo=UTC),
+    )
+    db.add_all([reciente, viejo])  # insertar desordenado: no vale "el primero"
+    db.commit()
+    rule = _financial_rule(db, company, operator=">", value="100", metric="revenue")
+
+    result = AlertRuleService().evaluate(db, rule)
+
+    assert result["observation"]["financial_fact_id"] == reciente.id
+    assert Decimal(str(result["observed"])) == Decimal("150")
+    assert result["status"] == "triggered"
+
+
+def test_financial_metric_ignora_hechos_de_otra_metrica(db):
+    """Un hecho de revenue no alimenta una regla de roe: la regla declara
+    missing en vez de comparar contra la métrica equivocada."""
+    company = _company(db)
+    db.add(FinancialFact(
+        company_id=company.id, metric="revenue", value=Decimal("999"),
+        unit="USD", period="FY", fiscal_year=2023,
+    ))
+    db.commit()
+    rule = _financial_rule(db, company, operator=">", value="100", metric="roe")
+
+    result = AlertRuleService().evaluate(db, rule)
+
+    assert result["matched"] is False
+    assert result["observed"] is None
+    assert result["observation"]["status"] == "missing"
