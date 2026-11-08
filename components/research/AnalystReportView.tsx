@@ -1,8 +1,9 @@
 import Link from 'next/link';
+import { chartPriceUnit } from '@/lib/market/chart-price-units';
 
 import DcaWatchCard from '@/components/watchlist/DcaWatchCard';
 import { SotpBreakdownView } from '@/components/research/SotpBreakdownSection';
-import { fairValueRange, thesisRisks, userEstimates, vsPrice, type ReportCell, type ReportInputs, type ReportPeriod } from '@/lib/research/analyst-report';
+import { fairValueRange, thesisRisks, userEstimates, reportVsPrice, type ReportCell, type ReportInputs, type ReportPeriod } from '@/lib/research/analyst-report';
 import { thesisCatalystLabel } from '@/lib/research/catalyst-label';
 import { cleanThesisText } from '@/lib/research/thesis-text';
 import { readingSections } from '@/lib/research/thesis-reading-sections';
@@ -29,15 +30,23 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
   const { report, card, fair, thesis, sotp, honesty, keyStats, shorts } = data;
   const ticker = data.ticker;
   const market = report?.market;
-  const currency = market?.currency ?? fair?.currency ?? sotp?.model?.currency ?? null;
   const na = t('research.informe.na');
-  const money = (v: number | null | undefined, digits = 2) => (v == null ? na : currency ? fmt.formatMoney(v, currency, { minimumFractionDigits: digits, maximumFractionDigits: digits }) : fmt.formatNumber(v, { maximumFractionDigits: digits }));
-  const big = (v: number | null | undefined) => (v == null ? na : currency ? fmt.formatMoneyCompact(v, currency) : fmt.formatCompact(v));
+  const money = (v: number | null | undefined, unit: string | null | undefined, digits = 2) => {
+    const u = chartPriceUnit(unit);
+    return v == null || !u ? na : fmt.formatMoney(v / u.divisor, u.currency, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  };
+  const big = (v: number | null | undefined, unit?: string | null) => {
+    const u = chartPriceUnit(unit);
+    return v == null || !u ? na : fmt.formatMoneyCompact(v / u.divisor, u.currency);
+  };
   const count = (v: number | null | undefined) => (v == null ? na : fmt.formatCompact(v));
   const pct = (v: number | null) => (v == null ? na : fmt.formatPercent(v, { fromRatio: true, digits: 1, signDisplay: 'always' }));
   const price = market?.price ?? card?.current?.close ?? sotp?.price ?? null;
+  const priceCurrency = market?.price != null ? market.currency : card?.current?.close != null ? null : sotp?.price_currency;
+  const fairCurrency = fair?.currency;
   const priceDate = market?.price_date ?? card?.current?.signal_date ?? sotp?.price_as_of ?? null;
   const range = fairValueRange(fair, thesis, data.engineRange);
+  const rangeCurrency = range?.source === 'engine' ? data.engineRange?.currency : fairCurrency;
   const zone = card?.available ? card.current : undefined;
   const sections = thesis ? readingSections(thesis) : [];
   const risks = thesisRisks(thesis, sections);
@@ -63,19 +72,19 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
           </div>
           <div>
             <p className="text-xs text-gray-500">{t('research.informe.fairValue')}</p>
-            <p className="mt-1 text-lg font-semibold text-gray-100" data-testid="informe-fair">{fair?.value != null ? money(fair.value) : t('research.informe.noFairValue')}</p>
+            <p className="mt-1 text-lg font-semibold text-gray-100" data-testid="informe-fair">{fair?.value != null ? money(fair.value, fairCurrency) : t('research.informe.noFairValue')}</p>
             <p className="text-xs text-gray-400">{fair?.label ? valuationSummaryText(fair.label, locale) : ''}{fair?.as_of ? ` · ${fmt.formatMarketDate(fair.as_of)}` : ''}</p>
             {fair?.value == null && fair?.reason ? <p className="text-xs text-gray-400">{valuationSummaryText(fair.reason, locale)}</p> : null}
           </div>
           <div>
             <p className="text-xs text-gray-500">{t('research.informe.fairRange')}</p>
-            <p className="mt-1 text-gray-100" data-testid="informe-range">{range ? `${money(range.low)} – ${money(range.high)}` : na}</p>
+            <p className="mt-1 text-gray-100" data-testid="informe-range">{range ? `${money(range.low, rangeCurrency)} – ${money(range.high, rangeCurrency)}` : na}</p>
             <p className="text-xs text-gray-400">{range ? (range.source === 'thesis' ? t('research.informe.rangeThesis') : t('research.informe.rangeEngine')) : ''}</p>
           </div>
           <div>
             <p className="text-xs text-gray-500">{t('research.informe.price')}</p>
-            <p className="mt-1 text-lg font-semibold text-gray-100">{money(price)}</p>
-            <p className="text-xs text-gray-400">{priceDate ? fmt.formatMarketDate(priceDate) : ''}{fair?.value != null && price ? ` · ${t('research.informe.fairVsPrice', { pct: pct(vsPrice(fair.value, price)) })}` : ''}</p>
+            <p className="mt-1 text-lg font-semibold text-gray-100">{money(price, priceCurrency)}</p>
+            <p className="text-xs text-gray-400">{priceDate ? fmt.formatMarketDate(priceDate) : ''}{fair?.value != null && price ? ` · ${t('research.informe.fairVsPrice', { pct: pct(reportVsPrice(fair.value, fairCurrency, price, priceCurrency)) })}` : ''}</p>
           </div>
         </div>
         <p className="mt-3 text-xs text-gray-500">{t('research.informe.notARating')}</p>
@@ -88,16 +97,16 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
       <section aria-labelledby="informe-mercado" className={BOX}>
         <h2 className={H2} id="informe-mercado">{t('research.informe.marketData')}</h2>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm" data-testid="informe-market">
-          <Item label={t('research.informe.price')} value={money(price)} />
-          <Item label={t('research.informe.marketCap')} value={big(market?.market_cap)} note={market?.market_cap_basis === 'shares_diluted' ? t('research.informe.marketCapDiluted') : undefined} />
-          <Item label={t('research.informe.range52w')} value={r52 ? `${money(r52.low)} – ${money(r52.high)}` : na} />
+          <Item label={t('research.informe.price')} value={money(price, priceCurrency)} />
+          <Item label={t('research.informe.marketCap')} value={big(market?.market_cap, market?.market_cap_currency)} note={market?.market_cap_basis === 'shares_diluted' ? t('research.informe.marketCapDiluted') : undefined} />
+          <Item label={t('research.informe.range52w')} value={r52 ? `${money(r52.low, keyStats?.currency)} – ${money(r52.high, keyStats?.currency)}` : na} />
           <Item label={t('research.informe.avgVolume')} value={count(market?.avg_volume)} note={market?.avg_volume ? t('research.informe.avgVolumeNote', { n: market.avg_volume_sessions }) : undefined} />
           <Item label={t('research.informe.shortVolume')} value={shortRatio == null ? na : fmt.formatPercent(shortRatio, { fromRatio: true, digits: 1 })} note={shortRatio == null ? undefined : t('research.informe.shortVolumeNote')} />
-          <Item label={t('research.informe.ev')} value={big(market?.enterprise_value)} note={market?.enterprise_value == null ? evReason(t, market?.enterprise_value_reason) : t('research.informe.evNote')} />
+          <Item label={t('research.informe.ev')} value={big(market?.enterprise_value, market?.enterprise_value_currency)} note={market?.enterprise_value == null ? evReason(t, market?.enterprise_value_reason) : t('research.informe.evNote')} />
           <Item label={t('research.informe.sharesOut')} value={count(market?.shares_outstanding?.value)} note={market?.shares_outstanding?.period_end ? fmt.formatMarketDate(market.shares_outstanding.period_end) : undefined} />
           <Item label={t('research.informe.sharesDiluted')} value={count(market?.shares_diluted?.value)} note={sotp?.result?.shares_diluted ? t('research.informe.sharesSotp', { n: fmt.formatNumber(sotp.result.shares_diluted, { maximumFractionDigits: 1 }) }) : undefined} />
-          <Item label={t('research.informe.cash')} value={big(market?.cash?.value)} />
-          <Item label={t('research.informe.debt')} value={big(market?.total_debt?.value)} />
+          <Item label={t('research.informe.cash')} value={big(market?.cash?.value, market?.cash?.unit)} />
+          <Item label={t('research.informe.debt')} value={big(market?.total_debt?.value, market?.total_debt?.unit)} />
         </dl>
       </section>
 
@@ -180,13 +189,13 @@ function evReason(t: T, reason: string | null | undefined): string | undefined {
   }
 }
 
-function cellText(cell: ReportCell, big: (v: number | null | undefined) => string): string {
+function cellText(cell: ReportCell, big: (v: number | null | undefined, unit?: string | null) => string): string {
   if (!cell || cell.value == null) return '—';
   const marks = `${cell.derived_q4 ? '¹' : ''}${cell.basis === 'source_ebitda' ? '²' : ''}`;
-  return `${big(cell.value)}${marks}`;
+  return `${big(cell.value, cell.unit)}${marks}`;
 }
 
-function PeriodTable({ t, fmt, big, title, rows, kind }: { t: T; fmt: Formatters; big: (v: number | null | undefined) => string; title: string; rows: ReportPeriod[]; kind: 'FY' | 'Q' }) {
+function PeriodTable({ t, fmt, big, title, rows, kind }: { t: T; fmt: Formatters; big: (v: number | null | undefined, unit?: string | null) => string; title: string; rows: ReportPeriod[]; kind: 'FY' | 'Q' }) {
   if (!rows.length) return <p className="mb-2 text-sm text-gray-400">{title}: {t('research.informe.noActuals')}</p>;
   const head = (row: ReportPeriod) => {
     const year = fmt.formatMarketDate(row.period_end, { year: '2-digit', month: 'short' });

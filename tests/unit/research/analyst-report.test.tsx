@@ -4,7 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 import { AnalystReportView } from '@/components/research/AnalystReportView';
 import { createFormatters } from '@/lib/format';
 import { createTranslator } from '@/lib/i18n/translate';
-import { engineRangeFrom, fairValueRange, thesisRisks, userEstimates, vsPrice, type ReportInputs } from '@/lib/research/analyst-report';
+import { engineRangeFrom, fairValueRange, thesisRisks, userEstimates, vsPrice, reportVsPrice, type ReportInputs } from '@/lib/research/analyst-report';
 import type { SotpResponse } from '@/lib/research/sotp';
 import fixture from './analyst-report-asts.fixture.json';
 import sotpFixture from './sotp-asts.fixture.json';
@@ -97,5 +97,53 @@ describe('AnalystReportView (ASTS)', () => {
     view('en');
     expect(screen.getByText('Market data')).toBeTruthy();
     expect(screen.getByText(/not a buy or sell recommendation/)).toBeTruthy();
+  });
+});
+
+
+describe('informe: currencies belong to each figure', () => {
+  it('normalizes GBp/GBX against GBP without mixing USD or unlabelled figures', () => {
+    expect(reportVsPrice(50, 'GBP', 4255, 'GBp')).toBeCloseTo(50 / 42.55 - 1);
+    expect(reportVsPrice(50, 'GBP', 4255, 'GBX')).toBeCloseTo(50 / 42.55 - 1);
+    expect(reportVsPrice(50, 'USD', 4255, 'GBp')).toBeNull();
+    expect(reportVsPrice(50, null, 40, 'USD')).toBeNull();
+    expect(reportVsPrice(50, 'USD', 40, 'USD')).toBe(0.25);
+  });
+
+  it('does not label a DCA card price with a borrowed currency', () => {
+    const report = structuredClone(data.report!);
+    report.market.price = null;
+    view('es', { report });
+    const header = screen.getByTestId('analyst-report').querySelector('header')!;
+    expect(header.textContent).toContain('valor justo N/D vs precio');
+  });
+
+  it('engine range currency is independent of the fair value and unknown units stay N/D', () => {
+    expect(engineRangeFrom({ low: 40, high: 60, currency: 'GBP' })).toEqual({ low: 40, high: 60, currency: 'GBP' });
+    view('es', { fair: { ...data.fair!, value: 50, currency: 'USD' }, thesis: null, engineRange: { low: 40, high: 60, currency: 'GBP' } });
+    expect(screen.getByTestId('informe-range').textContent).toContain('GBP');
+    expect(screen.getByTestId('informe-range').textContent).not.toContain('US$');
+  });
+
+  it('header/ranges/cash/debt retain their units rather than borrowing price currency', () => {
+    const report = structuredClone(data.report!);
+    Object.assign(report.market, { price: 4255, currency: 'GBp', market_cap: 42550000,
+      market_cap_currency: 'GBP', enterprise_value: 37550000, enterprise_value_currency: 'GBP',
+      cash: { value: 10000000, unit: 'GBP', period_end: '2026-09-30', provenance: 'reported' },
+      total_debt: { value: 5000000, unit: 'USD', period_end: '2026-09-30', provenance: 'reported' } });
+    const keyStats = { ...data.keyStats!, currency: 'GBX', range_52w: { low: 4000, high: 5000, source: 'test' } };
+    view('es', { report, fair: { ...data.fair!, value: 50, currency: 'USD' }, thesis: null,
+      engineRange: { low: 40, high: 60, currency: 'USD' }, keyStats });
+    const header = screen.getByTestId('analyst-report').querySelector('header')!;
+    expect(header.textContent).toContain('42,55');
+    expect(screen.getByTestId('informe-fair').textContent).toContain('US$');
+    expect(screen.getByTestId('informe-range').textContent).toContain('US$');
+    expect(header.textContent).toMatch(/valor justo N\/D vs precio/);
+    const market = screen.getByTestId('informe-market');
+    expect(market.textContent).toContain('40,00');
+    const cash = within(market).getByText('Caja').parentElement!;
+    const debt = within(market).getByText('Deuda').parentElement!;
+    expect(cash.textContent).toContain('GBP');
+    expect(debt.textContent).toContain('US$');
   });
 });
