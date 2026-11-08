@@ -171,10 +171,12 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
         return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
     };
 
+    // Tinta oscura sobre el sólido: blanco sobre green-500/teal-500/yellow-500
+    // da 2,2-3,7:1 (suspende AA en texto pequeño); gray-900 da 5,3-9,2:1.
     const getGradeColor = (grade: string) => {
-        if (grade.startsWith('A')) return 'bg-green-500';
-        if (grade.startsWith('B')) return 'bg-teal-500';
-        return 'bg-yellow-500';
+        if (grade.startsWith('A')) return 'bg-green-500 text-gray-900';
+        if (grade.startsWith('B')) return 'bg-teal-500 text-gray-900';
+        return 'bg-yellow-500 text-gray-900';
     };
 
     return (
@@ -319,12 +321,12 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                                     {pick.symbol}
                                                 </h3>
                                                 {pick.isStrongBuy && (
-                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold text-white bg-gradient-to-r from-teal-500 to-emerald-500 animate-pulse">
+                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold text-gray-900 bg-gradient-to-r from-teal-500 to-emerald-500 animate-pulse">
                                                         {t('propicks.content.gemBadge')}
                                                     </span>
                                                 )}
                                                 {!pick.isStrongBuy && (
-                                                    <span className={`px-2 py-0.5 rounded text-xs font-bold text-white ${getGradeColor(pick.grade)}`}>
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${getGradeColor(pick.grade)}`}>
                                                         {pick.grade}
                                                     </span>
                                                 )}
