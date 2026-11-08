@@ -6,7 +6,7 @@ import asyncio
 import logging
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -24,6 +24,7 @@ from app.services.connectors.base import UpstreamRateLimited
 from app.services.connectors.ecb import ECBClient, ECBRates
 from app.services.connectors.finnhub import FinnhubClient
 from app.services.connectors.fmp import FMPClient
+from app.services.connectors.official_fx import OFFICIAL_FEEDS, fetch_official_quotes, to_base_rates
 from app.services.portfolio_fx_service import TAX_CURRENCY, PortfolioFXService
 from app.services.portfolio_ledger_service import PortfolioLedgerService
 from app.services.price_freshness import close_is_stale, market_price_is_stale
@@ -409,10 +410,55 @@ class MarketRefreshService:
         self,
         price_provider: PriceProvider | None = None,
         fx_provider: FXProvider | None = None,
+        official_fx_fetcher: Callable[[str], Awaitable[str]] | None = None,
     ) -> None:
         self.price_provider = price_provider or PublicPriceProvider()
         self.fx_provider = fx_provider or ECBFXProvider()
+        self.official_fx_fetcher = official_fx_fetcher
         self.settings = get_settings()
+
+    async def _official_fx(
+        self,
+        db: Session,
+        fx: PortfolioFXService,
+        base_currency: str,
+        currencies: set[str],
+        snapshot: ECBRates,
+        as_of: date,
+        fx_errors: list[dict],
+    ) -> int:
+        """Tipos oficiales (NBG, CBC) de las divisas que el BCE no publica.
+
+        Se guardan como las filas BCE (base por 1 divisa) con su fuente y su
+        fecha reales; una divisa que no se obtiene queda en ``fx_errors`` con
+        el motivo, nunca se descarta en silencio.
+        """
+        kwargs = {"fetcher": self.official_fx_fetcher} if self.official_fx_fetcher else {}
+        quotes, errors = await fetch_official_quotes(currencies, on=as_of, **kwargs)
+        fx_errors.extend(errors)
+        rates = to_base_rates(
+            quotes,
+            base_currency=base_currency,
+            base_per={k.upper(): v for k, v in snapshot.rates.items()},
+            base_per_date=snapshot.rate_date,
+        )
+        written = 0
+        for currency in sorted(currencies):
+            found = rates.get(currency)
+            if found is None:
+                if not any(e.get("currency") == currency for e in errors):
+                    fx_errors.append({"currency": currency, "reason": "rate_not_available"})
+                continue
+            fx.upsert_rate(
+                db,
+                base_currency=base_currency,
+                quote_currency=currency,
+                rate=found.rate,
+                rate_date=found.rate_date,
+                source=found.source,
+            )
+            written += 1
+        return written
 
     async def refresh(
         self,
@@ -522,7 +568,12 @@ class MarketRefreshService:
         # La valoracion convierte la divisa de REPORTE de los hechos (BABA: CNY)
         # a la del listado: esas divisas tambien necesitan su tipo BCE del dia,
         # aunque ninguna posicion cotice en ellas. Subunidades (GBX) -> GBP.
-        held_ids = {company.id for _, company in rows}
+        # Tambien las de las empresas en seguimiento (watchlist), no solo las
+        # de cartera: TSMC reporta en TWD y su ficha se valora aunque no haya
+        # posicion; sin su tipo, el DCF y la TIR quedaban bloqueados.
+        held_ids = {company.id for _, company in rows} | {
+            company.id for company in companies if company.id is not None
+        }
         if held_ids:
             fact_units = db.scalars(
                 select(FinancialFact.unit)
@@ -530,19 +581,31 @@ class MarketRefreshService:
                 .distinct()
             ).all()
             quote_currencies |= reporting_currencies(fact_units)
+            # Y la divisa de cotizacion de cada una (CGEO.L cotiza en GBp y
+            # reporta en GEL: hacen falta las dos patas).
+            quote_currencies |= reporting_currencies(company.currency for company in companies)
             quote_currencies = {
                 normalize_currency(code)[0] or code for code in quote_currencies
             }
         fx_errors: list[dict] = []
         fx_updated = 0
+        # Divisas que el BCE no publica (GEL, TWD) salen del banco central
+        # emisor; las que cruzan por USD necesitan el USD del BCE en la misma
+        # toma.
+        official_needed = {c for c in quote_currencies if c in OFFICIAL_FEEDS}
+        ecb_quotes = quote_currencies | ({"USD"} if official_needed else set())
         try:
             snapshot = await self.fx_provider.fetch(
                 base_currency=base_currency,
-                quote_currencies=quote_currencies,
+                quote_currencies=ecb_quotes,
             )
+            official_missing: set[str] = set()
             for currency in quote_currencies:
                 rate = snapshot.rates.get(currency)
                 if rate is None:
+                    if currency in OFFICIAL_FEEDS:
+                        official_missing.add(currency)
+                        continue
                     fx_errors.append({"currency": currency, "reason": "rate_not_available"})
                     continue
                 fx.upsert_rate(
@@ -554,6 +617,10 @@ class MarketRefreshService:
                     source="ECB",
                 )
                 fx_updated += 1
+            if official_missing:
+                fx_updated += await self._official_fx(
+                    db, fx, base_currency, official_missing, snapshot, as_of, fx_errors
+                )
             if base_currency.upper() != TAX_CURRENCY:
                 # La fiscalidad (IRPF, Modelo 720) va SIEMPRE en euros al tipo
                 # BCE: con una divisa base distinta (USD) se guardan tambien
@@ -561,8 +628,15 @@ class MarketRefreshService:
                 tax_quotes = (quote_currencies | {base_currency.upper()}) - {TAX_CURRENCY}
                 tax_snapshot = await self.fx_provider.fetch(
                     base_currency=TAX_CURRENCY,
-                    quote_currencies=tax_quotes,
+                    quote_currencies=tax_quotes | ({"USD"} if official_needed else set()),
                 )
+                tax_official = {
+                    c for c in tax_quotes if c in OFFICIAL_FEEDS and tax_snapshot.rates.get(c) is None
+                }
+                if tax_official:
+                    await self._official_fx(
+                        db, fx, TAX_CURRENCY, tax_official, tax_snapshot, as_of, fx_errors
+                    )
                 for currency in tax_quotes:
                     rate = tax_snapshot.rates.get(currency)
                     if rate is None:
