@@ -9,10 +9,10 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * /calendar/suscripcion: el origen del enlace de suscripción se construye con
- * saneado SINTÁCTICO de cabeceras (trim, primer valor de la lista forwarded,
- * proto solo http/https, dominio por defecto si la sintaxis no cuadra). OJO:
- * no hay allowlist — un host sintácticamente válido se acepta tal cual.
+ * /calendar/suscripcion: el origen del enlace de suscripción (que lleva el
+ * token del feed en la URL) NO puede salir de una cabecera Host controlable:
+ * solo el dominio propio, hosts locales de desarrollo o NEXT_PUBLIC_SITE_URL.
+ * Un host ajeno, aunque sea sintácticamente válido, cae al dominio propio.
  * Un backend sin endpoint (404) se trata como caído.
  */
 const getCalendarFeed = vi.fn();
@@ -51,27 +51,33 @@ describe('página de suscripción al calendario', () => {
         expect(managerProps.origin).toBe('https://gerarai.com');
     });
 
-    it('sin variable: host y proto de cabeceras saneados (primer valor de la lista)', async () => {
-        headerValues = { 'x-forwarded-host': 'app.gerarai.com, evil.example', 'x-forwarded-proto': 'https, http' };
+    it('sin variable: dominio propio y proto saneados (primer valor de la lista)', async () => {
+        headerValues = { 'x-forwarded-host': 'gerarai.duckdns.org, evil.example', 'x-forwarded-proto': 'https, http' };
         render(await CalendarSubscriptionPage());
-        expect(managerProps.origin).toBe('https://app.gerarai.com');
+        expect(managerProps.origin).toBe('https://gerarai.duckdns.org');
     });
 
-    it('host con sintaxis inválida o proto desconocido: cae al dominio por defecto', async () => {
+    it('host ajeno aunque sea válido (evil.example) NO cuela: cae al dominio propio', async () => {
+        headerValues = { host: 'evil.example' };
+        render(await CalendarSubscriptionPage());
+        expect(managerProps.origin).toBe('https://gerarai.duckdns.org');
+    });
+
+    it('host con sintaxis inválida o proto desconocido: cae al dominio propio en https', async () => {
         headerValues = { host: 'evil.example/?x=', 'x-forwarded-proto': 'javascript:' };
         render(await CalendarSubscriptionPage());
-        expect(managerProps.origin).toBe('https://gerarai.vercel.app');
+        expect(managerProps.origin).toBe('https://gerarai.duckdns.org');
     });
 
-    it('un host sintácticamente válido se acepta tal cual (no hay allowlist)', async () => {
-        headerValues = { host: 'otro-dominio.example' };
+    it('localhost de desarrollo sí entra en la lista de confianza', async () => {
+        headerValues = { host: 'localhost:3000', 'x-forwarded-proto': 'http' };
         render(await CalendarSubscriptionPage());
-        expect(managerProps.origin).toBe('https://otro-dominio.example');
+        expect(managerProps.origin).toBe('http://localhost:3000');
     });
 
-    it('sin cabeceras útiles: dominio por defecto en https', async () => {
+    it('sin cabeceras útiles: dominio propio en https', async () => {
         render(await CalendarSubscriptionPage());
-        expect(managerProps.origin).toBe('https://gerarai.vercel.app');
+        expect(managerProps.origin).toBe('https://gerarai.duckdns.org');
     });
 
     it('404 del backend (endpoint sin desplegar): pantalla de reintento como caído', async () => {
