@@ -59,6 +59,7 @@ SOTP_VALUER_TOOLS: tuple[str, ...] = (
     "share_count_documents",
     "balance_asset_documents",
     "analyst_estimates",
+    "companies_house",
     "value_drivers",
     "financial_facts",
     "valuation_engine",
@@ -906,6 +907,64 @@ def _company_guidance_outputs(db: Session, company: Company, tenant_id: int) -> 
     return out
 
 
+
+def companies_house_outputs(result: Mapping[str, Any] | None) -> list[ToolOutput]:
+    """Una salida por filial britanica verificada: sus ultimas cuentas en Companies House,
+    citadas con su URL publica, y las cifras del iXBRL cuando las cuentas van etiquetadas."""
+    out: list[ToolOutput] = []
+    for row in (result or {}).get("members") or []:
+        figures = {
+            f["metric"]: {"millones": f["value_millions"], "moneda": f["currency"], "cierre": f["period_end"],
+                          "concepto": f["concept"]}
+            for f in row.get("figures") or []
+        }
+        made_up = row.get("made_up_to") or ""
+        kind = row.get("accounts_type") or "sin cuentas"
+        quote = "; ".join(f"{f['label']} {f['value']:,.0f} {f['currency']} a {f['period_end']} ({f['concept']})"
+                          for f in row.get("figures") or [])
+        out.append(ToolOutput(
+            source={"table": "companies_house", "id": str(row.get("company_number") or ""),
+                    "url": row.get("ixbrl_url") if figures and row.get("ixbrl_url") else
+                    (row.get("document_url") or row.get("company_url") or ""),
+                    "date": str(made_up),
+                    "title": f"{row.get('company_name')} ({row.get('company_number')}): cuentas «{kind}» "
+                             f"a {made_up or 's/f'}, Companies House"},
+            data={
+                "sociedad": row.get("company_name"), "numero": row.get("company_number"),
+                "controladora": row.get("parent"), "por_que_es_del_grupo": row.get("via"),
+                "tipo_cuentas": kind, "cierre": made_up, "presentadas": row.get("filed_on"),
+                "formatos": row.get("formats"), "paginas": row.get("pages"),
+                "cifras": figures or None,
+                "nota": None if figures else "cuentas en PDF (sin iXBRL): citables por su enlace, sin cifras extraidas",
+                "quote": quote or None, "ficha": row.get("company_url"),
+            },
+        ))
+    return out
+
+
+def companies_house_tool(db: Session) -> ToolSpec:
+    """Filiales britanicas del holding y sus cuentas oficiales (Companies House). Apagada sin clave."""
+
+    def companies_house(ctx: RunContext) -> list[ToolOutput]:
+        from sqlalchemy import select
+
+        from app.services.companies_house_evidence import collect_group_accounts, subsidiary_hints
+
+        if not ctx.ticker:
+            return []
+        company = db.scalars(select(Company).where(Company.ticker == ctx.ticker)).first()
+        # Solo emisores sin SEC (holdings de Londres, Toronto…): una empresa con CIK ya tiene sus
+        # segmentos en el XBRL de la SEC y sus filiales britanicas serian ruido y peticiones.
+        if company is None or not company.name or getattr(company, "cik", None):
+            return []
+        tenant = ctx.tenant_id if type(ctx.tenant_id) is int else None
+        result = collect_group_accounts(company.name, subsidiary_hints(db, company, tenant))
+        return companies_house_outputs(result)
+
+    return ToolSpec(name="companies_house", fn=companies_house,
+                    description="Filiales britanicas verificadas por PSC y sus ultimas cuentas en Companies House")
+
+
 def build_sotp_tools(db: Session, anchors: Mapping[str, Any]) -> dict[str, ToolSpec]:
     from app.services.expert_team.recopilador import company_documents_tool
     from app.services.expert_team.tools import build_tools
@@ -916,6 +975,7 @@ def build_sotp_tools(db: Session, anchors: Mapping[str, Any]) -> dict[str, ToolS
     tools["share_count_documents"] = share_count_documents_tool(db)
     tools["balance_asset_documents"] = balance_asset_documents_tool(db)
     tools["analyst_estimates"] = analyst_estimates_tool(db)
+    tools["companies_house"] = companies_house_tool(db)
     tools["sotp_anchors"] = ToolSpec(name="sotp_anchors", fn=lambda ctx: _anchor_outputs(anchors),
                                      description="Precio, acciones, caja, deuda, ingresos y tasa CAPM fijados por el código")
     return tools
@@ -1281,6 +1341,8 @@ __all__ = [
     "SotpProposalResult",
     "build_model",
     "build_sotp_tools",
+    "companies_house_outputs",
+    "companies_house_tool",
     "generate_sotp_proposal",
     "parse_classification",
     "parse_proposal",

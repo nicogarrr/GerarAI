@@ -345,7 +345,57 @@ class ThesisEvidenceService:
                 items.append({**item, "text": "pending"})
                 continue
             items.append({**item, "text": "queued"})
+        items.extend(self._uk_subsidiary_reports(db, company))
         return {"status": "ok" if items else "pending", "reason": reason, "items": items}
+
+    def _fetch_uk_group(self, company: Company, hints: list[str]) -> dict[str, Any] | None:
+        from app.services.companies_house_evidence import collect_group_accounts
+
+        return collect_group_accounts(company.name, hints)
+
+    def _uk_subsidiary_reports(self, db: Session, company: Company) -> list[dict[str, Any]]:
+        """Cuentas consolidadas de las filiales britanicas (Companies House) para leerlas enteras.
+
+        Las grandes van en PDF escaneado: la ingesta normal (con OCR) las deja citables por
+        pagina, con el nombre de la filial en el titulo para que nadie las tome por las del
+        holding. Apagado sin ``COMPANIES_HOUSE_API_KEY``; nunca tumba la tesis."""
+        from app.services.companies_house_evidence import subsidiary_hints, subsidiary_reports
+
+        if not company.name:
+            return []
+        try:
+            hints = subsidiary_hints(db, company, db.info.get("tenant_id"))
+            result = self._fetch_uk_group(company, hints)
+        except Exception as exc:  # noqa: BLE001 - best-effort
+            _log_source_failure("Companies House (filiales britanicas)", company.ticker, exc)
+            return []
+        out: list[dict[str, Any]] = []
+        for row in subsidiary_reports(result or {}):
+            url = str(row["document_url"])
+            item = {"kind": "subsidiary_accounts", "url": url, "date": row.get("filed_on"),
+                    "source": "Companies House", "company": row.get("company_name"),
+                    "company_number": row.get("company_number")}
+            if annual_report_has_text(db, company.id, url):
+                out.append({**item, "text": "ingested"})
+                continue
+            try:
+                from app.workers.dramatiq_app import process_document
+
+                process_document.send(
+                    company.ticker,
+                    f"{row.get('company_name')} (filial británica, {row.get('company_number')}) — "
+                    f"cuentas «{row.get('accounts_type')}» a {row.get('made_up_to')} (Companies House)",
+                    url, "companies_house", row.get("filed_on"), db.info.get("tenant_id"), db.info.get("user_id"),
+                    filing_metadata={"form": "subsidiary_accounts", "provider": "Companies House",
+                                     "company_number": row.get("company_number"),
+                                     "report_date_hint": row.get("made_up_to")},
+                )
+            except Exception as exc:  # noqa: BLE001
+                _log_source_failure("Companies House (filiales britanicas)", company.ticker, exc)
+                out.append({**item, "text": "pending"})
+                continue
+            out.append({**item, "text": "queued"})
+        return out
 
     def _enqueue_annual_report_text(self, db: Session, company: Company, filing: dict[str, Any]) -> None:
         """Encola la descarga + troceado del texto del informe anual (worker).
