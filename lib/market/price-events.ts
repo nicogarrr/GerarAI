@@ -124,6 +124,18 @@ export function markersByDay(events: PriceEvent[], hidden: ReadonlySet<PriceEven
         });
 }
 
+/**
+ * Tamaño del marcador de un día según el ancho de pantalla: en pantallas
+ * estrechas (móvil, <640 px) los círculos de tamaño fijo se solapaban hasta
+ * ser ilegibles (24 sesiones en 390 px), así que el marcador se encoge
+ * manteniendo color y texto; el detalle del día sigue en la lista
+ * «Eventos del periodo». En escritorio se conservan los tamaños previos.
+ */
+export function markerSize(count: number, wide: boolean): number {
+    if (count > 1) return wide ? 1.4 : 0.9;
+    return wide ? 1 : 0.6;
+}
+
 /** Velas desde la primera compra (incluida). */
 export function barsSince<T extends { date: string }>(bars: T[], firstDate: string | null | undefined): T[] {
     if (!firstDate) return bars;
