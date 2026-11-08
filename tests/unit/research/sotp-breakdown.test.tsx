@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 
 import { SotpBreakdownView } from '@/components/research/SotpBreakdownSection';
@@ -6,6 +6,9 @@ import { createFormatters } from '@/lib/format';
 import { createTranslator } from '@/lib/i18n/translate';
 import { sotpModelFromForm, type SotpResponse } from '@/lib/research/sotp';
 import fixture from './sotp-asts.fixture.json';
+import agentsFixture from './sotp-agents-asts.fixture.json';
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 const data = fixture as unknown as SotpResponse;
 const es = createTranslator('es');
@@ -63,5 +66,65 @@ describe('SotpBreakdownView', () => {
     render(<SotpBreakdownView data={data} t={createTranslator('en')} fmt={createFormatters('en')} locale="en" ticker="ASTS" />);
     expect(screen.getByTestId('sotp-unvalidated').textContent).toBe('User assumptions, not validated against history');
     expect(screen.getByTestId('sotp-base-rate').textContent).toContain('burns cash');
+  });
+
+  it('propuesta de los agentes: etiqueta con fecha y precio, versiones, razones y fuentes por parte', () => {
+    const agents = agentsFixture as unknown as SotpResponse;
+    render(<SotpBreakdownView data={agents} t={createTranslator('es')} fmt={createFormatters('es')} locale="es" ticker="ASTS" />);
+    expect(screen.getByTestId('sotp-unvalidated').textContent).toBe('Propuesta de los agentes, no validada contra histórico');
+    expect(screen.getByTestId('sotp-agents-label').textContent).toContain('32,33');
+    expect(screen.getByTestId('sotp-agents-label').textContent).toContain('2026');
+    const nav = screen.getByRole('navigation', { name: 'Versiones del desglose' });
+    expect(within(nav).getByText(/Propuesta de los agentes · por defecto/)).toBeTruthy();
+    expect(within(nav).getByRole('link', { name: 'Ejemplo pegado por Nico' }).getAttribute('href')).toBe('/research/ASTS?view=valuation&sotp=example#desglose-partes');
+    expect(screen.getByTestId('sotp-summary').textContent?.length).toBeGreaterThan(40);
+    expect(screen.getAllByText('¿De dónde sale?').length).toBeGreaterThan(3);
+    expect(screen.getAllByText(/Caja menos deuda/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/aún no factura/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/CAPM de GerarAI/).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Regenerar solo el desglose' })).toBeTruthy();
+    expect(screen.getByTestId('sotp-warnings').textContent).toContain('infravalorado por falta de estimaciones');
+    expect(screen.getByTestId('sotp-unvalued').textContent).toContain('financiación o inversión');
+    expect(screen.getByTestId('sotp-total').textContent).toContain('4,80');
+    expect(screen.queryByTestId('sotp-no-agents')).toBeNull();
+    // La tasa base y la sensibilidad siguen siempre al lado.
+    expect(screen.getByTestId('sotp-base-rate')).toBeTruthy();
+    expect(screen.getByTestId('sotp-sensitivity').textContent).toContain('Múltiplos −30 %');
+  });
+
+  it('dos propuestas de los agentes que difieren más de un 30 %: «resultado sensible a supuestos»', () => {
+    const agents = { ...(agentsFixture as unknown as SotpResponse), agents_stability: { previous_value_per_share: 6.13, current_value_per_share: 2.81, change: -0.542, unstable: true, threshold: 0.3 } };
+    render(<SotpBreakdownView data={agents} t={createTranslator('es')} fmt={createFormatters('es')} locale="es" ticker="ASTS" />);
+    expect(screen.getByTestId('sotp-unstable').textContent).toContain('Resultado sensible a supuestos');
+    expect(screen.getByTestId('sotp-unstable').textContent).toContain('6,13');
+  });
+
+  it('sin valorar, dos lecturas distintas y qué dato lo cambió: todo a la vista', () => {
+    const base = agentsFixture as unknown as SotpResponse;
+    const agents = { ...base, model: { ...base.model!, unvalued: [{ name: 'Japón (J-LEO)', status: 'beta', reason: 'sin cifra de ingresos en la evidencia' }] }, agents: { ...base.agents, readings_differ: true, readings: [{ value_per_share: 3.1 }, { value_per_share: 4.4 }], changed_by: ['nuevo: 8-K 6-nov-2026'] } } as SotpResponse;
+    render(<SotpBreakdownView data={agents} t={createTranslator('es')} fmt={createFormatters('es')} locale="es" ticker="ASTS" />);
+    expect(screen.getByTestId('sotp-unvalued').textContent).toContain('Japón (J-LEO) — sin cifra de ingresos en la evidencia');
+    expect(screen.getByTestId('sotp-readings').textContent).toContain('se muestra la más conservadora');
+    expect(screen.getByTestId('sotp-changed-by').textContent).toBe('Cambió por un dato nuevo: nuevo: 8-K 6-nov-2026');
+  });
+
+  it('tesis larga de los expertos y aviso de «casi todo caja» bien visibles', () => {
+    const base = agentsFixture as unknown as SotpResponse;
+    const agents = { ...base, agents: { ...base.agents, mostly_cash: { cash_per_share: 3.95, value_per_share: 4.8, share: 0.823 }, narrative: { status: 'ok', version: 'sotp-narrative-v1', sections: [{ key: 'resumen', title: 'Resumen', text: 'El desglose da 4,80 $ por acción frente a 32,33 $.' }, { key: 'conclusion', title: 'Conclusión', text: 'Sin estimaciones el negocio principal no se puede valorar.' }] } } } as SotpResponse;
+    render(<SotpBreakdownView data={agents} t={createTranslator('es')} fmt={createFormatters('es')} locale="es" ticker="ASTS" />);
+    const cash = screen.getByTestId('sotp-mostly-cash').textContent ?? '';
+    expect(cash).toContain('3,95');
+    expect(cash).toContain('no es un valor razonable');
+    const narrative = screen.getByTestId('sotp-narrative');
+    expect(within(narrative).getByRole('heading', { name: 'Tesis de los expertos sobre el desglose' })).toBeTruthy();
+    expect(within(narrative).getByText('El desglose da 4,80 $ por acción frente a 32,33 $.')).toBeTruthy();
+    expect(within(narrative).getByText('Conclusión')).toBeTruthy();
+  });
+
+  it('sin propuesta de los agentes lo dice, con el motivo del último intento, y ofrece generarla', () => {
+    const withStatus = { ...data, variants: [{ key: 'agents', label: 'Propuesta de los agentes', available: false }, { key: 'example', label: 'Ejemplo pegado por Nico', available: true }], agents_status: { source: 'thesis', run_id: 1, job_status: 'succeeded', status: 'rejected', problems: ['falta el escenario bajista'] } } as unknown as SotpResponse;
+    render(<SotpBreakdownView data={withStatus} t={createTranslator('es')} fmt={createFormatters('es')} locale="es" ticker="ASTS" />);
+    expect(screen.getByTestId('sotp-no-agents').textContent).toBe('Sin propuesta de los agentes todavía. Último intento: falta el escenario bajista');
+    expect(screen.getByRole('button', { name: 'Generar con expertos' })).toBeTruthy();
   });
 });

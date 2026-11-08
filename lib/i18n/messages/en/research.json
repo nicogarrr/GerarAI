@@ -1943,7 +1943,51 @@
       "missingValue": "{name}: the value is missing.",
       "noParts": "At least one named part is needed."
     },
-    "dilutionDefault": "Dilution {n}"
+    "dilutionDefault": "Dilution {n}",
+    "exampleNico": "Example pasted by Nico (Nov 8, 2026).",
+    "agentsLabel": "Proposal by GerarAI's expert agents · {date} · price {price}. Every figure carries its reason and its source or assumption; not validated against history.",
+    "userLabel": "Edited by you.",
+    "noAgents": "No proposal from the agents yet.",
+    "noAgentsWhy": "Last attempt: {why}",
+    "variantNav": "Breakdown versions",
+    "variantDefault": "default",
+    "variant": {
+      "agents": "Agents' proposal",
+      "user": "Edited by you",
+      "example": "Example pasted by Nico"
+    },
+    "why": {
+      "revenue": "Revenue",
+      "margin": "Margin",
+      "multiple": "Multiple",
+      "probability": "Probability",
+      "value": "Value",
+      "shares": "Shares"
+    },
+    "whyTitle": "Where does it come from?",
+    "sources": "Sources",
+    "rateSource": "Rate: {source}",
+    "notCommercial": "not yet billing",
+    "belowZero": "Debts exceed the parts: the share is not worth less than 0.",
+    "editAgentsHint": "Saving creates your own version (“Edited by you”); the agents' proposal is kept.",
+    "agents": {
+      "generate": "Generate with experts",
+      "regenerate": "Regenerate the breakdown only",
+      "hint": "The thesis generates it on its own when it finishes; this redoes only the breakdown with the expert agents.",
+      "running": "The agents are working on the breakdown…",
+      "done": "Done: the new proposal is ready.",
+      "failed": "The agents left no proposal.",
+      "error": "Could not check the job. Try again."
+    },
+    "unvalidatedAgents": "Agents' proposal, not validated against history",
+    "agentsVariance": "Figures from fixed rules over the agents' classification: the same data gives the same number; it only changes when new data arrives.",
+    "unstable": "Result sensitive to assumptions: the agents' previous proposal gave {previous} and this one gives {current} ({change}).",
+    "readingsDiffer": "Two agent readings classified differently ({values}); the most conservative is shown.",
+    "changedBy": "Changed by new data: {what}",
+    "unvaluedTitle": "Not valued (no checkable figure in the evidence, they add nothing):",
+    "mostlyCash": "Note: {cash} of the {total} per share ({share}) is today's cash minus debt, not business. The core business is undervalued for lack of estimates: this figure is not a fair value of the share.",
+    "narrativeTitle": "The experts' thesis on the breakdown",
+    "narrativeHint": "Prose by the agents; every figure comes from the calculation above (markers), never from the model."
   },
   "informe": {
     "metaTitle": "{ticker} report",

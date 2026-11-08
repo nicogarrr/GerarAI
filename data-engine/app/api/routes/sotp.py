@@ -1,6 +1,6 @@
 """Desglose por partes (SOTP) editable: GET/PUT/DELETE /valuation/{ticker}/sotp."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -23,12 +23,36 @@ def _context(db: Session, ticker: str):
 
 
 @router.get("/{ticker}/sotp")
-def get_user_sotp(ticker: str, db: Session = Depends(get_db)) -> dict:
-    """Desglose por partes del usuario (o el borrador de ejemplo), con su aritmética,
-    escenarios, sensibilidad y la tasa base medida. Supuestos del usuario: no es el
-    valor justo de GerarAI."""
+def get_user_sotp(
+    ticker: str,
+    db: Session = Depends(get_db),
+    variant: str | None = Query(default=None, pattern="^(agents|user|example)$"),
+) -> dict:
+    """Desglose por partes con su aritmética, escenarios, sensibilidad y la tasa base
+    medida. Versiones: la propuesta de los agentes (por defecto en cuanto existe), la
+    editada por el usuario (si es posterior) y el ejemplo de código del ticker.
+    Supuestos no validados: no es el valor justo de GerarAI."""
     company, tenant = _context(db, ticker)
-    return UserSotpService().read(db, company, tenant)
+    return UserSotpService().read(db, company, tenant, variant=variant)
+
+
+@router.post("/{ticker}/sotp/generate", status_code=202)
+def generate_agents_sotp(ticker: str, db: Session = Depends(get_db)) -> dict:
+    """«Generar con expertos»: encola el valorador SOTP del equipo (job en segundo plano)."""
+    from app.services import sotp_agents_job
+
+    company, _tenant = _context(db, ticker)
+    run, created = sotp_agents_job.enqueue(db, company.ticker)
+    return {"job": sotp_agents_job.job_payload(run), "created": created}
+
+
+@router.get("/{ticker}/sotp/jobs/latest")
+def latest_agents_sotp_job(ticker: str, db: Session = Depends(get_db)) -> dict:
+    """Estado honesto del último «Generar con expertos» (sin ETA)."""
+    from app.services import sotp_agents_job
+
+    company, _tenant = _context(db, ticker)
+    return {"job": sotp_agents_job.job_payload(sotp_agents_job.latest_run(db, company.ticker))}
 
 
 @router.put("/{ticker}/sotp")

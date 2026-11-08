@@ -25,7 +25,8 @@ SPEND_PER_CALL_EUR = 0.02
 
 
 def provider_reasoner(
-    provider: Any | None = None, *, db: Session | None = None, commit_usage: bool = True
+    provider: Any | None = None, *, db: Session | None = None, commit_usage: bool = True,
+    temperature: float = 0.2,
 ) -> Reasoner:
     async def reason(system: str, user: str, max_tokens: int, task: str) -> str:
         from app.core.i18n import current_language
@@ -56,7 +57,7 @@ def provider_reasoner(
         request = LLMRequest(
             messages=[Message("system", system), Message("user", user)],
             task="main_financial_analysis",
-            temperature=0.2,
+            temperature=temperature,
             max_tokens=max_tokens,
             metadata={"expert_team_task": task},
         )

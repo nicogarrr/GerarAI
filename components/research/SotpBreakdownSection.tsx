@@ -1,12 +1,14 @@
 import { Layers } from 'lucide-react';
+import Link from 'next/link';
 
 import { MutationForm } from '@/components/forms/MutationForm';
+import SotpAgentsButton from '@/components/research/SotpAgentsButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { deleteSotpResult, saveSotpResult } from '@/lib/actions/sotp.actions';
-import { formatNumberForInput } from '@/lib/format';
+import { formatNumberForInput, formatUserDate } from '@/lib/format';
 import { getFormat, getLocale, getT } from '@/lib/i18n/server';
-import { SOTP_EXTRA_DILUTION, SOTP_EXTRA_PARTS, SOTP_EXTRA_SCENARIOS, getSotp, type SotpModel, type SotpResponse } from '@/lib/research/sotp';
+import { SOTP_EXTRA_DILUTION, SOTP_EXTRA_PARTS, SOTP_EXTRA_SCENARIOS, getSotp, type SotpModel, type SotpResponse, type SotpSource, type SotpVariantKey, type SotpWhy } from '@/lib/research/sotp';
 
 type T = Awaited<ReturnType<typeof getT>>;
 type F = Awaited<ReturnType<typeof getFormat>>;
@@ -17,6 +19,20 @@ const SENS_KEYS = {
   revenue_minus_50: 'research.sotp.sens.revenueMinus50',
   rate_plus_5pp: 'research.sotp.sens.ratePlus5pp',
   combined: 'research.sotp.sens.combined',
+} as const;
+
+const VARIANT_KEYS = {
+  agents: 'research.sotp.variant.agents',
+  user: 'research.sotp.variant.user',
+  example: 'research.sotp.variant.example',
+} as const;
+const WHY_KEYS = {
+  revenue: 'research.sotp.why.revenue',
+  margin: 'research.sotp.why.margin',
+  multiple: 'research.sotp.why.multiple',
+  probability: 'research.sotp.why.probability',
+  value: 'research.sotp.why.value',
+  shares: 'research.sotp.why.shares',
 } as const;
 
 const BOX = 'rounded-lg border border-gray-800 bg-gray-900/40 p-3';
@@ -32,8 +48,8 @@ function pct(fmt: F, value: number | null | undefined, sign = true): string {
  * hoy → $/acción con su aritmética, escenarios, sensibilidad y, siempre al
  * lado, la tasa base medida y la etiqueta de supuestos no validados.
  */
-export async function SotpBreakdownSection({ ticker }: { ticker: string }) {
-  const [data, t, fmt, locale] = await Promise.all([getSotp(ticker), getT(), getFormat(), getLocale()]);
+export async function SotpBreakdownSection({ ticker, variant = null }: { ticker: string; variant?: SotpVariantKey | null }) {
+  const [data, t, fmt, locale] = await Promise.all([getSotp(ticker, variant), getT(), getFormat(), getLocale()]);
   if (!data) return <p className={`${BOX} text-xs text-gray-400`} role="status">{t('research.sotp.loadError')}</p>;
   return <SotpBreakdownView data={data} t={t} fmt={fmt} locale={locale} ticker={ticker} />;
 }
@@ -55,9 +71,66 @@ export function SotpBreakdownView({ data, t, fmt, locale, ticker, editable = tru
       <div className="flex flex-wrap items-center gap-2">
         <Layers aria-hidden="true" className="h-5 w-5 text-teal-300" />
         <h3 className="text-lg font-semibold text-gray-100" id="sotp-title">{t('research.sotp.title')}</h3>
-        <span className="rounded-full border border-amber-700/60 bg-amber-950/40 px-2 py-0.5 text-xs text-amber-200" data-testid="sotp-unvalidated">{t('research.sotp.unvalidated')}</span>
+        <span className="rounded-full border border-amber-700/60 bg-amber-950/40 px-2 py-0.5 text-xs text-amber-200" data-testid="sotp-unvalidated">{data.origin === 'agents' ? t('research.sotp.unvalidatedAgents') : t('research.sotp.unvalidated')}</span>
       </div>
-      {data.origin === 'example' ? <p className="text-xs text-amber-200/90">{t('research.sotp.exampleDraft', { author: model?.author ?? '—' })}</p> : null}
+      <SotpVariantNav data={data} t={t} ticker={ticker} />
+      {data.origin === 'example' ? <p className="text-xs text-amber-200/90">{t('research.sotp.exampleNico')} {t('research.sotp.exampleDraft', { author: model?.author ?? '—' })}</p> : null}
+      {data.origin === 'agents' ? (
+        <p className="text-xs text-teal-200" data-testid="sotp-agents-label">
+          {t('research.sotp.agentsLabel', {
+            date: data.agents?.generated_at ? formatUserDate(data.agents.generated_at, undefined, '—', locale) : '—',
+            price: data.agents?.price !== null && data.agents?.price !== undefined ? perShare(data.agents.price) : '—',
+          })}
+        </p>
+      ) : null}
+      {data.origin === 'agents' && data.agents?.mostly_cash ? (
+        <p className="rounded-md border border-amber-600 bg-amber-950/60 px-3 py-2 text-sm font-medium text-amber-100" data-testid="sotp-mostly-cash" role="note">
+          {t('research.sotp.mostlyCash', {
+            cash: perShare(data.agents.mostly_cash.cash_per_share),
+            total: perShare(data.agents.mostly_cash.value_per_share),
+            share: fmt.formatPercent(data.agents.mostly_cash.share, { digits: 0 }),
+          })}
+        </p>
+      ) : null}
+      {data.origin === 'agents' ? <p className="text-xs text-amber-200/90">{t('research.sotp.agentsVariance')}</p> : null}
+      {data.origin === 'agents' && data.agents_stability?.unstable ? (
+        <p className="rounded-md border border-amber-700/60 bg-amber-950/40 px-2 py-1 text-xs text-amber-100" data-testid="sotp-unstable">
+          {t('research.sotp.unstable', {
+            previous: perShare(data.agents_stability.previous_value_per_share),
+            current: perShare(data.agents_stability.current_value_per_share),
+            change: pct(fmt, data.agents_stability.change),
+          })}
+        </p>
+      ) : null}
+      {data.origin === 'saved' ? <p className="text-xs text-gray-400">{t('research.sotp.userLabel')}</p> : null}
+      {!(data.variants ?? []).some((v) => v.key === 'agents' && v.available) ? (
+        <p className="text-xs text-gray-400" data-testid="sotp-no-agents">
+          {t('research.sotp.noAgents')}
+          {data.agents_status?.problems?.length ? ` ${t('research.sotp.noAgentsWhy', { why: data.agents_status.problems.slice(0, 3).join(' · ') })}` : ''}
+        </p>
+      ) : null}
+      {model?.summary ? <p className="text-sm text-gray-300" data-testid="sotp-summary">{model.summary}</p> : null}
+      {data.origin === 'agents' && data.agents?.readings_differ && data.agents.readings?.length ? (
+        <p className="text-xs text-amber-200/90" data-testid="sotp-readings">
+          {t('research.sotp.readingsDiffer', { values: data.agents.readings.map((r) => perShare(r.value_per_share)).join(' / ') })}
+        </p>
+      ) : null}
+      {data.origin === 'agents' && data.agents?.changed_by?.length ? (
+        <p className="text-xs text-gray-400" data-testid="sotp-changed-by">{t('research.sotp.changedBy', { what: data.agents.changed_by.slice(0, 4).join(' · ') })}</p>
+      ) : null}
+      {model?.warnings?.length ? (
+        <ul className="space-y-1 rounded-md border border-amber-800/60 bg-amber-950/30 px-2 py-1 text-xs text-amber-100" data-testid="sotp-warnings">
+          {model.warnings.map((w, i) => <li key={i}>{w}</li>)}
+        </ul>
+      ) : null}
+      {model?.unvalued?.length ? (
+        <div className="text-xs text-gray-400" data-testid="sotp-unvalued">
+          <p className="text-gray-300">{t('research.sotp.unvaluedTitle')}</p>
+          <ul className="list-disc pl-4">
+            {model.unvalued.map((u, i) => <li key={`${u.name}-${i}`}>{u.name}{u.reason ? ` — ${u.reason}` : ''}</li>)}
+          </ul>
+        </div>
+      ) : null}
       {model?.source ? <p className="text-xs text-gray-500">{model.source}</p> : null}
       {baseRateText ? (
         <p className={`${BOX} text-xs text-gray-300`} data-testid="sotp-base-rate">
@@ -74,6 +147,21 @@ export function SotpBreakdownView({ data, t, fmt, locale, ticker, editable = tru
             <div className={BOX}><p className="text-xs text-gray-500">{t('research.sotp.discount')}</p><p className="text-sm text-gray-200">{t('research.sotp.discountValue', { rate: pct(fmt, model.discount_rate, false), years: fmt.formatNumber(result.discount_years, { maximumFractionDigits: 1 }), factor: fmt.formatNumber(result.discount_factor, { maximumFractionDigits: 4 }) })}</p></div>
             <div className={BOX}><p className="text-xs text-gray-500">{t('research.sotp.shares')}</p><p className="text-sm text-gray-200">{t('research.sotp.sharesValue', { current: fmt.formatNumber(model.shares_current, { maximumFractionDigits: 1 }), diluted: fmt.formatNumber(result.shares_diluted, { maximumFractionDigits: 1 }) })}</p></div>
           </div>
+          {model.discount_rate_source ? <p className="text-xs text-gray-500">{t('research.sotp.rateSource', { source: model.discount_rate_source })}</p> : null}
+          {model.dilution.length ? (
+            <div className="text-xs text-gray-400">
+              <p className="text-gray-300">{t('research.sotp.dilutionTitle')}</p>
+              <ul className="space-y-1">
+                {model.shares_why?.shares ? <li>{model.shares_why.shares}</li> : null}
+                {model.dilution.map((d, i) => (
+                  <li key={`${d.label}-${i}`}>
+                    + {fmt.formatNumber(d.shares, { maximumFractionDigits: 1 })} M · {d.label}
+                    <SotpWhyDetails assumption={d.assumption} sources={d.sources} t={t} why={d.why} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <div className="overflow-x-auto" role="region" aria-label={t('research.sotp.tableLabel')} tabIndex={0}>
             <table className="w-full text-left text-sm">
               <caption className="sr-only">{t('research.sotp.tableLabel')}</caption>
@@ -93,7 +181,9 @@ export function SotpBreakdownView({ data, t, fmt, locale, ticker, editable = tru
                           : t('research.sotp.arithAsset', { value: money(row.value_at_maturity) })}
                         {row.probability < 1 ? ` · ${t('research.sotp.probability', { p: pct(fmt, row.probability, false) })}` : ''}
                         {` · ÷ ${fmt.formatNumber(row.discount_factor, { maximumFractionDigits: 4 })}`}
+                        {row.commercial === false ? ` · ${t('research.sotp.notCommercial')}` : ''}
                       </span>
+                      <SotpWhyDetails assumption={row.assumption} sources={row.sources} t={t} why={row.why} />
                     </th>
                     <td className="py-2 text-right text-gray-300">{money(row.present_value)}</td>
                     <td className="py-2 text-right font-medium text-gray-100">{perShare(row.value_per_share)}</td>
@@ -118,6 +208,7 @@ export function SotpBreakdownView({ data, t, fmt, locale, ticker, editable = tru
                     <span className="text-gray-300">{s.label}</span>
                     <span className="text-right text-gray-100">
                       {s.computed ? `${perShare(s.value_per_share)} (${pct(fmt, s.vs_price)})` : t('research.sotp.notComputed')}
+                      {s.computed && s.value_per_share !== null && s.value_per_share <= 0 ? <span className="block text-xs text-amber-200/90">{t('research.sotp.belowZero')}</span> : null}
                       {s.stated_value_per_share !== null && s.stated_value_per_share !== undefined ? <span className="block text-xs text-gray-500">{t('research.sotp.stated', { value: perShare(s.stated_value_per_share) })}</span> : null}
                     </span>
                     {s.note ? <span className="basis-full text-xs text-gray-500">{s.note}</span> : null}
@@ -139,12 +230,74 @@ export function SotpBreakdownView({ data, t, fmt, locale, ticker, editable = tru
           </div>
         </>
       ) : <p className="text-sm text-gray-400">{t('research.sotp.empty')}</p>}
-      {editable ? <SotpEditor model={model} t={t} locale={locale} ticker={ticker} saved={data.origin === 'saved'} versions={data.saved?.versions ?? 0} /> : null}
+      {data.origin === 'agents' && data.agents?.narrative?.sections?.length ? (
+        <section aria-label={t('research.sotp.narrativeTitle')} className="space-y-3 rounded-lg border border-gray-800 bg-gray-900/40 p-3" data-testid="sotp-narrative">
+          <h3 className="text-sm font-semibold text-gray-100">{t('research.sotp.narrativeTitle')}</h3>
+          <p className="text-xs text-gray-500">{t('research.sotp.narrativeHint')}</p>
+          {data.agents.narrative.sections.map((section) => (
+            <div key={section.key} className="space-y-1">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-teal-300">{section.title}</h4>
+              <p className="whitespace-pre-line text-sm leading-relaxed text-gray-300">{section.text}</p>
+            </div>
+          ))}
+        </section>
+      ) : null}
+      {editable ? <SotpAgentsButton hasProposal={(data.variants ?? []).some((v) => v.key === 'agents' && v.available)} ticker={ticker} /> : null}
+      {editable ? <SotpEditor model={model} t={t} locale={locale} ticker={ticker} saved={data.origin === 'saved'} versions={data.saved?.versions ?? 0} fromAgents={data.origin === 'agents'} /> : null}
     </section>
   );
 }
 
-function SotpEditor({ model, t, locale, ticker, saved, versions }: { model?: SotpModel; t: T; locale: 'es' | 'en'; ticker: string; saved: boolean; versions: number }) {
+/** «¿De dónde sale?»: razón de cada cifra, supuesto explícito y fuentes (propuesta de los agentes). */
+function SotpWhyDetails({ why, sources, assumption, t }: { why?: SotpWhy; sources?: SotpSource[]; assumption?: string | null; t: T }) {
+  const entries = Object.entries(why ?? {}).filter(([key, text]) => key in WHY_KEYS && text) as [keyof typeof WHY_KEYS, string][];
+  if (!entries.length && !sources?.length && !assumption) return null;
+  return (
+    <details className="mt-1 text-xs text-gray-400">
+      <summary className="cursor-pointer text-teal-300">{t('research.sotp.whyTitle')}</summary>
+      <ul className="mt-1 space-y-1">
+        {entries.map(([key, text]) => <li key={key}><span className="text-gray-300">{t(WHY_KEYS[key])}:</span> {text}</li>)}
+        {assumption ? <li className="text-amber-200/90">{assumption}</li> : null}
+        {sources?.length ? (
+          <li>
+            <span className="text-gray-300">{t('research.sotp.sources')}:</span>{' '}
+            {sources.map((src, i) => (
+              <span key={`${src.label}-${i}`}>
+                {i ? ' · ' : ''}
+                {src.url ? (src.url.startsWith('/') ? <Link className="underline" href={src.url}>{src.label}</Link> : <a className="underline" href={src.url} rel="noreferrer" target="_blank">{src.label}</a>) : src.label}
+                {src.date ? ` (${src.date})` : ''}
+              </span>
+            ))}
+          </li>
+        ) : null}
+      </ul>
+    </details>
+  );
+}
+
+function SotpVariantNav({ data, t, ticker }: { data: SotpResponse; t: T; ticker: string }) {
+  const variants = (data.variants ?? []).filter((v) => v.available);
+  if (variants.length < 2) return null;
+  return (
+    <nav aria-label={t('research.sotp.variantNav')} className="flex flex-wrap gap-2 text-xs">
+      {variants.map((v) => {
+        const current = v.key === data.variant;
+        return (
+          <Link
+            aria-current={current ? 'true' : undefined}
+            className={`inline-flex min-h-11 items-center rounded-full border px-3 sm:min-h-0 sm:py-1 ${current ? 'border-teal-500 bg-teal-950/40 text-teal-200' : 'border-gray-700 text-gray-300'}`}
+            href={`/research/${encodeURIComponent(ticker)}?view=valuation&sotp=${v.key}#desglose-partes`}
+            key={v.key}
+          >
+            {t(VARIANT_KEYS[v.key])}{v.key === data.default_variant ? ` · ${t('research.sotp.variantDefault')}` : ''}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function SotpEditor({ model, t, locale, ticker, saved, versions, fromAgents = false }: { model?: SotpModel; t: T; locale: 'es' | 'en'; ticker: string; saved: boolean; versions: number; fromAgents?: boolean }) {
   const v = (n: number | null | undefined, scale = 1) => (n === null || n === undefined ? '' : formatNumberForInput(n * scale, locale));
   const parts = [...(model?.parts ?? []), ...Array.from({ length: SOTP_EXTRA_PARTS }, () => null)];
   const dilution = [...(model?.dilution ?? []), ...Array.from({ length: SOTP_EXTRA_DILUTION }, () => null)];
@@ -155,6 +308,7 @@ function SotpEditor({ model, t, locale, ticker, saved, versions }: { model?: Sot
       <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-teal-300">{model ? t('research.sotp.edit') : t('research.sotp.create')}{saved ? ` · ${t('research.sotp.versions', { count: versions })}` : ''}</summary>
       <MutationForm action={saveSotpResult.bind(null, ticker, counts)} className="mt-3 grid gap-4" successMessage={t('research.sotp.saved')}>
         <p className="text-xs text-gray-500">{t('research.sotp.unitsHint')}</p>
+        {fromAgents ? <p className="text-xs text-amber-200/90">{t('research.sotp.editAgentsHint')}</p> : null}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <label className={LABEL}><span>{t('research.sotp.baseYear')}</span><Input name="base_year" inputMode="numeric" defaultValue={v(model?.base_year ?? new Date().getFullYear())} required /></label>
           <label className={LABEL}><span>{t('research.sotp.valuationYear')}</span><Input name="valuation_year" inputMode="numeric" defaultValue={v(model?.valuation_year)} required /></label>

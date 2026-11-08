@@ -65,6 +65,49 @@ def _text(value, limit: int = 240) -> str:
     return str(value or "").strip()[:limit]
 
 
+#: Campos «¿de dónde sale?» de cada parte (opcionales; los rellena la propuesta de los agentes).
+USER_SOTP_WHY_KEYS = ("revenue", "margin", "multiple", "probability", "value", "shares")
+USER_SOTP_MAX_SOURCES = 6
+
+
+def _why(value) -> dict | None:
+    if not isinstance(value, dict):
+        return None
+    out = {k: _text(value.get(k), 300) for k in USER_SOTP_WHY_KEYS if _text(value.get(k), 300)}
+    return out or None
+
+
+def _sources(value) -> list[dict]:
+    """Fuentes de una cifra: [{label, url?, date?}], solo texto, URL https o ruta interna."""
+    out: list[dict] = []
+    for item in value if isinstance(value, list) else []:
+        if not isinstance(item, dict):
+            continue
+        label = _text(item.get("label"), 160)
+        url = _text(item.get("url"), 400)
+        if url and not (url.startswith("https://") or url.startswith("/")):
+            url = ""
+        if not label and not url:
+            continue
+        out.append({"label": label or url, "url": url or None, "date": _text(item.get("date"), 20) or None})
+        if len(out) >= USER_SOTP_MAX_SOURCES:
+            break
+    return out
+
+
+def _provenance(item: dict, target: dict) -> None:
+    """Copia las razones y fuentes opcionales de una parte, dilución o escenario."""
+    why = _why(item.get("why"))
+    if why:
+        target["why"] = why
+    sources = _sources(item.get("sources"))
+    if sources:
+        target["sources"] = sources
+    assumption = _text(item.get("assumption"), 300)
+    if assumption:
+        target["assumption"] = assumption
+
+
 def normalize_user_sotp(raw) -> tuple[dict, list[str]]:
     """Valida y normaliza el modelo editable. Devuelve (modelo, problemas).
 
@@ -90,7 +133,9 @@ def normalize_user_sotp(raw) -> tuple[dict, list[str]]:
             continue
         shares = _num(item.get("shares"), name=f"dilución {i + 1}", problems=problems, required=True)
         if shares is not None:
-            dilution.append({"label": _text(item.get("label")) or f"Dilución {i + 1}", "shares": shares})
+            entry = {"label": _text(item.get("label")) or f"Dilución {i + 1}", "shares": shares}
+            _provenance(item, entry)
+            dilution.append(entry)
     parts = []
     raw_parts = raw.get("parts") or []
     if not isinstance(raw_parts, list) or not raw_parts:
@@ -115,6 +160,9 @@ def normalize_user_sotp(raw) -> tuple[dict, list[str]]:
                 "note": _text(item.get("note"), 400) or None}
         probability = _num(item.get("probability"), name=f"{label}: probabilidad", problems=problems, low=0.0, high=1.0)
         part["probability"] = 1.0 if probability is None else probability
+        if isinstance(item.get("commercial"), bool):
+            part["commercial"] = item["commercial"]
+        _provenance(item, part)
         if kind == "operating":
             revenue = _num(item.get("revenue"), name=f"{label}: ingresos", problems=problems, low=0.0)
             ebitda = _num(item.get("ebitda"), name=f"{label}: EBITDA", problems=problems)
@@ -154,6 +202,7 @@ def normalize_user_sotp(raw) -> tuple[dict, list[str]]:
             "shares_total": _num(item.get("shares_total"), name=f"{label}: acciones", problems=problems, low=0.0, low_inclusive=False),
             "stated_value_per_share": _num(item.get("stated_value_per_share"), name=f"{label}: valor declarado", problems=problems),
         }
+        _provenance(item, scenario)
         scenarios.append(scenario)
     model = {
         "version": USER_SOTP_VERSION,
@@ -172,6 +221,28 @@ def normalize_user_sotp(raw) -> tuple[dict, list[str]]:
         "source": _text(raw.get("source"), 400) or None,
         "stated_value_per_share": _num(raw.get("stated_value_per_share"), name="valor declarado", problems=problems),
     }
+    summary = _text(raw.get("summary"), 1500)
+    if summary:
+        model["summary"] = summary
+    shares_why = _why(raw.get("shares_why"))
+    if shares_why:
+        model["shares_why"] = shares_why
+    unvalued = []
+    for item in (raw.get("unvalued") or [])[:20]:
+        if isinstance(item, dict) and _text(item.get("name"), 120):
+            unvalued.append({"name": _text(item.get("name"), 120), "status": _text(item.get("status"), 30) or None,
+                             "reason": _text(item.get("reason"), 300) or None})
+    if unvalued:
+        model["unvalued"] = unvalued
+    warnings = [_text(w, 300) for w in (raw.get("warnings") or [])[:10] if _text(w, 300)]
+    if warnings:
+        model["warnings"] = warnings
+    rules = _text(raw.get("rules_version"), 40)
+    if rules:
+        model["rules_version"] = rules
+    rate_source = _text(raw.get("discount_rate_source"), 300)
+    if rate_source:
+        model["discount_rate_source"] = rate_source
     if shares_current is not None and shares_current + sum(d["shares"] for d in dilution) <= 0:
         problems.append("las acciones diluidas deben ser positivas")
     return model, problems
@@ -212,6 +283,7 @@ def _compute(model: dict, *, revenue_factor: float = 1.0, multiple_factor: float
             "value_at_maturity": ev, "value_at_maturity_weighted": ev_weighted,
             "discount_factor": factor, "present_value": pv,
             "value_per_share": pv / shares,
+            **{k: part[k] for k in ("why", "sources", "assumption", "commercial") if k in part},
         })
     total_ev = sum(r["value_at_maturity_weighted"] for r in rows)
     total_pv = sum(r["present_value"] for r in rows)

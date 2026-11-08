@@ -78,6 +78,7 @@ import { WhatToBelieveSection } from '@/components/research/WhatToBelieveSection
 import { WhatToBelieveSkeleton } from '@/components/research/WhatToBelieveView';
 import { DcaHitRatesSection } from '@/components/research/DcaHitRatesSection';
 import { SotpBreakdownSection } from '@/components/research/SotpBreakdownSection';
+import { sotpVariantParam } from '@/lib/research/sotp';
 import { NewsPreparingNotice } from '@/components/research/NewsPreparingNotice';
 import { getNewsPreparing } from '@/lib/research/news-preparing';
 import { TtmPanel } from '@/components/research/TtmPanel';
@@ -194,7 +195,7 @@ const readSnapshot = cache((ticker: string) => getResearchCompanySnapshot(ticker
 
 type PageProps = {
   params: Promise<{ ticker: string }>;
-  searchParams: Promise<{ view?: string; chat?: string; pagina?: string; metrics?: string; years?: string; periodicity?: string }>;
+  searchParams: Promise<{ view?: string; chat?: string; pagina?: string; metrics?: string; years?: string; periodicity?: string; sotp?: string }>;
 };
 
 
@@ -1712,7 +1713,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       <div className="space-y-6">
         <ValuationView valuation={await viewData('valuation')} currency={company.currency} ticker={ticker} />
         <div className="scroll-mt-6" id="que-hace-falta-creer"><Suspense fallback={<WhatToBelieveSkeleton />}><WhatToBelieveSection ticker={ticker} /></Suspense></div>
-        <div className="scroll-mt-6" id="desglose-partes"><Suspense fallback={null}><SotpBreakdownSection ticker={ticker} /></Suspense></div>
+        <div className="scroll-mt-6" id="desglose-partes"><Suspense fallback={null}><SotpBreakdownSection ticker={ticker} variant={sotpVariantParam(query.sotp)} /></Suspense></div>
         <Link className="inline-flex min-h-[44px] items-center text-sm text-teal-300 sm:min-h-0" data-testid="informe-link" href={`/research/${encodeURIComponent(ticker)}/informe`}>{t('research.informe.link')} →</Link>
       </div>
     );

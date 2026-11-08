@@ -504,6 +504,15 @@ class Settings(BaseSettings):
     # Equipo de expertos con coordinador (app/services/expert_team). Apagado:
     # tesis y chat siguen exactamente igual. Env: EXPERT_TEAM_ENABLED.
     expert_team_enabled: bool = False
+    # Al terminar «Generar tesis» (job async), el valorador SOTP del equipo de
+    # expertos propone el desglose por partes («propuesta de los agentes»).
+    # Independiente de EXPERT_TEAM_ENABLED: es una llamada LLM más con
+    # presupuesto; si falla, la tesis queda igual. Env THESIS_SOTP_AGENTS_ENABLED.
+    thesis_sotp_agents_enabled: bool = True
+    #: Lecturas del clasificador SOTP por huella nueva; con más de una gana la más conservadora.
+    sotp_agents_readings: int = 1
+    #: Tesis larga con marcadores sobre la propuesta (cifras del código, prosa de los expertos).
+    sotp_agents_narrative_enabled: bool = True
     # Control de la valoración frente al consenso de analistas (>35 % exige
     # conciliación dato a dato). Independiente del equipo de expertos: sin
     # consenso se publica con la salvedad, con desviación no conciliada no.

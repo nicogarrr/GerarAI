@@ -1,0 +1,556 @@
+{
+ "ticker": "ASTS",
+ "available": true,
+ "origin": "agents",
+ "label": "Propuesta de los agentes expertos: supuestos no validados contra histórico",
+ "validated": false,
+ "model": {
+  "version": "sotp-user-v1",
+  "currency": "USD",
+  "units": "millones",
+  "base_year": 2026,
+  "valuation_year": 2030,
+  "discount_years": 4.0,
+  "discount_rate": 0.15001557,
+  "shares_current": 389.167494,
+  "dilution": [
+   {
+    "label": "Acciones Clase A entregadas como parte de la contraprestación de la licencia Blacklift (extremo alto del rango 10–14 mil",
+    "shares": 14.0,
+    "why": {
+     "shares": "14.0 M copiados de la evidencia. Cita: «AST SpaceMobile will pay approximately $800 million in upfront consideration, comprised of $400 million in cash and 10 to 14 million shares of Class A Common Stock, as determined by a forward VWAP calculation»"
+    },
+    "sources": [
+     {
+      "label": "8-K EX-99.1: AST SpaceMobile construirá su cohete Blacklift (6-nov-2026) (document_chunks)",
+      "url": "https://www.sec.gov/Archives/edgar/data/1780312/000149315226050513/ex99-1.htm",
+      "date": "2026-11-06"
+     }
+    ]
+   },
+   {
+    "label": "Remuneración en acciones (SBC) hasta el año valorado",
+    "shares": 5.87565728425611,
+    "why": {
+     "shares": "SBC 47,5 M$/año × 4 años ÷ precio 32.33 = 5,9 M"
+    },
+    "sources": [
+     {
+      "label": "SBC anual (SEC)",
+      "url": "/research/ASTS?view=valuation",
+      "date": "2025-12-31"
+     }
+    ]
+   },
+   {
+    "label": "Ampliaciones para cubrir la quema",
+    "shares": 0.0,
+    "why": {
+     "shares": "quema 1.136,3 M$/año × 2 años = 2.272,5 M ≤ liquidez 4.588,3 M: sin ampliación por regla"
+    },
+    "sources": [
+     {
+      "label": "Flujo de caja libre anual (SEC)",
+      "url": "/research/ASTS?view=valuation",
+      "date": "2025-12-31"
+     }
+    ]
+   }
+  ],
+  "parts": [
+   {
+    "name": "Red de banda ancha celular desde el espacio con socios MNO (partner-first)",
+    "kind": "operating",
+    "group": "Conectividad direct-to-device",
+    "note": null,
+    "probability": 0.35,
+    "commercial": false,
+    "why": {
+     "revenue": "Regla «backlog»: backlog 1.300,0 M ÷ 5 años = 260,0 M/año (plano). Cita: «Revenue backlog increased to approximately $1.30 billion in aggregate contracted revenue with commercial partners and contract awards with the United States Government»",
+     "margin": "Tabla «telecom_mayorista» (operador mayorista / reparto de ingresos con operadoras): margen EBITDA 45 % a madurez.",
+     "multiple": "Tabla «telecom_mayorista»: 8x EBITDA a madurez.",
+     "probability": "Estado «beta» → 35 % (tabla fija). «we are preparing to initiate beta services with select strategic partners» y «Beta service initiative to offer scaled non-commercial usage with strategic MNO partners in select markets globally» (ev-"
+    },
+    "sources": [
+     {
+      "label": "8-K EX-99.1: actualización de negocio y resultados del 2T 2026 (document_chunks)",
+      "url": "https://www.sec.gov/Archives/edgar/data/1780312/000119312526342540/asts-ex99_1.htm",
+      "date": "2026-08-10"
+     }
+    ],
+    "revenue": 260.0,
+    "ebitda": null,
+    "ebitda_margin": 0.45,
+    "multiple": 8.0
+   },
+   {
+    "name": "Entregas de gateways a socios MNO y hitos del Gobierno de EE.UU.",
+    "kind": "operating",
+    "group": "Ingresos actuales",
+    "note": null,
+    "probability": 0.9,
+    "commercial": true,
+    "why": {
+     "revenue": "Regla «reportado»: 31,5 M × 4 trimestres (2026) × (1 + 15 %)^4 = 220,4 M (crecimiento: histórico 126 %, tope 15 % por estado «comercial»). Cita: «Second quarter revenue of $31.5 million driven by gateway deliveries and U.S. Government milestones met»",
+     "margin": "Tabla «hardware_equipos» (fabricación y venta de equipos): margen EBITDA 15 % a madurez.",
+     "multiple": "Tabla «hardware_equipos»: 9x EBITDA a madurez.",
+     "probability": "Estado «comercial» → 90 % (tabla fija). «Second quarter revenue of $31.5 million driven by gateway deliveries and U.S. Government milestones met» (ev-10): ya factura a clientes de pago, aunque la cifra agrega gateways y hitos gubernamentale"
+    },
+    "sources": [
+     {
+      "label": "8-K EX-99.1: actualización de negocio y resultados del 2T 2026 (document_chunks)",
+      "url": "https://www.sec.gov/Archives/edgar/data/1780312/000119312526342540/asts-ex99_1.htm",
+      "date": "2026-08-10"
+     }
+    ],
+    "revenue": 220.37478749999994,
+    "ebitda": null,
+    "ebitda_margin": 0.15,
+    "multiple": 9.0
+   },
+   {
+    "name": "Derechos prioritarios de espectro (MSS) y tasas de uso pagadas en acciones",
+    "kind": "asset",
+    "group": "Activos",
+    "note": null,
+    "probability": 0.6,
+    "why": {
+     "probability": "Estado «contratado» → 60 % (tabla fija).",
+     "value": "14.2 M copiados de la evidencia × probabilidad ÷ acciones (sin descontar: es valor de hoy). Cita: «Issuance of equity to acquire spectrum priority rights and pay spectrum usage fees - - - - - - 10,914 - - 3,266 14,180»"
+    },
+    "sources": [
+     {
+      "label": "ASTS 10-Q (2026-06-30) (document_chunks)",
+      "url": "https://www.sec.gov/Archives/edgar/data/1780312/000119312526342550/asts-20260630.htm",
+      "date": "2026-08-10"
+     }
+    ],
+    "value": 14.18,
+    "discounted": false
+   },
+   {
+    "name": "Caja menos deuda (último balance SEC)",
+    "kind": "asset",
+    "group": "Balance de hoy",
+    "note": null,
+    "probability": 1.0,
+    "why": {
+     "value": "caja 2,288 M + inversiones a corto 2,300 M − deuda 2,972 M = 1,616 M a 2026-06-30 (SEC; la deuda incluye los convertibles)."
+    },
+    "sources": [
+     {
+      "label": "Acciones, caja y deuda (SEC)",
+      "url": "/research/ASTS?view=valuation",
+      "date": "2026-06-30"
+     }
+    ],
+    "value": 1616.3370000000004,
+    "discounted": false
+   }
+  ],
+  "scenarios": [
+   {
+    "key": "bear",
+    "label": "Bajista (regla fija)",
+    "note": "Regla fija: la mitad de ingresos, múltiplos −30 % y dos años de retraso.",
+    "revenue_factor": 0.5,
+    "multiple_factor": 0.7,
+    "delay_years": 2.0,
+    "discount_rate": null,
+    "shares_total": null,
+    "stated_value_per_share": null
+   },
+   {
+    "key": "bull",
+    "label": "Alcista (regla fija)",
+    "note": "Regla fija: ingresos +50 % y múltiplos +20 %, sin retraso.",
+    "revenue_factor": 1.5,
+    "multiple_factor": 1.2,
+    "delay_years": 0.0,
+    "discount_rate": null,
+    "shares_total": null,
+    "stated_value_per_share": null
+   }
+  ],
+  "author": "Agentes expertos de GerarAI",
+  "source": "Propuesta de los agentes (2026-11-08, precio 32.33 USD). Clasificación de los agentes; cifras por reglas fijas (sotp-rules-v2), no validadas contra histórico.",
+  "stated_value_per_share": null,
+  "summary": "El peso del caso está en el servicio de banda ancha direct-to-device con operadores móviles, que sigue en fase beta y sin uso comercial a escala; lo que ya factura son las entregas de gateways y los hitos del Gobierno de EE.UU. El backlog contratado agregado y el espectro son el soporte declarado, pero la evidencia no desglosa cuánto corresponde a cada segmento. La selección preliminar del J-LEO japonés, la joint venture con los grandes operadores estadounidenses y las aplicaciones de IoT, edge compute y radar están sin probar. El cohete propio es integración vertical de coste, no una línea de ingresos. Lo que cambiaría la clasificación es el arranque efectivo del servicio beta con socios y la conversión del backlog en ingresos reconocidos.",
+  "shares_why": {
+   "shares": "389.2 M (shares_outstanding, SEC 2026-08-06) + la dilución de abajo."
+  },
+  "unvalued": [
+   {
+    "name": "Cohete Blacklift y licencia perpetua de motores Miranda/Vira (Firefly)",
+    "status": "contratado",
+    "reason": "sin cifra de ingresos en la evidencia"
+   },
+   {
+    "name": "IoT, AI edge compute, radar USG, emergencia federal y redes adicionales financiadas",
+    "status": "idea",
+    "reason": "sin cifra de ingresos en la evidencia"
+   },
+   {
+    "name": "Joint venture con Rakuten para la iniciativa J-LEO (MIC de Japón)",
+    "status": "beta",
+    "reason": "ancla contrato: la cifra es financiación o inversión (non-dilutive), no ingresos"
+   }
+  ],
+  "warnings": [
+   "«Red de banda ancha celular desde el espacio con socios MNO (partner-first)»: infravalorado por falta de estimaciones: su ancla es backlog, no una previsión de ingresos, y no hay guía de la empresa citada."
+  ],
+  "rules_version": "sotp-rules-v2",
+  "discount_rate_source": "CAPM de GerarAI (calculated_metric): 15.0%"
+ },
+ "result": {
+  "rows": [
+   {
+    "name": "Red de banda ancha celular desde el espacio con socios MNO (partner-first)",
+    "kind": "operating",
+    "group": "Conectividad direct-to-device",
+    "revenue": 260.0,
+    "ebitda": 117.0,
+    "multiple": 8.0,
+    "probability": 0.35,
+    "ebitda_margin": 0.45,
+    "value_at_maturity": 936.0,
+    "value_at_maturity_weighted": 327.59999999999997,
+    "discount_factor": 1.749100972018658,
+    "present_value": 187.29621973848253,
+    "value_per_share": 0.45788865832476655,
+    "why": {
+     "revenue": "Regla «backlog»: backlog 1.300,0 M ÷ 5 años = 260,0 M/año (plano). Cita: «Revenue backlog increased to approximately $1.30 billion in aggregate contracted revenue with commercial partners and contract awards with the United States Government»",
+     "margin": "Tabla «telecom_mayorista» (operador mayorista / reparto de ingresos con operadoras): margen EBITDA 45 % a madurez.",
+     "multiple": "Tabla «telecom_mayorista»: 8x EBITDA a madurez.",
+     "probability": "Estado «beta» → 35 % (tabla fija). «we are preparing to initiate beta services with select strategic partners» y «Beta service initiative to offer scaled non-commercial usage with strategic MNO partners in select markets globally» (ev-"
+    },
+    "sources": [
+     {
+      "label": "8-K EX-99.1: actualización de negocio y resultados del 2T 2026 (document_chunks)",
+      "url": "https://www.sec.gov/Archives/edgar/data/1780312/000119312526342540/asts-ex99_1.htm",
+      "date": "2026-08-10"
+     }
+    ],
+    "commercial": false
+   },
+   {
+    "name": "Entregas de gateways a socios MNO y hitos del Gobierno de EE.UU.",
+    "kind": "operating",
+    "group": "Ingresos actuales",
+    "revenue": 220.37478749999994,
+    "ebitda": 33.05621812499999,
+    "multiple": 9.0,
+    "probability": 0.9,
+    "ebitda_margin": 0.15,
+    "value_at_maturity": 297.5059631249999,
+    "value_at_maturity_weighted": 267.7553668124999,
+    "discount_factor": 1.749100972018658,
+    "present_value": 153.0817094587057,
+    "value_per_share": 0.374243423898142,
+    "why": {
+     "revenue": "Regla «reportado»: 31,5 M × 4 trimestres (2026) × (1 + 15 %)^4 = 220,4 M (crecimiento: histórico 126 %, tope 15 % por estado «comercial»). Cita: «Second quarter revenue of $31.5 million driven by gateway deliveries and U.S. Government milestones met»",
+     "margin": "Tabla «hardware_equipos» (fabricación y venta de equipos): margen EBITDA 15 % a madurez.",
+     "multiple": "Tabla «hardware_equipos»: 9x EBITDA a madurez.",
+     "probability": "Estado «comercial» → 90 % (tabla fija). «Second quarter revenue of $31.5 million driven by gateway deliveries and U.S. Government milestones met» (ev-10): ya factura a clientes de pago, aunque la cifra agrega gateways y hitos gubernamentale"
+    },
+    "sources": [
+     {
+      "label": "8-K EX-99.1: actualización de negocio y resultados del 2T 2026 (document_chunks)",
+      "url": "https://www.sec.gov/Archives/edgar/data/1780312/000119312526342540/asts-ex99_1.htm",
+      "date": "2026-08-10"
+     }
+    ],
+    "commercial": true
+   },
+   {
+    "name": "Derechos prioritarios de espectro (MSS) y tasas de uso pagadas en acciones",
+    "kind": "asset",
+    "group": "Activos",
+    "revenue": null,
+    "ebitda": null,
+    "multiple": null,
+    "probability": 0.6,
+    "ebitda_margin": null,
+    "value_at_maturity": 14.18,
+    "value_at_maturity_weighted": 8.508,
+    "discount_factor": 1.0,
+    "present_value": 8.508,
+    "value_per_share": 0.020799761524640564,
+    "why": {
+     "probability": "Estado «contratado» → 60 % (tabla fija).",
+     "value": "14.2 M copiados de la evidencia × probabilidad ÷ acciones (sin descontar: es valor de hoy). Cita: «Issuance of equity to acquire spectrum priority rights and pay spectrum usage fees - - - - - - 10,914 - - 3,266 14,180»"
+    },
+    "sources": [
+     {
+      "label": "ASTS 10-Q (2026-06-30) (document_chunks)",
+      "url": "https://www.sec.gov/Archives/edgar/data/1780312/000119312526342550/asts-20260630.htm",
+      "date": "2026-08-10"
+     }
+    ]
+   },
+   {
+    "name": "Caja menos deuda (último balance SEC)",
+    "kind": "asset",
+    "group": "Balance de hoy",
+    "revenue": null,
+    "ebitda": null,
+    "multiple": null,
+    "probability": 1.0,
+    "ebitda_margin": null,
+    "value_at_maturity": 1616.3370000000004,
+    "value_at_maturity_weighted": 1616.3370000000004,
+    "discount_factor": 1.0,
+    "present_value": 1616.3370000000004,
+    "value_per_share": 3.9515073041200006,
+    "why": {
+     "value": "caja 2,288 M + inversiones a corto 2,300 M − deuda 2,972 M = 1,616 M a 2026-06-30 (SEC; la deuda incluye los convertibles)."
+    },
+    "sources": [
+     {
+      "label": "Acciones, caja y deuda (SEC)",
+      "url": "/research/ASTS?view=valuation",
+      "date": "2026-06-30"
+     }
+    ]
+   }
+  ],
+  "total_value_at_maturity": 2220.2003668125003,
+  "total_present_value": 1965.2229291971887,
+  "total_revenue": 289.3373087499999,
+  "total_ebitda": 70.70059631249998,
+  "weighted_multiple": 8.420796964441445,
+  "shares_diluted": 409.0431512842561,
+  "discount_rate": 0.15001557,
+  "discount_years": 4.0,
+  "discount_factor": 1.749100972018658,
+  "value_per_share": 4.80443914786755,
+  "price": 32.33,
+  "vs_price": -0.8513937782905181,
+  "stated_value_per_share": null,
+  "stated_gap": null,
+  "price_covered_by": [
+   {
+    "name": "Caja menos deuda (último balance SEC)",
+    "value_per_share": 3.9515073041200006,
+    "cumulative_per_share": 3.9515073041200006,
+    "covers_price": false
+   },
+   {
+    "name": "Red de banda ancha celular desde el espacio con socios MNO (partner-first)",
+    "value_per_share": 0.45788865832476655,
+    "cumulative_per_share": 4.409395962444767,
+    "covers_price": false
+   },
+   {
+    "name": "Entregas de gateways a socios MNO y hitos del Gobierno de EE.UU.",
+    "value_per_share": 0.374243423898142,
+    "cumulative_per_share": 4.78363938634291,
+    "covers_price": false
+   },
+   {
+    "name": "Derechos prioritarios de espectro (MSS) y tasas de uso pagadas en acciones",
+    "value_per_share": 0.020799761524640564,
+    "cumulative_per_share": 4.8044391478675506,
+    "covers_price": false
+   }
+  ],
+  "scenarios": [
+   {
+    "key": "bear",
+    "label": "Bajista (regla fija)",
+    "note": "Regla fija: la mitad de ingresos, múltiplos −30 % y dos años de retraso.",
+    "revenue_factor": 0.5,
+    "multiple_factor": 0.7,
+    "delay_years": 2.0,
+    "discount_rate": null,
+    "shares_total": null,
+    "stated_value_per_share": null,
+    "computed": true,
+    "value_per_share": 4.192525093997623,
+    "vs_price": -0.8703209064646575,
+    "stated_vs_price": null,
+    "stated_gap": null
+   },
+   {
+    "key": "bull",
+    "label": "Alcista (regla fija)",
+    "note": "Regla fija: ingresos +50 % y múltiplos +20 %, sin retraso.",
+    "revenue_factor": 1.5,
+    "multiple_factor": 1.2,
+    "delay_years": 0.0,
+    "discount_rate": null,
+    "shares_total": null,
+    "stated_value_per_share": null,
+    "computed": true,
+    "value_per_share": 5.470144813645877,
+    "vs_price": -0.8308028204872911,
+    "stated_vs_price": null,
+    "stated_gap": null
+   }
+  ],
+  "sensitivity": [
+   {
+    "key": "multiples_minus_30",
+    "label": "Múltiplos −30 %",
+    "value_per_share": 4.554799523200677,
+    "vs_base": -0.05196020117721245,
+    "vs_price": -0.8591153874667282
+   },
+   {
+    "key": "delay_2y",
+    "label": "Ingresos 2 años más tarde",
+    "value_per_share": 4.601501432367446,
+    "vs_base": -0.042239626573307265,
+    "vs_price": -0.8576708496019967
+   },
+   {
+    "key": "revenue_minus_50",
+    "label": "Ingresos −50 %",
+    "value_per_share": 4.388373106756095,
+    "vs_base": -0.08660033529535394,
+    "vs_price": -0.8642631269175349
+   },
+   {
+    "key": "rate_plus_5pp",
+    "label": "Tasa +5 puntos",
+    "value_per_share": 4.674181822948264,
+    "vs_base": -0.027111869025773894,
+    "vs_price": -0.8554227707099207
+   },
+   {
+    "key": "combined",
+    "label": "Las tres a la vez: múltiplos −30 %, 2 años tarde y tasa +5 puntos",
+    "value_per_share": 4.3134873300930465,
+    "vs_base": -0.10218712375458272,
+    "vs_price": -0.8665794206590459
+   }
+  ],
+  "trace": {
+   "method": "sum_of_the_parts_user",
+   "version": "sotp-user-v1",
+   "formula": "Σ (EBITDA × múltiplo × probabilidad) / (1 + tasa)^años + activos / (1 + tasa)^años; ÷ acciones diluidas"
+  }
+ },
+ "price": 32.33,
+ "price_currency": "USD",
+ "price_as_of": "2026-11-06",
+ "base_rate": {
+  "applies": true,
+  "fiscal_year": 2025,
+  "cases": 2845,
+  "median_return_24m": -0.51,
+  "fell_over_half_24m_share": 0.5,
+  "doubled_24m_share": 0.11,
+  "beat_spy_24m_share": 0.21,
+  "stopped_filing_24m_share": 0.15,
+  "message_es": "Punto de partida: la empresa aún pierde dinero y quema caja. En el backtest (2.845 casos así en EE. UU., 2014–2026, contando las que desaparecieron), a 2 años la rentabilidad mediana fue -51 %: la mitad cayó más de un 50 %, el 11 % más que duplicó y solo el 21 % batió al S&P 500. No cambia esta cifra.",
+  "message_en": "Starting point: the company still loses money and burns cash. In the backtest (2,845 such US cases, 2014–2026, including those that disappeared), the median 2-year return was -51%: half fell more than 50%, 11% more than doubled and only 21% beat the S&P 500. It does not change this figure."
+ },
+ "saved": {
+  "row_id": 7,
+  "saved_at": "2026-11-08T11:15:01.772802+00:00",
+  "versions": 7
+ },
+ "agents_stability": {
+  "previous_value_per_share": 4.804439,
+  "previous_generated_at": "2026-11-08T11:14:48.645414+00:00",
+  "current_value_per_share": 4.804439,
+  "change": 0.0,
+  "unstable": false,
+  "threshold": 0.3
+ },
+ "agents": {
+  "generated_at": "2026-11-08T11:15:01.769863+00:00",
+  "price": 32.33,
+  "price_currency": "USD",
+  "price_as_of": "2026-11-06",
+  "thesis_version_id": null,
+  "trigger": "reglas_v2_misma_clasificacion",
+  "prompt_version": "sotp-valuer-v2",
+  "rules_version": "sotp-rules-v2",
+  "cache_hit": true,
+  "readings": null,
+  "readings_differ": null,
+  "changed_by": [
+   "reglas sotp-rules-v1 → sotp-rules-v2 sobre la misma clasificación (0 llamadas)"
+  ],
+  "fingerprint": "adeaceb4abc8f786fb6965dcc4c5a3dae0184df2a61f4d2c17b1ae21e63ee08e",
+  "narrative": {
+   "status": "ok",
+   "version": "sotp-narrative-v1",
+   "sections": [
+    {
+     "key": "resumen",
+     "title": "Resumen",
+     "text": "AST SpaceMobile es una compañía de conectividad móvil directa desde el espacio: quiere que un teléfono normal hable con satélites a través de operadores móviles socios, sin necesidad de antena especial. El paquete valora un caso base de 4,80 $ por acción, con un escenario bajista de 4,19 $ y uno alcista de 5,47 $, frente a un precio de mercado de 32,33 $; la diferencia entre el valor base y el precio es −85 %. Esa cifra no es una promesa: sale de sumar partes descontadas al 15,0 % hasta 2030, con un valor presente total de 1.965 M$. Lo que ya factura son las entregas de gateways y los hitos del Gobierno de EE.UU.; lo grande, la banda ancha desde el espacio con operadores, sigue en fase beta y sin uso comercial a escala. La selección preliminar del J-LEO japonés, la joint venture con los grandes operadores estadounidenses y las aplicaciones de IoT, edge compute y radar están sin probar. El cohete propio es integración vertical de coste, no una línea de ingresos."
+    },
+    {
+     "key": "negocio",
+     "title": "El negocio",
+     "text": "El negocio central es un operador mayorista de conectividad móvil desde satélites con enfoque partner-first: el operador móvil aporta espectro, clientes y facturación, mientras AST despliega satélites y gateways en tierra. Ese modelo busca evitar competir con las telecos y repartir ingresos con ellas. Hoy lo comercial son las entregas de gateways a socios MNO y los hitos del Gobierno de EE.UU.; el servicio direct-to-device con operadores está en preparación beta con socios seleccionados, lo que significa que todavía no hay ingresos comerciales a escala por esa vía. La evidencia disponible no desglosa cuánto del backlog contratado agregado corresponde a cada segmento, y tampoco hay guía de la empresa citada para la parte de banda ancha. Además del servicio con operadores, la compañía explora IoT, edge compute, radar para el Gobierno, emergencia federal y redes adicionales financiadas, pero esas líneas no tienen cifra de ingresos en la evidencia y no sostienen la valoración. El cohete Blacklift y la licencia perpetua de motores Miranda/Vira son coste e integración vertical, no una fuente de ingresos valorada."
+    },
+    {
+     "key": "partes",
+     "title": "Desglose por partes",
+     "text": "La parte principal es la red de banda ancha celular desde el espacio con socios MNO, valorada en 0,46 $ por acción. Su ancla es el backlog contratado agregado, no una previsión de ingresos: al repartirlo en el periodo de contrato sale un ingreso anual de 260 M$, con margen EBITDA de 45 % y múltiplo de 8x, y se le asigna una probabilidad de 35 % porque sigue en beta. Esta parte está infravalorada por falta de estimaciones: el propio paquete avisa de que no hay una previsión de ingresos ni guía de la empresa citada, así que el valor depende de que el backlog se convierta en facturación reconocida. La parte de entregas de gateways e hitos gubernamentales vale 0,37 $, con ingresos de 220 M$, margen de 15 %, múltiplo de 9x y probabilidad de 90 %; ya factura a clientes de pago, aunque la evidencia agrega gateways e hitos del Gobierno y no los separa.\n\nLos derechos prioritarios de espectro MSS y las tasas de uso pagadas en acciones aportan 0,02 $, con probabilidad de 60 %; es un valor copiado de la evidencia, sin descuento, y depende de que esos derechos se materialicen. La caja menos deuda del último balance SEC vale 3,95 $ y tiene probabilidad de 100 %; es el soporte más tangible, aunque la deuda incluye los convertibles. En conjunto, la suma de partes da el caso base, pero la parte que más pesa emocionalmente, la banda ancha desde el espacio, es justamente la que está en beta y la que tiene menor probabilidad asignada."
+    },
+    {
+     "key": "dilucion_balance",
+     "title": "Dilución y balance",
+     "text": "La valoración por acción se reparte sobre 409,0 M acciones diluidas, frente a 389,2 M acciones actuales; eso añade 19,9 M. La mayor parte de esa dilución viene de la licencia Blacklift, con 14,0 M, y de la remuneración en acciones hasta el año valorado, con 5,9 M; las ampliaciones para cubrir la quema son 0,0 M. No es una dilución extrema, pero pesa porque cualquier retraso del plan se suma a una base de títulos mayor y reduce el valor por acción. El balance no es holgado: la caja menos deuda es positiva, pero incluye convertibles, y esa parte financiera ya está valorada en 3,95 $. Si la quema se acelera o el beta se retrasa, la dilución y la deuda vuelven a ser el tema central para un inversor particular."
+    },
+    {
+     "key": "casos",
+     "title": "Casos alcista, base y bajista",
+     "text": "El caso base da 4,80 $ por acción. El caso bajista da 4,19 $: reduce los ingresos al 50 %, el múltiplo al 70 % y retrasa el plan 2 años. El caso alcista da 5,47 $: eleva los ingresos al 150 %, el múltiplo al 120 % y no retrasa el plan, con 0 años de retraso. Todos los casos se descuentan al 15,0 % hasta 2030, de modo que el tiempo y el múltiplo pesan tanto como los ingresos. La diferencia entre el caso bajista y el alcista no está en la caja, que es la misma, sino en la conversión del backlog y en que el servicio beta llegue a ser comercial."
+    },
+    {
+     "key": "que_puede_pasar",
+     "title": "Qué puede pasar: catalizadores y riesgos",
+     "text": "Lo que puede cambiar la tesis es el arranque comercial del servicio beta con socios MNO y la conversión del backlog en ingresos reconocidos. También importan las entregas de gateways, los hitos del Gobierno de EE.UU., la selección definitiva del J-LEO japonés, la joint venture con Rakuten y los grandes operadores estadounidenses, y cualquier noticia sobre espectro. Lo que está sin probar son IoT, edge compute, radar, emergencia federal y redes adicionales financiadas; no tienen cifra de ingresos en la evidencia y no sostienen la valoración. El cohete Blacklift y la licencia perpetua de motores son coste e integración, no ingresos. Si el beta no se convierte en servicio comercial, la parte principal se queda en una opción y el valor tangible se acerca a la caja menos deuda y a las partes ya comerciales."
+    },
+    {
+     "key": "noticias",
+     "title": "Noticias recientes",
+     "text": "En el paquete no hay titulares recientes; la evidencia son citas de resultados, contratos y presentaciones. Por eso la tesis no se apoya en noticias de mercado sino en hitos operativos. Las noticias que importan son el inicio del servicio beta con socios, la conversión de backlog en facturación reconocida, nuevas entregas de gateways, hitos del Gobierno, la decisión definitiva del J-LEO y el avance de la joint venture con operadores. Cualquier titular sobre ampliación de capital, deuda convertible o retraso de lanzamientos también mueve la percepción de dilución y balance, aunque no cambie el negocio de fondo."
+    },
+    {
+     "key": "conclusion",
+     "title": "Conclusión",
+     "text": "La tesis es asimétrica pero no está probada: el caso base de 4,80 $ frente al precio de 32,33 $ implica −85 %, y el mercado parece pagar opciones que el paquete no valora, como J-LEO, IoT, edge compute, radar y el cohete. Para que esa diferencia se cierre hace falta evidencia de beta comercial y de conversión de backlog, no solo contratos anunciados. El inversor particular debe mirar la dilución de 19,9 M acciones, la base de 409,0 M y el balance con convertibles; sin esas pruebas, el valor tangible se queda cerca de la caja menos deuda y de las partes comerciales, y la banda ancha desde el espacio sigue siendo una opción, no una realidad facturada."
+    }
+   ]
+  },
+  "mostly_cash": {
+   "cash_per_share": 3.9515073041200006,
+   "value_per_share": 4.80443914786755,
+   "share": 0.8224700495736068
+  }
+ },
+ "variant": "agents",
+ "default_variant": "agents",
+ "variants": [
+  {
+   "key": "agents",
+   "label": "Propuesta de los agentes",
+   "available": true,
+   "saved_at": "2026-11-08T11:15:01.772802+00:00",
+   "generated_at": "2026-11-08T11:15:01.769863+00:00",
+   "price": 32.33,
+   "price_as_of": "2026-11-06",
+   "value_per_share": 4.804439
+  },
+  {
+   "key": "user",
+   "label": "Editado por ti",
+   "available": false
+  },
+  {
+   "key": "example",
+   "label": "Ejemplo pegado por Nico",
+   "available": true
+  }
+ ],
+ "agents_status": null,
+ "_fuente": "Salida real (8-nov-2026, local): SOTP determinista de ASTS (reglas sotp-rules-v2, clasificación cacheada) y tesis con marcadores (1 llamada real, DeepSeek-V4.1-Flash por la API de DeepSeek)."
+}

@@ -1943,7 +1943,51 @@
       "missingValue": "{name}: falta el valor.",
       "noParts": "Hace falta al menos una parte con nombre."
     },
-    "dilutionDefault": "Dilución {n}"
+    "dilutionDefault": "Dilución {n}",
+    "exampleNico": "Ejemplo pegado por Nico (8-nov-2026).",
+    "agentsLabel": "Propuesta de los agentes expertos de GerarAI · {date} · precio {price}. Cada cifra lleva su razón y su fuente o supuesto; no está validada contra el histórico.",
+    "userLabel": "Editado por ti.",
+    "noAgents": "Sin propuesta de los agentes todavía.",
+    "noAgentsWhy": "Último intento: {why}",
+    "variantNav": "Versiones del desglose",
+    "variantDefault": "por defecto",
+    "variant": {
+      "agents": "Propuesta de los agentes",
+      "user": "Editado por ti",
+      "example": "Ejemplo pegado por Nico"
+    },
+    "why": {
+      "revenue": "Ingresos",
+      "margin": "Margen",
+      "multiple": "Múltiplo",
+      "probability": "Probabilidad",
+      "value": "Valor",
+      "shares": "Acciones"
+    },
+    "whyTitle": "¿De dónde sale?",
+    "sources": "Fuentes",
+    "rateSource": "Tasa: {source}",
+    "notCommercial": "aún no factura",
+    "belowZero": "Las deudas superan a las partes: la acción no vale menos de 0.",
+    "editAgentsHint": "Al guardar se crea tu versión («Editado por ti»); la propuesta de los agentes se conserva.",
+    "agents": {
+      "generate": "Generar con expertos",
+      "regenerate": "Regenerar solo el desglose",
+      "hint": "La tesis lo genera sola al terminar; esto rehace solo el desglose con los agentes expertos.",
+      "running": "Los agentes están trabajando en el desglose…",
+      "done": "Listo: ya tienes la propuesta nueva.",
+      "failed": "Los agentes no dejaron propuesta.",
+      "error": "No se pudo consultar el trabajo. Inténtalo de nuevo."
+    },
+    "unvalidatedAgents": "Propuesta de los agentes, no validada contra histórico",
+    "agentsVariance": "Cifras por reglas fijas desde la clasificación de los agentes: con los mismos datos sale el mismo número; solo cambia cuando entra un dato nuevo.",
+    "unstable": "Resultado sensible a supuestos: la propuesta anterior de los agentes daba {previous} y esta da {current} ({change}).",
+    "readingsDiffer": "Dos lecturas de los agentes clasificaron distinto ({values}); se muestra la más conservadora.",
+    "changedBy": "Cambió por un dato nuevo: {what}",
+    "unvaluedTitle": "Sin valorar (no hay cifra comprobable en la evidencia, no suman):",
+    "mostlyCash": "Ojo: {cash} de los {total} por acción ({share}) son caja menos deuda de hoy, no negocio. El negocio principal queda infravalorado por falta de estimaciones: esta cifra no es un valor razonable de la acción.",
+    "narrativeTitle": "Tesis de los expertos sobre el desglose",
+    "narrativeHint": "Prosa de los agentes; cada cifra sale del cálculo de arriba (marcadores), nunca del modelo."
   },
   "informe": {
     "metaTitle": "Informe de {ticker}",

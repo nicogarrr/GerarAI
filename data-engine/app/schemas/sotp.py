@@ -27,3 +27,10 @@ class SotpModelIn(BaseModel):
     author: str | None = None
     source: str | None = None
     stated_value_per_share: Any = None
+    # Procedencia que traen las propuestas de los agentes (se conserva al editar una copia).
+    summary: str | None = None
+    discount_rate_source: str | None = None
+    shares_why: dict[str, Any] | None = None
+    unvalued: list[dict[str, Any]] | None = None
+    warnings: list[str] | None = None
+    rules_version: str | None = None

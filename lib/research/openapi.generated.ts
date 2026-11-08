@@ -6427,9 +6427,10 @@ export interface paths {
         };
         /**
          * Get User Sotp
-         * @description Desglose por partes del usuario (o el borrador de ejemplo), con su aritmética,
-         *     escenarios, sensibilidad y la tasa base medida. Supuestos del usuario: no es el
-         *     valor justo de GerarAI.
+         * @description Desglose por partes con su aritmética, escenarios, sensibilidad y la tasa base
+         *     medida. Versiones: la propuesta de los agentes (por defecto en cuanto existe), la
+         *     editada por el usuario (si es posterior) y el ejemplo de código del ticker.
+         *     Supuestos no validados: no es el valor justo de GerarAI.
          */
         get: operations["get_user_sotp_api_valuation__ticker__sotp_get"];
         /**
@@ -6440,6 +6441,46 @@ export interface paths {
         post?: never;
         /** Delete User Sotp */
         delete: operations["delete_user_sotp_api_valuation__ticker__sotp_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/valuation/{ticker}/sotp/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Agents Sotp
+         * @description «Generar con expertos»: encola el valorador SOTP del equipo (job en segundo plano).
+         */
+        post: operations["generate_agents_sotp_api_valuation__ticker__sotp_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/valuation/{ticker}/sotp/jobs/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Latest Agents Sotp Job
+         * @description Estado honesto del último «Generar con expertos» (sin ETA).
+         */
+        get: operations["latest_agents_sotp_job_api_valuation__ticker__sotp_jobs_latest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -13794,24 +13835,40 @@ export interface components {
             }[] | null;
             /** Discount Rate */
             discount_rate?: unknown;
+            /** Discount Rate Source */
+            discount_rate_source?: string | null;
             /** Discount Years */
             discount_years?: unknown;
             /** Parts */
             parts?: {
                 [key: string]: unknown;
             }[] | null;
+            /** Rules Version */
+            rules_version?: string | null;
             /** Scenarios */
             scenarios?: {
                 [key: string]: unknown;
             }[] | null;
             /** Shares Current */
             shares_current?: unknown;
+            /** Shares Why */
+            shares_why?: {
+                [key: string]: unknown;
+            } | null;
             /** Source */
             source?: string | null;
             /** Stated Value Per Share */
             stated_value_per_share?: unknown;
+            /** Summary */
+            summary?: string | null;
+            /** Unvalued */
+            unvalued?: {
+                [key: string]: unknown;
+            }[] | null;
             /** Valuation Year */
             valuation_year?: unknown;
+            /** Warnings */
+            warnings?: string[] | null;
         };
         /** SourceCreate */
         SourceCreate: {
@@ -30890,7 +30947,9 @@ export interface operations {
     };
     get_user_sotp_api_valuation__ticker__sotp_get: {
         parameters: {
-            query?: never;
+            query?: {
+                variant?: string | null;
+            };
             header?: {
                 "x-cavaai-user"?: string | null;
                 "x-cavaai-tenant"?: string | null;
@@ -31008,6 +31067,94 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_agents_sotp_api_valuation__ticker__sotp_generate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    latest_agents_sotp_job_api_valuation__ticker__sotp_jobs_latest_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
             };
             /** @description Validation Error */
             422: {
