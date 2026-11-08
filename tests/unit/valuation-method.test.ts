@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { sbcAdjustmentText, trackRecordText, valuationMethodView } from '@/lib/research/valuation-method';
+import { impliedGrowthText, sbcAdjustmentText, trackRecordText, valuationMethodView } from '@/lib/research/valuation-method';
 
 describe('valuationMethodView', () => {
   it('devuelve null sin etiqueta, aviso ni rango (la ficha no cambia)', () => {
@@ -64,5 +64,17 @@ describe('sbcAdjustmentText', () => {
     expect(sbcAdjustmentText(note, 'en')).toBe(note.message_en);
     expect(sbcAdjustmentText(null, 'es')).toBeNull();
     expect(sbcAdjustmentText(undefined, 'en')).toBeNull();
+  });
+});
+
+describe('impliedGrowthText', () => {
+  it('crecimiento descontado frente al histórico, solo si el motor lo manda', () => {
+    const note = {
+      message_es: 'Crecimiento que descuenta el precio: 14,0 % anual de ingresos durante 5 años; en los últimos 3 ejercicios ha crecido un 9,0 % anual (FY2022–FY2025). Dato informativo: no cambia la señal.',
+      message_en: 'Growth priced in: 14.0% a year in revenue for 5 years; over the last 3 fiscal years it grew 9.0% a year (FY2022–FY2025). For information only: it does not change the signal.',
+    };
+    expect(impliedGrowthText(note, 'es')).toBe(note.message_es);
+    expect(impliedGrowthText(note, 'en')).toBe(note.message_en);
+    expect(impliedGrowthText(null, 'es')).toBeNull();
   });
 });

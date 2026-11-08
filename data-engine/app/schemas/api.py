@@ -955,6 +955,8 @@ class ValuationResponse(BaseModel):
     track_record: dict | None = None
     # Valor si se restaran los pagos en acciones (app/valuation/sbc_note.py); informativo.
     sbc_adjustment: dict | None = None
+    # Crecimiento que descuenta el precio frente al histórico (app/valuation/implied_growth_note.py); informativo.
+    implied_growth: dict | None = None
     reverse_dcf: dict = {}
     sensitivity: dict = {}
     moat: dict = {}

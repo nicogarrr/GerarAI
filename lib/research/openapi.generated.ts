@@ -14614,6 +14614,10 @@ export interface components {
             fair_value_range?: {
                 [key: string]: unknown;
             } | null;
+            /** Implied Growth */
+            implied_growth?: {
+                [key: string]: unknown;
+            } | null;
             /** Listed Share Values */
             listed_share_values?: {
                 [key: string]: number | null;

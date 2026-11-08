@@ -505,18 +505,13 @@ def planned_reverse_dcf(
         if plan.growth_fade
         else f" y después el {_pct_es(terminal_growth)} terminal"
     )
-    hist = (
-        f" El histórico es {_pct_es(historical_cagr['value'])} anual (CAGR FY{historical_cagr['from_year']}–"
-        f"FY{historical_cagr['to_year']})."
-        if historical_cagr
-        else ""
-    )
+    # El histórico frente a lo descontado va en su propia línea (implied_growth_note.py).
     price = _num_es(market_price, 2)
     if required_growth is not None:
         explanation = (
             f"El precio de {price} descuenta un crecimiento de ingresos del {_pct_es(required_growth)} anual "
             f"durante {STAGE1_YEARS} años{fade}, con margen FCF de llegada del {_pct_es(margin)} y WACC "
-            f"del {_pct_es(wacc)}. El modelo usa {_pct_es(growth)}.{hist}"
+            f"del {_pct_es(wacc)}. El modelo usa {_pct_es(growth)}."
         )
     else:
         explanation = (

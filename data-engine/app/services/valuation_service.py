@@ -40,6 +40,7 @@ from app.valuation.engines.base import (
 )
 from app.valuation.engines.registry import declared_engine_fallback
 from app.valuation.engines.scenario_engine import SCENARIO_FALLBACK_REASONS
+from app.valuation.implied_growth_note import implied_growth_vs_history
 from app.valuation.margin_convention import MARGIN_OF_SAFETY_CONVENTION
 from app.valuation.normalized_fcf import fy_history
 from app.valuation.point_in_time import (
@@ -842,6 +843,10 @@ class ValuationService:
                 sbc = None
             if sbc is not None:
                 result["sbc_adjustment"] = sbc
+        # Línea informativa: crecimiento que descuenta el precio frente al histórico.
+        implied = implied_growth_vs_history(result)
+        if implied is not None:
+            result["implied_growth"] = implied
 
         # Ensure contract fields always present for API / thesis consumers.
         result.setdefault("status", "ok")
