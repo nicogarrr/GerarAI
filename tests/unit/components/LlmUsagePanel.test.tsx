@@ -88,4 +88,24 @@ describe('LegCard', () => {
         expect(container.textContent).toContain('Operativo');
         expect(container.textContent).not.toContain('Semanal');
     });
+
+    // Regresión #418 (medido en prod 8-nov-2026): las fechas del panel se
+    // formatean en la zona del usuario (Europe/Madrid), no en la del proceso.
+    // Vitest corre con TZ=UTC (vitest.config.mts), igual que el servidor: si
+    // alguien vuelve a formatDate sin timeZone, el SSR daría la hora UTC y el
+    // navegador la de Madrid y React rompería la hidratación en /settings.
+    it('fija las fechas a Europe/Madrid aunque el proceso corra en UTC', () => {
+        const madrid = (iso: string) => new Intl.DateTimeFormat('es', {
+            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+            timeZone: 'Europe/Madrid',
+        }).format(new Date(iso));
+        const { container } = render(<LegCard leg={goLeg} />);
+        // Cada plantilla ancla la fecha a SU call site (limited_until y
+        // resetsAt comparten ISO en el fixture; sin la plantilla un fallo en
+        // uno quedaría enmascarado por el otro).
+        expect(container.textContent).toContain(`sin cuota hasta ${madrid('2026-11-02T00:00:00Z')}`);
+        expect(container.textContent).toContain(`se renueva ${madrid('2026-11-02T00:00:00Z')}`);
+        render(<LlmUsagePanel usage={usage} />);
+        expect(screen.getByText(/Actualizado/).textContent).toContain(madrid('2026-11-01T07:30:00Z'));
+    });
 });

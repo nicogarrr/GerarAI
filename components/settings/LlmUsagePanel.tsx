@@ -1,7 +1,7 @@
 'use client';
 
 import type { LlmUsage, LlmUsageLeg } from '@/lib/actions/llm-settings.actions';
-import { formatDate } from '@/lib/format';
+import { formatUserDateTime } from '@/lib/format';
 import { useLocale, useT } from '@/lib/i18n/client';
 import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 
@@ -33,15 +33,19 @@ export function LegCard({ leg, t = esT, locale = 'es' as const }: {
         stateKey === 'ok' ? 'bg-emerald-900/50 text-emerald-300' :
         stateKey === 'limited' ? 'bg-amber-900/50 text-amber-300' :
         'bg-gray-800 text-gray-400';
+    // SIEMPRE formatUserDateTime (zona fija Europe/Madrid): formatDate sin
+    // timeZone formatea en la zona del PROCESO (UTC en el servidor, Madrid en
+    // el navegador), el texto SSR no casa con el del cliente y React rompe la
+    // hidratación (#418 en cada carga de /settings; medido en prod 8-nov-2026).
     const until = leg.limited_until
-        ? formatDate(leg.limited_until, DATE_TIME_OPTS, undefined, locale)
+        ? formatUserDateTime(leg.limited_until, DATE_TIME_OPTS, undefined, locale)
         : null;
     const weekly = leg.quota?.weekly;
     const monthly = leg.quota?.monthly;
     const weeklyPercent = percent(weekly?.percent);
     const monthlyPercent = percent(monthly?.percent);
     const resetsAt = typeof weekly?.resetsAt === 'string'
-        ? formatDate(weekly.resetsAt, DATE_TIME_OPTS, undefined, locale)
+        ? formatUserDateTime(weekly.resetsAt, DATE_TIME_OPTS, undefined, locale)
         : null;
     const limits = leg.published_limits
         ? Object.values(leg.published_limits).map((l) => l.rpd).filter((v): v is number => typeof v === 'number')
@@ -110,7 +114,7 @@ export default function LlmUsagePanel({ usage }: { usage: LlmUsage }) {
             ))}
             <p className="text-xs text-gray-500">
                 {t('settings.llm.usage.generatedAt', {
-                    date: formatDate(usage.generated_at, DATE_TIME_OPTS, undefined, locale),
+                    date: formatUserDateTime(usage.generated_at, DATE_TIME_OPTS, undefined, locale),
                 })}
             </p>
         </div>
