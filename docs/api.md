@@ -16,9 +16,16 @@ Las peticiones internas entre Next.js y FastAPI incorporan las siguientes cabece
 | `X-CavaAI-User` | String | Identificador del usuario emisor | `usr_8f9a2b1c` |
 | `X-CavaAI-Timestamp` | Integer | Epoch timestamp Unix en segundos | `1730332800` |
 | `X-CavaAI-Signature` | String | Firma HMAC-SHA256 en formato hex | `e3b0c44298fc...` |
+| `X-CavaAI-Nonce` | String | Nonce de un solo uso (anti-repetición; Redis `SET NX EX` con fallback local) | `9f2c...` |
+| `X-CavaAI-Method` | String | Método HTTP firmado | `POST` |
+| `X-CavaAI-Path` | String | Ruta firmada | `/api/portfolio/summary` |
+| `X-CavaAI-Body-Hash` | String | SHA-256 hex del cuerpo crudo de la petición | `e3b0c44298fc...` |
 
 > [!NOTE]
-> Las peticiones con un timestamp que difiera en más de 300 segundos respecto a la hora del servidor son rechazadas con código HTTP `401 Unauthorized` para evitar ataques de repetición.
+> Las peticiones con un timestamp que difiera en más de 300 segundos respecto a la hora del servidor son rechazadas con código HTTP `401 Unauthorized` para evitar ataques de repetición. Los timestamps en el futuro se rechazan siempre (la tolerancia solo aplica hacia el pasado).
+
+> [!IMPORTANT]
+> En producción la firma es **vinculante** (*bound*): firma tenant, usuario, timestamp, nonce, método, ruta y hash del cuerpo, de modo que una firma capturada no se puede reutilizar en otro endpoint ni con un cuerpo manipulado. El formato antiguo sin estas cuatro cabeceras solo se acepta en entornos locales y de test (`app/core/auth.py`).
 
 ---
 
