@@ -1045,11 +1045,11 @@ def active_sections(ctx: ThesisContext) -> list[tuple[str, str, str, tuple[str, 
     return [s for s in SECTIONS if s[0] not in OPTIONAL or s[0] in ctx.optional]
 
 
-# Nombres de normas y formularios: no son cifras («IFRS 16», «NIC 36», «ASC 842», «Form 20-F», «Pilar 2»).
+# Nombres de normas, formularios y anexos SEC: no son cifras («IFRS 16», «NIC 36», «ASC 842», «Form 20-F», «Pilar 2», «EX-99.1»).
 _NAMES = re.compile(r"\b(?:IFRS|NIIF|IAS|NIC|ASC|ASU|US\s?GAAP\s?ASC|Pilar|Pillar|Basilea|Basel|Solvencia|Solvency|"
                     r"Form|formulario|Regla|Rule|Item|Nivel|Level|Tier)\s?\d+(?:[-–]\d+)?[A-Z]?\b"
                     r"|\b\d{1,2}\s+de\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b"
-                    r"|\b\d{1,2}-[KFQ]\b|\b(?:20|40|10|6|8)-[A-Z]\b|\bS&P\s?500\b|\bQ[1-4]\b|\bH[12]\b|\b[1-4]T\b", re.I)
+                    r"|\bEX-\d{1,3}(?:\.\d{1,2})?[A-Z]?\b|\b\d{1,2}-[KFQ]\b|\b(?:20|40|10|6|8)-[A-Z]\b|\bS&P\s?500\b|\bQ[1-4]\b|\bH[12]\b|\b[1-4]T\b", re.I)
 
 
 def _masked(text: str) -> tuple[str, list[str]]:
