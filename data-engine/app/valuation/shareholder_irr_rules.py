@@ -62,21 +62,27 @@ BASE_RATE_BUCKETS: tuple[tuple[str, float, float], ...] = (
     ("10-20 %", 0.10, 0.20),
     ("> 20 %", 0.20, 10.0),
 )
-BASE_RATES: dict[str, dict[str, float]] = {
-    "decrece": {"p25": -0.0165, "p50": 0.011, "p75": 0.0642, "n": 92},
-    "0-5 %": {"p25": -0.0199, "p50": 0.0154, "p75": 0.0444, "n": 129},
-    "5-10 %": {"p25": 0.0092, "p50": 0.044, "p75": 0.0807, "n": 111},
-    "10-20 %": {"p25": 0.0183, "p50": 0.073, "p75": 0.1134, "n": 91},
-    "> 20 %": {"p25": 0.0202, "p50": 0.0631, "p75": 0.2053, "n": 60},
+BASE_RATES: dict[str, dict[str, Any]] = {
+    "decrece": {"p25": -0.0165, "p50": 0.011, "p75": 0.0642, "n": 92, "known_at": "2022-02-23"},
+    "0-5 %": {"p25": -0.0199, "p50": 0.0154, "p75": 0.0444, "n": 129, "known_at": "2020-02-28"},
+    "5-10 %": {"p25": 0.0092, "p50": 0.044, "p75": 0.0807, "n": 111, "known_at": "2020-12-18"},
+    "10-20 %": {"p25": 0.0183, "p50": 0.073, "p75": 0.1134, "n": 91, "known_at": "2020-12-18"},
+    "> 20 %": {"p25": 0.0202, "p50": 0.0631, "p75": 0.2053, "n": 60, "known_at": "2020-02-28"},
 }
 #: Último cierre cuya cifra entra en la tabla: observaciones con inicio 2010–2014 y resultado a 5 años, así que
-#: la tabla usa ingresos hasta el ejercicio 2019. Valorar una fecha anterior con ella es mirar al futuro.
+#: la tabla usa ingresos hasta el ejercicio 2019.
 BASE_RATE_OUTCOMES_THROUGH = date(2019, 12, 31)
+#: Cuándo se conoció la tabla: la fecha de presentación (``filed``) más tardía de las cifras que usa, por
+#: tramo (``known_at``) y para la tabla entera. No el día siguiente al último cierre: el 10-K del ejercicio
+#: 2019 se presentó en 2020 y alguna cifra usada salió en una presentación posterior. Lo da
+#: ``scripts/irr_base_rates.py`` junto con la tabla.
+BASE_RATES_KNOWN_AT = date.fromisoformat(max(str(r["known_at"]) for r in BASE_RATES.values()))
 
 
-def base_rates_known_at(as_of: date) -> dict[str, dict[str, float]] | None:
-    """La tabla de tasas base si ya era conocida en ``as_of``; None si lleva información posterior."""
-    return BASE_RATES if as_of > BASE_RATE_OUTCOMES_THROUGH else None
+def base_rates_known_at(as_of: date) -> dict[str, dict[str, Any]] | None:
+    """La tabla de tasas base si ya era conocida en ``as_of`` (presentada antes de esa fecha); None si
+    lleva información publicada después."""
+    return BASE_RATES if as_of > BASE_RATES_KNOWN_AT else None
 
 
 BASE_RATE_SOURCE = (

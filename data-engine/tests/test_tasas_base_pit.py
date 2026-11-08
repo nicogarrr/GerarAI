@@ -12,7 +12,27 @@ from app.valuation import shareholder_irr_rules as rules
 def test_tabla_solo_conocida_despues_de_sus_datos():
     assert rules.base_rates_known_at(date(2015, 6, 30)) is None
     assert rules.base_rates_known_at(date(2019, 12, 31)) is None
-    assert rules.base_rates_known_at(date(2020, 6, 30)) is rules.BASE_RATES
+    # Fuga de #4795: la tabla se daba por conocida el 2020-01-01, al día siguiente del cierre del ejercicio
+    # 2019, aunque sus cifras se presentaron después (10-K de 2020 y una presentación de 2022-02-23).
+    assert rules.base_rates_known_at(date(2020, 1, 1)) is None
+    assert rules.base_rates_known_at(date(2020, 6, 30)) is None
+    assert date(2022, 2, 23) == rules.BASE_RATES_KNOWN_AT
+    assert rules.base_rates_known_at(date(2022, 6, 30)) is rules.BASE_RATES
+
+
+def test_el_script_guarda_la_fecha_de_presentacion_mas_tardia(tmp_path):
+    import json
+
+    path = Path(__file__).resolve().parents[1] / "scripts" / "irr_base_rates.py"
+    spec = importlib.util.spec_from_file_location("irr_base_rates_script", path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    rev = {f"{y}-12-31": [100.0 * 1.07 ** (y - 2007), f"{y + 1}-02-20"] for y in range(2007, 2020)}
+    rev["2019-12-31"][1] = "2021-03-01"  # la cifra de 2019 se presentó tarde
+    (tmp_path / "a.json").write_text(json.dumps({"sic": "3571", "m": {"revenue": rev}}))
+    obs, known = mod.observations(str(tmp_path))
+    assert len(obs["5-10 %"]) == 5 and known == {"5-10 %": "2021-03-01"}
 
 
 def _script():
@@ -35,5 +55,5 @@ def test_backtest_antes_de_2020_no_usa_la_tabla_del_producto():
     # con la tabla vacía (la regla usa su respaldo 0 / 3 / 6 %)
     assert seen == [{}] and out[0]["base_rates"] == "sin_datos_previos"
     assert rules.BASE_RATES  # la tabla del producto se restaura
-    out = mod.value_date(("2021-06-30", [{**row, "t": "2021-06-30"}], False))
+    out = mod.value_date(("2022-06-30", [{**row, "t": "2022-06-30"}], False))
     assert seen[-1] == rules.BASE_RATES and out[0]["base_rates"] == "producto"
