@@ -37,6 +37,12 @@ CONCEPTS: dict[str, tuple[str, ...]] = {
                 "SalesRevenueGoodsNet", "Revenue", "SalesRevenueServicesNet", "RealEstateRevenueNet",
                 "RevenuesNetOfInterestExpense"),
     "operating_income": ("OperatingIncomeLoss", "ProfitLossFromOperatingActivities"),
+    # respaldo del EBITDA por componentes (app.valuation.ebitda_components), mismos conceptos que la ingesta
+    "income_before_tax": ("ProfitLossBeforeTax",),
+    "interest_expense": ("InterestExpense", "FinanceCosts"),
+    "income_tax_expense": ("IncomeTaxExpenseBenefit", "IncomeTaxExpenseContinuingOperations"),
+    "net_income_total": ("ProfitLoss",),
+    "finance_income_cost": ("FinanceIncomeCost",),
     "net_income": ("NetIncomeLoss", "ProfitLoss", "ProfitLossAttributableToOwnersOfParent"),
     "depreciation_amortization": ("DepreciationDepletionAndAmortization", "DepreciationAmortizationAndAccretionNet",
                                   "DepreciationAndAmortization", "DepreciationAmortizationAndImpairmentLossReversalOfImpairmentLossRecognisedInProfitOrLoss",
@@ -77,6 +83,9 @@ CONCEPTS: dict[str, tuple[str, ...]] = {
 }
 #: Métrica del backtest → métrica de la ingesta del producto: sus conceptos van PRIMERO y en su orden.
 _PRODUCT_METRIC = {"revenue": "revenue", "operating_income": "operating_income", "net_income": "net_income",
+                   "income_before_tax": "income_before_tax", "interest_expense": "interest_expense",
+                   "income_tax_expense": "income_tax_expense", "net_income_total": "net_income_total",
+                   "finance_income_cost": "finance_income_cost",
                    "depreciation_amortization": "depreciation_amortization",
                    "operating_cash_flow": "operating_cash_flow", "capital_expenditure": "capital_expenditure",
                    "dividends_paid": "dividends_paid", "common_stock_repurchased": "common_stock_repurchased",
@@ -277,6 +286,8 @@ def build_inputs(facts: Sequence[Fact], *, t: date, price: float, splits: Sequen
         raise ValueError("sin ingresos anuales")
     last = years[-1]
     series = {m: annual(facts, m) for m in ("operating_income", "depreciation_amortization", "net_income",
+                                             "income_before_tax", "interest_expense", "income_tax_expense",
+                                             "net_income_total", "finance_income_cost",
                                              "operating_cash_flow", "capital_expenditure", "dividends_paid",
                                              "common_stock_repurchased", "acquisitions",
                                              "stock_based_compensation", "shares_diluted", "eps_diluted")}
@@ -284,8 +295,16 @@ def build_inputs(facts: Sequence[Fact], *, t: date, price: float, splits: Sequen
     def s(m: str) -> list[float | None]:
         return [series[m].get(y) for y in years]
 
+    from app.valuation import ebitda_components as ec
+
     oi, da = s("operating_income"), s("depreciation_amortization")
-    ebitda = [o + abs(d) if o is not None and d is not None else None for o, d in zip(oi, da, strict=True)]
+    pbt = [ec.pretax_income(income_before_tax=p, profit_loss=pl, income_tax_expense=tx)
+           for p, pl, tx in zip(s("income_before_tax"), s("net_income_total"), s("income_tax_expense"), strict=True)]
+    fin, nfr = s("interest_expense"), s("finance_income_cost")
+    # misma función que la app (shareholder_irr_service.starting_point)
+    ebitda = [ec.ebitda_from_components(operating_income=o, depreciation_amortization=d, income_before_tax=p,
+                                        interest_expense=f, net_finance_result=nf)[0]
+              for o, d, p, f, nf in zip(oi, da, pbt, fin, nfr, strict=True)]
     revenue = [rev.get(y) for y in years]
     net_income = s("net_income")
     method = choose_method(revenue=revenue[-1], ebitda_years=ebitda, net_income=net_income[-1],

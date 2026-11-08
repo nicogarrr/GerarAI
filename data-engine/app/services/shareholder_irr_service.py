@@ -25,6 +25,14 @@ from app.core.errors import redact_secrets
 from app.models import Company, FinancialFact
 from app.valuation import shareholder_irr as engine
 from app.valuation import shareholder_irr_rules as rules
+from app.valuation.ebitda_components import DERIVED as EBITDA_DERIVED
+from app.valuation.ebitda_components import FORMULAS as EBITDA_FORMULAS
+from app.valuation.ebitda_components import (
+    OPERATING_PLUS_DA,
+    PRETAX_COMPONENTS,
+    ebitda_from_components,
+    pretax_income,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +42,8 @@ _FLOW = ("revenue", "operating_income", "depreciation_amortization", "ebitda", "
          "net_income_attributable", "operating_cash_flow", "capital_expenditure", "dividends_paid",
          "common_stock_repurchased", "acquisitions", "stock_based_compensation", "shares_diluted",
          "eps_diluted", "free_cash_flow", "interest_expense", "earned_premiums", "lease_income",
-         "gain_on_sale_real_estate")
+         "gain_on_sale_real_estate", "income_before_tax", "income_tax_expense", "finance_income_cost",
+         "net_income_total")
 _POINT = ("cash_and_equivalents", "short_term_investments", "total_debt", "long_term_debt",
           "operating_lease_liabilities", "lease_liabilities_current", "lease_liabilities_noncurrent",
           "minority_interest", "hybrid_capital", "shares_outstanding", "total_equity", "preferred_stock")
@@ -180,7 +189,12 @@ def company_kind(company: Company, annual: Mapping[str, Mapping[int, dict]]) -> 
     for y in years[-2:]:
         oi, da, ni = v("operating_income", y), v("depreciation_amortization", y), v("net_income", y)
         ocf, capex = v("operating_cash_flow", y), v("capital_expenditure", y)
-        ebitda = (oi + abs(da)) if (oi is not None and da is not None) else v("ebitda", y)
+        ebitda, _basis = ebitda_from_components(
+            operating_income=oi, depreciation_amortization=da, ebitda_reported=v("ebitda", y),
+            income_before_tax=pretax_income(income_before_tax=v("income_before_tax", y),
+                                            profit_loss=v("net_income_total", y),
+                                            income_tax_expense=v("income_tax_expense", y)),
+            interest_expense=v("interest_expense", y), net_finance_result=v("finance_income_cost", y))
         fcf = (ocf - abs(capex or 0.0)) if ocf is not None else None
         if all(x is not None and x <= 0 for x in (ebitda, ni, fcf)):
             burning += 1
@@ -279,12 +293,22 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     def series(metric: str) -> list[float | None]:
         return [_mill(annual.get(metric, {}).get(y)) for y in years]
 
+    ebitda_basis: dict[int, str | None] = {}
+
     def ebitda_for(y: int) -> float | None:
-        oi = _mill(annual.get("operating_income", {}).get(y))
-        da = _mill(annual.get("depreciation_amortization", {}).get(y))
-        if oi is not None and da is not None:
-            return oi + abs(da)
-        return _mill(annual.get("ebitda", {}).get(y))
+        value, how = ebitda_from_components(
+            operating_income=_mill(annual.get("operating_income", {}).get(y)),
+            depreciation_amortization=_mill(annual.get("depreciation_amortization", {}).get(y)),
+            ebitda_reported=_mill(annual.get("ebitda", {}).get(y)),
+            income_before_tax=pretax_income(
+                income_before_tax=_mill(annual.get("income_before_tax", {}).get(y)),
+                profit_loss=_mill(annual.get("net_income_total", {}).get(y)),
+                income_tax_expense=_mill(annual.get("income_tax_expense", {}).get(y))),
+            interest_expense=_mill(annual.get("interest_expense", {}).get(y)),
+            net_finance_result=_mill(annual.get("finance_income_cost", {}).get(y)),
+        )
+        ebitda_basis[y] = how
+        return value
 
     revenue = series("revenue")
     ebitda = [ebitda_for(y) for y in years]
@@ -416,7 +440,8 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
         price=float(price), shares_diluted=shares, revenue=revenue[-1] or 0.0,
         ebitda=ebitda[-1], net_income=net_income[-1], cash=cash, debt=debt, leases=leases, hybrids=hybrids,
         minorities=minorities if chosen_basis == "ev_ebitda" else 0.0, currency=reporting, basis=chosen_basis,
-        sources={"revenue": f"revenue {last}:FY", "ebitda": "resultado operativo + amortizaciones del ejercicio"},
+        sources={"revenue": f"revenue {last}:FY",
+                 "ebitda": EBITDA_FORMULAS.get(ebitda_basis.get(last) or OPERATING_PLUS_DA, "")},
         earnings_label=earnings_label,
     )
     if chosen_basis == "pb" and book[-1] is None:  # comparable valorado con la base de la empresa
@@ -446,6 +471,12 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     cites["annual"] = {m: {str(y): annual[m][y] for y in years if y in annual.get(m, {})} for m in _FLOW if m in annual}
     cites["method"] = method
     cites["ifrs16_leases_in_debt"] = use_leases
+    derived_years = [y for y in years if ebitda_basis.get(y) in EBITDA_DERIVED]
+    if derived_years:
+        how = ebitda_basis[derived_years[-1]] or PRETAX_COMPONENTS
+        cites["ebitda_basis"] = {"formula": EBITDA_FORMULAS[how], "years": derived_years}
+        warnings.append(f"EBITDA derivado como {EBITDA_FORMULAS[how].split(' (')[0]} "
+                        f"en {', '.join(str(y) for y in derived_years)}: el emisor no etiqueta el resultado operativo")
     return sp, hist, warnings, cites
 
 

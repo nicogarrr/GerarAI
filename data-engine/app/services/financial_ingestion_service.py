@@ -253,7 +253,8 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # 3 (8-nov-2026): ``acquisitions`` (PaymentsToAcquireBusinesses…), que el motor de TIR necesita.
 # 4 (8-nov-2026): ``gain_on_sale_real_estate`` (plusvalías por ventas de inmuebles), para el FFO de un REIT.
 # 5 (8-nov-2026): filers IFRS sin minoritarios: ProfitLoss/Equity de respaldo; ``total_debt`` = Borrowings.
-SEC_INGESTION_RULES_VERSION = 5
+# 6 (8-nov-2026): ``net_income_total`` (ProfitLoss) y ``finance_income_cost``, para el EBITDA por componentes.
+SEC_INGESTION_RULES_VERSION = 6
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("revenue",           ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax", "RegulatedAndUnregulatedOperatingRevenue"],  "USD"),
@@ -261,6 +262,8 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("operating_income",  ["OperatingIncomeLoss"],                                                                  "USD"),
     ("income_before_tax", ["IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomesticAndForeign"], "USD"),
     ("income_tax_expense", ["IncomeTaxExpenseBenefit"],                                                             "USD"),
+    # beneficio del ejercicio TOTAL (dominante + minoritarios): solo para derivar el beneficio antes de impuestos
+    ("net_income_total", ["ProfitLoss"],                                                                            "USD"),
     ("interest_expense",   ["InterestExpenseNonoperating", "InterestExpenseNonOperating", "InterestExpense", "InterestExpenseDebt", "InterestExpenseLongTermDebt", "InterestAndDebtExpense",
                             # Tag NETO no operativo: ULTIMO alias. CHTR dejo de
                             # usar InterestExpense en 2015 y el gasto viaja aqui
@@ -394,6 +397,9 @@ SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("operating_income",  ["ProfitLossFromOperatingActivities"],                                       "USD"),
     ("income_before_tax", ["ProfitLossBeforeTax"],                                                     "USD"),
     ("income_tax_expense", ["IncomeTaxExpenseContinuingOperations"],                                   "USD"),
+    # EBITDA por componentes (app.valuation.ebitda_components) cuando no hay resultado operativo etiquetado
+    ("net_income_total", ["ProfitLoss"],                                                               "USD"),
+    ("finance_income_cost", ["FinanceIncomeCost"],                                                     "USD"),
     ("interest_expense",  ["InterestExpense", "FinanceCosts"],                                         "USD"),
     ("net_income",        ["ProfitLossAttributableToOwnersOfParent"],                                  "USD"),
     ("eps_diluted",       ["DilutedEarningsLossPerShare"],                                             "USD/share"),
@@ -465,7 +471,8 @@ def sec_ifrs_metric_map_for(ifrs_facts: dict[str, Any]) -> list[tuple[str, list[
 # (PaymentsToAcquireOrRedeemEntitysShares).
 # 3 (8-nov-2026): ``net_income`` = beneficio atribuible a la dominante (ProfitLoss solo de respaldo) y
 # ``shares_diluted`` = AdjustedWeightedAverageShares cuando el emisor la etiqueta (sin derivar).
-ESEF_INGESTION_RULES_VERSION = 3
+# 4 (8-nov-2026): ``net_income_total`` (ProfitLoss) y ``finance_income_cost`` (EBITDA por componentes).
+ESEF_INGESTION_RULES_VERSION = 4
 
 ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # RevenueFromContractsWithCustomers: emisores que solo etiquetan la cifra
@@ -482,6 +489,8 @@ ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("gross_profit",      ["ifrs-full:GrossProfit"],                                                     "iso4217:EUR"),
     ("income_before_tax", ["ifrs-full:ProfitLossBeforeTax"],                                             "iso4217:EUR"),
     ("income_tax_expense", ["ifrs-full:IncomeTaxExpenseContinuingOperations"],                           "iso4217:EUR"),
+    ("net_income_total", ["ifrs-full:ProfitLoss"],                                                        "iso4217:EUR"),
+    ("finance_income_cost", ["ifrs-full:FinanceIncomeCost"],                                              "iso4217:EUR"),
     ("interest_expense",  ["ifrs-full:InterestExpense", "ifrs-full:FinanceCosts"],                       "iso4217:EUR"),
     ("depreciation_amortization", ["ifrs-full:DepreciationAndAmortisationExpense",
                                    "ifrs-full:AdjustmentsForDepreciationAndAmortisationExpense"],        "iso4217:EUR"),
