@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useT } from '@/lib/i18n/client';
-import type { TranslationKey } from '@/lib/i18n/t';
 import {
     getPushStatus,
     registerPushDevice,
@@ -16,6 +15,7 @@ import { isIos, isStandalone } from '@/lib/pwa/platform';
 
 // Etiquetas es enlazadas al diccionario: export de compatibilidad para los
 // tests; la vista pinta con useT() via PUSH_TYPE_LABEL_KEYS.
+import { PUSH_TYPE_LABEL_KEYS } from '@/lib/alerts/push-type-labels';
 import esAlerts from '@/lib/i18n/messages/es/alerts.json';
 
 export const PUSH_TYPE_LABELS: Record<PushEventType, string> = {
@@ -27,17 +27,6 @@ export const PUSH_TYPE_LABELS: Record<PushEventType, string> = {
     insiders: esAlerts.push.types.insiders,
     shorts_rising: esAlerts.push.types.shortsRising,
     daily_digest: esAlerts.push.types.dailyDigest,
-};
-
-const PUSH_TYPE_LABEL_KEYS: Record<PushEventType, TranslationKey> = {
-    macro_event: 'alerts.push.types.macroEvent',
-    earnings: 'alerts.push.types.earnings',
-    dca_levels: 'alerts.push.types.dcaLevels',
-    new_filing: 'alerts.push.types.newFiling',
-    thesis_broken: 'alerts.push.types.thesisBroken',
-    insiders: 'alerts.push.types.insiders',
-    shorts_rising: 'alerts.push.types.shortsRising',
-    daily_digest: 'alerts.push.types.dailyDigest',
 };
 
 type Support = 'checking' | 'unsupported' | 'ios-install' | 'denied' | 'ready';

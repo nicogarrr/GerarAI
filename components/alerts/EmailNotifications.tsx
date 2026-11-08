@@ -2,24 +2,13 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useT } from '@/lib/i18n/client';
-import type { TranslationKey } from '@/lib/i18n/t';
 import {
     getEmailAlertStatus,
     setEmailAlertPreference,
     type EmailAlertStatus,
 } from '@/lib/actions/email-alerts.actions';
 import type { PushEventType } from '@/lib/alerts/push-event-types';
-
-const TYPE_LABEL_KEYS: Record<PushEventType, TranslationKey> = {
-    macro_event: 'alerts.push.types.macroEvent',
-    earnings: 'alerts.push.types.earnings',
-    dca_levels: 'alerts.push.types.dcaLevels',
-    new_filing: 'alerts.push.types.newFiling',
-    thesis_broken: 'alerts.push.types.thesisBroken',
-    insiders: 'alerts.push.types.insiders',
-    shorts_rising: 'alerts.push.types.shortsRising',
-    daily_digest: 'alerts.push.types.dailyDigest',
-};
+import { PUSH_TYPE_LABEL_KEYS } from '@/lib/alerts/push-type-labels';
 
 /**
  * Avisos por correo a la direccion propia del usuario (la de su sesion), con
@@ -86,7 +75,7 @@ export default function EmailNotifications() {
                                     checked={pref.enabled}
                                     onChange={(event) => void toggle(pref.event_type, event.target.checked)}
                                 />
-                                {ti(TYPE_LABEL_KEYS[pref.event_type])}
+                                {ti(PUSH_TYPE_LABEL_KEYS[pref.event_type])}
                             </label>
                         ))}
                     </fieldset>
