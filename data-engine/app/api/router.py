@@ -45,6 +45,7 @@ from app.api.routes import (
     screeners,
     search,
     settings,
+    sotp,
     sources,
     taxes,
     telegram_link,
@@ -98,6 +99,7 @@ api_router.include_router(
 api_router.include_router(obsidian.router, prefix="/thesis", tags=["thesis"])
 api_router.include_router(obsidian.vault_router, prefix="/obsidian", tags=["obsidian"])
 api_router.include_router(valuation.router, prefix="/valuation", tags=["valuation"])
+api_router.include_router(sotp.router, prefix="/valuation", tags=["valuation"])
 api_router.include_router(watchlist.router, prefix="/watchlist", tags=["watchlist"])
 api_router.include_router(
     work_products.router, prefix="/work-products", tags=["work-products"]
