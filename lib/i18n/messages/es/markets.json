@@ -22,7 +22,13 @@
     "lastFailed": " · la última actualización falló; se reintenta cada minuto",
     "refresh": "Actualizar ahora",
     "groupEmpty": "No hay datos disponibles ahora. Se reintenta cada minuto.",
-    "footer": "Cada fila muestra la hora que informa el proveedor y su antigüedad al consultar la fuente (hora de Madrid); el panel se actualiza cada minuto. No son datos oficiales de mercado ni sirven para operar con garantías."
+    "footer": "Cada fila muestra la hora que informa el proveedor y su antigüedad al consultar la fuente (hora de Madrid); el panel se actualiza cada minuto. No son datos oficiales de mercado ni sirven para operar con garantías.",
+    "tableCaption": "Cotizaciones en directo: {group}",
+    "columns": {
+      "instrument": "Instrumento",
+      "price": "Precio",
+      "change": "Cambio"
+    }
   },
   "metaTitle": "Mercados",
   "metaDescription": "Índices, futuros, acciones del IBEX 35, materias primas y divisas con la hora real de cada cotización y su fuente.",
