@@ -154,6 +154,14 @@ def test_quarter_mention_in_body_or_guidance_never_confirms():
         "<h1>Second quarter 2026 results</h1><p>Revenue grew 12% compared with the quarter ended June 30, 2025.</p>",
         "Jun/2026",
     ) == "confirmado"
+    # Texto plano sin marcas: solo el primer enunciado es el titular; el trimestre
+    # del cierre en enunciados posteriores no confirma (repro del auditor).
+    assert svc.check_period(
+        "Second quarter 2025 results. Strong momentum into second quarter 2026. Quarter ended June 30, 2025.",
+        "Jun/2026",
+    ) == "contradice"
+    # Y en texto plano el primer enunciado sigue confirmando (pins ya existentes).
+    assert svc.check_period("Q2 2026 Update Highlights", "Jun/2026") == "confirmado"
 
 
 def test_domestic_doc_with_cover_date_but_other_period_links_nothing():

@@ -186,7 +186,12 @@ def _headline(doc_html: str, text: str) -> str:
     del T2-2025.
     """
     headings = list(_HEADING_RE.finditer(doc_html[:6000]))
-    headline = _text(headings[0].group(1)) if headings else text[:200]
+    if headings:
+        headline = _text(headings[0].group(1))
+    else:
+        # Sin titular marcado solo vale el primer enunciado: lo que sigue ya es
+        # cuerpo (guía, comparativas, texto corrido) y no es el periodo principal.
+        headline = re.split(r"(?<=[.!?;])\s", text, maxsplit=1)[0][:200]
     kept = [s for s in re.split(r"(?<=[.!?;])\s+", headline) if not _GUIDANCE_RE.search(s)]
     return " ".join(kept).lower()
 
