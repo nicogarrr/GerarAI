@@ -2628,6 +2628,9 @@ class FinancialIngestionService:
             "origin": snapshot.get("origin") or "local_snapshot",
             "esef_snapshot_fingerprint": snapshot_fingerprint,
             **({"source": snapshot["source"]} if snapshot.get("source") else {}),
+            # Por ejercicio: URL del documento oficial, fecha de deposito y
+            # sha256 (indice xbrl.org o NSM de la FCA): hechos citables.
+            **({"filing_sources": snapshot["filing_sources"]} if snapshot.get("filing_sources") else {}),
             **({"identity": live_identity} if live_identity else {}),
             "last_refreshed_at": datetime.now(UTC).isoformat(),
         }

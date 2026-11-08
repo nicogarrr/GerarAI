@@ -38,6 +38,7 @@
 #   services/connectors/ecb.py: connector to a fixed public data API
 #   services/connectors/ecb_history.py: connector to a fixed public data API
 #   services/connectors/esef.py: connector to a fixed public data API
+#   services/connectors/fca_nsm.py: FCA National Storage Mechanism, fixed hosts (api.data.fca.org.uk, data.fca.org.uk)
 #   services/connectors/finnhub.py: connector to a fixed public data API
 #   services/connectors/fmp.py: connector to a fixed public data API
 #   services/connectors/form13dg.py: connector to a fixed public data API
@@ -119,6 +120,7 @@ rules:
     - /data-engine/app/services/connectors/ecb_history.py
     - /data-engine/app/services/connectors/edgar_common.py
     - /data-engine/app/services/connectors/esef.py
+    - /data-engine/app/services/connectors/fca_nsm.py
     - /data-engine/app/services/connectors/finnhub.py
     - /data-engine/app/services/connectors/fmp.py
     - /data-engine/app/services/connectors/form13dg.py
