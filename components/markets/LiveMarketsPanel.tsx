@@ -142,8 +142,18 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
     }, []);
 
     useEffect(() => {
-        const timer = setInterval(refresh, POLL_MS);
-        return () => clearInterval(timer);
+        // Pestaña oculta: no gastar red ni batería sondeando cotizaciones que
+        // nadie ve; al volver a la pestaña se refresca al instante. Mismo
+        // patrón que CompanyHeaderQuote.
+        const tick = () => {
+            if (document.visibilityState === 'visible') void refresh();
+        };
+        const timer = setInterval(tick, POLL_MS);
+        document.addEventListener('visibilitychange', tick);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener('visibilitychange', tick);
+        };
     }, [refresh]);
 
     return (
