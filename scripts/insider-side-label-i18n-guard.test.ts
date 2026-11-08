@@ -60,11 +60,12 @@ describe('Insider: etiqueta de lado internacionalizada', () => {
     assert.equal(resEn.fichaTxSell, undefined);
   });
   it('insiderCodeLabel con t traduce por clave; sin t mantiene el legacy es', async () => {
+    // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
     const { insiderCodeLabel: label } = await import('../lib/insider/format.ts');
-    const en = (p, vars) =>
+    const en = (p: string, vars?: Record<string, string | number>) =>
       p === 'insider.feed.codeLabels.A' ? 'Grant or award'
         : p === 'insider.feed.codeLabels.M' ? 'Option exercise'
-          : p === 'insider.feed.codeUnknown' ? `Code ${vars.code}`
+          : p === 'insider.feed.codeUnknown' ? `Code ${vars?.code}`
             : p;
     assert.equal(label('A', en), 'Grant or award');
     assert.equal(label('m', en), 'Option exercise');
