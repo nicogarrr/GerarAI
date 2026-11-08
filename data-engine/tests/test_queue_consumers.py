@@ -67,8 +67,15 @@ def _colas_consumidas() -> dict[str, str]:
                 for parte in comando
             ]
             args = make_argument_parser().parse_args(resuelto[1:])
-            # Sin -Q el worker consume solo "default" (default del parser).
-            for cola in args.queues or ["default"]:
+            # Sin -Q, Worker consume TODAS las colas declaradas
+            # (``consumer_whitelist = queues and set(queues)`` -> None).
+            if args.queues is None:
+                from app.workers.dramatiq_app import broker
+
+                colas = broker.get_declared_queues()
+            else:
+                colas = args.queues
+            for cola in colas:
                 consumidas.setdefault(cola, nombre)
     return consumidas
 
