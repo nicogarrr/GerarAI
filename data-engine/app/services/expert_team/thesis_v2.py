@@ -1031,6 +1031,8 @@ class ThesisResult:
     fingerprint: str | None = None
     probability_choice: str | None = None
     probability_reason: str | None = None
+    figure_markers: dict[str, str] = field(default_factory=dict)  # fuente.N: cifra literal de un documento
+    guard: dict[str, Any] = field(default_factory=dict)  # FigureGuard.as_dict() de las secciones finales
 
 
 def thesis_fingerprint(ctx: ThesisContext) -> str:
@@ -1047,9 +1049,13 @@ def active_sections(ctx: ThesisContext) -> list[tuple[str, str, str, tuple[str, 
 
 # Nombres de normas, formularios y anexos SEC: no son cifras («IFRS 16», «NIC 36», «ASC 842», «Form 20-F», «Pilar 2», «EX-99.1»).
 _NAMES = re.compile(r"\b(?:IFRS|NIIF|IAS|NIC|ASC|ASU|US\s?GAAP\s?ASC|Pilar|Pillar|Basilea|Basel|Solvencia|Solvency|"
-                    r"Form|formulario|Regla|Rule|Item|Nivel|Level|Tier)\s?\d+(?:[-–]\d+)?[A-Z]?\b"
+                    r"Form|formulario|Regla|Rule|Item|Nivel|Level|Tier)\s?\d+(?:b\d?-\d+)?(?:[-–]\d+)?[A-Z]?\b"
                     r"|\b\d{1,2}\s+de\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b"
-                    r"|\bEX-\d{1,3}(?:\.\d{1,2})?[A-Z]?\b|\b\d{1,2}-[KFQ]\b|\b(?:20|40|10|6|8)-[A-Z]\b|\bS&P\s?500\b|\bQ[1-4]\b|\bH[12]\b|\b[1-4]T\b", re.I)
+                    r"|\b\d{1,2}-[KFQ]\b|\b(?:20|40|10|6|8)-[A-Z]\b|\bS&P\s?500\b|\bQ[1-4]\b|\bH[12]\b|\b[1-4]T\b"
+                    # Reglas, anexos y apartados de la SEC: «plan 10b5-1», «Rule 10b-5», «EX-99.1», «Exhibit 10.2»,
+                    # «Section 16», «Schedule 13D», «DEF 14A», «S-3», «Form 144»: son nombres, no cifras.
+                    r"|\b10b5-1\b|\b10b-5\b|\bEX-\d+(?:\.\d+)?\b|\b13[DFG](?:/A)?\b|\bDEF\s?14A\b|\b[SF]-[1-4]\b"
+                    r"|\b(?:Exhibit|Anexo|Section|Secci[oó]n|Schedule|Art[ií]culo|Article|Part|Parte)\s?\d+[A-Z]?(?:\.\d+)?\b", re.I)
 
 
 def _masked(text: str) -> tuple[str, list[str]]:
@@ -1074,6 +1080,122 @@ def loose_numbers(text: str) -> list[str]:
 def strip_loose(text: str) -> str:
     work, kept = _masked(text)
     return _unmasked(strip_free_numbers(work), kept)
+
+
+# ------------------------------------------------------------------ que no se pierda ningún dato
+
+_FIG = re.compile(r"[-−+]?[$€£]?\d[\d.,]*(?:\s*(?:%|pp\b|M\$|M€|M£|M\b|\$|€|£|x\b|veces\b))?")
+_PROTECT = re.compile(r"\{\{\s*[a-z0-9_.]+\s*\}\}|\x01.\x01")
+
+
+def _fig_key(text: str) -> str:
+    """Forma comparable de una cifra tal como se escribe: «−12,7 %» y «-12,7%» son la misma."""
+    t = (text or "").strip().replace("−", "-").replace("\u00a0", " ").replace(" ", "")
+    return t.rstrip(".,;:")
+
+
+def _fig_number(text: str) -> str:
+    return re.sub(r"[^\d.,\-]", "", _fig_key(text)).strip(".,")
+
+
+def _float_es(num: str) -> float | None:
+    try:
+        return float(num.replace(".", "").replace(",", "."))
+    except ValueError:
+        return None
+
+
+def _float_en(num: str) -> float | None:
+    try:
+        return float(num.replace(",", ""))
+    except ValueError:
+        return None
+
+
+def _evidence_figure(fig: str, passages: Sequence[Mapping[str, Any]]) -> Mapping[str, Any] | None:
+    """El pasaje que trae esa cifra tal cual (o el mismo valor en notación inglesa), si alguno la trae.
+
+    Una cifra corta y sin unidad («5», «12») no basta: aparece en cualquier texto. Hace falta unidad
+    (%, $, M, x) o al menos tres dígitos.
+    """
+    num = _fig_number(fig)
+    digits = sum(ch.isdigit() for ch in num)
+    unit = re.search(r"(%|pp|\$|€|£|M|x)$", _fig_key(fig))
+    if not num or (digits < 3 and not unit):
+        return None
+    value = _float_es(num.lstrip("-"))
+    for p in passages:
+        text = str(p.get("text") or "")
+        for m in re.finditer(r"(?<![\d.,])\d[\d.,]*\d|(?<![\d.,])\d", text):
+            tok = m.group(0)
+            if tok == num.lstrip("-"):
+                return p
+            if value is not None and digits >= 2 and value in (_float_en(tok), _float_es(tok)):
+                return p
+    return None
+
+
+@dataclass
+class FigureGuard:
+    """Qué hizo la guardia con las cifras libres de una sección: enlazadas o quitadas (nunca en silencio)."""
+
+    to_markers: list[dict[str, str]] = field(default_factory=list)  # cifra = valor de un marcador del código
+    to_sources: list[dict[str, Any]] = field(default_factory=list)  # cifra literal de un documento citado
+    removed: list[str] = field(default_factory=list)  # sin fuente: quitadas
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"a_marcador": len(self.to_markers), "a_documento": len(self.to_sources),
+                "quitadas": len(self.removed), "detalle_documento": self.to_sources[:20],
+                "detalle_quitadas": self.removed[:40]}
+
+
+def recover_figures(text: str, markers: Mapping[str, str], passages: Sequence[Mapping[str, Any]],
+                    extra: dict[str, str], guard: FigureGuard) -> str:
+    """Convierte en marcador cada cifra libre que ya tiene fuente, en vez de borrarla.
+
+    - Si la cifra es exactamente el valor de un marcador del código, se escribe ese marcador.
+    - Si aparece literal en un pasaje citado, se crea un marcador ``fuente.N`` con la cifra tal cual y su
+      documento (``extra`` y ``guard.to_sources``).
+    Lo demás no se toca aquí: lo verá la guardia como cifra sin marcador.
+    """
+    by_value: dict[str, str] = {}
+    for key, value in markers.items():
+        if value and any(ch.isdigit() for ch in str(value)) and _FIG.fullmatch(str(value).strip()):
+            by_value.setdefault(_fig_key(str(value)), key)
+    sourced = {v: k for k, v in extra.items()}
+    work, kept = _masked(text)
+
+    def swap(m: re.Match[str]) -> str:
+        raw = m.group(0)
+        if not any(ch.isdigit() for ch in raw):
+            return raw
+        trail = raw[len(raw.rstrip()):]
+        fig = raw.strip()
+        key = by_value.get(_fig_key(fig))
+        if key is not None:
+            guard.to_markers.append({"cifra": fig, "marcador": key})
+            return "{{" + key + "}}" + trail
+        if free_numbers(fig) == []:  # año, fecha o formulario: no es cifra
+            return raw
+        p = _evidence_figure(fig, passages)
+        if p is None:
+            return raw
+        nkey = sourced.get(fig)
+        if nkey is None:
+            nkey = f"fuente.{len(extra) + 1}"
+            extra[nkey] = fig
+            sourced[fig] = nkey
+            guard.to_sources.append({"cifra": fig, "marcador": nkey, "documento": p.get("document"),
+                                     "url": p.get("url"), "fecha": p.get("date")})
+        return "{{" + nkey + "}}" + trail
+
+    pieces, last = [], 0
+    for prot in _PROTECT.finditer(work):
+        pieces.append(_FIG.sub(swap, work[last:prot.start()]))
+        pieces.append(prot.group(0))
+        last = prot.end()
+    pieces.append(_FIG.sub(swap, work[last:]))
+    return _unmasked("".join(pieces), kept)
 
 
 def _parse(text: str, keys: Sequence[str]) -> tuple[dict[str, str] | None, dict[str, Any]]:
@@ -1109,15 +1231,21 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
         # Una tesis que se cortó a medias (fallo del modelo en la 2.ª llamada) NO se sirve como hecha:
         # se reanuda con lo ya aceptado y solo se piden las secciones que faltan.
         resume = {k: v for k, v in dict(cached["sections"]).items() if v}
-    elif cached and cached.get("fingerprint") == fp and cached.get("sections"):
+    elif cached and cached.get("fingerprint") == fp and cached.get("sections") and not (
+            cached.get("status") == "stripped" and "guard" not in cached):
+        # Una tesis «stripped» de la guardia anterior (borraba cifras con fuente sin decirlo) se rehace.
         return ThesisResult(status="cached", sections=dict(cached["sections"]), fingerprint=fp,
                             probability_choice=cached.get("probability_choice"),
-                            probability_reason=cached.get("probability_reason"))
+                            probability_reason=cached.get("probability_reason"),
+                            figure_markers=dict(cached.get("figure_markers") or {}),
+                            guard=dict(cached.get("guard") or {}))
     markers = thesis_markers(ctx)
     out = ThesisResult(status="ok", fingerprint=fp)
+    guards: dict[str, FigureGuard] = {}
     if resume and cached:
         out.probability_choice = cached.get("probability_choice")
         out.probability_reason = cached.get("probability_reason")
+        out.figure_markers.update(dict(cached.get("figure_markers") or {}))
     tabs = tables(ctx)
     if ctx.valuation.get("status") == "not_meaningful":
         system_note = ("La valoración por TIR NO se puede proyectar con los datos contables ({{valoracion.motivo}}): "
@@ -1175,10 +1303,14 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
                 if not body:
                     continue  # una sección vacía no sustituye a lo ya escrito
                 issues = []
+                # Antes de juzgar: cada cifra que ya tiene fuente (marcador del código o pasaje citado) se
+                # convierte en marcador; solo cuenta como «sin marcador» lo que no tiene fuente.
+                guards[k] = FigureGuard()
+                body = recover_figures(body, markers, ctx.passages, out.figure_markers, guards[k])
                 loose = loose_numbers(body)
                 if loose:
                     issues.append(f"{k}: números sin marcador: {', '.join(loose[:6])}")
-                bad = unknown_markers(body, markers)
+                bad = unknown_markers(body, {**markers, **out.figure_markers})
                 if bad:
                     issues.append(f"{k}: marcadores que no existen: {', '.join(bad[:6])}")
                 if issues:
@@ -1200,13 +1332,57 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
         out.sections.update(accepted)
         if pending:
             stripped = True
-            out.sections.update({k: MARKER.sub(lambda mm: mm.group(0) if mm.group(1) in markers else "",
-                                               strip_loose(v)) for k, v in pending.items() if k not in accepted})
+            known = {**markers, **out.figure_markers}
+            for k, v in pending.items():
+                if k in accepted:
+                    continue
+                gone = loose_numbers(v)
+                guards.setdefault(k, FigureGuard()).removed.extend(f"{k}: {n}" for n in gone)
+                out.sections[k] = MARKER.sub(lambda mm: mm.group(0) if mm.group(1) in known else "", strip_loose(v))
+    _finish_guard(out, guards, ctx.ticker)
     if not out.sections:
         out.status = "rejected"
     elif stripped:
         out.status = "stripped"
     return out
+
+
+def _finish_guard(out: ThesisResult, guards: Mapping[str, FigureGuard], ticker: str) -> None:
+    """Resumen de la guardia de las secciones finales; los marcadores fuente.N que no se usan, fuera."""
+    used = {m.group(1) for v in out.sections.values() for m in MARKER.finditer(v or "")}
+    out.figure_markers = {k: v for k, v in out.figure_markers.items() if k in used}
+    total = FigureGuard()
+    for k in out.sections:
+        g = guards.get(k)
+        if g is None:
+            continue
+        total.to_markers.extend(g.to_markers)
+        total.to_sources.extend(s for s in g.to_sources if s["marcador"] in out.figure_markers)
+        total.removed.extend(g.removed)
+    seen: set[str] = set()
+    total.to_sources = [s for s in total.to_sources if not (s["marcador"] in seen or seen.add(s["marcador"]))]
+    out.guard = total.as_dict()
+    if total.removed:
+        logger.info("tesis v2 %s: %d cifras sin fuente quitadas: %s", ticker, len(total.removed),
+                    "; ".join(total.removed[:20]))
+
+
+def guard_warning(guard: Mapping[str, Any] | None) -> str | None:
+    """Línea visible de la guardia de cifras: cuántas se enlazaron a su fuente y cuáles se quitaron."""
+    if not guard:
+        return None
+    linked = int(guard.get("a_marcador") or 0) + int(guard.get("a_documento") or 0)
+    removed = list(guard.get("detalle_quitadas") or [])
+    n_removed = int(guard.get("quitadas") or 0)
+    if not linked and not n_removed:
+        return None
+    text = f"Guardia de cifras: {linked} cifras del texto enlazadas a su dato o documento"
+    if n_removed:
+        sample = ", ".join(r.split(": ", 1)[-1] for r in removed[:6])
+        text += f"; {n_removed} quitadas por no tener fuente ({sample})"
+    else:
+        text += "; ninguna quitada"
+    return text + "."
 
 
 _DOUBLE_TIMES = re.compile(r"(\d)x\s+veces\b")
@@ -1269,7 +1445,9 @@ def generate_thesis_v2(db: Session, company: Company, *, reasoner: Reasoner | No
         "status": res.status, "version": THESIS_V2_VERSION, "fingerprint": res.fingerprint,
         "sections": res.sections, "problems": res.problems[:20], "llm_calls": res.llm_calls,
         "probability_choice": res.probability_choice, "probability_reason": res.probability_reason,
+        "figure_markers": res.figure_markers, "guard": res.guard,
     }
+    markers = {**res.figure_markers, **markers}
     if res.sections and not (res.status == "cached" and row is not None):
         if row is not None:
             row.superseded_at = datetime.now(UTC)
@@ -1285,7 +1463,12 @@ def generate_thesis_v2(db: Session, company: Company, *, reasoner: Reasoner | No
 
 
 def present(ctx: ThesisContext, doc: Mapping[str, Any], markers: Mapping[str, str]) -> dict[str, Any]:
+    markers = {**dict(doc.get("figure_markers") or {}), **markers}
     rendered = render(doc.get("sections") or {}, markers)
+    warnings = list(ctx.valuation.get("warnings") or [])
+    line = guard_warning(doc.get("guard"))
+    if line:
+        warnings.append(line)
     tabs = tables(ctx)
     return {
         "status": doc.get("status"), "ticker": ctx.ticker, "company": ctx.company, "version": THESIS_V2_VERSION,
@@ -1297,7 +1480,7 @@ def present(ctx: ThesisContext, doc: Mapping[str, Any], markers: Mapping[str, st
                      "tir10": markers.get("pond.tir10"), "base_tir10": markers.get("esc.base.tir10"),
                      "multiple": markers.get("punto.multiplo"), "peers_median": markers.get("comparables.mediana"),
                      "cost_of_equity": markers.get("tasa.coste_capital")},
-        "warnings": ctx.valuation.get("warnings") or [],
+        "warnings": warnings,
         "sources": sorted({p["document"] for p in ctx.passages if p.get("document")}),
         "llm_calls": doc.get("llm_calls"),
     }
