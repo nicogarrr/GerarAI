@@ -579,6 +579,10 @@ _MY_THESES_EN_RE = re.compile(
 )
 
 
+_ASKS_OWN_CASH_RE = re.compile(r"(?i)\b(?:efectivo|liquidez|caja)\b")
+_OTHER_CASH_RE = re.compile(r"(?i)\bflujo\s+de\s+caja|\bcaja\s+(?:libre|neta)\b")
+
+
 def answer_data_question(db: Session, question: str) -> ChatResponse | None:
     """None means this tool does not own the question; never guess user intent."""
     tenant = db.info.get("tenant_id")
@@ -603,7 +607,16 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
     valuation = bool(re.search(r"(?i)\b(?:precio|PER|cotiza\w*)\b|\ba\s+cu[aá]nto\s+est[aá]n?\b", question)) and not re.search(r"(?i)\b(?:medio|coste|peso|posici[oó]n|tengo|compr[eé]|pagu[eé])\b|\bprecio\s+de\s+compra\b", question)
     plan = bool(re.search(r"(?i)\b(?:mi|el|tu)\s+plan\b|\bplan\s+de\s+(?:inversi[oó]n|aportaci\w+)", question))
     if plan and not re.search(r"(?i)\b(?:compra|comprar|vende|vender|ejecuta|buy|sell)\b", question):
-        return _plan_answer(db)
+        answer = _plan_answer(db)
+        # «¿Cuánto efectivo tengo y cuánto debería aportar según mi plan?»: las
+        # dos partes. Antes solo salía el plan y el efectivo se perdía.
+        if _ASKS_OWN_CASH_RE.search(question) and not _OTHER_CASH_RE.search(question):
+            from app.services.brain_account_tools import _cash_answer
+
+            cash = _cash_answer(db, tenant)
+            answer.answer = f"{cash.answer}\n{answer.answer}"
+            answer.sources = [*cash.sources, *answer.sources]
+        return answer
     thesis_valuation = bool(re.search(r"(?i)\btesis\b", question)) and bool(
         re.search(r"(?i)\b(?:margen\s+de\s+seguridad|valor\s+esperado|escenarios?|valor\s+objetivo|precio\s+objetivo)\b", question))
     if thesis_valuation and not re.search(r"(?i)\b(?:compra|comprar|vende|vender|ejecuta|buy|sell)\b", question):
