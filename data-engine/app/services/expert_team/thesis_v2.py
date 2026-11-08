@@ -1291,9 +1291,11 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
         "insiders": ctx.insiders and {"ventanas": ctx.insiders.get("windows"), "nota": "cita con los marcadores insiders.*"},
         "equipo_de_expertos": expert_payload(ctx.experts),
     }
-    from app.services.expert_team.quote_check import evidence_texts, non_literal, unquote_non_literal
+    from app.services.expert_team.quote_check import evidence_sources, literal_problems, unquote_non_literal
 
-    evidence = evidence_texts(ctx.passages, ctx.guidance, ctx.analysts, ctx.price_targets, ctx.insiders, ctx.experts)
+    # Por documento, no aplanada: cada cita se busca en el documento al que la prosa la atribuye.
+    evidence = evidence_sources(ctx.passages, guidance=ctx.guidance, analysts=ctx.analysts,
+                                price_targets=ctx.price_targets, insiders=ctx.insiders, experts=ctx.experts)
 
     def rendered(text: str) -> str:
         return render({"x": text}, {**markers, **out.figure_markers})["x"]
@@ -1344,11 +1346,12 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
                 loose = loose_numbers(body)
                 if loose:
                     issues.append(f"{k}: números sin marcador: {', '.join(loose[:6])}")
-                not_literal = non_literal(body, evidence, rendered)
+                not_literal = literal_problems(body, evidence, rendered)
                 if not_literal:
                     issues.append(f"{k}: citas que no están literales en los pasajes (cópialas tal cual, en su idioma "
-                                  f"original, con la traducción al lado; o escríbelas sin comillas): "
-                                  + "; ".join(f"«{q[:90]}»" for q in not_literal[:3]))
+                                  f"original, de UN documento y en su orden, nombrándolo, con la traducción al lado; "
+                                  f"o escríbelas sin comillas): "
+                                  + "; ".join(f"«{q[:90]}» ({why})" for q, why in not_literal[:3]))
                 bad = unknown_markers(body, {**markers, **out.figure_markers})
                 if bad:
                     issues.append(f"{k}: marcadores que no existen: {', '.join(bad[:6])}")
