@@ -20,7 +20,13 @@
     "fairValue": {
       "byThesis": "{count} with a published thesis",
       "byEngine": "{count} from the valuation engine",
-      "summary": "By fair value ({source}): {under} undervalued · {over} overvalued"
+      "summary": "By fair value ({source}), against {peers} valued companies: {cheap} in the cheapest 20% · {dear} in the most expensive 20%",
+      "rankQ1": "In the cheapest 20%",
+      "rankQ2": "In the cheapest 20–40%",
+      "rankQ3": "Middle rank by value",
+      "rankQ4": "In the most expensive 20–40%",
+      "rankQ5": "In the most expensive 20%",
+      "rankTitle": "Fair value / price against {peers} companies valued by the engine: cheaper than {pct}% of them. It is a rank, not a price target. In the backtest (S&P 500, 2015–2026) the cheapest 20% beat the most expensive 20% over 24 months (+4 and +12 points); a plain “undervalued” predicted nothing over 12 months."
     },
     "earningsUnavailable": "Earnings calendar unavailable right now.",
     "earningsPartial": "Earnings calendar incomplete: some dates may be missing.",

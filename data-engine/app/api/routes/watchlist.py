@@ -44,6 +44,7 @@ from app.services.earnings_dates_service import is_fresh
 from app.services.fair_value_service import resolve_fair_values
 from app.services.fundamentals_seed_service import enqueue_fundamentals_seed
 from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
+from app.valuation.relative_rank import engine_peer_ratios, relative_ranks, value_ratio
 
 router = APIRouter()
 
@@ -294,6 +295,9 @@ async def watchlist_monitor(
     from app.valuation.currency import normalize_currency
 
     items: dict[str, dict] = {}
+    # Valor justo / precio de cada ticker pedido: su puesto frente al resto
+    # (app/valuation/relative_rank.py) sustituye al «infravalorada/sobrevalorada».
+    target_ratios: dict[str, float | None] = {}
     for company in companies:
         ticker = str(company.ticker).upper()
         low_row = lows.get(company.id)
@@ -315,6 +319,7 @@ async def watchlist_monitor(
                 # valor justo va en libras (precio del modelo en divisa principal).
                 comparable = comparable / Decimal(normalize_currency(company.currency)[1])
                 side = "infravalorada" if float(comparable) < fair_value else "sobrevalorada"
+                target_ratios[ticker] = value_ratio(fair_value, float(comparable))
         items[ticker] = {
             "low_52w": float(low_row.close) if low_row is not None else None,
             "low_52w_date": low_row.date.isoformat() if low_row is not None else None,
@@ -331,11 +336,22 @@ async def watchlist_monitor(
             # None cuando hay valor justo.
             "fair_value_reason": reading.get("reason"),
             "valuation_side": side,
+            "valuation_rank": None,
             "currency": company.currency,
             "next_earnings_date": None,
             "next_earnings_source": None,
             "next_earnings_confirmed": None,
         }
+
+    if any(ratio is not None for ratio in target_ratios.values()):
+        try:
+            peers = engine_peer_ratios(db)
+        except SQLAlchemyError:
+            # Sin comparables legibles no hay puesto; el resto del monitor sigue.
+            db.rollback()
+            peers = {}
+        for ticker, rank in relative_ranks(target_ratios, peers).items():
+            items[ticker]["valuation_rank"] = rank
 
     # Proximos resultados: SOLO la tabla refrescada por el job (Yahoo/NASDAQ/
     # manual). Sin llamada en vivo: ver el docstring. earnings_status pasa a

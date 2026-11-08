@@ -20,7 +20,13 @@
     "fairValue": {
       "byThesis": "{count} con tesis publicada",
       "byEngine": "{count} con el motor de valoración",
-      "summary": "Según el valor justo ({source}): {under} infravaloradas · {over} sobrevaloradas"
+      "summary": "Según el valor justo ({source}), frente a {peers} empresas valoradas: {cheap} entre el 20 % más barato · {dear} entre el 20 % más caro",
+      "rankQ1": "Entre el 20 % más barato",
+      "rankQ2": "Entre el 20–40 % más barato",
+      "rankQ3": "Puesto medio por valor",
+      "rankQ4": "Entre el 20–40 % más caro",
+      "rankQ5": "Entre el 20 % más caro",
+      "rankTitle": "Valor justo / precio frente a {peers} empresas valoradas por el motor: más barata que el {pct} %. Es un puesto, no un precio objetivo. En el backtest (S&P 500, 2015–2026) el 20 % más barato batió al 20 % más caro a 24 meses (+4 y +12 puntos); «infravalorada» a secas no anticipaba nada a 12 meses."
     },
     "earningsUnavailable": "Calendario de resultados no disponible ahora mismo.",
     "earningsPartial": "Calendario de resultados incompleto: puede faltar alguna fecha.",

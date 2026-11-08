@@ -1,6 +1,6 @@
 """GET /api/watchlist/monitor con response_model.
 
-Forma medida contra la ruta y fair_value_service.choose/_reading: item de 18
+Forma medida contra la ruta y fair_value_service.choose/_reading: item de 18 (19 con valuation_rank)
 claves siempre; los huecos sin dato van a null, nunca se omiten. Sin tesis ni
 motor: fair_value_source None y label "Sin valor justo". earnings_status str.
 Servicio real sobre SQLite, sin mock.
@@ -23,6 +23,7 @@ ITEM_KEYS = {
     "low_52w", "low_52w_date", "low_52w_sessions", "last_close", "last_close_date",
     "fair_value", "fair_value_thesis_version", "fair_value_source", "fair_value_label",
     "fair_value_as_of", "fair_value_publishable", "fair_value_reason", "valuation_side",
+    "valuation_rank",
     "currency", "next_earnings_date", "next_earnings_source", "next_earnings_confirmed",
 }
 
@@ -68,7 +69,7 @@ def test_monitor_company_without_data_18_keys(monkeypatch) -> None:
 
     assert res.status_code == 200, res.text
     item = res.json()["items"]["WMNODAT"]
-    # 18 claves siempre, nunca omitidas.
+    # 18 claves (+ valuation_rank) siempre, nunca omitidas.
     assert set(item) == ITEM_KEYS
     # Sin precios, sin tesis ni motor: huecos a null y «Sin valor justo».
     assert item["low_52w"] is None
