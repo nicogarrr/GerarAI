@@ -73,6 +73,18 @@ def manager_holdings(cik: str, db: Session = Depends(get_db)) -> dict:
     return ManagerHoldingIngestionService().latest_holdings(db, cik=cik)
 
 
+@router.get("/institutions/{ticker}")
+def institutional_holders_route(ticker: str, db: Session = Depends(get_db)) -> dict:
+    """Todos los gestores 13F de una acción (SEC Form 13F Data Sets): mayores
+    tenedores, quién compra y quién vende frente al trimestre anterior."""
+    from app.services.institutional_holders import institutional_holders
+
+    result = institutional_holders(db, ticker)
+    if result is None:
+        raise HTTPException(status_code=404, detail="company not found")
+    return result
+
+
 @router.get("/schedule-13dg", response_model=Schedule13DGResponseOut)
 def schedule_13dg(
     ticker: str = Query(min_length=1, max_length=20),

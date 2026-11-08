@@ -66,6 +66,7 @@
 #   services/finnhub_profile_backfill.py: Finnhub fixed host
 #   services/historical_stress_service.py: fixed market-data host
 #   services/insider_service.py: SEC fixed host
+#   services/institutional_holders.py: SEC fixed host (Form 13F Data Sets); dataset links regex-pinned to /files/ on www.sec.gov
 #   services/investor_videos.py: YouTube feed fixed host, redirects off
 #   services/macro_calendar_service.py: fixed public data API
 #   services/manager_holding_ingestion_service.py: SEC fixed host
@@ -153,6 +154,7 @@ rules:
     - /data-engine/app/services/finnhub_profile_backfill.py
     - /data-engine/app/services/historical_stress_service.py
     - /data-engine/app/services/insider_service.py
+    - /data-engine/app/services/institutional_holders.py
     - /data-engine/app/services/investor_videos.py
     - /data-engine/app/services/macro_calendar_service.py
     - /data-engine/app/services/manager_holding_ingestion_service.py

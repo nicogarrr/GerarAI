@@ -9,6 +9,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 
 from app.core.config import get_settings
 from app.services.etf_holdings import refresh_etf_holdings
+from app.services.institutional_holders import refresh_institutional_holders
 from app.services.retention_service import run_retention
 from app.services.thesis_job_service import reconcile_thesis_dispatches
 from app.workers.dramatiq_app import (
@@ -261,6 +262,10 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     _register(scheduler, partial(coalesced_send, refresh_macro_context), "cron", job_id="macro_context_refresh", hour=23, minute=10)
     # Holdings oficiales de ETFs tematicos (UFO, NASA): 1 descarga por ETF y semana.
     _register(scheduler, refresh_etf_holdings, "cron", job_id="etf_holdings_refresh", day_of_week="mon", hour=7, minute=20)
+    # Institucionales de todo el 13F (Form 13F Data Sets de la SEC, trimestral):
+    # mira la página una vez por semana y solo descarga si hay ZIP nuevo.
+    _register(scheduler, refresh_institutional_holders, "cron", job_id="institutional_holders_refresh",
+              day_of_week="wed", hour=6, minute=40)
     # instrument_references (nombres 13F por CUSIP, gems smart-money, resolver
     # de renombres por FIGI): semanal; sin el refresco la tabla queda congelada
     # al seed manual y los consumidores degradan en silencio.
