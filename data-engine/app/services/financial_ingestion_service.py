@@ -235,13 +235,21 @@ TOTAL_DEBT_LOOSE_GROUPS: tuple[tuple[tuple[str, tuple[str, ...]], ...], ...] = (
     TOTAL_DEBT_LEASE_CHOICES,
 )
 TOTAL_DEBT_LAST_RESORT = "DebtInstrumentCarryingAmount"
+# Deuda corriente TOTAL (vencimientos corrientes de la deuda a plazo + préstamos
+# a corto + pagarés). Hay emisores que, junto a LongTermDebtNoncurrent, solo
+# etiquetan este total corriente y no LongTermDebtCurrent (UNH 10-Q 3T 2026:
+# 68.714 M no corrientes + 5.617 M corrientes; sin él total_debt salía 68.714).
+# Solo entra con un tag de plazo NO corriente cuyo «Current» no consta, y en
+# lugar de los préstamos a corto (ya los incluye), nunca además.
+TOTAL_DEBT_CURRENT_TOTAL = "DebtCurrent"
+TOTAL_DEBT_NONCURRENT_TERM_TAGS = frozenset({"LongTermDebtNoncurrent", "LongTermDebtAndCapitalLeaseObligations"})
 TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
     [TOTAL_DEBT_AGGREGATE]
     + [t for t, _, _ in TOTAL_DEBT_TERM_CHOICES]
     + [t for _, extra, _ in TOTAL_DEBT_TERM_CHOICES for t in extra]
     + [t for g in (TOTAL_DEBT_SHORT_CHOICES, TOTAL_DEBT_LEASE_CHOICES, *TOTAL_DEBT_LOOSE_GROUPS)
        for t, extra in g for t in (t, *extra)]
-    + [TOTAL_DEBT_LAST_RESORT]
+    + [TOTAL_DEBT_LAST_RESORT, TOTAL_DEBT_CURRENT_TOTAL]
 ))
 
 # Version de las REGLAS de ingesta SEC; forma parte de la huella del payload
@@ -259,7 +267,9 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 #    EarningsPerShareBasicAndDiluted), que etiquetan las empresas con pérdidas.
 # 9 (8-nov-2026): ingresos de arrendadores (OperatingLeaseLeaseIncome): en la misma presentación gana el mayor
 #    entre ese concepto y el de contratos con clientes (CPT 12,97 M -> 1.573,5 M).
-SEC_INGESTION_RULES_VERSION = 9
+# 10 (8-nov-2026): total_debt con DebtCurrent cuando el emisor solo etiqueta la deuda a plazo no corriente
+#    y el total corriente (UNH 3T 2026: 68.714 -> 74.331 M).
+SEC_INGESTION_RULES_VERSION = 10
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Arrendadores (REIT): su ingreso principal es el del arrendamiento (ASC 842),
@@ -918,7 +928,16 @@ def _compose_total_debt(
                     leases_in = includes_leases
                     break
             if term:
-                parts = term + pick(TOTAL_DEBT_SHORT_CHOICES, end)
+                current_total = by_concept.get(TOTAL_DEBT_CURRENT_TOTAL, {}).get(end)
+                if (
+                    len(term) == 1
+                    and term[0][0] in TOTAL_DEBT_NONCURRENT_TERM_TAGS
+                    and current_total is not None
+                    and _decimal(current_total.get("val")) is not None
+                ):
+                    parts = term + [(TOTAL_DEBT_CURRENT_TOTAL, current_total)]
+                else:
+                    parts = term + pick(TOTAL_DEBT_SHORT_CHOICES, end)
                 if not leases_in:
                     parts += pick(TOTAL_DEBT_LEASE_CHOICES, end)
             else:
