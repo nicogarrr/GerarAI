@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLocale, useT, useFormat } from '@/lib/i18n/client';
-import { paperTradingMessage } from '@/lib/paper-trading/messages-en';
+import { paperTradingMessage, paperTradingReason } from '@/lib/paper-trading/messages-en';
 import { useRouter } from 'next/navigation';
 import type { Currency } from '@/lib/paper-trading/types';
 import { clientOrderIdAfter, parseEsNumber, type SubmitFx } from './submit';
@@ -103,11 +103,11 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                 } else if (result.outcome === 'duplicate') {
                     setDuplicate(
                         result.reason
-                            ? ti('paperTrading.fx.duplicateRejected', { reason: paperTradingMessage(result.reason, locale) })
+                            ? ti('paperTrading.fx.duplicateRejected', { reason: paperTradingReason(result.reason, locale) })
                             : ti('paperTrading.fx.duplicateFill'),
                     );
                 } else {
-                    setSubmitError(ti('paperTrading.fx.rejected', { reason: result.reason ? paperTradingMessage(result.reason, locale) : ti('paperTrading.ticket.reasonMissing') }));
+                    setSubmitError(ti('paperTrading.fx.rejected', { reason: result.reason ? paperTradingReason(result.reason, locale) : ti('paperTrading.ticket.reasonMissing') }));
                 }
                 clientOrderId.current = clientOrderIdAfter(result, clientOrderId.current, newClientOrderId);
             } else {

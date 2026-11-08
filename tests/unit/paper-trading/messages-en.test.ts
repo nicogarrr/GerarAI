@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { paperTradingMessage } from '@/lib/paper-trading/messages-en';
+import { paperTradingMessage, paperTradingReason } from '@/lib/paper-trading/messages-en';
 
 const literals = (file: string, pattern: RegExp) =>
   [...readFileSync(file, 'utf8').matchAll(pattern)].map((m) => m[1] ?? m[2]);
@@ -26,7 +26,20 @@ describe('demo account messages in English', () => {
       .toBe('Insufficient USD balance: the purchase costs 1.250,00 and there is 300,00. If it is in USD, convert EUR first (simulated manual conversion).');
     expect(paperTradingMessage('No puedes vender 5 acciones de AAPL: la posición en USD es 2.', 'en'))
       .toBe('You cannot sell 5 shares of AAPL: the USD position is 2.');
+    expect(paperTradingMessage('No puedes vender 1 acción de BBVA: la posición en EUR es 0.', 'en'))
+      .toBe('You cannot sell 1 share of BBVA: the EUR position is 0.');
+    // Motivos antiguos guardados en el historial («1 acciones»): también se traducen.
+    expect(paperTradingMessage('No puedes vender 1 acciones de BBVA: la posición en EUR es 0.', 'en'))
+      .toBe('You cannot sell 1 share of BBVA: the EUR position is 0.');
     expect(paperTradingMessage('Mensaje desconocido', 'en')).toBe('Mensaje desconocido');
+  });
+
+  it('paperTradingReason leaves one final period for templates that add their own', () => {
+    expect(paperTradingReason('No puedes vender 1 acción de BBVA: la posición en EUR es 0.'))
+      .toBe('No puedes vender 1 acción de BBVA: la posición en EUR es 0');
+    expect(paperTradingReason('fondos insuficientes')).toBe('fondos insuficientes');
+    expect(paperTradingReason('No puedes vender 1 acción de BBVA: la posición en EUR es 0.', 'en'))
+      .toBe('You cannot sell 1 share of BBVA: the EUR position is 0');
   });
 
   it('the fixed notices shown with every demo account are in English', () => {
@@ -40,7 +53,10 @@ describe('demo account messages in English', () => {
   it('option, conversion and ledger messages with figures are in English', () => {
     const cases: Array<[string, string]> = [
       ['La prima admite como máximo 4 decimales.', 'The premium allows at most 4 decimals.'],
-      ['No se pueden cerrar 3 contratos: solo hay 1 abiertos.', 'You cannot close 3 contracts: only 1 are open.'],
+      // Motivo antiguo guardado en el historial: «1 abiertos» se traduce ya con la concordancia correcta.
+      ['No se pueden cerrar 3 contratos: solo hay 1 abiertos.', 'You cannot close 3 contracts: only 1 is open.'],
+      ['No se pueden cerrar 1 contrato: solo hay 0 abiertos.', 'You cannot close 1 contract: only 0 are open.'],
+      ['No se pueden cerrar 2 contratos: solo hay 1 abierto.', 'You cannot close 2 contracts: only 1 is open.'],
       ['La comisión (5,00) supera el efectivo disponible tras el cierre (2,00): la demo no admite sobregiro.',
         'The fee (5,00) exceeds the cash available after the close (2,00): the demo does not allow overdrafts.'],
       ['La comisión (5,00 USD) supera el efectivo disponible tras la venta (2,00): la demo no admite sobregiro.',

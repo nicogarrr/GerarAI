@@ -202,6 +202,20 @@ describe('OrderTicket (ticket manual de la cuenta demo)', () => {
         expect(submitFill.mock.calls[0][0].clientOrderId).not.toBe(submitFill.mock.calls[1][0].clientOrderId);
     });
 
+    it('un motivo de rechazo que ya acaba en punto no sale con dos puntos', async () => {
+        const submitFill = vi.fn<SubmitFill>().mockResolvedValue({
+            ok: true,
+            outcome: 'rejected',
+            reason: 'No puedes vender 1 acción de BBVA: la posición en EUR es 0.',
+            state: stateView(),
+        });
+        const { form } = setup(submitFill);
+        fillBasics();
+        await submitForm(form);
+        expect(screen.getByRole('alert')).toHaveTextContent('Orden rechazada: No puedes vender 1 acción de BBVA: la posición en EUR es 0.');
+        expect(screen.getByRole('alert')).not.toHaveTextContent('0..');
+    });
+
     it('un duplicado de fill no se duplica y conserva el identificador (reintento seguro)', async () => {
         const submitFill = vi.fn<SubmitFill>().mockResolvedValue({ ok: true, outcome: 'duplicate', reason: null, state: stateView() });
         const { form } = setup(submitFill);

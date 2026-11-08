@@ -81,8 +81,10 @@ const PATTERNS_EN: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
     (m) => `Insufficient ${m[1]} balance: the purchase costs ${m[2]} and there is ${m[3]}. If it is in USD, convert EUR first (simulated manual conversion).`,
   ],
   [
-    /^No puedes vender (.+?) acciones de (.+?): la posición en (\w+) es (.+?)\.$/,
-    (m) => `You cannot sell ${m[1]} shares of ${m[2]}: the ${m[3]} position is ${m[4]}.`,
+    // Singular y plural: el historial guarda el motivo ya grabado y puede
+    // llevar la forma antigua («1 acciones»); ambas se traducen.
+    /^No puedes vender (.+?) (?:acción|acciones) de (.+?): la posición en (\w+) es (.+?)\.$/,
+    (m) => `You cannot sell ${m[1]} ${m[1] === '1' ? 'share' : 'shares'} of ${m[2]}: the ${m[3]} position is ${m[4]}.`,
   ],
   [
     /^Saldo (\w+) insuficiente: la compra cuesta (.+?) y hay (.+?)\.$/,
@@ -102,8 +104,8 @@ const PATTERNS_EN: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
   ],
   [/^La prima admite como máximo (\d+) decimales\.$/, (m) => `The premium allows at most ${m[1]} decimals.`],
   [
-    /^No se pueden cerrar (.+?) contratos: solo hay (.+?) abiertos\.$/,
-    (m) => `You cannot close ${m[1]} contracts: only ${m[2]} are open.`,
+    /^No se pueden cerrar (.+?) (?:contrato|contratos): solo hay (.+?) (?:abierto|abiertos)\.$/,
+    (m) => `You cannot close ${m[1]} ${m[1] === '1' ? 'contract' : 'contracts'}: only ${m[2]} ${m[2] === '1' ? 'is' : 'are'} open.`,
   ],
   [
     /^La operación no cuadra en su fecha de ejecución \(el libro se recalcula por fecha, no por orden de alta\): ([\s\S]+)$/,
@@ -140,4 +142,14 @@ export function paperTradingMessage(text: string, locale: 'es' | 'en' = 'es'): s
     if (match) return render(match);
   }
   return text;
+}
+
+/**
+ * Motivo listo para una plantilla i18n que ya añade el punto final
+ * («Orden rechazada: {reason}.»): el motivo del servidor también acaba en
+ * punto y sin este recorte salía duplicado («…es 0..»). El historial sigue
+ * mostrando el motivo íntegro con su punto.
+ */
+export function paperTradingReason(text: string, locale: 'es' | 'en' = 'es'): string {
+  return paperTradingMessage(text, locale).replace(/\.$/, '');
 }

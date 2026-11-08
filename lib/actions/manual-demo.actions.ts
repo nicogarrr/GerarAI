@@ -1002,7 +1002,8 @@ export async function placeManualOrder(raw: unknown): Promise<ManualDemoOrderRes
             } else {
                 const held = position?.quantity ?? 0;
                 if (held < parsed.quantity) {
-                    return { kind: 'reject', reason: `No puedes vender ${parsed.quantity} acciones de ${parsed.instrument.symbol}: la posición en ${parsed.currency} es ${held}.` };
+                    const noun = parsed.quantity === 1 ? 'acción' : 'acciones';
+                    return { kind: 'reject', reason: `No puedes vender ${parsed.quantity} ${noun} de ${parsed.instrument.symbol}: la posición en ${parsed.currency} es ${held}.` };
                 }
                 // Sin sobregiro: la comisión también debe caber en el cash que
                 // queda tras abonar la venta (la compra ya lo chequea).
