@@ -170,6 +170,7 @@ export type ResearchValuation = {
   /** Fiabilidad histórica del DCF estándar: cuánto se alejó el precio del valor en el backtest. */
   track_record?: TrackRecordLike;
   sbc_adjustment?: TrackRecordLike;
+  implied_growth?: TrackRecordLike;
   reverse_dcf: {
     status?: string;
     out_of_bounds?: boolean;

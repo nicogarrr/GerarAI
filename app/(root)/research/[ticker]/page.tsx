@@ -152,7 +152,7 @@ import QuickAlertButton from '@/components/research/QuickAlertButton';
 import ThesisMemo from '@/components/research/ThesisMemo';
 import { valuationScenarioDisplay } from '@/lib/research/listed-share-values';
 import { baseAssumptionsText, blockerLabel, reverseDcfText, scenarioNotesList, scenarioWarningLines } from '@/lib/research/valuation-display';
-import { sbcAdjustmentText, trackRecordText, valuationMethodView } from '@/lib/research/valuation-method';
+import { impliedGrowthText, sbcAdjustmentText, trackRecordText, valuationMethodView } from '@/lib/research/valuation-method';
 import { scenarioNoteText } from '@/lib/research/scenario-notes-text';
 import ThesisExportMenu from '@/components/research/ThesisExportMenu';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
@@ -416,6 +416,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
   const scenarioNotes = scenarioNotesList(valuation.scenario_notes);
   const scenarioWarnings = scenarioWarningLines(valuation.trace, locale);
   const reverseText = reverseDcfText(valuation.reverse_dcf, locale);
+  const impliedGrowth = impliedGrowthText(valuation.implied_growth, locale);
   const methodView = valuationMethodView(valuation);
   const trackRecord = trackRecordText(valuation.track_record, locale);
   const sbcLine = sbcAdjustmentText(valuation.sbc_adjustment, locale);
@@ -468,6 +469,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
           </ul>
         ) : null}
         {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
+        {impliedGrowth ? <p className="text-xs leading-5 text-gray-400">{impliedGrowth}</p> : null}
       {trackRecord ? <p className="text-xs leading-5 text-gray-500">{trackRecord}</p> : null}
       {sbcLine ? <p className="text-xs leading-5 text-gray-500">{sbcLine}</p> : null}
         {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
@@ -512,6 +514,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
         </div>
       ) : null}
       {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
+      {impliedGrowth ? <p className="text-xs leading-5 text-gray-400">{impliedGrowth}</p> : null}
       {trackRecord ? <p className="text-xs leading-5 text-gray-500">{trackRecord}</p> : null}
       {sbcLine ? <p className="text-xs leading-5 text-gray-500">{sbcLine}</p> : null}
       {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}

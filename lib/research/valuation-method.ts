@@ -70,3 +70,8 @@ export function trackRecordText(record: TrackRecordLike | undefined, locale: str
 export function sbcAdjustmentText(note: TrackRecordLike | undefined, locale: string): string | null {
   return trackRecordText(note, locale);
 }
+
+/** Crecimiento que descuenta el precio frente al histórico (data-engine app/valuation/implied_growth_note.py). Informativo. */
+export function impliedGrowthText(note: TrackRecordLike | undefined, locale: string): string | null {
+  return trackRecordText(note, locale);
+}

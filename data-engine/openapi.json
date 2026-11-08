@@ -23933,6 +23933,18 @@
             ],
             "title": "Fair Value Range"
           },
+          "implied_growth": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implied Growth"
+          },
           "listed_share_values": {
             "anyOf": [
               {
