@@ -30,6 +30,17 @@ _EXCLUDED_PATH_PREFIXES = (
     "/api/csrf-token",
 )
 
+# Pares (metodo, ruta exacta) exentos: llevan su propia auth HMAC y su emisor
+# no puede obtener un token CSRF (no es un navegador con sesion). El metodo va
+# en la clave: eximir la ruta para cualquier metodo dejaba PUT/PATCH/DELETE
+# saltarse el CSRF hasta un 405 de routing.
+# - POST /api/telegram/link-proof: el bot de Asistenta firma con X-Asistenta-*
+#   (secreto TELEGRAM_LINK_SECRET, ventana de 60 s, token de un solo uso).
+#   Antes NO estaba exenta y el middleware respondia 403 a TODAS las pruebas
+#   de vinculacion del bot: la vinculacion de Telegram nunca funcionaba en la
+#   app real (los tests montaban el router suelto, sin este middleware).
+_EXCLUDED_METHOD_PATHS = frozenset({("POST", "/api/telegram/link-proof")})
+
 
 # Secreto de respaldo por proceso (solo dev/test): en produccion la config
 # exige RESEARCH_AUTH_SECRET, asi que este camino nunca se alcanza ahi. Antes
@@ -101,7 +112,9 @@ class CSRFMiddleware:
 
         request = Request(scope)
         path = request.url.path
-        if any(path.startswith(prefix) for prefix in _EXCLUDED_PATH_PREFIXES):
+        if (scope["method"], path) in _EXCLUDED_METHOD_PATHS or any(
+            path.startswith(prefix) for prefix in _EXCLUDED_PATH_PREFIXES
+        ):
             await self.app(scope, receive, send)
             return
 
