@@ -1,5 +1,5 @@
 """Opt-in routing over the durable research-alert/outbox pipeline. No provider reads."""
-from datetime import UTC
+from datetime import UTC, datetime
 
 from sqlalchemy import exists, or_, select
 from sqlalchemy.orm import Session
@@ -37,9 +37,36 @@ def event_type(db: Session, alert: ResearchAlert) -> str | None:
     return None
 
 
-def subscription_for(db: Session, alert: ResearchAlert) -> AlertSubscription | None:
+def alert_category(db: Session, alert: ResearchAlert) -> str | None:
+    """Tipo de evento de la alerta si es del tenant de la sesión; si no, ``None``.
+
+    Las tres comprobaciones de cobertura (Telegram, push, correo) abrían con
+    esta misma guarda copiada: sin tipo de evento, o con la alerta de otro
+    tenant, la alerta no tiene canal.
+    """
     category = event_type(db, alert)
     if not category or alert.tenant_id is None or alert.tenant_id != db.info.get("tenant_id"):
+        return None
+    return category
+
+
+def alert_after_opt_in(created_at: datetime, enabled_at: datetime) -> bool:
+    """``True`` si la alerta nació tras el alta de la preferencia/suscripción.
+
+    Un aviso anterior al alta no se manda por un canal nuevo. Ambos lados se
+    normalizan a tz-aware (UTC) antes de comparar.
+    """
+    created, since = created_at, enabled_at
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=UTC)
+    if since.tzinfo is None:
+        since = since.replace(tzinfo=UTC)
+    return created >= since
+
+
+def subscription_for(db: Session, alert: ResearchAlert) -> AlertSubscription | None:
+    category = alert_category(db, alert)
+    if category is None:
         return None
     row = db.scalar(select(AlertSubscription).where(
         AlertSubscription.tenant_id == alert.tenant_id,
@@ -52,13 +79,7 @@ def subscription_for(db: Session, alert: ResearchAlert) -> AlertSubscription | N
 
     if not binding_for(db, alert.tenant_id, row.user_id, row.chat_id):
         return None
-    created = alert.created_at
-    since = row.enabled_at
-    if created.tzinfo is None:
-        created = created.replace(tzinfo=UTC)
-    if since.tzinfo is None:
-        since = since.replace(tzinfo=UTC)
-    return row if created >= since else None
+    return row if alert_after_opt_in(alert.created_at, row.enabled_at) else None
 
 
 def dispatch_pending(db: Session, *, limit: int = 100) -> dict:

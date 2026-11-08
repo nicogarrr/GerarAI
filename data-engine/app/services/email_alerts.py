@@ -14,7 +14,6 @@ Mismas garantias que Telegram (``subscription_for``) y push
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -62,16 +61,11 @@ def preference_for(db: Session, alert: ResearchAlert) -> UserEmailTarget | None:
     Solo aplica si la alerta es del tenant y del usuario de la sesion que la
     despacha, el tipo tiene opt-in activo y la alerta nacio tras el alta.
     """
-    from app.services.outbound_alerts import event_type
+    from app.services.outbound_alerts import alert_after_opt_in, alert_category
 
-    category = event_type(db, alert)
+    category = alert_category(db, alert)
     user = db.info.get("user_id")
-    if (
-        not category
-        or not user
-        or alert.tenant_id is None
-        or alert.tenant_id != db.info.get("tenant_id")
-    ):
+    if not category or not user:
         return None
     row = db.scalar(
         select(EmailPreference).where(
@@ -83,12 +77,7 @@ def preference_for(db: Session, alert: ResearchAlert) -> UserEmailTarget | None:
     )
     if row is None:
         return None
-    created, since = alert.created_at, row.enabled_at
-    if created.tzinfo is None:
-        created = created.replace(tzinfo=UTC)
-    if since.tzinfo is None:
-        since = since.replace(tzinfo=UTC)
-    if created < since:
+    if not alert_after_opt_in(alert.created_at, row.enabled_at):
         return None
     binding = binding_for(db, alert.tenant_id, user)
     if binding is None:
@@ -104,16 +93,11 @@ def opted_out(db: Session, alert: ResearchAlert) -> bool:
     ALERT_EMAIL_TO ignoraria el opt-out. Sin fila todavia no hay decision y
     se mantiene el comportamiento historico (cuenta propietaria).
     """
-    from app.services.outbound_alerts import event_type
+    from app.services.outbound_alerts import alert_after_opt_in, alert_category
 
-    category = event_type(db, alert)
+    category = alert_category(db, alert)
     user = db.info.get("user_id")
-    if (
-        not category
-        or not user
-        or alert.tenant_id is None
-        or alert.tenant_id != db.info.get("tenant_id")
-    ):
+    if not category or not user:
         return False
     row = db.scalar(
         select(EmailPreference).where(
@@ -126,9 +110,4 @@ def opted_out(db: Session, alert: ResearchAlert) -> bool:
         return False
     if not row.enabled:
         return True
-    created, since = alert.created_at, row.enabled_at
-    if created.tzinfo is None:
-        created = created.replace(tzinfo=UTC)
-    if since.tzinfo is None:
-        since = since.replace(tzinfo=UTC)
-    return created < since
+    return not alert_after_opt_in(alert.created_at, row.enabled_at)
