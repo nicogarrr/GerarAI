@@ -146,13 +146,16 @@ Producción usa `docker-compose.prod.yml` con `.env.production` en la VM
 | `LLM_SETTINGS_ENCRYPTION_KEY` | recomendada | cifra las claves LLM que guarda cada usuario en Ajustes |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | opcionales | avisos por Telegram |
 | `SMTP_*`, `ALERT_EMAIL_TO`, `DCA_ALERTS_*` | si se mergea #2310 | avisos DCA por correo |
-| `WORKERS_ENABLED` | sí | `true` en la VM (workers y scheduler activos) |
+| `WORKERS_ENABLED` | sí | el compose la fuerza a `"false"` en el servicio backend: workers y scheduler corren en servicios separados |
 | `RETENTION_JOB_ENABLED`, `RETENTION_DRY_RUN`, `ACCESS_REQUEST_RETENTION_DAYS` | recomendadas | retención de datos (privacidad) |
 
 ### Servidor propio (docker compose)
 
-Las mismas variables de ambos bloques en `docker.env`, más las de
-`docker-compose.prod.yml`. Recarga con `docker compose --env-file docker.env up -d`.
+Receta **local** (no producción): las mismas variables de ambos bloques en
+`docker.env` y arranque con `docker compose --env-file docker.env up -d`
+(usa el `docker-compose.yml` de desarrollo, sin `-f`). En producción se usa
+`docker-compose.prod.yml` con `.env.production` vía `./scripts/deploy.sh`
+(`docs/oracle-setup.md`).
 
 - [ ] Frontend VM: `docker compose -p gerarai-front -f docker-compose.frontend.yml --env-file .env.frontend.production up -d --build --wait` y verificación del runbook (`docs/frontend-oracle.md`). La vía de respaldo en Vercel no se redepliega salvo que se use.
 - [ ] Backend VM: `.env.production` al día en la VM y `./scripts/deploy.sh` en verde (`docs/oracle-setup.md`).
