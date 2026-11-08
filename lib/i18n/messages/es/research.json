@@ -2135,5 +2135,34 @@
     },
     "seeAll": "Ver todos los políticos",
     "footer": "Cámara de EE. UU. (Clerk, PTR del STOCK Act: 45 días para declarar). Importes en rangos, como exige la ley. Senado no disponible: su web bloquea el acceso automatizado."
+  },
+  "institucionales": {
+    "title": "Todos los gestores 13F",
+    "summary": "{holders} gestores declaran {shares} acciones a {period} (el trimestre anterior, {prior}).",
+    "net": "Neto de los gestores que presentaron ambos trimestres frente a {prior}: {net} acciones.",
+    "countsLabel": "Movimientos del trimestre",
+    "top": "Mayores tenedores",
+    "buyers": "Quién compra",
+    "sellers": "Quién vende",
+    "none": "Nadie en el trimestre.",
+    "pctOf13f": "{pct} del total 13F",
+    "vsPrior": "{change} vs. trimestre anterior",
+    "prevShares": "antes {shares}",
+    "fromTo": "{from} → {to}",
+    "source": "Fuente: SEC, Form 13F Data Sets ({period} frente a {prior}); cada nombre enlaza a su 13F en EDGAR.",
+    "sourceLink": "Fichero de la SEC",
+    "empty": "Aún no se ha cargado el fichero trimestral de 13F de la SEC para esta acción; se actualiza solo cada semana.",
+    "noCusip": "Sin CUSIP verificado: no se puede cruzar con el 13F.",
+    "loadError": "No se pudieron cargar los institucionales ahora mismo.",
+    "status": {
+      "nuevo": "Nueva",
+      "aumenta": "Aumenta",
+      "reduce": "Reduce",
+      "igual": "Igual",
+      "vendeTodo": "Vende todo",
+      "sin13fAun": "Sin 13F aún",
+      "sin13fPrevio": "Sin 13F previo"
+    },
+    "limits": "13F: solo gestores con más de 100 M$ en acciones de EE. UU., trimestral, hasta 45 días de retraso y solo largos. Un gestor puede declarar lo que otro también declara: la suma no son las acciones en circulación. «Sin 13F aún» / «Sin 13F previo»: no consta su 13F de ese trimestre; no cuenta como venta ni como compra."
   }
 }

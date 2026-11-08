@@ -140,7 +140,8 @@ import {
   getResearchNews,
 } from '@/lib/actions/research.actions';
 import { getCompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
-import { getCompanyHolders } from '@/lib/actions/investors.actions';
+import { getCompanyHolders, getInstitutionalHolders } from '@/lib/actions/investors.actions';
+import { InstitutionalHoldersPanel } from '@/components/research/InstitutionalHoldersPanel';
 import { getShareCapital } from '@/lib/actions/share-capital.actions';
 import { getDecisionLessons, getDriverAssumptions, getFinancialTerminal, getManagementCredibility } from '@/lib/actions/research-tools.actions';
 import { getKnowledgeDocumentsForTicker } from '@/lib/actions/research-tools.actions';
@@ -1533,9 +1534,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     // Propietarios = 13F (gestores) + insiders (Form 4, SEC EDGAR, gratis).
     // Los Form 4 persistidos se leen del backend; sin red ni proveedor de
     // pago. Best-effort: cualquier fallo degrada a panel vacio honesto.
-    const [insiderFilings, participation] = await Promise.all([
+    const [insiderFilings, participation, institutions] = await Promise.all([
       getInsiderFilings(ticker, 8).catch(() => null),
       getParticipationFilings(ticker).catch(() => null),
+      // Todos los gestores 13F (no solo los superinversores): best-effort, un
+      // fallo degrada a su propio estado vacío honesto.
+      getInstitutionalHolders(ticker).catch(() => null),
     ]);
     return (
       <div className="space-y-6">
@@ -1578,6 +1582,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             </p>
           </Panel>
         )}
+        <InstitutionalHoldersPanel data={institutions} locale={locale} />
         <Panel title={t('research.fichaInsidersPanel')}>
           {insiderFilings === null || insiderFilings.status !== 'ok' || insiderFilings.filings.length === 0 ? (
             insiderFilings?.foreign_issuer ? (

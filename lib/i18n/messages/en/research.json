@@ -2135,5 +2135,34 @@
     },
     "seeAll": "See all politicians",
     "footer": "US House (Clerk, STOCK Act PTRs: 45 days to disclose). Amounts in ranges, as the law requires. Senate unavailable: its site blocks automated access."
+  },
+  "institucionales": {
+    "title": "All 13F managers",
+    "summary": "{holders} managers report {shares} shares as of {period} (prior quarter: {prior}).",
+    "net": "Net of managers that filed both quarters vs {prior}: {net} shares.",
+    "countsLabel": "Quarter moves",
+    "top": "Largest holders",
+    "buyers": "Who is buying",
+    "sellers": "Who is selling",
+    "none": "Nobody this quarter.",
+    "pctOf13f": "{pct} of 13F total",
+    "vsPrior": "{change} vs prior quarter",
+    "prevShares": "previously {shares}",
+    "fromTo": "{from} → {to}",
+    "source": "Source: SEC Form 13F Data Sets ({period} vs {prior}); each name links to its 13F on EDGAR.",
+    "sourceLink": "SEC file",
+    "empty": "The SEC quarterly 13F file has not been loaded for this stock yet; it refreshes weekly.",
+    "noCusip": "No verified CUSIP: cannot match against 13F.",
+    "loadError": "Institutional holders could not be loaded right now.",
+    "status": {
+      "nuevo": "New",
+      "aumenta": "Adds",
+      "reduce": "Trims",
+      "igual": "Same",
+      "vendeTodo": "Sold out",
+      "sin13fAun": "No 13F yet",
+      "sin13fPrevio": "No prior 13F"
+    },
+    "limits": "13F: only managers with over $100M in US equities, quarterly, up to 45 days late and long-only. One manager may report what another also reports: the sum is not shares outstanding. «No 13F yet» / «No prior 13F»: that quarter's 13F is not on file; not counted as a sale or a purchase."
   }
 }

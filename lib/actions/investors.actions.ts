@@ -3,6 +3,7 @@
 import { researchRequest } from '@/lib/research/client';
 import { AppError } from '@/lib/types/errors';
 
+import type { InstitutionalHolders } from '@/lib/research/institutional-holders';
 import type { InvestorVideo } from '@/lib/ui/youtube-video';
 
 import type { ManagerChanges, OwnershipProvenance } from './ownership.actions';
@@ -181,6 +182,16 @@ export type CompanyHolders = {
 export async function getCompanyHolders(ticker: string): Promise<CompanyHolders | null> {
   try {
     return await requestJson<CompanyHolders>(`/api/investors/holders/${encodeURIComponent(ticker)}`);
+  } catch (error) {
+    if (error instanceof AppError && error.code === 'RESEARCH_API_ERROR' && error.statusCode === 404) return null;
+    throw error;
+  }
+}
+
+/** Todos los gestores 13F de la acción (SEC Form 13F Data Sets); null si el ticker no existe. */
+export async function getInstitutionalHolders(ticker: string): Promise<InstitutionalHolders | null> {
+  try {
+    return await requestJson<InstitutionalHolders>(`/api/ownership/institutions/${encodeURIComponent(ticker)}`);
   } catch (error) {
     if (error instanceof AppError && error.code === 'RESEARCH_API_ERROR' && error.statusCode === 404) return null;
     throw error;
