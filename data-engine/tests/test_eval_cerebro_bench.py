@@ -39,8 +39,8 @@ def _script():
 
 def test_case_set_is_versioned_and_complete():
     cases = [json.loads(x) for x in CASES.read_text(encoding="utf-8").splitlines() if x.strip()]
-    assert len(cases) == 80
-    assert len({c["id"] for c in cases}) == 80
+    assert len(cases) == 82
+    assert len({c["id"] for c in cases}) == 82
     assert {c["category"] for c in cases} == CATEGORIES
     for c in cases:
         assert set(c["expect"]) <= KNOWN_EXPECT, c["id"]
@@ -152,3 +152,9 @@ def test_random_figures_rarely_match_a_context():
     ground = G.build_ground([" ".join(f"{rng.uniform(1, 999):.2f}" for _ in range(150))], [])
     hits = sum(G._matches(round(rng.uniform(1, 999), 2), 1.0, False, 2, ground) for _ in range(500))
     assert hits / 500 < 0.02
+
+
+def test_english_scale_words_in_sources():
+    # Las fuentes SEC vienen en inglés: «$9.28 billion» respalda «9.280 millones».
+    ground = G.build_ground(["we had outstanding $9.28 billion and $17.85 billion of cash"], [])
+    assert G.ungrounded_numbers("Deuda de 9.280 millones y caja de 17.850 millones.", ground) == []

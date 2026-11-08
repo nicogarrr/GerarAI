@@ -108,7 +108,7 @@ def financial_numbers(text: str) -> list[tuple[str, float]]:
 
 
 _UNIT_RE = re.compile(
-    r"^\s*(?:(?P<b>mil\s+millones|billones?\b|bn\b|B\b)|(?P<m>millones|mill\.?|M\b|MM\b)|(?P<k>mil\b|k\b)|(?P<p>%|por\s+ciento|pp\b|puntos))",
+    r"^\s*(?:(?P<b>mil\s+millones|billones?\b|billions?\b|bn\b|B\b)|(?P<m>millones|millions?\b|mill\.?|M\b|MM\b)|(?P<k>mil\b|k\b)|(?P<p>%|por\s+ciento|pp\b|puntos))",
     re.IGNORECASE,
 )
 
@@ -122,7 +122,9 @@ def _decimals(raw: str) -> int:
     for sep in (",", "."):
         if sep in s:
             tail = s.rsplit(sep, 1)[1]
-            if not (sep == "." and len(tail) == 3 and "," not in s and s.split(".")[0].strip("0")) and not (sep == "," and s.count(",") > 1):
+            if not (sep == "." and len(tail) == 3 and "," not in s and s.split(".")[0].strip("0")) and not (
+                sep == "," and s.count(",") > 1
+            ):
                 return len(tail)
     return 0
 
