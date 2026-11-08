@@ -38,7 +38,11 @@ export function PriceEventsPanel({ events, hiddenKinds, onToggleKind, onFocus, h
                             <div className="flex flex-wrap items-baseline gap-2">
                                 <button type="button" onClick={() => onFocus(event.date)} className="tabular-nums text-gray-400 underline-offset-2 hover:underline" title={t('research.chart.showOnChart')}>{formatMarketDate(event.date)}</button>
                                 <span className="rounded px-1 text-[10px] font-semibold" style={{ color: EVENT_KINDS[event.kind].color }}>{t(EVENT_KIND_KEYS[event.kind])}</span>
-                                <span className="min-w-0 flex-1 text-gray-200">{event.title}</span>
+                                {/* basis-full en móvil: el titular baja a su propia línea a todo lo
+                                    ancho. Con flex-1 a secas se quedaba con el hueco que dejaban
+                                    fecha + tipo + fuente (~60 px a 390 px) y salía una palabra por
+                                    línea, ilegible. Desde sm vuelve al comportamiento en línea. */}
+                                <span className="min-w-0 flex-1 basis-full text-gray-200 sm:basis-auto">{event.title}</span>
                                 {event.source_url ? <a href={event.source_url} target="_blank" rel="noreferrer" className="text-[10px] text-gray-500 underline">{event.source}</a> : <span className="text-[10px] text-gray-500">{event.source}</span>}
                                 {event.detail ? <button type="button" aria-expanded={open === event.id} onClick={() => setOpen(open === event.id ? null : event.id)} className="text-[10px] text-gray-500 hover:text-gray-200">{open === event.id ? t('research.chart.less') : t('research.chart.detail')}</button> : null}
                             </div>
