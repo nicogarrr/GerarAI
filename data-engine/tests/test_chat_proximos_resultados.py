@@ -27,7 +27,7 @@ from app.services.display_es import fecha_es
 # (esperado 6 feb 2027, salió 7 feb tras medianoche).
 FIXED_NOW = datetime(2027, 2, 3, 12, 0, tzinfo=UTC)  # 13:00 en Madrid: fecha inequívoca
 TODAY = local_today(FIXED_NOW)
-assert TODAY == date(2027, 2, 3)
+assert date(2027, 2, 3) == TODAY
 
 
 @pytest.fixture(autouse=True)
