@@ -16,6 +16,11 @@
  */
 const REAL = {
     '@/lib/format': '../lib/format.ts',
+    // research-identity es el codigo REAL de firma (HMAC, path decodificado,
+    // hash del cuerpo): los controles de identidad se ejercitan de verdad.
+    // Solo require-user (sesion Next) sigue stubbed, como antes.
+    '@/lib/auth/research-identity': '../lib/auth/research-identity.ts',
+    '@/lib/types/errors': '../lib/types/errors.ts',
     '@/lib/paper-trading/types': '../lib/paper-trading/types.ts',
     '@/lib/paper-trading/accounting': '../lib/paper-trading/accounting.ts',
     '@/lib/paper-trading/options': '../lib/paper-trading/options.ts',

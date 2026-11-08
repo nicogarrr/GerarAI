@@ -12,11 +12,16 @@ import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => readFileSync(join(here, '..', rel), 'utf8');
-const pages = ['app/(root)/research/news/page.tsx', 'app/(root)/research/sources/page.tsx'];
+// En /research/news la degradación vive en NewsFeedSection.tsx (extraído de
+// page.tsx en #4895); en /research/sources sigue en la propia página.
+const pages = [
+    { page: 'app/(root)/research/news/page.tsx', impl: 'app/(root)/research/news/NewsFeedSection.tsx' },
+    { page: 'app/(root)/research/sources/page.tsx', impl: 'app/(root)/research/sources/page.tsx' },
+];
 
-for (const page of pages) {
+for (const { page, impl } of pages) {
     test(`${page}: degrada solo con backend caido y propaga lo demas`, () => {
-        const src = read(page);
+        const src = read(impl);
         assert.match(src, /import \{ isBackendUnavailableError \} from '@\/lib\/backend-offline'/);
         assert.match(src, /import BackendOffline from '@\/components\/system\/BackendOffline'/);
         const catchBlock = src.slice(src.indexOf('} catch (error) {'));
@@ -36,7 +41,12 @@ for (const page of pages) {
 }
 
 test('news: la promesa de contexto no queda sin consumir en la salida temprana', () => {
-    assert.match(read(pages[0]), /tickerContextPromise\.catch\(\(\) => undefined\)/);
+    const section = read(pages[0].impl);
+    assert.match(section, /tickerContextPromise\.catch\(\(\) => undefined\)/);
+    // El catch que consume la promesa va ANTES de cualquier salida (return/throw).
+    const catchBlock = section.slice(section.indexOf('} catch (error) {'));
+    assert.ok(catchBlock.indexOf('tickerContextPromise.catch(() => undefined)') < catchBlock.indexOf('return <BackendOffline'));
+    assert.ok(catchBlock.indexOf('tickerContextPromise.catch(() => undefined)') < catchBlock.indexOf('throw error;'));
 });
 
 test('clasificacion: 4xx no cuentan como backend caido', () => {
