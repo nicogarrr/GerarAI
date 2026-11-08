@@ -30,6 +30,7 @@ import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -848,6 +849,24 @@ def _resolve_fact_locators(db: Session, long_term_model: dict) -> dict[int, str]
     return locators
 
 
+#: Plazo «idle in transaction» de la transacción en curso mientras la narrativa espera al modelo.
+SLOW_CALL_IDLE_SECONDS = 900
+
+
+def allow_slow_call(db: Session, seconds: int = SLOW_CALL_IDLE_SECONDS) -> None:
+    """La narrativa corre dentro de la transacción de la tesis, que no se puede confirmar a medias. Mientras el
+    modelo responde, la conexión queda «idle in transaction» y Postgres la corta a los
+    ``idle_in_transaction_session_timeout`` de la conexión (120 s, app/core/database.py): se pierde la sesión, el
+    gasto no se anota y el job entero falla. ``SET LOCAL`` sube ese plazo solo para esta transacción; al confirmarla
+    o deshacerla vuelve el de la conexión."""
+    try:
+        if db.get_bind().dialect.name != "postgresql":
+            return
+        db.execute(text(f"SET LOCAL idle_in_transaction_session_timeout = {int(seconds) * 1000}"))
+    except Exception:  # noqa: BLE001 - sin el ajuste la llamada sigue, con el plazo de la conexión
+        logger.warning("narrativa extensa: no se pudo ampliar el plazo de la transacción", exc_info=True)
+
+
 def maybe_deep_narrative(
     db: Session,
     company: Company,
@@ -918,6 +937,7 @@ def maybe_deep_narrative(
         except Exception:  # noqa: BLE001 - el registro contable no decide el contenido
             logger.warning("budget_record_failed: el gasto LLM de esta narrativa no quedo contabilizado", exc_info=True)
 
+    allow_slow_call(db)
     response = None
     last_reason: str | None = None
     for attempt in range(2):
