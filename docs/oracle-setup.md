@@ -116,15 +116,18 @@ antes de subir su limite: el presupuesto global no debe pasar de 10 GiB.
    `.env.frontend.production` (modo 600); sigue el runbook de
    `docs/frontend-oracle.md`. Sin ellas el frontend no autentica ni firma
    contra el backend. Las claves son:
-   `FMP_BACKEND_URL=https://<BACKEND_DOMAIN>` (el hostname del backend en
-   `.env.production`; en la instalacion actual, `https://51.170.37.134.sslip.io`),
    `RESEARCH_AUTH_SECRET` (el mismo valor que en la VM),
    `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL=https://gerarai.duckdns.org`,
    `MONGODB_URI` (Atlas M0), `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID`.
+   `FMP_BACKEND_URL` NO hace falta definirla en `.env.frontend.production`:
+   `docker-compose.frontend.yml` la fuerza a `http://backend:8000` (red
+   Docker interna de la VM), que tiene prioridad sobre el env_file.
    Ojo: front y back responden en hostnames distintos (`gerarai.duckdns.org` y
    `BACKEND_DOMAIN`) aunque ambos estan en la misma VM.
    Si se usa la via de respaldo en Vercel, esas mismas variables van en el
-   proyecto de Vercel con `BETTER_AUTH_URL=https://<tu-app>.vercel.app`.
+   proyecto de Vercel, con `BETTER_AUTH_URL=https://<tu-app>.vercel.app` y
+   `FMP_BACKEND_URL=https://<BACKEND_DOMAIN>` (el hostname publico del
+   backend; en la instalacion actual, `https://51.170.37.134.sslip.io`).
 8. **Backups**: `crontab -e` y anade (horas UTC, sin solapar con el deploy):
    ```
    17 4 * * * cd /home/ubuntu/GerarAI && RCLONE_REMOTE=r2:<tu-bucket-de-backups> ./scripts/backup.sh --stop-storage >> /var/log/cavaai-backup.log 2>&1
