@@ -18,9 +18,14 @@ Asistenta sigue siendo el único consumidor de actualizaciones/webhook.
    nunca se reutiliza `TELEGRAM_CHAT_ID` global para estos eventos.
 5. `PUT /api/alerts/telegram-subscriptions/{event_type}`:
    `{ "enabled": true, "chat_id": "<chat privado confirmado>" }`.
-   Tipos: `thesis_broken`, `new_filing`, `insiders`, `shorts_rising`.
-   `GET /api/alerts/telegram-subscriptions` devuelve los cuatro tipos, apagados
-   por defecto. Desactivar usa el mismo PUT con `enabled:false`.
+   Tipos (`EVENT_TYPES` en `app/services/outbound_alerts.py`):
+   `thesis_broken`, `new_filing`, `insiders`, `shorts_rising`, `daily_digest`,
+   `dca_levels`, `macro_event`, `earnings`.
+   `GET /api/alerts/telegram-subscriptions` devuelve los ocho tipos, apagados
+   por defecto. Activar exige el chat ya vinculado (`403 chat_link_required`
+   si no lo está) y solo el dueño de la suscripción puede modificarla
+   (`403 subscription_owner_only`). Desactivar usa el mismo PUT con
+   `enabled:false`.
    Este PR ofrece las APIs de prueba del bot y confirmación del propietario,
    no una pantalla nueva. Hasta verificar el chat y activar cada tipo no se envía nada.
 
