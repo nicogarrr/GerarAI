@@ -41,6 +41,9 @@ logger = logging.getLogger(__name__)
 THESIS_V2_VERSION = "thesis-v2-1"
 INPUT_KEY = "thesis_v2"
 MAX_ATTEMPTS = 2
+#: Plazo por petición y total de cada llamada al modelo de la tesis v2 (respuesta de hasta 24.000 tokens).
+CALL_TIMEOUT_SECONDS = 600.0
+CALL_TOTAL_TIMEOUT_SECONDS = 900.0
 PASSAGES_PER_GROUP = 6
 MAX_CHUNKS_PER_DOC = 1500
 
@@ -1239,9 +1242,16 @@ def generate_thesis_v2(db: Session, company: Company, *, reasoner: Reasoner | No
         tenant_id = tid if type(tid) is int else None
     ctx = build_context(db, company, today=today, tenant_id=tenant_id)
     if reasoner is None:
+        from app.llm.factory import create_llm_provider
         from app.services.expert_team.service import provider_reasoner
 
-        reasoner = provider_reasoner(db=db, commit_usage=False, temperature=0.0)
+        # Cada parte pide hasta 24.000 tokens: con el plazo general (120 s por petición) el proveedor la corta
+        # a mitad y la tesis sale en error (POOL: 120,1 s y fuera). Plazo propio de esta llamada larga, y gasto
+        # anotado con commit: sin él la sesión queda «idle in transaction» durante la llamada y Postgres la corta.
+        reasoner = provider_reasoner(
+            create_llm_provider(timeout_seconds=CALL_TIMEOUT_SECONDS, total_timeout_seconds=CALL_TOTAL_TIMEOUT_SECONDS),
+            db=db, commit_usage=True, temperature=0.0,
+        )
     if ctx.valuation.get("status") not in ("ok", "not_meaningful"):
         return {"status": ctx.valuation.get("status"), "reason": ctx.valuation.get("reason"),
                 "ticker": company.ticker, "valuation": ctx.valuation}
