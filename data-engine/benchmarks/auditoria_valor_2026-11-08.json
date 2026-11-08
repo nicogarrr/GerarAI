@@ -1,0 +1,367 @@
+{
+ "_fuente": "gerarai-audit1/AUDIT.md (auditoria-valor-1, main 81aa6cf41, 2026-11-08); solo filas no OK",
+ "ASTS": [
+  {
+   "input": "diluted shares",
+   "verdict": "STALE / multi-class",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "value",
+   "verdict": "METHOD (no runway shown)",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "CGEO.L": [
+  {
+   "input": "all financial data",
+   "verdict": "NON-PRIMARY SOURCE",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "shares FY2022",
+   "verdict": "UNITS",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "value",
+   "verdict": "FX COVERAGE",
+   "dato": false,
+   "puntos": 1
+  },
+  {
+   "input": "company type",
+   "verdict": "WRONG TYPE",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "CPT": [
+  {
+   "input": "revenue FY25",
+   "verdict": "ERROR ×121",
+   "dato": true,
+   "puntos": 2
+  },
+  {
+   "input": "diluted shares",
+   "verdict": "REVIEW (−7.7 %)",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "method/type",
+   "verdict": "METHOD",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "BN": [
+  {
+   "input": "leases",
+   "verdict": "OMITTED",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "DCF card",
+   "verdict": "METHOD (bear 1.7× price)",
+   "dato": false,
+   "puntos": 1
+  },
+  {
+   "input": "TIR",
+   "verdict": "METHOD",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "KKR": [
+  {
+   "input": "net income FY25",
+   "verdict": "REVIEW (+5 %)",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "debt",
+   "verdict": "NON-PRIMARY + STALE",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "method/type",
+   "verdict": "METHOD/TYPE",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "POOL": [
+  {
+   "input": "diluted shares",
+   "verdict": "STALE (−4.2 %)",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "TIR vs DCF",
+   "verdict": "INCONSISTENT ENGINES; DCF bear 0.07× price",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "CB": [
+  {
+   "input": "diluted shares",
+   "verdict": "STALE (−4.8 %)",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "insurer engine",
+   "verdict": "METHOD (not derived)",
+   "dato": false,
+   "puntos": 1
+  },
+  {
+   "input": "type",
+   "verdict": "WRONG TYPE (TIR uses tir_per)",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "UNH": [
+  {
+   "input": "debt",
+   "verdict": "ERROR (−7.6 %)",
+   "dato": true,
+   "puntos": 2
+  },
+  {
+   "input": "diluted shares",
+   "verdict": "STALE (−1.6 %)",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "DCF",
+   "verdict": "OUT OF RANGE 0.2–5×",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "HIMS": [
+  {
+   "input": "TIR bear",
+   "verdict": "BEAR CASE DISAPPEARS",
+   "dato": false,
+   "puntos": 1
+  },
+  {
+   "input": "method",
+   "verdict": "DCF BULL > 5×",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "RXRX": [
+  {
+   "input": "value",
+   "verdict": "METHOD (no runway shown)",
+   "dato": false,
+   "puntos": 1
+  },
+  {
+   "input": "diluted shares",
+   "verdict": "STALE",
+   "dato": true,
+   "puntos": 1
+  }
+ ],
+ "NAUT": [
+  {
+   "input": "value",
+   "verdict": "METHOD (no runway shown)",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "ABCL": [
+  {
+   "input": "value",
+   "verdict": "METHOD (no runway shown)",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "IBRX": [
+  {
+   "input": "value",
+   "verdict": "METHOD (no runway shown)",
+   "dato": false,
+   "puntos": 1
+  },
+  {
+   "input": "diluted shares",
+   "verdict": "STALE",
+   "dato": true,
+   "puntos": 1
+  }
+ ],
+ "AAPL": [
+  {
+   "input": "DCF",
+   "verdict": "INCONSISTENT ENGINES",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "ERF.PA": [
+  {
+   "input": "revenue / EBITDA / NI",
+   "verdict": "STALE (1 filing)",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "cash / debt",
+   "verdict": "MIXED YEARS + NON-PRIMARY",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "diluted shares",
+   "verdict": "STALE",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "hybrids",
+   "verdict": "OMITTED (custom concept)",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "DCF",
+   "verdict": "NEGATIVE BEAR HIDDEN",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "GOOGL": [
+  {
+   "input": "shares",
+   "verdict": "REVIEW (multi-class)",
+   "dato": true,
+   "puntos": 1
+  }
+ ],
+ "TSM": [
+  {
+   "input": "P&L",
+   "verdict": "STALE (1 filing)",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "shares",
+   "verdict": "ADR RATIO MIXED IN THE SERIES",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "value",
+   "verdict": "FX COVERAGE",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "AIR.PA": [
+  {
+   "input": "debt",
+   "verdict": "ERROR −23 % + NON-PRIMARY",
+   "dato": true,
+   "puntos": 2
+  },
+  {
+   "input": "EBIT",
+   "verdict": "METHOD (metodo-1 PR-C)",
+   "dato": true,
+   "puntos": 1
+  }
+ ],
+ "META": [
+  {
+   "input": "DCF",
+   "verdict": "INCONSISTENT ENGINES",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "AMZN": [
+  {
+   "input": "DCF",
+   "verdict": "NEGATIVE BEAR HIDDEN; ENGINES INCONSISTENT",
+   "dato": false,
+   "puntos": 1
+  }
+ ],
+ "TSLA": [
+  {
+   "input": "diluted shares",
+   "verdict": "STALE",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "debt",
+   "verdict": "REVIEW (−1 to −12 %)",
+   "dato": true,
+   "puntos": 1
+  }
+ ],
+ "CNQ": [
+  {
+   "input": "debt",
+   "verdict": "LEASES OMITTED (flag is false)",
+   "dato": true,
+   "puntos": 1
+  },
+  {
+   "input": "FCF (DCF)",
+   "verdict": "FCF NOT DERIVED",
+   "dato": true,
+   "puntos": 1
+  }
+ ],
+ "FFH": [
+  {
+   "input": "shares",
+   "verdict": "ERROR +10.6 %",
+   "dato": true,
+   "puntos": 2
+  },
+  {
+   "input": "revenue",
+   "verdict": "ERROR −35 %",
+   "dato": true,
+   "puntos": 2
+  },
+  {
+   "input": "insurer engine",
+   "verdict": "METHOD",
+   "dato": false,
+   "puntos": 1
+  },
+  {
+   "input": "TIR",
+   "verdict": "INCOMPLETE OUTPUT",
+   "dato": false,
+   "puntos": 1
+  }
+ ]
+}
