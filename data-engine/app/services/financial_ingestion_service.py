@@ -254,7 +254,8 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # 4 (8-nov-2026): ``gain_on_sale_real_estate`` (plusvalías por ventas de inmuebles), para el FFO de un REIT.
 # 5 (8-nov-2026): filers IFRS sin minoritarios: ProfitLoss/Equity de respaldo; ``total_debt`` = Borrowings.
 # 6 (8-nov-2026): ``net_income_total`` (ProfitLoss) y ``finance_income_cost``, para el EBITDA por componentes.
-SEC_INGESTION_RULES_VERSION = 6
+# 7 (8-nov-2026): minoritarios: ``minority_interest`` IFRS (NoncontrollingInterests) y ``net_income_minority``.
+SEC_INGESTION_RULES_VERSION = 7
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("revenue",           ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax", "RegulatedAndUnregulatedOperatingRevenue"],  "USD"),
@@ -335,6 +336,8 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Puente EV -> equity del DCF: patrimonio de minoritarios (NCI) y valor de
     # las preferentes. Saldos de balance (instantes).
     ("minority_interest", ["MinorityInterest"],                                                                     "USD"),
+    # beneficio de los minoritarios: con él, la parte del accionista de los flujos consolidados (metodo-1)
+    ("net_income_minority", ["NetIncomeLossAttributableToNoncontrollingInterest"],                                  "USD"),
     ("preferred_stock",   ["PreferredStockValue", "PreferredStockValueOutstanding"],                               "USD"),
     ("intangible_assets", SEC_INTANGIBLE_COMPONENTS,                                                                "USD"),
     ("operating_lease_liabilities", ["OperatingLeaseLiability", "OperatingLeaseLiabilityNoncurrent"],                "USD"),
@@ -408,6 +411,9 @@ SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("total_assets",      ["Assets"],                                                                  "USD"),
     ("total_liabilities", ["Liabilities"],                                                             "USD"),
     ("total_equity",      ["EquityAttributableToOwnersOfParent"],                                      "USD"),
+    # Minoritarios (IAS 1.54q / 81B): sin ellos el puente EV → capital no los restaba (BN, 40-F).
+    ("minority_interest", ["NoncontrollingInterests"],                                                 "USD"),
+    ("net_income_minority", ["ProfitLossAttributableToNoncontrollingInterests"],                       "USD"),
     ("cash_and_equivalents", ["CashAndCashEquivalents"],                                               "USD"),
     ("short_term_investments", ["ShorttermDepositsNotClassifiedAsCashEquivalents"],                     "USD"),
     ("operating_cash_flow", ["CashFlowsFromUsedInOperatingActivities"],                                "USD"),
@@ -472,7 +478,8 @@ def sec_ifrs_metric_map_for(ifrs_facts: dict[str, Any]) -> list[tuple[str, list[
 # 3 (8-nov-2026): ``net_income`` = beneficio atribuible a la dominante (ProfitLoss solo de respaldo) y
 # ``shares_diluted`` = AdjustedWeightedAverageShares cuando el emisor la etiqueta (sin derivar).
 # 4 (8-nov-2026): ``net_income_total`` (ProfitLoss) y ``finance_income_cost`` (EBITDA por componentes).
-ESEF_INGESTION_RULES_VERSION = 4
+# 5 (8-nov-2026): ``minority_interest`` (NoncontrollingInterests) y ``net_income_minority``.
+ESEF_INGESTION_RULES_VERSION = 5
 
 ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # RevenueFromContractsWithCustomers: emisores que solo etiquetan la cifra
@@ -498,6 +505,8 @@ ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("total_assets",      ["ifrs-full:Assets"],                                                          "iso4217:EUR"),
     ("total_liabilities", ["ifrs-full:Liabilities"],                                                     "iso4217:EUR"),
     ("total_equity",      ["ifrs-full:EquityAttributableToOwnersOfParent", "ifrs-full:Equity"],          "iso4217:EUR"),
+    ("minority_interest", ["ifrs-full:NoncontrollingInterests"],                                          "iso4217:EUR"),
+    ("net_income_minority", ["ifrs-full:ProfitLossAttributableToNoncontrollingInterests"],                "iso4217:EUR"),
     ("cash_and_equivalents", ["ifrs-full:CashAndCashEquivalents"],                                       "iso4217:EUR"),
     # Depositos a plazo fuera de equivalentes de caja (IAS 7): el puente de la
     # deuda neta los resta solo si la deuda neta resuelta es deuda - caja.

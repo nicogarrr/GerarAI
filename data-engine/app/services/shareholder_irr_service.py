@@ -25,6 +25,7 @@ from app.core.errors import redact_secrets
 from app.models import Company, FinancialFact
 from app.valuation import shareholder_irr as engine
 from app.valuation import shareholder_irr_rules as rules
+from app.valuation.attributable import attributable_shares, scale_flows
 from app.valuation.ebitda_components import DERIVED as EBITDA_DERIVED
 from app.valuation.ebitda_components import FORMULAS as EBITDA_FORMULAS
 from app.valuation.ebitda_components import (
@@ -43,7 +44,7 @@ _FLOW = ("revenue", "operating_income", "depreciation_amortization", "ebitda", "
          "common_stock_repurchased", "acquisitions", "stock_based_compensation", "shares_diluted",
          "eps_diluted", "free_cash_flow", "interest_expense", "earned_premiums", "lease_income",
          "gain_on_sale_real_estate", "income_before_tax", "income_tax_expense", "finance_income_cost",
-         "net_income_total")
+         "net_income_total", "net_income_minority")
 _POINT = ("cash_and_equivalents", "short_term_investments", "total_debt", "long_term_debt",
           "operating_lease_liabilities", "lease_liabilities_current", "lease_liabilities_noncurrent",
           "minority_interest", "hybrid_capital", "shares_outstanding", "total_equity", "preferred_stock")
@@ -460,11 +461,30 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
                              buybacks=series("common_stock_repurchased"), acquisitions=(), sbc=sbc)
     else:
         earnings_series = net_income if chosen_basis == "pe" else ebitda
+        ocf, capex_s, acq = series("operating_cash_flow"), series("capital_expenditure"), series("acquisitions")
+        if chosen_basis == "pe":
+            # beneficio ATRIBUIBLE frente a flujos CONSOLIDADOS: los flujos, a la parte del accionista
+            shares_attr = attributable_shares(ni_attr if any(x is not None for x in ni_attr) else net_income,
+                                              series("net_income_minority"), series("total_equity"),
+                                              series("minority_interest"))
+            if any(x is not None and x[0] < 1.0 for x in shares_attr):
+                ocf, capex_s, acq = (scale_flows(v, shares_attr) for v in (ocf, capex_s, acq))
+                cites["attributable_share"] = {
+                    "formula": ("flujo consolidado × parte del accionista (beneficio de la dominante / beneficio "
+                                "total; si falta, patrimonio de la dominante / patrimonio total)"),
+                    "years": {str(y): None if x is None else {"share": x[0], "from": x[1]}
+                              for y, x in zip(years, shares_attr, strict=True)},
+                }
+                last_share = shares_attr[-1]
+                if last_share is not None:
+                    warnings.append(f"minoritarios: flujo de caja, capex y adquisiciones consolidados × {last_share[0]:.0%} "
+                                    f"(parte del accionista según el {last_share[1]}) para compararlos con el beneficio "
+                                    "atribuible")
         hist = rules.History(
             years=years, revenue=revenue, earnings=earnings_series,
-            operating_cash_flow=series("operating_cash_flow"), capex=series("capital_expenditure"),
+            operating_cash_flow=ocf, capex=capex_s,
             dividends=series("dividends_paid"), buybacks=series("common_stock_repurchased"),
-            acquisitions=series("acquisitions"), sbc=sbc,
+            acquisitions=acq, sbc=sbc,
         )
     if chosen_basis != "pb" and not any(a for a in hist.acquisitions if a):
         warnings.append("adquisiciones sin dato: el crecimiento histórico (que puede incluir compras) se toma como orgánico")
