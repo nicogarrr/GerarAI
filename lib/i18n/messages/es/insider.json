@@ -152,8 +152,6 @@
     "persisted": "{ticker}: {count} Form 4 desde filings persistidos (último filing: {latest}); la lectura en vivo de SEC EDGAR falló. Los datos son los de esos filings, no de hoy."
   },
   "politicians": {
-    "metaTitle": "Políticos · operaciones declaradas",
-    "metaDescription": "Operaciones en bolsa declaradas por los miembros de la Cámara de EE. UU. (STOCK Act), con su retraso.",
     "title": "Operaciones de políticos",
     "intro": "Lo que declaran los miembros de la Cámara de EE. UU. en sus PTR: cada operación, su rango de importe y si se declaró dentro de los 45 días que da la ley.",
     "chamber": "Cámara",
@@ -195,6 +193,7 @@
     "count": "{total} políticos",
     "more": "Ver más",
     "empty": "Aún no hay declaraciones guardadas. Se descargan del Clerk de la Cámara cada 6 horas.",
+    "offline": "La lista de políticos no está disponible ahora mismo; el resto de Insiders sí.",
     "legal": "Fuente: Clerk of the House. La ley (5 U.S.C. §13107) prohíbe usar estas declaraciones con fines comerciales, salvo para difundirlas al público general."
   }
 }

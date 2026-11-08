@@ -152,8 +152,6 @@
     "persisted": "{ticker}: {count} Form 4s from saved filings (latest filing: {latest}); the live SEC EDGAR read failed. The data comes from those filings, not from today."
   },
   "politicians": {
-    "metaTitle": "Politicians · disclosed trades",
-    "metaDescription": "Stock trades disclosed by members of the US House (STOCK Act), with their delay.",
     "title": "Politicians' trades",
     "intro": "What members of the US House disclose in their PTRs: every trade, its amount range and whether it was disclosed within the 45 days the law allows.",
     "chamber": "Chamber",
@@ -195,6 +193,7 @@
     "count": "{total} politicians",
     "more": "See more",
     "empty": "No disclosures stored yet. They are downloaded from the House Clerk every 6 hours.",
+    "offline": "The politicians list is unavailable right now; the rest of Insiders still works.",
     "legal": "Source: Clerk of the House. The law (5 U.S.C. §13107) forbids using these reports for commercial purposes, except dissemination to the general public."
   }
 }

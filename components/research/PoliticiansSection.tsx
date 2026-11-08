@@ -39,7 +39,7 @@ export function PoliticiansSection({ ticker, data, locale = DEFAULT_LOCALE }: { 
   const footer = (
     <p className="text-xs text-gray-500">
       {t('research.politicos.footer')}{' '}
-      <Link className="text-teal-300" href="/politicos">{t('research.politicos.seeAll')}</Link>
+      <Link className="text-teal-300" href="/insider#politicos">{t('research.politicos.seeAll')}</Link>
     </p>
   );
   if (data === null) return <p className="text-sm text-gray-400" role="status">{t('research.politicos.loadError')}</p>;

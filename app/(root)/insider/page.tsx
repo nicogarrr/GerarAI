@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import InsiderFeed from '@/components/insider/InsiderFeed';
 import InsiderOperationsView from '@/components/insider/InsiderOperationsView';
 import InsiderSignalsView from '@/components/insider/InsiderSignalsView';
+import { loadPoliticiansSection, PoliticiansListSection, type PoliticiansSearchParams, type PoliticiansSectionView } from '@/components/insider/PoliticiansListSection';
 import BackendOffline from '@/components/system/BackendOffline';
 import {
     getInsiderFeed,
@@ -17,7 +18,7 @@ import {
 } from '@/lib/actions/insider.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { isAppError, isAuthError } from '@/lib/types/errors';
-import { getT } from '@/lib/i18n/server';
+import { getLocale, getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -31,7 +32,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 type PageProps = {
-    searchParams: Promise<{ ticker?: string; lado?: string; dias?: string }>;
+    searchParams: Promise<{ ticker?: string; lado?: string; dias?: string } & PoliticiansSearchParams>;
 };
 
 /** Un 4xx (ticker sin CIK, sin filings) es "no hay datos de este ticker", no
@@ -44,7 +45,9 @@ function isUnknownTicker(error: unknown): boolean {
 
 export default async function InsiderPage({ searchParams }: PageProps) {
     const t = await getT();
-    const { ticker: rawTicker, lado, dias } = await searchParams;
+    const locale = await getLocale();
+    const query = await searchParams;
+    const { ticker: rawTicker, lado, dias } = query;
     const side = lado === 'buy' || lado === 'sell' ? lado : 'all';
     const days = [30, 365].includes(Number(dias)) ? Number(dias) : 90;
     const ticker = rawTicker?.trim().toUpperCase() || null;
@@ -58,6 +61,7 @@ export default async function InsiderPage({ searchParams }: PageProps) {
     let filings: InsiderFilingsResult | null = null;
     let feed: InsiderFeedResult | null = null;
     let operations: InsiderOperationsResult | null = null;
+    let politicians: PoliticiansSectionView | null = null;
 
     if (ticker) {
         try {
@@ -76,7 +80,7 @@ export default async function InsiderPage({ searchParams }: PageProps) {
         // falle no puede tumbar la otra (estado honesto por seccion).
         let feedError: unknown = null;
         let opsError: unknown = null;
-        [feed, operations] = await Promise.all([
+        [feed, operations, politicians] = await Promise.all([
             getInsiderFeed(side, days).catch((error) => {
                 if (isAuthError(error)) throw error;
                 feedError = error;
@@ -87,6 +91,7 @@ export default async function InsiderPage({ searchParams }: PageProps) {
                 opsError = error;
                 return null;
             }),
+            loadPoliticiansSection(query),
         ]);
         if (isBackendUnavailableError(feedError) && isBackendUnavailableError(opsError)) {
             return <BackendOffline feature={t('insider.meta.backendFeature')} retryHref={retryHref} />;
@@ -117,6 +122,7 @@ export default async function InsiderPage({ searchParams }: PageProps) {
                 <>
                     <InsiderOperationsView days={365} result={operations} />
                     <InsiderFeed days={days} feed={feed} side={side} />
+                    {politicians ? <PoliticiansListSection locale={locale} view={politicians} /> : null}
                 </>
             ) : null}
         </main>

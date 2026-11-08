@@ -78,7 +78,7 @@ it('políticos: quién operó el ticker, rango declarado, retraso y enlace al PT
   expect(screen.getByText('1.001–15.000 $')).toBeInTheDocument();
   expect(screen.getByText(/a tiempo/)).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Ver PTR' })).toHaveAttribute('href', tickerTrades.trades[0].source_url);
-  expect(screen.getByRole('link', { name: 'Ver todos los políticos' })).toHaveAttribute('href', '/politicos');
+  expect(screen.getByRole('link', { name: 'Ver todos los políticos' })).toHaveAttribute('href', '/insider#politicos');
 });
 
 it('rango abierto («Over $50,000,000») se muestra como «más de», no como una cifra', () => {

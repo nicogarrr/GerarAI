@@ -109,7 +109,7 @@ const CATALOG_EXCEPTIONS: Record<string, string> = {
     '/inversores/cartas': 'subnav propio de Inversores (HubNav)',
     '/inversores/videos': 'subnav propio de Inversores (HubNav)',
     '/inversores/conceptos': 'subnav propio de Inversores (HubNav)',
-    '/politicos': 'subnav propio de Inversores/Señales (HubNav), junto a Insiders; enlazada desde la sección Políticos de la ficha',
+    '/politicos': 'redirect de compatibilidad a /insider#politicos (la lista es una sección de Insiders; Nico 2026-11-08: sin pestañas nuevas)',
     // El asistente de research se unificó en el Cerebro: la ruta queda solo
     // como redirect que lo abre (handoff sessionStorage + evento open-brain).
     '/calendar/resultados': 'pestaña de CalendarTabs (subnav propio de Calendarios)',

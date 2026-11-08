@@ -4,13 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   actions: vi.fn(), status: vi.fn(), calendar: vi.fn(), materials: vi.fn(),
-  signals: vi.fn(), filings: vi.fn(), feed: vi.fn(), operations: vi.fn(),
+  signals: vi.fn(), filings: vi.fn(), feed: vi.fn(), operations: vi.fn(), politicians: vi.fn(),
 }));
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('@/lib/actions/corporate-actions.actions', () => ({ getCorporateActions: mocks.actions, getCorporateActionsSyncStatus: mocks.status }));
 vi.mock('@/lib/actions/catalysts.actions', () => ({ getFollowedEarnings: mocks.calendar }));
 vi.mock('@/lib/actions/earnings-materials.actions', () => ({ getEarningsMaterials: mocks.materials }));
 vi.mock('@/lib/actions/insider.actions', () => ({ getInsiderSignals: mocks.signals, getInsiderFilings: mocks.filings, getInsiderFeed: mocks.feed, getInsiderOperations: mocks.operations }));
+vi.mock('@/lib/actions/politicians.actions', () => ({ getPoliticians: mocks.politicians }));
 vi.mock('@/lib/backend-offline', () => ({ isBackendUnavailableError: (e: unknown) => e instanceof Error && e.message === 'offline' }));
 vi.mock('@/components/system/BackendOffline', () => ({ default: ({retryHref}: {retryHref: string}) => <a href={retryHref}>Backend offline</a> }));
 vi.mock('@/components/corporate-actions/CorporateActionsView', () => ({ default: ({emptyMessage}: {emptyMessage?: string}) => <p>{emptyMessage}</p> }));
@@ -77,5 +78,15 @@ describe('#2969 insider outages', () => {
     const html = renderToStaticMarkup(await InsiderPage({searchParams: Promise.resolve({})}));
     expect(html).not.toContain('Backend offline');
     expect(html).toContain('Operations available');
+  });
+  it('la sección Políticos vive en /insider y su fallo no tumba la página', async () => {
+    mocks.feed.mockResolvedValue({});
+    mocks.operations.mockResolvedValue({});
+    mocks.politicians.mockRejectedValue(new Error('offline'));
+    const html = renderToStaticMarkup(await InsiderPage({searchParams: Promise.resolve({partido: 'D'})}));
+    expect(html).toContain('id="politicos"');
+    expect(html).toContain('Operations available');
+    expect(html).not.toContain('Backend offline');
+    expect(mocks.politicians).toHaveBeenCalledWith(expect.objectContaining({ party: 'D', chamber: 'all' }));
   });
 });
