@@ -242,8 +242,10 @@ class NsmClient:
         blob, sha = await self.fetch_document(filing)
         report, path = report_from_package(blob)
         parsed = parse_ixbrl_facts(io.BytesIO(report))
-        declared = (parsed.get("entity_lei") or "").upper()
-        if declared and declared != filing.lei.upper():
+        declared = (parsed.get("entity_lei") or "").strip().upper()
+        if not declared:
+            raise NsmError("el documento no declara un LEI: descartado")
+        if declared != filing.lei.strip().upper():
             raise NsmError(f"el documento declara el LEI {declared}, no {filing.lei}: descartado")
         if not parsed.get("facts"):
             raise NsmError("paquete sin hechos iXBRL")
