@@ -20,23 +20,83 @@ PASSAGE = {"group": "guia", "document": "10-K 2025", "url": "https://sec.gov/x",
 
 def test_cita_literal_en_ingles_con_traduccion_al_lado_pasa():
     body = f"Según el 10-K, «{TEXT}» (traducción: «esperamos que los acuerdos mayoristas generen ingresos recurrentes»)."
-    assert Q.non_literal(body, [PASSAGE["text"]]) == []
+    assert Q.non_literal(body, Q.evidence_sources([PASSAGE])) == []
 
 
 def test_traduccion_presentada_como_cita_se_rechaza():
     body = "Según el 10-K, «esperamos que los acuerdos mayoristas generen ingresos recurrentes desde 2026»."
-    assert len(Q.non_literal(body, [PASSAGE["text"]])) == 1
+    assert len(Q.non_literal(body, Q.evidence_sources([PASSAGE]))) == 1
 
 
 def test_elipsis_y_mayusculas_no_rompen_la_cita_literal():
     body = "La empresa dice: «we expect our wholesale agreements … beginning in fiscal 2026»."
-    assert Q.non_literal(body, [PASSAGE["text"]]) == []
+    assert Q.non_literal(body, Q.evidence_sources([PASSAGE])) == []
 
 
 def test_ultimo_recurso_quita_las_comillas_y_lo_registra():
     body = "Según el 10-K, «esperamos que los acuerdos mayoristas generen ingresos recurrentes»."
-    out, touched = Q.unquote_non_literal(body, [PASSAGE["text"]])
+    out, touched = Q.unquote_non_literal(body, Q.evidence_sources([PASSAGE]))
     assert "«" not in out and "esperamos que los acuerdos" in out and len(touched) == 1
+
+
+OTHER = {"group": "riesgos", "document": "Q3 2026 earnings release", "url": "https://ir.example.com/q3",
+         "date": "2026-10-30", "text": "Margins improved on lower freight costs. Demand remained resilient in Europe."}
+
+
+def test_elipsis_que_junta_documentos_distintos_se_rechaza():
+    """Antes (#4863, medido por el auditor): con la evidencia aplanada, un trozo del 10-K + «…» + un trozo de la
+    nota de resultados pasaba como cita literal."""
+    ev = Q.evidence_sources([PASSAGE, OTHER])
+    body = "La empresa dice: «we expect our wholesale agreements … demand remained resilient in Europe»."
+    assert Q.non_literal(body, ev) != []
+    assert Q.literal_problems(body, ev)[0][1] == "junta trozos de documentos distintos"
+    # Cada trozo por separado sí está, cada uno en su documento:
+    assert Q.non_literal("Según el 10-K, «we expect our wholesale agreements to generate recurring revenue».", ev) == []
+    assert Q.non_literal("La nota de resultados dice «demand remained resilient in Europe».", ev) == []
+
+
+def test_elipsis_con_trozos_en_orden_invertido_se_rechaza():
+    ev = Q.evidence_sources([PASSAGE])
+    body = "Según el 10-K, «beginning in fiscal 2026 … we expect our wholesale agreements»."
+    assert Q.literal_problems(body, ev) == [(
+        "beginning in fiscal 2026 … we expect our wholesale agreements",
+        "los trozos no están en el orden del documento o se solapan")]
+    assert Q.non_literal("Según el 10-K, «we expect our wholesale agreements … beginning in fiscal 2026».", ev) == []
+
+
+def test_elipsis_con_trozos_solapados_se_rechaza():
+    ev = Q.evidence_sources([PASSAGE])
+    # «wholesale agreements to generate» y «to generate recurring» se solapan en el documento: no son dos trozos.
+    body = "Según el 10-K, «we expect our wholesale agreements to generate … to generate recurring revenue»."
+    assert Q.non_literal(body, ev) != []
+
+
+def test_la_cita_se_busca_en_el_documento_atribuido_no_en_otro():
+    ev = Q.evidence_sources([PASSAGE, OTHER])
+    # Está literal, pero en la nota de resultados, no en el 10-K al que se atribuye.
+    body = "Según el 10-K, «margins improved on lower freight costs»."
+    assert Q.non_literal(body, ev) == ["margins improved on lower freight costs"]
+
+
+def test_cita_atribuida_a_un_documento_que_no_esta_en_la_evidencia_se_rechaza():
+    ev = Q.evidence_sources([PASSAGE])
+    body = "Según el 10-Q del tercer trimestre, «we expect our wholesale agreements to generate recurring revenue»."
+    assert Q.literal_problems(body, ev) == [("we expect our wholesale agreements to generate recurring revenue",
+                                             "el documento al que se atribuye no está en la evidencia")]
+    out, touched = Q.unquote_non_literal(body, ev)
+    assert "«" not in out and len(touched) == 1
+
+
+def test_el_informe_anual_es_el_10k_y_el_titulo_tambien_atribuye():
+    ev = Q.evidence_sources([PASSAGE, OTHER])
+    assert Q.non_literal(f"El informe anual dice «{TEXT}»", ev) == []
+    assert Q.non_literal("En la Q3 2026 earnings release: «margins improved on lower freight costs».", ev) == []
+
+
+def test_la_traduccion_detras_no_cuenta_como_atribucion():
+    ev = Q.evidence_sources([PASSAGE])
+    body = f"Según el 10-K, «{TEXT}» (traducción: «según el informe trimestral, esperamos ingresos»)."
+    assert Q.non_literal(body, ev) == []
 
 
 def _reply(texts):
