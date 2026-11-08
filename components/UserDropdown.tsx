@@ -49,20 +49,22 @@ const UserDropdown = ({ user }: { user: User }) => {
                 </Button>
             </DropdownMenuTrigger>
             {/* `align="end" + sideOffset` sustituye al `relative right-5` con el
-                que se corrigia a mano la alineacion del menu. */}
-            <DropdownMenuContent align="end" sideOffset={8} className="bg-gray-800 text-gray-400">
+                que se corrigia a mano la alineacion del menu. El tope de ancho
+                evita que un nombre o email largo desborde la pantalla en
+                movil (390px): el texto se trunca, el menu no empuja el layout. */}
+            <DropdownMenuContent align="end" sideOffset={8} className="max-w-[calc(100vw-1rem)] bg-gray-800 text-gray-400">
                 <DropdownMenuLabel>
                     <div className="flex items-center gap-3 py-2">
-                        <Avatar className="h-10 w-10">
+                        <Avatar className="h-10 w-10 shrink-0">
                             <AvatarFallback className="bg-teal-500 text-gray-900 text-sm font-bold">
                                 {user.name[0]}
                             </AvatarFallback>
                         </Avatar>
-                        <div className="flex flex-col">
-                            <span className='text-base font-medium text-gray-400'>
+                        <div className="flex min-w-0 flex-col">
+                            <span className='truncate text-base font-medium text-gray-400'>
                                 {user.name}
                             </span>
-                            <span className="text-sm text-gray-500">{user.email}</span>
+                            <span className="truncate text-sm text-gray-500">{user.email}</span>
                         </div>
                     </div>
                 </DropdownMenuLabel>
