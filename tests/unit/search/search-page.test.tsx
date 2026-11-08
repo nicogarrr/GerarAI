@@ -56,21 +56,36 @@ describe('/search con respuestas del backend', () => {
         spy.mockRestore();
     });
 
-    it('[null] dentro de la lista: se filtra y la página pinta el vacío legítimo sin lanzar', async () => {
-        mocks.researchRequest.mockResolvedValue({ query: 'test', items: [null], page_info: { total_items: 1 } });
+    it('cuerpo objeto sin lista ({}) — error de contrato logueado, no vacío falso', async () => {
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        mocks.researchRequest.mockResolvedValue({});
         render(await page());
-        expect(screen.getByText('Ninguna evidencia coincide con la consulta y los filtros.')).toBeInTheDocument();
-        expect(offline()).not.toBeInTheDocument();
+        expect(offline()).toBeInTheDocument();
+        expect(screen.queryByText('Ninguna evidencia coincide con la consulta y los filtros.')).not.toBeInTheDocument();
+        expect(spy.mock.calls.some((call) => String(call[0]).includes('[search]'))).toBe(true);
+        spy.mockRestore();
     });
 
-    it('ítem sin scores: se pinta sin lanzar (el JSX lee scores.reranker)', async () => {
+    it('[null] dentro de la lista: corrupción logueada con [search] y estado local, no cero falso', async () => {
+        const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        mocks.researchRequest.mockResolvedValue({ query: 'test', items: [null], page_info: { total_items: 1 } });
+        render(await page());
+        expect(offline()).toBeInTheDocument();
+        expect(screen.queryByText('Ninguna evidencia coincide con la consulta y los filtros.')).not.toBeInTheDocument();
+        expect(spy.mock.calls.some((call) => String(call[0]).includes('[search]'))).toBe(true);
+        spy.mockRestore();
+    });
+
+    it('ítem sin métricas: se pinta con N/D explícito (nunca 0 inventado) y sin lanzar', async () => {
         mocks.researchRequest.mockResolvedValue({
             query: 'test',
-            items: [{ entity_type: 'ticker', entity_id: 3, title: 'Empresa sin scores', text: 'texto' }],
+            items: [{ entity_type: 'ticker', entity_id: 3, title: 'Empresa sin métricas', text: 'texto' }],
             page_info: { total_items: 1 },
         });
         render(await page());
-        expect(screen.getByText('Empresa sin scores')).toBeInTheDocument();
+        expect(screen.getByText('Empresa sin métricas')).toBeInTheDocument();
+        expect(screen.getAllByText(/N\/D/).length).toBeGreaterThan(0);
+        expect(screen.queryByText(/0,0000/)).not.toBeInTheDocument();
         expect(offline()).not.toBeInTheDocument();
     });
 });

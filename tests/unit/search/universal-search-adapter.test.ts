@@ -45,6 +45,13 @@ describe('toUniversalSearchResponse: contrato roto = error, nunca vacío falso',
         expect(() => toUniversalSearchResponse([])).toThrow(UniversalSearchContractError);
     });
 
+    it('cuerpo objeto SIN lista real ({}, items:null): contrato roto, nunca vacío falso', () => {
+        expect(() => toUniversalSearchResponse({})).toThrow(UniversalSearchContractError);
+        expect(() => toUniversalSearchResponse({ query: 'test' })).toThrow(UniversalSearchContractError);
+        expect(() => toUniversalSearchResponse({ items: null })).toThrow(UniversalSearchContractError);
+        expect(() => toUniversalSearchResponse({ results: null })).toThrow(UniversalSearchContractError);
+    });
+
     it('results/items presentes pero no lista: UniversalSearchContractError', () => {
         expect(() => toUniversalSearchResponse({ items: { bad: true } })).toThrow(UniversalSearchContractError);
         expect(() => toUniversalSearchResponse({ results: 'oops' })).toThrow(UniversalSearchContractError);
@@ -57,23 +64,27 @@ describe('toUniversalSearchResponse: contrato roto = error, nunca vacío falso',
 });
 
 describe('toUniversalSearchResponse: ítems hostiles dentro de una lista válida', () => {
-    it('[null] se filtra: results queda [] y el render no puede lanzar', () => {
-        const out = toUniversalSearchResponse({ items: [null], total: 1 });
-        expect(out.results).toEqual([]);
+    it('[null] es corrupción de datos: contrato roto, nunca filtrado silencioso', () => {
+        expect(() => toUniversalSearchResponse({ items: [null], total: 1 })).toThrow(UniversalSearchContractError);
     });
 
-    it('ítem sin scores se conserva con scores a cero (el JSX lee scores.reranker)', () => {
-        const out = toUniversalSearchResponse({ items: [{ entity_type: 'ticker', entity_id: 3, title: 'Sin scores' }] });
+    it('ítem sin identidad de entidad: contrato roto', () => {
+        expect(() => toUniversalSearchResponse({ items: [{ entity_id: 1 }] })).toThrow(UniversalSearchContractError);
+        expect(() => toUniversalSearchResponse({ items: [{ entity_type: 'ticker', entity_id: '7' }] })).toThrow(UniversalSearchContractError);
+    });
+
+    it('ítem sin métricas: source_trust y scores quedan null (la ficha pinta N/D), nunca 0 inventado', () => {
+        const out = toUniversalSearchResponse({ items: [{ entity_type: 'ticker', entity_id: 3, title: 'Sin métricas' }] });
         expect(out.results).toHaveLength(1);
-        expect(out.results[0].scores).toEqual({ lexical: 0, vector: 0, rrf: 0, reranker: 0 });
-        expect(out.results[0].title).toBe('Sin scores');
+        expect(out.results[0].source_trust).toBeNull();
+        expect(out.results[0].scores).toEqual({ lexical: null, vector: null, rrf: null, reranker: null });
+        expect(out.results[0].title).toBe('Sin métricas');
     });
 
-    it('ítem sin identidad de entidad se descarta; campos escalares se coercionan', () => {
-        const out = toUniversalSearchResponse({ items: [
-            { entity_id: 1 },
-            { entity_type: 'ticker', entity_id: '7', title: 42, ticker: 9, source_trust: 'alta' },
-        ] });
-        expect(out.results).toEqual([]);
+    it('métricas presentes pero inválidas: null, no cero', () => {
+        const out = toUniversalSearchResponse({ items: [{ entity_type: 'ticker', entity_id: 3, source_trust: 'alta', scores: { reranker: Number.NaN, vector: 0.2 } }] });
+        expect(out.results[0].source_trust).toBeNull();
+        expect(out.results[0].scores.reranker).toBeNull();
+        expect(out.results[0].scores.vector).toBe(0.2);
     });
 });

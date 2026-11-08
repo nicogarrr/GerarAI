@@ -6,15 +6,23 @@
  * Motivo (hallazgo 2026-11-08, ref 760826059): el backend respondía 200 y la
  * página reventaba igualmente al pintar (results.map sobre una forma
  * inesperada o un cuerpo vacío): el crash se llevaba la página entera al
- * ErrorBoundary global. Reglas:
- * - Estructura inválida (cuerpo no objeto, results/items no lista, retrieval
- *   o filters no objeto): UniversalSearchContractError. Nunca se pinta como
- *   «sin evidencia» legítimo: la página lo loguea con [search] y muestra el
- *   estado local de error.
- * - Ítems inválidos o incompletos dentro de una lista válida: se filtran o se
- *   coercionan a formas seguras, de modo que el render posterior no puede
- *   lanzar (p. ej. scores ausentes dejaban un TypeError en result.scores).
+ * ErrorBoundary global. Reglas de veracidad (nada de ceros inventados):
+ * - El cuerpo debe ser un objeto con una LISTA real (`results` o `items`;
+ *   una lista vacía sí es un cero legítimo). Cualquier otra forma es
+ *   UniversalSearchContractError: la página lo loguea con [search] y muestra
+ *   el estado local de error, nunca un «sin evidencia» falso.
+ * - Un ítem inválido dentro de la lista es corrupción de datos, no un cero:
+ *   UniversalSearchContractError, nunca un filtrado silencioso.
+ * - Las métricas ausentes (source_trust, scores) se propagan como null y la
+ *   ficha las pinta como N/D explícito; nunca se inventa un 0.
  */
+
+export type UniversalSearchScores = {
+  lexical: number | null;
+  vector: number | null;
+  rrf: number | null;
+  reranker: number | null;
+};
 
 export type UniversalSearchResult = {
   entity_type: string;
@@ -26,10 +34,10 @@ export type UniversalSearchResult = {
   status: string;
   source_type: string;
   source_tier: string;
-  source_trust: number;
+  source_trust: number | null;
   as_of: string | null;
   citation: string;
-  scores: { lexical: number; vector: number; rrf: number; reranker: number };
+  scores: UniversalSearchScores;
 };
 
 export type UniversalSearchResponse = {
@@ -79,15 +87,19 @@ function asStringOrNull(value: unknown): string | null {
 }
 
 /**
- * Un ítem se conserva cuando identifica su entidad (tipo + id); el resto de
- * campos se coercionan para que el JSX no pueda lanzar. Sin identidad no hay
- * nada honesto que pintar: se descarta.
+ * Un ítem válido identifica su entidad (tipo + id). Las métricas que faltan
+ * quedan en null (la ficha las pinta N/D); un ítem que no es objeto o no
+ * identifica su entidad es corrupción: se rechaza la respuesta entera, no se
+ * filtra en silencio.
  */
-function asResultItem(value: unknown): UniversalSearchResult | null {
-  if (!isRecord(value)) return null;
-  if (typeof value.entity_type !== 'string' || value.entity_type === '') return null;
+function asResultItem(value: unknown): UniversalSearchResult {
+  if (!isRecord(value)) {
+    throw new UniversalSearchContractError('a result item is not an object');
+  }
   const entityId = asFiniteNumber(value.entity_id);
-  if (entityId === null) return null;
+  if (typeof value.entity_type !== 'string' || value.entity_type === '' || entityId === null) {
+    throw new UniversalSearchContractError('a result item lacks entity_type/entity_id');
+  }
   const scores = isRecord(value.scores) ? value.scores : {};
   return {
     entity_type: value.entity_type,
@@ -99,14 +111,14 @@ function asResultItem(value: unknown): UniversalSearchResult | null {
     status: asString(value.status),
     source_type: asString(value.source_type),
     source_tier: asString(value.source_tier),
-    source_trust: asFiniteNumber(value.source_trust) ?? 0,
+    source_trust: asFiniteNumber(value.source_trust),
     as_of: asStringOrNull(value.as_of),
     citation: asString(value.citation),
     scores: {
-      lexical: asFiniteNumber(scores.lexical) ?? 0,
-      vector: asFiniteNumber(scores.vector) ?? 0,
-      rrf: asFiniteNumber(scores.rrf) ?? 0,
-      reranker: asFiniteNumber(scores.reranker) ?? 0,
+      lexical: asFiniteNumber(scores.lexical),
+      vector: asFiniteNumber(scores.vector),
+      rrf: asFiniteNumber(scores.rrf),
+      reranker: asFiniteNumber(scores.reranker),
     },
   };
 }
@@ -115,9 +127,10 @@ export function toUniversalSearchResponse(raw: unknown): UniversalSearchResponse
   if (!isRecord(raw)) {
     throw new UniversalSearchContractError('body is not an object');
   }
-  const wireList = raw.results ?? raw.items;
-  if (wireList !== undefined && wireList !== null && !Array.isArray(wireList)) {
-    throw new UniversalSearchContractError('results/items is not a list');
+  for (const key of ['results', 'items'] as const) {
+    if (raw[key] !== undefined && raw[key] !== null && !Array.isArray(raw[key])) {
+      throw new UniversalSearchContractError(`${key} is not a list`);
+    }
   }
   if (raw.retrieval !== undefined && raw.retrieval !== null && !isRecord(raw.retrieval)) {
     throw new UniversalSearchContractError('retrieval is not an object');
@@ -125,10 +138,11 @@ export function toUniversalSearchResponse(raw: unknown): UniversalSearchResponse
   if (raw.filters !== undefined && raw.filters !== null && !isRecord(raw.filters)) {
     throw new UniversalSearchContractError('filters is not an object');
   }
-  const items = Array.isArray(wireList) ? wireList : [];
-  const results = items
-    .map(asResultItem)
-    .filter((item): item is UniversalSearchResult => item !== null);
+  const wireList = Array.isArray(raw.results) ? raw.results : Array.isArray(raw.items) ? raw.items : null;
+  if (wireList === null) {
+    throw new UniversalSearchContractError('body without a results list');
+  }
+  const results = wireList.map(asResultItem);
   const pageInfo = isRecord(raw.page_info) ? raw.page_info : {};
   const total = asFiniteNumber(raw.total) ?? asFiniteNumber(pageInfo.total_items) ?? results.length;
   return {
