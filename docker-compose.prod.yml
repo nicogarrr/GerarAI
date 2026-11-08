@@ -663,7 +663,7 @@ services:
     image: cavaai-backend:prod
     container_name: cavaai-worker-yahoo
     restart: unless-stopped
-    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "${YAHOO_THREADS:-2}", "-Q", "yahoo", "-Q", "yahoo-news"]
+    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "${YAHOO_THREADS:-2}", "-Q", "yahoo", "yahoo-news"]
     environment:
       <<: [*app-env, *worker-db-env]
     logging: *default-logging
