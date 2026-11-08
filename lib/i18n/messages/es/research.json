@@ -2051,6 +2051,22 @@
     "fullThesis": "Tesis completa",
     "footer": "Informe compuesto con los datos de GerarAI el {date}. Las cifras de la tesis y del desglose son supuestos del usuario.",
     "na": "N/D",
-    "link": "Informe tipo analista"
+    "link": "Informe tipo analista",
+    "tesis": {
+      "kicker": "Tesis de inversión GerarAI · {date}",
+      "title": "{company} ({ticker}): tesis de inversión",
+      "price": "Precio",
+      "irr5": "TIR ponderada a 5 años",
+      "irr10": "TIR ponderada a 10 años",
+      "base10": "TIR base a 10 años",
+      "coe": "Coste del capital (CAPM)",
+      "multiple": "Múltiplo de partida",
+      "peers": "Mediana de comparables",
+      "probabilities": "Probabilidades de los escenarios: {reason}",
+      "stale": "Los datos han cambiado desde que se redactó: las cifras son las del cálculo con el que se escribió el texto; la tesis se rehace con la próxima tesis.",
+      "footer": "Todas las cifras y tablas las calcula el código con los informes citados; el texto lo redactan los agentes expertos con esas cifras como marcadores y un validador rechaza cualquier número escrito a mano. Es un análisis, no una recomendación de compra o venta.",
+      "warnings": "Avisos de datos",
+      "sources": "Documentos leídos: {list}"
+    }
   }
 }
