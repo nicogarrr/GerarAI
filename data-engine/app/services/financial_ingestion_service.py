@@ -285,7 +285,13 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 #    MISMO filing y cierre, cuando no hay concepto explícito de inversiones a corto (ABCL: 540,1 − 120,1 = 420,0 M$).
 # 16 (9-nov-2026): total_debt con deuda garantizada / no garantizada (SecuredLongTermDebt, UnsecuredLongTermDebt…)
 #    como componentes sueltos, sin sumar además LongTermDebtCurrent (IBRX 3T 2026: N/D → 426,3 M$ + arrendamiento financiero).
-SEC_INGESTION_RULES_VERSION = 16
+# 17 (9-nov-2026): arrendamiento operativo total = no corriente + corriente del MISMO filing cuando el 10-Q no etiqueta
+#    el total (META 3T 2026: 28.651 → 31.173 M$; antes solo la parte no corriente).
+# 18 (9-nov-2026): plan C con linkbases embebidos en el .xsd o con otro nombre (índice del filing) y sin reutilizar
+#    una N/D por fallo de descarga (BX 10-K 2025: FRE N/D → 5.737,5 M$; DE N/D → 7.882,2 M$).
+# 19 (9-nov-2026): FRE/DE totales sin XBRL desde una tabla anual del HTML del MISMO informe anual
+#    (filing_html_tables; BN 40-F 2025: DE N/D → 6.008 M$, FRE N/D → 2.995 M$).
+SEC_INGESTION_RULES_VERSION = 19
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Arrendadores (REIT): su ingreso principal es el del arrendamiento (ASC 842),
@@ -746,9 +752,68 @@ def with_derived_short_term_investments(
     return out_facts, out_map
 
 
+#: Concepto sintético (no existe en la taxonomía): pasivo por arrendamiento operativo TOTAL = no corriente + corriente.
+DERIVED_OPERATING_LEASE_TOTAL = "OperatingLeaseLiabilityNoncurrentPlusCurrent"
+_LEASE_TOTAL = "OperatingLeaseLiability"
+_LEASE_NONCURRENT = "OperatingLeaseLiabilityNoncurrent"
+_LEASE_CURRENT = "OperatingLeaseLiabilityCurrent"
+
+
+def with_derived_operating_lease_total(
+    facts: dict[str, Any], metric_map: list[tuple[str, list[str], str]],
+) -> tuple[dict[str, Any], list[tuple[str, list[str], str]]]:
+    """Pasivo por arrendamiento operativo total = no corriente + corriente del MISMO filing (regla 17).
+
+    El 10-K etiqueta el total en la nota de arrendamientos (``OperatingLeaseLiability``), pero muchos 10-Q solo
+    traen las dos líneas del balance: la no corriente (``OperatingLeaseLiabilityNoncurrent``) y la corriente
+    (``OperatingLeaseLiabilityCurrent``). Con la no corriente como respaldo, el trimestre quedaba sin la parte
+    corriente (META 3T 2026: 28.651 M$ frente a 28.651 + 2.522 = 31.173 M$; POOL: 231,1 frente a 351,9 M$), y el
+    puente de la deuda neta restaba de menos. Regla general y conservadora:
+
+    - solo con los DOS hechos en el MISMO filing (``accn``), cierre (``end``) y unidad, y ambos ≥ 0;
+    - solo para cierres sin el total explícito (el total presentado siempre gana);
+    - sin la parte corriente etiquetada no se suma nada: queda la no corriente como hasta ahora.
+
+    Devuelve una copia superficial con el concepto sintético :data:`DERIVED_OPERATING_LEASE_TOTAL` y el mapa con
+    ese concepto JUSTO DETRÁS del total (antes de la no corriente sola). Puro.
+    """
+    if not any(m == "operating_lease_liabilities" and _LEASE_NONCURRENT in cs for m, cs, _u in metric_map):
+        return facts, metric_map
+    if _LEASE_NONCURRENT not in facts or _LEASE_CURRENT not in facts:
+        return facts, metric_map
+    covered = {str(e.get("end")) for entries in (((facts.get(_LEASE_TOTAL) or {}).get("units") or {}).values())
+               for e in entries if isinstance(e, dict)}
+    derived: dict[str, list[dict[str, Any]]] = {}
+    for unit, noncurrent in ((facts[_LEASE_NONCURRENT] or {}).get("units") or {}).items():
+        current = {(e.get("accn"), e.get("end")): e for e in ((facts[_LEASE_CURRENT] or {}).get("units") or {}).get(unit, [])
+                   if isinstance(e, dict) and not e.get("start")}
+        for e in noncurrent:
+            if not isinstance(e, dict) or e.get("start") or str(e.get("end")) in covered:
+                continue
+            cur = current.get((e.get("accn"), e.get("end")))
+            nc, cv = _decimal(e.get("val")), _decimal(cur.get("val")) if cur else None
+            if nc is None or cv is None or nc < 0 or cv < 0:
+                continue
+            derived.setdefault(unit, []).append({**e, "val": float(nc + cv), "_derived_from": (
+                f"{_LEASE_NONCURRENT} {nc} + {_LEASE_CURRENT} {cv} (mismo filing {e.get('accn')})")})
+    if not derived:
+        return facts, metric_map
+    out_facts = {**facts, DERIVED_OPERATING_LEASE_TOTAL: {"units": derived}}
+    out_map: list[tuple[str, list[str], str]] = []
+    for m, cs, u in metric_map:
+        if m == "operating_lease_liabilities" and DERIVED_OPERATING_LEASE_TOTAL not in cs:
+            at = cs.index(_LEASE_NONCURRENT)
+            cs = [*cs[:at], DERIVED_OPERATING_LEASE_TOTAL, *cs[at:]]
+        out_map.append((m, list(cs), u))
+    return out_facts, out_map
+
+
+SYNTHETIC_CONCEPTS = frozenset({DERIVED_SHORT_TERM_INVESTMENTS, DERIVED_OPERATING_LEASE_TOTAL})
+
+
 def _synthetic(entry: dict[str, Any]) -> bool:
-    """El hecho sale de una resta entre conceptos presentados (no está presentado tal cual)."""
-    return entry.get("_concept") == DERIVED_SHORT_TERM_INVESTMENTS
+    """El hecho sale de una operación entre conceptos presentados (no está presentado tal cual)."""
+    return entry.get("_concept") in SYNTHETIC_CONCEPTS
 
 
 def _cash_includes_investments(concept_usage: dict[str, dict[str, Any]], end: str) -> bool:
@@ -2268,6 +2333,8 @@ class FinancialIngestionService:
                 }
         # Inversiones a corto que solo se leen como total combinado − caja (regla 15).
         us_gaap, metric_map = with_derived_short_term_investments(us_gaap, metric_map)
+        # Arrendamiento operativo total de los 10-Q que solo etiquetan no corriente + corriente (regla 17).
+        us_gaap, metric_map = with_derived_operating_lease_total(us_gaap, metric_map)
         # Divisa de reporte del filer (10-K: USD; 20-F en US GAAP: CNY, TWD...).
         # Cada hecho monetario se guarda con ELLA como unidad.
         reporting_currency = _sec_reporting_currency(us_gaap)
