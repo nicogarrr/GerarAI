@@ -4700,6 +4700,11 @@
             "title": "Close",
             "type": "number"
           },
+          "close_kind": {
+            "default": "close",
+            "title": "Close Kind",
+            "type": "string"
+          },
           "color": {
             "title": "Color",
             "type": "string"
@@ -4797,6 +4802,40 @@
             },
             "title": "Level Prices",
             "type": "object"
+          },
+          "live_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live At"
+          },
+          "live_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live Price"
+          },
+          "live_session": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live Session"
           },
           "metrics": {
             "additionalProperties": {
@@ -36819,7 +36858,7 @@
     },
     "/api/companies/{ticker}/analyst-targets": {
       "get": {
-        "description": "Per-firm analyst price targets (Yahoo Finance via yfinance, free and\nunofficial). Every row carries its source and date; a failed or empty\nsource is reported as such, never filled in. Tickers without coverage on\ntheir bare line fall back to their reviewed listing (KRKNF -> PNG.V),\ndeclaring symbol and currency; a currency mismatch is never adopted.\nWith press=1 (company page only) recent press notes complement Yahoo:\ndeterministic extraction, each row attributed with outlet, link and the\narticle's publication date; the aggregate consensus stays Yahoo's.",
+        "description": "Per-firm analyst price targets (Yahoo Finance via yfinance, free and\nunofficial). Every row carries its source and date; a failed or empty\nsource is reported as such, never filled in. Tickers without coverage on\ntheir bare line fall back to their reviewed listing (KRKNF -> PNG.V),\ndeclaring symbol and currency; a currency mismatch is never adopted.\nWith press=1 (company page only) recent press notes complement Yahoo:\ndeterministic extraction, each row attributed with outlet, link and the\narticle's publication date; the aggregate consensus stays Yahoo's. One\nshared deadline covers Yahoo, both press passes AND the listing fallback,\nso the endpoint always answers before the frontend's 14 s cutoff.",
         "operationId": "company_analyst_targets_api_companies__ticker__analyst_targets_get",
         "parameters": [
           {
@@ -105625,7 +105664,7 @@
     },
     "/api/watchlist/dca-signals/{symbol}/card": {
       "get": {
-        "description": "Tarjeta DCA de la watchlist: nivel por semana/mes/trimestre/a\u00f1o, meses en zona,\nriesgo, \u00ab\u00bfpor qu\u00e9?\u00bb y movimiento desde el \u00faltimo cambio de nivel.\n\nMisma serie que la se\u00f1al diaria (Yahoo, cierre ajustado, sin la barra del d\u00eda\nen curso) y mismo motor; la se\u00f1al oficial es la mensual.",
+        "description": "Tarjeta DCA de la watchlist: nivel por semana/mes/trimestre/a\u00f1o, meses en zona,\nriesgo, \u00ab\u00bfpor qu\u00e9?\u00bb y movimiento desde el \u00faltimo cambio de nivel.\n\nMisma serie que la se\u00f1al diaria (Yahoo, cierre ajustado, sin la barra del d\u00eda\nen curso) y mismo motor; la se\u00f1al oficial es la mensual. El periodo en\nformaci\u00f3n usa el precio actual (premercado/sesi\u00f3n/post) cuando hay uno\nfiable, siempre etiquetado como precio actual y nunca como cierre; la\nse\u00f1al oficial, el estado guardado y los avisos siguen solo con cierres.",
         "operationId": "dca_watch_card_api_watchlist_dca_signals__symbol__card_get",
         "parameters": [
           {
