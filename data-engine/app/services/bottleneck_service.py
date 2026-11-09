@@ -198,57 +198,85 @@ def stored_evidence(db: Session, tenant: int) -> Iterator[Evidence]:
 _SEC_ORIGIN = "sec.gov"
 
 
-def _n_sources(components: list[tuple[set[str], set[str]]]) -> int:
+def _n_sources(component_origins: Iterable[set[str]]) -> int:
     """Componentes con origen conocido; los que solo citan a la SEC colapsan en 1."""
-    secular = any(origins and origins <= {_SEC_ORIGIN} for _, origins in components)
-    others = sum(1 for _, origins in components if origins and not origins <= {_SEC_ORIGIN})
+    secular = any(origins and origins <= {_SEC_ORIGIN} for origins in component_origins)
+    others = sum(1 for origins in component_origins if origins and not origins <= {_SEC_ORIGIN})
     return others + (1 if secular else 0)
 
 
-def aggregate(evidence: Iterable[Evidence]) -> dict[str, dict]:
-    groups: dict[str, list[Evidence]] = {theme: [] for theme in THEMES}
-    for item in evidence:
-        for theme in extract_themes(item.text):
-            groups[theme].append(item)
-    result: dict[str, dict] = {}
-    for theme, items in groups.items():
+def _uf_find(uf: dict[str, str], key: str) -> str:
+    root = key
+    while uf[root] != root:
+        root = uf[root]
+    while uf[key] != root:  # compresión de camino: uniones casi planas
+        uf[key], key = root, uf[key]
+    return root
+
+
+class _ThemeAccum:
+    """Acumulador en flujo de un tema: la evidencia se procesa y se SUELTA.
+
+    La versión por lotes guardaba cada Evidence (con su texto completo) en una
+    lista por tema hasta el final: cientos de miles de chunks de ~1 KB por 6
+    temas eran el pico de ~4 GB del OOM medido en prod (02:47/02:58 CET). Aquí
+    el texto muere tras extract_themes; por tema quedan solo union-find de
+    claves de identidad, orígenes por componente, ids y min/max de fechas.
+    """
+
+    __slots__ = ("uf", "origins", "ids", "first", "last")
+
+    def __init__(self) -> None:
+        self.uf: dict[str, str] = {}
+        self.origins: dict[str, set[str]] = {}
+        self.ids: set[str] = set()
+        self.first: datetime | None = None
+        self.last: datetime | None = None
+
+    def add(self, item: Evidence) -> None:
+        self.ids.add(item.id)
+        seen = item.date.replace(tzinfo=UTC) if item.date.tzinfo is None else item.date.astimezone(UTC)
+        if self.first is None or seen < self.first:
+            self.first = seen
+        if self.last is None or seen > self.last:
+            self.last = seen
         # Union by source, URL, checksum or identical text. Transitive copies
         # cannot inflate the count by switching publisher in a storage lane.
-        components: list[tuple[set[str], set[str]]] = []
-        for item in items:
-            keys = set(item.identities)
-            if item.origin:
-                keys.add("origin:" + item.origin)
-            origins = {item.origin} if item.origin else set()
-            remaining = []
-            for old_keys, old_origins in components:
-                if keys & old_keys:
-                    keys |= old_keys
-                    origins |= old_origins
-                else:
-                    remaining.append((old_keys, old_origins))
-            # Merging may connect a previously separate component.
-            while any(keys & k for k, _ in remaining):
-                disconnected = []
-                for old_keys, old_origins in remaining:
-                    if keys & old_keys:
-                        keys |= old_keys
-                        origins |= old_origins
-                    else:
-                        disconnected.append((old_keys, old_origins))
-                remaining = disconnected
-            components = [*remaining, (keys, origins)]
-        dates = [i.date.replace(tzinfo=UTC) if i.date.tzinfo is None else i.date.astimezone(UTC) for i in items]
-        result[theme] = {
-            "evidence_ids": sorted({i.id for i in items}),
-            "first_seen": min(dates) if dates else None,
-            "last_seen": max(dates) if dates else None,
+        keys = set(item.identities)
+        if item.origin:
+            keys.add("origin:" + item.origin)
+        root: str | None = None
+        for key in keys:
+            if key not in self.uf:
+                self.uf[key] = key
+                self.origins[key] = set()
+            found = _uf_find(self.uf, key)
+            if root is None:
+                root = found
+            elif found != root:
+                self.uf[found] = root
+                self.origins[root] |= self.origins.pop(found)
+        if item.origin and root is not None:
+            self.origins[root].add(item.origin)
+
+    def result(self) -> dict:
+        return {
+            "evidence_ids": sorted(self.ids),
+            "first_seen": self.first,
+            "last_seen": self.last,
             # Conservador (objecion del auditor): TODO sec.gov cuenta como UN
             # origen. 10 pasajes de 10 filings distintos de la SEC son UNA
             # fuente (el regulador), no diez; MIN_SOURCES=2 exige otra via.
-            "n_sources": _n_sources(components),
+            "n_sources": _n_sources(self.origins.values()),
         }
-    return result
+
+
+def aggregate(evidence: Iterable[Evidence]) -> dict[str, dict]:
+    groups: dict[str, _ThemeAccum] = {theme: _ThemeAccum() for theme in THEMES}
+    for item in evidence:
+        for theme in extract_themes(item.text):
+            groups[theme].add(item)
+    return {theme: acc.result() for theme, acc in groups.items()}
 
 
 def refresh_signals(db: Session) -> int:
