@@ -39,6 +39,7 @@ import app.services.market_refresh_service as mrs
 from app.models.entities import (
     Base,
     Company,
+    FXRate,
     MarketPrice,
     Position,
     SavedScreen,
@@ -90,6 +91,11 @@ def _consumidores_doblados(monkeypatch):
     monkeypatch.setattr(
         "app.core.cache.invalidate_portfolio_cache", lambda db=None: None
     )
+    # El listener after_commit de core.cache_invalidation conserva la
+    # referencia importada de invalidate_portfolio_cache, asi que el doble de
+    # arriba no lo intercepta: se dobla el punto comun _redis_client (None =
+    # desactivado determinista, sin intento real a localhost:6379).
+    monkeypatch.setattr("app.core.cache._redis_client", lambda: None)
 
 
 class _FXServicioEspia:
@@ -260,13 +266,66 @@ async def test_refresh_base_usd_escribe_tipos_fiscales_en_eur(db, monkeypatch):
 
 @pytest.mark.anyio
 async def test_refresh_fx_excepcion_hace_rollback_y_clasifica(db, monkeypatch):
-    servicio, _, _ = _servicio(monkeypatch, fx_exc=RuntimeError("ecb caido"))
+    """El fallo en el bloque fiscal (segunda llamada al proveedor) deja el
+    upsert del primer bloque pendiente: el espia sobre db.rollback demuestra
+    que se llama UNA vez y que descarta esa escritura (tabla FXRate vacia).
+    PortfolioFXService va REAL (escribe FXRate de verdad); solo se dobla su
+    base_currency para forzar el bloque fiscal EUR."""
+    company = _company(db, "AAPL")
+    position = Position(
+        tenant_id=db.info["tenant_id"], company_id=company.id,
+        quantity=Decimal("1"), currency="GBP", base_currency="USD",
+    )
+    db.add(position)
+    db.commit()
+    provider = _FXProvider(
+        rates_por_base={"USD": {"GBP": Decimal("0.79")}}
+    )
+    fetch_real = provider.fetch
 
-    resultado = await servicio.refresh(db, as_of=AS_OF, companies=[])
+    async def _fetch_falla_en_el_bloque_fiscal(**kwargs):
+        if len(provider.calls) == 1:  # segunda llamada: bloque fiscal EUR
+            provider.calls.append(
+                (kwargs["base_currency"], set(kwargs["quote_currencies"]))
+            )
+            raise RuntimeError("ecb caido")
+        return await fetch_real(**kwargs)
 
+    provider.fetch = _fetch_falla_en_el_bloque_fiscal
+    fx_real = mrs.PortfolioFXService()
+    monkeypatch.setattr(fx_real, "base_currency", lambda db: "USD")
+    monkeypatch.setattr(mrs, "PortfolioFXService", lambda: fx_real)
+    rollbacks = []
+    rollback_real = db.rollback
+
+    def _rollback_espia():
+        # La escritura del primer bloque ya esta flusheada pero SIN commit:
+        # visible dentro de la transaccion (count==1) al llegar el rollback.
+        rollbacks.append(db.query(FXRate).count())
+        rollback_real()
+
+    monkeypatch.setattr(db, "rollback", _rollback_espia)
+    servicio = MarketRefreshService(
+        price_provider=_PriceProvider(), fx_provider=provider
+    )
+
+    resultado = await servicio.refresh(db, as_of=AS_OF, companies=[company])
+
+    assert provider.calls == [
+        ("USD", {"GBP", "USD"}),
+        ("EUR", {"GBP", "USD"}),
+    ]
     etapa_fx = resultado["stages"][1]
     assert etapa_fx["status"] == "partial"
-    assert etapa_fx["errors"] == [{"provider": "ECB", "reason": "RuntimeError:ecb caido"}]
+    assert etapa_fx["errors"] == [
+        {"currency": "USD", "reason": "rate_not_available"},
+        {"provider": "ECB", "reason": "RuntimeError:ecb caido"},
+    ]
+    # Rollback exactamente una vez, con el upsert (USD, GBP) visible en la
+    # transaccion (sin commit)...
+    assert rollbacks == [1]
+    # ...y la escritura quedo descartada: la tabla sigue vacia.
+    assert db.query(FXRate).count() == 0
 
 
 @pytest.mark.anyio
