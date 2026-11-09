@@ -295,62 +295,92 @@ def upsert_prices(
     escrita aquí salía en /screener como «Cierre {hoy}» a media sesión.
     """
     now = now or datetime.now(UTC)
-    written = 0
+    prepared: list[dict[str, Any]] = []
     for bar in bars:
         if not _bar_is_final(company, bar, now):
             continue
         if not bar_unit_is_known(company, bar):
             continue
         # None = ausente -> NULL/preserva; 0 explicito de la fuente es dato.
-        volume = bar.volume
-        values = {
-            "company_id": company.id,
-            "date": bar.day,
-            "open": bar.close,
-            "high": bar.close,
-            "low": bar.close,
-            "close": bar.close,
-            "adj_close": bar.adj_close,
-            "volume": volume,
-            "source": "yfinance",
-            "quote_currency": bar.quote_currency,
-        }
-        if db.bind is not None and db.bind.dialect.name == "postgresql":
-            stmt = pg_insert(MarketPrice).values(**values)
-            stmt = stmt.on_conflict_do_update(
-                constraint="uq_market_price_company_date",
-                set_={
-                    "close": stmt.excluded.close,
-                    "adj_close": stmt.excluded.adj_close,
-                    # Un re-sync sin volumen (NaN de la fuente) NO pisa el
-                    # volumen real ya guardado: ausente no borra dato.
-                    "volume": sa.func.coalesce(stmt.excluded.volume, MarketPrice.volume),
-                    "source": stmt.excluded.source,
-                    "quote_currency": stmt.excluded.quote_currency,
-                },
-            )
-            db.execute(stmt)
-        else:
-            existing = db.scalar(
+        prepared.append(
+            {
+                "company_id": company.id,
+                "date": bar.day,
+                "open": bar.close,
+                "high": bar.close,
+                "low": bar.close,
+                "close": bar.close,
+                "adj_close": bar.adj_close,
+                "volume": bar.volume,
+                "source": "yfinance",
+                "quote_currency": bar.quote_currency,
+            }
+        )
+    written = len(prepared)
+    if not prepared:
+        return 0
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        # Una sola sentencia por tanda. Con fecha duplicada en la tanda gana
+        # la ultima barra, igual que en el upsert fila a fila anterior (PG no
+        # admite afectar dos veces la misma fila en un multi-VALUES).
+        by_day = {row["date"]: row for row in prepared}
+        stmt = pg_insert(MarketPrice).values(list(by_day.values()))
+        stmt = stmt.on_conflict_do_update(
+            constraint="uq_market_price_company_date",
+            set_={
+                "close": stmt.excluded.close,
+                "adj_close": stmt.excluded.adj_close,
+                # Un re-sync sin volumen (NaN de la fuente) NO pisa el
+                # volumen real ya guardado: ausente no borra dato.
+                "volume": sa.func.coalesce(stmt.excluded.volume, MarketPrice.volume),
+                "source": stmt.excluded.source,
+                "quote_currency": stmt.excluded.quote_currency,
+            },
+        )
+        db.execute(stmt)
+    else:
+        # Una sola lectura por tanda: la clave (company_id, date) es unica y
+        # la lista de dias acota la query (sin historial que hidratar).
+        days = {row["date"] for row in prepared}
+        existing_by_day = {
+            row.date: row
+            for row in db.scalars(
                 select(MarketPrice).where(
                     MarketPrice.company_id == company.id,
-                    MarketPrice.date == bar.day,
+                    MarketPrice.date.in_(days),
                 )
             )
+        }
+        for values in prepared:
+            existing = existing_by_day.get(values["date"])
+            volume = values["volume"]
             if existing is not None:
-                existing.close = bar.close
-                existing.adj_close = bar.adj_close
+                # Mismo valor: no se reescribe la fila (ni su updated_at);
+                # la via Postgres tampoco toca updated_at en el conflicto.
+                unchanged = (
+                    existing.close == values["close"]
+                    and existing.adj_close == values["adj_close"]
+                    and existing.source == values["source"]
+                    and existing.quote_currency == values["quote_currency"]
+                    and (volume is None or existing.volume == volume)
+                )
+                if unchanged:
+                    continue
+                existing.close = values["close"]
+                existing.adj_close = values["adj_close"]
                 # Igual que la via Postgres: ausente no borra dato real.
                 if volume is not None:
                     existing.volume = volume
-                existing.source = "yfinance"
-                existing.quote_currency = bar.quote_currency
+                existing.source = values["source"]
+                existing.quote_currency = values["quote_currency"]
             else:
-                db.add(MarketPrice(**values))
-        written += 1
-    if written:
-        # Movers cachea el cálculo de cierres: se invalida tras el commit.
-        movers_cache.mark_prices_written(db)
+                new_row = MarketPrice(**values)
+                db.add(new_row)
+                # Un dia duplicado en la misma tanda actualiza el pendiente,
+                # como hacia el SELECT por barra con autoflush.
+                existing_by_day[values["date"]] = new_row
+    # Movers cachea el cálculo de cierres: se invalida tras el commit.
+    movers_cache.mark_prices_written(db)
     return written
 
 
