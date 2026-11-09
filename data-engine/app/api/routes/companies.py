@@ -100,6 +100,9 @@ router = APIRouter()
 
 
 MAX_SNAPSHOT_BATCH_TICKERS = 50
+# Presupuesto total del endpoint de precios objetivo (Yahoo + prensa +
+# fallback de listado): el front corta a 14 s.
+ROUTE_BUDGET_SECONDS = 13.0
 
 
 @router.get("/{ticker}/analyst-targets", response_model=AnalystTargets)
@@ -111,8 +114,13 @@ async def company_analyst_targets(ticker: str, press: bool = False) -> AnalystTa
     declaring symbol and currency; a currency mismatch is never adopted.
     With press=1 (company page only) recent press notes complement Yahoo:
     deterministic extraction, each row attributed with outlet, link and the
-    article's publication date; the aggregate consensus stays Yahoo's."""
-    result = await analyst_targets_service.get(ticker, press=press)
+    article's publication date; the aggregate consensus stays Yahoo's. One
+    shared deadline covers Yahoo, both press passes AND the listing fallback,
+    so the endpoint always answers before the frontend's 14 s cutoff."""
+    import time as _time
+
+    deadline = _time.monotonic() + ROUTE_BUDGET_SECONDS
+    result = await analyst_targets_service.get(ticker, press=press, deadline=deadline)
     if result.status != "empty":
         return result
     # Listado revisado (mapa de fundamentales no oficiales): si Yahoo no
@@ -124,7 +132,7 @@ async def company_analyst_targets(ticker: str, press: bool = False) -> AnalystTa
     entry = REVIEWED_MAP.get(ticker.strip().upper())
     if not entry:
         return result
-    alt = await analyst_targets_service.get(entry["symbol"], press=press)
+    alt = await analyst_targets_service.get(entry["symbol"], press=press, deadline=deadline)
     if alt.status != "available" or (alt.currency or "").upper() != entry["currency"]:
         return result
     return alt.model_copy(

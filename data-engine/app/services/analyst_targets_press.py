@@ -99,7 +99,10 @@ def _trusted(url: str) -> bool:
 _PRICE_TARGET_PANEL = re.compile(
     r"\$\s?(?P<a>\d{1,5}(?:\.\d{1,2})?)\s(?:share\s)?price target"
     r"|price target\b[^.]{0,60}?\b(?:of|to|at|is)\s(?:[A-Z]{1,3})?\$\s?(?P<b>\d{1,5}(?:\.\d{1,2})?)"
-    r"|target (?:to|of)\s(?:[A-Z]{1,3})?\$\s?(?P<c>\d{1,5}(?:\.\d{1,2})?)", re.I)
+    r"|target (?:to|of)\s(?:[A-Z]{1,3})?\$\s?(?P<c>\d{1,5}(?:\.\d{1,2})?)"
+    # Titulares tipo «AST Spacemobile (ASTS) PT Lowered to $54.00 at Piper».
+    r"|\bPT\s+(?:raised|lowered|cut|hiked|maintained|reiterated|kept|initiated|set|lifted"
+    r"|boosted|trimmed)\s+(?:to|at|of)\s(?:[A-Z]{1,3})?\$\s?(?P<d>\d{1,5}(?:\.\d{1,2})?)", re.I)
 _PRIOR_TARGET = re.compile(
     r"\bfrom\s(?:[A-Z]{1,3})?\$\s?(?P<prior>\d{1,5}(?:\.\d{1,2})?)", re.I)
 
@@ -119,29 +122,60 @@ _CURRENCY_MENTION = re.compile(
 
 # Fechas de la nota respaldadas por el texto (auditor: la fecha de publicación
 # solo vale si el texto no dice otra). «on November 3» fija el día; «on
-# Monday» fija el día de esa semana. Fecha futura = fila descartada.
+# November 3, 2024» respeta el año explícito; «on Monday» fija el día de esa
+# semana. Referencias vagas («last year», «in September») = sin fecha
+# verificable = sin fila. Fecha futura = fila descartada.
 _WEEKDAYS = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4,
              "saturday": 5, "sunday": 6}
 _MONTHS = {"january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
-           "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12}
+           "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12,
+           "jan": 1, "feb": 2, "mar": 3, "apr": 4, "jun": 6, "jul": 7, "aug": 8,
+           "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dec": 12}
+_MONTH_ALT = "|".join(sorted(_MONTHS, key=len, reverse=True))
 _ON_WEEKDAY = re.compile(r"\bon (monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", re.I)
 _ON_MONTH_DAY = re.compile(
-    r"\bon (january|february|march|april|may|june|july|august|september|october|november|december)"
-    r"\s+(\d{1,2})(?:st|nd|rd|th)?\b", re.I)
+    r"\bon (" + _MONTH_ALT + r")\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+'?(\d{4}|\d{2}))?\b", re.I)
+_ON_DAY_MONTH = re.compile(
+    r"\bon (\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(" + _MONTH_ALT + r")\.?(?:,?\s+'?(\d{4}|\d{2}))?\b",
+    re.I)
+_VAGUE_DATE = re.compile(
+    r"\b(?:last (?:year|month|week)|earlier this (?:year|month|week)|this (?:spring|summer|fall|autumn|winter)"
+    r"|recently|previously|a while ago)\b|\bin (?:" + _MONTH_ALT + r")\.?\b(?!\s+\d)", re.I)
+
+
+def _anchor_year(raw: str | None) -> int | None:
+    if not raw:
+        return None
+    year = int(raw)
+    return year if len(raw) == 4 else 2000 + year
 
 
 def note_date(sentence: str, *, published: date, today: date) -> date | None:
     """Fecha de la nota: la que respalda el texto o, sin ancla, la de publicación.
 
-    None cuando no hay fecha verificable (publicación en el futuro o ancla que
-    cae en el futuro): sin fecha verificable no hay fila.
+    None cuando no hay fecha verificable (publicación en el futuro, ancla en
+    el futuro o referencia vaga tipo «last year»): sin fecha verificable no
+    hay fila. Un año explícito se respeta siempre.
     """
     if published > today:
         return None
-    match = _ON_MONTH_DAY.search(sentence)
-    if match:
+    for match, month_first in (
+        (_ON_MONTH_DAY.search(sentence), True),
+        (_ON_DAY_MONTH.search(sentence), False),
+    ):
+        if match is None:
+            continue
+        month = _MONTHS[(match.group(1) if month_first else match.group(2)).lower().rstrip(".")]
+        day_num = int(match.group(2) if month_first else match.group(1))
+        year = _anchor_year(match.group(3))
+        if year is not None:  # año explícito: se respeta siempre
+            try:
+                day = date(year, month, day_num)
+            except ValueError:
+                return None
+            return None if day > today else day
         try:
-            day = date(published.year, _MONTHS[match.group(1).lower()], int(match.group(2)))
+            day = date(published.year, month, day_num)
         except ValueError:
             return None
         if day > published:
@@ -158,6 +192,8 @@ def note_date(sentence: str, *, published: date, today: date) -> date | None:
         delta = (published.weekday() - _WEEKDAYS[match.group(1).lower()]) % 7
         day = published - timedelta(days=delta)
         return None if day > today else day
+    if _VAGUE_DATE.search(sentence):
+        return None
     return published
 
 
@@ -172,6 +208,66 @@ _STOP_TICKER_TOKENS = {
     "TWD", "SEK", "NOK", "DKK", "GBX",
 }
 _TICKER_TOKEN = re.compile(r"(?<![\w$.])([A-Z][A-Z0-9]{1,4})(?![\w])")
+
+
+def company_aliases(text: str, symbol: str) -> set[str]:
+    """Nombres propios de la empresa vistos junto al ticker: «AST Spacemobile
+    (NASDAQ: ASTS)» da «AST Spacemobile» (y sus sufijos por si el titular
+    pega un verbo: «Barclays Raises AST SpaceMobile (ASTS)»)."""
+    aliases: set[str] = set()
+    pattern = re.compile(
+        r"([A-Z][A-Za-z0-9&'.-]+(?:\s+[A-Z][A-Za-z0-9&'.-]+){0,3})"
+        r"\s*\(\s*(?:[A-Z][A-Z0-9]{1,6}:\s*)?" + re.escape(symbol) + r"\s*\)")
+    for match in pattern.finditer(text):
+        words = match.group(1).split()
+        for k in range(1, len(words) + 1):
+            aliases.add(" ".join(words[-k:]))
+    return aliases
+
+
+# Conectores que pueden seguir al objeto del objetivo en una frase sana:
+# «...on ASTS to $54», «...on ASTS) on Monday», «...(ASTS) and maintains Buy».
+_TAIL_CONNECTORS = {
+    "to", "from", "while", "on", "with", "and", "as", "at", "after", "before", "amid", "in",
+    "of", "the", "a", "an", "its", "for", "versus", "vs", "than",
+    *list(_WEEKDAYS), *[m for m in _MONTHS if len(m) > 2],
+}
+
+
+def _tail_clean(sentence: str, end: int) -> bool:
+    """Tras el objeto no puede venir otro sustantivo propio en mayúsculas
+    («...price target on ASTS Apple»): conectores, fechas y cifras sí son
+    continuaciones sanas («on ASTS to $54», «on ASTS) on Monday»)."""
+    rest = re.sub(r"^[\s\)\]\.,;:]+", "", sentence[end:])
+    if not rest:
+        return True
+    token = rest.split()[0]
+    if not token[0].isupper():
+        return True
+    return re.sub(r"[()\[\]{},;:.!$]", "", token).lower() in _TAIL_CONNECTORS
+
+
+def bound_to_company(sentence: str, symbol: str, aliases: set[str]) -> bool:
+    """El objetivo va pegado a «on/for <empresa>» o al titular «<empresa> PT
+    Raised to $X» (patrón estricto). «price target on Apple while discussing
+    ASTS» NO vincula: el objeto del objetivo es otra empresa."""
+    objects = sorted({symbol, *aliases}, key=len, reverse=True)
+    obj = ("(?:" + "|".join(re.escape(o) for o in objects) + ")"
+           + r"(?:\s*\(\s*(?:[A-Z][A-Z0-9]{1,6}:\s*)?" + re.escape(symbol) + r"\s*\))?")
+    for pattern in (
+        # «price target on AST Spacemobile (NASDAQ: ASTS) to $54» y «$90 price target on ASTS».
+        r"price target\s+(?:on|for)\s+" + obj + r"(?!\w)",
+        # «price target of/to $90 on ASTS».
+        r"price target\s+(?:of|to|at|is)\s+(?:[A-Z]{1,3})?\$\s?\d[\d,]*(?:\.\d{1,2})?"
+        r"\s+(?:on|for)\s+" + obj + r"(?!\w)",
+        # Titulares tipo «AST Spacemobile (ASTS) PT Raised to $90 at Cantor».
+        obj + r"\s+PT\s+(?:raised|lowered|cut|hiked|maintained|reiterated|kept|initiated|set"
+        r"|lifted|boosted|trimmed)\b",
+    ):
+        match = re.search(pattern, sentence, re.I)
+        if match and _tail_clean(sentence, match.end()):
+            return True
+    return False
 
 
 def _foreign_ticker(sentence: str, symbol: str, firm: str) -> bool:
@@ -289,6 +385,7 @@ def extract_targets(text: str, *, symbol: str, published: date, url: str, full_t
     if not _mentions_symbol(text, symbol):
         return []
     outlet = outlet_name(url)
+    aliases = company_aliases(text, symbol)
     article_firms = firms_in(text)
     found: list[PressTarget] = []
     for sentence in sentence_split(text):
@@ -299,6 +396,8 @@ def extract_targets(text: str, *, symbol: str, published: date, url: str, full_t
         # menciona ASTS de pasada no convierte el objetivo de OTRA empresa en
         # una fila de ASTS.
         if not _mentions_symbol(sentence, symbol):
+            continue
+        if not bound_to_company(sentence, symbol, aliases):
             continue
         own = firms_in(sentence)
         firm = own[0] if len(own) == 1 else (article_firms[0] if not own and len(article_firms) == 1 else None)
@@ -313,14 +412,14 @@ def extract_targets(text: str, *, symbol: str, published: date, url: str, full_t
         day = note_date(sentence, published=published, today=today)
         if day is None:
             continue
-        value = match.group("a") or match.group("b") or match.group("c")
+        value = match.group("a") or match.group("b") or match.group("c") or match.group("d")
         try:
             target = float(value)
         except (TypeError, ValueError):
             continue
         if target <= 0:
             continue
-        num_start = match.start("a") if match.group("a") else (match.start("b") if match.group("b") else match.start("c"))
+        num_start = next(match.start(g) for g in ("a", "b", "c", "d") if match.group(g))
         prior = None
         prior_match = _PRIOR_TARGET.search(sentence)
         if prior_match:
@@ -330,6 +429,11 @@ def extract_targets(text: str, *, symbol: str, published: date, url: str, full_t
                 prior = prior_value
         rating_match = _RATING.search(sentence)
         action = next((name for name, rx in press_actions() if rx.search(sentence)), None)
+        # Una firma, una fila por texto: el titular y el cuerpo repiten la
+        # misma nota («PT Lowered to $54» + «lowered its price target ... to
+        # $54.00 from $98.00»). Gana la frase con más contexto (anterior,
+        # rating, acción); a igual riqueza, la última (el cuerpo, no el
+        # titular).
         found.append(PressTarget(
             firm=canonical_firm,
             date=day,
@@ -343,7 +447,14 @@ def extract_targets(text: str, *, symbol: str, published: date, url: str, full_t
             currency_mentions=tuple(m.group(1) for m in _CURRENCY_MENTION.finditer(sentence)),
             full_text=full_text,
         ))
-    return found
+    best: dict[str, tuple[tuple[int, int, int, int], PressTarget]] = {}
+    for index, row in enumerate(found):
+        richness = (row.prior_target is not None, row.rating is not None, row.action is not None)
+        score = (*richness, index)
+        current = best.get(row.firm)
+        if current is None or score >= current[0]:
+            best[row.firm] = (score, row)
+    return [row for _, row in best.values()]
 
 
 async def _default_fetch(url: str):
@@ -351,6 +462,20 @@ async def _default_fetch(url: str):
 
     return await fetch_public_url_async(
         url, timeout=FETCH_TIMEOUT_S, max_bytes=MAX_ARTICLE_BYTES, headers={"User-Agent": USER_AGENT})
+
+
+# Ritmo por HOST compartido entre llamadas del proceso: dos fichas distintas
+# que consultan prensa a la vez no pisan al mismo medio ni a Bing.
+_HOST_LAST: dict[str, float] = {}
+
+
+async def _paced_fetch(fetch, url: str):
+    host = urlparse(url).netloc or url
+    wait = MIN_INTERVAL_S - (time.monotonic() - _HOST_LAST.get(host, 0.0))
+    if wait > 0:
+        await asyncio.sleep(wait)
+    _HOST_LAST[host] = time.monotonic()
+    return await fetch(url)
 
 
 def base_queries(symbol: str) -> list[str]:
@@ -381,15 +506,9 @@ async def fetch_press_targets(symbol: str, *, today: date, queries: list[str] | 
     if not symbol:
         return []
     earliest = today - timedelta(days=LOOKBACK_DAYS)
-    last = 0.0
 
     async def paced(url: str):
-        nonlocal last
-        wait = MIN_INTERVAL_S - (time.monotonic() - last)
-        if wait > 0:
-            await asyncio.sleep(wait)
-        last = time.monotonic()
-        return await fetch(url)
+        return await _paced_fetch(fetch, url)
 
     items: list[PressItem] = []
     for query in (queries if queries is not None else base_queries(symbol)):

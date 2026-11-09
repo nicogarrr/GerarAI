@@ -368,7 +368,8 @@ class AnalystTargetsService:
     def __init__(self) -> None:
         self._cache: dict[str, tuple[float, AnalystTargets]] = {}
 
-    async def get(self, symbol: str, *, press: bool = False) -> AnalystTargets:
+    async def get(self, symbol: str, *, press: bool = False,
+                  deadline: float | None = None) -> AnalystTargets:
         key = symbol.strip().upper()
         # La variante con prensa se cachea aparte: la celda de listas (sin
         # press) y la ficha (con press) no comparten entrada.
@@ -378,16 +379,22 @@ class AnalystTargetsService:
         if hit is not None and now - hit[0] < CACHE_TTL_SECONDS:
             return hit[1]
         fetched_at = int(now)
-        deadline = time.monotonic() + TOTAL_BUDGET_SECONDS
+        # Presupuesto compartido con la ruta (fallback de listado incluido):
+        # la suma de llamadas nunca supera el corte del front.
+        deadline = deadline if deadline is not None else time.monotonic() + TOTAL_BUDGET_SECONDS
         press_targets: list[Any] = []
         if press:
             from app.services.analyst_targets_press import fetch_press_targets
 
+            remaining = deadline - time.monotonic()
             data, found = await asyncio.gather(
-                asyncio.wait_for(asyncio.to_thread(_fetch_sync, key), timeout=FETCH_TIMEOUT_SECONDS),
+                asyncio.wait_for(
+                    asyncio.to_thread(_fetch_sync, key),
+                    timeout=min(FETCH_TIMEOUT_SECONDS, max(0.5, remaining)),
+                ),
                 asyncio.wait_for(
                     fetch_press_targets(key, today=datetime.now(UTC).date()),
-                    timeout=min(PRESS_TIMEOUT_SECONDS, TOTAL_BUDGET_SECONDS),
+                    timeout=min(PRESS_TIMEOUT_SECONDS, max(0.5, remaining)),
                 ),
                 return_exceptions=True,
             )
@@ -397,7 +404,8 @@ class AnalystTargetsService:
         else:
             try:
                 data = await asyncio.wait_for(
-                    asyncio.to_thread(_fetch_sync, key), timeout=FETCH_TIMEOUT_SECONDS
+                    asyncio.to_thread(_fetch_sync, key),
+                    timeout=min(FETCH_TIMEOUT_SECONDS, max(0.5, deadline - time.monotonic())),
                 )
             except Exception:  # noqa: BLE001 - Yahoo puede fallar; nunca se cachea un fallo
                 data = None

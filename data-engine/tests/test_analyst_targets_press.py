@@ -460,3 +460,68 @@ def test_segunda_pasada_omite_firmas_frescas(monkeypatch) -> None:
     monkeypatch.setattr(press, "fetch_press_targets", fake_press)
     asyncio.run(svc.AnalystTargetsService().get("ASTS", press=True))
     assert calls == [None]
+
+
+def _extract(text, today=TODAY, symbol="ASTS"):
+    return press.extract_targets(
+        text, symbol=symbol, published=today, url="https://www.example.com/news/1",
+        full_text=True, today=today)
+
+
+# --- Bloqueo A del auditor: anio explicito y fechas vagas ------------------
+
+def test_extract_explicit_year_respected_even_if_past():
+    text = "Cantor Fitzgerald reiterated a $90.00 price target on ASTS on November 3, 2024."
+    rows = _extract(text)
+    assert len(rows) == 1 and rows[0].date == date(2024, 11, 3)
+
+
+def test_extract_month_day_abbreviation_variants():
+    for fmt in ("on Nov. 3", "on November 3rd", "on 3 Nov", "on 3 November"):
+        rows = _extract(f"Cantor Fitzgerald kept a $90 price target on ASTS {fmt}.")
+        assert len(rows) == 1 and rows[0].date == date(2026, 11, 3), fmt
+
+
+def test_extract_two_digit_year():
+    rows = _extract(
+        "Cantor Fitzgerald reiterated a $90.00 price target on ASTS on Nov. 3, '24.")
+    assert len(rows) == 1 and rows[0].date == date(2024, 11, 3)
+
+
+def test_extract_vague_dates_produce_no_row():
+    for vague in ("last year", "earlier this month", "last week", "in September"):
+        text = f"Cantor Fitzgerald reiterated a $90.00 price target on ASTS {vague}."
+        assert _extract(text) == [], vague
+
+
+def test_extract_explicit_future_year_produces_no_row():
+    rows = _extract(
+        "Cantor Fitzgerald reiterated a $90.00 price target on ASTS on November 3, 2027.")
+    assert rows == []
+
+
+# --- Bloqueo B del auditor: el objetivo debe ir pegado a la empresa --------
+
+def test_extract_foreign_company_object_produces_no_row():
+    text = "Cantor Fitzgerald reiterated a $90.00 price target on Apple while discussing ASTS."
+    assert _extract(text) == []
+
+
+def test_extract_cross_company_news_round1_produces_no_row():
+    # Primer contraejemplo del auditor: «ASTS is in the news. Cantor ... $250 on AAPL».
+    text = ("ASTS is in the news. Cantor Fitzgerald reiterated a $250.00 price target on "
+            "Apple (NASDAQ: AAPL) and keeps an Overweight rating.")
+    assert _extract(text) == []
+
+
+def test_extract_bound_object_variants_pass():
+    cases = [
+        ("Cantor Fitzgerald reiterated a $90.00 price target on ASTS.", 90.0),
+        ("AST Spacemobile (ASTS) PT Raised to $90 at Cantor Fitzgerald.", 90.0),
+        ("AST Spacemobile (NASDAQ: ASTS) PT Lowered to $54.00 From $98.00 at Piper Sandler.", 54.0),
+        ("Roth Capital lowered its price target on AST SpaceMobile (ASTS) to $50.00.", 50.0),
+    ]
+    for text, expected in cases:
+        rows = _extract(text)
+        assert len(rows) == 1, text
+        assert rows[0].price_target == expected, text
