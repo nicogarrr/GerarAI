@@ -1998,6 +1998,24 @@ class ChatService:
                 llm_trace={"path": "page_identity", "generated": False, "provider_calls": 0},
                 context=context_echo,
             )
+        # «¿Qué ha hecho Buffett con Apple en su último 13F?»: pide su 13F,
+        # no una cita; antes de la guardia de autor (benchmark ins08). Sin modelo.
+        from app.services.brain_13f_tools import answer_13f_question
+
+        filing_13f = answer_13f_question(db, question or "")
+        if filing_13f is not None:
+            filing_13f.context = context_echo
+            return filing_13f
+        # «¿Cuánto efectivo tengo?» → «¿y si aporto 600 €, cuánto tendría?»:
+        # el saldo del hilo más la aportación, con la suma a la vista (seg06).
+        from app.services.brain_account_tools import cash_contribution_answer
+
+        contribution = cash_contribution_answer(
+            db, question or "", [t.content for t in history or [] if t.role == "user" and t.content],
+        )
+        if contribution is not None:
+            contribution.context = context_echo
+            return contribution
         # Tu IRPF al vender va antes que los datos de empresa, el ticker
         # desconocido o el contexto personal: tengas el valor o no, se
         # responde a esa pregunta y no a otra.
