@@ -653,6 +653,24 @@ def _current_delivery_id() -> str | None:
     return str(message_id) if message_id else None
 
 
+def _ensure_company_fx(db: Session, ticker: object) -> None:
+    """Nunca lanza: sin tipo, la valoración dice cuál falta y por qué."""
+    if not isinstance(ticker, str) or not ticker:
+        return
+    try:
+        from app.services.company_resolver import resolve_company
+        from app.services.fx_backfill import ensure_company_fx
+
+        company = resolve_company(db, ticker)
+        if company is not None:
+            out = ensure_company_fx(db, company)
+            if out.get("missing"):
+                logger.info("thesis job %s: tipos sin fuente %s", ticker, out["missing"])
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        logger.warning("thesis job %s: relleno FX falló (%s)", ticker, type(exc).__name__)
+
+
 def run_thesis_job(run_id: int) -> None:
     """Run a thesis delivery with tenant context and recoverable retries."""
     import contextlib
@@ -791,6 +809,9 @@ def run_thesis_job(run_id: int) -> None:
                 _record_preclaim_failure(db, run_id, exc)
                 raise
         db.commit()
+        # Tipos de cambio que falten para valorar ESTA empresa (TSM: USD→TWD; CGEO.L: GEL), pedidos al
+        # BCE o al banco central emisor antes de valorar; lo que siga sin tipo queda N/D con su motivo.
+        _ensure_company_fx(db, payload.get("ticker"))
         # Fencing token del intento: si una entrega de recuperacion (lease
         # expirado, reconciler) toma el run MIENTRAS este intento genera,
         # intent +1 lo delata. Ni el commit de exito ni el manejador de
