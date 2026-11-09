@@ -27,6 +27,7 @@ vi.mock('@/components/brain/BrainGuideAnswer', () => ({
     BrainGuideAnswer: ({ result }: { result: { answer: string } }) => <div data-testid="guide-answer">{result.answer}</div>,
 }));
 
+import BottomNav from '@/components/layout/BottomNav';
 import { GlobalBrain } from '@/components/brain/GlobalBrain';
 import { OPEN_BRAIN_PENDING_KEY, openBrain } from '@/lib/brain/open-brain';
 import { brainStorageKey } from '@/lib/brain/conversation';
@@ -57,6 +58,20 @@ afterEach(() => {
 });
 
 describe('GlobalBrain: botón y apertura', () => {
+    it('queues a BottomNav click before the brain listener mounts and consumes it once', async () => {
+        const nav = render(<BottomNav />);
+        expect(document.documentElement).not.toHaveAttribute('data-brain-ready');
+        fireEvent.click(screen.getByRole('button', { name: 'Abrir el cerebro' }));
+        expect(window.sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBe('null');
+        nav.unmount();
+        const brain = render(<GlobalBrain userId="u1" />);
+        expect(await screen.findByRole('dialog', { name: 'Cerebro GerarAI' })).toBeVisible();
+        expect(window.sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBeNull();
+        brain.unmount();
+        render(<GlobalBrain userId="u1" />);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
     it('cerrado: solo el botón flotante; la pista se pliega a los 4 s', () => {
         vi.useFakeTimers();
         const { container } = render(<GlobalBrain userId="u1" />);
