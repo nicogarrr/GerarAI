@@ -53,6 +53,7 @@ from app.services.analyst_note_service import (
     AnalystNoteService,
     normalize_action,
 )
+from app.services.analyst_yahoo import fetch_upgrades_downgrades_records
 from app.services.inferred_input_service import is_valid_https_url
 
 Reasoner = Callable[[str, str, int, str], Awaitable[str]]
@@ -318,22 +319,7 @@ def _fetch_yahoo_sync(symbol: str) -> dict[str, Any]:
     from app.services.analyst_targets_service import _fetch_currency_and_type
 
     ticker = yf.Ticker(symbol)
-    frame: Any = ticker.upgrades_downgrades
-    records: list[dict[str, Any]] = []
-    if frame is not None and len(frame) > 0:
-        for index, item in frame.iterrows():
-            records.append(
-                {
-                    "date": index,
-                    "firm": item.get("Firm"),
-                    "to_grade": item.get("ToGrade"),
-                    "from_grade": item.get("FromGrade"),
-                    "action": item.get("Action"),
-                    "price_target_action": item.get("priceTargetAction"),
-                    "price_target": item.get("currentPriceTarget"),
-                    "prior_target": item.get("priorPriceTarget"),
-                }
-            )
+    records = fetch_upgrades_downgrades_records(ticker)
     closes: list[tuple[date, float]] = []
     history: Any = ticker.history(period="2y", auto_adjust=False)
     if history is not None and len(history) > 0:

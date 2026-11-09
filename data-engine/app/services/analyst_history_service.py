@@ -45,6 +45,7 @@ from app.services.analyst_targets_service import (
     _positive,
     non_equity_label,
 )
+from app.services.analyst_yahoo import fetch_upgrades_downgrades_records
 
 SOURCE = "Yahoo Finance (no oficial): histórico de recomendaciones y cierres diarios"
 SOURCE_URL = "https://finance.yahoo.com/quote/{symbol}/analysis/"
@@ -475,19 +476,15 @@ def build_history(
 def _fetch_history_records(symbol: str) -> list[dict[str, Any]]:
     import yfinance as yf
 
-    frame = yf.Ticker(symbol).upgrades_downgrades
-    records: list[dict[str, Any]] = []
-    if frame is not None and len(frame) > 0:
-        for index, item in frame.iterrows():
-            records.append(
-                {
-                    "date": index,
-                    "firm": item.get("Firm"),
-                    "grade_action": item.get("Action"),
-                    "price_target": item.get("currentPriceTarget"),
-                }
-            )
-    return records
+    return [
+        {
+            "date": record["date"],
+            "firm": record["firm"],
+            "grade_action": record["action"],
+            "price_target": record["price_target"],
+        }
+        for record in fetch_upgrades_downgrades_records(yf.Ticker(symbol))
+    ]
 
 
 def _fetch_prices(symbol: str) -> dict[str, list[tuple[date, float]]]:
