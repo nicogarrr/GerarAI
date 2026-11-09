@@ -174,14 +174,43 @@ _ENDED_RE = re.compile(
 )
 
 
+_HEADING_RE = re.compile(r"<(?:h1|h2|h3|title)[^>]*>(.*?)</(?:h1|h2|h3|title)>", re.IGNORECASE | re.S)
+_GUIDANCE_RE = re.compile(r"\b(guidance|outlook|forecast|gu[ií]a|previsi[oó]n(?:es)?)\b", re.IGNORECASE)
+
+
+def _headline(doc_html: str, text: str) -> str:
+    """Titular/periodo principal del documento: el primer encabezado (h1-h3/title)
+    o, si no hay marcas, el principio del texto. Las frases de guía a futuro
+    («guidance», «outlook») no son el periodo del que informa el documento y se
+    retiran: una nota del T2-2025 con «guidance for second quarter 2026» habla
+    del T2-2025.
+    """
+    headings = list(_HEADING_RE.finditer(doc_html[:6000]))
+    if headings:
+        headline = _text(headings[0].group(1))
+    else:
+        # Sin titular marcado solo vale el primer enunciado: lo que sigue ya es
+        # cuerpo (guía, comparativas, texto corrido) y no es el periodo principal.
+        headline = re.split(r"(?<=[.!?;])\s", text, maxsplit=1)[0][:200]
+    kept = [s for s in re.split(r"(?<=[.!?;])\s+", headline) if not _GUIDANCE_RE.search(s)]
+    return " ".join(kept).lower()
+
+
 def check_period(doc_html: str, fiscal_label: str | None) -> str:
     """``confirmado`` / ``contradice`` / ``no_verificado`` frente al cierre del calendario ("Sep/2026").
 
     Confirma solo el periodo declarado en contexto: un "quarter/period/months ended ..." que
-    coincide con el cierre, o el nombre del trimestre con su año ("second quarter 2026"). Una
-    fecha suelta de portada o publicación ("June 5, 2026") NO confirma. Si el texto declara
-    "ended" de otro periodo y ninguno del cierre, contradice aunque la portada lleve una fecha
-    del mes del cierre; las comparativas de otros años no tumban una confirmación real.
+    coincide con el cierre, o el nombre del trimestre con su año EN EL TITULAR del documento
+    (primer encabezado; "Second quarter 2026 results"). Una fecha suelta de portada o
+    publicación ("June 5, 2026") NO confirma, y una mención del trimestre en el cuerpo tampoco:
+    la guía a futuro ("guidance for second quarter 2026" en una nota del T2-2025) no es el
+    periodo del que informa el documento. Si el texto declara "ended" de otro periodo y ninguno
+    del cierre, contradice aunque la portada lleve una fecha del mes del cierre; las
+    comparativas de otros años no tumban una confirmación real: un "ended" de OTRO AÑO
+    ("quarter ended June 30, 2025" al lado del titular "second quarter 2026") es la
+    comparativa habitual del año previo y no contradice el titular, mientras que un "ended" del
+    MISMO año y otro mes es una declaración estructurada de otro periodo y sí contradice aunque
+    el titular diga el trimestre del cierre.
     """
     match = re.match(r"^([A-Za-z]{3})/(\d{4})$", fiscal_label or "")
     if not match:
@@ -196,12 +225,20 @@ def check_period(doc_html: str, fiscal_label: str | None) -> str:
     ended_matches = list(_ENDED_RE.finditer(text))
     if any(m.group(1) == month and m.group(2) == year for m in ended_matches):
         return "confirmado"
-    if any(m.group(1) in _MONTHS for m in ended_matches):
+    # Mismo año y otro mes: declaración estructurada de otro periodo del mismo año
+    # fiscal; contradice incluso si el titular dice el trimestre del cierre.
+    if any(m.group(1) in _MONTHS and m.group(2) == year for m in ended_matches):
         return "contradice"
     if month_index % 3 == 2:
         quarter = month_index // 3
-        if re.search(rf"\b{_ORDINALS[quarter]} quarter,? (?:of )?{year}\b|\bq{quarter + 1}\s*{year}\b", text):
+        # La confirmación por nombre de trimestre se ancla al titular: el cuerpo
+        # puede mencionar otros trimestres (guía, comparativas) sin informar de ellos.
+        if re.search(rf"\b{_ORDINALS[quarter]} quarter,? (?:of )?{year}\b|\bq{quarter + 1}\s*{year}\b", _headline(doc_html, text)):
             return "confirmado"
+    # Solo «ended» de otros años (filing viejo o comparativa sin confirmación del
+    # cierre): contradice — no hay nada que respalde el periodo esperado.
+    if any(m.group(1) in _MONTHS for m in ended_matches):
+        return "contradice"
     return "no_verificado"
 
 

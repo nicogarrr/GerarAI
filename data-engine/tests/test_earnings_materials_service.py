@@ -118,6 +118,50 @@ def test_cover_date_never_confirms_and_ended_context_wins():
     ) == "confirmado"
     # Solo periodo de otro año: contradice.
     assert svc.check_period("results for the quarter ended June 30, 2025", "Jun/2026") == "contradice"
+    # Repro: la comparativa del año previo NO tumba el titular que confirma el trimestre.
+    assert svc.check_period(
+        "<h1>Second quarter 2026 results</h1><p>Revenue grew 12% compared with the quarter ended June 30, 2025.</p>",
+        "Jun/2026",
+    ) == "confirmado"
+    # Un «ended» del MISMO año y otro mes es declaración estructurada de otro periodo:
+    # contradice aunque el titular diga el trimestre del cierre.
+    assert svc.check_period(
+        "Second quarter 2026 results. Results for the quarter ended March 31, 2026.", "Jun/2026"
+    ) == "contradice"
+
+
+def test_quarter_mention_in_body_or_guidance_never_confirms():
+    # Repro del auditor: titular T2-2025 + guía al T2-2026 en el cuerpo NO es Jun/2026.
+    assert svc.check_period(
+        "<h1>Second quarter 2025 results</h1><p>Guidance for second quarter 2026.</p>"
+        "<p>Quarter ended June 30, 2025.</p>",
+        "Jun/2026",
+    ) == "contradice"
+    # El trimestre del cierre solo en el cuerpo (sin «ended» del cierre) no confirma:
+    # el titular es el periodo principal.
+    assert svc.check_period(
+        "<h1>Annual results 2025</h1><p>Strong momentum into second quarter 2026.</p>",
+        "Jun/2026",
+    ) == "no_verificado"
+    # La guía en el propio titular tampoco confirma el periodo.
+    assert svc.check_period(
+        "<h1>Company raises guidance for second quarter 2026</h1><p>Details inside.</p>",
+        "Jun/2026",
+    ) == "no_verificado"
+    # Pero el titular que SÍ informa del trimestre sigue confirmando aunque el
+    # cuerpo compare con el año previo (pin del repro original).
+    assert svc.check_period(
+        "<h1>Second quarter 2026 results</h1><p>Revenue grew 12% compared with the quarter ended June 30, 2025.</p>",
+        "Jun/2026",
+    ) == "confirmado"
+    # Texto plano sin marcas: solo el primer enunciado es el titular; el trimestre
+    # del cierre en enunciados posteriores no confirma (repro del auditor).
+    assert svc.check_period(
+        "Second quarter 2025 results. Strong momentum into second quarter 2026. Quarter ended June 30, 2025.",
+        "Jun/2026",
+    ) == "contradice"
+    # Y en texto plano el primer enunciado sigue confirmando (pins ya existentes).
+    assert svc.check_period("Q2 2026 Update Highlights", "Jun/2026") == "confirmado"
 
 
 def test_domestic_doc_with_cover_date_but_other_period_links_nothing():
