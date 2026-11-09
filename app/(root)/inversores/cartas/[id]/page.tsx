@@ -7,6 +7,7 @@ import { ScreenBreadcrumbName } from '@/components/screeners/ScreenBreadcrumbNam
 import { getKnowledgeDocument, getKnowledgeDocumentChunkPage, getKnowledgeLetters } from '@/lib/actions/research-tools.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getT } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 
 import { LibraryChat } from '../../_components/LibraryChat';
 import { Pagination } from '../../_components/Pagination';
@@ -17,8 +18,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
-    const t = await getT();
-    return { title: t('investors.reader.metaTitle'), description: t('investors.reader.metaDescription') };
+    return i18nPageMetadata('investors.reader.metaTitle', 'investors.reader.metaDescription');
 }
 
 const PAGE_SIZE = 8;

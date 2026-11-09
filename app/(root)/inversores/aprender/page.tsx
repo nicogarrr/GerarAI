@@ -2,10 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { getT } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 
 export async function generateMetadata(): Promise<Metadata> {
-    const t = await getT();
-    return { title: t('investors.learn.metaTitle'), description: t('investors.learn.description') };
+    return i18nPageMetadata('investors.learn.metaTitle', 'investors.learn.description');
 }
 
 export default async function AprenderPage() {

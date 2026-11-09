@@ -3,12 +3,12 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
 import { getLocale, getT } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 
 import { INVESTOR_CHANNELS, channelNoteLabel, channelSourceLabel, type ChannelCategory } from './channels';
 
 export async function generateMetadata(): Promise<Metadata> {
-    const t = await getT();
-    return { title: t('investors.channels.title'), description: t('investors.channels.description') };
+    return i18nPageMetadata('investors.channels.title', 'investors.channels.description');
 }
 
 export default async function ChannelsPage() {

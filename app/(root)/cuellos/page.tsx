@@ -16,13 +16,13 @@ import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { BOTTLENECK_TO_THEMES, basketName, bottleneckThemeName } from '@/lib/market/theme-bottleneck-map';
 import type { Formatters } from '@/lib/format';
 import { getFormat, getLocale, getT } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 import type { Locale } from '@/lib/i18n/locale';
 import { bottleneckReasoningText, bottleneckText } from '@/lib/research/bottleneck-text';
 import type { TranslateFn } from '@/lib/i18n/translate';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
-  return { title: t('bottlenecks.page.metaTitle'), description: t('bottlenecks.page.metaDescription') };
+    return i18nPageMetadata('bottlenecks.page.metaTitle', 'bottlenecks.page.metaDescription');
 }
 
 export const dynamic = 'force-dynamic';
