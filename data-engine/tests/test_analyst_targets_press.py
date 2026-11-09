@@ -10,6 +10,7 @@ fila del día con medio, enlace y fecha real de publicación.
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import UTC, date, datetime, timedelta
 
 from app.services import analyst_targets_press as press
@@ -427,9 +428,9 @@ def test_segunda_pasada_con_consultas_por_firma_envejecida(monkeypatch) -> None:
     assert result.status == "available"
 
 
-def test_sin_presupuesto_no_hay_segunda_pasada_y_yahoo_se_devuelve(monkeypatch) -> None:
-    # Presupuesto agotado (auditor: 18 s de peor caso frente a 14 s del front):
-    # la segunda pasada no corre y el panel devuelve Yahoo tal cual.
+def test_sin_presupuesto_no_hay_prensa_ni_espera_minima(monkeypatch) -> None:
+    # Presupuesto agotado (auditor, ronda 3): ni fase de prensa ni espera
+    # mínima de 0,5 s; la respuesta sale al instante con el fallo declarado.
     monkeypatch.setattr(svc, "TOTAL_BUDGET_SECONDS", 0)
     monkeypatch.setattr(svc, "_fetch_sync", lambda symbol: _payload())
     calls: list = []
@@ -439,11 +440,12 @@ def test_sin_presupuesto_no_hay_segunda_pasada_y_yahoo_se_devuelve(monkeypatch) 
         return []
 
     monkeypatch.setattr(press, "fetch_press_targets", fake_press)
+    started = time.monotonic()
     result = asyncio.run(svc.AnalystTargetsService().get("ASTS", press=True))
-    # La segunda pasada NO corre sin presupuesto: ninguna consulta por firma.
-    assert not any(isinstance(queries, list) for queries in calls)
-    assert result.status == "available" and result.rows[0].source == svc.SOURCE
-    assert result.note is None and result.note_code is None
+    elapsed = time.monotonic() - started
+    assert calls == []  # ninguna pasada de prensa
+    assert elapsed < 0.5  # sin espera mínima
+    assert result.note_code == "fetch_failed"
 
 
 def test_segunda_pasada_omite_firmas_frescas(monkeypatch) -> None:
@@ -525,3 +527,65 @@ def test_extract_bound_object_variants_pass():
         rows = _extract(text)
         assert len(rows) == 1, text
         assert rows[0].price_target == expected, text
+
+
+# --- Bloqueo 1 del auditor (ronda 3): cifra pegada y frase con 2 objetivos --
+
+def test_extract_two_price_targets_in_one_sentence_produces_no_row():
+    text = ("Cantor reiterated a $250 price target on Apple while keeping a "
+            "$90 price target on ASTS.")
+    assert _extract(text) == []
+
+
+def test_extract_extra_money_figure_produces_no_row():
+    text = "Cantor Fitzgerald reiterated a $90 price target on ASTS, above the $80 consensus."
+    assert _extract(text) == []
+
+
+def test_extract_prior_from_figure_still_allowed():
+    rows = _extract("Piper Sandler lowered its price target on ASTS to $54.00 from $98.00.")
+    assert len(rows) == 1 and rows[0].price_target == 54.0 and rows[0].prior_target == 98.0
+
+
+# --- Bloqueo 2 del auditor (ronda 3): años sueltos sin fecha completa -------
+
+def test_extract_stray_year_without_full_date_produces_no_row():
+    assert _extract("Cantor Fitzgerald reiterated a $90.00 price target on ASTS in 2024.") == []
+    assert _extract("Cantor Fitzgerald reiterated a $90.00 price target on ASTS on November 3 in 2024.") == []
+    assert _extract("Cantor Fitzgerald reiterated a $90.00 price target on ASTS back in '24.") == []
+
+
+def test_extract_same_year_mention_keeps_pubdate():
+    rows = _extract("Cantor Fitzgerald reiterated a $90.00 price target on ASTS in 2026.")
+    assert len(rows) == 1 and rows[0].date == TODAY
+
+
+# --- Bloqueo 3 del auditor (ronda 3): lock por host en el pacing ------------
+
+def test_paced_fetch_serializes_same_host(monkeypatch):
+    monkeypatch.setattr(press, "MIN_INTERVAL_S", 0.08)
+    monkeypatch.setattr(press, "_HOST_LAST", {})
+    monkeypatch.setattr(press, "_HOST_LOCKS", {})
+    order = []
+
+    async def fake_fetch(url):
+        order.append(("start", url))
+        await asyncio.sleep(0.03)
+        order.append(("end", url))
+
+    async def run():
+        await asyncio.gather(
+            press._paced_fetch(fake_fetch, "https://m.example.com/a"),
+            press._paced_fetch(fake_fetch, "https://m.example.com/b"),
+        )
+
+    asyncio.run(run())
+    # Con lock, la segunda petición no empieza hasta que acaba la primera.
+    assert order == [("start", "https://m.example.com/a"),
+                     ("end", "https://m.example.com/a"),
+                     ("start", "https://m.example.com/b"),
+                     ("end", "https://m.example.com/b")] or \
+           order == [("start", "https://m.example.com/b"),
+                     ("end", "https://m.example.com/b"),
+                     ("start", "https://m.example.com/a"),
+                     ("end", "https://m.example.com/a")]

@@ -92,17 +92,10 @@ def _trusted(url: str) -> bool:
     host = (urlparse(url).netloc or "").lower().removeprefix("www.")
     return any(host == domain or host.endswith("." + domain) for domain in _TRUSTED_DOMAINS)
 
-# Como el patrón de analyst_press_estimates, pero admite además la forma
-# «price target on AST Spacemobile to $54» (habitual en prensa: el objetivo
-# tras «on <empresa>»). El patrón del colector de estimaciones no se toca:
-# alimenta inputs declarados de valoración y su cobertura es deliberada.
-_PRICE_TARGET_PANEL = re.compile(
-    r"\$\s?(?P<a>\d{1,5}(?:\.\d{1,2})?)\s(?:share\s)?price target"
-    r"|price target\b[^.]{0,60}?\b(?:of|to|at|is)\s(?:[A-Z]{1,3})?\$\s?(?P<b>\d{1,5}(?:\.\d{1,2})?)"
-    r"|target (?:to|of)\s(?:[A-Z]{1,3})?\$\s?(?P<c>\d{1,5}(?:\.\d{1,2})?)"
-    # Titulares tipo «AST Spacemobile (ASTS) PT Lowered to $54.00 at Piper».
-    r"|\bPT\s+(?:raised|lowered|cut|hiked|maintained|reiterated|kept|initiated|set|lifted"
-    r"|boosted|trimmed)\s+(?:to|at|of)\s(?:[A-Z]{1,3})?\$\s?(?P<d>\d{1,5}(?:\.\d{1,2})?)", re.I)
+# Una frase con más de un «price target» o más de una cifra de dinero no
+# atribuible se descarta entera: fail-closed (auditor, ronda 3).
+_PT_WORD = re.compile(r"\bprice targets?\b", re.I)
+_MONEY_FIGURE = re.compile(r"\$\s?\d")
 _PRIOR_TARGET = re.compile(
     r"\bfrom\s(?:[A-Z]{1,3})?\$\s?(?P<prior>\d{1,5}(?:\.\d{1,2})?)", re.I)
 
@@ -150,6 +143,18 @@ def _anchor_year(raw: str | None) -> int | None:
     return year if len(raw) == 4 else 2000 + year
 
 
+_YEAR_4 = re.compile(r"(?<![\w.,$])((?:19|20)\d{2})(?![\w])")
+_YEAR_2 = re.compile(r"'(\d{2})(?![\d])")
+
+
+def _sentence_years(sentence: str) -> set[int]:
+    """Años escritos en la frase («in 2024», «en el '24»), de 4 cifras o de
+    2 con apóstrofo."""
+    years = {int(y) for y in _YEAR_4.findall(sentence)}
+    years |= {2000 + int(y) for y in _YEAR_2.findall(sentence)}
+    return years
+
+
 def note_date(sentence: str, *, published: date, today: date) -> date | None:
     """Fecha de la nota: la que respalda el texto o, sin ancla, la de publicación.
 
@@ -165,15 +170,20 @@ def note_date(sentence: str, *, published: date, today: date) -> date | None:
     ):
         if match is None:
             continue
+        year = _anchor_year(match.group(3))
         month = _MONTHS[(match.group(1) if month_first else match.group(2)).lower().rstrip(".")]
         day_num = int(match.group(2) if month_first else match.group(1))
-        year = _anchor_year(match.group(3))
         if year is not None:  # año explícito: se respeta siempre
             try:
                 day = date(year, month, day_num)
             except ValueError:
                 return None
             return None if day > today else day
+        # «on November 3 in 2024»: el año escrito no va pegado a la fecha;
+        # sin fecha completa que lo respalde, sin fila.
+        years = _sentence_years(sentence)
+        if any(y != published.year for y in years):
+            return None
         try:
             day = date(published.year, month, day_num)
         except ValueError:
@@ -187,6 +197,11 @@ def note_date(sentence: str, *, published: date, today: date) -> date | None:
                 return None
             day = date(published.year - 1, day.month, day.day)
         return None if day > today else day
+    # «...price target on ASTS in 2024.»: año escrito distinto del de
+    # publicación y sin fecha completa; sin fecha verificable no hay fila.
+    years = _sentence_years(sentence)
+    if any(y != published.year for y in years):
+        return None
     match = _ON_WEEKDAY.search(sentence)
     if match:
         delta = (published.weekday() - _WEEKDAYS[match.group(1).lower()]) % 7
@@ -247,27 +262,37 @@ def _tail_clean(sentence: str, end: int) -> bool:
     return re.sub(r"[()\[\]{},;:.!$]", "", token).lower() in _TAIL_CONNECTORS
 
 
-def bound_to_company(sentence: str, symbol: str, aliases: set[str]) -> bool:
-    """El objetivo va pegado a «on/for <empresa>» o al titular «<empresa> PT
-    Raised to $X» (patrón estricto). «price target on Apple while discussing
-    ASTS» NO vincula: el objeto del objetivo es otra empresa."""
+_MONEY = r"(?:[A-Z]{1,3})?\$\s?(\d{1,5}(?:\.\d{1,2})?)"
+
+
+def bound_value(sentence: str, symbol: str, aliases: set[str]) -> tuple[float, int] | None:
+    """(cifra, posición) solo si la cifra va PEGADA al objeto de la empresa:
+    «$90 price target on ASTS», «price target of/to $90 on ASTS», «price
+    target on ASTS to $90» o el titular «<empresa> PT Raised to $90».
+    «$250 price target on Apple while keeping a $90 price target on ASTS»
+    no llega aquí: se descarta antes por tener dos «price target»."""
     objects = sorted({symbol, *aliases}, key=len, reverse=True)
     obj = ("(?:" + "|".join(re.escape(o) for o in objects) + ")"
            + r"(?:\s*\(\s*(?:[A-Z][A-Z0-9]{1,6}:\s*)?" + re.escape(symbol) + r"\s*\))?")
     for pattern in (
-        # «price target on AST Spacemobile (NASDAQ: ASTS) to $54» y «$90 price target on ASTS».
-        r"price target\s+(?:on|for)\s+" + obj + r"(?!\w)",
-        # «price target of/to $90 on ASTS».
-        r"price target\s+(?:of|to|at|is)\s+(?:[A-Z]{1,3})?\$\s?\d[\d,]*(?:\.\d{1,2})?"
-        r"\s+(?:on|for)\s+" + obj + r"(?!\w)",
-        # Titulares tipo «AST Spacemobile (ASTS) PT Raised to $90 at Cantor».
+        _MONEY + r"\s(?:share\s)?price target\s+(?:on|for)\s+" + obj + r"(?!\w)",
+        r"price target\s+(?:of|at|to|is)\s+" + _MONEY + r"\s+(?:on|for)\s+" + obj + r"(?!\w)",
+        r"price target\s+(?:on|for)\s+" + obj + r"\s+(?:to|at|of)\s+" + _MONEY,
         obj + r"\s+PT\s+(?:raised|lowered|cut|hiked|maintained|reiterated|kept|initiated|set"
-        r"|lifted|boosted|trimmed)\b",
+        r"|lifted|boosted|trimmed)\s+(?:to|at|of)\s+" + _MONEY,
     ):
         match = re.search(pattern, sentence, re.I)
         if match and _tail_clean(sentence, match.end()):
-            return True
-    return False
+            return float(match.group(1)), match.start(1)
+    return None
+
+
+def _excess_money_figures(sentence: str) -> bool:
+    """Más de una cifra de dinero no atribuible: la frase se descarta.
+    El «from $98.00» del objetivo anterior sí es atribuible y no cuenta."""
+    figures = len(_MONEY_FIGURE.findall(sentence))
+    priors = len(_PRIOR_TARGET.findall(sentence))
+    return figures - min(priors, 1) > 1
 
 
 def _foreign_ticker(sentence: str, symbol: str, firm: str) -> bool:
@@ -389,16 +414,19 @@ def extract_targets(text: str, *, symbol: str, published: date, url: str, full_t
     article_firms = firms_in(text)
     found: list[PressTarget] = []
     for sentence in sentence_split(text):
-        match = _PRICE_TARGET_PANEL.search(sentence)
-        if match is None:
+        # Fail-closed: más de un «price target» o más de una cifra de dinero
+        # no atribuible, y la frase entera se descarta.
+        if len(_PT_WORD.findall(sentence)) > 1 or _excess_money_figures(sentence):
             continue
         # Firma, cifra y empresa/ticker en la MISMA frase: un artículo que
         # menciona ASTS de pasada no convierte el objetivo de OTRA empresa en
         # una fila de ASTS.
         if not _mentions_symbol(sentence, symbol):
             continue
-        if not bound_to_company(sentence, symbol, aliases):
+        bound = bound_value(sentence, symbol, aliases)
+        if bound is None:
             continue
+        target, num_start = bound
         own = firms_in(sentence)
         firm = own[0] if len(own) == 1 else (article_firms[0] if not own and len(article_firms) == 1 else None)
         if firm is None:
@@ -409,17 +437,11 @@ def extract_targets(text: str, *, symbol: str, published: date, url: str, full_t
         # Marca de divisa no reconocida («XYZ$90»): la fila no es verificable.
         if any(m.group(1).upper() not in DOLLAR_MARKS for m in _ANY_MARK.finditer(sentence)):
             continue
+        if target <= 0:
+            continue
         day = note_date(sentence, published=published, today=today)
         if day is None:
             continue
-        value = match.group("a") or match.group("b") or match.group("c") or match.group("d")
-        try:
-            target = float(value)
-        except (TypeError, ValueError):
-            continue
-        if target <= 0:
-            continue
-        num_start = next(match.start(g) for g in ("a", "b", "c", "d") if match.group(g))
         prior = None
         prior_match = _PRIOR_TARGET.search(sentence)
         if prior_match:
@@ -465,17 +487,22 @@ async def _default_fetch(url: str):
 
 
 # Ritmo por HOST compartido entre llamadas del proceso: dos fichas distintas
-# que consultan prensa a la vez no pisan al mismo medio ni a Bing.
+# que consultan prensa a la vez no pisan al mismo medio ni a Bing. El lock por
+# host reserva el hueco antes de dormir: dos _paced_fetch concurrentes al
+# mismo host salen serializados, no a la vez.
 _HOST_LAST: dict[str, float] = {}
+_HOST_LOCKS: dict[str, asyncio.Lock] = {}
 
 
 async def _paced_fetch(fetch, url: str):
     host = urlparse(url).netloc or url
-    wait = MIN_INTERVAL_S - (time.monotonic() - _HOST_LAST.get(host, 0.0))
-    if wait > 0:
-        await asyncio.sleep(wait)
-    _HOST_LAST[host] = time.monotonic()
-    return await fetch(url)
+    lock = _HOST_LOCKS.setdefault(host, asyncio.Lock())
+    async with lock:
+        wait = MIN_INTERVAL_S - (time.monotonic() - _HOST_LAST.get(host, 0.0))
+        if wait > 0:
+            await asyncio.sleep(wait)
+        _HOST_LAST[host] = time.monotonic()
+        return await fetch(url)
 
 
 def base_queries(symbol: str) -> list[str]:

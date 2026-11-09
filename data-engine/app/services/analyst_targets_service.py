@@ -379,22 +379,25 @@ class AnalystTargetsService:
         if hit is not None and now - hit[0] < CACHE_TTL_SECONDS:
             return hit[1]
         fetched_at = int(now)
-        # Presupuesto compartido con la ruta (fallback de listado incluido):
-        # la suma de llamadas nunca supera el corte del front.
+        # Presupuesto de espera compartido con la ruta (fallback de listado
+        # incluido): limita lo que el endpoint ESPERA; el to_thread de Yahoo
+        # sigue trabajando en segundo plano tras el timeout. Con el
+        # presupuesto agotado no hay fase de prensa ni espera mínima: solo
+        # Yahoo al instante (timeout 0).
         deadline = deadline if deadline is not None else time.monotonic() + TOTAL_BUDGET_SECONDS
         press_targets: list[Any] = []
-        if press:
+        if press and deadline - time.monotonic() > 0:
             from app.services.analyst_targets_press import fetch_press_targets
 
             remaining = deadline - time.monotonic()
             data, found = await asyncio.gather(
                 asyncio.wait_for(
                     asyncio.to_thread(_fetch_sync, key),
-                    timeout=min(FETCH_TIMEOUT_SECONDS, max(0.5, remaining)),
+                    timeout=min(FETCH_TIMEOUT_SECONDS, remaining),
                 ),
                 asyncio.wait_for(
                     fetch_press_targets(key, today=datetime.now(UTC).date()),
-                    timeout=min(PRESS_TIMEOUT_SECONDS, max(0.5, remaining)),
+                    timeout=min(PRESS_TIMEOUT_SECONDS, remaining),
                 ),
                 return_exceptions=True,
             )
@@ -405,7 +408,7 @@ class AnalystTargetsService:
             try:
                 data = await asyncio.wait_for(
                     asyncio.to_thread(_fetch_sync, key),
-                    timeout=min(FETCH_TIMEOUT_SECONDS, max(0.5, deadline - time.monotonic())),
+                    timeout=min(FETCH_TIMEOUT_SECONDS, max(0.0, deadline - time.monotonic())),
                 )
             except Exception:  # noqa: BLE001 - Yahoo puede fallar; nunca se cachea un fallo
                 data = None
