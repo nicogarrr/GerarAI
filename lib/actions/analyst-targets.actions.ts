@@ -25,7 +25,7 @@ export type ListingAnalystTargets = {
     source: string;
     note: string | null;
     /** Código estable de la nota (el front la traduce; `note` va en castellano). */
-    noteCode?: 'fetch_failed' | 'not_equity' | 'consensus_only' | 'no_targets' | null;
+    noteCode?: 'fetch_failed' | 'not_equity' | 'consensus_only' | 'no_targets' | 'with_press' | null;
     /** Tipo de instrumento declarado por Yahoo cuando no es una acción. */
     instrumentType?: string | null;
 };

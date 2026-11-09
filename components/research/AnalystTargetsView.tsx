@@ -66,7 +66,9 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
                                     <span className="shrink-0 tabular-nums text-gray-100">{fmtTarget(row.price_target)}</span>
                                 </div>
                                 <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-3 text-xs text-gray-400">
-                                    <span>{analystRatingEs(row.rating, locale) ?? fmt.na} · {fmt.formatMarketDate(row.date)}</span>
+                                    <span>{analystRatingEs(row.rating, locale) ?? fmt.na} · {fmt.formatMarketDate(row.date)}{row.source_url ? (
+                                        <> · <a className="underline decoration-gray-600 underline-offset-2" href={row.source_url} target="_blank" rel="noreferrer noopener">{row.source}</a></>
+                                    ) : null}</span>
                                     <span className="tabular-nums">{t('research.analystTargets.priorLabel', { value: fmtTarget(row.prior_target) })} · <span title={t('research.analystTargets.upsideTitle')}>{t('research.analystTargets.upside')}</span> {!cur || row.upside_percent === null || row.upside_percent === undefined ? fmt.na : fmt.formatPercent(row.upside_percent, { fromRatio: false, signDisplay: 'always' })}</span>
                                 </div>
                             </li>
@@ -88,7 +90,9 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
                             <tbody className="divide-y divide-gray-800">
                                 {rows.map((row) => (
                                     <tr key={`${row.firm}-${row.date}`}>
-                                        <th className="py-1.5 pr-3 font-medium text-gray-100" scope="row">{row.firm}</th>
+                                        <th className="py-1.5 pr-3 font-medium text-gray-100" scope="row">{row.firm}{row.source_url ? (
+                                            <a className="block text-xs font-normal text-gray-500 underline decoration-gray-700 underline-offset-2" href={row.source_url} target="_blank" rel="noreferrer noopener">{row.source}</a>
+                                        ) : null}</th>
                                         <td className="py-1.5 pr-3 text-gray-300">{analystRatingEs(row.rating, locale) ?? fmt.na}</td>
                                         <td className="py-1.5 pr-3 text-right tabular-nums text-gray-100">{fmtTarget(row.price_target)}</td>
                                         <td className="py-1.5 pr-3 text-right tabular-nums text-gray-400">{fmtTarget(row.prior_target)}</td>
@@ -100,6 +104,9 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
                         </table>
                     </div>
                     </>
+                    ) : null}
+                    {note && data.rows.length > 0 ? (
+                        <p className="mt-2 text-xs text-gray-500">{note}</p>
                     ) : null}
                     <p className="mt-2 text-xs text-gray-500">
                         {t('research.analystTargets.fetched', { date: fmt.formatUserDateTime(data.fetched_at * 1000) })}

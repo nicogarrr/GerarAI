@@ -103,13 +103,16 @@ MAX_SNAPSHOT_BATCH_TICKERS = 50
 
 
 @router.get("/{ticker}/analyst-targets", response_model=AnalystTargets)
-async def company_analyst_targets(ticker: str) -> AnalystTargets:
+async def company_analyst_targets(ticker: str, press: bool = False) -> AnalystTargets:
     """Per-firm analyst price targets (Yahoo Finance via yfinance, free and
     unofficial). Every row carries its source and date; a failed or empty
     source is reported as such, never filled in. Tickers without coverage on
     their bare line fall back to their reviewed listing (KRKNF -> PNG.V),
-    declaring symbol and currency; a currency mismatch is never adopted."""
-    result = await analyst_targets_service.get(ticker)
+    declaring symbol and currency; a currency mismatch is never adopted.
+    With press=1 (company page only) recent press notes complement Yahoo:
+    deterministic extraction, each row attributed with outlet, link and the
+    article's publication date; the aggregate consensus stays Yahoo's."""
+    result = await analyst_targets_service.get(ticker, press=press)
     if result.status != "empty":
         return result
     # Listado revisado (mapa de fundamentales no oficiales): si Yahoo no
@@ -121,7 +124,7 @@ async def company_analyst_targets(ticker: str) -> AnalystTargets:
     entry = REVIEWED_MAP.get(ticker.strip().upper())
     if not entry:
         return result
-    alt = await analyst_targets_service.get(entry["symbol"])
+    alt = await analyst_targets_service.get(entry["symbol"], press=press)
     if alt.status != "available" or (alt.currency or "").upper() != entry["currency"]:
         return result
     return alt.model_copy(

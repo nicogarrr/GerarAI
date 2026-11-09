@@ -28,7 +28,7 @@ def _targets(symbol: str, status: str, currency: str | None, mean: float | None)
 
 
 def test_reviewed_listing_fallback_declares_symbol_and_currency(monkeypatch) -> None:
-    async def fake_get(symbol: str) -> AnalystTargets:
+    async def fake_get(symbol: str, *, press: bool = False) -> AnalystTargets:
         if symbol == "KRKNF":
             return _targets("KRKNF", "empty", "USD", None)
         if symbol == "PNG.V":
@@ -46,7 +46,7 @@ def test_reviewed_listing_fallback_declares_symbol_and_currency(monkeypatch) -> 
 
 
 def test_fallback_never_adopts_a_currency_mismatch(monkeypatch) -> None:
-    async def fake_get(symbol: str) -> AnalystTargets:
+    async def fake_get(symbol: str, *, press: bool = False) -> AnalystTargets:
         if symbol == "KRKNF":
             return _targets("KRKNF", "empty", "USD", None)
         if symbol == "PNG.V":
@@ -62,7 +62,7 @@ def test_fallback_never_adopts_a_currency_mismatch(monkeypatch) -> None:
 def test_primary_available_skips_fallback(monkeypatch) -> None:
     calls: list[str] = []
 
-    async def fake_get(symbol: str) -> AnalystTargets:
+    async def fake_get(symbol: str, *, press: bool = False) -> AnalystTargets:
         calls.append(symbol)
         return _targets(symbol, "available", "USD", 102.15)
 
@@ -71,3 +71,16 @@ def test_primary_available_skips_fallback(monkeypatch) -> None:
     assert response.status_code == 200, response.text
     assert calls == ["RKLB"]
     assert response.json()["symbol"] == "RKLB"
+
+
+def test_press_param_llega_al_servicio(monkeypatch) -> None:
+    calls: list[bool] = []
+
+    async def fake_get(symbol: str, *, press: bool = False) -> AnalystTargets:
+        calls.append(press)
+        return _targets(symbol, "available", "USD", 102.15)
+
+    monkeypatch.setattr("app.api.routes.companies.analyst_targets_service.get", fake_get)
+    assert client.get("/api/companies/RKLB/analyst-targets").status_code == 200
+    assert client.get("/api/companies/RKLB/analyst-targets?press=true").status_code == 200
+    assert calls == [False, True]

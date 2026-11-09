@@ -995,6 +995,17 @@
             "title": "Source",
             "type": "string"
           },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
           "upside_percent": {
             "anyOf": [
               {
@@ -1071,7 +1082,8 @@
                   "fetch_failed",
                   "not_equity",
                   "consensus_only",
-                  "no_targets"
+                  "no_targets",
+                  "with_press"
                 ],
                 "type": "string"
               },
@@ -36807,7 +36819,7 @@
     },
     "/api/companies/{ticker}/analyst-targets": {
       "get": {
-        "description": "Per-firm analyst price targets (Yahoo Finance via yfinance, free and\nunofficial). Every row carries its source and date; a failed or empty\nsource is reported as such, never filled in. Tickers without coverage on\ntheir bare line fall back to their reviewed listing (KRKNF -> PNG.V),\ndeclaring symbol and currency; a currency mismatch is never adopted.",
+        "description": "Per-firm analyst price targets (Yahoo Finance via yfinance, free and\nunofficial). Every row carries its source and date; a failed or empty\nsource is reported as such, never filled in. Tickers without coverage on\ntheir bare line fall back to their reviewed listing (KRKNF -> PNG.V),\ndeclaring symbol and currency; a currency mismatch is never adopted.\nWith press=1 (company page only) recent press notes complement Yahoo:\ndeterministic extraction, each row attributed with outlet, link and the\narticle's publication date; the aggregate consensus stays Yahoo's.",
         "operationId": "company_analyst_targets_api_companies__ticker__analyst_targets_get",
         "parameters": [
           {
@@ -36817,6 +36829,16 @@
             "schema": {
               "title": "Ticker",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "press",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Press",
+              "type": "boolean"
             }
           },
           {

@@ -589,3 +589,13 @@ def press_estimates_stale(db: Any, company: Any, tenant_id: int, *, today: date 
     marks = [r.get("collected_on") for r in rows if isinstance(r, dict) and r.get("kind") == "analyst_press"]
     latest = max((date.fromisoformat(m) for m in marks if m), default=None)
     return latest is None or latest < today - timedelta(days=STALE_DAYS)
+
+
+# -- alias públicos para el panel de precios objetivo -------------------------
+# analyst_targets_press reutiliza la misma extracción determinista y la misma
+# lectura educada de artículos; se exportan con nombre público para no
+# importar privados entre módulos. Comportamiento intacto.
+Robots = _Robots
+published_from_html = _published_from_html
+press_actions = lambda: _ACTIONS  # noqa: E731 - alias estable de la tabla
+sentence_split = lambda text: _SENTENCE.split(text)  # noqa: E731 - alias estable

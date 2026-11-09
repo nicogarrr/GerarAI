@@ -1,0 +1,324 @@
+"""Prensa como complemento del panel de precios objetivo (press=1).
+
+Caso real: Cantor Fitzgerald reiteró Overweight y 90 $ sobre ASTS el
+2026-11-09; Yahoo seguía mostrando la nota de Cantor del 11 de agosto. La
+pasada de prensa (RSS de Bing News + lectura del artículo respetando
+robots.txt, o el fragmento literal del RSS si el medio bloquea) aporta la
+fila del día con medio, enlace y fecha real de publicación.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from datetime import UTC, date, datetime, timedelta
+
+from app.services import analyst_targets_press as press
+from app.services import analyst_targets_service as svc
+
+TODAY = date(2026, 11, 9)
+
+CANTOR_SNIPPET = (
+    "Cantor Fitzgerald Reiterates Overweight Rating on AST Spacemobile (ASTS). "
+    "Cantor Fitzgerald analyst Colin Canfield reiterated an Overweight rating and "
+    "$90.00 price target on AST Spacemobile (NASDAQ: ASTS) on Monday."
+)
+
+PIPER_SNIPPET = (
+    "AST Spacemobile (ASTS) PT Lowered to $54 at Piper Sandler. "
+    "Piper Sandler lowered its price target on AST Spacemobile (NASDAQ: ASTS) "
+    "to $54.00 from $98.00 while maintaining a Neutral rating."
+)
+
+
+def _rss(*entries: tuple[str, str, str, str]) -> str:
+    items = "".join(
+        f"<item><title>{title}</title><link>https://www.bing.com/news/click?url={url}</link>"
+        f"<description>{desc}</description><pubDate>{pub}</pubDate></item>"
+        for url, title, desc, pub in entries
+    )
+    return f"<rss><channel>{items}</channel></rss>"
+
+
+def _fetch_map(pages: dict[str, str], rss: str):
+    async def fetch(url: str):
+        if "bing.com/news" in url:
+            return rss.encode(), None, url
+        if url in pages:
+            return pages[url].encode(), None, url
+        raise ConnectionError("medio bloqueado")
+
+    return fetch
+
+
+# -- rss_items ----------------------------------------------------------------
+
+
+def test_rss_items_extrae_enlace_titulo_fragmento_y_fecha() -> None:
+    xml = _rss(("https://www.streetinsider.com/x", "Título", "Descripción <b>con html</b>",
+                "Mon, 09 Nov 2026 11:39:00 GMT"))
+    [item] = press.rss_items(xml)
+    assert item.url == "https://www.streetinsider.com/x"
+    assert item.title == "Título"
+    assert item.description == "Descripción con html"
+    assert item.published == date(2026, 11, 9)
+
+
+def test_rss_items_descarta_enlaces_no_https() -> None:
+    xml = _rss(("http://www.streetinsider.com/x", "T", "D", "Mon, 09 Nov 2026 11:39:00 GMT"))
+    assert press.rss_items(xml) == []
+
+
+# -- extract_targets ----------------------------------------------------------
+
+
+def test_extrae_reiteracion_de_cantor_con_firma_objetivo_recomendacion_y_accion() -> None:
+    rows = press.extract_targets(
+        CANTOR_SNIPPET, symbol="ASTS", published=TODAY,
+        url="https://www.streetinsider.com/x", full_text=False)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.firm == "Cantor Fitzgerald"
+    assert row.price_target == 90.0
+    assert row.rating == "Overweight"
+    assert row.action == "reiterate"
+    assert row.outlet == "StreetInsider"
+    assert row.url == "https://www.streetinsider.com/x"
+    assert row.date == TODAY
+
+
+def test_extrae_recorte_con_objetivo_anterior() -> None:
+    rows = press.extract_targets(
+        PIPER_SNIPPET, symbol="ASTS", published=TODAY,
+        url="https://au.investing.com/news/x", full_text=False)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.firm == "Piper Sandler"
+    assert row.price_target == 54.0
+    assert row.prior_target == 98.0
+    assert row.outlet == "Investing.com"
+
+
+def test_sin_ticker_en_el_texto_no_hay_fila() -> None:
+    rows = press.extract_targets(
+        "Cantor Fitzgerald reiterated an Overweight rating and $90.00 price target on the stock.",
+        symbol="ASTS", published=TODAY, url="https://www.streetinsider.com/x", full_text=False)
+    assert rows == []
+
+
+def test_sin_firma_atribuible_no_hay_fila() -> None:
+    rows = press.extract_targets(
+        "An analyst reiterated a Buy rating and $90.00 price target on ASTS.",
+        symbol="ASTS", published=TODAY, url="https://www.streetinsider.com/x", full_text=False)
+    assert rows == []
+
+
+def test_varias_firmas_en_un_articulo() -> None:
+    text = (
+        "AST Spacemobile (ASTS) saw mixed calls on Monday. "
+        "Cantor Fitzgerald reiterated an Overweight rating and $90.00 price target on ASTS. "
+        "Deutsche Bank raised its price target on ASTS to $93.00 from $81.00 with a Buy rating."
+    )
+    rows = press.extract_targets(text, symbol="ASTS", published=TODAY,
+                                 url="https://www.benzinga.com/x", full_text=True)
+    by_firm = {row.firm: row for row in rows}
+    assert by_firm["Cantor Fitzgerald"].price_target == 90.0
+    assert by_firm["Deutsche Bank"].price_target == 93.0
+    assert by_firm["Deutsche Bank"].prior_target == 81.0
+    assert by_firm["Deutsche Bank"].action == "reiterate" or by_firm["Deutsche Bank"].action is None
+
+
+# -- currency_matches ---------------------------------------------------------
+
+
+def test_divisa_dolar_solo_cuadra_con_listado_en_usd() -> None:
+    assert press.currency_matches(None, "USD")
+    assert not press.currency_matches(None, "CAD")
+    assert not press.currency_matches(None, None)
+    assert press.currency_matches("USD", "USD")
+    assert not press.currency_matches("CAD", "USD")
+
+
+# -- fetch_press_targets ------------------------------------------------------
+
+
+def test_fragmento_del_rss_cuando_el_medio_bloquea_la_lectura() -> None:
+    rss = _rss(("https://www.streetinsider.com/x", CANTOR_SNIPPET.split(". ")[0],
+                CANTOR_SNIPPET.split(". ", 1)[1], "Mon, 09 Nov 2026 11:39:00 GMT"))
+    rows = asyncio.run(press.fetch_press_targets(
+        "ASTS", today=TODAY, fetch=_fetch_map({}, rss)))
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.firm == "Cantor Fitzgerald" and row.price_target == 90.0
+    assert row.full_text is False
+
+
+def test_articulo_leido_gana_al_fragmento_a_igual_fecha() -> None:
+    article = "<html><body><article><p>" + CANTOR_SNIPPET + "</p>" + (
+        "<p>Relleno del artículo con suficiente texto para superar el mínimo de "
+        "caracteres legibles que exige la puerta de muro de pago del panel.</p>" * 4
+    ) + "</article></body></html>"
+    rss = _rss(("https://www.streetinsider.com/x", "Cantor keeps PT on ASTS",
+                "Cantor Fitzgerald keeps $90.00 price target on ASTS", "Mon, 09 Nov 2026 11:39:00 GMT"))
+    rows = asyncio.run(press.fetch_press_targets(
+        "ASTS", today=TODAY, fetch=_fetch_map({"https://www.streetinsider.com/x": article}, rss)))
+    assert len(rows) == 1
+    assert rows[0].full_text is True
+    assert rows[0].action == "reiterate"
+
+
+def test_notas_antiguas_fuera_de_la_ventana() -> None:
+    rss = _rss(("https://www.streetinsider.com/x", "Cantor keeps $90.00 price target on ASTS",
+                "Cantor Fitzgerald kept a $90.00 price target on ASTS.", "Sun, 01 Mar 2026 11:39:00 GMT"))
+    assert asyncio.run(press.fetch_press_targets("ASTS", today=TODAY, fetch=_fetch_map({}, rss))) == []
+
+
+def test_fallo_del_rss_devuelve_vacio() -> None:
+    async def fetch(url: str):
+        raise ConnectionError("bing caído")
+
+    assert asyncio.run(press.fetch_press_targets("ASTS", today=TODAY, fetch=fetch)) == []
+
+
+# -- merge_press_rows ----------------------------------------------------------
+
+
+def _pt(firm: str, day: date, target: float, mark: str | None = None) -> press.PressTarget:
+    return press.PressTarget(
+        firm=firm, date=day, price_target=target, prior_target=None, rating=None, action=None,
+        outlet="StreetInsider", url="https://www.streetinsider.com/x", currency_mark=mark,
+        full_text=False)
+
+
+def _yahoo_row(firm: str, day: date, target: float) -> svc.AnalystTargetRow:
+    return svc.AnalystTargetRow(firm=firm, date=day.isoformat(), price_target=target)
+
+
+def test_prensa_mas_reciente_reemplaza_la_fila_de_yahoo() -> None:
+    rows = [_yahoo_row("Cantor Fitzgerald", date(2026, 8, 11), 61.0)]
+    merged = svc.merge_press_rows(rows, [_pt("Cantor Fitzgerald", TODAY, 90.0)],
+                                  reference_price=50.0, currency="USD")
+    assert len(merged) == 1
+    row = merged[0]
+    assert row.date == TODAY.isoformat() and row.price_target == 90.0
+    assert row.source == "StreetInsider"
+    assert row.source_url == "https://www.streetinsider.com/x"
+    assert row.upside_percent == 80.0
+
+
+def test_prensa_mas_antigua_o_de_la_misma_fecha_no_reemplaza_a_yahoo() -> None:
+    rows = [_yahoo_row("Cantor Fitzgerald", TODAY, 90.0)]
+    older = _pt("Cantor Fitzgerald", date(2026, 8, 11), 61.0)
+    same_day = _pt("Cantor Fitzgerald", TODAY, 88.0)
+    merged = svc.merge_press_rows(rows, [older, same_day], reference_price=50.0, currency="USD")
+    assert len(merged) == 1
+    assert merged[0].price_target == 90.0 and merged[0].source == svc.SOURCE
+
+
+def test_prensa_de_firma_nueva_se_añade_ordenada_por_fecha() -> None:
+    rows = [_yahoo_row("TD Cowen", date(2026, 10, 1), 80.0)]
+    merged = svc.merge_press_rows(rows, [_pt("Cantor Fitzgerald", TODAY, 90.0)],
+                                  reference_price=None, currency="USD")
+    assert [row.firm for row in merged] == ["Cantor Fitzgerald", "TD Cowen"]
+    assert merged[0].upside_percent is None
+
+
+def test_divisa_no_verificable_descarta_la_fila_de_prensa() -> None:
+    rows = [_yahoo_row("TD Cowen", date(2026, 10, 1), 80.0)]
+    merged = svc.merge_press_rows(rows, [_pt("Cantor Fitzgerald", TODAY, 90.0)],
+                                  reference_price=50.0, currency="CAD")
+    assert len(merged) == 1 and merged[0].source == svc.SOURCE
+    merged = svc.merge_press_rows(rows, [_pt("Cantor Fitzgerald", TODAY, 90.0)],
+                                  reference_price=50.0, currency=None)
+    assert len(merged) == 1 and merged[0].source == svc.SOURCE
+
+
+# -- servicio: press=1 ---------------------------------------------------------
+
+
+def _payload() -> dict:
+    when = datetime(2026, 8, 11, 12, 0)
+    return {
+        "records": [{"firm": "Cantor Fitzgerald", "date": when, "rating": "Overweight",
+                     "action": "main", "price_target": 61.0, "prior_target": None}],
+        "consensus": {"current": 50.0, "mean": 70.0, "low": 40.0, "high": 90.0, "median": 68.0},
+        "currency": "USD", "quote_type": "EQUITY", "first_trade_date": None,
+    }
+
+
+def _get(monkeypatch, *, press_rows, press_flag=True, calls: list | None = None):
+    monkeypatch.setattr(svc, "_fetch_sync", lambda symbol: _payload())
+
+    async def fake_press(symbol: str, *, today: date, queries: list[str] | None = None):
+        if calls is not None:
+            calls.append(queries)
+        return press_rows
+
+    monkeypatch.setattr(press, "fetch_press_targets", fake_press)
+    return asyncio.run(svc.AnalystTargetsService().get("ASTS", press=press_flag))
+
+
+def test_press_1_añade_la_nota_del_dia_y_declara_la_fuente(monkeypatch) -> None:
+    result = _get(monkeypatch, press_rows=[_pt("Cantor Fitzgerald", TODAY, 90.0)])
+    assert result.status == "available"
+    assert len(result.rows) == 1
+    row = result.rows[0]
+    assert row.firm == "Cantor Fitzgerald" and row.date == TODAY.isoformat()
+    assert row.price_target == 90.0 and row.source == "StreetInsider"
+    assert result.note_code == "with_press" and result.note
+    # El consenso agregado sigue siendo el de Yahoo, nunca recalculado.
+    assert result.consensus is not None and result.consensus.mean == 70.0
+
+
+def test_press_1_con_error_de_prensa_deja_el_panel_como_yahoo(monkeypatch) -> None:
+    monkeypatch.setattr(svc, "_fetch_sync", lambda symbol: _payload())
+
+    async def boom(symbol: str, *, today: date, queries: list[str] | None = None):
+        raise RuntimeError("bing caído")
+
+    monkeypatch.setattr(press, "fetch_press_targets", boom)
+    result = asyncio.run(svc.AnalystTargetsService().get("ASTS", press=True))
+    assert result.status == "available"
+    assert len(result.rows) == 1 and result.rows[0].source == svc.SOURCE
+    assert result.note is None and result.note_code is None
+
+
+def test_sin_press_no_consulta_prensa_y_cachea_aparte(monkeypatch) -> None:
+    monkeypatch.setattr(svc, "_fetch_sync", lambda symbol: _payload())
+    calls: list = []
+
+    async def fake_press(symbol: str, *, today: date, queries: list[str] | None = None):
+        calls.append(symbol)
+        return []
+
+    monkeypatch.setattr(press, "fetch_press_targets", fake_press)
+    service = svc.AnalystTargetsService()
+    plain = asyncio.run(service.get("ASTS"))
+    assert calls == [] and plain.note_code is None
+    with_press = asyncio.run(service.get("ASTS", press=True))
+    assert calls == ["ASTS", "ASTS"] and with_press.note_code is None
+    # Entradas de caché separadas: la variante sin prensa no cambia.
+    assert asyncio.run(service.get("ASTS")).rows[0].price_target == 61.0
+
+
+def test_segunda_pasada_con_consultas_por_firma_envejecida(monkeypatch) -> None:
+    calls: list = []
+    result = _get(monkeypatch, press_rows=[], calls=calls)
+    # La fila de Yahoo es del 11 ago: envejecida, dispara la consulta por firma.
+    assert calls == [None, ['"ASTS" "Cantor Fitzgerald"']]
+    assert result.status == "available"
+
+
+def test_segunda_pasada_omite_firmas_frescas(monkeypatch) -> None:
+    fresh = datetime.now(UTC) - timedelta(days=1)
+    payload = _payload()
+    payload["records"][0]["date"] = fresh
+    monkeypatch.setattr(svc, "_fetch_sync", lambda symbol: payload)
+    calls: list = []
+
+    async def fake_press(symbol: str, *, today: date, queries: list[str] | None = None):
+        calls.append(queries)
+        return []
+
+    monkeypatch.setattr(press, "fetch_press_targets", fake_press)
+    asyncio.run(svc.AnalystTargetsService().get("ASTS", press=True))
+    assert calls == [None]
