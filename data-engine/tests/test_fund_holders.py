@@ -180,6 +180,78 @@ def test_job_reprocesa_cuando_el_universo_crece_aunque_el_fichero_ya_estaba():
     assert third["status"] == "sin_cambios"  # universo completo ya procesado
 
 
+def test_corregir_el_cusip_invalida_el_snapshot_y_se_recalcula():
+    """Residual de #4843 (N-PORT): corregir el CUSIP de una empresa ya procesada
+    dejaba la ficha sirviendo posiciones del CUSIP anterior. Ahora el snapshot va
+    ligado al CUSIP: la lectura solo sirve el calculado con el actual y re-ingerir
+    el mismo fichero crea un snapshot nuevo."""
+    db = _db()
+    cusips = fh.universe_cusips(db)
+    assert set(cusips) == {APPLE}
+    assert fh.ingest_reports(db, nport.parse_dataset(_zip(), set(cusips)), REF, "x1", cusips)["companies"] == 1
+    # El CUSIP guardado resulta erróneo y se corrige al de Microsoft (que sí está en el ZIP).
+    db.query(Company).filter(Company.ticker == "AAPL").one().isin = "US5949181045"
+    db.commit()
+    cusips = fh.universe_cusips(db)
+    assert set(cusips) == {MSFT}
+    # La lectura no sirve el snapshot del CUSIP anterior.
+    assert fh.fund_holders(db, "AAPL")["status"] == "sin_datos"
+    # Re-ingerir el mismo fichero crea un snapshot nuevo para el CUSIP corregido.
+    reports = nport.parse_dataset(_zip_con_solo_msft(), set(cusips))
+    assert fh.ingest_reports(db, reports, REF, "x1", cusips)["companies"] == 1
+    view = fh.fund_holders(db, "AAPL")
+    assert view["status"] == "ok" and view["cusip"] == MSFT
+    assert view["totals"] == {"funds": 1, "shares": 500.0, "value_usd": 60000.0}
+
+
+def test_documento_sin_cusip_grabado_sigue_sirviendo():
+    """Documentos de antes de la vinculación (listing_key sin CUSIP) se siguen
+    sirviendo tal cual: no se rompe lo ya guardado."""
+    db = _db()
+    cusips = fh.universe_cusips(db)
+    fh.ingest_reports(db, nport.parse_dataset(_zip(), set(cusips)), REF, "x1", cusips)
+    doc = db.query(PublicSourceDocument).one()
+    doc.listing_key = "nport:2026q3"  # como quedó antes de la vinculación
+    db.commit()
+    view = fh.fund_holders(db, "AAPL")
+    assert view["status"] == "ok" and view["dataset"] == "2026q3" and view["totals"]["funds"] == 2
+
+
+def test_refresh_recalcula_si_el_snapshot_no_es_del_cusip_actual():
+    """«Procesado» exige documento calculado con el CUSIP actual: un documento
+    legado (sin CUSIP) o con otro CUSIP obliga a recalcular, así corregir la
+    identidad de una empresa invalida su snapshot guardado."""
+    html = '<a href="/files/dera/data/form-n-port-data-sets/2026q3_nport.zip">b</a>'
+    body = _zip().getvalue()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=html) if str(request.url) == nport.DATASETS_PAGE else httpx.Response(200, content=body)
+
+    for legacy_key in ("nport:2026q3", f"nport:2026q3:{MSFT}"):
+        db = _db()
+        db.add(PublicSourceDocument(company_id=1, listing_key=legacy_key, provider=fh.PROVIDER, source_url=URL,
+                                    checksum="x", fetched_at=datetime(2026, 9, 1), official=True))
+        db.commit()
+        out = fh.refresh_fund_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
+        assert out["status"] == "ok" and out["companies"] == 1  # recalcula, no «sin_cambios»
+        again = fh.refresh_fund_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
+        assert again["status"] == "sin_cambios"
+
+
+def test_lectura_encuentra_el_snapshot_valido_aunque_haya_muchos_de_otro_cusip():
+    """Repro del auditor: el filtro por CUSIP no puede tener tope arbitrario —
+    8 snapshots más recientes de otro CUSIP no tapan el calculado con el actual."""
+    db = _db()
+    db.add(PublicSourceDocument(company_id=1, listing_key=f"nport:2026q3:{APPLE}", provider=fh.PROVIDER,
+                                source_url=URL, checksum="ok", fetched_at=datetime(2026, 9, 1), official=True))
+    for i, label in enumerate(("2026q4", "2027q1", "2027q2", "2027q3", "2027q4", "2028q1", "2028q2", "2028q3")):
+        db.add(PublicSourceDocument(company_id=1, listing_key=f"nport:{label}:{MSFT}", provider=fh.PROVIDER,
+                                    source_url=URL, checksum=f"x{i}", fetched_at=datetime(2026, 9, 1), official=True))
+    db.commit()
+    view = fh.fund_holders(db, "AAPL")
+    assert view["status"] == "ok" and view["dataset"] == "2026q3"
+
+
 def test_ingesta_sin_informes_validos_no_persiste_ni_marca_procesado():
     """Parser que devuelve {} (cabeceras o fechas cambiadas, sin lanzar): N/D,
     no «0 fondos», y el fichero NO queda procesado (el reintento no se congela)."""

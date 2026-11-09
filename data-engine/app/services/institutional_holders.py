@@ -144,11 +144,21 @@ def _name(row: HolderRow) -> str:
     return f"{row.cik}|{row.manager}"[:200]
 
 
-def persist(db: Session, company: Company, summary: dict[str, Any], *, dataset_url: str, prior_url: str, checksum: str) -> PublicSourceDocument | None:
-    """Guarda el agregado (idempotente por checksum de los ZIP)."""
+def _listing_cusip(listing_key: str) -> str | None:
+    """CUSIP con el que se calculó el snapshot (None = documento de antes de la vinculación)."""
+    parts = listing_key.split(":")
+    return parts[2] if len(parts) > 2 else None
+
+
+def persist(db: Session, company: Company, summary: dict[str, Any], *, cusip: str, dataset_url: str, prior_url: str, checksum: str) -> PublicSourceDocument | None:
+    """Guarda el agregado (idempotente por checksum de los ZIP y CUSIP usado).
+
+    El CUSIP va en el listing_key: corregir el CUSIP de la empresa crea un
+    snapshot nuevo en vez de servir las posiciones calculadas para el anterior.
+    """
     current: date = summary["current"]
     prior: date = summary["prior"]
-    listing = f"13f:{current.isoformat()}"
+    listing = f"13f:{current.isoformat()}:{cusip}"
     existing = db.scalar(select(PublicSourceDocument).where(
         PublicSourceDocument.company_id == company.id, PublicSourceDocument.listing_key == listing,
         PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.checksum == checksum))
@@ -220,13 +230,19 @@ def institutional_holders(db: Session, ticker: str) -> dict[str, Any] | None:
                             "limitations": list(LIMITATIONS), "top_holders": [], "buyers": [], "sellers": []}
     if cusip is None:
         return {**base, "status": "sin_identificador"}
-    doc = db.scalar(select(PublicSourceDocument).where(
-        PublicSourceDocument.company_id == company.id, PublicSourceDocument.provider == PROVIDER)
-        .order_by(PublicSourceDocument.listing_key.desc(), PublicSourceDocument.fetched_at.desc(), PublicSourceDocument.id.desc()).limit(1))
+    # El snapshot solo se sirve si se calculó para el CUSIP actual: uno
+    # grabado con otro CUSIP no es válido para esta identidad (los documentos
+    # de antes de la vinculación, sin CUSIP grabado, se aceptan tal cual). El
+    # filtro va en SQL: sin tope arbitrario que pueda tapar el válido.
+    listing = PublicSourceDocument.listing_key
+    doc = db.scalars(select(PublicSourceDocument).where(
+        PublicSourceDocument.company_id == company.id, PublicSourceDocument.provider == PROVIDER,
+        listing.like(f"%:{cusip}") | ~listing.like("%:%:%"))
+        .order_by(listing.desc(), PublicSourceDocument.fetched_at.desc(), PublicSourceDocument.id.desc())).first()
     if doc is None:
         return {**base, "status": "sin_datos"}
     facts = list(db.scalars(select(PublicFinancialFact).where(PublicFinancialFact.source_document_id == doc.id).order_by(PublicFinancialFact.id)))
-    current = date.fromisoformat(doc.listing_key.split(":", 1)[1])
+    current = date.fromisoformat(doc.listing_key.split(":")[1])
     totals: dict[str, Any] = {}
     prior: date | None = None
     prior_url = None
@@ -305,7 +321,7 @@ def ingest_parsed(db: Session, parses: list[ds.DatasetParse], checksums: list[st
         # Snapshot aunque no haya holders en ningún periodo: sin documento la
         # ficha serviría el trimestre anterior como actual y el refresh no
         # sabría que esta empresa ya está procesada para este fichero.
-        if persist(db, company, summary, dataset_url=parses[0].url, prior_url=parses[1].url, checksum=checksum) is not None:
+        if persist(db, company, summary, cusip=cusip, dataset_url=parses[0].url, prior_url=parses[1].url, checksum=checksum) is not None:
             stored += 1
     db.commit()
     return {"status": "ok", "period": current.isoformat(), "prior": prior.isoformat(), "companies": stored,
@@ -349,8 +365,15 @@ def refresh_institutional_holders(db: Session | None = None, client: httpx.Clien
         # Procesado = TODAS las empresas del universo tienen documento de este
         # fichero; una sola sin procesar obliga a recalcular (persist es
         # idempotente por empresa y checksum, así que solo se guardan las nuevas).
-        processed = set(session.scalars(select(PublicSourceDocument.company_id).where(
-            PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.source_url == refs[0].url)))
+        # Procesado = TODAS las empresas del universo tienen documento de este
+        # fichero CALCULADO CON SU CUSIP ACTUAL; un documento sin CUSIP grabado
+        # (anterior a la vinculación) o con otro CUSIP obliga a recalcular, así
+        # corregir la identidad de una empresa invalida su snapshot (persist es
+        # idempotente por empresa, CUSIP y checksum: solo se guardan las nuevas).
+        company_cusip = {company.id: cusip for cusip, company in cusips.items()}
+        rows = session.execute(select(PublicSourceDocument.company_id, PublicSourceDocument.listing_key).where(
+            PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.source_url == refs[0].url)).all()
+        processed = {cid for cid, key in rows if _listing_cusip(key) is not None and _listing_cusip(key) == company_cusip.get(cid)}
         if all(company.id in processed for company in cusips.values()):
             return {"status": "sin_cambios", "dataset": refs[0].url}
         parses, checksums = [], []

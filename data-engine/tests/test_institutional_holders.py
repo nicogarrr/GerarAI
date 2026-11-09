@@ -81,10 +81,14 @@ def _datasets():
     return q2, q1
 
 
-def _parsed():
+def _parsed_con(cusips: set[str]):
     q2, q1 = _datasets()
-    return [ds.parse_dataset(q2, {APPLE}, url="https://www.sec.gov/files/x/01jun2026-31aug2026_form13f.zip"),
-            ds.parse_dataset(q1, {APPLE}, url="https://www.sec.gov/files/x/01mar2026-31may2026_form13f.zip")]
+    return [ds.parse_dataset(q2, cusips, url="https://www.sec.gov/files/x/01jun2026-31aug2026_form13f.zip"),
+            ds.parse_dataset(q1, cusips, url="https://www.sec.gov/files/x/01mar2026-31may2026_form13f.zip")]
+
+
+def _parsed():
+    return _parsed_con({APPLE})
 
 
 def test_reglas_13f_opciones_filas_y_enmiendas():
@@ -183,7 +187,7 @@ def test_pagina_de_la_sec_y_job_sin_cambios():
     refs = ds.list_datasets(html)
     assert [r.window_end for r in refs] == [date(2026, 8, 31), date(2026, 5, 31)]
     db = _db()
-    db.add(PublicSourceDocument(company_id=1, listing_key="13f:2026-06-30", provider=ih.PROVIDER, source_url=refs[0].url,
+    db.add(PublicSourceDocument(company_id=1, listing_key=f"13f:2026-06-30:{APPLE}", provider=ih.PROVIDER, source_url=refs[0].url,
                                 checksum="x", fetched_at=__import__("datetime").datetime(2026, 9, 1), official=True))
     db.commit()
     calls: list[str] = []
@@ -313,6 +317,84 @@ def test_ingesta_actual_sin_13f_validos_no_persiste_aunque_el_previo_sea_valido(
     assert out["status"] == "sin_datos"
     assert db.query(PublicSourceDocument).count() == 0
     assert ih.institutional_holders(db, "AAPL")["status"] == "sin_datos"
+
+
+def test_corregir_el_cusip_invalida_el_snapshot_y_se_recalcula():
+    """Residual de #4843: corregir el CUSIP de una empresa ya procesada no
+    invalidaba nada — la ficha servía las posiciones calculadas para el CUSIP
+    anterior. Ahora el snapshot va ligado al CUSIP: la lectura solo sirve el
+    calculado con el actual y re-ingerir los mismos ZIP crea un snapshot nuevo."""
+    db = _db()
+    cusips = ih.universe_cusips(db)
+    assert set(cusips) == {APPLE}
+    assert ih.ingest_parsed(db, _parsed(), ["c2", "c1"], cusips)["companies"] == 1
+    # El CUSIP guardado resulta erróneo y se corrige al de Microsoft.
+    db.query(Company).filter(Company.ticker == "AAPL").one().isin = "US5949181045"
+    db.commit()
+    assert set(ih.universe_cusips(db)) == {OTHER}
+    # La lectura no sirve el snapshot del CUSIP anterior.
+    assert ih.institutional_holders(db, "AAPL")["status"] == "sin_datos"
+    # Re-ingerir los mismos ZIP crea un snapshot nuevo (no choca con el viejo).
+    out = ih.ingest_parsed(db, _parsed_con({OTHER}), ["c2", "c1"], ih.universe_cusips(db))
+    assert out["companies"] == 1
+    assert db.query(PublicSourceDocument).count() == 2
+    view = ih.institutional_holders(db, "AAPL")
+    assert view["status"] == "ok" and view["cusip"] == OTHER and view["period"] == "2026-06-30"
+    assert view["totals"]["shares"] == 10 and view["totals"]["shares_prior"] == 3
+
+
+def test_documento_sin_cusip_grabado_sigue_sirviendo():
+    """Documentos de antes de la vinculación (listing_key sin CUSIP) se siguen
+    sirviendo tal cual: no se rompe lo ya guardado."""
+    db = _db()
+    ih.ingest_parsed(db, _parsed(), ["c2", "c1"], ih.universe_cusips(db))
+    doc = db.query(PublicSourceDocument).one()
+    doc.listing_key = "13f:2026-06-30"  # como quedó antes de la vinculación
+    db.commit()
+    view = ih.institutional_holders(db, "AAPL")
+    assert view["status"] == "ok" and view["period"] == "2026-06-30" and view["totals"]["shares"] == 1165
+
+
+def test_refresh_recalcula_si_el_snapshot_no_es_del_cusip_actual():
+    """«Procesado» exige documento calculado con el CUSIP actual: un documento
+    legado (sin CUSIP) o con otro CUSIP obliga a recalcular, así corregir la
+    identidad de una empresa invalida su snapshot guardado."""
+    html = ('<a href="/files/a/01mar2026-31may2026_form13f.zip">x</a><a href="/files/a/01jun2026-31aug2026_form13f.zip">y</a>')
+    q2, q1 = _datasets()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url == ds.DATASETS_PAGE:
+            return httpx.Response(200, text=html)
+        return httpx.Response(200, content=(q2 if "jun2026" in url else q1).getvalue())
+
+    for legacy_key in ("13f:2026-06-30", f"13f:2026-06-30:{OTHER}"):
+        db = _db()
+        db.add(PublicSourceDocument(company_id=1, listing_key=legacy_key, provider=ih.PROVIDER,
+                                    source_url="https://www.sec.gov/files/a/01jun2026-31aug2026_form13f.zip",
+                                    checksum="x", fetched_at=__import__("datetime").datetime(2026, 9, 1), official=True))
+        db.commit()
+        out = ih.refresh_institutional_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
+        assert out["status"] == "ok" and out["companies"] == 1  # recalcula, no «sin_cambios»
+        again = ih.refresh_institutional_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
+        assert again["status"] == "sin_cambios"
+
+
+def test_lectura_encuentra_el_snapshot_valido_aunque_haya_muchos_de_otro_cusip():
+    """Repro del auditor: el filtro por CUSIP no puede tener tope arbitrario —
+    8 snapshots más recientes de otro CUSIP no tapan el calculado con el actual."""
+    db = _db()
+    url = "https://www.sec.gov/files/x/q.zip"
+    when = __import__("datetime").datetime(2026, 9, 1)
+    db.add(PublicSourceDocument(company_id=1, listing_key=f"13f:2026-06-30:{APPLE}", provider=ih.PROVIDER,
+                                source_url=url, checksum="ok", fetched_at=when, official=True))
+    for i, d in enumerate(("2026-07-31", "2026-08-31", "2026-09-30", "2026-10-31",
+                           "2026-11-30", "2026-12-31", "2027-01-31", "2027-02-28")):
+        db.add(PublicSourceDocument(company_id=1, listing_key=f"13f:{d}:{OTHER}", provider=ih.PROVIDER,
+                                    source_url=url, checksum=f"x{i}", fetched_at=when, official=True))
+    db.commit()
+    view = ih.institutional_holders(db, "AAPL")
+    assert view["status"] == "ok" and view["period"] == "2026-06-30"
 
 
 def test_ingesta_previo_sin_13f_validos_no_persiste_aunque_el_actual_sea_valido():

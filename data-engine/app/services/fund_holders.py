@@ -58,8 +58,16 @@ def _concept(rep: nport.FundReport) -> str:
     return f"{rep.series_id or '-'}|{rep.display_name}"[:200]
 
 
+def _listing_cusip(listing_key: str) -> str | None:
+    """CUSIP con el que se calculó el snapshot (None = documento de antes de la vinculación)."""
+    parts = listing_key.split(":")
+    return parts[2] if len(parts) > 2 else None
+
+
 def persist(db: Session, company: Company, cusip: str, summary: dict[str, Any], *, dataset: nport.NportDatasetRef, checksum: str) -> PublicSourceDocument | None:
-    listing = f"nport:{dataset.label}"
+    # El CUSIP va en el listing_key: corregir el CUSIP de la empresa crea un
+    # snapshot nuevo en vez de servir las posiciones calculadas para el anterior.
+    listing = f"nport:{dataset.label}:{cusip}"
     exists = db.scalar(select(PublicSourceDocument.id).where(
         PublicSourceDocument.company_id == company.id, PublicSourceDocument.listing_key == listing,
         PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.checksum == checksum))
@@ -112,8 +120,15 @@ def fund_holders(db: Session, ticker: str) -> dict[str, Any] | None:
                             "limitations": list(LIMITATIONS), "top_funds": [], "by_weight": []}
     if cusip is None:
         return {**base, "status": "sin_identificador"}
-    doc = db.scalar(select(PublicSourceDocument).where(PublicSourceDocument.company_id == company.id, PublicSourceDocument.provider == PROVIDER)
-                    .order_by(PublicSourceDocument.listing_key.desc(), PublicSourceDocument.fetched_at.desc(), PublicSourceDocument.id.desc()).limit(1))
+    # El snapshot solo se sirve si se calculó para el CUSIP actual: uno
+    # grabado con otro CUSIP no es válido para esta identidad (los documentos
+    # de antes de la vinculación, sin CUSIP grabado, se aceptan tal cual). El
+    # filtro va en SQL: sin tope arbitrario que pueda tapar el válido.
+    listing = PublicSourceDocument.listing_key
+    doc = db.scalars(select(PublicSourceDocument).where(
+        PublicSourceDocument.company_id == company.id, PublicSourceDocument.provider == PROVIDER,
+        listing.like(f"%:{cusip}") | ~listing.like("%:%:%"))
+        .order_by(listing.desc(), PublicSourceDocument.fetched_at.desc(), PublicSourceDocument.id.desc())).first()
     if doc is None:
         return {**base, "status": "sin_datos"}
     totals: dict[str, float] = {}
@@ -142,7 +157,7 @@ def fund_holders(db: Session, ticker: str) -> dict[str, Any] | None:
             by_weight.append(row)
     top.sort(key=lambda r: (-(r["shares"] or 0), r["series_id"]))
     by_weight.sort(key=lambda r: (-(r["weight_pct"] or 0), r["series_id"]))
-    return {**base, "status": "ok", "dataset": doc.listing_key.split(":", 1)[1],
+    return {**base, "status": "ok", "dataset": doc.listing_key.split(":")[1],
             "source": {"dataset_url": doc.source_url, "page": nport.DATASETS_PAGE, "fetched_at": doc.fetched_at.isoformat()},
             "totals": {"funds": int(totals.get("funds", 0)), "shares": totals.get("shares", 0.0), "value_usd": totals.get("value", 0.0)},
             "top_funds": top, "by_weight": by_weight}
@@ -194,8 +209,14 @@ def refresh_fund_holders(db: Session | None = None, client: httpx.Client | None 
         # Procesado = TODAS las empresas del universo tienen documento de este
         # fichero; una sola sin procesar obliga a recalcular (persist es
         # idempotente por empresa y checksum, así que solo se guardan las nuevas).
-        processed = set(session.scalars(select(PublicSourceDocument.company_id).where(
-            PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.source_url == ref.url)))
+        # Procesado = TODAS las empresas del universo tienen documento de este
+        # fichero CALCULADO CON SU CUSIP ACTUAL; un documento sin CUSIP grabado
+        # (anterior a la vinculación) o con otro CUSIP obliga a recalcular, así
+        # corregir la identidad de una empresa invalida su snapshot.
+        company_cusip = {company.id: cusip for cusip, company in cusips.items()}
+        rows = session.execute(select(PublicSourceDocument.company_id, PublicSourceDocument.listing_key).where(
+            PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.source_url == ref.url)).all()
+        processed = {cid for cid, key in rows if _listing_cusip(key) is not None and _listing_cusip(key) == company_cusip.get(cid)}
         if all(company.id in processed for company in cusips.values()):
             return {"status": "sin_cambios", "dataset": ref.url}
         digest = hashlib.sha256()
