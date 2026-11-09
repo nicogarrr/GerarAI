@@ -18,6 +18,7 @@ import { ThemeFlow, ThemeFlowUnavailable } from './_components/ThemeFlow';
 import { ThemeFundamentals } from './_components/ThemeFundamentals';
 import type { Formatters } from '@/lib/format';
 import { getFormat, getT } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 import type { TranslateFn } from '@/lib/i18n/translate';
 import {
   constituentContribution,
@@ -35,8 +36,7 @@ import { paginateThemes, parseThemePage, themePageHref } from '@/lib/market/them
 import { THEME_TO_BOTTLENECK, basketName, bottleneckThemeName } from '@/lib/market/theme-bottleneck-map';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
-  return { title: t('themes.page.metaTitle'), description: t('themes.page.metaDescription') };
+    return i18nPageMetadata('themes.page.metaTitle', 'themes.page.metaDescription');
 }
 
 export const dynamic = 'force-dynamic';

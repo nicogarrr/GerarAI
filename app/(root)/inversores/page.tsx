@@ -5,6 +5,7 @@ import BackendOffline from '@/components/system/BackendOffline';
 import { getInvestors } from '@/lib/actions/investors.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getFormat, getT } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 
 import { InvestorSelector } from './_components/InvestorSelector';
 import { InvestorAvatar } from './_components/Avatar';
@@ -16,8 +17,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
-    const t = await getT();
-    return { title: t('investors.hub.title'), description: t('investors.hub.description') };
+    return i18nPageMetadata('investors.hub.title', 'investors.hub.description');
 }
 
 const PAGE_SIZE = 12;

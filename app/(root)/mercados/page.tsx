@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getT } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 import { getLiveMarkets } from '@/lib/actions/live-quotes.actions';
 import { LiveMarketsPanel } from '@/components/markets/LiveMarketsPanel';
 import { PageHeader } from '@/components/ui/page-header';
@@ -8,8 +9,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
-    const t = await getT();
-    return { title: t('markets.metaTitle'), description: t('markets.metaDescription') };
+    return i18nPageMetadata('markets.metaTitle', 'markets.metaDescription');
 }
 
 export default async function MercadosPage() {
