@@ -524,7 +524,7 @@ function AlertsManager() {
                                         {alert.lastEvaluatedAt
                                             ? ti('alerts.list.motorEvaluated', { date: f.formatUserDateTime(alert.lastEvaluatedAt), count: String(alert.triggerCount), channels: (alert.channels.map((c) => etiquetaCanal(c, ti)).join(', ') || etiquetaCanal('in_app', ti)) })
                                             : ti('alerts.list.motorPending')}
-                                        {alertSkipNote(alert.lastResultStatus) ? ` · ${alertSkipNote(alert.lastResultStatus)}` : null}
+                                        {alertSkipNote(alert.lastResultStatus, ti) ? ` · ${alertSkipNote(alert.lastResultStatus, ti)}` : null}
                                     </p>
                                     {alert.symbol ? (
                                         <Link
