@@ -120,6 +120,27 @@ def test_cambio_divisa_sin_lado_se_omite(db):
     assert db.scalar(select(func.count()).select_from(FxConversion)) == 0
 
 
+def test_cambio_divisa_cantidad_ilegible_se_omite(db):
+    xml = _flex(
+        '<Trades><Trade symbol="EUR.USD" assetCategory="CASH" buySell="BUY" '
+        'quantity="mil" tradePrice="1.08" proceeds="-1080" '
+        'tradeDate="2026-03-15" tradeID="FX4"/></Trades>'
+    )
+    resultado = IBKRImportService().import_flex_xml(db, xml, trades_only=True)
+    assert resultado["fx_conversions_skipped"] == 1
+    assert db.scalar(select(func.count()).select_from(FxConversion)) == 0
+
+
+def test_cambio_divisa_sin_importes_legibles_se_omite(db):
+    xml = _flex(
+        '<Trades><Trade symbol="EUR.USD" assetCategory="CASH" buySell="BUY" '
+        'quantity="1000" tradeDate="2026-03-15" tradeID="FX5"/></Trades>'
+    )
+    resultado = IBKRImportService().import_flex_xml(db, xml, trades_only=True)
+    assert resultado["fx_conversions_skipped"] == 1
+    assert db.scalar(select(func.count()).select_from(FxConversion)) == 0
+
+
 def test_split_fs_se_registra_como_pendiente(db):
     xml = _flex(
         '<Trades><Trade symbol="AAPL" assetCategory="STK" buySell="BUY" '
