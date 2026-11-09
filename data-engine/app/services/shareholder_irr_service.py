@@ -880,10 +880,20 @@ def value_company(db: Session, company: Company, *, today: date | None = None,
     except ValueError as exc:
         return {"status": "insufficient", "reason": redact_secrets(str(exc)), "ticker": company.ticker}
     if cites["method"]["chosen"] == "caja_runway":
+        rw = runway(sp, hist, cites)
+        try:
+            from app.services.pre_revenue_valuation import value_pre_revenue
+
+            pre = value_pre_revenue(db, company, sp=sp, hist=hist, cites=cites, runway=rw, today=today)
+        except Exception as exc:  # noqa: BLE001 - sin la ruta de preingresos queda el runway, nunca una ficha vacía
+            logger.info("preingresos %s: %s", company.ticker, type(exc).__name__)
+            pre = {"error": redact_secrets(f"{type(exc).__name__}: {exc}")[:300]}
         return {"status": "not_meaningful", "ticker": company.ticker, "as_of": today.isoformat(),
                 "reason": ("empresa sin beneficio que proyectar (" + cites["method"]["kind_reason"] + "): se valora por "
                            "su caja, su consumo y su dilución, y por la suma de partes de lo que aún no factura"),
-                "method": cites["method"], "runway": runway(sp, hist, cites),
+                "method": cites["method"], "runway": rw, "pre_revenue": pre,
+                "peers": [{"ticker": p["ticker"], "name": p.get("name"), "selection": pre.get("peer_layer"),
+                           "multiple": p["multiple"], "multiple_basis": "ev_sales"} for p in pre.get("peers") or []],
                 "starting_point": {**asdict(sp), "market_cap": sp.market_cap, "net_debt": sp.net_debt,
                                    "enterprise_value": sp.enterprise_value, "multiple": sp.multiple,
                                    "margin": sp.margin},
