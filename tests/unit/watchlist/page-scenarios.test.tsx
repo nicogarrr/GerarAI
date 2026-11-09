@@ -44,6 +44,15 @@ function find(node: unknown, name: string, out: El[] = []): El[] {
   }
   return out;
 }
+function order(node: unknown, out: string[] = []): string[] {
+  if (Array.isArray(node)) node.forEach((n) => order(n, out));
+  else if (node && typeof node === 'object') {
+    const el = node as El;
+    if (el.props?.as === 'article' && typeof el.props.symbol === 'string') out.push(el.props.symbol);
+    if (el.props) Object.values(el.props).forEach((v) => order(v, out));
+  }
+  return out;
+}
 function text(node: unknown): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   if (Array.isArray(node)) return node.map(text).join('|');
@@ -86,9 +95,9 @@ describe('/watchlist escenarios', () => {
 
   it('lista vacía y lista no disponible devuelven página', async () => {
     m.state.mockResolvedValue({ items: [], unavailable: false });
-    expect(await render()).toBeTruthy();
+    expect(order(await render())).toEqual([]);
     m.state.mockResolvedValue({ items: [], unavailable: true });
-    expect(await render()).toBeTruthy();
+    expect(order(await render())).toEqual([]);
   });
 
   it('filas mixtas: fuera del master, fallo, rangos, notas de resultados y DCA', async () => {
@@ -110,9 +119,10 @@ describe('/watchlist escenarios', () => {
     });
     m.dca.mockResolvedValue({ data: { items: [{ symbol: 'AAPL', company_name: 'Apple', sources: [], in_watchlist: true, in_portfolio: false, min_level_override: null, effective_min_level: 2, alerts_on: true, state: null }], signal_months: 24 }, unavailable: false });
     const page = await render();
-    expect(page).toBeTruthy();
+    expect(order(page).join(',')).toBe('AAPL,ZZZZ,BOOM,EMPT');
+    expect(text(page)).toContain('watchlist.page.earningsPartial');
     m.monitor.mockResolvedValue({ items: {}, earningsStatus: 'unavailable' });
-    expect(await render()).toBeTruthy();
+    expect(text(await render())).toContain('watchlist.page.earningsUnavailable');
   });
 
   it('dato en timeout: la entrada vacía cede al cierre datado', async () => {
@@ -131,14 +141,15 @@ describe('/watchlist escenarios', () => {
   });
 
   it.each([
-    ['symbol', 'asc'], ['symbol', 'desc'], ['price', 'asc'], ['price', 'desc'], ['change', 'desc'],
-    ['marketCap', 'asc'], ['pe', 'desc'], ['earnings', 'asc'], ['bogus', 'asc'],
-  ])('orden %s %s', async (sort, dir) => {
+    ['symbol', 'asc', 'A,B,C'], ['symbol', 'desc', 'C,B,A'], ['price', 'asc', 'A,B,C'], ['price', 'desc', 'C,B,A'],
+    ['change', 'desc', 'C,B,A'], ['marketCap', 'asc', 'A,B,C'], ['pe', 'desc', 'C,B,A'], ['earnings', 'asc', 'B,A,C'],
+    ['bogus', 'asc', 'B,A,C'],
+  ])('orden %s %s -> %s', async (sort, dir, expected) => {
     m.state.mockResolvedValue({ items: ['B', 'A', 'C'].map(item), unavailable: false });
     m.entry.mockImplementation(async (symbol: string) => full(symbol, symbol.charCodeAt(0)));
     m.monitor.mockResolvedValue({ items: { A: { next_earnings_date: '2026-01-02' }, B: { next_earnings_date: '2026-01-01' } }, earningsStatus: 'ok' });
     const page = await render({ sort, dir });
-    expect(page).toBeTruthy();
+    expect(order(page).join(',')).toBe(expected);
   });
 
   it('paginación: 30 símbolos, página 2, página inválida y página fuera de rango', async () => {
@@ -146,9 +157,12 @@ describe('/watchlist escenarios', () => {
     m.state.mockResolvedValue({ items, unavailable: false });
     const p2 = await render({ page: '2' });
     expect(find(p2, 'DatedRow').length).toBe(2 * 12);
-    expect(await render({ page: 'abc' })).toBeTruthy();
-    expect(await render({ page: '99' })).toBeTruthy();
-    expect(await render({ page: '2', sort: 'price', dir: 'asc' })).toBeTruthy();
+    const names = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => `S${a + i}`).join(',');
+    expect(order(p2).join(',')).toBe(names(12, 23));
+    expect(order(await render({ page: 'abc' })).join(',')).toBe(names(0, 11));
+    expect(order(await render({ page: '99' })).join(',')).toBe(names(24, 29));
+    m.entry.mockImplementation(async (symbol: string) => full(symbol, Number(symbol.slice(1)) + 1));
+    expect(order(await render({ page: '2', sort: 'price', dir: 'asc' })).join(',')).toBe(names(12, 23));
   });
 
   it('DatedRow tolera que la promesa de cierres falle y un precio en vivo manda', async () => {
