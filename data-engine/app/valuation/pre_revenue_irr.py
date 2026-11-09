@@ -24,6 +24,9 @@ una lleva su fuente.
    c. guía de la propia empresa para ese ejercicio (punto medio; bajo/alto, su rango);
    d. si no hay ninguna de las tres: cartera contratada (backlog / obligaciones de desempeño pendientes)
       del último filing repartida en los años hasta T (suelo contratado).
+   e. si tampoco hay cartera: «estimación propia» por fase e industria (``revenue_phase_rates``, regla
+      fase-industria-v1 pre-registrada el 9-nov-2026): ingresos del último ejercicio × p25/p50/p75 del
+      cociente a 5 años de las empresas de su SIC de 3 dígitos que estaban en la misma fase; T = último + 5.
    Sin rango propio, bajista = base × (1 − ``REVENUE_SPREAD``) y alcista = base × (1 + ``REVENUE_SPREAD``).
 4. **Múltiplo EV/ventas**: el de comparables MADUROS (operativos, con ingresos y EV positivos), calculado
    con la misma fórmula (EV / ingresos del último ejercicio) que la empresa. Bajista p25, base mediana,
@@ -61,7 +64,7 @@ class RevenueAnchor:
     base: float
     low: float | None
     high: float | None
-    source: str               # analistas | consenso_prensa | guia | backlog
+    source: str               # analistas | consenso_prensa | guia | backlog | estimacion_propia
     label: str
     cite: Mapping[str, Any] = field(default_factory=dict)
 
@@ -105,13 +108,17 @@ def choose_anchor(anchors: Sequence[RevenueAnchor], last_fy: int) -> tuple[Reven
     """El ancla de ingresos de la regla (paso 3) o (None, motivo)."""
     order = {"analistas": 0, "consenso_prensa": 1, "guia": 2, "backlog": 3}
     window = range(last_fy + HORIZON_MIN, last_fy + HORIZON_MAX + 1)
-    usable = [a for a in anchors if a.year in window and a.base and a.base > 0 and a.source != "backlog"]
+    usable = [a for a in anchors if a.year in window and a.base and a.base > 0
+              and a.source not in ("backlog", "estimacion_propia")]
     if usable:
         far = max(a.year for a in usable)
         return min((a for a in usable if a.year == far), key=lambda a: order[a.source]), None
     backlog = [a for a in anchors if a.source == "backlog" and a.base and a.base > 0]
     if backlog:
         return backlog[0], None
+    own = [a for a in anchors if a.source == "estimacion_propia" and a.base and a.base > 0]
+    if own:
+        return own[0], None
     return None, (f"sin consenso de ingresos {last_fy + HORIZON_MIN}–{last_fy + HORIZON_MAX} (ni de firmas, ni de "
                   "prensa, ni guía de la empresa) y sin cartera contratada en los filings")
 
