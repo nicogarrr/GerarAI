@@ -42,18 +42,39 @@ def store_series(db: Session, key: str, rows: list[dict], fetched_at: datetime) 
     series_id, unit, _ = FRED_SERIES[key]
     added = 0
     revisions = 0
-    for day, value in parse_points(rows):
-        if day > fetched_at.astimezone(UTC).date():
-            continue
-        previous = db.scalar(
+    points = [(d, v) for d, v in parse_points(rows) if d <= fetched_at.astimezone(UTC).date()]
+    days = [d for d, _ in points]
+    # Lote único por serie (anti N+1): la última observación «observed» de
+    # cada día y los pares (día, vintage) existentes salen de dos consultas en
+    # vez de dos POR PUNTO (~800 por serie y refresco). Mismos filtros que el
+    # chequeo anterior: el de vintage no lleva geography/source/status.
+    latest_by_day: dict[date, MarketObservation] = {}
+    existing_vintages: set[tuple[date, str]] = set()
+    if days:
+        for row in db.scalars(
             select(MarketObservation).where(
                 MarketObservation.metric_key == key,
                 MarketObservation.geography == "US",
                 MarketObservation.source == "FRED",
-                MarketObservation.observation_date == day,
+                MarketObservation.observation_date.in_(days),
                 MarketObservation.status == "observed",
-            ).order_by(MarketObservation.fetched_at.desc(), MarketObservation.id.desc()).limit(1)
+            ).order_by(
+                MarketObservation.observation_date,
+                MarketObservation.fetched_at.desc(),
+                MarketObservation.id.desc(),
+            )
+        ).all():
+            latest_by_day.setdefault(row.observation_date, row)
+        existing_vintages = set(
+            db.execute(
+                select(MarketObservation.observation_date, MarketObservation.vintage).where(
+                    MarketObservation.metric_key == key,
+                    MarketObservation.observation_date.in_(days),
+                )
+            ).all()
         )
+    for day, value in points:
+        previous = latest_by_day.get(day)
         if previous and previous.value == value:
             continue
         if previous:
@@ -64,14 +85,9 @@ def store_series(db: Session, key: str, rows: list[dict], fetched_at: datetime) 
         else:
             vintage = "initial"
         status = "observed"
-        if db.scalar(
-            select(MarketObservation.id).where(
-                MarketObservation.metric_key == key,
-                MarketObservation.observation_date == day,
-                MarketObservation.vintage == vintage,
-            )
-        ):
+        if (day, vintage) in existing_vintages:
             continue
+        existing_vintages.add((day, vintage))
         db.add(
             MarketObservation(
                 metric_key=key,
