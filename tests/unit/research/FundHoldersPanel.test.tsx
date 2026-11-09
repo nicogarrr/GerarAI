@@ -90,3 +90,10 @@ describe('FundHoldersPanel: acciones ausentes no son cero', () => {
     expect(within(screen.getAllByRole('listitem')[0]).getByText('0')).toBeInTheDocument();
   });
 });
+
+
+it('fondos sin enlace al dataset conservan la atribución de la SEC', () => {
+  render(<FundHoldersPanel data={{ ...data, source: undefined }} locale="es" />);
+  expect(screen.queryByRole('link', { name: 'SEC Form N-PORT Data Sets' })).not.toBeInTheDocument();
+  expect(screen.getByTestId('fondos')).toHaveTextContent('SEC Form N-PORT Data Sets');
+});
