@@ -200,7 +200,9 @@ def test_sin_email_no_llama_a_sync_binding(entorno, monkeypatch):
     assert "user_email" not in db.info
 
 
-def test_sync_binding_en_carrera_hace_rollback_sin_romper(entorno, monkeypatch):
+def test_sync_binding_conflictivo_no_rompe_get_db(entorno, monkeypatch):
+    # IntegrityError dentro de get_db: el generador sigue rindiendo la sesion.
+    # No se espia el rollback ni estado SQL: solo que no rompe el flujo.
     llamadas = []
     import app.services.email_alerts as email_alerts
 
