@@ -272,3 +272,161 @@ def test_module_grades_follow_their_stated_bar():
         {"roles_con_aporte": 0, "roles_evaluados": 6, "tesis_en_suelo": 0, "tesis_juzgadas": 22}
     )
     assert e["nota"] == 0.0
+
+
+# ------------------------------------------------------------------------------------- baremo estricto v2
+
+
+def _rig_v2(**over):
+    base = {
+        "status": "ok",
+        "free_numbers_final": 0,
+        "unknown_markers_final": 0,
+        "guard_problems": {"free_numbers": 0, "false_positive_10b5_1": 0},
+        "quotes": {"quotes": 4, "not_literal": 1, "translated": 0},
+        "quotes_attributed": {"quotes": 0, "not_literal": 0},
+        "sections": {"expected": 16, "filled": 16},
+        "kill_switches": {"count": 4, "as_threshold": 4},
+        "method": {"ok": True},
+        "source": {
+            "price": {"value": 100.0, "cited": 100.0},
+            "shares": {"value": 50.0},
+            "net_debt": {"value": 200.0},
+        },
+    }
+    base.update(over)
+    return base
+
+
+def test_v2_pesos_suman_1_y_secciones_kill_son_menores():
+    assert math.isclose(sum(nt.PESOS_RIGOR_V2.values()), 1.0)
+    assert nt.PESOS_RIGOR_V2["secciones"] + nt.PESOS_RIGOR_V2["kill_switches"] <= 0.15 + 1e-9
+    assert set(nt.FORMULAS_RIGOR_V2) == set(nt.PESOS_RIGOR_V2)
+
+
+def test_v2_tesis_recortada_saca_0_en_cifras():
+    v1 = nt.rigor_components(_rig_v2(status="stripped"))
+    v2 = nt.rigor_components_v2(_rig_v2(status="stripped"))
+    assert v1["componentes"]["cifras_libres"]["valor"] == 1.0  # v1 la premiaba
+    assert v2["componentes"]["cifras_libres"]["valor"] == 0.0
+    assert v2["recortada"] is True
+
+
+def test_v2_error_de_audit_anula_datos():
+    flags = [{"input": "debt", "dato": True, "puntos": 2}]
+    v1 = nt.rigor_components(_rig_v2(), flags)
+    v2 = nt.rigor_components_v2(_rig_v2(), flags, {"shares": 50.0, "net_debt": 200.0})
+    assert v1["componentes"]["datos_fuente"]["valor"] > 0.3  # v1: un ERROR solo quitaba 0,15
+    assert v2["componentes"]["datos_fuente"]["valor"] == 0.0
+
+
+def test_v2_datos_contra_fuente_primaria_no_contra_la_propia_cita():
+    # La tesis cita 50 M acciones y su cita dice 50 (coherente), pero la portada dice 60: mal.
+    prim = {"shares": 60.0, "net_debt": 200.0}
+    r = nt.rigor_components_v2(_rig_v2(), [], prim)
+    fp = r["fuente_primaria"]
+    assert (
+        fp["shares"]["estado"] == "mal" and fp["price"]["estado"] == "ok" and fp["net_debt"]["estado"] == "ok"
+    )
+    assert math.isclose(r["componentes"]["datos_fuente"]["valor"], 2 / 3, rel_tol=1e-3)
+    # Sin valor primario: «no verificado» vale 0,5, no 1.
+    r2 = nt.rigor_components_v2(_rig_v2(), [], {})
+    assert r2["fuente_primaria"]["shares"]["estado"] == "no_verificado"
+    assert math.isclose(r2["componentes"]["datos_fuente"]["valor"], (1 + 0.5 + 0.5) / 3, rel_tol=1e-3)
+    # Los avisos (no ERROR) restan 0,25 cada uno.
+    r3 = nt.rigor_components_v2(_rig_v2(), [{"dato": True, "puntos": 1}], prim)
+    assert math.isclose(r3["componentes"]["datos_fuente"]["valor"], 2 / 3 * 0.75, rel_tol=1e-3)
+
+
+def test_v2_cuenta_todas_las_citas_y_sin_citas_no_es_el_maximo():
+    sin = nt.rigor_components_v2(_rig_v2(quotes={"quotes": 0, "not_literal": 0}))
+    assert sin["componentes"]["citas_literales"]["valor"] == nt.SIN_CITAS < 1
+    # v1 miraba solo las atribuidas (0 → máximo); v2 cuenta las 4 citas, 1 no literal.
+    assert nt.rigor_components(_rig_v2())["componentes"]["citas_literales"]["valor"] == 1.0
+    assert nt.rigor_components_v2(_rig_v2())["componentes"]["citas_literales"]["valor"] == 0.75
+
+
+def test_v2_kill_switch_solo_cuenta_si_el_codigo_puede_comprobarlo():
+    sw = [
+        {"key": "a", "metric": "Deuda neta / EBITDA", "threshold": "> 2,7x", "current": "1,7x"},
+        {"key": "b", "metric": "Crecimiento", "threshold": "< −4,0 % dos años", "current": "−0,4 %"},
+        {"key": "c", "metric": "Meses de caja", "threshold": "< 12 meses", "current": "sin consumo"},
+        {"key": "d", "metric": "Calidad del equipo", "threshold": "si empeora", "current": "buena"},
+        {"key": "e", "metric": "Margen", "threshold": "< 10 %", "current": None},
+    ]
+    rep = nt.kill_switch_report_v2(sw)
+    assert rep == {"count": 5, "checkable": 2, "not_checkable": ["c", "d", "e"]}
+    r = nt.rigor_components_v2(_rig_v2(), kill_v2=rep)
+    assert math.isclose(r["componentes"]["kill_switches"]["valor"], 0.4)
+
+
+def test_v2_juez_numantia_es_el_objetivo():
+    assert nt.judge_vs_numantia_10(0.0) == 10.0
+    assert nt.judge_vs_numantia_10(0.3) == 10.0
+    assert nt.judge_vs_numantia_10(-1.0) == 5.0
+    assert nt.judge_vs_numantia_10(-2.5) == 0.0
+    assert nt.judge_vs_numantia_10(None, 3.5) == 7.0
+
+
+def test_v2_nota_y_modulo_sin_tesis_cuenta_cero():
+    assert nt.grade_v2(None, None)["nota"] == 0.0
+    assert nt.grade_v2(8.0, 5.0)["nota"] == 7.4
+    m = nt.module_tesis_v2({"A": 8.0, "B": 6.0, "C": None}, ["A", "B", "C"])
+    assert m["nota"] == 4.7 and m["sin_tesis"] == ["C"] and m["min"] == 0.0
+
+
+def test_v2_estricto_baja_la_nota_de_una_tesis_que_v1_llenaba_sola():
+    rig = _rig_v2(status="stripped", quotes={"quotes": 0, "not_literal": 0})
+    flags = [{"dato": True, "puntos": 2}]
+    v1 = nt.grade(nt.rigor_components(rig, flags)["rigor_10"], 3.5)["nota"]
+    v2r = nt.rigor_components_v2(rig, flags, {})["rigor_10"]
+    v2 = nt.grade_v2(v2r, nt.judge_vs_numantia_10(-1.0))["nota"]
+    assert v1 >= 8.0 and v2 < 6.0
+
+
+def test_cerebro_v2_aciertos_del_control_y_muestra_aparte():
+    x = {
+        "holdout_aciertos": 24,
+        "holdout_casos": 30,
+        "muestra_aciertos": 66,
+        "muestra_casos": 80,
+        "juez_antes_5": 3.17,
+        "p95_s": 16.4,
+        "cifras_inventadas": 0,
+    }
+    g = nt.grade_cerebro_v2(x)
+    assert g["componentes"]["aciertos_control"]["valor"] == 0.8
+    assert g["dentro_de_muestra"] == 8.2
+    assert g["nota"] == round(10 * (0.6 * 0.8 + 0.2 * 3.17 / 5 + 0.2 * 10 / 16.4), 1)
+    assert nt.grade_cerebro_v2({**x, "cifras_inventadas": 1})["nota"] == round(g["nota"] / 2, 1)
+
+
+def test_cerebro_no_puedo_no_es_acierto():
+    from evals.cerebro import bench_grade as G
+
+    case = {
+        "id": "x",
+        "category": "valoracion_tesis",
+        "q": "¿Cuál es el margen de seguridad de CB?",
+        "expect": {"must_any": ["CB|Chubb"]},
+    }
+    ans = "No puedo medir el margen de seguridad de CB: no hay valor justo guardado en la cartera de hoy."
+    r = G.grade_case(case, {"answer": ans}, latency_s=3.0, ground=[], fact_values={})
+    assert r.checks["contesta"] is False and not r.passed
+    # Fuera de ámbito, negarse es la respuesta correcta…
+    fuera = {"id": "f", "category": "fuera_ambito", "q": "¿Qué tiempo hará?", "expect": {}}
+    ok = G.grade_case(
+        fuera,
+        {"answer": "No puedo darte el tiempo: solo trato tu cartera e inversiones."},
+        latency_s=3.0,
+        ground=[],
+        fact_values={},
+    )
+    assert ok.checks["contesta"] is True
+    # …pero la reserva genérica es un fallo del sistema en cualquier categoría.
+    res = "No puedo responderte con fuentes ahora mismo; prueba de nuevo en un momento."
+    bad = G.grade_case(fuera, {"answer": res}, latency_s=3.0, ground=[], fact_values={})
+    assert bad.checks["contesta"] is False
+    assert G.cannot_answer("no puedo, lo siento") and not G.cannot_answer(
+        "Tienes 10 acciones; no puedo decir más."
+    )

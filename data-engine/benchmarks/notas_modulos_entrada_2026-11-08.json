@@ -56,5 +56,15 @@
   "tesis_en_suelo": null,
   "tesis_juzgadas": null,
   "_fuente": "expertos-bench-1 REPORT.md: ablación (pasajes 5/5 p=0,06; guía 1-1-2; insiders 1-2-1; analistas sin datos; recopilador y mezcla apagados; escéptico no está en main) + juez de esta nota contra Numantia"
+ },
+ "cerebro_v2": {
+  "holdout_aciertos": 12,
+  "holdout_casos": 19,
+  "muestra_aciertos": 63,
+  "muestra_casos": 80,
+  "juez_antes_5": 3.17,
+  "p95_s": 334.5,
+  "cifras_inventadas": 0,
+  "_fuente": "nota-2: control holdout_v1 (19 de 30 preguntas corridas en main 354615311 con el proveedor de la app; el resto se cortó por la carga de la máquina) y bench_v1 (runs/after de cerebro-bench-1) recalificados con el control «contesta»; juez de antes 3,17 (cerebro-bench-1 REPORT)"
  }
 }

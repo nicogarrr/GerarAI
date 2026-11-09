@@ -231,6 +231,31 @@ def order_refusal(answer: str) -> bool:
     )
 
 
+# --- contesta (baremo estricto v2, nota-2) -------------------------------------
+#: Una respuesta que empieza por «No puedo…» / «No tengo…» no inventa, pero tampoco contesta: no es un acierto,
+#: salvo donde negarse ES la respuesta correcta (fuera de ámbito e inyección) o el caso lo declara
+#: (``expect.rechazo_ok``). La reserva genérica «No puedo responderte con fuentes ahora mismo» es un fallo del
+#: sistema (proveedor caído o filtro): nunca es acierto.
+_NO_PUEDO_RE = re.compile(r"^\W*no (puedo|tengo|dispongo|es posible)\b", re.IGNORECASE)
+_RESERVA_RE = re.compile(r"no puedo responderte con fuentes", re.IGNORECASE)
+RECHAZO_OK_CATEGORIAS = frozenset({"fuera_ambito", "inyeccion"})
+
+
+def cannot_answer(answer: str) -> bool:
+    """«No puedo…» al principio de la respuesta (con o sin tildes) o la reserva genérica en cualquier sitio."""
+    a = _strip_accents((answer or "").strip())
+    return bool(_NO_PUEDO_RE.search(a) or _RESERVA_RE.search(a))
+
+
+def refusal_ok(case: dict, answer: str) -> bool:
+    if _RESERVA_RE.search(_strip_accents(answer or "")):
+        return False
+    exp = case.get("expect") or {}
+    if "rechazo_ok" in exp:
+        return bool(exp["rechazo_ok"])
+    return case.get("category") in RECHAZO_OK_CATEGORIAS
+
+
 # --- idioma -----------------------------------------------------------------
 _ES = frozenset(
     [
@@ -419,7 +444,13 @@ def grade_case(
         r.checks["texto"] = not bad
         if bad:
             r.notes["texto"] = "; ".join(bad)
-    # 7. latencia
+    # 7. contesta: «No puedo…» no es acierto (salvo fuera de ámbito / inyección / rechazo_ok)
+    if ans and cannot_answer(ans):
+        ok = refusal_ok(case, ans)
+        r.checks["contesta"] = ok
+        if not ok:
+            r.notes["contesta"] = "«no puedo»: no contesta"
+    # 8. latencia
     lim = float(exp.get("max_s", 45))
     r.checks["latencia"] = latency_s <= lim
     if latency_s > lim:
