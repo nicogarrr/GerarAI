@@ -15,7 +15,7 @@ import { CHART_RANGES, type CompanyChartRange } from '@/lib/market/chart-ranges'
 import { normalizeChartPriceUnits } from '@/lib/market/chart-price-units';
 import { adx, cleanBars, dailyPivots, fibonacci, preferCandlesticks, rangeBars, sma, structure } from '@/lib/market/technical';
 import { getChartEvents, type ChartEvents } from '@/lib/actions/price-events.actions';
-import { barsSince, detectMovements, eventsInRange, markerSize, movementEvents, markersByDay, targetDistancePercent, volumeSpikeFlags, type PriceEventKind } from '@/lib/market/price-events';
+import { barsSince, detectMovements, eventsInRange, markerSize, markersForBars, movementEvents, markersByDay, targetDistancePercent, volumeSpikeFlags, type PriceEventKind } from '@/lib/market/price-events';
 import { PriceEventsPanel } from '@/components/research/PriceEventsPanel';
 import { storedEventText } from '@/lib/market/price-events-text';
 
@@ -299,7 +299,10 @@ function PriceCanvas({ bars, levels, currency, candleMode = false, hourly = fals
         const known = new Set(bars.map((bar) => bar.date));
         // Marcadores más pequeños en pantallas estrechas: a tamaño fijo se
         // solapaban hasta ser ilegibles (markerSize, tests en price-events).
-        const seriesMarkers: SeriesMarker<Time>[] = hourly ? [] : markers.filter((marker) => known.has(marker.date)).map((marker) => ({ time: marker.date as Time, position: 'aboveBar', shape: 'circle', color: marker.color, text: marker.text, size: markerSize(marker.count, wide) }));
+        // En tramos muy largos (Máx, >1.500 barras) los marcadores se funden en
+        // una banda que tapa el precio: se omiten en el canvas y el detalle
+        // queda en la lista «Eventos del período» (markersForBars).
+        const seriesMarkers: SeriesMarker<Time>[] = hourly ? [] : markersForBars(markers, bars.length).filter((marker) => known.has(marker.date)).map((marker) => ({ time: marker.date as Time, position: 'aboveBar', shape: 'circle', color: marker.color, text: marker.text, size: markerSize(marker.count, wide) }));
         current.markers.setMarkers(candleMode ? [] : seriesMarkers);
         current.candleMarkers.setMarkers(candleMode ? seriesMarkers : []);
         // Las líneas viven en la serie ACTIVA (línea o velas); al alternar de
