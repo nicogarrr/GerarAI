@@ -51,6 +51,7 @@ from datetime import date, timedelta
 from typing import Any
 
 from app.services.estimate_base_rates import BaseRate
+from app.services.fiscal_label import nominal_month
 
 logger = logging.getLogger(__name__)
 
@@ -141,16 +142,8 @@ class Cell:
 
 # ---------------------------------------------------------------------- periodos
 # Calendarios de 52/53 semanas (AAPL, retail, semis): el periodo cierra un sábado o domingo a ±7 días
-# del fin de mes, así que un cierre el 3 de enero es el ejercicio de diciembre, no uno nuevo.
-WEEKLY_CALENDAR_DAYS = 7
-
-
-def nominal_month(end: date) -> tuple[int, int]:
-    """(año, mes) al que pertenece un cierre: el mismo mes, o el anterior si cae en sus primeros 7 días."""
-    if end.day <= WEEKLY_CALENDAR_DAYS:
-        prev = end.replace(day=1) - timedelta(days=1)
-        return prev.year, prev.month
-    return end.year, end.month
+# del fin de mes, así que un cierre el 3 de enero es el ejercicio de diciembre, no uno nuevo. La regla
+# (``WEEKLY_CALENDAR_DAYS`` y ``nominal_month``) vive en fiscal_label, compartida con la etiqueta dei.
 
 
 def fy_end_month(fy_ends: Sequence[date]) -> int:
