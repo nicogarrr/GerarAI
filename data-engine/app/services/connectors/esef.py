@@ -365,6 +365,19 @@ class EsefClient:
         _, name = parse_entity(payload)
         return name
 
+    async def fetch_package(self, filing: EsefFiling) -> bytes:
+        """Paquete ESEF (zip) del filing: trae la taxonomía de extensión del emisor
+        (etiquetas, cálculo y anclajes) que el render xBRL-JSON no incluye."""
+        if not filing.package_url:
+            raise EsefError(f"filing {filing.fxo_id} has no package (package_url null)")
+        _throttle()
+        try:
+            resp = await self._client.get(filing.package_url, headers={"Accept": "application/zip"})
+            resp.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise EsefError(f"GET {filing.package_url} failed: {exc!r}") from exc
+        return resp.content
+
     async def fetch_filing_json(self, filing: EsefFiling) -> dict[str, Any]:
         """Download the xBRL-JSON render. Raises EsefError when unavailable —
         older filings only carry the zip package and we do not parse iXBRL."""
