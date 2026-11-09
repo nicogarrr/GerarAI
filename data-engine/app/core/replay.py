@@ -41,22 +41,12 @@ async def consume_nonce(
     """
     if use_redis:
         try:
-            import redis.asyncio as redis
+            from app.core.redis_client import short_async_redis
 
-            from app.core.redis_retry import no_retry_async
-
-            # Cold-start CPU contention can exceed 250/500 ms. Keep a bounded
-            # wait, no retry of an ambiguously committed write, and fail closed.
-            client = redis.from_url(
-                redis_url, socket_connect_timeout=1.0, socket_timeout=1.5,
-                retry=no_retry_async(),
-            )
-            try:
+            async with short_async_redis(redis_url) as client:
                 acquired = await client.set(
                     nonce_key, "1", nx=True, ex=max(int(ttl_seconds), 1)
                 )
-            finally:
-                await client.aclose()
             return bool(acquired)
         except Exception as exc:  # noqa: BLE001 — fail closed or local fallback
             if not allow_local_fallback:

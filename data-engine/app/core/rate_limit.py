@@ -143,27 +143,16 @@ async def _record_hit(
     now = _now()
     if use_redis:
         try:
-            import redis.asyncio as redis
+            from app.core.redis_client import short_async_redis
 
-            from app.core.redis_retry import no_retry_async
-
-            # Cold-start CPU contention can exceed 250/500 ms. Keep a bounded
-            # wait, no retry of an ambiguously committed write, and fail closed.
-            client = redis.from_url(
-                redis_url, socket_connect_timeout=1.0, socket_timeout=1.5,
-                retry=no_retry_async(),
-            )
             member = f"{now:.6f}:{uuid.uuid4().hex}"
-            try:
-                async with client.pipeline(transaction=True) as pipe:
-                    pipe.zremrangebyscore(key, "-inf", now - window_seconds)
-                    pipe.zadd(key, {member: now})
-                    pipe.zcard(key)
-                    pipe.expire(key, window_seconds + 5)
-                    pipe.zrange(key, 0, 0, withscores=True)
-                    _, _, count, _, oldest = await pipe.execute()
-            finally:
-                await client.aclose()
+            async with short_async_redis(redis_url) as client, client.pipeline(transaction=True) as pipe:
+                pipe.zremrangebyscore(key, "-inf", now - window_seconds)
+                pipe.zadd(key, {member: now})
+                pipe.zcard(key)
+                pipe.expire(key, window_seconds + 5)
+                pipe.zrange(key, 0, 0, withscores=True)
+                _, _, count, _, oldest = await pipe.execute()
             retry_after = _retry_after(
                 oldest[0][1] if oldest else now, now, window_seconds
             )
@@ -403,17 +392,10 @@ def _trusted_proxy_peer(peer: str, settings) -> bool:
 async def _count_hits(key: str, *, use_redis: bool, redis_url: str) -> int:
     now = _now()
     if use_redis:
-        import redis.asyncio as redis
+        from app.core.redis_client import short_async_redis
 
-        from app.core.redis_retry import no_retry_async
-
-        client = redis.from_url(
-            redis_url, socket_connect_timeout=1.0, socket_timeout=1.5, retry=no_retry_async()
-        )
-        try:
+        async with short_async_redis(redis_url) as client:
             return int(await client.zcount(key, now - WINDOW_SECONDS, "+inf"))
-        finally:
-            await client.aclose()
     with _local_lock:
         hits = _local_hits.get(key)
         if not hits:
