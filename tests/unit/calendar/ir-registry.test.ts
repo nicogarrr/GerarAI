@@ -53,9 +53,9 @@ describe('irLinksFor', () => {
         expect(irLinksFor('NOEXISTE', '2026-11-08')).toBeNull();
     });
 
-    it('cubre las posiciones y watchlist registradas el 2026-11-08', () => {
+    it('cubre las posiciones y watchlist registradas el 2026-11-09', () => {
         // Guard anti-regresion: cada ticker registrado responde con su seccion oficial.
-        for (const ticker of ['META', 'BN', 'TSLA', 'ASTS', 'ZETA', 'CGEO.L', 'KRKNF', 'BABA', 'BWMX', 'KKR', 'POOL', 'CB', 'CPT']) {
+        for (const ticker of ['META', 'BN', 'TSLA', 'ASTS', 'ZETA', 'CGEO.L', 'KRKNF', 'BABA', 'BWMX', 'KKR', 'POOL', 'CB', 'CPT', 'UBER', 'RKLB', 'ONDS']) {
             expect(irLinksFor(ticker, '2026-11-08')?.section.url, ticker).toMatch(/^https:\/\//);
         }
     });
@@ -70,6 +70,18 @@ describe('irLinksFor', () => {
         const otherDay = irLinksFor('META', '2026-10-22');
         expect(otherDay?.eventPage).toBeNull();
         expect(otherDay?.section.url).toBe(IR_REGISTRY.META.section.url);
+    });
+
+    it('enlaza el evento RKLB del 2026-11-09 solo ese dia', () => {
+        const exact = irLinksFor('RKLB', '2026-11-09');
+        expect(exact?.eventPage?.period).toBe('T3 2026');
+        expect(irLinksFor('RKLB', '2026-11-10')?.eventPage).toBeNull();
+    });
+
+    it('enlaza el evento ONDS del 2026-11-12 solo ese dia', () => {
+        const exact = irLinksFor('ONDS', '2026-11-12');
+        expect(exact?.eventPage?.url).toContain('ir.ondas.com/ir-calendar/');
+        expect(irLinksFor('ONDS', '2026-11-11')?.eventPage).toBeNull();
     });
 
     it('una entrada sin eventos devuelve seccion y eventPage null', () => {
