@@ -291,6 +291,24 @@ def _filing_published_at(filed: object):
         return None
 
 
+def _existing_source_urls(db: Session, urls: list[str]) -> set[str]:
+    """URLs ya dadas de alta como documento, en UNA sola consulta.
+
+    Las ingestas SEC/IR deduplican por ``source_url``; una consulta por
+    candidato era un N+1 por empresa en cada pasada de evidencia.
+    """
+    if not urls:
+        return set()
+    return set(
+        db.scalars(
+            select(Document.source_url).where(
+                Document.source_url.in_(urls),
+                *tenant_filters(db, Document),
+            )
+        ).all()
+    )
+
+
 class ThesisEvidenceService:
     """Reune y persiste el paquete de evidencia best-effort para una tesis."""
 
@@ -998,6 +1016,12 @@ class ThesisEvidenceService:
         created = 0
         items: list[dict[str, Any]] = []
         filings = select_filings(filings)
+        # Dedup en lote: `seen` arranca con lo ya persistido y recoge lo que
+        # esta pasada añade (una URL repetida dentro del lote no entra dos
+        # veces; antes el autoflush de cada EXISTS hacia esa dedup).
+        seen = _existing_source_urls(
+            db, [u for u in (f.get("document_url") or f.get("index_url") for f in filings) if u]
+        )
         for filing in filings:
             form = filing.get("form")
             url = filing.get("document_url") or filing.get("index_url")
@@ -1005,16 +1029,9 @@ class ThesisEvidenceService:
             items.append({"form": form, "filing_date": filed, "url": url})
             if not url:
                 continue
-            exists = db.scalar(
-                select(Document.id)
-                .where(
-                    Document.source_url == url,
-                    *tenant_filters(db, Document),
-                )
-                .limit(1)
-            )
-            if exists:
+            if url in seen:
                 continue
+            seen.add(url)
             db.add(
                 Document(
                     company_id=company.id,
@@ -1288,20 +1305,14 @@ class ThesisEvidenceService:
         items = getattr(result, "items", None) or []
         created = 0
         listed: list[dict[str, Any]] = []
+        seen = _existing_source_urls(db, [item.url for item in items[:MAX_IR_DOCUMENTS] if item.url])
         for item in items[:MAX_IR_DOCUMENTS]:
             listed.append({"title": item.title, "url": item.url})
             if not item.url:
                 continue
-            exists = db.scalar(
-                select(Document.id)
-                .where(
-                    Document.source_url == item.url,
-                    *tenant_filters(db, Document),
-                )
-                .limit(1)
-            )
-            if exists:
+            if item.url in seen:
                 continue
+            seen.add(item.url)
             db.add(
                 Document(
                     company_id=company.id,

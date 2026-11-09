@@ -280,8 +280,13 @@ def sync_all_thesis_rules(db: Session) -> None:
             )
         ).all()
     )
+    # Un db.get por empresa era un N+1 en cada pasada global; un solo IN.
+    companies = {
+        company.id: company
+        for company in db.scalars(select(Company).where(Company.id.in_(company_ids)))
+    }
     for company_id in sorted(company_ids):
-        company = db.get(Company, company_id)
+        company = companies.get(company_id)
         if company is not None:
             sync_thesis_rules(db, company)
 

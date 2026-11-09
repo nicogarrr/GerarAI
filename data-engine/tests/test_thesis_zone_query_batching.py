@@ -1,0 +1,225 @@
+"""Lotes en la zona de tesis: dedup de documentos y cargas por empresa sin N+1.
+
+Cada test cuenta las queries SQL reales (before_cursor_execute) sobre una BD
+sqlite en memoria y fija el tope exacto que el barrido de rendimiento
+garantiza, ademas del resultado funcional. Antes, cada candidato/empresa/fact
+hacia su propia consulta: el coste crecia linealmente con empresas x pasadas.
+"""
+from __future__ import annotations
+
+from datetime import date, datetime
+from decimal import Decimal
+from types import SimpleNamespace
+
+import pytest
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import Session
+
+import app.core.database  # noqa: F401 - registra los listeners de tenant
+from app.models.entities import (
+    Base,
+    Company,
+    Document,
+    FinancialFact,
+    Tenant,
+    ThesisVersion,
+)
+
+
+@pytest.fixture
+def db_counter():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    counter = {"n": 0}
+
+    @event.listens_for(engine, "before_cursor_execute")
+    def _count(conn, cursor, statement, parameters, context, executemany):
+        counter["n"] += 1
+
+    with Session(engine, expire_on_commit=False) as session:
+        session.add(Tenant(id=1, external_id="t1"))
+        session.commit()
+        yield session, counter
+    engine.dispose()
+
+
+def _company(db: Session, ticker: str = "ACME") -> Company:
+    company = Company(
+        ticker=ticker, name=ticker, exchange="NASDAQ", currency="USD",
+        sector="Tech", industry="Tech", company_type="holding",
+        valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(company)
+    db.commit()
+    return company
+
+
+def _filing(i: int, url: str | None = None) -> dict:
+    return {
+        "form": "10-Q",
+        "document_url": url or f"https://sec.test/10q-{i}.htm",
+        "index_url": None,
+        "filing_date": f"2026-0{1 + (i % 9)}-15",
+        "accession_number": f"0000000000-26-{i:06d}",
+    }
+
+
+# --- _ingest_filings: dedup de URLs en lote ---------------------------------
+
+
+def test_ingest_filings_second_pass_is_one_query(db_counter, monkeypatch):
+    from app.services.thesis_evidence_service import ThesisEvidenceService
+
+    db, counter = db_counter
+    company = _company(db)
+    monkeypatch.setattr(ThesisEvidenceService, "_fetch_filings", lambda self, cik: [_filing(i) for i in range(8)])
+    monkeypatch.setattr(ThesisEvidenceService, "_annual_report_text", lambda self, db, company, filings: {})
+
+    first = ThesisEvidenceService()._ingest_filings(db, company, "0000000001")
+    assert first["documents_created"] == 8
+    db.commit()
+
+    counter["n"] = 0
+    again = ThesisEvidenceService()._ingest_filings(db, company, "0000000001")
+    assert again["documents_created"] == 0
+    # Una sola consulta IN para las 8 URLs; antes eran 8 EXISTS por pasada.
+    assert counter["n"] <= 2, f"segunda pasada uso {counter['n']} queries (>2)"
+
+
+def test_ingest_filings_dedups_repeated_url_inside_the_batch(db_counter, monkeypatch):
+    from app.services.thesis_evidence_service import ThesisEvidenceService
+
+    db, _counter = db_counter
+    company = _company(db, "DUP")
+    dup = "https://sec.test/mismo.htm"
+    monkeypatch.setattr(
+        ThesisEvidenceService, "_fetch_filings",
+        lambda self, cik: [_filing(1, url=dup), _filing(2, url=dup), _filing(3)],
+    )
+    monkeypatch.setattr(ThesisEvidenceService, "_annual_report_text", lambda self, db, company, filings: {})
+
+    result = ThesisEvidenceService()._ingest_filings(db, company, "0000000001")
+    # La URL repetida dentro del mismo lote entra una sola vez.
+    assert result["documents_created"] == 2
+
+
+# --- _ingest_ir: dedup de URLs en lote --------------------------------------
+
+
+def test_ingest_ir_second_pass_is_one_query(db_counter, monkeypatch):
+    from app.services.thesis_evidence_service import ThesisEvidenceService
+
+    db, counter = db_counter
+    company = _company(db, "IRCO")
+    company.ir_url = "https://ir.example.com"
+    db.commit()
+    items = [SimpleNamespace(title=f"release {i}", url=f"https://ir.example.com/r{i}") for i in range(10)]
+    monkeypatch.setattr(
+        ThesisEvidenceService, "_fetch_ir",
+        lambda self, ir_url, ticker: SimpleNamespace(items=items, errors=[]),
+    )
+
+    first = ThesisEvidenceService()._ingest_ir(db, company)
+    assert first["documents_created"] == 10
+    db.commit()
+
+    counter["n"] = 0
+    again = ThesisEvidenceService()._ingest_ir(db, company)
+    assert again["documents_created"] == 0
+    # Una sola consulta IN para los 10 releases; antes eran 10 EXISTS.
+    assert counter["n"] <= 2, f"segunda pasada IR uso {counter['n']} queries (>2)"
+
+
+# --- _resolve_fact_locators: documentos en lote ------------------------------
+
+
+def test_resolve_fact_locators_batches_document_reads(db_counter):
+    from app.services.thesis_deep_narrative import _resolve_fact_locators
+
+    db, counter = db_counter
+    company = _company(db, "LOC")
+    docs = [
+        Document(company_id=company.id, title=f"doc {i}", source_type="SEC",
+                 source_url=f"https://sec.test/d{i}")
+        for i in range(5)
+    ]
+    db.add_all(docs)
+    db.flush()
+    fact_ids = []
+    for i, doc in enumerate(docs):
+        fact = FinancialFact(
+            company_id=company.id, metric="revenue", value=Decimal("10"), unit="USD",
+            period=f"20{20 + i}-12-31:FY", fiscal_year=2020 + i,
+            source_id=doc.id, source_type="SEC",
+        )
+        db.add(fact)
+        db.flush()
+        fact_ids.append(fact.id)
+    db.commit()
+
+    counter["n"] = 0
+    locators = _resolve_fact_locators(
+        db, {"driver_model": [{"source_fact_ids": fact_ids}]}
+    )
+    # 2 consultas (facts IN + documentos IN); antes 1 + N gets por driver.
+    assert counter["n"] == 2, f"locators uso {counter['n']} queries (!=2)"
+    assert locators == {fid: f"https://sec.test/d{i}" for i, fid in enumerate(fact_ids)}
+
+
+# --- _annual_facts: fechas de documentos fuente en lote ----------------------
+
+
+def test_annual_facts_prefetches_source_documents(db_counter):
+    from app.services.thesis_projection_service import ThesisProjectionService
+
+    db, counter = db_counter
+    company = _company(db, "PROJ")
+    docs = [
+        Document(company_id=company.id, title=f"10-K {year}", source_type="SEC",
+                 source_url=f"https://sec.test/10k-{year}", published_at=datetime(year, 3, 1))
+        for year in range(2019, 2025)
+    ]
+    db.add_all(docs)
+    db.flush()
+    for i, year in enumerate(range(2019, 2025)):
+        for metric in ("revenue", "net_income"):
+            db.add(FinancialFact(
+                company_id=company.id, metric=metric, value=Decimal("100"), unit="USD",
+                period=f"{year}-12-31:FY", fiscal_year=year,
+                source_id=docs[i].id, source_type="SEC",
+            ))
+    db.commit()
+
+    counter["n"] = 0
+    out = ThesisProjectionService()._annual_facts(db, company, date(2026, 10, 8))
+    # 2 consultas (facts + documentos IN); antes 1 + un get por fact anual.
+    assert counter["n"] == 2, f"_annual_facts uso {counter['n']} queries (!=2)"
+    assert set(out) == {"revenue", "net_income"}
+    assert sorted(out["revenue"]) == list(range(2019, 2025))
+
+
+# --- sync_all_thesis_rules: empresas en lote ---------------------------------
+
+
+def test_sync_all_thesis_rules_loads_companies_in_one_query(db_counter, monkeypatch):
+    from app.services import thesis_invalidation_rules as rules
+
+    db, counter = db_counter
+    companies = [_company(db, f"SYNC{i}") for i in range(8)]
+    for company in companies:
+        db.add(ThesisVersion(
+            company_id=company.id, version=1, status="final",
+            thesis_markdown="# T", executive_summary="R", rating="watch",
+            invalidation_criteria=[], invalidation_rules=[],
+        ))
+    db.commit()
+
+    synced: list[int] = []
+    monkeypatch.setattr(rules, "sync_thesis_rules", lambda db, company: synced.append(company.id) or [])
+
+    counter["n"] = 0
+    rules.sync_all_thesis_rules(db)
+    # 3 consultas fijas (ids con tesis + ids con reglas vivas + empresas IN),
+    # independientes del numero de empresas; antes era 2 + N gets.
+    assert counter["n"] == 3, f"sync_all uso {counter['n']} queries (!=3)"
+    assert synced == sorted(company.id for company in companies)
