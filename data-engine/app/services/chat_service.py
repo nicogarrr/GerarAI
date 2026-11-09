@@ -1652,20 +1652,31 @@ class ChatService:
         return latest_thesis_version(db, company)
 
     def _key_facts(self, db: Session, company: Company, limit: int = 8) -> list[FinancialFact]:
-        # One query instead of one per metric: pick the latest fact per
-        # metric in Python, preserving the per-metric ordering contract.
+        from sqlalchemy import func
+
+        from app.core.tenancy import tenant_filters
+
+        # Rank in SQL rather than hydrating every historical revision. Both
+        # the ranking and the outer entity load remain tenant-scoped.
+        ranked = select(
+            FinancialFact.id,
+            func.row_number().over(
+                partition_by=FinancialFact.metric,
+                order_by=(
+                    FinancialFact.fiscal_year.desc().nullslast(),
+                    desc(FinancialFact.created_at),
+                    desc(FinancialFact.id),
+                ),
+            ).label("rank"),
+        ).where(
+            FinancialFact.company_id == company.id,
+            FinancialFact.metric.in_(KEY_FACT_METRICS),
+            *tenant_filters(db, FinancialFact),
+        ).subquery()
         rows = db.scalars(
             select(FinancialFact)
-            .where(
-                FinancialFact.company_id == company.id,
-                FinancialFact.metric.in_(KEY_FACT_METRICS),
-            )
-            .order_by(
-                FinancialFact.metric,
-                FinancialFact.fiscal_year.desc().nullslast(),
-                desc(FinancialFact.created_at),
-                desc(FinancialFact.id),
-            )
+            .join(ranked, FinancialFact.id == ranked.c.id)
+            .where(ranked.c.rank == 1, *tenant_filters(db, FinancialFact))
         ).all()
         latest: dict[str, FinancialFact] = {}
         for row in rows:
