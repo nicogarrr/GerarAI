@@ -367,6 +367,35 @@ def merge_press_rows(
 class AnalystTargetsService:
     def __init__(self) -> None:
         self._cache: dict[str, tuple[float, AnalystTargets]] = {}
+        self._yahoo_inflight: dict[str, asyncio.Task] = {}
+
+    async def _yahoo(self, symbol: str, remaining: float) -> dict[str, Any] | None:
+        # Las variantes con/sin prensa conservan caches separados, pero las
+        # lecturas Yahoo simultáneas del mismo ticker comparten un solo lote
+        # de cuatro peticiones. Cada consumidor conserva su propio presupuesto.
+        if remaining <= 0:
+            return None
+        task = self._yahoo_inflight.get(symbol)
+        if task is None:
+            async def fetch():
+                try:
+                    return await asyncio.to_thread(_fetch_sync, symbol)
+                except Exception:  # noqa: BLE001 - fuente externa: fallo declarado, nunca cacheado
+                    return None
+                finally:
+                    self._yahoo_inflight.pop(symbol, None)
+
+            task = asyncio.create_task(fetch())
+            self._yahoo_inflight[symbol] = task
+        try:
+            # Un timeout o cancelación del consumidor no cancela el lote que
+            # otro consumidor sigue esperando. La entrada dura hasta que el
+            # hilo acaba, aunque todos agoten su espera: no duplica trabajo.
+            return await asyncio.wait_for(
+                asyncio.shield(task), timeout=min(FETCH_TIMEOUT_SECONDS, remaining)
+            )
+        except TimeoutError:
+            return None
 
     async def get(self, symbol: str, *, press: bool = False,
                   deadline: float | None = None) -> AnalystTargets:
@@ -391,10 +420,7 @@ class AnalystTargetsService:
 
             remaining = deadline - time.monotonic()
             data, found = await asyncio.gather(
-                asyncio.wait_for(
-                    asyncio.to_thread(_fetch_sync, key),
-                    timeout=min(FETCH_TIMEOUT_SECONDS, remaining),
-                ),
+                self._yahoo(key, remaining),
                 asyncio.wait_for(
                     fetch_press_targets(key, today=datetime.now(UTC).date()),
                     timeout=min(PRESS_TIMEOUT_SECONDS, remaining),
@@ -406,10 +432,7 @@ class AnalystTargetsService:
             # Prensa fallida o agotada: panel igual que antes, sin ruido.
         else:
             try:
-                data = await asyncio.wait_for(
-                    asyncio.to_thread(_fetch_sync, key),
-                    timeout=min(FETCH_TIMEOUT_SECONDS, max(0.0, deadline - time.monotonic())),
-                )
+                data = await self._yahoo(key, deadline - time.monotonic())
             except Exception:  # noqa: BLE001 - Yahoo puede fallar; nunca se cachea un fallo
                 data = None
         if not isinstance(data, dict):
