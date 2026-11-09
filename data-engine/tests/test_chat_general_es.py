@@ -85,7 +85,9 @@ def test_synthesize_general_no_inventa_si_vacio():
             question="hola que hay", baseline=baseline
         )
     )
-    assert "No puedo responderte con fuentes ahora mismo" in result.answer
+    # cerebro-det: sin datos ni modelo, dice qué falta en vez de «No puedo responderte con fuentes».
+    assert "No puedo responderte con fuentes" not in result.answer
+    assert result.answer.startswith("Te digo solo lo que tiene fuente. N/D: falta ")
     assert result.model == "fallback"
     assert result.llm_trace["fallback"] is True
 
