@@ -92,10 +92,14 @@ export function LocaleProvider({ locale, children }: { locale: Locale; children:
   // al navegar, la página anterior sigue a la vista hasta tenerlas). En el
   // servidor están todas y no se espera nada.
   const areas = DEV_ALL_AREAS ? I18N_AREAS : spanishAreasForPath(pathname);
-  if (!hasSpanishAreas(areas)) use(ensureSpanishAreas(areas));
-  // El inglés tampoco va en el chunk común: si el locale es «en» y aún no
-  // está, se espera a su chunk (y al castellano entero) antes de pintar.
-  if (locale === 'en' && !hasEnglishMessages()) use(ensureEnglish());
+  // El inglés depende del castellano entero: esperar una sola promesa para
+  // ambos. Dos use() condicionales hacían que, al resolverse el castellano,
+  // la promesa inglesa ocupase el slot anterior durante el reintento React.
+  if (locale === 'en') {
+    if (!hasEnglishMessages()) use(ensureEnglish());
+  } else if (!hasSpanishAreas(areas)) {
+    use(ensureSpanishAreas(areas));
+  }
 
   return <LocaleContext.Provider value={locale}>{children}</LocaleContext.Provider>;
 }
