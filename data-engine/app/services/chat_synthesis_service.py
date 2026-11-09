@@ -420,6 +420,91 @@ _CREDENTIAL_PAIR_RE = re.compile(r"(?i)\b(api[_-]?key|token|secret|password|auth
 FALLBACK_DETAIL_MAX = 200
 
 
+# Proveedor caído (402, 429, plazo agotado o caída): qué falta y por qué, sin
+# cifras. Benchmark Cerebro 2026-11-08 (pasada 2, clave de Go en 402): 11
+# preguntas sin ticker acabaron en «No puedo responderte con fuentes ahora
+# mismo; prueba de nuevo…», que no dice qué falta ni deja nada útil.
+_MODEL_DOWN_MOTIVES = {
+    "budget": ("se ha alcanzado el tope de gasto en modelos de la app",
+               "the app's model spending cap has been reached"),
+    "limit": ("el proveedor del modelo no tiene saldo o ha llegado a su límite de uso",
+              "the model provider is out of credit or has hit its usage limit"),
+    "rejected": ("la redacción del modelo no superó el control de fuentes",
+                 "the model's write-up did not pass the source check"),
+    "timeout": ("el modelo no respondió a tiempo", "the model did not answer in time"),
+    "down": ("el proveedor del modelo no responde", "the model provider is not answering"),
+}
+
+_GUARD_MISSING = (
+    (r"cartera", "tus posiciones guardadas en el contexto de esta pregunta (motivo: la respuesta hablaba de tu cartera sin tenerlas)",
+     "your saved positions in this question's context (reason: the answer talked about your portfolio without them)"),
+    (r"inversor|doctrina", "un texto de ese inversor en la biblioteca o su 13F (motivo: la respuesta le atribuía una opinión sin fragmento suyo)",
+     "a text by that investor in the library or their 13F (reason: the answer attributed an opinion without an excerpt of theirs)"),
+    (r"fuente|seg[uú]n|dominio|enlace",
+     "la fuente documental que citaba la respuesta (motivo: no está entre los datos de la app)",
+     "the document the answer cited (reason: it is not in the app's data)"),
+    (r"cifra|decimal|cantidad|n[uú]mero",
+     "la fuente de las cifras exactas que daba la respuesta (motivo: no están en los datos de la app para esta pregunta)",
+     "a source for the exact figures in the answer (reason: they are not in the app's data for this question)"),
+)
+
+
+def _missing_from_guard(reason: str | None, lang: str = "es") -> str | None:
+    """Qué dato falta, en palabras del usuario, a partir del motivo del guard.
+
+    Nunca repite el motivo literal: puede llevar cifras del candidato
+    rechazado («cifra con decimales no aproximada: 12,34») y esas cifras no
+    tienen fuente.
+    """
+    if not reason or re.search(r"vac[ií]o|empty|language|idioma", reason, re.I):
+        # Respuesta vacía o en otro idioma: fallo del proveedor, no un dato que falte.
+        return None
+    for pattern, es, en in _GUARD_MISSING:
+        if re.search(pattern, reason, re.I):
+            return en if lang == "en" else es
+    return (
+        "a source in the app's data for that answer (reason: the source check rejected it)"
+        if lang == "en"
+        else "una fuente en los datos de la app para esa respuesta (motivo: el control de fuentes la rechazó)"
+    )
+
+
+def _model_down_kind(exc: BaseException | None, reason: str) -> str:
+    """Clase del fallo del modelo para el texto de «proveedor caído».
+
+    Recorre la cadena de la excepción (``__cause__``/``__context__``) y la
+    etiqueta del primario que deja ChatFallbackProvider («backup chain
+    exhausted after primary go:modelo:ProviderHTTPError402»). Determinista.
+    """
+    if reason == "budget_exhausted":
+        return "budget"
+    if reason == "ungrounded":
+        return "rejected"
+    from app.llm.errors import ProviderHTTPError, ProviderTransportError
+
+    chain: list[BaseException] = []
+    seen: set[int] = set()
+    current = exc
+    while current is not None and id(current) not in seen and len(chain) < 8:
+        seen.add(id(current))
+        chain.append(current)
+        current = current.__cause__ or current.__context__
+    texts = " ".join(str(item) for item in chain)
+    if re.search(r"after primary \S*:(?:ProviderResponseError|ValueError)\b", texts):
+        return "rejected"
+    if reason == "quota" or re.search(r"HTTPError(?:402|429)\b|:cooling\b|HTTP (?:402|429)\b", texts) or any(
+        isinstance(item, ProviderHTTPError) and item.status_code in {402, 429} for item in chain
+    ):
+        return "limit"
+    if re.search(r"Candidate rejected", texts):
+        return "rejected"
+    if re.search(r":timeout\b|timed? ?out", texts, re.I) or any(
+        isinstance(item, (ProviderTransportError, TimeoutError)) for item in chain
+    ):
+        return "timeout"
+    return "down"
+
+
 def _fallback_detail(exc: BaseException) -> str:
     """Mensaje del fallo para la traza (sin secretos, acotado).
 
@@ -1408,6 +1493,7 @@ class ChatSynthesisService:
                 baseline,
                 reason="quota" if is_quota_exhausted(exc) else "provider_or_guard_failure",
                 detail=f"{type(exc).__name__}: {_fallback_detail(exc)}",
+                exc=exc,
             )
         text = (guarded.response.text or "").strip()
         rejection = _general_rejection(
@@ -1422,7 +1508,9 @@ class ChatSynthesisService:
         )
         if rejection is not None:
             logger.warning("chat general fallback: ungrounded: %s", rejection)
-            return self._general_fallback(baseline, reason="ungrounded", detail=_fallback_detail(ValueError(rejection)))
+            return self._general_fallback(
+                baseline, reason="ungrounded", detail=_fallback_detail(ValueError(rejection)), guard_reason=rejection,
+            )
         # Fuentes visibles: SOLO la doctrina que la respuesta usa de verdad
         # (autor o titulo mencionado). Antes se adjuntaban siempre las top-3,
         # usadas o no ("Hola" salia con "Fuentes" de cartas de fondos).
@@ -1456,30 +1544,69 @@ class ChatSynthesisService:
         )
 
     @staticmethod
-    def _general_fallback(baseline: ChatResponse, *, reason: str, detail: str | None = None) -> ChatResponse:
-        """Degradado honesto en espanol: nunca texto crudo del proveedor.
+    def _general_fallback(
+        baseline: ChatResponse,
+        *,
+        reason: str,
+        detail: str | None = None,
+        guard_reason: str | None = None,
+        exc: BaseException | None = None,
+    ) -> ChatResponse:
+        """Proveedor caído o respuesta rechazada: respuesta determinista, sin modelo.
 
-        Sin fuentes adjuntas: el degradado no uso ninguna y ensenarlas
-        sugeriria un respaldo que no existe.
+        Nunca texto crudo del proveedor ni «No puedo responderte con fuentes»
+        (benchmark Cerebro 2026-11-08). Con datos de la app (``baseline`` con
+        fuentes que no son doctrina) responde con ellos tal cual y añade lo
+        que falta como «N/D: falta X (motivo)». Sin datos, solo el N/D y cómo
+        seguir. El texto añadido no lleva cifras: toda cifra de la respuesta
+        sale del ``baseline`` determinista (0 cifras inventadas).
         """
-        answer = (
-            "El modelo configurado ha llegado a su límite de uso y no puedo responderte con fuentes ahora mismo; "
-            "prueba de nuevo en un par de minutos o dame un ticker para ir a datos concretos."
-            if reason == "quota"
-            else "No puedo responderte con fuentes ahora mismo; "
-            "prueba de nuevo en un momento o dame un ticker para ir a datos concretos."
-        )
         from app.core.i18n import current_language
 
-        if current_language() == "en":
-            # Ajustes → Idioma = English: el mismo aviso, en inglés.
-            answer = (
-                "The configured model has reached its usage limit and I can't answer with sources right now; "
-                "try again in a couple of minutes or give me a ticker to go to specific data."
-                if reason == "quota"
-                else "I can't answer with sources right now; "
-                "try again in a moment or give me a ticker to go to specific data."
+        lang = current_language()
+        en = lang == "en"
+        kind = _model_down_kind(exc, reason)
+        if guard_reason is None and exc is not None:
+            found = re.search(r"Ungrounded general output: ([^\n]+)", f"{exc} {exc.__cause__ or ''}")
+            guard_reason = found.group(1) if found else None
+        missing = _missing_from_guard(guard_reason, lang) if kind == "rejected" else None
+        if missing is None:
+            es_motive, en_motive = _MODEL_DOWN_MOTIVES[kind]
+            missing = (
+                f"the model's write-up (reason: {en_motive})" if en
+                else f"la redacción del modelo (motivo: {es_motive})"
             )
+        nd = f"N/D: {'missing' if en else 'falta'} {missing}."
+        # Datos de herramientas de la app (precio, cifras, posiciones); la
+        # doctrina recuperada (cartas) no es una respuesta por sí sola.
+        data_sources = [
+            source for source in baseline.sources or []
+            if not (isinstance(source, dict) and source.get("type") == "knowledge_chunk")
+        ]
+        trace = {
+            "path": "general", "fallback": True, "reason": reason, "deterministic": True,
+            "model_down": kind,
+            **({"fallback_detail": detail} if detail else {}),
+        }
+        if data_sources and (baseline.answer or "").strip():
+            return ChatResponse(
+                answer=f"{baseline.answer.strip()}\n\n{nd}",
+                sources=data_sources,
+                proposed_actions=baseline.proposed_actions,
+                model="deterministic",
+                prompt_version=GENERAL_PROMPT_VERSION,
+                confidence=0.3,
+                llm_trace=trace,
+            )
+        answer = (
+            f"I'll only tell you what has a source. {nd} "
+            "Give me a company or ticker and I'll answer with its sourced data."
+            if en
+            else f"Te digo solo lo que tiene fuente. {nd} "
+            "Dime una empresa o ticker y te respondo con sus datos con fuente."
+        )
+        # Sin fuentes adjuntas: el degradado no usó ninguna y enseñarlas
+        # sugeriría un respaldo que no existe.
         return ChatResponse(
             answer=answer,
             sources=[],
@@ -1487,10 +1614,7 @@ class ChatSynthesisService:
             model="fallback",
             prompt_version=GENERAL_PROMPT_VERSION,
             confidence=0.2,
-            llm_trace={
-                "path": "general", "fallback": True, "reason": reason,
-                **({"fallback_detail": detail} if detail else {}),
-            },
+            llm_trace=trace,
         )
 
     @staticmethod

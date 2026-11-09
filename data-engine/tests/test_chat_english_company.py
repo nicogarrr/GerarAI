@@ -104,7 +104,8 @@ def test_general_fallback_in_english():
     finally:
         from app.core.i18n import _request_language
         _request_language.reset(token)
-    assert text == "I can't answer with sources right now; try again in a moment or give me a ticker to go to specific data."
-    assert quota.startswith("The configured model has reached its usage limit")
+    # cerebro-det: con datos de la app la reserva responde con ellos, sin modelo, y marca lo que falta.
+    assert text.startswith("ASTS trades") and "N/D: missing the model's write-up" in text
+    assert "N/D: missing the model's write-up (reason: the model provider is out of credit" in quota
     es = ChatSynthesisService._general_fallback(base, reason="error").answer
-    assert es.startswith("No puedo responderte con fuentes ahora mismo")
+    assert "No puedo responderte con fuentes" not in es and "N/D: falta la redacción del modelo" in es
