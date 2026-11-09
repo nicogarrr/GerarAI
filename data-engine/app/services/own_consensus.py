@@ -522,6 +522,42 @@ def _prior_key(period: str) -> str:
     return f"{q}_{int(y) - 1}"
 
 
+Q4_EPS_SHARE_BAND = 2.0
+
+
+def derived_q4_eps(key: str, eps_actuals: Mapping[str, Actual], operating_actuals: Mapping[str, Actual]
+                   ) -> Actual | None:
+    """BPA del 4T sin trimestral presentado (regla ``bpa_4t_año_menos_9m v1``).
+
+    El 10-K da el BPA del año pero no el del 4T. Se deriva 4T ≈ BPA del año − (1T + 2T + 3T),
+    marcado ``derived`` y «aproximado» porque cada BPA usa sus acciones medias. Solo si:
+    el año y los tres trimestres son presentados; el 4T sale positivo y no mayor que el año
+    (una división de acciones no reexpresada en los 10-Q lo hace negativo); y su peso en el
+    año no se aleja más de ``Q4_EPS_SHARE_BAND`` veces del peso del 4T del beneficio
+    operativo del mismo año (presentado o derivado). Si falla algo, None (sin estimación).
+    """
+    if not key.startswith("q4_"):
+        return None
+    year = key[3:]
+    fy = eps_actuals.get(f"fy{year}")
+    parts = [eps_actuals.get(f"q{i}_{year}") for i in (1, 2, 3)]
+    if fy is None or any(p is None or p.derived for p in parts) or fy.derived or fy.value <= 0:
+        return None
+    nine = sum(p.value for p in parts if p is not None)
+    q4 = fy.value - nine
+    if not 0 < q4 <= fy.value:
+        return None
+    oi_fy, oi_q4 = operating_actuals.get(f"fy{year}"), operating_actuals.get(key)
+    if oi_fy is None or oi_q4 is None or oi_fy.value <= 0 or oi_q4.value <= 0:
+        return None
+    share_eps, share_oi = q4 / fy.value, oi_q4.value / oi_fy.value
+    if not (1 / Q4_EPS_SHARE_BAND <= share_eps / share_oi <= Q4_EPS_SHARE_BAND):
+        return None
+    return Actual(key, fy.end, q4, fy.filed, fy.url, derived=True,
+                  formula=f"4T ≈ BPA del año ({fy.value:,.2f}) − 9M ({nine:,.2f}), aproximado: cada BPA "
+                          "usa sus acciones medias")
+
+
 def _eps_candidate(period: str, eps_actuals: Mapping[str, Actual], eps_done: Mapping[str, Cell],
                    operating_cells: Mapping[str, Cell], operating_actuals: Mapping[str, Actual]) -> Candidate | None:
     """``modelo`` del BPA (regla ``bpa_escala_beneficio_operativo v1``).
@@ -539,9 +575,12 @@ def _eps_candidate(period: str, eps_actuals: Mapping[str, Actual], eps_done: Map
         return None
     prev = _prior_key(period)
     eps_prev_a, oi_prev_a = eps_actuals.get(prev), operating_actuals.get(prev)
+    if eps_prev_a is None and oi_prev_a is not None:
+        eps_prev_a = derived_q4_eps(prev, eps_actuals, operating_actuals)
     citations: list[dict[str, Any]] = []
     if eps_prev_a is not None and oi_prev_a is not None:
-        eps_prev, oi_prev, label = eps_prev_a.value, oi_prev_a.value, f"{prev} presentado"
+        eps_prev, oi_prev = eps_prev_a.value, oi_prev_a.value
+        label = f"{prev} derivado [{eps_prev_a.formula}]" if eps_prev_a.derived else f"{prev} presentado"
         citations = [_cite_actual(eps_prev_a), _cite_actual(oi_prev_a)]
     else:
         eps_c, oi_c = eps_done.get(prev), operating_cells.get(prev)
