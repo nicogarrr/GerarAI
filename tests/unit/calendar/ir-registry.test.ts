@@ -84,6 +84,19 @@ describe('irLinksFor', () => {
         expect(irLinksFor('ONDS', '2026-11-11')?.eventPage).toBeNull();
     });
 
+    it.each([
+        ['ZETA', '2026-11-09', 'zetaglobal.com'],
+        ['BWMX', '2026-10-22', 'befra.com'],
+        ['POOL', '2026-10-22', 'poolcorp.com'],
+        ['CB', '2026-10-20', 'investors.chubb.com'],
+        ['CPT', '2026-11-05', 'camdenliving.com'],
+    ])('el evento T3 2026 de %s enlaza solo en su dia exacto', (ticker, date, host) => {
+        const exact = irLinksFor(ticker, date);
+        expect(exact?.eventPage?.period).toBe('T3 2026');
+        expect(exact?.eventPage?.url).toContain(host);
+        expect(irLinksFor(ticker, '2026-12-31')?.eventPage).toBeNull();
+    });
+
     it('una entrada sin eventos devuelve seccion y eventPage null', () => {
         const links = irLinksFor('TSLA', '2026-10-22');
         expect(links?.eventPage).toBeNull();
