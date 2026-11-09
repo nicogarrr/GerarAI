@@ -13,7 +13,7 @@ import asyncio
 import math
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 
 from pydantic import BaseModel
@@ -24,6 +24,21 @@ SOURCE_URL = "https://finance.yahoo.com/quote/{symbol}/analysis/"
 # ficha y listas el mismo día; Yahoo sigue marcando la latencia real de ingesta.
 CACHE_TTL_SECONDS = 3600
 FETCH_TIMEOUT_SECONDS = 12.0
+# Presupuesto de la pasada de prensa: corre en paralelo a Yahoo, así que no
+# suma a la latencia salvo que Yahoo termine antes (caso típico: símbolo sin
+# cobertura). La prensa es un complemento de mejor esfuerzo: al agotarse el
+# presupuesto el panel devuelve solo Yahoo, nunca falla por la prensa.
+PRESS_TIMEOUT_SECONDS = 9.0
+# Segunda pasada de prensa (consultas por firma envejecida), tras Yahoo.
+PRESS_FIRM_TIMEOUT_SECONDS = 6.0
+# Presupuesto TOTAL de la petición con press=1 (Yahoo + ambas pasadas de
+# prensa): el front corta a 14 s, así que la segunda pasada solo corre con el
+# tiempo que quede; si no llega, se devuelve lo de Yahoo (o la primera
+# pasada) sin ruido. Medido por el auditor: sin deadline, el peor caso eran
+# ~18 s y el panel no llegaba a pintar.
+TOTAL_BUDGET_SECONDS = 12.5
+# Una fila de Yahoo más vieja que esto dispara la consulta por firma en prensa.
+STALE_FIRM_DAYS = 7
 MAX_AGE_DAYS = 365
 MAX_ROWS = 25
 
@@ -38,6 +53,9 @@ class AnalystTargetRow(BaseModel):
     # (objetivo / precio de referencia - 1) * 100, solo con precio de referencia.
     upside_percent: float | None = None
     source: str = SOURCE
+    # Enlace al artículo cuando la fila viene de prensa (con press=1); las
+    # filas de Yahoo no llevan enlace por fila, solo el panel (source_url).
+    source_url: str | None = None
 
 
 class AnalystConsensus(BaseModel):
@@ -65,7 +83,7 @@ class AnalystTargets(BaseModel):
     consensus: AnalystConsensus | None = None
     rows: list[AnalystTargetRow] = []
     note: str | None = None
-    note_code: Literal["fetch_failed", "not_equity", "consensus_only", "no_targets"] | None = None
+    note_code: Literal["fetch_failed", "not_equity", "consensus_only", "no_targets", "with_press"] | None = None
     # Tipo de instrumento que declara Yahoo (ETF, MUTUALFUND...) cuando no es
     # una accion; acompana a note_code="not_equity" para traducir la nota.
     instrument_type: str | None = None
@@ -304,22 +322,97 @@ def _fetch_sync(symbol: str) -> dict[str, Any]:
         }
 
 
+def merge_press_rows(
+    rows: list[AnalystTargetRow],
+    press_targets: list[Any],
+    *,
+    reference_price: float | None,
+    currency: str | None,
+) -> list[AnalystTargetRow]:
+    """Filas de Yahoo fusionadas con notas de prensa, última por firma.
+
+    Una nota de prensa solo reemplaza la fila de Yahoo de su firma cuando es
+    MÁS reciente (a igual fecha gana Yahoo, fuente estructurada). La divisa
+    marcada en la frase debe resolver a la declarada por Yahoo para el
+    listado: sin divisa declarada o con marca incompatible, la fila de prensa
+    se descarta (nunca se mezclan divisas). El consenso agregado no se toca.
+    """
+    from app.services.analyst_targets_press import currency_matches
+
+    merged = {row.firm.casefold(): row for row in rows}
+    for target in press_targets:
+        if not currency_matches(target.currency_mark, currency, target.currency_mentions):
+            continue
+        key = target.firm.casefold()
+        current = merged.get(key)
+        if current is not None and current.date >= target.date.isoformat():
+            continue
+        merged[key] = AnalystTargetRow(
+            firm=target.firm,
+            date=target.date.isoformat(),
+            rating=target.rating,
+            action=target.action,
+            price_target=target.price_target,
+            prior_target=target.prior_target,
+            upside_percent=(
+                round((target.price_target / reference_price - 1) * 100, 1) if reference_price else None
+            ),
+            source=target.outlet,
+            source_url=target.url,
+        )
+    ordered = sorted(merged.values(), key=lambda row: (row.date, row.firm), reverse=True)
+    return ordered[:MAX_ROWS]
+
+
 class AnalystTargetsService:
     def __init__(self) -> None:
         self._cache: dict[str, tuple[float, AnalystTargets]] = {}
 
-    async def get(self, symbol: str) -> AnalystTargets:
+    async def get(self, symbol: str, *, press: bool = False,
+                  deadline: float | None = None) -> AnalystTargets:
         key = symbol.strip().upper()
+        # La variante con prensa se cachea aparte: la celda de listas (sin
+        # press) y la ficha (con press) no comparten entrada.
+        cache_key = f"{key}|press" if press else key
         now = time.time()
-        hit = self._cache.get(key)
+        hit = self._cache.get(cache_key)
         if hit is not None and now - hit[0] < CACHE_TTL_SECONDS:
             return hit[1]
         fetched_at = int(now)
-        try:
-            data = await asyncio.wait_for(
-                asyncio.to_thread(_fetch_sync, key), timeout=FETCH_TIMEOUT_SECONDS
+        # Presupuesto de espera compartido con la ruta (fallback de listado
+        # incluido): limita lo que el endpoint ESPERA; el to_thread de Yahoo
+        # sigue trabajando en segundo plano tras el timeout. Con el
+        # presupuesto agotado no hay fase de prensa ni espera mínima: solo
+        # Yahoo al instante (timeout 0).
+        deadline = deadline if deadline is not None else time.monotonic() + TOTAL_BUDGET_SECONDS
+        press_targets: list[Any] = []
+        if press and deadline - time.monotonic() > 0:
+            from app.services.analyst_targets_press import fetch_press_targets
+
+            remaining = deadline - time.monotonic()
+            data, found = await asyncio.gather(
+                asyncio.wait_for(
+                    asyncio.to_thread(_fetch_sync, key),
+                    timeout=min(FETCH_TIMEOUT_SECONDS, remaining),
+                ),
+                asyncio.wait_for(
+                    fetch_press_targets(key, today=datetime.now(UTC).date()),
+                    timeout=min(PRESS_TIMEOUT_SECONDS, remaining),
+                ),
+                return_exceptions=True,
             )
-        except Exception:  # noqa: BLE001 - Yahoo puede fallar; nunca se cachea un fallo
+            if isinstance(found, list):
+                press_targets = found
+            # Prensa fallida o agotada: panel igual que antes, sin ruido.
+        else:
+            try:
+                data = await asyncio.wait_for(
+                    asyncio.to_thread(_fetch_sync, key),
+                    timeout=min(FETCH_TIMEOUT_SECONDS, max(0.0, deadline - time.monotonic())),
+                )
+            except Exception:  # noqa: BLE001 - Yahoo puede fallar; nunca se cachea un fallo
+                data = None
+        if not isinstance(data, dict):
             return AnalystTargets(
                 symbol=key,
                 fetched_at=fetched_at,
@@ -346,7 +439,7 @@ class AnalystTargetsService:
                 note_code="not_equity",
                 instrument_type=(data.get("quote_type") or "").strip().upper() or None,
             )
-            self._cache[key] = (now, result)
+            self._cache[cache_key] = (now, result)
             return result
         consensus_raw = data["consensus"]
         reference = _positive(consensus_raw.get("current"))
@@ -368,10 +461,41 @@ class AnalystTargetsService:
         has_consensus = any(
             value is not None for value in (consensus.low, consensus.high, consensus.mean, consensus.median)
         )
+        if press:
+            # Segunda pasada de prensa con consultas por firma para las casas
+            # cuya fila de Yahoo va envejecida: Bing posiciona mejor
+            # «"ASTS" "Cantor Fitzgerald"» que la consulta general. Presupuesto
+            # acotado para no pasar el timeout del front; sin tiempo, se
+            # devuelve lo de la primera pasada (o solo Yahoo).
+            today = datetime.now(UTC).date()
+            cutoff = (today - timedelta(days=STALE_FIRM_DAYS)).isoformat()
+            stale_firms = [row.firm for row in rows if row.date < cutoff]
+            remaining = deadline - time.monotonic()
+            if stale_firms and remaining > 0.75:
+                from app.services.analyst_targets_press import fetch_press_targets, firm_queries
+
+                # nosemgrep: gerarai-broad-except-pass -- prensa de mejor esfuerzo: sin ella o sin tiempo, el panel devuelve Yahoo tal cual
+                try:
+                    more = await asyncio.wait_for(
+                        fetch_press_targets(key, today=today, queries=firm_queries(key, stale_firms)),
+                        timeout=min(PRESS_FIRM_TIMEOUT_SECONDS, remaining),
+                    )
+                    press_targets = [*press_targets, *more]
+                except Exception:  # noqa: BLE001 - mejor esfuerzo: sin tiempo, Yahoo tal cual
+                    pass
+        if press_targets:
+            rows = merge_press_rows(
+                rows, press_targets, reference_price=reference, currency=data.get("currency")
+            )
         # Disponible tambien con SOLO consenso agregado (sin detalle por firma,
         # p.ej. PNG.V): el consenso es dato real y se etiqueta como agregado.
-        note_code: Literal["consensus_only", "no_targets"] | None
-        if rows:
+        note_code: Literal["consensus_only", "no_targets", "with_press"] | None
+        if any(row.source != SOURCE for row in rows):
+            note, note_code = (
+                "Incluye notas de prensa recientes con su medio, fecha y enlace.",
+                "with_press",
+            )
+        elif rows:
             note, note_code = None, None
         elif has_consensus:
             note, note_code = "Solo hay consenso agregado, sin detalle por firma.", "consensus_only"
@@ -391,7 +515,7 @@ class AnalystTargetsService:
             note=note,
             note_code=note_code,
         )
-        self._cache[key] = (now, result)
+        self._cache[cache_key] = (now, result)
         return result
 
 

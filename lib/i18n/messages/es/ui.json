@@ -63,7 +63,8 @@
       "fetchFailed": "No se pudo consultar el consenso ahora; reintenta en unos minutos.",
       "notEquity": "El valor {symbol} está identificado como {instrument}, no como una acción, así que no hay precios objetivo de analistas que mostrar para una empresa con este ticker.",
       "consensusOnly": "Solo hay consenso agregado, sin detalle por firma.",
-      "noTargets": "No hay precios objetivo por analista para este valor."
+      "noTargets": "No hay precios objetivo por analista para este valor.",
+      "withPress": "Incluye notas de prensa recientes con su medio, fecha y enlace."
     },
     "instrument": {
       "ETF": "un ETF",

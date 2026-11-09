@@ -13,7 +13,7 @@ import type { TranslateFn } from '../i18n/translate.ts';
 export type AnalystTargetsCopyInput = {
   symbol: string;
   note?: string | null;
-  note_code?: 'fetch_failed' | 'not_equity' | 'consensus_only' | 'no_targets' | null;
+  note_code?: 'fetch_failed' | 'not_equity' | 'consensus_only' | 'no_targets' | 'with_press' | null;
   instrument_type?: string | null;
   reference_price_source?: string | null;
   reference_price_source_code?: 'market_at_fetch' | null;
@@ -46,6 +46,8 @@ export function analystTargetsNote(data: AnalystTargetsCopyInput | null | undefi
       return t('ui.analystTargets.notes.consensusOnly');
     case 'no_targets':
       return t('ui.analystTargets.notes.noTargets');
+    case 'with_press':
+      return t('ui.analystTargets.notes.withPress');
     default:
       return data.note ?? null;
   }

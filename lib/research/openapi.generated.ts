@@ -1163,6 +1163,9 @@ export interface paths {
          *     source is reported as such, never filled in. Tickers without coverage on
          *     their bare line fall back to their reviewed listing (KRKNF -> PNG.V),
          *     declaring symbol and currency; a currency mismatch is never adopted.
+         *     With press=1 (company page only) recent press notes complement Yahoo:
+         *     deterministic extraction, each row attributed with outlet, link and the
+         *     article's publication date; the aggregate consensus stays Yahoo's.
          */
         get: operations["company_analyst_targets_api_companies__ticker__analyst_targets_get"];
         put?: never;
@@ -7515,6 +7518,8 @@ export interface components {
              * @default Yahoo Finance (no oficial), agregado de analistas
              */
             source: string;
+            /** Source Url */
+            source_url?: string | null;
             /** Upside Percent */
             upside_percent?: number | null;
         };
@@ -7530,7 +7535,7 @@ export interface components {
             /** Note */
             note?: string | null;
             /** Note Code */
-            note_code?: ("fetch_failed" | "not_equity" | "consensus_only" | "no_targets") | null;
+            note_code?: ("fetch_failed" | "not_equity" | "consensus_only" | "no_targets" | "with_press") | null;
             /** Reference Price */
             reference_price?: number | null;
             /** Reference Price Source */
@@ -17716,7 +17721,9 @@ export interface operations {
     };
     company_analyst_targets_api_companies__ticker__analyst_targets_get: {
         parameters: {
-            query?: never;
+            query?: {
+                press?: boolean;
+            };
             header?: {
                 "x-cavaai-user"?: string | null;
                 "x-cavaai-tenant"?: string | null;

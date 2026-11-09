@@ -13,7 +13,10 @@ export type AnalystTargets = components['schemas']['AnalystTargets'];
  */
 export const getAnalystTargets = cache(async (symbol: string): Promise<AnalystTargets | null> => {
   try {
-    return await researchRequest<AnalystTargets>(`/api/companies/${encodeURIComponent(symbol)}/analyst-targets`, { timeoutMs: 14000 });
+    // press=1: la ficha complementa Yahoo con notas de prensa recientes
+    // (medio, fecha y enlace por fila; el consenso agregado sigue siendo Yahoo).
+    // Las celdas de listas no la piden: mantienen la latencia de Yahoo solo.
+    return await researchRequest<AnalystTargets>(`/api/companies/${encodeURIComponent(symbol)}/analyst-targets?press=1`, { timeoutMs: 14000 });
   } catch {
     return null;
   }
