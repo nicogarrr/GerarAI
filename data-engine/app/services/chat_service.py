@@ -1495,7 +1495,10 @@ class ChatService:
         named = companies_named_in(question, all_companies(db))
         if named.companies:
             return False
-        known_tickers = list(db.scalars(select(Company.ticker)).all())
+        # El catalogo ya se leyo arriba en ESTA transaccion: otro scan entero
+        # de companies solo para los tickers era un segundo full-table por
+        # mensaje de chat.
+        known_tickers = [c.ticker for c in all_companies(db) if c.ticker]
         return bool(unknown_ticker_mentions(question, known_tickers, ignore_spans=named.spans))
 
     def _explicit_mention(self, db: Session, question: str) -> Company | None:
@@ -2132,7 +2135,7 @@ class ChatService:
                     },
                     context=context_echo,
                 )
-            known_tickers = list(db.scalars(select(Company.ticker)).all())
+            known_tickers = [c.ticker for c in all_companies(db) if c.ticker]
             unknown = (
                 [] if doctrine_question
                 else unknown_ticker_mentions(question, known_tickers, ignore_spans=named.spans)
