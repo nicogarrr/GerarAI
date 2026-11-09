@@ -6,6 +6,7 @@ import BackendOffline from '@/components/system/BackendOffline';
 import { getIpoCalendar, type IpoCalendar, type IpoEvent } from '@/lib/actions/catalysts.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getT, getFormat } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import type { Formatters } from '@/lib/format';
 
@@ -13,11 +14,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
-    const ti = await getT();
-    return {
-        title: ti('calendar.meta.iposTitle'),
-        description: ti('calendar.meta.iposDescription'),
-    };
+    return i18nPageMetadata('calendar.meta.iposTitle', 'calendar.meta.iposDescription');
 }
 
 function eventDetail(event: IpoEvent, ti: TFunction): string | null {

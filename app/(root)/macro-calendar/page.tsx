@@ -10,6 +10,7 @@ import {
 } from '@/lib/actions/macro-calendar.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getT, getFormat } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 import { eightKItemTitle, eightKReason } from '@/lib/calendar/eight-k-text';
 import { macroSourceName } from '@/lib/calendar/macro-text';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
@@ -18,11 +19,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
-    const ti = await getT();
-    return {
-        title: ti('calendar.meta.macroTitle'),
-        description: ti('calendar.meta.macroDescription'),
-    };
+    return i18nPageMetadata('calendar.meta.macroTitle', 'calendar.meta.macroDescription');
 }
 
 type PageProps = { searchParams: Promise<{ macro?: string; k8?: string }> };

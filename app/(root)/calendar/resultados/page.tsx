@@ -7,16 +7,13 @@ import { getEarningsMaterials } from '@/lib/actions/earnings-materials.actions';
 import { HISTORY_DAYS, type EventMaterials } from '@/lib/earnings-materials';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getT, getFormat } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
-    const ti = await getT();
-    return {
-        title: ti('calendar.meta.earningsTitle'),
-        description: ti('calendar.meta.earningsDescription'),
-    };
+    return i18nPageMetadata('calendar.meta.earningsTitle', 'calendar.meta.earningsDescription');
 }
 
 function addDays(iso: string, days: number): string {
