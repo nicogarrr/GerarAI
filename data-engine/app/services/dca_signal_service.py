@@ -367,11 +367,13 @@ def fetch_live_quotes(symbols: Sequence[str]) -> dict[str, Any]:
 
     Una pasada concurrente con el servicio ya existente (gratuito, con cache
     y timeouts propios, NUNCA lanza: en error devuelve status=\"unavailable\").
-    Si la pasada entera falla (p. ej. sin event loop posible), devuelve {} y
-    la evaluacion sigue solo con cierres.
+    Si la pasada entera falla, devuelve {} y la evaluacion sigue solo con
+    cierres. Va por el puente async compartido: ``asyncio.run`` a pelo lanza
+    RuntimeError con un loop activo en el hilo (guard del repo).
     """
     import asyncio
 
+    from app.services.async_bridge import run_from_any_context
     from app.services.extended_quote_service import extended_quote_service
 
     async def _gather() -> list[Any]:
@@ -384,7 +386,7 @@ def fetch_live_quotes(symbols: Sequence[str]) -> dict[str, Any]:
         return await asyncio.gather(*[_one(s) for s in symbols])
 
     try:
-        quotes = asyncio.run(_gather())
+        quotes = run_from_any_context(_gather())
     except Exception:  # noqa: BLE001 - sin precio actual no se veta: solo cierres
         logger.warning("dca live quotes gather failed; evaluating with closes only", exc_info=True)
         return {}

@@ -477,6 +477,38 @@ def test_fetch_live_quotes_empty_symbols():
     assert _REAL_FETCH_LIVE_QUOTES([]) == {}
 
 
+def test_fetch_live_quotes_from_inside_a_running_loop(monkeypatch):
+    """Con un loop activo en el hilo, el puente ejecuta la pasada en un hilo
+    propio: antes era un ``asyncio.run`` a pelo y lanzaba RuntimeError, que el
+    except se comia y dejaba la evaluacion sin premercado en toda ruta async.
+    """
+    import asyncio
+
+    from app.services.extended_quote_service import ExtendedQuote
+
+    async def fake_get(ticker):
+        await asyncio.sleep(0)
+        return ExtendedQuote(
+            ticker=ticker,
+            status="available",
+            session="pre",
+            price_session="pre",
+            price=175.75,
+            timestamp=_LIVE_TS,
+            currency="USD",
+            fetched_at=_LIVE_TS,
+        )
+
+    _stub_quote_get(monkeypatch, fake_get)
+
+    async def outer():
+        return _REAL_FETCH_LIVE_QUOTES(["NVDA"])
+
+    quotes = asyncio.run(outer())
+    assert quotes["NVDA"].price == 175.75
+    assert quotes["NVDA"].session == "pre"
+
+
 def test_live_time_label_edge_cases():
     from app.services.dca_alert_copy import live_time_label
 
