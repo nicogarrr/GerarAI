@@ -238,6 +238,20 @@ def test_refresh_recalcula_si_el_snapshot_no_es_del_cusip_actual():
         assert again["status"] == "sin_cambios"
 
 
+def test_lectura_encuentra_el_snapshot_valido_aunque_haya_muchos_de_otro_cusip():
+    """Repro del auditor: el filtro por CUSIP no puede tener tope arbitrario —
+    8 snapshots más recientes de otro CUSIP no tapan el calculado con el actual."""
+    db = _db()
+    db.add(PublicSourceDocument(company_id=1, listing_key=f"nport:2026q3:{APPLE}", provider=fh.PROVIDER,
+                                source_url=URL, checksum="ok", fetched_at=datetime(2026, 9, 1), official=True))
+    for i, label in enumerate(("2026q4", "2027q1", "2027q2", "2027q3", "2027q4", "2028q1", "2028q2", "2028q3")):
+        db.add(PublicSourceDocument(company_id=1, listing_key=f"nport:{label}:{MSFT}", provider=fh.PROVIDER,
+                                    source_url=URL, checksum=f"x{i}", fetched_at=datetime(2026, 9, 1), official=True))
+    db.commit()
+    view = fh.fund_holders(db, "AAPL")
+    assert view["status"] == "ok" and view["dataset"] == "2026q3"
+
+
 def test_ingesta_sin_informes_validos_no_persiste_ni_marca_procesado():
     """Parser que devuelve {} (cabeceras o fechas cambiadas, sin lanzar): N/D,
     no «0 fondos», y el fichero NO queda procesado (el reintento no se congela)."""

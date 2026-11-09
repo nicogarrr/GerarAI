@@ -380,6 +380,23 @@ def test_refresh_recalcula_si_el_snapshot_no_es_del_cusip_actual():
         assert again["status"] == "sin_cambios"
 
 
+def test_lectura_encuentra_el_snapshot_valido_aunque_haya_muchos_de_otro_cusip():
+    """Repro del auditor: el filtro por CUSIP no puede tener tope arbitrario —
+    8 snapshots más recientes de otro CUSIP no tapan el calculado con el actual."""
+    db = _db()
+    url = "https://www.sec.gov/files/x/q.zip"
+    when = __import__("datetime").datetime(2026, 9, 1)
+    db.add(PublicSourceDocument(company_id=1, listing_key=f"13f:2026-06-30:{APPLE}", provider=ih.PROVIDER,
+                                source_url=url, checksum="ok", fetched_at=when, official=True))
+    for i, d in enumerate(("2026-07-31", "2026-08-31", "2026-09-30", "2026-10-31",
+                           "2026-11-30", "2026-12-31", "2027-01-31", "2027-02-28")):
+        db.add(PublicSourceDocument(company_id=1, listing_key=f"13f:{d}:{OTHER}", provider=ih.PROVIDER,
+                                    source_url=url, checksum=f"x{i}", fetched_at=when, official=True))
+    db.commit()
+    view = ih.institutional_holders(db, "AAPL")
+    assert view["status"] == "ok" and view["period"] == "2026-06-30"
+
+
 def test_ingesta_previo_sin_13f_validos_no_persiste_aunque_el_actual_sea_valido():
     """Simétrico: ZIP previo sin 13F válidos + ZIP actual válido. Comparar con
     un trimestre vacío inventaría «nuevo»/«sin 13F previo» en todos: N/D."""

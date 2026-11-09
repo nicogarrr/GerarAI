@@ -232,11 +232,13 @@ def institutional_holders(db: Session, ticker: str) -> dict[str, Any] | None:
         return {**base, "status": "sin_identificador"}
     # El snapshot solo se sirve si se calculó para el CUSIP actual: uno
     # grabado con otro CUSIP no es válido para esta identidad (los documentos
-    # de antes de la vinculación, sin CUSIP grabado, se aceptan tal cual).
-    docs = db.scalars(select(PublicSourceDocument).where(
-        PublicSourceDocument.company_id == company.id, PublicSourceDocument.provider == PROVIDER)
-        .order_by(PublicSourceDocument.listing_key.desc(), PublicSourceDocument.fetched_at.desc(), PublicSourceDocument.id.desc()).limit(8))
-    doc = next((d for d in docs if _listing_cusip(d.listing_key) in (None, cusip)), None)
+    # de antes de la vinculación, sin CUSIP grabado, se aceptan tal cual). El
+    # filtro va en SQL: sin tope arbitrario que pueda tapar el válido.
+    listing = PublicSourceDocument.listing_key
+    doc = db.scalars(select(PublicSourceDocument).where(
+        PublicSourceDocument.company_id == company.id, PublicSourceDocument.provider == PROVIDER,
+        listing.like(f"%:{cusip}") | ~listing.like("%:%:%"))
+        .order_by(listing.desc(), PublicSourceDocument.fetched_at.desc(), PublicSourceDocument.id.desc())).first()
     if doc is None:
         return {**base, "status": "sin_datos"}
     facts = list(db.scalars(select(PublicFinancialFact).where(PublicFinancialFact.source_document_id == doc.id).order_by(PublicFinancialFact.id)))
