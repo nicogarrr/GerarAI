@@ -85,3 +85,31 @@ def test_ingesta_fred_revision_append_e_idempotencia():
     antiguas = db.query(MarketObservation).filter_by(vintage="initial").count()
     assert antiguas == 50
     db.close()
+
+
+def test_ingesta_fred_no_hidrata_la_historia_de_vintages():
+    # Probe del auditor: 8 días × 30 vintages, todos «observed». La última de
+    # cada día sale con row_number en SQL (rn = 1): 8 instancias ORM, no 240.
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine, expire_on_commit=False)()
+    for i in range(8):
+        for v in range(30):
+            db.add(
+                MarketObservation(
+                    metric_key="vix_us", geography="US",
+                    observation_date=BASE - timedelta(days=i), value=Decimal("20"),
+                    unit="índice", source="FRED",
+                    source_url="https://fred.stlouisfed.org/series/VIXCLS",
+                    fetched_at=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(minutes=v),
+                    vintage=f"v{v}", status="observed",
+                )
+            )
+    db.commit()
+    db.expire_all()
+    loaded = {"n": 0}
+    event.listen(MarketObservation, "load", lambda *a: loaded.__setitem__("n", loaded["n"] + 1))
+    result = store_series(db, "vix_us", _rows(8), datetime(2026, 2, 1, tzinfo=UTC))
+    assert loaded["n"] <= 8, loaded
+    assert result == {"added": 0, "revisions_applied": 0}
+    db.close()
