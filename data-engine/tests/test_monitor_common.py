@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import create_engine, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401
@@ -181,3 +182,35 @@ def test_record_fatal_recovers_from_poisoned_session(db):
         )
     )
     assert state is not None and state.consecutive_errors == 1
+
+
+def test_record_fatal_with_persistent_db_failure_still_never_raises(db, caplog):
+    """La caida no era transitoria: rollback/relectura/commit tambien fallan.
+    El contrato 'el actor jamas recibe una excepcion' se mantiene, stats
+    queda marcado como error y el detalle va a logs (salvedad del FAV de
+    #5034 convertida en fix)."""
+
+    class AlwaysFailingCommit:
+        """Proxy de Session: todo delega menos commit, que siempre lanza."""
+
+        def __init__(self, real):
+            self._real = real
+
+        def __getattr__(self, name):
+            return getattr(self._real, name)
+
+        def commit(self):
+            raise OperationalError("commit", {}, Exception("db still down"))
+
+    stats: dict = {"errors": [], "status": "ok"}
+    with caplog.at_level("ERROR", logger="app.services.monitor_common"):
+        monitor_common.record_fatal(
+            AlwaysFailingCommit(db), None, "test_connector", stats,
+            OperationalError("select", {}, Exception("db down")),
+        )
+    assert stats["status"] == "error"
+    assert any(e.startswith("fatal:") for e in stats["errors"])
+    assert any(
+        "no se pudo persistir el fallo de test_connector" in r.message
+        for r in caplog.records
+    )
