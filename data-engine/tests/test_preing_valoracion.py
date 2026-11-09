@@ -145,7 +145,7 @@ def test_comparables_caen_a_capas_mas_anchas_y_lo_dicen(monkeypatch):
             _co(5, "PRE", industry="Other", sector="Other")]
     mature = {"P1": 2.0, "P2": 4.0, "P3": 6.0}
 
-    def fake_mult(_db, peer, _today, memo):
+    def fake_mult(_db, peer, _today, memo, *_excluded):
         return R.PeerMultiple(peer.ticker, None, mature[peer.ticker] * 100.0, 100.0) if peer.ticker in mature else None
 
     from app.services import peer_comparison_service as pcs

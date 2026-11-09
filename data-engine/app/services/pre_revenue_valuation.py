@@ -152,12 +152,35 @@ def official_contract_anchor(db: Any, company: Company, *, last_fy: int, ccy: st
     return None
 
 
-def _mature_multiple(db: Any, peer: Company, today: date, memo: dict[int, Any]) -> rules.PeerMultiple | None:
+#: Exchanges que no son una cotización (ficha de una empresa privada o sin mercado).
+UNLISTED_EXCHANGES = frozenset({"", "PRIVATE", "PRIVADA", "UNLISTED", "NONE", "N/A", "UNKNOWN"})
+#: Comparables del grupo SIC declarado: los de capitalización más cercana (distancia logarítmica).
+GROUP_NEAREST = 12
+PRIVATE_REASON = "N/D (privada, sin cotización)"
+
+
+def _unlisted_reason(peer: Company, exc: Exception) -> str | None:
+    """Motivo visible de un candidato que no puede dar múltiplo por no cotizar (None si es otro fallo)."""
+    if "sin precio" not in str(exc):
+        return None
+    if str(getattr(peer, "exchange", "") or "").strip().upper() in UNLISTED_EXCHANGES:
+        return PRIVATE_REASON
+    return "N/D (sin precio de mercado guardado)"
+
+
+def _mature_multiple(db: Any, peer: Company, today: date, memo: dict[int, Any],
+                     excluded: dict[int, str] | None = None) -> rules.PeerMultiple | None:
     if peer.id in memo:
         return memo[peer.id]
     from app.services.shareholder_irr_service import _is_financial, starting_point
 
     res = None
+    if (excluded is not None and str(getattr(peer, "exchange", "") or "").strip().upper() in UNLISTED_EXCHANGES
+            and not getattr(peer, "cik", None)):
+        # Sin cotización ni filings: nunca da múltiplo (ni con valoraciones de prensa).
+        excluded[peer.id] = PRIVATE_REASON
+        memo[peer.id] = None
+        return None
     try:
         sp, _hist, _w, cites = starting_point(db, peer, today=today, basis="ev_ebitda")
         kind = (cites.get("method") or {}).get("kind")
@@ -165,8 +188,13 @@ def _mature_multiple(db: Any, peer: Company, today: date, memo: dict[int, Any]) 
                 and sp.enterprise_value > 0):
             res = rules.PeerMultiple(peer.ticker, peer.name, float(sp.enterprise_value), float(sp.revenue),
                                      revenue_cagr(db, peer))
-    except ValueError:  # sin precio, sin ingresos…: un comparable sin datos no entra
+        elif excluded is not None and kind == "pre_revenue":
+            excluded[peer.id] = "sin múltiplo maduro (preingresos o quema caja: su EV/ventas no es de salida)"
+    except ValueError as exc:  # sin precio, sin ingresos…: un comparable sin datos no entra
         res = None
+        why = _unlisted_reason(peer, exc)
+        if why and excluded is not None:
+            excluded[peer.id] = why
     except Exception as exc:  # noqa: BLE001 - un comparable roto no tumba la ficha
         logger.info("preingresos comparable %s: %s", peer.ticker, type(exc).__name__)
         db.rollback()
@@ -218,12 +246,79 @@ def by_market_cap(db: Any, companies: list[Company]) -> list[Company]:
     return sorted(companies, key=lambda c: (caps.get(c.id) is None, -float(caps.get(c.id) or 0), str(c.ticker)))
 
 
-def mature_peers(db: Any, company: Company, today: date) -> tuple[list[rules.PeerMultiple], str | None, str | None,
-                                                                   list[dict[str, Any]]]:
-    """(comparables maduros, capa usada, motivo si no hay, intentos por capa)."""
+def _derived_cap_usd(db: Any, company: Company) -> float | None:
+    """Capitalización en USD cuando no hay una guardada: último cierre × acciones de la última portada (o media
+    diluida), convertida con el tipo de cambio guardado. Solo ordena candidatos; nunca entra en un múltiplo."""
+    try:
+        from app.services.user_sotp_service import _price, convert_amount
+
+        price, ccy, as_of = _price(db, company)
+        if not price:
+            return None
+        fact = None
+        for metric in ("shares_outstanding", "shares_diluted"):
+            fact = db.scalars(select(FinancialFact).where(
+                FinancialFact.company_id == company.id, FinancialFact.metric == metric,
+                FinancialFact.value.is_not(None)).order_by(desc(FinancialFact.period), desc(FinancialFact.id))).first()
+            if fact is not None and float(fact.value) > 0:
+                break
+            fact = None
+        if fact is None:
+            return None
+        cap = float(price) * float(fact.value)
+        code = str(ccy or company.currency or "USD").upper()
+        if code != "USD":
+            conv = convert_amount(db, cap, code, "USD", as_of or date.today())
+            return float(conv[0]) if conv else None
+        return cap
+    except Exception as exc:  # noqa: BLE001 - sin capitalización, el candidato va al final
+        logger.info("preingresos capitalización derivada %s: %s", getattr(company, "ticker", "?"), type(exc).__name__)
+        db.rollback()
+        return None
+
+
+def _nearest_by_cap(db: Any, company: Company, cands: list[Company], n: int) -> list[Company]:
+    """Los ``n`` candidatos de capitalización más cercana a la de ``company`` (|log(cap/cap_empresa)|); sin
+    capitalización de la empresa, los mayores; sin la del candidato, al final. Desempate por ticker."""
+    import math
+
+    caps: dict[int, Any] = {}
+    try:
+        from app.services.peer_comparison_service import PeerComparisonService
+
+        caps = PeerComparisonService()._latest_market_caps_usd(db, [company.id, *(c.id for c in cands)])  # noqa: SLF001
+    except Exception as exc:  # noqa: BLE001
+        logger.info("preingresos capitalizaciones (grupo): %s", type(exc).__name__)
+        db.rollback()
+    for c in [company, *cands]:
+        if not caps.get(c.id):
+            derived = _derived_cap_usd(db, c)
+            if derived:
+                caps[c.id] = derived
+    own = float(caps.get(company.id) or 0)
+
+    def key(c: Company) -> tuple[Any, ...]:
+        cap = float(caps.get(c.id) or 0)
+        if cap <= 0:
+            return (1, 0.0, str(c.ticker))
+        return (0, abs(math.log(cap / own)) if own > 0 else -cap, str(c.ticker))
+
+    return sorted(cands, key=key)[:n]
+
+
+def mature_peers(db: Any, company: Company, today: date, excluded_out: list[dict[str, Any]] | None = None
+                 ) -> tuple[list[rules.PeerMultiple], str | None, str | None, list[dict[str, Any]]]:
+    """(comparables maduros, capa usada, motivo si no hay, intentos por capa).
+
+    Capas (regla «comparables-sic-v1»): grupo SIC declarado (``sic_classification.SIC_INDUSTRY_GROUPS``, los
+    ``GROUP_NEAREST`` de capitalización más cercana) o, fuera de un grupo, el mismo SIC; después el servicio de
+    comparables, la industria, el sector y la base. Los candidatos sin cotización de la capa usada van a
+    ``excluded_out`` con su motivo («N/D (privada, sin cotización)») y nunca dan múltiplo."""
     from app.services.peer_comparison_service import _same_issuer
+    from app.services.sic_classification import company_sic, group_label, industry_group
 
     memo: dict[int, Any] = {}
+    excluded: dict[int, str] = {}
     tried: list[dict[str, Any]] = []
 
     def run(label: str, cands: list[Company]) -> list[rules.PeerMultiple]:
@@ -231,11 +326,20 @@ def mature_peers(db: Any, company: Company, today: date) -> tuple[list[rules.Pee
         for c in cands:
             if c.id == company.id or _same_issuer(company, c):
                 continue
-            pm = _mature_multiple(db, c, today, memo)
+            pm = _mature_multiple(db, c, today, memo, excluded)
             if pm is not None:
                 got.append(pm)
         tried.append({"capa": label, "candidatos": len(cands), "maduros": len(got)})
         return got
+
+    def done(cands: list[Company], used: list[Company]) -> None:
+        for c in cands:
+            if c.id not in memo and c.id != company.id:
+                _mature_multiple(db, c, today, memo, excluded)
+        if excluded_out is not None:
+            excluded_out.extend({"ticker": c.ticker, "name": c.name, "motivo": excluded[c.id]}
+                                for c in cands if c.id in excluded
+                                and (c in used or excluded[c.id] == PRIVATE_REASON))
 
     try:
         from app.services.peer_comparison_service import PeerComparisonService
@@ -247,11 +351,22 @@ def mature_peers(db: Any, company: Company, today: date) -> tuple[list[rules.Pee
         svc_peers = []
     with_revenue = (select(FinancialFact.company_id).where(FinancialFact.metric == "revenue",
                                                            FinancialFact.period.like("%:FY")).distinct())
-    tiers: list[tuple[str, list[Company]]] = [("comparables del servicio de comparables", list(svc_peers))]
     industry, sector = _known(company.industry), _known(company.sector)
     base_q = select(Company).where(Company.id != company.id, Company.id.in_(with_revenue))
     everyone = list(db.scalars(base_q).all())
     ranked = by_market_cap(db, everyone)
+    tiers: list[tuple[str, list[Company]]] = []
+    sic = company_sic(company)
+    group = industry_group(sic)
+    if group is not None:
+        members = [c for c in everyone if industry_group(company_sic(c)) == group]
+        tiers.append((f"mismo grupo de industria: {group_label(group)}, las {GROUP_NEAREST} de capitalización más "
+                      "cercana", _nearest_by_cap(db, company, members, GROUP_NEAREST)))
+    elif sic is not None:
+        tiers.append((f"mismo código SIC ({sic})",
+                      _nearest_by_cap(db, company, [c for c in everyone if company_sic(c) == sic], GROUP_NEAREST)))
+    # Comparables declarados (servicio): los que no cotizan salen excluidos con su motivo, nunca con múltiplo.
+    tiers.append(("comparables del servicio de comparables", list(svc_peers)))
     if industry:
         tiers.append((f"misma industria ({industry})",
                       [c for c in ranked if c.industry == company.industry][:MAX_CANDIDATES]))
@@ -259,12 +374,15 @@ def mature_peers(db: Any, company: Company, today: date) -> tuple[list[rules.Pee
         tiers.append((f"mismo sector ({sector})", [c for c in ranked if c.sector == company.sector][:MAX_CANDIDATES]))
     tiers.append(("toda la base no financiera, las mayores por capitalización (sin comparables suficientes del sector)",
                   ranked[:MAX_CANDIDATES]))
+    declared = list(svc_peers)
     for label, cands in tiers:
         got = run(label, cands)
         if len(got) >= rules.MIN_PEERS:
+            done([*cands, *[c for c in declared if c not in cands]], cands)
             return got, label, None, tried
+    done(declared, [])
     return [], None, (f"menos de {rules.MIN_PEERS} comparables maduros con ingresos y EV positivos en ninguna capa "
-                      "(servicio, industria, sector, base)"), tried
+                      "(grupo SIC, servicio, industria, sector, base)"), tried
 
 
 def value_pre_revenue(db: Any, company: Company, *, sp: Any, hist: Any, cites: Mapping[str, Any],
@@ -281,7 +399,8 @@ def value_pre_revenue(db: Any, company: Company, *, sp: Any, hist: Any, cites: M
     rw = rules.runway(sp.cash, fcf, missing=runway.get("missing"))
     anchors = revenue_anchors(db, company, last_fy=last_fy, ccy=ccy, today=today)
     anchor, anchor_missing = rules.choose_anchor(anchors, last_fy)
-    peers, layer, peers_missing, tried = mature_peers(db, company, today)
+    excluded: list[dict[str, Any]] = []
+    peers, layer, peers_missing, tried = mature_peers(db, company, today, excluded)
     stats = rules.peer_stats(peers)
     scen = rules.scenarios(today=today, price=sp.price, shares=sp.shares_diluted, cash=sp.cash,
                            debt=sp.debt + sp.leases, minorities=sp.minorities, hybrids=sp.hybrids, fcf=fcf,
@@ -306,6 +425,7 @@ def value_pre_revenue(db: Any, company: Company, *, sp: Any, hist: Any, cites: M
                    "revenue_cagr_3y": p.growth}
                   for p in sorted(peers, key=lambda p: p.multiple)],
         "peer_layer": layer, "peer_stats": stats, "peers_missing": peers_missing, "peer_layers_tried": tried,
+        "peers_excluded": excluded,
         "scenarios": scen, "formulas": rules.FORMULAS,
     }
     payload["fingerprint"] = hashlib.sha256(json.dumps(
