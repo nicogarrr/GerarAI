@@ -230,10 +230,17 @@ TOTAL_DEBT_LOOSE_GROUPS: tuple[tuple[tuple[str, tuple[str, ...]], ...], ...] = (
     (("NotesPayable", ()), ("LongTermNotesPayable", ()),
      ("NotesPayableNoncurrent", ("NotesPayableCurrent",))),
     (("LongTermLineOfCredit", ()),),
+    # Deuda garantizada / no garantizada: el desglose de la deuda a plazo de quien no etiqueta LongTermDebt
+    # (IBRX 10-Q 3T 2026: SecuredLongTermDebt 426,3 M$ y nada más). Cada tag ya incluye su parte corriente,
+    # así que con cualquiera de ellos no se suma además LongTermDebtCurrent (TOTAL_DEBT_INCLUDES_CURRENT).
+    (("SecuredLongTermDebt", ()), ("SecuredDebt", ())),
+    (("UnsecuredLongTermDebt", ()), ("UnsecuredDebt", ())),
     (("LongTermDebtCurrent", ()),),
     TOTAL_DEBT_SHORT_CHOICES,
     TOTAL_DEBT_LEASE_CHOICES,
 )
+#: Componentes sueltos que ya llevan dentro los vencimientos corrientes: con alguno, LongTermDebtCurrent no se suma.
+TOTAL_DEBT_INCLUDES_CURRENT = frozenset({"SecuredLongTermDebt", "SecuredDebt", "UnsecuredLongTermDebt", "UnsecuredDebt"})
 TOTAL_DEBT_LAST_RESORT = "DebtInstrumentCarryingAmount"
 # Deuda corriente TOTAL (vencimientos corrientes de la deuda a plazo + préstamos
 # a corto + pagarés). Hay emisores que, junto a LongTermDebtNoncurrent, solo
@@ -276,7 +283,9 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # 14 (9-nov-2026): extensiones del emisor (sec_extension_facts: capex propio, FRE/DE de gestoras).
 # 15 (9-nov-2026): inversiones a corto derivadas = CashCashEquivalentsAndShortTermInvestments − caja estricta del
 #    MISMO filing y cierre, cuando no hay concepto explícito de inversiones a corto (ABCL: 540,1 − 120,1 = 420,0 M$).
-SEC_INGESTION_RULES_VERSION = 15
+# 16 (9-nov-2026): total_debt con deuda garantizada / no garantizada (SecuredLongTermDebt, UnsecuredLongTermDebt…)
+#    como componentes sueltos, sin sumar además LongTermDebtCurrent (IBRX 3T 2026: N/D → 426,3 M$ + arrendamiento financiero).
+SEC_INGESTION_RULES_VERSION = 16
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Arrendadores (REIT): su ingreso principal es el del arrendamiento (ASC 842),
@@ -1045,6 +1054,9 @@ def _compose_total_debt(
                     parts += pick(TOTAL_DEBT_LEASE_CHOICES, end)
             else:
                 for group in TOTAL_DEBT_LOOSE_GROUPS:
+                    if group == (("LongTermDebtCurrent", ()),) and any(
+                            tag in TOTAL_DEBT_INCLUDES_CURRENT for tag, _ in parts):
+                        continue
                     parts += pick(group, end)
                 # Un arrendamiento financiero solo NO es la deuda de la
                 # empresa (p.ej. F: 0,9 mil M frente a la deuda real de
