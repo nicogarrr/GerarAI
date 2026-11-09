@@ -1,18 +1,39 @@
+from datetime import UTC, datetime
+
 import pytest
 
 from app.services import energy_flows
 from app.services.money_flows import FLOW_THEMES
 
+# parse_retail_revenue exige year < datetime.now(UTC).year: un periodo fijo
+# haria caducar estos tests al cambiar de año natural.
+LAST_FULL_YEAR = str(datetime.now(UTC).year - 1)
+
 
 def rows():
-    amounts = {"RES": "262079.35817", "COM": "200316.21062", "IND": "89878.15655", "TRA": "1011.10902", "OTH": "0", "ALL": "553284.83436"}
-    return [{"period": "2025", "stateid": "US", "sectorid": k, "revenue": v,
-             "revenue-units": "million dollars"} for k, v in amounts.items()]
+    amounts = {
+        "RES": "262079.35817",
+        "COM": "200316.21062",
+        "IND": "89878.15655",
+        "TRA": "1011.10902",
+        "OTH": "0",
+        "ALL": "553284.83436",
+    }
+    return [
+        {
+            "period": LAST_FULL_YEAR,
+            "stateid": "US",
+            "sectorid": k,
+            "revenue": v,
+            "revenue-units": "million dollars",
+        }
+        for k, v in amounts.items()
+    ]
 
 
 def test_live_response_fixture_units_and_no_double_count():
     year, sectors, total = energy_flows.parse_retail_revenue(rows())
-    assert year == "2025"
+    assert year == LAST_FULL_YEAR
     assert len(sectors) == 5
     assert total == pytest.approx(553284834360)
     assert sum(r["amount"] for r in sectors) == pytest.approx(total)
@@ -46,6 +67,7 @@ def test_missing_duplicate_and_non_reconciling_fail_closed():
 def test_outage_no_fabricated_data_or_secret(monkeypatch):
     def fail():
         raise RuntimeError("private secret must never reach payload")
+
     monkeypatch.setattr(energy_flows, "load_revenue", fail)
     payload = energy_flows.build_energy_flow(FLOW_THEMES["utilities"])
     assert payload["spenders"] == []
