@@ -909,12 +909,19 @@ def guidance_growth(db: Session, company: Company, last_year: int, revenue_last:
     """Crecimiento de ingresos que da la propia empresa para el ejercicio siguiente al último cerrado
     (guía citada de sus notas de resultados, ``company_guidance``: punto medio, con su frase y su URL)."""
     from app.models.declared_input_value import DeclaredInputValue
+    from app.services.fiscal_label import label_offset_from_facts
 
     if not revenue_last or revenue_last <= 0:
         return None, None
+    # ``last_year`` es el año nominal del cierre; la guía va con la etiqueta del emisor (un ejercicio que
+    # cierra el 30-ene-2026 y la empresa llama «fiscal 2025» tiene su siguiente en «fiscal 2026»).
+    labels = db.execute(select(FinancialFact.period, FinancialFact.fiscal_year).where(
+        FinancialFact.company_id == company.id, FinancialFact.source_type == "SEC",
+        FinancialFact.period.like("%:FY"), FinancialFact.fiscal_year.is_not(None))).all()
+    offset = label_offset_from_facts((_end(p), y) for p, y in labels)
     row = db.scalars(select(DeclaredInputValue).where(
         DeclaredInputValue.company_id == company.id,
-        DeclaredInputValue.input_key == f"guidance.revenue.fy{last_year + 1}",
+        DeclaredInputValue.input_key == f"guidance.revenue.fy{last_year + 1 - offset}",
         DeclaredInputValue.superseded_at.is_(None)).order_by(desc(DeclaredInputValue.id))).first()
     if row is None or row.base is None:
         return None, None

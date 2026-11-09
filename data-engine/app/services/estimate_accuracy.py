@@ -33,6 +33,7 @@ from app.services.own_consensus import (
     actuals_from_facts,
     fy_end_month,
     horizon_of,
+    label_offset_of,
     period_end,
 )
 
@@ -79,13 +80,14 @@ def cases(estimates: Sequence[Estimate], actuals: Mapping[str, Mapping[str, Actu
     """Un caso por (fuente, métrica, periodo): la última estimación anterior al cierre."""
     fy_month: dict[str, int] = {m: fy_end_month([a.end for k, a in acts.items() if k.startswith("fy")])
                                 for m, acts in actuals.items()}
+    offset: dict[str, int] = {m: label_offset_of(acts) for m, acts in actuals.items()}
     last: dict[tuple[str, str, str], Estimate] = {}
     for e in sorted(estimates, key=lambda e: e.as_of):
         acts = actuals.get(e.metric)
         if not acts:
             continue
         try:
-            end = period_end(e.period, fy_month.get(e.metric, 12))
+            end = period_end(e.period, fy_month.get(e.metric, 12), offset.get(e.metric, 0))
         except (ValueError, IndexError):
             continue
         if e.as_of < end:
@@ -95,7 +97,7 @@ def cases(estimates: Sequence[Estimate], actuals: Mapping[str, Mapping[str, Actu
         real = actuals[metric].get(period)
         if real is None or not e.mid:
             continue
-        end = period_end(period, fy_month.get(metric, 12))
+        end = period_end(period, fy_month.get(metric, 12), offset.get(metric, 0))
         ratio = real.value / e.mid
         excluded = scale_mismatch(real.value, e.mid)
         if not excluded and metric in STABLE_METRICS and not (1 / EXTREME_RATIO <= ratio <= EXTREME_RATIO):
