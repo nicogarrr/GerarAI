@@ -250,7 +250,12 @@ function PriceCanvas({ bars, levels, currency, candleMode = false, hourly = fals
                     layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: '#71717a', fontSize: 11, attributionLogo: true, panes: { separatorColor: '#27272a' } },
                     grid: { vertLines: { visible: false }, horzLines: { color: '#27272a' } },
                     rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.12, bottom: 0.08 } },
-                    timeScale: { borderVisible: false, rightOffset: 6 },
+                    // minBarSpacing por defecto (0,5 px) ponía techo a lo que fitContent
+                    // puede encajar: ~664 barras en 332 px. En 5A/Máx (1.256-11.569
+                    // sesiones) el gráfico mostraba en silencio solo los últimos ~2 años
+                    // mientras el pie anunciaba el rango completo. Con 0,001 fitContent
+                    // encaja todo el historial, como hace TradingView.
+                    timeScale: { borderVisible: false, rightOffset: 6, minBarSpacing: 0.001 },
                     // Sin priceFormatter global: en lightweight-charts pisa el priceFormat de TODAS las series y
                     // el volumen salía con la moneda («99,10 US$»).
                     localization: { locale: intlLocale(latest.current.fmt.locale) },
