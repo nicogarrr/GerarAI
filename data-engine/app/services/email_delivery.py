@@ -20,6 +20,7 @@ clase de la excepcion (y el codigo SMTP cuando lo hay).
 
 from __future__ import annotations
 
+import math
 import smtplib
 import socket
 import ssl
@@ -149,6 +150,8 @@ def send_email(
     try:
         port = int(settings.smtp_port)
         timeout = float(settings.smtp_timeout_seconds)
+        if not 1 <= port <= 65535 or not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError(f"port={port!r} timeout={timeout!r} fuera de rango")
     except (TypeError, ValueError) as exc:
         # Config malformada (una env con texto en SMTP_PORT o el timeout):
         # el docstring promete no lanzar, y reintentar no sanea la config,
