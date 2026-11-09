@@ -22,6 +22,7 @@ STALE_CLAIM_SECONDS = 600
 # afirma cumplimiento del header por encima del cap). Se aplica fijando la
 # elegibilidad del claim (updated_at en el futuro), sin columna dedicada.
 RETRY_AFTER_CAP_SECONDS = 3600
+RETRY_AFTER_FALLBACK_SECONDS = 600
 
 
 def record_in_app_delivery(db: Session, alert: ResearchAlert) -> None:
@@ -227,6 +228,25 @@ class NotificationService:
             "redispatched": redispatched,
             "errors": errors,
         }
+
+    @staticmethod
+    def _telegram_retry_after(body: dict) -> int:
+        """Segundos de espera de un 429 de Telegram, saneados y con cap.
+
+        El json de la API se parsea con json.loads, que acepta Infinity/NaN:
+        int(inf) lanza OverflowError e int(nan) ValueError, y cualquiera de
+        los dos caia en el except generico del dispatch -> 'unknown' ->
+        reintento infinito del outbox (salvedad del FAV de #5033). Valor no
+        entero o <=0: cooldown por defecto.
+        """
+        raw = (body.get("parameters") or {}).get("retry_after")
+        try:
+            seconds = int(raw)
+        except (TypeError, ValueError, OverflowError):
+            seconds = RETRY_AFTER_FALLBACK_SECONDS
+        if seconds <= 0:
+            seconds = RETRY_AFTER_FALLBACK_SECONDS
+        return min(seconds, RETRY_AFTER_CAP_SECONDS)
 
     @staticmethod
     def _extract_retry_after(exc: Exception) -> int | None:
@@ -471,7 +491,7 @@ class NotificationService:
             timeout = float(settings.telegram_timeout_seconds)
             if not math.isfinite(timeout) or timeout <= 0:
                 raise ValueError(f"timeout={timeout!r} fuera de rango")
-        except (TypeError, ValueError) as exc:
+        except Exception as exc:  # noqa: BLE001 - un __float__ puede lanzar lo que sea
             # Config malformada: como en email_delivery.send_email, failed y
             # no unknown — el outbox reintentaria para siempre lo que no se
             # sanea solo. httpx no valida el timeout hasta la peticion.
@@ -492,7 +512,7 @@ class NotificationService:
                     return self._result(
                         "throttled" if code == 429 else "failed",
                         error="Telegram rechazó el mensaje",
-                        retry_after=min(int((body.get("parameters") or {}).get("retry_after") or 600), RETRY_AFTER_CAP_SECONDS) if code == 429 else None,
+                        retry_after=self._telegram_retry_after(body) if code == 429 else None,
                     )
             return self._result("delivered")
         except Exception as exc:

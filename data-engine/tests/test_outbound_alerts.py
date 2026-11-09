@@ -253,3 +253,77 @@ def test_telegram_timeout_malformed_config_is_failed(monkeypatch):
                                    telegram_timeout_seconds=bad)
         result = notification_service.NotificationService()._dispatch_telegram(settings, payload)
         assert result["status"] == "failed" and "config invalida" in result["error"], bad
+
+
+def _telegram_settings(**over):
+    base = dict(telegram_enabled=True, telegram_bot_token="test-only",
+                telegram_chat_id="dest", telegram_api_base_url="https://api.telegram.org",
+                telegram_timeout_seconds=10)
+    base.update(over)
+    return SimpleNamespace(**base)
+
+
+def _client_respondiendo(monkeypatch, response):
+    class Client:
+        def __init__(self, **kw): pass
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def post(self, *args, **kw): return response
+    monkeypatch.setattr(notification_service.httpx, "Client", Client)
+
+
+_PAYLOAD = {"severity": "high", "title": "Alerta", "message": "Fuente",
+            "company_id": 1, "alert_id": 1, "chat_id": "12345"}
+
+
+def test_telegram_retry_after_sanitizado(monkeypatch):
+    """retry_after del body 429: Infinity/NaN (json.loads los acepta) o texto
+    ya no lanzan OverflowError/ValueError hacia el except generico (que
+    clasificaba 'unknown' y el outbox reintentaba para siempre): cooldown por
+    defecto. Enteros grandes siguen con cap y los normales pasan."""
+    req = httpx.Request("POST", "https://api.telegram.org/")
+    headers = {"content-type": "application/json"}
+
+    def resp_429(raw_json: str) -> httpx.Response:
+        # content crudo: httpx.Response(json=...) serializa con allow_nan=False
+        # y no admitiria Infinity/NaN, que json.loads SI acepta por defecto.
+        return httpx.Response(
+            200,
+            content=('{"ok": false, "error_code": 429, "parameters": {"retry_after": '
+                     + raw_json + "}}").encode(),
+            headers=headers, request=req,
+        )
+
+    for raw, esperado in (
+        ("Infinity", 600), ("NaN", 600), ('"abc"', 600), ("null", 600),
+        ("-5", 600), ("0", 600), ("10.7", 10), ("45", 45), ("1000000000", 3600),
+    ):
+        _client_respondiendo(monkeypatch, resp_429(raw))
+        result = notification_service.NotificationService()._dispatch_telegram(_telegram_settings(), _PAYLOAD)
+        assert result["status"] == "throttled" and result["retry_after"] == esperado, raw
+
+
+def test_telegram_timeout_con_float_defectuoso_es_failed(monkeypatch):
+    """Un __float__ que lanza algo que no es TypeError/ValueError tambien es
+    config invalida -> failed; nunca llega al actor ni a la red."""
+    class RaroFloat:
+        def __float__(self):
+            raise RuntimeError("roto")
+    class Client:
+        def __init__(self, **kw):
+            raise AssertionError("config invalida no debe construir httpx.Client")
+    monkeypatch.setattr(notification_service.httpx, "Client", Client)
+    result = notification_service.NotificationService()._dispatch_telegram(
+        _telegram_settings(telegram_timeout_seconds=RaroFloat()), _PAYLOAD)
+    assert result["status"] == "failed" and "config invalida" in result["error"]
+
+
+def test_telegram_timeout_string_numerico_se_acepta(monkeypatch):
+    """La config llega de variables de entorno (strings): '10' es un timeout
+    valido y el dispatch intenta la entrega. Comportamiento fijado a
+    proposito (salvedad del FAV de #5033), no accidente."""
+    response = httpx.Response(200, json={"ok": True}, request=httpx.Request("POST", "https://api.telegram.org/"))
+    _client_respondiendo(monkeypatch, response)
+    result = notification_service.NotificationService()._dispatch_telegram(
+        _telegram_settings(telegram_timeout_seconds="10"), _PAYLOAD)
+    assert result["status"] == "delivered"
