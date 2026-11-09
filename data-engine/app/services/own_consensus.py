@@ -19,6 +19,8 @@ demás quedan como contraste:
 5. ``modelo``: tendencia log-lineal de hasta 12 trimestres desestacionalizados,
    encogida hacia la tasa base con peso n/(n + ``SHRINK_K``) y desvanecida a la mitad
    cada año de horizonte. El beneficio operativo = ingresos estimados × margen TTM.
+   El BPA = BPA del mismo periodo anterior × (beneficio operativo estimado / el del
+   periodo anterior), con acciones, intereses e impuestos constantes (``_eps_candidate``).
 6. ``tasa_base``: el último dato × (1 + mediana del crecimiento de su grupo), con
    p25/p75 como rango.
 
@@ -356,7 +358,9 @@ def build_cells(metric: str, actuals: Mapping[str, Actual], *, today: date,
                 guidance: Sequence[GuidanceRow] = (), guidance_history: Sequence[GuidanceRow] = (),
                 analyst: Sequence[Mapping[str, Any]] = (), base_rate: BaseRate | None = None,
                 revenue_cells: Mapping[str, Cell] | None = None, revenue_actuals: Mapping[str, Actual] | None = None,
-                measured_errors: Mapping[tuple[str, str], Sequence[float]] | None = None) -> dict[str, Cell]:
+                measured_errors: Mapping[tuple[str, str], Sequence[float]] | None = None,
+                operating_cells: Mapping[str, Cell] | None = None,
+                operating_actuals: Mapping[str, Actual] | None = None) -> dict[str, Cell]:
     """Todas las celdas de una métrica: trimestres sin presentar del ejercicio en curso,
     el ejercicio en curso, el siguiente y cualquier periodo con guía futura."""
     measured = measured_errors or {}
@@ -453,6 +457,12 @@ def build_cells(metric: str, actuals: Mapping[str, Actual], *, today: date,
                     f"{'dato' if p else 'estimación'} anterior {anchor:,.0f} × (1 + {base_rate.p50:+.2%}) "
                     f"(mediana del grupo «{base_rate.group}», n={base_rate.n}; rango p25–p75)",
                     ([_cite_actual(p)] if p else []) + [{"kind": "tasa_base", "source": base_rate.source}]))
+        # 5b. modelo de BPA: el BPA del mismo periodo anterior escalado por el beneficio
+        # operativo estimado (acciones, intereses e impuestos constantes).
+        if metric == "eps" and operating_cells is not None and operating_actuals is not None:
+            eps_model = _eps_candidate(period, actuals, cells, operating_cells, operating_actuals)
+            if eps_model is not None:
+                cands.append(eps_model)
         # puertas
         flags: list[str] = []
         prev_actual = prior(period)
@@ -503,6 +513,55 @@ def build_cells(metric: str, actuals: Mapping[str, Actual], *, today: date,
                     cell.flags.append(f"suma_trimestres≠año: los 4 trimestres suman {sum(parts):,.0f} "
                                       f"({gap:+.1%} frente al año)")
     return cells
+
+
+def _prior_key(period: str) -> str:
+    if period.startswith("fy"):
+        return f"fy{int(period[2:]) - 1}"
+    q, y = period.split("_")
+    return f"{q}_{int(y) - 1}"
+
+
+def _eps_candidate(period: str, eps_actuals: Mapping[str, Actual], eps_done: Mapping[str, Cell],
+                   operating_cells: Mapping[str, Cell], operating_actuals: Mapping[str, Actual]) -> Candidate | None:
+    """``modelo`` del BPA (regla ``bpa_escala_beneficio_operativo v1``).
+
+    BPA estimado = BPA del mismo periodo anterior × (beneficio operativo estimado del
+    periodo / beneficio operativo del periodo anterior). Supone constantes las acciones,
+    los intereses y el tipo fiscal, y lo dice en la fórmula. Ancla presentada si existe;
+    si no (el año +2), la estimación publicada del año anterior de las dos métricas.
+    Sin estimación (None) si falta cualquiera de las cuatro cifras o alguna no es
+    positiva: escalar una pérdida por un ratio no tiene sentido económico.
+    """
+    oi_cell = operating_cells.get(period)
+    oi_est = oi_cell.published if oi_cell is not None else None
+    if oi_est is None:
+        return None
+    prev = _prior_key(period)
+    eps_prev_a, oi_prev_a = eps_actuals.get(prev), operating_actuals.get(prev)
+    citations: list[dict[str, Any]] = []
+    if eps_prev_a is not None and oi_prev_a is not None:
+        eps_prev, oi_prev, label = eps_prev_a.value, oi_prev_a.value, f"{prev} presentado"
+        citations = [_cite_actual(eps_prev_a), _cite_actual(oi_prev_a)]
+    else:
+        eps_c, oi_c = eps_done.get(prev), operating_cells.get(prev)
+        if eps_prev_a is not None or oi_prev_a is not None or eps_c is None or oi_c is None \
+                or eps_c.published is None or oi_c.published is None:
+            return None
+        eps_prev, oi_prev, label = eps_c.published.mid, oi_c.published.mid, f"{prev} estimado"
+    if not (eps_prev > 0 and oi_prev > 0 and oi_est.mid > 0):
+        return None
+
+    def scale(v: float | None) -> float | None:
+        return None if v is None or v <= 0 else eps_prev * v / oi_prev
+    mid = eps_prev * oi_est.mid / oi_prev
+    citations.append({"kind": "estimacion_beneficio_operativo", "source": oi_est.source, "period": period,
+                      "value": oi_est.mid, "formula": oi_est.formula})
+    return Candidate(
+        "modelo", scale(oi_est.low), mid, scale(oi_est.high),
+        f"BPA {label} {eps_prev:,.2f} × beneficio operativo estimado {oi_est.mid:,.0f} ({oi_est.source}) / "
+        f"{oi_prev:,.0f} ({oi_est.mid / oi_prev - 1:+.1%}); acciones, intereses e impuestos constantes",
+        citations)
 
 
 def _model_candidate(metric: str, period: str, actuals: Mapping[str, Actual], series: Sequence[Actual],
@@ -665,14 +724,20 @@ def build_company_consensus(db: Any, company: Any, tenant_id: int, *, today: dat
         base_rate_for = _default_rate
     rate = base_rate_for(rev_actuals)
     rev_cells: dict[str, Cell] = {}
+    oi_cells: dict[str, Cell] = {}
+    oi_actuals: Mapping[str, Actual] = {}
     for metric in METRICS:
         acts = rev_actuals if metric == "revenue" else actuals_from_facts(_facts(db, company, FACT_METRIC[metric]),
                                                                            metric=metric)
         cells = build_cells(metric, acts, today=today, guidance=guidance, guidance_history=history,
                             analyst=analyst, base_rate=rate if metric != "eps" else None,
-                            revenue_cells=rev_cells, revenue_actuals=rev_actuals, measured_errors=measured_errors)
+                            revenue_cells=rev_cells, revenue_actuals=rev_actuals, measured_errors=measured_errors,
+                            operating_cells=oi_cells if metric == "eps" else None,
+                            operating_actuals=oi_actuals if metric == "eps" else None)
         if metric == "revenue":
             rev_cells = cells
+        elif metric == "operating_income":
+            oi_cells, oi_actuals = cells, acts
         out["cells"].extend(c.as_dict() for c in cells.values())
     if rate is not None:
         out["base_rate"] = {"group": rate.group, "p25": rate.p25, "p50": rate.p50, "p75": rate.p75, "n": rate.n,
