@@ -13,6 +13,8 @@ import { type ValueRank, valueRankEvidenceParams, valueRankKey, valueRankSummary
 import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { Suspense, type ReactNode } from 'react';
+import type { DatedChange } from '@/lib/market/dated-change';
 import { WatchlistMembership, WatchlistEntry, WatchlistCount } from '@/components/watchlist/WatchlistMembership';
 import WatchlistRemoveButton from '@/components/watchlist/WatchlistRemoveButton';
 import WatchlistBuyAction from '@/components/watchlist/WatchlistBuyAction';
@@ -57,6 +59,26 @@ interface WatchlistStock extends WatchlistEntryData {
     /** true = fuera del master y el proveedor no conoce el símbolo («No encontrado»). */
     notFound: boolean;
     addedAt: Date;
+}
+
+type DatedMap = Record<string, DatedChange>;
+
+/** Mismo cierre datado y mismo % que Movers y Mercado; un precio en vivo manda. */
+function applyDated<T extends WatchlistEntryData>(entry: T, dated: DatedMap): T {
+    if (entry.priceKind === 'live') return entry;
+    const d = dated[entry.symbol.trim().toUpperCase()];
+    return d ? { ...entry, price: d.price, change: d.change, changePercent: d.changePercent, priceKind: 'close' as const, priceAsOf: d.date } : entry;
+}
+
+/** Repinta la fila entera con el cierre datado cuando llega la promesa compartida. */
+async function DatedRow<T extends WatchlistEntryData>({ stock, promise, render }: { stock: T; promise: Promise<DatedMap>; render: (stock: T) => ReactNode }) {
+    const dated = await promise.catch((): DatedMap => ({}));
+    return <>{render(applyDated(stock, dated))}</>;
+}
+
+async function DatedValuationGrid({ stocks, promise }: { stocks: WatchlistEntryData[]; promise: Promise<DatedMap> }) {
+    const dated = await promise.catch((): DatedMap => ({}));
+    return <ValuationSummaryGrid quotes={stocks.map((s) => applyDated(s, dated)).map((s) => ({ symbol: s.symbol, price: s.price, currency: s.currency }))} />;
 }
 
 // Página corta (móvil primero): 12 filas por página. Con 20 la lista se
@@ -109,6 +131,9 @@ export default async function WatchlistPage({
     // el monitor denso (52 sem, próximos resultados, tesis) y la lectura por
     // símbolo son independientes: se lanzan a la vez. Antes iban en cadena
     // (cierres, luego monitor, luego símbolos) y el TTFB sumaba los tres tramos.
+    // Con orden por métrica se espera por completo antes de ordenar; sin él la
+    // fila se pinta sin cierre y el cierre datado la repinta vía <Suspense>
+    // (la ruta /api/market/changes no bloquea el documento).
     const datedChangesPromise = fetchDatedChanges(pageSymbols);
     const monitorPromise = getWatchlistMonitor(pageSymbols);
     // La línea pre/post-mercado (decorativa) NO se espera en el render:
@@ -176,7 +201,7 @@ export default async function WatchlistPage({
             })
             .catch(() => false),
     );
-    const [datedChanges, monitorData, basicsList, notFoundList] = await Promise.all([datedChangesPromise, monitorPromise, Promise.all(basicsPromises), Promise.all(notFoundPromises)]);
+    const [datedChanges, monitorData, basicsList, notFoundList] = await Promise.all([metricSort ? datedChangesPromise : Promise.resolve({} as DatedMap), monitorPromise, Promise.all(basicsPromises), Promise.all(notFoundPromises)]);
     const watchlistStocks: WatchlistStock[] = await Promise.all(
         pageItems.map(async (item, index) => {
             try {
@@ -191,18 +216,7 @@ export default async function WatchlistPage({
                 const timedOut = settled.value === null;
                 const basics: ResearchCompanyBasics | null = basicsList[index] ?? null;
                 const entry: WatchlistEntryData = settled.value ?? emptyWatchlistEntry(item.symbol.trim().toUpperCase(), basics, null);
-                // Mismo cierre datado y mismo % que Movers y Mercado.
-                const dated = entry.priceKind === 'live' ? undefined : datedChanges[item.symbol.trim().toUpperCase()];
-                const data = dated
-                    ? {
-                          ...entry,
-                          price: dated.price,
-                          change: dated.change,
-                          changePercent: dated.changePercent,
-                          priceKind: 'close' as const,
-                          priceAsOf: dated.date,
-                      }
-                    : entry;
+                const data = applyDated(entry, datedChanges);
                 return {
                     ...data,
                     analysis: item.analysis,
@@ -337,6 +351,15 @@ export default async function WatchlistPage({
         );
     };
 
+    // Sin orden por métrica el cierre llega después: cada fila va en su propio
+    // <Suspense> (fallback = fila sin cierre datado).
+    const dated = (stock: WatchlistStock, render: (stock: WatchlistStock) => ReactNode): ReactNode =>
+        metricSort ? render(stock) : (
+            <Suspense key={stock.symbol} fallback={render(stock)}>
+                <DatedRow stock={stock} promise={datedChangesPromise} render={render} />
+            </Suspense>
+        );
+
     const dca = await dcaPromise;
     const dcaBySymbol = new Map<string, DcaSignalItem>((dca.data?.items ?? []).map((item) => [item.symbol.toUpperCase(), item]));
     const dcaSignalMonths = dca.data?.signal_months ?? null;
@@ -420,7 +443,7 @@ export default async function WatchlistPage({
                         en el contenido con el menú lateral y salía cortada con un
                         scroll horizontal sin indicio (QA 2026-10-19, tablet 820px). */}
                     <div className="space-y-3 xl:hidden">
-                        {displayStocks.map((stock) => (
+                        {displayStocks.map((baseStock) => dated(baseStock, (stock) => (
                             <WatchlistEntry as="article" symbol={stock.symbol} key={stock.symbol} className="min-w-0 rounded-xl border border-gray-700/60 bg-gray-900/60 p-3">
                                 <div className="flex min-w-0 items-center gap-3">
                                     <CompanyLogo ticker={stock.quoteSymbol ?? stock.symbol} loading="lazy" name={stock.name} className="size-11 shrink-0 rounded-lg" />
@@ -490,7 +513,7 @@ export default async function WatchlistPage({
                                     <WatchlistRemoveButton symbol={stock.symbol} />
                                 </div>
                             </WatchlistEntry>
-                        ))}
+                        )))}
                         {marketCapLegend}
                     </div>
 
@@ -525,7 +548,7 @@ export default async function WatchlistPage({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {displayStocks.map((stock) => (
+                                {displayStocks.map((baseStock) => dated(baseStock, (stock) => (
                                     <WatchlistEntry as="tr" symbol={stock.symbol} key={stock.symbol} className="border-gray-800 transition-colors hover:bg-gray-800/30">
                                         <TableCell>
                                             <Link href={`/research/${stock.symbol}`} className="group flex items-center gap-3">
@@ -607,7 +630,7 @@ export default async function WatchlistPage({
                                         </TableCell>
 
                                     </WatchlistEntry>
-                                ))}
+                                )))}
                             </TableBody>
                         </Table>
                         {marketCapLegend ? <div className="border-t border-gray-700 px-4 py-2">{marketCapLegend}</div> : null}
@@ -616,7 +639,13 @@ export default async function WatchlistPage({
             )}
 
             <DcaSignalsPanel data={dca.data} unavailable={dca.unavailable} ti={t} locale={locale} />
-        <ValuationSummaryGrid quotes={watchlistStocks.map(s => ({ symbol: s.symbol, price: s.price, currency: s.currency }))} />
+        {metricSort ? (
+            <ValuationSummaryGrid quotes={watchlistStocks.map(s => ({ symbol: s.symbol, price: s.price, currency: s.currency }))} />
+        ) : (
+            <Suspense fallback={<ValuationSummaryGrid quotes={watchlistStocks.map(s => ({ symbol: s.symbol, price: s.price, currency: s.currency }))} />}>
+                <DatedValuationGrid stocks={watchlistStocks} promise={datedChangesPromise} />
+            </Suspense>
+        )}
         </main>
         </WatchlistMembership>
     );
