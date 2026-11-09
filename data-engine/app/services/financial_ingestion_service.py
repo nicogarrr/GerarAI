@@ -274,7 +274,9 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # 13 (9-nov-2026): IFRS: ProfitLoss/Equity solo pasan a atribuibles con señal positiva de minoritarios = 0;
 #    sin ella se guardan como total (net_income_total / total_equity_total) y lo atribuible queda no verificable (CNQ).
 # 14 (9-nov-2026): extensiones del emisor (sec_extension_facts: capex propio, FRE/DE de gestoras).
-SEC_INGESTION_RULES_VERSION = 14
+# 15 (9-nov-2026): inversiones a corto derivadas = CashCashEquivalentsAndShortTermInvestments − caja estricta del
+#    MISMO filing y cierre, cuando no hay concepto explícito de inversiones a corto (ABCL: 540,1 − 120,1 = 420,0 M$).
+SEC_INGESTION_RULES_VERSION = 15
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Arrendadores (REIT): su ingreso principal es el del arrendamiento (ASC 842),
@@ -681,6 +683,63 @@ DERIVED_PAIR_METRICS: tuple[str, ...] = (
     "net_debt",
     "revenue_growth",
 )
+
+
+#: Concepto sintético (no existe en la taxonomía): inversiones a corto DERIVADAS del total combinado menos la caja.
+DERIVED_SHORT_TERM_INVESTMENTS = "CashCashEquivalentsAndShortTermInvestmentsLessCashAndCashEquivalents"
+_STRICT_CASH = "CashAndCashEquivalentsAtCarryingValue"
+_COMBINED_CASH = "CashCashEquivalentsAndShortTermInvestments"
+
+
+def with_derived_short_term_investments(
+    facts: dict[str, Any], metric_map: list[tuple[str, list[str], str]],
+) -> tuple[dict[str, Any], list[tuple[str, list[str], str]]]:
+    """Inversiones a corto = total combinado caja + inversiones − caja estricta, cuando faltan como concepto.
+
+    Muchos emisores presentan en el balance «Cash and cash equivalents» y «Marketable securities» con el
+    subtotal ``CashCashEquivalentsAndShortTermInvestments``, pero etiquetan los valores con un concepto que
+    no distingue corto de largo (``AvailableForSaleSecuritiesDebtSecurities``: ABCL 2T-2026, 420,0 M$ fuera de
+    una caja de 120,1 M$). Esos 420 M$ son liquidez del runway. Regla general y conservadora:
+
+    - solo con los DOS hechos en el MISMO filing (``accn``), cierre (``end``) y unidad;
+    - solo para cierres sin ningún concepto explícito de la métrica (el explícito siempre gana);
+    - solo si la diferencia es positiva (si el total es la propia caja, no hay inversiones que añadir).
+
+    Devuelve una copia superficial de los hechos con el concepto sintético
+    :data:`DERIVED_SHORT_TERM_INVESTMENTS` y el mapa con ese concepto AL FINAL de la lista de la métrica. Puro.
+    """
+    explicit: list[str] = []
+    for metric, concepts, _unit in metric_map:
+        if metric == "short_term_investments":
+            explicit = [c for c in concepts if c != DERIVED_SHORT_TERM_INVESTMENTS]
+    if not explicit or _COMBINED_CASH not in facts or _STRICT_CASH not in facts:
+        return facts, metric_map
+    covered = {str(e.get("end")) for c in explicit
+               for entries in ((facts.get(c) or {}).get("units") or {}).values() for e in entries if isinstance(e, dict)}
+    derived: dict[str, list[dict[str, Any]]] = {}
+    for unit, combined in ((facts[_COMBINED_CASH] or {}).get("units") or {}).items():
+        strict = {(e.get("accn"), e.get("end")): e for e in ((facts[_STRICT_CASH] or {}).get("units") or {}).get(unit, [])
+                  if isinstance(e, dict) and not e.get("start")}
+        for e in combined:
+            if not isinstance(e, dict) or e.get("start") or str(e.get("end")) in covered:
+                continue
+            cash = strict.get((e.get("accn"), e.get("end")))
+            total, part = _decimal(e.get("val")), _decimal(cash.get("val")) if cash else None
+            if total is None or part is None or total - part <= 0:
+                continue
+            derived.setdefault(unit, []).append({**e, "val": float(total - part), "_derived_from": (
+                f"{_COMBINED_CASH} {total} − {_STRICT_CASH} {part} (mismo filing {e.get('accn')})")})
+    if not derived:
+        return facts, metric_map
+    out_facts = {**facts, DERIVED_SHORT_TERM_INVESTMENTS: {"units": derived}}
+    out_map = [(m, [*cs, DERIVED_SHORT_TERM_INVESTMENTS] if m == "short_term_investments" else list(cs), u)
+               for m, cs, u in metric_map]
+    return out_facts, out_map
+
+
+def _synthetic(entry: dict[str, Any]) -> bool:
+    """El hecho sale de una resta entre conceptos presentados (no está presentado tal cual)."""
+    return entry.get("_concept") == DERIVED_SHORT_TERM_INVESTMENTS
 
 
 def _cash_includes_investments(concept_usage: dict[str, dict[str, Any]], end: str) -> bool:
@@ -2195,6 +2254,8 @@ class FinancialIngestionService:
                     **(document.metadata_ or {}),
                     "sec_extension_map": {k: v for k, v in extension_map.items() if k != "reused"},
                 }
+        # Inversiones a corto que solo se leen como total combinado − caja (regla 15).
+        us_gaap, metric_map = with_derived_short_term_investments(us_gaap, metric_map)
         # Divisa de reporte del filer (10-K: USD; 20-F en US GAAP: CNY, TWD...).
         # Cada hecho monetario se guarda con ELLA como unidad.
         reporting_currency = _sec_reporting_currency(us_gaap)
@@ -2398,8 +2459,8 @@ class FinancialIngestionService:
                             "fiscal_quarter": fp,
                             "source_id": document.id,
                             "source_type": "SEC",
-                            "is_reported": not derived_from_ytd,
-                            "confidence": Decimal("0.85") if derived_from_ytd else Decimal("0.9"),
+                            "is_reported": not derived_from_ytd and not _synthetic(entry),
+                            "confidence": Decimal("0.85") if derived_from_ytd or _synthetic(entry) else Decimal("0.9"),
                             "accession_number": entry.get("accn"),
                             "filed": _publication_date(entry),
                         }
@@ -2465,8 +2526,8 @@ class FinancialIngestionService:
                             "fiscal_quarter": "FY",
                             "source_id": document.id,
                             "source_type": "SEC",
-                            "is_reported": True,
-                            "confidence": Decimal("0.95"),
+                            "is_reported": not _synthetic(entry),
+                            "confidence": Decimal("0.9") if _synthetic(entry) else Decimal("0.95"),
                             "accession_number": entry.get("accn"),
                             "filed": _publication_date(entry),
                         }

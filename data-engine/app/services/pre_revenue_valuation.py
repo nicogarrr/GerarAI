@@ -119,7 +119,37 @@ def revenue_anchors(db: Any, company: Company, *, last_fy: int, ccy: str, today:
                 year, conv / rules.HORIZON_MIN, None, None, "backlog",
                 f"cartera contratada ({fact.period}) repartida en {rules.HORIZON_MIN} años: suelo contratado",
                 {**_cite(fact), "total_millions": conv}))
+    contract = official_contract_anchor(db, company, last_fy=last_fy, ccy=ccy, today=today)
+    if contract is not None:
+        filed = [a for a in out if a.source == "backlog"]
+        if not filed or contract.cite["total_millions"] > float(filed[0].cite.get("total_millions") or 0):
+            out.insert(out.index(filed[0]) if filed else len(out), contract)
     return out
+
+
+def official_contract_anchor(db: Any, company: Company, *, last_fy: int, ccy: str, today: date
+                             ) -> rules.RevenueAnchor | None:
+    """Un contrato oficial (8-K/6-K o nota de prensa) con importe EXPLÍCITAMENTE atribuido a la empresa, como
+    cartera contratada repartida en ``HORIZON_MIN`` años. Sin importe atribuible (lo normal), None: nada cambia."""
+    try:
+        from app.services.official_catalysts import catalysts_for
+
+        cats = [c for c in catalysts_for(db, company, today=today)
+                if c.get("amount_for_company_value") and c.get("amount_currency")]
+    except Exception as exc:  # noqa: BLE001
+        logger.info("preingresos catalizadores: %s", type(exc).__name__)
+        return None
+    for c in cats:  # el más reciente primero
+        conv, _how = _convert(db, float(c["amount_for_company_value"]) / 1e6, c["amount_currency"], ccy, today)
+        if conv is None or conv <= 0:
+            continue
+        return rules.RevenueAnchor(
+            last_fy + rules.HORIZON_MIN, conv / rules.HORIZON_MIN, None, None, "backlog",
+            f"contrato oficial atribuido a la empresa ({c.get('date')}, {c.get('publisher')}) repartido en "
+            f"{rules.HORIZON_MIN} años: suelo contratado",
+            {"url": c.get("url"), "quote": c.get("summary"), "as_of": c.get("date"), "amount": c.get("amount_for_company"),
+             "total_millions": conv})
+    return None
 
 
 def _mature_multiple(db: Any, peer: Company, today: date, memo: dict[int, Any]) -> rules.PeerMultiple | None:
@@ -133,7 +163,8 @@ def _mature_multiple(db: Any, peer: Company, today: date, memo: dict[int, Any]) 
         kind = (cites.get("method") or {}).get("kind")
         if (kind in _MATURE_KINDS and not _is_financial(peer) and sp.revenue and sp.revenue > 0
                 and sp.enterprise_value > 0):
-            res = rules.PeerMultiple(peer.ticker, peer.name, float(sp.enterprise_value), float(sp.revenue))
+            res = rules.PeerMultiple(peer.ticker, peer.name, float(sp.enterprise_value), float(sp.revenue),
+                                     revenue_cagr(db, peer))
     except ValueError:  # sin precio, sin ingresos…: un comparable sin datos no entra
         res = None
     except Exception as exc:  # noqa: BLE001 - un comparable roto no tumba la ficha
@@ -144,9 +175,47 @@ def _mature_multiple(db: Any, peer: Company, today: date, memo: dict[int, Any]) 
     return res
 
 
+def revenue_cagr(db: Any, company: Company, years: int = 3) -> float | None:
+    """TCAC de ingresos de los ``years`` últimos ejercicios (hechos FY), o None si falta un extremo."""
+    try:
+        rows = db.execute(select(FinancialFact.period, FinancialFact.value).where(
+            FinancialFact.company_id == company.id, FinancialFact.metric == "revenue",
+            FinancialFact.period.like("%:FY")).order_by(desc(FinancialFact.period))).all()
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        return None
+    by_year: dict[int, float] = {}
+    for period, value in rows:
+        try:
+            by_year.setdefault(int(str(period)[:4]), float(value))
+        except (TypeError, ValueError):
+            continue
+    if not by_year:
+        return None
+    last = max(by_year)
+    first = by_year.get(last - years)
+    if not first or first <= 0 or by_year[last] <= 0:
+        return None
+    return (by_year[last] / first) ** (1 / years) - 1
+
+
 def _known(text: Any) -> str | None:
     t = str(text or "").strip()
     return None if t.lower() in ("", "unknown", "n/a", "none") else t
+
+
+def by_market_cap(db: Any, companies: list[Company]) -> list[Company]:
+    """Las capas anchas se recortan por tamaño, no por orden alfabético: capitalización en USD descendente
+    (la misma consulta del servicio de comparables), sin capitalización al final, desempate por ticker."""
+    caps: dict[int, Any] = {}
+    try:
+        from app.services.peer_comparison_service import PeerComparisonService
+
+        caps = PeerComparisonService()._latest_market_caps_usd(db, [c.id for c in companies])  # noqa: SLF001
+    except Exception as exc:  # noqa: BLE001 - sin capitalizaciones, orden por ticker
+        logger.info("preingresos capitalizaciones: %s", type(exc).__name__)
+        db.rollback()
+    return sorted(companies, key=lambda c: (caps.get(c.id) is None, -float(caps.get(c.id) or 0), str(c.ticker)))
 
 
 def mature_peers(db: Any, company: Company, today: date) -> tuple[list[rules.PeerMultiple], str | None, str | None,
@@ -180,15 +249,16 @@ def mature_peers(db: Any, company: Company, today: date) -> tuple[list[rules.Pee
                                                            FinancialFact.period.like("%:FY")).distinct())
     tiers: list[tuple[str, list[Company]]] = [("comparables del servicio de comparables", list(svc_peers))]
     industry, sector = _known(company.industry), _known(company.sector)
-    base_q = select(Company).where(Company.id != company.id, Company.id.in_(with_revenue)).order_by(Company.ticker)
+    base_q = select(Company).where(Company.id != company.id, Company.id.in_(with_revenue))
+    everyone = list(db.scalars(base_q).all())
+    ranked = by_market_cap(db, everyone)
     if industry:
         tiers.append((f"misma industria ({industry})",
-                      list(db.scalars(base_q.where(Company.industry == company.industry).limit(MAX_CANDIDATES)).all())))
+                      [c for c in ranked if c.industry == company.industry][:MAX_CANDIDATES]))
     if sector:
-        tiers.append((f"mismo sector ({sector})",
-                      list(db.scalars(base_q.where(Company.sector == company.sector).limit(MAX_CANDIDATES)).all())))
-    tiers.append(("toda la base no financiera (sin comparables suficientes del sector)",
-                  list(db.scalars(base_q.limit(MAX_CANDIDATES)).all())))
+        tiers.append((f"mismo sector ({sector})", [c for c in ranked if c.sector == company.sector][:MAX_CANDIDATES]))
+    tiers.append(("toda la base no financiera, las mayores por capitalización (sin comparables suficientes del sector)",
+                  ranked[:MAX_CANDIDATES]))
     for label, cands in tiers:
         got = run(label, cands)
         if len(got) >= rules.MIN_PEERS:
@@ -216,7 +286,8 @@ def value_pre_revenue(db: Any, company: Company, *, sp: Any, hist: Any, cites: M
     scen = rules.scenarios(today=today, price=sp.price, shares=sp.shares_diluted, cash=sp.cash,
                            debt=sp.debt + sp.leases, minorities=sp.minorities, hybrids=sp.hybrids, fcf=fcf,
                            dilution_hist=runway.get("dilution_cagr"), anchor=anchor, anchor_missing=anchor_missing,
-                           peers=stats, peers_missing=peers_missing, last_fy=last_fy, fy_end_month=fy_month)
+                           peers=stats, peers_missing=peers_missing, last_fy=last_fy, fy_end_month=fy_month,
+                           last_revenue=float(sp.revenue) if sp.revenue else None)
     payload = {
         "rules": rules.RULES_VERSION, "currency": ccy, "last_fiscal_year": last_fy,
         "runway": {**rw, "cash": sp.cash, "free_cash_flow": fcf,
@@ -231,7 +302,8 @@ def value_pre_revenue(db: Any, company: Company, *, sp: Any, hist: Any, cites: M
             "label": anchor.label, "cite": dict(anchor.cite)},
         "revenue_anchor_missing": anchor_missing,
         "anchors_found": [{"year": a.year, "source": a.source, "base": a.base} for a in anchors],
-        "peers": [{"ticker": p.ticker, "name": p.name, "ev": p.ev, "revenue": p.revenue, "multiple": p.multiple}
+        "peers": [{"ticker": p.ticker, "name": p.name, "ev": p.ev, "revenue": p.revenue, "multiple": p.multiple,
+                   "revenue_cagr_3y": p.growth}
                   for p in sorted(peers, key=lambda p: p.multiple)],
         "peer_layer": layer, "peer_stats": stats, "peers_missing": peers_missing, "peer_layers_tried": tried,
         "scenarios": scen, "formulas": rules.FORMULAS,
@@ -242,4 +314,4 @@ def value_pre_revenue(db: Any, company: Company, *, sp: Any, hist: Any, cites: M
     return payload
 
 
-__all__ = ["mature_peers", "revenue_anchors", "value_pre_revenue"]
+__all__ = ["by_market_cap", "mature_peers", "official_contract_anchor", "revenue_cagr", "revenue_anchors", "value_pre_revenue"]

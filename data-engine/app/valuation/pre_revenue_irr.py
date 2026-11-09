@@ -43,7 +43,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-RULES_VERSION = "preingresos-v1 (prerregistrada 9-nov-2026)"
+RULES_VERSION = "preingresos-v2 (prerregistrada 9-nov-2026: múltiplo maduro solo con crecimiento maduro)"
 SCENARIOS = ("bear", "base", "bull")
 SCENARIO_LABELS = {"bear": "Bajista", "base": "Base", "bull": "Alcista"}
 #: Fracción del consumo anual actual que se acumula cada año hasta el break-even en T.
@@ -71,6 +71,7 @@ class PeerMultiple:
     name: str | None
     ev: float
     revenue: float
+    growth: float | None = None  # TCAC de ingresos de sus 3 últimos ejercicios (v2)
 
     @property
     def multiple(self) -> float:
@@ -118,8 +119,45 @@ def peer_stats(peers: Sequence[PeerMultiple]) -> dict[str, float] | None:
     mults = [p.multiple for p in peers if p.revenue > 0 and p.ev > 0]
     if not mults:
         return None
-    return {"p25": quantile(mults, 0.25), "median": statistics.median(mults), "p75": quantile(mults, 0.75),
-            "n": float(len(mults))}
+    out = {"p25": quantile(mults, 0.25), "median": statistics.median(mults), "p75": quantile(mults, 0.75),
+           "n": float(len(mults))}
+    growths = [p.growth for p in peers if p.growth is not None]
+    if len(growths) >= MIN_PEERS:
+        out.update({"growth_p50": statistics.median(growths), "growth_p75": quantile(growths, 0.75),
+                    "growth_n": float(len(growths))})
+    return out
+
+
+def exit_revenue(rev: float, *, anchor_year: int, last_fy: int, last_revenue: float | None,
+                 peers: Mapping[str, float]) -> tuple[float | None, int, dict[str, Any]]:
+    """(ingresos de salida, año de salida, traza) de la regla v2 (a): el múltiplo maduro solo en un año de crecimiento
+    maduro. Si la empresa crece al año del ancla más que el p75 de los comparables, los ingresos se prolongan hasta
+    último_FY + HORIZON_MAX con crecimiento que se desvanece linealmente hasta la mediana de los comparables. Puro."""
+    trace: dict[str, Any] = {"anchor_year": anchor_year}
+    g75, g50 = peers.get("growth_p75"), peers.get("growth_p50")
+    n = anchor_year - last_fy
+    if g75 is None or g50 is None or not last_revenue or last_revenue <= 0 or n <= 0 or rev <= 0:
+        trace["fade"] = "sin crecimiento medible de la empresa o de ≥3 comparables: múltiplo al año del ancla"
+        return rev, anchor_year, trace
+    g_c = (rev / last_revenue) ** (1 / n) - 1
+    trace.update({"growth_company": g_c, "growth_peers_p50": g50, "growth_peers_p75": g75})
+    if g_c <= g75:
+        trace["fade"] = "crece como los comparables maduros: múltiplo al año del ancla"
+        return rev, anchor_year, trace
+    last_year = last_fy + HORIZON_MAX
+    steps = last_year - anchor_year
+    if steps <= 0:
+        trace["fade"] = "sin años para desvanecer el crecimiento"
+        return None, anchor_year, trace
+    path = []
+    for i in range(1, steps + 1):
+        g = g_c + (g50 - g_c) * i / steps
+        rev *= 1 + g
+        path.append({"year": anchor_year + i, "growth": g, "revenue": rev})
+    trace.update({"fade": (f"estimación propia por fórmula (no consenso): crecimiento {g_c:.0%} al {anchor_year} que se "
+                           f"desvanece linealmente hasta la mediana de los comparables ({g50:.0%}) en {last_year}"),
+                  "path": path})
+    return rev, last_year, trace
 
 
 def years_to(today: date, year: int, fy_end_month: int = 12) -> float:
@@ -137,7 +175,9 @@ def _dilution(k: str, *, burn: float, n_years: float, cash: float, price: float,
     new_shares = need / price if price > 0 else 0.0
     dil = new_shares / shares if shares > 0 else 0.0
     dil_from = "hueco de financiación"
-    if k == "bear" and dilution_hist is not None and dilution_hist > 0:
+    # v2 (e): con el consumo financiado (hueco 0) no hay dilución en ningún escenario; el suelo histórico del bajista
+    # solo aplica cuando hay que salir a financiarse.
+    if k == "bear" and need > 0 and dilution_hist is not None and dilution_hist > 0:
         hist_dil = (1 + dilution_hist) ** n_years - 1
         if hist_dil > dil:
             dil, dil_from = hist_dil, "dilución histórica compuesta"
@@ -151,14 +191,27 @@ def _dilution(k: str, *, burn: float, n_years: float, cash: float, price: float,
 def scenarios(*, today: date, price: float | None, shares: float | None, cash: float | None, debt: float | None,
               minorities: float, hybrids: float, fcf: float | None, dilution_hist: float | None,
               anchor: RevenueAnchor | None, anchor_missing: str | None, peers: Mapping[str, float] | None,
-              peers_missing: str | None, last_fy: int, fy_end_month: int = 12) -> dict[str, Any]:
+              peers_missing: str | None, last_fy: int, fy_end_month: int = 12,
+              last_revenue: float | None = None) -> dict[str, Any]:
     """Los tres escenarios de la regla (pasos 2–5), cada uno con su TIR o N/D y su motivo. La dilución
     proyectada se calcula aunque falte el ancla de ingresos o los comparables (con T = último ejercicio + 3)."""
     out: dict[str, Any] = {}
     burn = (-fcf if fcf < 0 else 0.0) if fcf is not None else None
-    exit_year = anchor.year if anchor is not None else last_fy + HORIZON_MIN
-    n_years = years_to(today, exit_year, fy_end_month)
     for k in SCENARIOS:
+        exit_year = anchor.year if anchor is not None else last_fy + HORIZON_MIN
+        rev: float | None = None
+        trace: dict[str, Any] = {}
+        if anchor is not None:
+            if k == "base":
+                rev = anchor.base
+            elif k == "bear":
+                rev = anchor.low if anchor.low is not None else anchor.base * (1 - REVENUE_SPREAD)
+            else:
+                rev = anchor.high if anchor.high is not None else anchor.base * (1 + REVENUE_SPREAD)
+            if peers is not None:
+                rev, exit_year, trace = exit_revenue(rev, anchor_year=anchor.year, last_fy=last_fy,
+                                                     last_revenue=last_revenue, peers=peers)
+        n_years = years_to(today, exit_year, fy_end_month)
         base_missing: list[str] = []
         for name, v in (("precio", price), ("acciones diluidas", shares), ("caja", cash), ("deuda", debt)):
             if v is None:
@@ -170,8 +223,12 @@ def scenarios(*, today: date, price: float | None, shares: float | None, cash: f
             missing.insert(0, anchor_missing or "sin ingresos a 3–5 años")
         if peers is None:
             missing.insert(0 if anchor is not None else 1, peers_missing or "sin comparables maduros")
+        if anchor is not None and peers is not None and rev is None:
+            missing.insert(0, f"crecimiento al año de salida ({trace.get('growth_company', 0):.0%}) muy por encima de "
+                              f"los comparables maduros (p75 {trace.get('growth_peers_p75', 0):.0%}) y sin años hasta "
+                              f"{last_fy + HORIZON_MAX}: el múltiplo maduro no aplica")
         row: dict[str, Any] = {"label": SCENARIO_LABELS[k], "year": exit_year, "years": n_years, "irr": None,
-                               "missing": "; ".join(missing) or None}
+                               "missing": "; ".join(missing) or None, **({"exit": trace} if trace else {})}
         if not base_missing:
             assert price is not None and shares is not None and cash is not None and burn is not None
             row.update(_dilution(k, burn=burn, n_years=n_years, cash=cash, price=price, shares=shares,
@@ -179,13 +236,7 @@ def scenarios(*, today: date, price: float | None, shares: float | None, cash: f
         if missing:
             out[k] = row
             continue
-        assert anchor is not None and peers is not None and debt is not None and price is not None
-        if k == "base":
-            rev = anchor.base
-        elif k == "bear":
-            rev = anchor.low if anchor.low is not None else anchor.base * (1 - REVENUE_SPREAD)
-        else:
-            rev = anchor.high if anchor.high is not None else anchor.base * (1 + REVENUE_SPREAD)
+        assert anchor is not None and peers is not None and debt is not None and price is not None and rev is not None
         mult = {"bear": peers["p25"], "base": peers["median"], "bull": peers["p75"]}[k]
         ev_t = rev * mult
         equity_t = ev_t + row["cash_end"] - debt - minorities - hybrids
@@ -207,13 +258,17 @@ FORMULAS = {
     "dilucion_historica": "TCAC de las acciones diluidas de los tres últimos ejercicios",
     "dilucion_proyectada": ("máx(0, consumo acumulado hasta el break-even + 6 meses de colchón − caja) / precio "
                             "actual / acciones diluidas; consumo acumulado = consumo anual × años × (1 bajista, "
-                            "½ base, ¼ alcista); en el bajista, como mínimo la dilución histórica compuesta"),
+                            "½ base, ¼ alcista); en el bajista con hueco > 0, como mínimo la dilución histórica compuesta; "
+                            "sin hueco, 0 en todos"),
     "ingresos": ("ingresos del año de salida (último ejercicio + 3 a + 5): firmas citadas → consenso de prensa → "
                  "guía de la empresa → cartera contratada repartida; sin rango, ±50 %"),
     "multiplo": "EV / ingresos del último ejercicio de comparables maduros: p25 / mediana / p75",
+    "salida": ("si la empresa crece al año del ancla más que el p75 de los comparables (TCAC de ingresos a 3 años), "
+               "ingresos prolongados hasta el último ejercicio + 5 con crecimiento que se desvanece linealmente hasta "
+               "la mediana de los comparables (estimación propia por fórmula); el múltiplo maduro se aplica ahí"),
     "tir": ("(precio en T / precio actual)^(1/años) − 1; precio en T = (ingresos × EV/ventas + caja en T − deuda − "
             "minoritarios − híbridos) / acciones tras la dilución"),
 }
 
 __all__ = ["BURN_FACTOR", "FORMULAS", "MIN_PEERS", "PeerMultiple", "RULES_VERSION", "RevenueAnchor", "SCENARIOS",
-           "choose_anchor", "peer_stats", "quantile", "runway", "scenarios", "years_to"]
+           "choose_anchor", "exit_revenue", "peer_stats", "quantile", "runway", "scenarios", "years_to"]
