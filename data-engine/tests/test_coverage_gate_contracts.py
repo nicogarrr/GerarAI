@@ -18,6 +18,7 @@ de que `scripts` llegue a sys.path.
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import re
@@ -624,12 +625,42 @@ def test_skip_guard_funciona_con_junit_con_namespace(tmp_path):
     assert gate.skipped_guard_failures(junit) == ["tests.test_queue_watchdog::t"]
 
 
+def _tiene_importorskip_real(path: Path) -> bool:
+    """AST, no substring: un comentario o un docstring con 'importorskip(' ya
+    no satisface el guard (salvedad del auditor de #5007). utf-8-sig por los
+    tests con BOM."""
+    tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
+    return any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "importorskip"
+        for node in ast.walk(tree)
+    )
+
+
 def test_los_ficheros_vigilados_por_el_guard_existen_y_siguen_pudiendo_saltar():
     """SKIP_GUARD_FILES es hardcodeada: si un fichero se renombra o deja de
     tener skips opt-in, la red vigila un fantasma y nadie avisa."""
     for rel in gate.SKIP_GUARD_FILES:
         path = ENGINE_ROOT / rel
         assert path.is_file(), f"fichero vigilado inexistente (renombrado?): {rel}"
-        assert "importorskip(" in path.read_text(encoding="utf-8"), (
+        assert _tiene_importorskip_real(path), (
             f"{rel} ya no tiene skips opt-in: sacarlo de SKIP_GUARD_FILES a proposito"
         )
+
+
+def test_el_guard_de_ficheros_exige_un_importorskip_real_no_un_comentario(tmp_path):
+    solo_comentario = tmp_path / "test_solo_comentario.py"
+    solo_comentario.write_text(
+        '# aqui se usaria importorskip("fakeredis") si hiciera falta\n'
+        'def test_algo():\n'
+        "    assert True\n",
+        encoding="utf-8",
+    )
+    assert not _tiene_importorskip_real(solo_comentario)
+    real = tmp_path / "test_real.py"
+    real.write_text(
+        'import pytest\npytest.importorskip("fakeredis")\n',
+        encoding="utf-8",
+    )
+    assert _tiene_importorskip_real(real)
