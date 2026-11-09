@@ -19,6 +19,7 @@ nunca rompe la ingesta de companyfacts: devuelve N/D con el motivo.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from app.services import xbrl_extension_map as xm
@@ -60,6 +61,121 @@ def is_asset_manager(company: Any, sic: Any = None) -> bool:
 
         code = company_sic(company)
     return code in ASSET_MANAGER_SIC
+
+
+#: Versión del resolvedor guardada con cada resolución: una resolución de una versión anterior se rehace una vez
+#: (2: tablas HTML del informe anual para FRE/DE totales sin XBRL).
+RESOLVER_VERSION = 2
+#: Prefijo sintético del concepto de una cifra leída de una tabla HTML (no es una taxonomía).
+HTML_TABLE_PREFIX = "html-table"
+
+#: Piezas del filing que lee el plan C (linkbases primero: si faltan no se descarga la instancia, la pieza grande).
+_DOC_SUFFIXES = (("lab", "_lab.xml"), ("cal", "_cal.xml"), ("instance", "_htm.xml"))
+
+
+def _fetch_failed(cached: dict[str, Any]) -> bool:
+    """La resolución guardada fue un fallo de descarga (no una ausencia real): no se reutiliza."""
+    if cached.get("fetch_error"):
+        return True
+    return any(str((m or {}).get("motivo") or "").startswith("no se pudo leer")
+               for m in (cached.get("metrics") or {}).values())
+
+
+async def _fetch_documents(sec: Any, urls: dict[str, str], docs: dict[str, bytes]) -> tuple[str, Exception] | None:
+    """Descarga en orden las piezas que faltan en ``docs``; la misma URL se lee una vez. (pieza, error) o None."""
+    for kind, url in urls.items():
+        if kind in docs:
+            continue
+        same = next((k for k, u in urls.items() if u == url and k in docs), None)
+        if same is not None:
+            docs[kind] = docs[same]
+            continue
+        try:
+            body, _ctype = await sec.filing_document(url)
+        except Exception as exc:  # noqa: BLE001 - el llamante decide (índice o N/D con motivo)
+            return kind, exc
+        docs[kind] = body
+    return None
+
+
+def _index_entries(index: bytes | str) -> list[tuple[str, int | None]]:
+    """(nombre, bytes) de cada fichero del índice ``index.json`` de un filing."""
+    import json
+
+    try:
+        payload = json.loads(index)
+    except (TypeError, ValueError):
+        return []
+    items = ((payload or {}).get("directory") or {}).get("item") or []
+    out: list[tuple[str, int | None]] = []
+    for i in items:
+        if isinstance(i, dict) and i.get("name"):
+            raw = str(i.get("size") or "").strip()
+            size = int(raw) if raw.isdigit() else None
+            out.append((str(i["name"]), size))
+    return out
+
+
+def _index_items(index: bytes | str) -> list[str]:
+    return [name for name, _size in _index_entries(index)]
+
+
+#: Tope de bytes de un documento HTML del filing que se lee buscando la tabla (BN 40-F 2025: 6,5 MB).
+HTML_DOC_MAX_BYTES = 20_000_000
+#: Como mucho estos documentos HTML por filing (sin bucles: cada uno una vez).
+HTML_DOC_MAX = 3
+_NOT_REPORT_HTML = re.compile(r"^R\d+\.htm$|-index(-headers)?\.html?$|cert|consent", re.I)
+#: Anexos numerados: solo los 13 (informe anual a los accionistas) y 99 (otros, p. ej. el informe anual de un 40-F)
+#: pueden traer las tablas; contratos (10), valores (4), filiales (21), consentimientos (23)… no.
+_EXHIBIT = re.compile(r"ex[-_]?(\d{1,3})", re.I)
+
+
+def html_report_documents(entries: list[tuple[str, int | None]], primary: str) -> list[str]:
+    """Documentos HTML del filing donde puede estar la tabla: el principal primero, luego el resto por tamaño.
+
+    Fuera las páginas R*.htm del visor, los índices, certificaciones y consentimientos, y lo que pase del tope."""
+    def exhibit_ok(name: str) -> bool:
+        m = _EXHIBIT.search(name)
+        return m is None or m.group(1)[:2] in ("13", "99")
+
+    docs = [(n, s) for n, s in entries if n.lower().endswith((".htm", ".html")) and not _NOT_REPORT_HTML.search(n)
+            and exhibit_ok(n) and (s is None or s <= HTML_DOC_MAX_BYTES)]
+    docs.sort(key=lambda ns: (ns[0] != primary, -(ns[1] or 0)))
+    return [n for n, _s in docs[:HTML_DOC_MAX]]
+
+
+def _reporting_unit(taxonomy: dict[str, Any]) -> str | None:
+    """Divisa más frecuente entre los hechos monetarios del payload (la de reporte del emisor)."""
+    counts: dict[str, int] = {}
+    for fact in taxonomy.values():
+        for unit, entries in ((fact or {}).get("units") or {}).items():
+            if len(unit) == 3 and unit.isalpha() and unit.isupper():
+                counts[unit] = counts.get(unit, 0) + len(entries or [])
+    return max(counts, key=lambda u: counts[u]) if counts else None
+
+
+def filing_file_names(items: list[str], stem: str) -> dict[str, str]:
+    """Nombres reales de etiquetas, cálculo e instancia según el índice del filing (puro).
+
+    Preferencia: ``<stem>_lab.xml`` → cualquier ``*_lab.xml`` → el esquema ``.xsd`` (linkbases embebidos, como
+    en los filings de Donnelley: BX 10-K 2025 solo publica ``bx-20251231.xsd`` y ``d48618d10k_htm.xml``). Igual
+    para el cálculo. La instancia: ``<stem>_htm.xml`` → la única ``*_htm.xml``. Una pieza sin candidato no sale."""
+    names = set(items)
+    xsd = sorted(n for n in names if n.endswith(".xsd"))
+    out: dict[str, str] = {}
+    for kind, suffix in (("lab", "_lab.xml"), ("cal", "_cal.xml")):
+        own = f"{stem}{suffix}"
+        others = sorted(n for n in names if n.endswith(suffix))
+        pick = own if own in names else (others[0] if len(others) == 1 else (xsd[0] if len(xsd) == 1 else None))
+        if pick:
+            out[kind] = pick
+    inst = f"{stem}_htm.xml"
+    instances = sorted(n for n in names if n.endswith("_htm.xml"))
+    if inst in names:
+        out["instance"] = inst
+    elif len(instances) == 1:
+        out["instance"] = instances[0]
+    return out
 
 
 def latest_annual_filing(submissions: dict[str, Any], forms: set[str]) -> dict[str, Any] | None:
@@ -174,24 +290,92 @@ async def resolve_latest_filing(
     if not wanted:
         return None
     if cached and (cached.get("filing") or {}).get("accn") == filing["accn"] and set(wanted) <= set(
-            cached.get("metrics") or {}):
+            cached.get("metrics") or {}) and not _fetch_failed(cached) and cached.get("resolver") == RESOLVER_VERSION:
         return {**cached, "reused": True}
     from app.services.connectors.sec import SECClient
 
     stem = _stem(str(filing["primary"]))
-    urls = {kind: SECClient.filing_document_url(cik, filing["accn"], f"{stem}{suffix}")
-            # Linkbases primero: si faltan no se descarga la instancia (la pieza grande).
-            for kind, suffix in (("lab", "_lab.xml"), ("cal", "_cal.xml"), ("instance", "_htm.xml"))}
+    names = {kind: f"{stem}{suffix}" for kind, suffix in _DOC_SUFFIXES}
+    urls = {kind: SECClient.filing_document_url(cik, filing["accn"], name) for kind, name in names.items()}
     docs: dict[str, bytes] = {}
-    try:
-        for kind, url in urls.items():
-            body, _ctype = await sec.filing_document(url)
-            docs[kind] = body
-    except Exception as exc:  # noqa: BLE001 - sin documentos: N/D con motivo, companyfacts sigue igual
-        missing = next(k for k in urls if k not in docs)
+    index_entries: list[tuple[str, int | None]] | None = None
+    failure = await _fetch_documents(sec, urls, docs)
+    if failure is not None:
+        # Los nombres <stem>_lab.xml/_cal.xml son la convención de unos agentes de presentación; otros
+        # (BX 10-K 2025, d48618d10k.htm) nombran los linkbases por el esquema o los EMBEBEN en el .xsd.
+        # Una lectura del índice del filing da los nombres reales; sin bucles: un solo reintento por pieza.
+        try:
+            index, _ctype = await sec.filing_document(SECClient.filing_document_url(cik, filing["accn"], "index.json"))
+            index_entries = _index_entries(index)
+            listed = filing_file_names([n for n, _s in index_entries], stem)
+        except Exception:  # noqa: BLE001 - sin índice: N/D con el motivo de la primera pieza
+            listed = {}
+        retry = {k: SECClient.filing_document_url(cik, filing["accn"], n) for k, n in listed.items()
+                 if k not in docs and n != names[k]}
+        if retry:
+            urls = {**urls, **retry}
+            failure = await _fetch_documents(sec, urls, docs)
+    if failure is not None:
+        missing, exc = failure
         motivo = f"no se pudo leer {missing} del filing {filing['accn']} ({type(exc).__name__})"
-        return {"filing": filing, "urls": urls,
+        return {"filing": filing, "urls": urls, "fetch_error": missing, "resolver": RESOLVER_VERSION,
                 "metrics": {m: xm.NotAvailable(m, motivo).as_dict() for m in wanted}}
     tax = xm.build_taxonomy(lab=docs["lab"], cal=docs["cal"])
     resolved = xm.resolve_extensions(tax, xm.parse_instance_facts(docs["instance"]), metrics=wanted)
-    return {"filing": filing, "urls": urls, "metrics": {m: r.as_dict() for m, r in resolved.items()}}
+    metrics = {m: r.as_dict() for m, r in resolved.items()}
+    pending = [m for m in wanted if m in ASSET_MANAGER_METRICS and (metrics.get(m) or {}).get("status") == "N/D"]
+    if pending:
+        metrics = await _from_report_tables(sec, cik, filing, taxonomy, metrics, pending, index_entries)
+    return {"filing": filing, "urls": urls, "resolver": RESOLVER_VERSION, "metrics": metrics}
+
+
+async def _from_report_tables(
+    sec: Any, cik: str, filing: dict[str, Any], taxonomy: dict[str, Any], metrics: dict[str, Any],
+    pending: list[str], index_entries: list[tuple[str, int | None]] | None,
+) -> dict[str, Any]:
+    """FRE/DE totales que el XBRL no etiqueta: fila de una tabla anual del HTML del MISMO informe anual.
+
+    BN (40-F 2025) solo etiqueta el DE por segmento; el total («Distributable earnings 6,008») está en las
+    tablas del informe anual que acompaña al 40-F. Lector determinista (``filing_html_tables``); sin fila,
+    sin escala o con tablas que no casan, la N/D se queda con su motivo ampliado."""
+    from app.services import filing_html_tables as ft
+    from app.services.connectors.sec import SECClient
+
+    out = dict(metrics)
+    unit = _reporting_unit(taxonomy)
+    if unit is None:
+        return out
+    try:
+        if index_entries is None:
+            index, _ctype = await sec.filing_document(SECClient.filing_document_url(cik, filing["accn"], "index.json"))
+            index_entries = _index_entries(index)
+    except Exception as exc:  # noqa: BLE001 - sin índice: las N/D se quedan
+        for m in pending:
+            out[m] = {**out[m], "motivo": f"{out[m].get('motivo')}; índice del filing no legible ({type(exc).__name__})"}
+        return out
+    left = list(pending)
+    read: list[str] = []
+    for name in html_report_documents(index_entries, str(filing.get("primary") or "")):
+        if not left:
+            break
+        url = SECClient.filing_document_url(cik, filing["accn"], name)
+        try:
+            body, _ctype = await sec.filing_document(url)
+        except Exception:  # noqa: BLE001 - un documento ilegible no rompe la ingesta
+            continue
+        read.append(name)
+        found = ft.resolve(body, left, source=name)
+        for m, f in found.items():
+            if f.conflict:
+                out[m] = xm.NotAvailable(m, f"tablas del informe anual que no casan: {f.conflict}").as_dict()
+            elif f.values:
+                out[m] = {"metric": m, "concept": f"{HTML_TABLE_PREFIX}:{m}", "label": m, "rule": "tabla_html",
+                          "evidence": f"{name}: " + "; ".join(f.evidence), "sign": 1, "unit": unit, "segment": None,
+                          "source_url": url,
+                          "values": [{"start": s, "end": e, "val": str(v)} for (s, e), v in sorted(f.values.items(),
+                                                                                                  key=lambda kv: kv[0][1])]}
+            left.remove(m)
+    for m in left:
+        out[m] = {**out[m], "motivo": f"{out[m].get('motivo')}; sin fila anual del total en las tablas HTML del "
+                                      f"informe ({', '.join(read) or 'ningún documento HTML candidato bajo el tope'})"}
+    return out
