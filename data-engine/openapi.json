@@ -105664,7 +105664,7 @@
     },
     "/api/watchlist/dca-signals/{symbol}/card": {
       "get": {
-        "description": "Tarjeta DCA de la watchlist: nivel por semana/mes/trimestre/a\u00f1o, meses en zona,\nriesgo, \u00ab\u00bfpor qu\u00e9?\u00bb y movimiento desde el \u00faltimo cambio de nivel.\n\nMisma serie que la se\u00f1al diaria (Yahoo, cierre ajustado, sin la barra del d\u00eda\nen curso) y mismo motor; la se\u00f1al oficial es la mensual. El periodo en\nformaci\u00f3n usa el precio actual (premercado/sesi\u00f3n/post) cuando hay uno\nfiable, siempre etiquetado como precio actual y nunca como cierre; la\nse\u00f1al oficial, el estado guardado y los avisos siguen solo con cierres.",
+        "description": "Tarjeta DCA de la watchlist: nivel por semana/mes/trimestre/a\u00f1o, meses en zona,\nriesgo, \u00ab\u00bfpor qu\u00e9?\u00bb y movimiento desde el \u00faltimo cambio de nivel.\n\nMisma serie que la se\u00f1al diaria (Yahoo, cierre ajustado, sin la barra del d\u00eda\nen curso) y mismo motor; la se\u00f1al oficial es la mensual. El periodo en\nformaci\u00f3n usa el precio actual (premercado/sesi\u00f3n/post) cuando hay uno\nfiable, siempre etiquetado como precio actual y nunca como cierre. La\nse\u00f1al oficial, el estado guardado y los avisos incorporan ese precio\nactual en el periodo en formaci\u00f3n (close_kind=\"live\"), sin persistirlo\ncomo cierre: close y signal_date siguen siendo el cierre asentado.",
         "operationId": "dca_watch_card_api_watchlist_dca_signals__symbol__card_get",
         "parameters": [
           {
