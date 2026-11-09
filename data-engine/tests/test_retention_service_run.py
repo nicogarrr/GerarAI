@@ -1,10 +1,12 @@
-"""Retención (2.ª tanda): RetentionService.run sobre varios tenants con
-SessionLocal y settings doblados, la guarda sin tenant de purge_tenant y el
-entrypoint run_retention del scheduler.
+"""Retención (2.ª y 3.ª tanda): RetentionService.run sobre varios tenants
+con SessionLocal y settings doblados, la guarda sin tenant de purge_tenant,
+el entrypoint run_retention, el tombstone real de un documento sin
+storage_uri y la guarda TOCTOU con evidencia insertada entre las dos
+comprobaciones.
 
-Sin red ni Postgres: SessionLocal se dobla a una fábrica SQLite en memoria;
-no hay documentos, así que store/index nunca se llaman. Settings falsas por
-monkeypatch (se restauran solas). Tenants sintéticos.
+Sin red ni Postgres: SessionLocal se dobla a una fábrica SQLite en memoria
+y, en los tests de purga real, store/index se doblan con monkeypatch (se
+restauran solos). Settings falsas por monkeypatch. Datos sintéticos.
 """
 
 from datetime import UTC, datetime, timedelta
