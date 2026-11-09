@@ -2,6 +2,7 @@ import math
 import re
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
@@ -183,6 +184,31 @@ def peer_eligibility(
         return None
     return "sector+" + "+".join(extras)
 
+def _candidate_possible(
+    target: Company,
+    candidate: Any,
+    *,
+    target_is_foreign: bool,
+    target_ref: tuple[str | None, str | None] | None,
+    candidate_ref: tuple[str | None, str | None] | None,
+) -> bool:
+    """Prefiltro barato y CONSERVADOR: True si el candidato puede llegar a
+    puntuar (por industria, por sector o por el eje de referencia). Solo
+    descarta imposibles; la elegibilidad exacta (con market cap y ficha
+    completa) y el mismo emisor se deciden después sobre los hidratados."""
+    if _industry_match(target, candidate) is not None:
+        return True
+    if not target_is_foreign:
+        sector = _label(target.sector)
+        if sector is not None and _label(candidate.sector) == sector:
+            return True
+    if target_ref and candidate_ref:
+        target_ref_industry = _label(target_ref[1])
+        if target_ref_industry is not None and target_ref_industry == _label(candidate_ref[1]):
+            return True
+    return False
+
+
 # Valores que significan «sin clasificar»: una coincidencia entre vacíos no es
 # evidencia de negocio (tenant 5, 4-nov-2026: el 100 % del universo era stub y
 # BFIT.AS salía con la A de la lista alfabética — A3M, ACS, ACX, AENA... — por
@@ -281,22 +307,42 @@ class PeerComparisonService:
         ][:limit]
         selected_ids = {peer.id for peer in selected} | {company.id}
 
-        candidates = list(
-            db.scalars(
-                select(Company).where(Company.id != company.id)
-            ).all()
-        )
-        # Una sola query de market cap para el target y TODOS los candidatos:
-        # antes era una por compania del universo (maestro + stubs + IBKR) y
-        # el coste de /peers crecia con el tamano de la tabla companies.
-        market_caps = self._latest_market_caps_usd(
-            db, [company.id, *(candidate.id for candidate in candidates)]
-        )
-        target_market_cap = market_caps.get(company.id)
         target_is_foreign = _is_foreign_issuer(company)
+        # Prefiltro ligero: solo las columnas que deciden si un candidato
+        # PUEDE entrar (industria, sector o eje de referencia), sin hidratar
+        # la fila completa del universo en cada petición. La elegibilidad
+        # exacta (con market cap), el mismo emisor y la puntuación se rehacen
+        # abajo sobre los hidratados, así el resultado es idéntico.
+        light_rows = db.execute(
+            select(Company.id, Company.ticker, Company.industry, Company.sector).where(
+                Company.id != company.id
+            )
+        ).all()
         # Eje de referencia (FinanceDatabase): una query para todo el universo.
-        ref_taxonomy = _reference_taxonomy(db, [company.ticker, *(c.ticker for c in candidates)])
+        ref_taxonomy = _reference_taxonomy(db, [company.ticker, *(row.ticker for row in light_rows)])
         target_ref = ref_taxonomy.get(str(company.ticker or "").strip().upper())
+        keep_ids = [
+            row.id
+            for row in light_rows
+            if row.id not in selected_ids
+            and _candidate_possible(
+                company,
+                row,
+                target_is_foreign=target_is_foreign,
+                target_ref=target_ref,
+                candidate_ref=ref_taxonomy.get(str(row.ticker or "").strip().upper()),
+            )
+        ]
+        candidates = (
+            list(db.scalars(select(Company).where(Company.id.in_(keep_ids))).all())
+            if keep_ids
+            else []
+        )
+        # Una sola query de market cap para el target y los candidatos que
+        # superan el prefiltro (antes: una por compañía del universo; después:
+        # el universo entero en el IN — maestro + stubs + importaciones IBKR).
+        market_caps = self._latest_market_caps_usd(db, [company.id, *keep_ids])
+        target_market_cap = market_caps.get(company.id)
         scored: list[tuple[float, Company, list[str], dict]] = []
         eligibility_by_id: dict[int, str] = {}
         for candidate in candidates:
