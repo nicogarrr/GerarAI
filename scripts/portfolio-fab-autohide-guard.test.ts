@@ -12,6 +12,8 @@ test('scroll and underlying page content cannot hide the mobile Cerebro entry', 
   // #1805: el Cerebro es una celda min-h-14 de la propia barra (ya no una
   // franja apilada que la pisaba); el hueco del contenido baja a 4.5rem.
   assert.ok(nav.includes('min-h-14'));
-  assert.ok(nav.includes('gerarai:open-brain'));
+  assert.ok(nav.includes("from '@/lib/brain/open-brain'"));
+  assert.ok(nav.includes("onClick={() => openBrain()}"));
+  assert.ok(!nav.includes('dispatchEvent'), 'no perder aperturas antes de montar el listener');
   assert.ok(layout.includes('pb-[calc(4.5rem+env(safe-area-inset-bottom))]'));
 });
