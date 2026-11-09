@@ -108,8 +108,18 @@ def test_ingesta_fred_no_hidrata_la_historia_de_vintages():
     db.commit()
     db.expire_all()
     loaded = {"n": 0}
-    event.listen(MarketObservation, "load", lambda *a: loaded.__setitem__("n", loaded["n"] + 1))
-    result = store_series(db, "vix_us", _rows(8), datetime(2026, 2, 1, tzinfo=UTC))
-    assert loaded["n"] <= 8, loaded
-    assert result == {"added": 0, "revisions_applied": 0}
-    db.close()
+
+    def _on_load(*a):
+        loaded["n"] += 1
+
+    # Listener nombrado y retirado en finally: un listener sobre la clase
+    # mapeada es global y sobrevive al engine si no se quita.
+    event.listen(MarketObservation, "load", _on_load)
+    try:
+        result = store_series(db, "vix_us", _rows(8), datetime(2026, 2, 1, tzinfo=UTC))
+        assert loaded["n"] <= 8, loaded
+        assert result == {"added": 0, "revisions_applied": 0}
+    finally:
+        event.remove(MarketObservation, "load", _on_load)
+        db.close()
+        engine.dispose()
