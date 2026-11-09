@@ -506,3 +506,84 @@ def test_refresh_from_sec_anclas_caidas_fail_closed_anual(db, monkeypatch):
     assert result["status"] == "ingested"
     assert result["annual_anchored_filings"] == 0
     assert _facts(db, company, "revenue") == []
+
+
+# --------------------------------------------------------------------------
+# Atajo unchanged por fingerprint e ifrs-full en refresh_from_sec. NO prueba:
+# mirror real (drain vacio en tests), DEI verificado, ni reglas NCI del mapa
+# ifrs (el doble solo etiqueta Revenue, sin minoritarios).
+# --------------------------------------------------------------------------
+
+
+class _FakeSECEstable:
+    payload = {"cik": 1, "facts": {"us-gaap": {
+        "Revenues": {"units": {"USD": [
+            {"fy": 2025, "fp": "FY", "form": "10-K", "start": "2025-01-01",
+             "end": "2025-12-31", "val": 5000000000, "filed": "2026-02-10",
+             "accn": "0000000001-25-000001"},
+        ]}}}}}
+
+    async def cik_for_ticker(self, ticker):
+        return "0000000001"
+
+    async def company_facts(self, cik):
+        return self.payload
+
+    async def annual_report_anchors(self, cik):
+        return {"0000000001-25-000001": "2025-12-31"}
+
+
+def test_refresh_from_sec_segunda_corrida_identica_es_unchanged(db, monkeypatch):
+    """Mismo payload y mismas anclas: la segunda corrida no reingiere, sale
+    por el atajo 'unchanged' (facts_imported 0) y no duplica hechos."""
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECEstable)
+    company = _company(db)
+    servicio = FinancialIngestionService()
+    primero = asyncio.run(servicio.refresh_from_sec(db=db, company=company))
+    assert primero["status"] == "ingested"
+    segundo = asyncio.run(servicio.refresh_from_sec(db=db, company=company))
+    assert segundo["status"] == "unchanged"
+    assert segundo["facts_imported"] == 0
+    assert segundo["source_document_id"] == primero["source_document_id"]
+    assert len(_facts(db, company, "revenue")) == 1
+
+
+class _FakeSECIfrs:
+    """Filer IFRS (20-F): companyfacts solo trae la taxonomia ifrs-full."""
+
+    # La divisa de reporte se prueba con conceptos de referencia (Assets):
+    # sin ellos la moneda es desconocida y el USD entra fail closed (nada).
+    payload = {"cik": 1, "facts": {"ifrs-full": {
+        "Assets": {"units": {"USD": [
+            {"fy": 2025, "fp": "FY", "form": "20-F",
+             "end": "2025-12-31", "val": 20000000000, "filed": "2026-03-01",
+             "accn": "0000000001-25-000002"},
+        ]}},
+        "Revenue": {"units": {"USD": [
+            {"fy": 2025, "fp": "FY", "form": "20-F", "start": "2025-01-01",
+             "end": "2025-12-31", "val": 7000000000, "filed": "2026-03-01",
+             "accn": "0000000001-25-000002"},
+        ]}}}}}
+
+    async def cik_for_ticker(self, ticker):
+        return "0000000001"
+
+    async def company_facts(self, cik):
+        return self.payload
+
+    async def annual_report_anchors(self, cik):
+        return {"0000000001-25-000002": "2025-12-31"}
+
+
+def test_refresh_from_sec_filer_ifrs_ingiere_con_mapa_ifrs(db, monkeypatch):
+    """Sin hechos us-gaap pero con ifrs-full: la ingesta cambia de taxonomia
+    y de mapa de conceptos y el revenue IFRS entra con su periodo FY."""
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECIfrs)
+    company = _company(db)
+    result = asyncio.run(
+        FinancialIngestionService().refresh_from_sec(db=db, company=company)
+    )
+    assert result["status"] == "ingested"
+    (revenue,) = _facts(db, company, "revenue")
+    assert revenue.value == Decimal("7000000000")
+    assert revenue.period == "2025-12-31:FY"
