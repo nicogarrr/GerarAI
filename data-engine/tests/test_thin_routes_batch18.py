@@ -30,6 +30,7 @@ from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
 import app.api.routes.portfolio as p
+from app.models import Transaction
 
 
 class _Scalars:
@@ -703,7 +704,8 @@ def _ledger(resultado=None, error=None):
 
 
 def _tx_devuelta():
-    return SimpleNamespace(id=5, company_id=1)
+    # Modelo ORM real (regla orm-fake-simplenamespace); db sigue doblado.
+    return Transaction(id=5, company_id=1)
 
 
 def _db_create():
@@ -1059,7 +1061,7 @@ def test_update_transaction_feliz_preserva_rastro(monkeypatch):
             ),
         ),
     )
-    tx = SimpleNamespace(
+    tx = Transaction(
         id=5, action="buy", company_id=1, price=Decimal("10"),
         trade_date=date(2026, 1, 1), quantity=Decimal("1"),
         raw_payload={"tradeID": "IBKR1", "notes": "vieja", "notes_author": "user"},
@@ -1099,8 +1101,8 @@ def test_update_transaction_sobrevendido_409(monkeypatch):
             ),
         ),
     )
-    tx = SimpleNamespace(id=5, action="buy", company_id=1, price=Decimal("10"),
-                         trade_date=date(2026, 1, 1), raw_payload={})
+    tx = Transaction(id=5, action="buy", company_id=1, price=Decimal("10"),
+                     trade_date=date(2026, 1, 1), raw_payload={})
     db = MagicMock()
     db.get.return_value = tx
     with pytest.raises(p.HTTPException) as exc:
@@ -1122,8 +1124,8 @@ def test_delete_transaction_404_y_feliz(monkeypatch):
     rebuild = MagicMock()
     monkeypatch.setattr(p, "PortfolioLedgerService",
                         lambda: SimpleNamespace(rebuild_position=rebuild))
-    tx = SimpleNamespace(action="buy", company_id=1, price=Decimal("10"),
-                         trade_date=date(2026, 1, 1))
+    tx = Transaction(action="buy", company_id=1, price=Decimal("10"),
+                     trade_date=date(2026, 1, 1))
     db.get.return_value = tx
     assert p.delete_transaction(1, db=db) is None
     db.delete.assert_called_once_with(tx)
@@ -1135,8 +1137,8 @@ def test_delete_transaction_404_y_feliz(monkeypatch):
 def test_delete_transaction_oversell_y_mixta(monkeypatch):
     # Lineas 1556-1565.
     monkeypatch.setattr(p, "_forget_removed_trade_price", MagicMock())
-    tx = SimpleNamespace(action="sell", company_id=1, price=Decimal("10"),
-                         trade_date=date(2026, 1, 1))
+    tx = Transaction(action="sell", company_id=1, price=Decimal("10"),
+                     trade_date=date(2026, 1, 1))
     for error, esperado in (
         (p.PortfolioOversellError("x"), 409),
         (p.PortfolioMixedCurrencyError("x"), 422),
@@ -1657,9 +1659,9 @@ def _dobles_update(monkeypatch, rebuild=None):
             rebuild_position=rebuild or MagicMock(),
         ),
     )
-    tx = SimpleNamespace(id=5, action="buy", company_id=1, price=Decimal("10"),
-                         trade_date=date(2026, 1, 1), raw_payload={},
-                         fees=Decimal("1"))
+    tx = Transaction(id=5, action="buy", company_id=1, price=Decimal("10"),
+                     trade_date=date(2026, 1, 1), raw_payload={},
+                     fees=Decimal("1"))
     db = MagicMock()
     db.get.return_value = tx
     return tx, db
@@ -1681,7 +1683,7 @@ def test_update_transaction_divisa_mixta_y_value_error(monkeypatch):
         _dobles_update(monkeypatch,
                        rebuild=MagicMock(side_effect=error))
         db = MagicMock()
-        db.get.return_value = SimpleNamespace(
+        db.get.return_value = Transaction(
             id=5, action="buy", company_id=1, price=Decimal("10"),
             trade_date=date(2026, 1, 1), raw_payload={},
         )
@@ -1698,7 +1700,7 @@ def test_delete_transaction_sin_company_no_recalcula(monkeypatch):
     monkeypatch.setattr(p, "PortfolioLedgerService",
                         lambda: SimpleNamespace(rebuild_position=rebuild))
     db = MagicMock()
-    db.get.return_value = SimpleNamespace(
+    db.get.return_value = Transaction(
         action="buy", company_id=None, price=Decimal("10"),
         trade_date=date(2026, 1, 1),
     )
