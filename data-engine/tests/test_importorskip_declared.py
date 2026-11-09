@@ -31,10 +31,14 @@ from pathlib import Path
 
 ENGINE_ROOT = Path(__file__).resolve().parents[1]
 
-# Módulo (top-level) -> distribución PyPI cuando no coinciden (vacío hoy:
-# todos los importorskip actuales casan por identidad). Si la guardia falla
-# con un módulo cuya distribución se llama distinto (p.ej. yaml -> pyyaml),
-# la entrada va AQUÍ, no en ALLOWED_UNDECLARED.
+# Módulo -> distribución PyPI cuando no coinciden (vacío hoy: todos los
+# importorskip actuales casan por identidad). La clave puede ser el top-level
+# (yaml -> pyyaml) o el módulo completo con puntos. OJO: un módulo con puntos
+# también se prueba tal cual como distribución (importorskip("zope.interface")
+# queda cubierto por la distribución zope.interface, PEP503 zope-interface),
+# así que los namespace packages no necesitan entrada aquí. Si la guardia
+# falla con un módulo cuya distribución se llama distinto de verdad, la
+# entrada va AQUÍ, no en ALLOWED_UNDECLARED.
 MODULE_TO_DIST: dict[str, str] = {}
 
 # Excepciones razonadas: paquetes instalados por un workflow aparte, no por
@@ -145,17 +149,31 @@ def _importorskip_targets() -> dict[str, list[str]]:
     return targets
 
 
+def _esta_cubierto(module: str, declared: set[str]) -> bool:
+    """El módulo de un importorskip está cubierto si es interno, si alguna de
+    sus candidatas a distribución está instalada por los jobs de tests o si
+    es una excepción razonada. Candidatas: el módulo completo y su top-level,
+    ambos tras MODULE_TO_DIST y normalizados PEP503 — así
+    importorskip("zope.interface") queda cubierto por la distribución
+    zope.interface sin falso positivo (hallazgo del auditor de #5035).
+    """
+    if module.startswith("app."):
+        return True  # módulo interno: el skip es por wiring, no por paquete
+    top = module.split(".")[0]
+    candidatos = {
+        _pep503(MODULE_TO_DIST.get(module, module)),
+        _pep503(MODULE_TO_DIST.get(top, top)),
+    }
+    if candidatos & declared:
+        return True
+    return top in ALLOWED_UNDECLARED or module in ALLOWED_UNDECLARED
+
+
 def test_todo_importorskip_es_interno_declarado_o_excepcion_razonada():
     declared = _declared_distributions()
     offenders = []
     for module, files in sorted(_importorskip_targets().items()):
-        if module.startswith("app."):
-            continue  # módulo interno: el skip es por wiring, no por paquete
-        top = module.split(".")[0]
-        dist = _pep503(MODULE_TO_DIST.get(top, top))
-        if dist in declared:
-            continue
-        if top in ALLOWED_UNDECLARED or module in ALLOWED_UNDECLARED:
+        if _esta_cubierto(module, declared):
             continue
         offenders.append(f"{module} (en {', '.join(files)})")
     assert not offenders, (
@@ -207,7 +225,23 @@ def test_la_tabla_de_mapeo_modulo_dist_sigue_usandose():
     targets = _importorskip_targets()
     tops = {m.split(".")[0] for m in targets}
     for module in MODULE_TO_DIST:
-        assert module in tops, f"mapeo muerto: {module} -> {MODULE_TO_DIST[module]}"
+        assert module in targets or module in tops, (
+            f"mapeo muerto: {module} -> {MODULE_TO_DIST[module]}"
+        )
+
+
+def test_modulo_con_puntos_cubierto_por_su_distribucion_pep503():
+    """El caso del auditor: importorskip("zope.interface") con la
+    distribución zope.interface declarada (PEP503: zope-interface) NO es un
+    falso positivo; sin la candidata de módulo completo lo sería."""
+    assert _esta_cubierto("zope.interface", {"zope-interface"})
+    assert not _esta_cubierto("zope.interface", {"otra-cosa"})
+    # El mapeo explícito por módulo completo también cubre.
+    MODULE_TO_DIST["uvicorn.logging"] = "uvicorn"
+    try:
+        assert _esta_cubierto("uvicorn.logging", {"uvicorn"})
+    finally:
+        del MODULE_TO_DIST["uvicorn.logging"]
 
 
 def test_normalizacion_pep503():
