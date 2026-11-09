@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getLocale, getT } from "@/lib/i18n/server";
+import { i18nPageTitle } from "@/lib/i18n/metadata";
 import { conceptsFor } from "./concepts-i18n";
 import { Pagination, paginate } from "../_components/Pagination";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
-  return { title: t('investors.concepts.metaTitle') };
+    return i18nPageTitle('investors.concepts.metaTitle');
 }
 
 export default async function ConceptsPage({
