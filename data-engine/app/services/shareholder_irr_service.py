@@ -197,7 +197,7 @@ def company_kind(company: Company, annual: Mapping[str, Mapping[int, dict]]) -> 
                                             profit_loss=v("net_income_total", y),
                                             income_tax_expense=v("income_tax_expense", y)),
             interest_expense=v("interest_expense", y), net_finance_result=v("finance_income_cost", y))
-        fcf = (ocf - abs(capex or 0.0)) if ocf is not None else None
+        fcf = (ocf - abs(capex)) if ocf is not None and capex is not None else None
         if all(x is not None and x <= 0 for x in (ebitda, ni, fcf)):
             burning += 1
     if len(years) >= 2 and burning == 2:
@@ -419,7 +419,19 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     elif kind == "real_estate":
         gains = series("gain_on_sale_real_estate")
         da = series("depreciation_amortization")
-        ffo = [None if n is None else n + abs(d or 0.0) - (g or 0.0) for n, d, g in zip(net_income, da, gains, strict=True)]
+        # FFO = beneficio + amortizaciones − plusvalías: sin amortización o sin plusvalías en todas las fuentes
+        # el FFO de ese año es N/D (no beneficio + 0 ni plusvalías = 0). Un 0 declarado por el emisor sí vale.
+        ffo = [None if n is None or d is None or g is None else n + abs(d) - g
+               for n, d, g in zip(net_income, da, gains, strict=True)]
+        ffo_missing = [", ".join(x for x, v in (("beneficio neto", n), ("amortizaciones", d),
+                                                  ("plusvalías por ventas de inmuebles", g)) if v is None)
+                       for n, d, g in zip(net_income, da, gains, strict=True)]
+        if ffo[-1] is None:
+            warnings.append(f"FFO {last} N/D (sin {ffo_missing[-1]} en ninguna fuente): no se valora por FFO "
+                            "y se usa el método general, avisado")
+        elif any(v is None for v in ffo[:-1]):
+            warnings.append("FFO N/D en " + "; ".join(f"{y} (sin {m})" for y, v, m in zip(years, ffo, ffo_missing, strict=True)
+                                                     if v is None) + ": esos años quedan fuera de la historia del FFO")
         if ffo[-1] is not None and ffo[-1] > 0:
             net_income = ffo
             earnings_label = "FFO"
@@ -435,8 +447,6 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
                             "inputs": [annual.get("net_income", {}).get(last),
                                        annual.get("depreciation_amortization", {}).get(last),
                                        annual.get("gain_on_sale_real_estate", {}).get(last)]}
-            if gains[-1] is None:
-                warnings.append("plusvalías por ventas de inmuebles sin etiquetar: el FFO puede estar inflado")
     elif kind == "pre_revenue":
         method = {"chosen": "caja_runway", "discarded": {
             "tir_ev_ebitda": "sin EBITDA positivo: no hay beneficio que proyectar con una TIR",
@@ -499,7 +509,11 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
             warnings.append("acciones diluidas derivadas como beneficio / BPA diluido (sin dato directo)")
         else:
             raise ValueError("sin acciones diluidas")
-    cash = (_mill(point.get("cash_and_equivalents")) or 0.0) + (_mill(point.get("short_term_investments")) or 0.0)
+    cash_eq = _mill(point.get("cash_and_equivalents"))
+    if cash_eq is None:
+        # Sin caja la deuda neta no se sabe: N/D con motivo, no caja = 0.
+        raise ValueError("sin caja en el último balance: la deuda neta no se puede calcular")
+    cash = cash_eq + (_mill(point.get("short_term_investments")) or 0.0)
     for k in ("cash_and_equivalents", "short_term_investments", "total_debt", "minority_interest", "hybrid_capital"):
         if k in point:
             cites[k] = point[k]
@@ -507,8 +521,8 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     if debt is None:
         debt = _mill(point.get("long_term_debt"))
         if debt is None:
-            warnings.append("deuda sin dato: se toma 0 y se avisa")
-            debt = 0.0
+            # Ausencia de etiqueta no prueba deuda 0 (la ingesta ya escribe 0 cuando el balance lo prueba).
+            raise ValueError("sin deuda en el último balance: la deuda neta no se puede calcular")
     # Los pasivos por arrendamiento ``lease_liabilities*`` solo salen de los mapas IFRS (US GAAP usa
     # operating_lease_liabilities): su presencia identifica a un filer IFRS de la SEC que reporta en USD (BN).
     ifrs = (reporting != "USD"
@@ -551,8 +565,9 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
         dist = [None if d is None and b is None else abs(d or 0.0) + abs(b or 0.0)
                 for d, b in zip(series("dividends_paid"), series("common_stock_repurchased"), strict=True)]
         sp = replace(sp, revenue=book[-1] or 0.0)
+        # Lo repartido ya es flujo neto de inversión: su «capex» es 0 por construcción (no un dato ausente).
         hist = rules.History(years=years, revenue=book, earnings=net_income, operating_cash_flow=dist,
-                             capex=[None] * len(years), dividends=series("dividends_paid"),
+                             capex=[None if x is None else 0.0 for x in dist], dividends=series("dividends_paid"),
                              buybacks=series("common_stock_repurchased"), acquisitions=(), sbc=sbc)
     else:
         earnings_series = net_income if chosen_basis == "pe" else ebitda
@@ -603,7 +618,7 @@ def runway(sp: engine.StartingPoint, hist: rules.History, cites: Mapping[str, An
     dilución = TCAC de las acciones diluidas de los tres últimos ejercicios."""
     ocf = hist.operating_cash_flow[-1] if hist.operating_cash_flow else None
     capex = hist.capex[-1] if hist.capex else None
-    fcf = None if ocf is None else ocf - abs(capex or 0.0)
+    fcf = None if ocf is None or capex is None else ocf - abs(capex)
     burn = max(-fcf, 0.0) if fcf is not None else None
     months = (sp.cash / burn * 12.0) if burn else None
     annual = cites.get("annual") or {}
@@ -619,6 +634,7 @@ def runway(sp: engine.StartingPoint, hist: rules.History, cites: Mapping[str, An
     return {
         "year": year, "cash": sp.cash, "debt": sp.debt, "operating_cash_flow": ocf, "capex": capex,
         "free_cash_flow": fcf, "burn": burn, "months": months, "dilution_cagr": dil,
+        "missing": ("sin flujo de caja operativo" if ocf is None else "sin capex") if fcf is None else None,
         "ev_to_cash": (ev / sp.cash) if sp.cash > 0 else None, "ev_to_revenue": (ev / rev) if rev and rev > 0 else None,
         "formulas": {
             "consumo": "−(flujo de caja operativo − capex) del último ejercicio",

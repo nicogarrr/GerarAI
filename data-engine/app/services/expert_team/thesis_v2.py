@@ -1060,7 +1060,8 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
                 ["Flujo de caja operativo", millions(rw.get("operating_cash_flow"), ccy), _cite_text((rw.get("sources") or {}).get("ocf"))],
                 ["Capex", millions(rw.get("capex"), ccy), _cite_text((rw.get("sources") or {}).get("capex"))],
                 ["Consumo anual de caja", millions(rw.get("burn"), ccy), f.get("consumo", "")],
-                ["Meses de margen (runway)", _es(rw["months"], 0) if rw.get("months") else "sin consumo", f.get("meses", "")],
+                ["Meses de margen (runway)", _es(rw["months"], 0) if rw.get("months") else (
+                    f"N/D ({rw['missing']})" if rw.get("missing") else "sin consumo"), f.get("meses", "")],
                 ["Dilución anual", pct(rw.get("dilution_cagr"), signed=True), f.get("dilucion", "")],
                 ["Valor de empresa / caja", times(rw.get("ev_to_cash")), "EV / (caja + inversiones a corto)"],
                 ["Valor de empresa / ingresos", times(rw.get("ev_to_revenue")), "EV / ingresos del último ejercicio"],
