@@ -294,7 +294,10 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # 20 (9-nov-2026): IFRS (20-F/40-F) sin DepreciationAndAmortisationExpense: el ajuste del estado de flujos
 #    (AdjustmentsForDepreciationAndAmortisationExpense) y, si tampoco, DepreciationExpense + AmortisationExpense del
 #    MISMO filing y periodo (TSM 20-F 2024: 653.610,5 + 9.186,1 = 662.796,6 M TWD; antes N/D y EBITDA «—»).
-SEC_INGESTION_RULES_VERSION = 20
+# 21 (9-nov-2026): US GAAP sin OperatingIncomeLoss: resultado operativo = antes de impuestos − NonoperatingIncomeExpense
+#    del MISMO filing y periodo, solo si cuadra con ingresos − gastos operativos (o bruto − gastos operativos) del mismo
+#    filing (ASTS 10-K 2025: −457,1 + 169,4 = −287,7 M$ = 70,9 − 358,6; antes N/D desde 2021 y EBITDA «—»).
+SEC_INGESTION_RULES_VERSION = 21
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Arrendadores (REIT): su ingreso principal es el del arrendamiento (ASC 842),
@@ -867,7 +870,81 @@ def with_derived_ifrs_depreciation_amortisation(
     return out_facts, out_map
 
 
-SYNTHETIC_CONCEPTS = frozenset({DERIVED_SHORT_TERM_INVESTMENTS, DERIVED_OPERATING_LEASE_TOTAL, DERIVED_IFRS_DA})
+#: Concepto sintético (no existe en la taxonomía): resultado operativo = antes de impuestos − resultado no operativo.
+DERIVED_OPERATING_INCOME = "OperatingIncomeLossFromPretaxLessNonoperating"
+_OPERATING_INCOME = "OperatingIncomeLoss"
+_NONOPERATING = "NonoperatingIncomeExpense"
+_OPERATING_COSTS = ("OperatingExpenses", "CostsAndExpenses", "OperatingCostsAndExpenses")
+#: Holgura del cuadre: 0,5 % del resultado operativo o 0,5 M (redondeos de la presentación).
+_OPERATING_CHECK_REL, _OPERATING_CHECK_ABS = Decimal("0.005"), Decimal("500000")
+
+
+def with_derived_operating_income(
+    facts: dict[str, Any], metric_map: list[tuple[str, list[str], str]],
+) -> tuple[dict[str, Any], list[tuple[str, list[str], str]]]:
+    """Resultado operativo de un 10-K/10-Q que no etiqueta ``OperatingIncomeLoss`` (regla 21).
+
+    Hay emisores que presentan «Loss from operations» sin etiquetarlo: solo los ingresos, los gastos operativos,
+    el resultado no operativo (``NonoperatingIncomeExpense``) y el beneficio antes de impuestos (ASTS desde 2021).
+    Sin resultado operativo el EBITDA salía «—» en el Informe y la valoración tiraba de «antes de impuestos +
+    gastos financieros», que mete el valor razonable de los warrants. Regla general y conservadora:
+
+    - resultado operativo = antes de impuestos − ``NonoperatingIncomeExpense``, los dos del MISMO filing, periodo
+      (``start``–``end``) y unidad;
+    - solo si CUADRA (±0,5 % o ±0,5 M) con ingresos − gastos operativos o con bruto − gastos operativos del mismo
+      filing y periodo: dos caminos de la propia presentación que dan la misma cifra;
+    - solo para periodos sin ``OperatingIncomeLoss`` presentado (el presentado gana siempre); si no cuadra, N/D.
+
+    Devuelve una copia superficial con :data:`DERIVED_OPERATING_INCOME` al FINAL de ``operating_income``. Puro.
+    """
+    concepts = {m: list(cs) for m, cs, _u in metric_map}
+    if _OPERATING_INCOME not in concepts.get("operating_income", []) or _NONOPERATING not in facts:
+        return facts, metric_map
+
+    def index(names: list[str] | tuple[str, ...]) -> dict[tuple[Any, Any, Any, str], Decimal]:
+        out: dict[tuple[Any, Any, Any, str], Decimal] = {}
+        for name in names:
+            for unit, entries in (((facts.get(name) or {}).get("units")) or {}).items():
+                for e in entries:
+                    val = _decimal(e.get("val")) if isinstance(e, dict) and e.get("start") else None
+                    if val is not None:
+                        out.setdefault((e.get("accn"), e.get("start"), e.get("end"), unit), val)
+        return out
+
+    covered = {(k[1], k[2]) for k in index([_OPERATING_INCOME])}
+    nonop = index([_NONOPERATING])
+    revenue, gross, costs = (index(concepts.get("revenue", [])), index(concepts.get("gross_profit", [])),
+                             index(_OPERATING_COSTS))
+    derived: dict[str, list[dict[str, Any]]] = {}
+    seen: set[tuple[Any, Any, Any, str]] = set()
+    for name in concepts.get("income_before_tax", []):
+        for unit, entries in (((facts.get(name) or {}).get("units")) or {}).items():
+            for e in entries:
+                if not isinstance(e, dict) or not e.get("start") or (e.get("start"), e.get("end")) in covered:
+                    continue
+                key = (e.get("accn"), e.get("start"), e.get("end"), unit)
+                pretax, other = _decimal(e.get("val")), nonop.get(key)
+                if key in seen or pretax is None or other is None or key not in costs:
+                    continue
+                operating = pretax - other
+                tolerance = max(abs(operating) * _OPERATING_CHECK_REL, _OPERATING_CHECK_ABS)
+                checks = [top - costs[key] for top in (revenue.get(key), gross.get(key)) if top is not None]
+                if not any(abs(operating - check) <= tolerance for check in checks):
+                    continue
+                seen.add(key)
+                derived.setdefault(unit, []).append({**e, "val": float(operating), "_derived_from": (
+                    f"{name} {pretax} − {_NONOPERATING} {other}, cuadra con ingresos − gastos operativos "
+                    f"(mismo filing {e.get('accn')})")})
+    if not derived:
+        return facts, metric_map
+    out_facts = {**facts, DERIVED_OPERATING_INCOME: {"units": derived}}
+    out_map = [(m, [*cs, DERIVED_OPERATING_INCOME] if m == "operating_income" and DERIVED_OPERATING_INCOME not in cs
+                else list(cs), u) for m, cs, u in metric_map]
+    return out_facts, out_map
+
+
+SYNTHETIC_CONCEPTS = frozenset({DERIVED_SHORT_TERM_INVESTMENTS, DERIVED_OPERATING_LEASE_TOTAL, DERIVED_IFRS_DA,
+                                DERIVED_OPERATING_INCOME})
 
 
 def _synthetic(entry: dict[str, Any]) -> bool:
@@ -2396,6 +2473,8 @@ class FinancialIngestionService:
         us_gaap, metric_map = with_derived_operating_lease_total(us_gaap, metric_map)
         # Amortizaciones IFRS como depreciación + amortización del mismo filing (regla 20).
         us_gaap, metric_map = with_derived_ifrs_depreciation_amortisation(us_gaap, metric_map)
+        # Resultado operativo US GAAP sin OperatingIncomeLoss, con cuadre de dos caminos (regla 21).
+        us_gaap, metric_map = with_derived_operating_income(us_gaap, metric_map)
         # Divisa de reporte del filer (10-K: USD; 20-F en US GAAP: CNY, TWD...).
         # Cada hecho monetario se guarda con ELLA como unidad.
         reporting_currency = _sec_reporting_currency(us_gaap)
