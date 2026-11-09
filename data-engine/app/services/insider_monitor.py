@@ -118,11 +118,6 @@ def scan(
     backfill: bool = False,
 ) -> dict[str, Any]:
     """Una corrida acotada del monitor. Devuelve stats; nunca lanza."""
-    state = monitor_common.connector_state(db, tenant_id, CONNECTOR_NAME)
-    state.last_started_at = monitor_common.utcnow()
-    db.add(state)
-    db.commit()
-
     stats: dict[str, Any] = {
         "connector": CONNECTOR_NAME,
         "lookback": lookback,
@@ -134,6 +129,13 @@ def scan(
         "status": "ok",
     }
     try:
+        # La escritura inicial del estado va DENTRO del try: fuera, un commit
+        # roto (sesion caida, BD caida) lanzaba al caller del actor pese al
+        # contrato "nunca lanza"; record_fatal ya hace rollback + relectura.
+        state = monitor_common.connector_state(db, tenant_id, CONNECTOR_NAME)
+        state.last_started_at = monitor_common.utcnow()
+        db.add(state)
+        db.commit()
         tickers = watchlist_tickers(db, tenant_id)
         if not tickers:
             stats["status"] = "skipped"

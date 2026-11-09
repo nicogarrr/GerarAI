@@ -1,6 +1,7 @@
 """PR-3: monitor programado de watchlist/cartera contra SEC Form 4."""
 
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 
 from app.core.database import SessionLocal, init_db
 from app.models.entities import (
@@ -196,6 +197,44 @@ def test_empty_watchlist_skips_cleanly():
             select(ConnectorState).where(ConnectorState.connector == "insider_monitor")
         )
         assert state.metadata_["runs"] == 1
+    finally:
+        _cleanup(db)
+        db.close()
+
+
+class _FlakyFirstCommit:
+    """Proxy de Session cuyo primer commit lanza (sesion caida al arrancar)."""
+
+    def __init__(self, real):
+        self._real = real
+        self._failed = False
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+    def commit(self):
+        if not self._failed:
+            self._failed = True
+            raise OperationalError("commit", {}, Exception("db down"))
+        return self._real.commit()
+
+
+def test_scan_first_commit_failure_is_recorded_not_raised():
+    """El commit inicial del estado va dentro del try: con la sesion caida al
+    arrancar, scan devuelve stats de error y deja last_error en vez de lanzar
+    al actor (el docstring promete 'nunca lanza')."""
+    db = _db()
+    try:
+        _cleanup(db)
+        stats = insider_monitor.scan(_FlakyFirstCommit(db), delay_seconds=0)
+        assert stats["status"] == "error"
+        assert any(e.startswith("fatal:") for e in stats["errors"])
+        state = db.scalar(
+            select(ConnectorState).where(ConnectorState.connector == "insider_monitor")
+        )
+        assert state is not None
+        assert (state.consecutive_errors or 0) >= 1
+        assert state.last_error and "OperationalError" in state.last_error
     finally:
         _cleanup(db)
         db.close()
