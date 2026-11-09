@@ -21,6 +21,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import ResearchAlert
+from app.services.notification_service import record_in_app_delivery
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,12 @@ def insert_alert_once(db: Session, alert: ResearchAlert) -> bool:
             db.flush()
     except IntegrityError:
         return False
+    # La alerta in_app esta entregada en cuanto existe: sin la fila de
+    # entrega, la UI la muestra "sin registro de entrega" para siempre
+    # (observado en prod el 09-nov-2026: "Cola yahoo atascada ... sin
+    # registro de entrega" mientras las de noticias salian "entregada").
+    # record_in_app_delivery es idempotente y no commitea.
+    record_in_app_delivery(db, alert)
     return True
 
 

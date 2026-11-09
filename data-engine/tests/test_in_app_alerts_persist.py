@@ -100,3 +100,49 @@ def test_same_fingerprint_other_tenant_is_a_distinct_alert(db):
     assert len(created_a) == 1 and len(created_b) == 1
     assert existing_b == 0  # el fingerprint es por tenant
     assert len(db.scalars(select(ResearchAlert)).all()) == 2
+
+
+def test_nueva_alerta_graba_su_entrega_in_app(db):
+    # Sin la fila de entrega, la UI muestra "sin registro de entrega" para
+    # siempre (prod, 09-nov-2026: "Cola yahoo atascada ... sin registro").
+    from app.models import AlertDelivery
+
+    tenant = _tenant(db)
+    created, _ = persist_in_app_alerts(
+        db, tenant_id=tenant.id, now=NOW, alerts=[_alert("fp1"), _alert("fp2")]
+    )
+    deliveries = db.scalars(select(AlertDelivery)).all()
+    assert len(deliveries) == 2
+    assert {d.alert_id for d in deliveries} == set(created)
+    for d in deliveries:
+        assert d.channel == "in_app"
+        assert d.status == "delivered"
+        assert d.attempts == 1
+
+
+def test_dedup_no_duplica_la_fila_de_entrega(db):
+    from app.models import AlertDelivery
+
+    tenant = _tenant(db)
+    persist_in_app_alerts(db, tenant_id=tenant.id, now=NOW, alerts=[_alert("fp1")])
+    persist_in_app_alerts(db, tenant_id=tenant.id, now=NOW, alerts=[_alert("fp1")])
+    assert len(db.scalars(select(AlertDelivery)).all()) == 1
+
+
+def test_insert_alert_once_registra_entrega_en_la_primitiva(db):
+    # La primitiva compartida (macro_reminders, watchdogs) tambien registra.
+    from app.models import AlertDelivery
+    from app.services.in_app_alerts import insert_alert_once
+
+    tenant = _tenant(db)
+    alert = ResearchAlert(
+        tenant_id=tenant.id, company_id=None, severity="medium", status="open",
+        alert_type="macro_reminder", title="t", message="m", fingerprint="fp-x",
+        channels=["in_app"], last_triggered_at=NOW, metadata_={},
+    )
+    assert insert_alert_once(db, alert) is True
+    deliveries = db.scalars(select(AlertDelivery)).all()
+    assert len(deliveries) == 1
+    assert deliveries[0].channel == "in_app"
+    assert insert_alert_once(db, alert) is False  # dedup: sin segunda entrega
+    assert len(db.scalars(select(AlertDelivery)).all()) == 1
