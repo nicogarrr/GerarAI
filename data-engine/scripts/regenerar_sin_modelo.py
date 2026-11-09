@@ -12,9 +12,10 @@ Uso:
       Congela de nuevo el consenso propio (claves de ejercicio de 52/53 semanas por mes nominal) y
       lista las fotos viejas cuya clave ya no corresponde a su cierre (no se borran: quedan como
       historia; la medición de aciertos usa la clave nueva).
-  python scripts/regenerar_sin_modelo.py filiales-uk [--tenant N] TICKER ...
+  python scripts/regenerar_sin_modelo.py filiales-uk [--dry-run] [--tenant N] TICKER ...
       Vuelve a recoger las cuentas de las filiales británicas (Companies House, con la regla de PSC
       de #4962) y encola su lectura. Necesita COMPANIES_HOUSE_API_KEY y el worker (cola de documentos).
+      Con --dry-run solo lista las empresas que se procesarían: no recoge nada ni encola nada.
 
 Sin TICKER: sotp = todas las empresas con propuesta de los agentes; consenso = la watchlist del tenant.
 Sale un JSON con el antes/después por empresa.
@@ -137,7 +138,7 @@ def run_consenso(db: Any, tickers: list[str], dry: bool, tenant: int | None) -> 
     return out
 
 
-def run_filiales_uk(db: Any, tickers: list[str], tenant: int | None) -> dict[str, Any]:
+def run_filiales_uk(db: Any, tickers: list[str], tenant: int | None, dry: bool = False) -> dict[str, Any]:
     from app.core.config import get_settings
     from app.services.thesis_evidence_service import ThesisEvidenceService
 
@@ -146,8 +147,18 @@ def run_filiales_uk(db: Any, tickers: list[str], tenant: int | None) -> dict[str
     if not tickers:
         raise SystemExit("filiales-uk necesita los tickers (p. ej. FFH.TO CGEO.L)")
     db.info["tenant_id"] = tenant or 1
+    companies = _companies(db, tickers)
+    if dry:
+        return {
+            c.ticker: {
+                "status": "dry_run",
+                "accion": "se recogerian las cuentas de las filiales UK y se encolaria su lectura"
+                " (con --dry-run no se recoge ni se encola nada)",
+            }
+            for c in companies
+        }
     service = ThesisEvidenceService()
-    return {c.ticker: service._uk_subsidiary_reports(db, c) for c in _companies(db, tickers)}  # noqa: SLF001
+    return {c.ticker: service._uk_subsidiary_reports(db, c) for c in companies}  # noqa: SLF001
 
 
 def main(argv: list[str]) -> None:
@@ -159,7 +170,7 @@ def main(argv: list[str]) -> None:
         elif cmd == "consenso":
             out = run_consenso(db, tickers, dry, tenant)
         else:
-            out = run_filiales_uk(db, tickers, tenant)
+            out = run_filiales_uk(db, tickers, tenant, dry)
         print(json.dumps({"command": cmd, "dry_run": dry, "result": out}, ensure_ascii=False, indent=1, default=str))
     finally:
         db.close()
