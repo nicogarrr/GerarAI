@@ -461,11 +461,22 @@ def evidence_passages(db: Session, company: Company, tenant_id: int | None) -> l
         query = query.where(Document.tenant_id == tenant_id)
     docs = db.scalars(query.order_by(Document.published_at.desc().nullslast(), Document.id.desc()).limit(8)).all()
     chunks: list[tuple[Any, str]] = []
-    for doc in docs:
-        if (doc.title or "").startswith("SEC XBRL facts"):
-            continue  # las cifras ya llegan como marcadores
-        for ch in db.scalars(select(DocumentChunk).where(DocumentChunk.document_id == doc.id)
-                             .order_by(DocumentChunk.chunk_index).limit(MAX_CHUNKS_PER_DOC)).all():
+    prose_docs = [doc for doc in docs if not (doc.title or "").startswith("SEC XBRL facts")]
+    # Lote único de chunks para todos los documentos (anti N+1): una consulta
+    # con IN + agrupación en memoria conserva el orden por documento y
+    # chunk_index y el tope por documento del bucle anterior (1 query por doc).
+    chunks_by_doc: dict[int, list[DocumentChunk]] = {}
+    if prose_docs:
+        for chunk in db.scalars(
+            select(DocumentChunk)
+            .where(DocumentChunk.document_id.in_([doc.id for doc in prose_docs]))
+            .order_by(DocumentChunk.document_id, DocumentChunk.chunk_index)
+        ).all():
+            per_doc = chunks_by_doc.setdefault(chunk.document_id, [])
+            if len(per_doc) < MAX_CHUNKS_PER_DOC:
+                per_doc.append(chunk)
+    for doc in prose_docs:
+        for ch in chunks_by_doc.get(doc.id, []):
             text = " ".join((ch.text or "").split())
             if len(text) >= 200 and text.count(".") >= 3:  # prosa, no índices ni tablas
                 chunks.append((doc, text))
