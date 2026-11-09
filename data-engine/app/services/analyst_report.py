@@ -59,6 +59,7 @@ class FactRow:
     source: str
     rank: tuple[float, float]
     derived: bool = False
+    url: str | None = None
 
 
 def _num(value: Decimal | None) -> float | None:
@@ -85,6 +86,7 @@ def _cell(row: FactRow | None, *, basis: str = "reported") -> dict | None:
         "reported": row.reported and not row.derived,
         "basis": basis,
         "derived_q4": row.derived,
+        "url": row.url,
     }
 
 
@@ -109,6 +111,7 @@ def _derive_q4(best: dict[tuple[str, str, date], FactRow], metric: str) -> None:
             metric=metric, kind="Q", quarter="Q4", end=q4_end,
             value=annual.value - sum((row.value for row in inside), Decimal("0")),
             unit=annual.unit, reported=False, source=annual.source, rank=annual.rank, derived=True,
+            url=annual.url,
         )
 
 
@@ -123,6 +126,7 @@ def _ebitda(best: dict[tuple[str, str, date], FactRow], kind: str, end: date) ->
             "reported": op.reported and da.reported and not (op.derived or da.derived),
             "basis": "operating_income_plus_da",
             "derived_q4": op.derived or da.derived,
+            "url": op.url,
         }
     return _cell(best.get(("ebitda", kind, end)), basis="source_ebitda")
 
@@ -215,7 +219,9 @@ def build_market(
     }
 
 
-def _fact_rows(facts: list[FinancialFact]) -> list[FactRow]:
+def _fact_rows(facts: list[FinancialFact], cik: str | None = None) -> list[FactRow]:
+    from app.core.source_urls import sec_filing_url
+
     rows = []
     for fact in facts:
         quarter = (fact.fiscal_quarter or "").upper()
@@ -232,6 +238,7 @@ def _fact_rows(facts: list[FinancialFact]) -> list[FactRow]:
             source=fact.source_type or "",
             rank=(float(SOURCE_PRIORITY.get(fact.source_type or "", 50)),
                   -(fact.created_at.timestamp() if fact.created_at else 0.0)),
+            url=sec_filing_url(fact.source_url, fact.accession_number, cik),
         ))
     return rows
 
@@ -271,7 +278,7 @@ def build_company_report(db: Session, company: Company, *, today: date | None = 
             volumes=volumes,
             points=points,
         ),
-        "estimates": build_estimates(_fact_rows(flow)),
+        "estimates": build_estimates(_fact_rows(flow, getattr(company, "cik", None))),
         # Holdings (p. ej. Georgia Capital): NAV por acción que publica la propia
         # empresa en sus resultados (NSM / web de inversores) y descuento del
         # precio sobre él, con documento, fecha y cita.
@@ -287,6 +294,7 @@ def build_company_report(db: Session, company: Company, *, today: date | None = 
             "avg_volume": f"Media de las últimas {AVG_VOLUME_SESSIONS} sesiones con volumen en nuestros cierres.",
             "ebitda": "EBITDA = resultado operativo + amortizaciones del mismo periodo; si falta, el EBITDA de la fuente.",
             "q4": "Un Q4 sin 10-Q se deriva como ejercicio − Q1 − Q2 − Q3.",
+            "url": "Cada cifra enlaza al filing del que sale (índice EDGAR por número de acceso o el documento ESEF).",
             "user_estimates": "Las estimaciones del usuario salen de su desglose por partes y su tesis, etiquetadas como suyas.",
             "nav": "NAV por acción tal como lo publica la empresa (último documento publicado); descuento = precio / NAV − 1.",
         },

@@ -147,3 +147,54 @@ describe('informe: currencies belong to each figure', () => {
     expect(debt.textContent).toContain('US$');
   });
 });
+
+describe('consenso propio en el informe', () => {
+  const consensus = {
+    version: 'consenso_propio v1',
+    cells: [
+      { metric: 'revenue', period: 'fy2027', period_end: '2027-09-30', status: 'estimado', source: 'modelo', low: 1, mid: 400_000_000_000, high: 2, formula: 'año anterior × (1 + g)', citations: [{ kind: 'dato_presentado', url: 'https://www.sec.gov/Archives/edgar/data/320193/x.htm' }] },
+      { metric: 'operating_income', period: 'fy2027', period_end: '2027-09-30', status: 'estimado', source: 'guia', mid: 170_000_000_000, citations: [] },
+      { metric: 'eps', period: 'fy2027', period_end: '2027-09-30', status: 'estimado', source: 'modelo', mid: 9.634, formula: 'BPA fy2026 presentado 8,98 × …', citations: [] },
+      { metric: 'eps', period: 'q4_2027', period_end: '2027-09-30', status: 'sin_estimacion', source: null, mid: null, reason: 'ninguna fuente disponible pasa las puertas' },
+      { metric: 'revenue', period: 'q1_2026', period_end: '2025-12-31', status: 'vencido', mid: null },
+      { metric: 'revenue', period: 'q1_2027', period_end: '2026-12-31', status: 'estimado', source: 'tasa_base', mid: 150_000_000_000, citations: [] },
+    ],
+  };
+
+  it('agrupa por periodo en orden, sin vencidos ni periodos sin ninguna estimación', async () => {
+    const { consensusRows, consensusSourceUrl } = await import('@/lib/research/analyst-report');
+    const rows = consensusRows(consensus);
+    expect(rows.map((r) => r.period)).toEqual(['q1_2027', 'fy2027']);
+    expect(rows[1].cells.eps?.mid).toBeCloseTo(9.634);
+    expect(consensusSourceUrl(rows[1].cells.revenue)).toBe('https://www.sec.gov/Archives/edgar/data/320193/x.htm');
+    expect(consensusSourceUrl(rows[1].cells.eps)).toBeNull();
+    expect(consensusRows(null)).toEqual([]);
+  });
+
+  it('pinta ingresos, beneficio operativo y BPA con su fuente y enlace; N/D sin consenso', () => {
+    view('es', { consensus });
+    const table = screen.getByRole('region', { name: /Consenso propio de GerarAI/ });
+    const fy = within(table).getByRole('row', { name: /Ej\./ });
+    expect(fy.textContent).toContain('9,63');
+    expect(fy.textContent).toContain('modelo propio');
+    expect(fy.textContent).toContain('guía de la empresa');
+    const link = within(fy).getByRole('link', { name: 'modelo propio' });
+    expect(link.getAttribute('href')).toBe('https://www.sec.gov/Archives/edgar/data/320193/x.htm');
+    expect(within(table).getByText('tasa base SEC')).toBeTruthy();
+    view('en', { consensus: null });
+    expect(screen.getAllByTestId('informe-consensus').at(-1)?.textContent).toContain('no own estimate');
+  });
+});
+
+describe('cifras reales con enlace al filing', () => {
+  it('la cifra real enlaza al filing cuando el informe trae su URL', () => {
+    const report = (data.report ? JSON.parse(JSON.stringify(data.report)) : null) as ReportInputs['report'];
+    const row = report?.estimates.annual.at(-1);
+    if (!report || !row?.revenue) throw new Error('fixture sin ingresos anuales');
+    row.revenue.url = 'https://www.sec.gov/Archives/edgar/data/1780312/000178031226000010/0001780312-26-000010-index.htm';
+    view('es', { report });
+    const annual = screen.getByRole('region', { name: /Por ejercicio/ });
+    const links = within(annual).getAllByRole('link');
+    expect(links.some((a) => a.getAttribute('href') === row.revenue?.url)).toBe(true);
+  });
+});
