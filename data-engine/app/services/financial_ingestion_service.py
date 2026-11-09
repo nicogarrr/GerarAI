@@ -719,6 +719,17 @@ _STRICT_CASH = "CashAndCashEquivalentsAtCarryingValue"
 _COMBINED_CASH = "CashCashEquivalentsAndShortTermInvestments"
 
 
+def _known_filing_accession(entry: dict[str, Any]) -> str | None:
+    """Textual filing identity for derivation, never an unknown/missing marker."""
+    accession = entry.get("accn")
+    if not isinstance(accession, str) or not accession.strip():
+        return None
+    accession = accession.strip()
+    if accession.lower() in {"none", "null", "unknown", "n/a", "n/d", "-"}:
+        return None
+    return accession
+
+
 def with_derived_short_term_investments(
     facts: dict[str, Any], metric_map: list[tuple[str, list[str], str]],
 ) -> tuple[dict[str, Any], list[tuple[str, list[str], str]]]:
@@ -729,7 +740,7 @@ def with_derived_short_term_investments(
     no distingue corto de largo (``AvailableForSaleSecuritiesDebtSecurities``: ABCL 2T-2026, 420,0 M$ fuera de
     una caja de 120,1 M$). Esos 420 M$ son liquidez del runway. Regla general y conservadora:
 
-    - solo con los DOS hechos en el MISMO filing (``accn``), cierre (``end``) y unidad;
+    - solo con los DOS hechos en el MISMO filing (``accn`` conocido), cierre (``end``) y unidad;
     - solo para cierres sin ningún concepto explícito de la métrica (el explícito siempre gana);
     - solo si la diferencia es positiva (si el total es la propia caja, no hay inversiones que añadir).
 
@@ -746,12 +757,15 @@ def with_derived_short_term_investments(
                for entries in ((facts.get(c) or {}).get("units") or {}).values() for e in entries if isinstance(e, dict)}
     derived: dict[str, list[dict[str, Any]]] = {}
     for unit, combined in ((facts[_COMBINED_CASH] or {}).get("units") or {}).items():
-        strict = {(e.get("accn"), e.get("end")): e for e in ((facts[_STRICT_CASH] or {}).get("units") or {}).get(unit, [])
+        strict = {(_known_filing_accession(e), e.get("end")): e for e in ((facts[_STRICT_CASH] or {}).get("units") or {}).get(unit, [])
                   if isinstance(e, dict) and not e.get("start")}
         for e in combined:
             if not isinstance(e, dict) or e.get("start") or str(e.get("end")) in covered:
                 continue
-            cash = strict.get((e.get("accn"), e.get("end")))
+            accession = _known_filing_accession(e)
+            if accession is None:
+                continue
+            cash = strict.get((accession, e.get("end")))
             total, part = _decimal(e.get("val")), _decimal(cash.get("val")) if cash else None
             if total is None or part is None or total - part <= 0:
                 continue
@@ -783,7 +797,8 @@ def with_derived_operating_lease_total(
     corriente (META 3T 2026: 28.651 M$ frente a 28.651 + 2.522 = 31.173 M$; POOL: 231,1 frente a 351,9 M$), y el
     puente de la deuda neta restaba de menos. Regla general y conservadora:
 
-    - solo con los DOS hechos en el MISMO filing (``accn``), cierre (``end``) y unidad, y ambos ≥ 0;
+    - solo con los DOS hechos en el MISMO filing (``accn`` conocido, no vacío ni marcador N/D),
+      cierre (``end``) y unidad, y ambos ≥ 0;
     - solo para cierres sin el total explícito (el total presentado siempre gana);
     - sin la parte corriente etiquetada no se suma nada: queda la no corriente como hasta ahora.
 
@@ -797,13 +812,17 @@ def with_derived_operating_lease_total(
     covered = {str(e.get("end")) for entries in (((facts.get(_LEASE_TOTAL) or {}).get("units") or {}).values())
                for e in entries if isinstance(e, dict)}
     derived: dict[str, list[dict[str, Any]]] = {}
+
     for unit, noncurrent in ((facts[_LEASE_NONCURRENT] or {}).get("units") or {}).items():
-        current = {(e.get("accn"), e.get("end")): e for e in ((facts[_LEASE_CURRENT] or {}).get("units") or {}).get(unit, [])
+        current = {(_known_filing_accession(e), e.get("end")): e for e in ((facts[_LEASE_CURRENT] or {}).get("units") or {}).get(unit, [])
                    if isinstance(e, dict) and not e.get("start")}
         for e in noncurrent:
             if not isinstance(e, dict) or e.get("start") or str(e.get("end")) in covered:
                 continue
-            cur = current.get((e.get("accn"), e.get("end")))
+            accession = _known_filing_accession(e)
+            if accession is None:
+                continue
+            cur = current.get((accession, e.get("end")))
             nc, cv = _decimal(e.get("val")), _decimal(cur.get("val")) if cur else None
             if nc is None or cv is None or nc < 0 or cv < 0:
                 continue
@@ -837,7 +856,7 @@ def with_derived_ifrs_depreciation_amortisation(
     estado de flujos: solo las dos partes de la nota de gastos por naturaleza (TSM 20-F 2024: depreciación
     653.610,5 + amortización 9.186,1 M TWD). Sin amortizaciones el EBITDA salía «—». Regla general y conservadora:
 
-    - solo con los DOS hechos en el MISMO filing (``accn``), periodo (``start``–``end``) y unidad, ambos ≥ 0;
+    - solo con los DOS hechos en el MISMO filing (``accn`` conocido), periodo (``start``–``end``) y unidad, ambos ≥ 0;
     - solo para periodos sin un total presentado (cualquiera de :data:`_IFRS_DA_TOTALS` gana siempre);
     - sin una de las dos partes no se suma nada (N/D como hasta ahora).
 
@@ -854,13 +873,16 @@ def with_derived_ifrs_depreciation_amortisation(
                for e in entries if isinstance(e, dict)}
     derived: dict[str, list[dict[str, Any]]] = {}
     for unit, depreciation in ((facts[_IFRS_DEPRECIATION] or {}).get("units") or {}).items():
-        amortisation = {(e.get("accn"), e.get("start"), e.get("end")): e
+        amortisation = {(_known_filing_accession(e), e.get("start"), e.get("end")): e
                         for e in ((facts[_IFRS_AMORTISATION] or {}).get("units") or {}).get(unit, [])
                         if isinstance(e, dict) and e.get("start")}
         for e in depreciation:
             if not isinstance(e, dict) or not e.get("start") or (str(e.get("start")), str(e.get("end"))) in covered:
                 continue
-            am = amortisation.get((e.get("accn"), e.get("start"), e.get("end")))
+            accession = _known_filing_accession(e)
+            if accession is None:
+                continue
+            am = amortisation.get((accession, e.get("start"), e.get("end")))
             dep, amv = _decimal(e.get("val")), _decimal(am.get("val")) if am else None
             if dep is None or amv is None or dep < 0 or amv < 0:
                 continue
@@ -893,7 +915,7 @@ def with_derived_operating_income(
     Sin resultado operativo el EBITDA salía «—» en el Informe y la valoración tiraba de «antes de impuestos +
     gastos financieros», que mete el valor razonable de los warrants. Regla general y conservadora:
 
-    - resultado operativo = antes de impuestos − ``NonoperatingIncomeExpense``, los dos del MISMO filing, periodo
+    - resultado operativo = antes de impuestos − ``NonoperatingIncomeExpense``, los dos del MISMO filing (``accn`` conocido), periodo
       (``start``–``end``) y unidad;
     - solo si CUADRA (±0,5 % o ±0,5 M) con ingresos − gastos operativos o con bruto − gastos operativos del mismo
       filing y periodo: dos caminos de la propia presentación que dan la misma cifra;
@@ -911,11 +933,15 @@ def with_derived_operating_income(
             for unit, entries in (((facts.get(name) or {}).get("units")) or {}).items():
                 for e in entries:
                     val = _decimal(e.get("val")) if isinstance(e, dict) and e.get("start") else None
-                    if val is not None:
-                        out.setdefault((e.get("accn"), e.get("start"), e.get("end"), unit), val)
+                    accession = _known_filing_accession(e) if isinstance(e, dict) else None
+                    if val is not None and accession is not None:
+                        out.setdefault((accession, e.get("start"), e.get("end"), unit), val)
         return out
 
-    covered = {(k[1], k[2]) for k in index([_OPERATING_INCOME])}
+    # A presented total wins even when its accession is unavailable.
+    covered = {(e.get("start"), e.get("end"))
+               for entries in ((facts.get(_OPERATING_INCOME) or {}).get("units") or {}).values()
+               for e in entries if isinstance(e, dict) and e.get("start") and _decimal(e.get("val")) is not None}
     nonop = index([_NONOPERATING])
     revenue, gross, costs = (index(concepts.get("revenue", [])), index(concepts.get("gross_profit", [])),
                              index(_OPERATING_COSTS))
@@ -926,7 +952,10 @@ def with_derived_operating_income(
             for e in entries:
                 if not isinstance(e, dict) or not e.get("start") or (e.get("start"), e.get("end")) in covered:
                     continue
-                key = (e.get("accn"), e.get("start"), e.get("end"), unit)
+                accession = _known_filing_accession(e)
+                if accession is None:
+                    continue
+                key = (accession, e.get("start"), e.get("end"), unit)
                 pretax, other = _decimal(e.get("val")), nonop.get(key)
                 if key in seen or pretax is None or other is None or key not in costs:
                     continue
