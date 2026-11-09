@@ -37,10 +37,7 @@ os.environ["MPLBACKEND"] = "Agg"
 # idempotente sin cambiar nada mas (sigue siendo un fichero real en disco, que
 # es lo que necesitan los tests que usan SessionLocal() en lugar de :memory:,
 # ya que cada conexion a :memory: abriria su propia base).
-_TEST_DB_PATH = Path(
-    os.environ.get("CAVAAI_TEST_DB")
-    or f"cavaai_test_{os.getpid()}_{uuid4().hex[:8]}.db"
-)
+_TEST_DB_PATH = Path(os.environ.get("CAVAAI_TEST_DB") or f"cavaai_test_{os.getpid()}_{uuid4().hex[:8]}.db")
 # Los tests gated a CI Postgres (round-trips reales de Alembic) necesitan la
 # URL original del job; sin esta copia la pierden al forzar el sqlite hermetico.
 os.environ.setdefault("CAVAAI_ORIGINAL_DATABASE_URL", os.environ.get("DATABASE_URL", ""))
@@ -65,6 +62,7 @@ def pytest_sessionfinish(session, exitstatus):  # noqa: ARG001
             candidate.unlink(missing_ok=True)
         except OSError:  # pragma: no cover - best effort
             pass
+
 
 # Importing main no debe filtrar secretos locales al proceso de test. La API
 # legacy (routers/) y los módulos de servicio (modules/) fueron retirados;
@@ -204,6 +202,7 @@ def _reset_chat_quota_cooldowns():
 def isolate_llm_free_tier_breaker():
     """Quota cooldowns persist in production, never across hermetic test cases."""
     from app.llm import base
+
     base._free_tier_breaker.clear()
     base._free_tier_breaker_status.clear()
     base._interactive_quota_breaker.clear()
@@ -223,12 +222,18 @@ def isolate_llm_free_tier_breaker():
 
 @pytest.fixture(autouse=True)
 def _reset_filing_deadline_failure_cache():
-    """La memoria corta de fallos de plazos 10-Q/10-K es estado global de proceso."""
+    """La memoria corta de fallos de plazos 10-Q/10-K es estado global de proceso.
+
+    Snapshot + restauracion: un clear() pelado destruiria el contenido que
+    el dict tuviera antes de la sesion de tests.
+    """
     from app.services import catalyst_calendar_service
 
+    original = dict(catalyst_calendar_service._FAILED_UNTIL)
     catalyst_calendar_service._FAILED_UNTIL.clear()
     yield
     catalyst_calendar_service._FAILED_UNTIL.clear()
+    catalyst_calendar_service._FAILED_UNTIL.update(original)
 
 
 @pytest.fixture(autouse=True)
