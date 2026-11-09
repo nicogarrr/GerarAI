@@ -141,8 +141,18 @@ def test_tope_por_documento_se_aplica_en_sql_sin_hidratar_de_mas(monkeypatch):
     monkeypatch.setattr("app.services.expert_team.thesis_v2.MAX_CHUNKS_PER_DOC", 5)
     engine, db, tenant, company = _session(2, 20)
     loaded = {"n": 0}
-    event.listen(DocumentChunk, "load", lambda *a: loaded.__setitem__("n", loaded["n"] + 1))
-    out = evidence_passages(db, company, tenant.id)
-    assert loaded["n"] <= 2 * 5, loaded
-    assert len(out) > 0
-    db.close()
+
+    def _on_load(*a):
+        loaded["n"] += 1
+
+    # Listener nombrado y retirado en finally: un listener sobre la clase
+    # mapeada es global y sobrevive al engine si no se quita.
+    event.listen(DocumentChunk, "load", _on_load)
+    try:
+        out = evidence_passages(db, company, tenant.id)
+        assert loaded["n"] <= 2 * 5, loaded
+        assert len(out) > 0
+    finally:
+        event.remove(DocumentChunk, "load", _on_load)
+        db.close()
+        engine.dispose()
