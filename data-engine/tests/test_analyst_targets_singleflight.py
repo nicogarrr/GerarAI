@@ -54,7 +54,7 @@ def test_timeout_does_not_cancel_other_consumer_or_duplicate_thread(monkeypatch)
         short = asyncio.create_task(service.get("ASTS", deadline=time.monotonic() + 0.03))
         assert await asyncio.to_thread(started.wait, 1)
         assert (await short).note_code == "fetch_failed"
-        assert "ASTS" in service._yahoo_inflight
+        assert (asyncio.get_running_loop(), "ASTS") in service._yahoo_inflight
         long = asyncio.create_task(service.get("ASTS", deadline=time.monotonic() + 1))
         await asyncio.sleep(0)
         release.set()
@@ -85,7 +85,7 @@ def test_cancelled_consumer_does_not_cancel_shared_fetch(monkeypatch):
             await first
         except asyncio.CancelledError:
             pass
-        assert not service._yahoo_inflight["ASTS"].cancelled()
+        assert not service._yahoo_inflight[(asyncio.get_running_loop(), "ASTS")].cancelled()
         second = asyncio.create_task(service.get("ASTS"))
         await asyncio.sleep(0)
         release.set()
@@ -155,3 +155,28 @@ def test_press_and_list_share_yahoo_but_keep_press_separate(monkeypatch):
 
     asyncio.run(run())
     assert calls == ["ASTS"] and press_calls == ["ASTS"]
+
+
+
+def test_same_service_simultaneous_event_loops_never_share_tasks(monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    service = svc.AnalystTargetsService()
+    both_fetching = threading.Barrier(2)
+    calls = []
+
+    def fetch(symbol):
+        calls.append(symbol)
+        # Ambos loops deben tener su propio Task y llegar a Yahoo. En la
+        # versión anterior uno esperaba el Task del otro loop, fallaba y el
+        # segundo fetch no llegaba a esta barrera.
+        both_fetching.wait(timeout=2)
+        return {"records": [], "consensus": {"mean": 90}}
+
+    monkeypatch.setattr(svc, "_fetch_sync", fetch)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(asyncio.run, service.get("ASTS")) for _ in range(2)]
+        results = [future.result(timeout=5) for future in futures]
+    assert all(result.status == "available" for result in results)
+    assert calls == ["ASTS", "ASTS"]
+    assert service._yahoo_inflight == {}

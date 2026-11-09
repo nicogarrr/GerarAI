@@ -367,7 +367,7 @@ def merge_press_rows(
 class AnalystTargetsService:
     def __init__(self) -> None:
         self._cache: dict[str, tuple[float, AnalystTargets]] = {}
-        self._yahoo_inflight: dict[str, asyncio.Task] = {}
+        self._yahoo_inflight: dict[tuple[asyncio.AbstractEventLoop, str], asyncio.Task] = {}
 
     async def _yahoo(self, symbol: str, remaining: float) -> dict[str, Any] | None:
         # Las variantes con/sin prensa conservan caches separados, pero las
@@ -375,7 +375,11 @@ class AnalystTargetsService:
         # de cuatro peticiones. Cada consumidor conserva su propio presupuesto.
         if remaining <= 0:
             return None
-        task = self._yahoo_inflight.get(symbol)
+        # Un Task pertenece a su event loop. Los consumidores síncronos que
+        # usan run_from_any_context pueden tener otro loop en otro hilo:
+        # nunca deben esperar el Task de ese otro loop.
+        flight_key = (asyncio.get_running_loop(), symbol)
+        task = self._yahoo_inflight.get(flight_key)
         if task is None:
             async def fetch():
                 try:
@@ -383,10 +387,10 @@ class AnalystTargetsService:
                 except Exception:  # noqa: BLE001 - fuente externa: fallo declarado, nunca cacheado
                     return None
                 finally:
-                    self._yahoo_inflight.pop(symbol, None)
+                    self._yahoo_inflight.pop(flight_key, None)
 
             task = asyncio.create_task(fetch())
-            self._yahoo_inflight[symbol] = task
+            self._yahoo_inflight[flight_key] = task
         try:
             # Un timeout o cancelación del consumidor no cancela el lote que
             # otro consumidor sigue esperando. La entrada dura hasta que el
