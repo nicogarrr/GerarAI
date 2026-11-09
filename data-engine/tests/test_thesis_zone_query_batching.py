@@ -297,8 +297,8 @@ def test_resolve_fact_locators_chunks_source_reads(db_counter, monkeypatch):
 
     counter["n"] = 0
     locators = _resolve_fact_locators(db, {"driver_model": [{"source_fact_ids": fact_ids}]})
-    # 1 (facts) + 3 lotes de documentos (2+2+1).
-    assert counter["n"] == 4, f"locators uso {counter['n']} queries (!=4)"
+    # 3 lotes de facts (2+2+1) + 3 lotes de documentos (2+2+1).
+    assert counter["n"] == 6, f"locators uso {counter['n']} queries (!=6)"
     assert locators == {fid: f"https://sec.test/cl{i}" for i, fid in enumerate(fact_ids)}
 
 
@@ -326,3 +326,38 @@ def test_sync_all_thesis_rules_chunks_company_load(db_counter, monkeypatch):
     # SQLite con suficientes empresas.
     assert counter["n"] == 5, f"sync_all uso {counter['n']} queries (!=5)"
     assert synced == sorted(company.id for company in companies)
+
+
+def test_resolve_fact_locators_chunks_fact_reads_too(db_counter, monkeypatch):
+    """El IN de facts (preexistente) tambien va por lotes: un driver_model
+    grande con un IN unico aborta en SQLite por variables."""
+    from app.core import sql_chunks
+    from app.services.thesis_deep_narrative import _resolve_fact_locators
+
+    monkeypatch.setattr(sql_chunks, "IN_CHUNK_SIZE", 2)
+    db, counter = db_counter
+    company = _company(db, "CHF")
+    docs = [
+        Document(company_id=company.id, title=f"doc {i}", source_type="SEC",
+                 source_url=f"https://sec.test/cf{i}")
+        for i in range(5)
+    ]
+    db.add_all(docs)
+    db.flush()
+    fact_ids = []
+    for i, doc in enumerate(docs):
+        fact = FinancialFact(
+            company_id=company.id, metric="revenue", value=Decimal("10"), unit="USD",
+            period=f"20{20 + i}-12-31:FY", fiscal_year=2020 + i,
+            source_id=doc.id, source_type="SEC",
+        )
+        db.add(fact)
+        db.flush()
+        fact_ids.append(fact.id)
+    db.commit()
+
+    counter["n"] = 0
+    locators = _resolve_fact_locators(db, {"driver_model": [{"source_fact_ids": fact_ids}]})
+    # 5 ids con lote de 2: 3 lotes de facts + 3 lotes de documentos.
+    assert counter["n"] == 6, f"locators uso {counter['n']} queries (!=6)"
+    assert locators == {fid: f"https://sec.test/cf{i}" for i, fid in enumerate(fact_ids)}

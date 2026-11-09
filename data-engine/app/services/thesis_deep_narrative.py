@@ -839,7 +839,11 @@ def _resolve_fact_locators(db: Session, long_term_model: dict) -> dict[int, str]
         return {}
     locators: dict[int, str] = {}
     try:
-        facts = db.query(FinancialFact).filter(FinancialFact.id.in_(ids)).all()
+        # IN por lotes: un driver_model grande con un IN unico aborta en
+        # SQLite ("too many SQL variables").
+        facts = []
+        for batch in chunked(sorted(set(ids))):
+            facts.extend(db.query(FinancialFact).filter(FinancialFact.id.in_(batch)).all())
         # Un db.get por fact era un N+1 por driver; un solo IN para todos.
         source_ids = {fact.source_id for fact in facts if fact.source_id is not None}
         # IN por lotes: con miles de fuentes un solo IN aborta en SQLite
