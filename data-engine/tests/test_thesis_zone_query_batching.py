@@ -223,3 +223,106 @@ def test_sync_all_thesis_rules_loads_companies_in_one_query(db_counter, monkeypa
     # independientes del numero de empresas; antes era 2 + N gets.
     assert counter["n"] == 3, f"sync_all uso {counter['n']} queries (!=3)"
     assert synced == sorted(company.id for company in companies)
+
+
+# --- IN por lotes acotados (mas elementos que el limite) ---------------------
+
+
+def test_chunked_batches_and_remainder():
+    from app.core.sql_chunks import chunked
+
+    assert list(chunked(range(7), size=3)) == [[0, 1, 2], [3, 4, 5], [6]]
+    assert list(chunked(range(4), size=2)) == [[0, 1], [2, 3]]
+    assert list(chunked([], size=2)) == []
+    # Por encima del limite de variables de SQLite no se llega nunca.
+    batches = list(chunked(range(1200)))
+    assert len(batches) == 3 and max(len(b) for b in batches) <= 500
+
+
+def test_annual_facts_chunks_source_document_reads(db_counter, monkeypatch):
+    from app.core import sql_chunks
+    from app.services.thesis_projection_service import ThesisProjectionService
+
+    monkeypatch.setattr(sql_chunks, "IN_CHUNK_SIZE", 2)
+    db, counter = db_counter
+    company = _company(db, "CHUNK")
+    docs = [
+        Document(company_id=company.id, title=f"10-K {year}", source_type="SEC",
+                 source_url=f"https://sec.test/chunk-{year}", published_at=datetime(year, 3, 1))
+        for year in range(2020, 2025)
+    ]
+    db.add_all(docs)
+    db.flush()
+    for i, year in enumerate(range(2020, 2025)):
+        db.add(FinancialFact(
+            company_id=company.id, metric="revenue", value=Decimal("100"), unit="USD",
+            period=f"{year}-12-31:FY", fiscal_year=year,
+            source_id=docs[i].id, source_type="SEC",
+        ))
+    db.commit()
+
+    counter["n"] = 0
+    out = ThesisProjectionService()._annual_facts(db, company, date(2026, 10, 8))
+    # 5 fuentes con lote de 2: 1 (facts) + 3 INs acotados; sin trocear seria
+    # 1 IN sin cota (y con 33k facts, "too many SQL variables").
+    assert counter["n"] == 4, f"_annual_facts uso {counter['n']} queries (!=4)"
+    assert sorted(out["revenue"]) == list(range(2020, 2025))
+
+
+def test_resolve_fact_locators_chunks_source_reads(db_counter, monkeypatch):
+    from app.core import sql_chunks
+    from app.services.thesis_deep_narrative import _resolve_fact_locators
+
+    monkeypatch.setattr(sql_chunks, "IN_CHUNK_SIZE", 2)
+    db, counter = db_counter
+    company = _company(db, "CHLOC")
+    docs = [
+        Document(company_id=company.id, title=f"doc {i}", source_type="SEC",
+                 source_url=f"https://sec.test/cl{i}")
+        for i in range(5)
+    ]
+    db.add_all(docs)
+    db.flush()
+    fact_ids = []
+    for i, doc in enumerate(docs):
+        fact = FinancialFact(
+            company_id=company.id, metric="revenue", value=Decimal("10"), unit="USD",
+            period=f"20{20 + i}-12-31:FY", fiscal_year=2020 + i,
+            source_id=doc.id, source_type="SEC",
+        )
+        db.add(fact)
+        db.flush()
+        fact_ids.append(fact.id)
+    db.commit()
+
+    counter["n"] = 0
+    locators = _resolve_fact_locators(db, {"driver_model": [{"source_fact_ids": fact_ids}]})
+    # 1 (facts) + 3 lotes de documentos (2+2+1).
+    assert counter["n"] == 4, f"locators uso {counter['n']} queries (!=4)"
+    assert locators == {fid: f"https://sec.test/cl{i}" for i, fid in enumerate(fact_ids)}
+
+
+def test_sync_all_thesis_rules_chunks_company_load(db_counter, monkeypatch):
+    from app.core import sql_chunks
+    from app.services import thesis_invalidation_rules as rules
+
+    monkeypatch.setattr(sql_chunks, "IN_CHUNK_SIZE", 2)
+    db, counter = db_counter
+    companies = [_company(db, f"CHS{i}") for i in range(5)]
+    for company in companies:
+        db.add(ThesisVersion(
+            company_id=company.id, version=1, status="final",
+            thesis_markdown="# T", executive_summary="R", rating="watch",
+            invalidation_criteria=[], invalidation_rules=[],
+        ))
+    db.commit()
+
+    synced: list[int] = []
+    monkeypatch.setattr(rules, "sync_thesis_rules", lambda db, company: synced.append(company.id) or [])
+
+    counter["n"] = 0
+    rules.sync_all_thesis_rules(db)
+    # 2 (ids) + 3 lotes de empresas (2+2+1); un IN unico sin cota aborta en
+    # SQLite con suficientes empresas.
+    assert counter["n"] == 5, f"sync_all uso {counter['n']} queries (!=5)"
+    assert synced == sorted(company.id for company in companies)

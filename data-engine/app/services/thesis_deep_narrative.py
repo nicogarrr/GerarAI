@@ -34,6 +34,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.sql_chunks import chunked
 from app.llm import (
     LLMRequest,
     Message,
@@ -841,11 +842,13 @@ def _resolve_fact_locators(db: Session, long_term_model: dict) -> dict[int, str]
         facts = db.query(FinancialFact).filter(FinancialFact.id.in_(ids)).all()
         # Un db.get por fact era un N+1 por driver; un solo IN para todos.
         source_ids = {fact.source_id for fact in facts if fact.source_id is not None}
-        urls: dict[int, str | None] = (
-            dict(db.execute(select(Document.id, Document.source_url).where(Document.id.in_(source_ids))).all())
-            if source_ids
-            else {}
-        )
+        # IN por lotes: con miles de fuentes un solo IN aborta en SQLite
+        # ("too many SQL variables").
+        urls: dict[int, str | None] = {}
+        for batch in chunked(sorted(source_ids)):
+            urls.update(
+                db.execute(select(Document.id, Document.source_url).where(Document.id.in_(batch))).all()
+            )
         for fact in facts:
             url = urls.get(fact.source_id) if fact.source_id is not None else None
             locators[fact.id] = url or f"Registro interno de datos financieros ({fact.source_type})."

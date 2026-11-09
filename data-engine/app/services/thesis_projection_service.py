@@ -34,6 +34,7 @@ from typing import Any
 from sqlalchemy import delete, desc, func, select, text
 from sqlalchemy.orm import Session
 
+from app.core.sql_chunks import chunked
 from app.core.tenancy import tenant_filters
 from app.models import (
     Company,
@@ -241,14 +242,15 @@ class ThesisProjectionService:
             )
             .order_by(FinancialFact.fiscal_year, desc(FinancialFact.id))
         ).all()
-        # Un db.get por fact era un N+1 por metrica/ejercicio; un solo IN con
-        # las fechas de publicacion de todos los documentos fuente.
+        # Un db.get por fact era un N+1 por metrica/ejercicio; INs acotados
+        # con las fechas de publicacion de todos los documentos fuente (un IN
+        # unico con decenas de miles de ids aborta en SQLite).
         doc_ids = {row.source_id for row in rows if row.source_id}
-        doc_published: dict[int, Any] = (
-            dict(db.execute(select(Document.id, Document.published_at).where(Document.id.in_(doc_ids))).all())
-            if doc_ids
-            else {}
-        )
+        doc_published: dict[int, Any] = {}
+        for batch in chunked(sorted(doc_ids)):
+            doc_published.update(
+                db.execute(select(Document.id, Document.published_at).where(Document.id.in_(batch))).all()
+            )
         out: dict[str, dict[int, FinancialFact]] = {}
         for row in rows:
             assert_period_no_lookahead(
