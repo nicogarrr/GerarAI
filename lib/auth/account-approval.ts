@@ -21,7 +21,8 @@
  * tests): scripts/account-approval.test.ts lo ejecuta con node --test.
  */
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
+// @ts-expect-error TS5097: node --test (--experimental-strip-types) necesita la extensión.
+import { hmacSignature, safeEqual } from './hmac.ts';
 
 export type AccountStatus = 'pending' | 'approved' | 'rejected';
 
@@ -79,16 +80,6 @@ export function signupAutoApprove(env: Env): boolean {
     return env.SIGNUP_AUTO_APPROVE === 'true' || env.SIGNUP_AUTO_APPROVE === '1';
 }
 
-function signature(payload: string, secret: string): string {
-    return createHmac('sha256', secret).update(payload).digest('base64url');
-}
-
-function safeEqual(a: string, b: string): boolean {
-    const ab = Buffer.from(a);
-    const bb = Buffer.from(b);
-    return ab.length === bb.length && timingSafeEqual(ab, bb);
-}
-
 /**
  * Token de decisión (aprobar/rechazar): `approvalId.action.expires.firma`.
  * La firma cubre los tres campos; approvalId es el ObjectId del registro de
@@ -105,7 +96,7 @@ export function createDecisionToken(args: {
     const ttlMs = args.ttlMs ?? APPROVAL_TOKEN_TTL_DEFAULT_MS;
     const expires = Math.floor((nowMs + ttlMs) / 1000);
     const payload = `${args.approvalId}.${args.action}.${expires}`;
-    return `${payload}.${signature(payload, args.secret)}`;
+    return `${payload}.${hmacSignature(payload, args.secret)}`;
 }
 
 export type DecisionTokenPayload = { approvalId: string; action: ApprovalAction; expires: number };
@@ -122,7 +113,7 @@ export function verifyDecisionToken(
     if (!approvalId || (action !== 'approve' && action !== 'reject') || !rawExpires || !provided) return null;
     const expires = Number(rawExpires);
     if (!Number.isInteger(expires) || expires * 1000 < nowMs) return null;
-    const expected = signature(`${approvalId}.${action}.${rawExpires}`, secret);
+    const expected = hmacSignature(`${approvalId}.${action}.${rawExpires}`, secret);
     return safeEqual(provided, expected) ? { approvalId, action, expires } : null;
 }
 
@@ -140,7 +131,7 @@ export function createAdminListToken(args: {
     const ttlMs = args.ttlMs ?? ADMIN_LIST_TOKEN_TTL_DEFAULT_MS;
     const expires = Math.floor((nowMs + ttlMs) / 1000);
     const payload = `admin-list.${expires}`;
-    return `${expires}.${signature(payload, args.secret)}`;
+    return `${expires}.${hmacSignature(payload, args.secret)}`;
 }
 
 export function verifyAdminListToken(
@@ -153,5 +144,5 @@ export function verifyAdminListToken(
     if (!rawExpires || !provided || rest.length > 0) return false;
     const expires = Number(rawExpires);
     if (!Number.isInteger(expires) || expires * 1000 < nowMs) return false;
-    return safeEqual(provided, signature(`admin-list.${rawExpires}`, secret));
+    return safeEqual(provided, hmacSignature(`admin-list.${rawExpires}`, secret));
 }

@@ -1,13 +1,8 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+// @ts-expect-error TS5097: node --test (--experimental-strip-types) necesita la extensión.
+import { hmacSignature, safeEqual } from './hmac.ts';
 
 export const DELETE_REAUTH_HEADER = 'x-cavaai-delete-reauth';
 export const DELETE_REAUTH_TTL_MS = 120_000;
-
-function signature(userId: string, expires: number, secret: string): string {
-    return createHmac('sha256', secret)
-        .update(`${userId}.${expires}`)
-        .digest('base64url');
-}
 
 export function createDeleteReauthToken(
     userId: string,
@@ -18,7 +13,7 @@ export function createDeleteReauthToken(
         throw new Error('BETTER_AUTH_SECRET is required for account reauthentication');
     }
     const expires = Math.floor((nowMs + DELETE_REAUTH_TTL_MS) / 1000);
-    return `${expires}.${signature(userId, expires, secret)}`;
+    return `${expires}.${hmacSignature(`${userId}.${expires}`, secret)}`;
 }
 
 export function verifyDeleteReauthToken(
@@ -32,9 +27,6 @@ export function verifyDeleteReauthToken(
     if (!rawExpires || !provided || rest.length > 0) return false;
     const expires = Number(rawExpires);
     if (!Number.isInteger(expires) || expires * 1000 < nowMs) return false;
-    const expected = signature(userId, expires, secret);
-    const providedBuffer = Buffer.from(provided);
-    const expectedBuffer = Buffer.from(expected);
-    return providedBuffer.length === expectedBuffer.length
-        && timingSafeEqual(providedBuffer, expectedBuffer);
+    const expected = hmacSignature(`${userId}.${expires}`, secret);
+    return safeEqual(provided, expected);
 }
