@@ -301,7 +301,10 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # 22 (9-nov-2026): año fiscal de los informes anuales con la etiqueta del emisor (dei:DocumentFiscalYearFocus):
 #    los que nombran el ejercicio por su año de inicio (cierre a finales de enero) ya no salen un año por delante
 #    de su guía (Lowe's: cierre 30-ene-2026 FY2026 → FY2025, su «fiscal 2025»).
-SEC_INGESTION_RULES_VERSION = 22
+# 23 (9-nov-2026): IFRS (20-F/40-F) con activo y pasivo corriente, reservas, fondo de comercio, intangibles y SBC
+#    estándar (CurrentAssets, CurrentLiabilities, RetainedEarnings, Goodwill, IntangibleAssetsOtherThanGoodwill,
+#    AdjustmentsForSharebasedPayments): TSM y CNQ ya tienen Z de Altman y la señal de liquidez del F-score.
+SEC_INGESTION_RULES_VERSION = 23
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Arrendadores (REIT): su ingreso principal es el del arrendamiento (ASC 842),
@@ -463,6 +466,17 @@ SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("total_assets",      ["Assets"],                                                                  "USD"),
     ("total_liabilities", ["Liabilities"],                                                             "USD"),
     ("total_equity",      ["EquityAttributableToOwnersOfParent"],                                      "USD"),
+    # Balance y SBC con el concepto IFRS estándar (regla 23): sin ellos el F-score de Piotroski y la Z de Altman
+    # de los 20-F/40-F quedaban sin liquidez ni fondo de maniobra (TSM, CNQ: «current_assets: N/D»).
+    ("current_assets",    ["CurrentAssets"],                                                           "USD"),
+    ("current_liabilities", ["CurrentLiabilities"],                                                    "USD"),
+    ("retained_earnings", ["RetainedEarnings"],                                                        "USD"),
+    ("goodwill",          ["Goodwill"],                                                                "USD"),
+    ("intangible_assets", ["IntangibleAssetsOtherThanGoodwill"],                                       "USD"),
+    # IFRS 2: el ajuste del estado de flujos (lo mismo que ShareBasedCompensation en US GAAP) y, si no, el gasto
+    # con empleados de la nota (BN). CNQ 2025: 180 M CAD en los dos.
+    ("stock_based_compensation", ["AdjustmentsForSharebasedPayments",
+                                  "ExpenseFromSharebasedPaymentTransactionsWithEmployees"],           "USD"),
     # Minoritarios (IAS 1.54q / 81B): sin ellos el puente EV → capital no los restaba (BN, 40-F).
     ("minority_interest", ["NoncontrollingInterests"],                                                 "USD"),
     ("net_income_minority", ["ProfitLossAttributableToNoncontrollingInterests"],                       "USD"),
