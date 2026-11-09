@@ -302,6 +302,18 @@ def test_telegram_retry_after_sanitizado(monkeypatch):
         result = notification_service.NotificationService()._dispatch_telegram(_telegram_settings(), _PAYLOAD)
         assert result["status"] == "throttled" and result["retry_after"] == esperado, raw
 
+    # parameters con forma no-dict NO vacia (lista o string: "x or {}" deja
+    # pasar la forma y .get lanza AttributeError): ausente a efectos de
+    # retry_after, cooldown por defecto y NUNCA excepcion hacia el except
+    # generico. Una lista VACIA ya la absorbe el "or {}" (es falsy): por eso
+    # el caso real es la no vacia.
+    for forma in (b'{"ok": false, "error_code": 429, "parameters": [["x"]]}',
+                  b'{"ok": false, "error_code": 429, "parameters": "texto"}'):
+        _client_respondiendo(monkeypatch, httpx.Response(
+            200, content=forma, headers=headers, request=req))
+        result = notification_service.NotificationService()._dispatch_telegram(_telegram_settings(), _PAYLOAD)
+        assert result["status"] == "throttled" and result["retry_after"] == 600, forma
+
 
 def test_telegram_timeout_con_float_defectuoso_es_failed(monkeypatch):
     """Un __float__ que lanza algo que no es TypeError/ValueError tambien es
