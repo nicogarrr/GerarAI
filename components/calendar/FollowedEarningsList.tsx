@@ -2,7 +2,10 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { ChevronRight, ExternalLink } from 'lucide-react';
 import { CompanyLogo } from '@/components/calendar/CompanyLogo';
-import { formatMarketDate } from '@/lib/format';
+import { formatMarketDate, type Formatters } from '@/lib/format';
+
+/** Formateador de fechas ligado al idioma activo (getFormat en servidor); sin él, español (tests y render directo). */
+type DateFormatter = Pick<Formatters, 'formatMarketDate'>;
 import { t, type TranslationKey, type TranslationVars } from '@/lib/i18n/t';
 
 type TiFn = (key: TranslationKey, vars?: TranslationVars) => string;
@@ -20,12 +23,13 @@ export function fiscalLabel(raw: string | null, ti: TiFn = esT): string | null {
     return match ? ti('calendar.earnings.fiscalClose', { label: `${match[1]} ${match[2]}` }) : raw;
 }
 
-/** Título de día al estilo "Mañana, 20 oct" / "mié, 21 oct". */
-export function dayHeading(day: string, today: string, ti: TiFn = esT): string {
-    const base = formatMarketDate(day, { weekday: 'short', day: 'numeric', month: 'short' });
+/** Título de día al estilo "Mañana, 20 oct" / "mié, 21 oct"; el idioma es el del formateador recibido. */
+export function dayHeading(day: string, today: string, ti: TiFn = esT, f?: DateFormatter): string {
+    const fmt = f?.formatMarketDate ?? formatMarketDate;
+    const base = fmt(day, { weekday: 'short', day: 'numeric', month: 'short' });
     const diff = Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
-    if (diff === 0) return ti('calendar.earnings.today', { date: formatMarketDate(day, { day: 'numeric', month: 'short' }) });
-    if (diff === 1) return ti('calendar.earnings.tomorrow', { date: formatMarketDate(day, { day: 'numeric', month: 'short' }) });
+    if (diff === 0) return ti('calendar.earnings.today', { date: fmt(day, { day: 'numeric', month: 'short' }) });
+    if (diff === 1) return ti('calendar.earnings.tomorrow', { date: fmt(day, { day: 'numeric', month: 'short' }) });
     return base;
 }
 
@@ -41,7 +45,8 @@ function materialLabel(doc: MaterialDocument, ti: TiFn): string {
 }
 
 /** Material oficial de la SEC para resultados ya publicados; sin dato = no se pinta nada. */
-export function MaterialsLine({ materials, ti = esT }: { materials: EventMaterials | undefined; ti?: TiFn }) {
+export function MaterialsLine({ materials, ti = esT, f }: { materials: EventMaterials | undefined; ti?: TiFn; f?: DateFormatter }) {
+    const fmt = f?.formatMarketDate ?? formatMarketDate;
     if (!materials || materials.status === 'sin_cobertura_sec' || materials.status === 'periodo_no_coincide') return null;
     if (materials.status === 'no_disponible') {
         return <p className="mt-1 text-xs text-gray-500">{ti('calendar.earnings.materialsUnavailable')}</p>;
@@ -57,14 +62,14 @@ export function MaterialsLine({ materials, ti = esT }: { materials: EventMateria
                     href={doc.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={ti('calendar.earnings.materialsDocTitle', { exhibit: doc.exhibit, date: formatMarketDate(materials.filed_at) })}
+                    title={ti('calendar.earnings.materialsDocTitle', { exhibit: doc.exhibit, date: fmt(materials.filed_at) })}
                     className="inline-flex items-center gap-1 rounded-md border border-teal-800/60 px-1.5 py-0.5 font-medium text-teal-300 hover:bg-gray-800"
                 >
                     {materialLabel(doc, ti)}
                     <ExternalLink aria-hidden="true" className="h-3 w-3" />
                 </a>
             ))}
-            <span className="text-gray-500">{ti('calendar.earnings.materialsSec', { date: formatMarketDate(materials.filed_at) })}</span>
+            <span className="text-gray-500">{ti('calendar.earnings.materialsSec', { date: fmt(materials.filed_at) })}</span>
         </p>
     );
 }
@@ -117,9 +122,9 @@ export function IrLine({ ticker, date, ti = esT }: { ticker: string; date: strin
 }
 
 /** Espera la promesa compartida de materiales (dentro de Suspense) y pinta solo la linea de esta fila. */
-export async function EventMaterialsLine({ promise, eventKey, ti = esT }: { promise: Promise<Record<string, EventMaterials>>; eventKey: string; ti?: TiFn }) {
+export async function EventMaterialsLine({ promise, eventKey, ti = esT, f }: { promise: Promise<Record<string, EventMaterials>>; eventKey: string; ti?: TiFn; f?: DateFormatter }) {
     const all = await promise;
-    return <MaterialsLine materials={all[eventKey]} ti={ti} />;
+    return <MaterialsLine materials={all[eventKey]} ti={ti} f={f} />;
 }
 
 export function FollowedEarningsRow({ event, materialsSlot, ti = esT }: { event: FollowedEarningsEvent; materialsSlot?: ReactNode; ti?: TiFn }) {
