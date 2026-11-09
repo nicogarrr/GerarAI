@@ -271,7 +271,9 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 #    y el total corriente (UNH 3T 2026: 68.714 -> 74.331 M).
 # 11 (8-nov-2026): filers IFRS: pasivos por arrendamiento (LeaseLiabilities y sus partes corriente/no corriente).
 # 12 (8-nov-2026): plan B: el último filing anual que companyfacts no trae se lee de su instancia XBRL (TSM 20-F 2025).
-SEC_INGESTION_RULES_VERSION = 12
+# 13 (9-nov-2026): IFRS: ProfitLoss/Equity solo pasan a atribuibles con señal positiva de minoritarios = 0;
+#    sin ella se guardan como total (net_income_total / total_equity_total) y lo atribuible queda no verificable (CNQ).
+SEC_INGESTION_RULES_VERSION = 13
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Arrendadores (REIT): su ingreso principal es el del arrendamiento (ASC 842),
@@ -455,10 +457,12 @@ SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("total_debt",        list(SEC_IFRS_DEBT_CONCEPTS),                                                "USD"),
 ]
 
-# Conceptos de minoritarios (IAS 1.81B/54q). Si el filer no etiqueta NINGUNO, no tiene minoritarios
-# y el total coincide con lo atribuible a la dominante: ProfitLoss y Equity sirven como respaldo
-# (CNQ, 40-F: solo etiqueta ProfitLoss/Equity y se quedaba sin beneficio ni patrimonio). Con
-# minoritarios (BN) el respaldo NO se activa: el total sería ~2,5x lo del accionista.
+# Conceptos de minoritarios (IAS 1.81B/54q). Que el filer no etiquete NINGUNO no prueba que no tenga
+# minoritarios (#4775 lo daba por hecho: CNQ, 40-F, solo etiqueta ProfitLoss/Equity). ProfitLoss y Equity
+# solo pasan a atribuibles con una señal POSITIVA de minoritarios = 0: el concepto NCI etiquetado a 0, o la
+# línea atribuible a la dominante igual al total. Sin señal, el total se guarda como total
+# (net_income_total / total_equity_total) y lo atribuible queda «no verificable».
+# Con minoritarios (BN) el respaldo NO se activa: el total sería ~2,5x lo del accionista.
 SEC_IFRS_NCI_CONCEPTS = (
     "ProfitLossAttributableToNoncontrollingInterests",
     "NoncontrollingInterests",
@@ -466,6 +470,11 @@ SEC_IFRS_NCI_CONCEPTS = (
     "ComprehensiveIncomeAttributableToNoncontrollingInterests",
 )
 SEC_IFRS_NO_NCI_FALLBACKS = {"net_income": "ProfitLoss", "total_equity": "Equity"}
+# Sin señal de minoritarios: el patrimonio total se guarda aparte (net_income_total ya está en el mapa).
+SEC_IFRS_UNVERIFIED_TOTALS = [("total_equity_total", ["Equity"], "USD")]
+ATTRIBUTABLE_UNVERIFIED = ("atribuible no verificable: el emisor solo etiqueta el total (ProfitLoss/Equity) y "
+                           "ninguna señal (minoritarios etiquetados a 0 o línea atribuible a la dominante) "
+                           "prueba que no haya minoritarios")
 
 
 def _ifrs_annual_values(ifrs_facts: dict[str, Any], concept: str) -> dict[tuple[str, str], float]:
@@ -478,6 +487,12 @@ def _ifrs_annual_values(ifrs_facts: dict[str, Any], concept: str) -> dict[tuple[
     return out
 
 
+def _ifrs_concept_values(ifrs_facts: dict[str, Any], concept: str) -> list[float]:
+    """Todos los valores de un concepto IFRS (flujo o saldo), en cualquier unidad."""
+    return [float(row["val"]) for rows in ((ifrs_facts.get(concept) or {}).get("units") or {}).values()
+            for row in rows or [] if row.get("val") is not None]
+
+
 def _ifrs_parent_differs_from_total(ifrs_facts: dict[str, Any]) -> bool:
     """Hay minoritarios aunque no se etiqueten como tales: el beneficio atribuible a la dominante
     (ProfitLossAttributableToOwnersOfParent) difiere del total (ProfitLoss) en algún ejercicio común
@@ -487,11 +502,31 @@ def _ifrs_parent_differs_from_total(ifrs_facts: dict[str, Any]) -> bool:
     return any(abs(parent[k] - total[k]) > 0.5 for k in parent.keys() & total.keys())
 
 
+def ifrs_nci_signal(ifrs_facts: dict[str, Any]) -> tuple[str, str]:
+    """(«nci», «cero» o «sin_senal», motivo): qué prueban los hechos IFRS del filer sobre sus minoritarios."""
+    tagged = [c for c in SEC_IFRS_NCI_CONCEPTS if ifrs_facts.get(c)]
+    if tagged:
+        values = [v for c in tagged for v in _ifrs_concept_values(ifrs_facts, c)]
+        if values and all(abs(v) <= 0.5 for v in values):
+            return "cero", f"minoritarios etiquetados a 0 ({', '.join(tagged)})"
+        return "nci", f"minoritarios etiquetados ({', '.join(tagged)})"
+    if _ifrs_parent_differs_from_total(ifrs_facts):
+        return "nci", "beneficio atribuible a la dominante distinto del total"
+    parent = _ifrs_annual_values(ifrs_facts, "ProfitLossAttributableToOwnersOfParent")
+    total = _ifrs_annual_values(ifrs_facts, "ProfitLoss")
+    if parent.keys() & total.keys():
+        return "cero", "beneficio atribuible a la dominante igual al total en todos los ejercicios comunes"
+    return "sin_senal", ATTRIBUTABLE_UNVERIFIED
+
+
 def sec_ifrs_metric_map_for(ifrs_facts: dict[str, Any]) -> list[tuple[str, list[str], str]]:
-    """SEC_IFRS_METRIC_MAP para ESTE filer: añade ProfitLoss/Equity detrás de lo atribuible solo si
-    no etiqueta minoritarios en ningún periodo (entonces total = dominante, por definición)."""
-    if any(ifrs_facts.get(c) for c in SEC_IFRS_NCI_CONCEPTS) or _ifrs_parent_differs_from_total(ifrs_facts):
+    """SEC_IFRS_METRIC_MAP para ESTE filer: ProfitLoss/Equity pasan a atribuibles solo con una señal
+    positiva de minoritarios = 0; sin señal, el patrimonio total se guarda como total_equity_total."""
+    signal, _why = ifrs_nci_signal(ifrs_facts)
+    if signal == "nci":
         return SEC_IFRS_METRIC_MAP
+    if signal == "sin_senal":
+        return [*SEC_IFRS_METRIC_MAP, *SEC_IFRS_UNVERIFIED_TOTALS]
     return [(m, [*concepts, SEC_IFRS_NO_NCI_FALLBACKS[m]] if m in SEC_IFRS_NO_NCI_FALLBACKS else concepts, unit)
             for m, concepts, unit in SEC_IFRS_METRIC_MAP]
 

@@ -392,6 +392,13 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     ebitda = [ebitda_for(y) for y in years]
     ni_attr = series("net_income_attributable")
     net_income = [a if a is not None else n for a, n in zip(ni_attr, series("net_income"), strict=True)]
+    if net_income[-1] is None and series("net_income_total")[-1] is not None:
+        # Solo hay beneficio total: sin señal de que no haya minoritarios no se toma como del accionista.
+        warnings.append(f"beneficio {last} atribuible no verificable: el emisor solo etiqueta el total y ninguna "
+                        "señal (minoritarios a 0, línea atribuible o estado de patrimonio) prueba que no haya "
+                        "minoritarios; el PER y el P/VC quedan N/D y el puente EV → capital resta 0 minoritarios sin verificar")
+        cites["attributable_unverified"] = {"year": last, "total": annual.get("net_income_total", {}).get(last),
+                                            "reason": "atribuible no verificable"}
     reporting = str((annual.get("revenue", {}).get(last) or {}).get("unit") or company.currency or "USD").upper()[:3]
     financial = _is_financial(company) or kind in ("insurer", "bank", "holding")
     method = choose_method(revenue=revenue[-1], ebitda_years=ebitda, net_income=net_income[-1],
