@@ -1,0 +1,98 @@
+{
+ "_fuente": "Valores leídos a mano de la fuente primaria por auditoria-valor-1 (gerarai-audit1/AUDIT.md, columna «source value»): SEC 10-K/10-Q/portada (DEI), 40-F, ESEF, informe anual. Millones (acciones en millones). Sin valor = no verificado.",
+ "ASTS": {
+  "shares": 299.06,
+  "doc": "10-Q 2T-26 diluidas (389,2 M todas las clases)"
+ },
+ "CGEO.L": {
+  "shares": 42.1,
+  "doc": "informe del emisor (unidades en miles en Yahoo)"
+ },
+ "CPT": {
+  "shares": 100.07,
+  "debt": 4828.3,
+  "revenue": 1573.5,
+  "doc": "portada 30-10-2026; 10-K 2025"
+ },
+ "BN": {
+  "shares": 2367.8,
+  "doc": "40-F FY25"
+ },
+ "POOL": {
+  "shares": 35.72,
+  "debt": 1166.9,
+  "doc": "portada 21-10-2026; 10-Q"
+ },
+ "CB": {
+  "shares": 382.1,
+  "debt": 18658.0,
+  "doc": "portada 20-10-2026; 10-Q"
+ },
+ "UNH": {
+  "shares": 896.0,
+  "debt": 74331.0,
+  "doc": "portada 30-10-2026; deuda no corriente + DebtCurrent"
+ },
+ "HIMS": {
+  "debt": 1365.3,
+  "doc": "10-Q 2T-26 (convertible)"
+ },
+ "RXRX": {
+  "shares": 622.8,
+  "doc": "portada 26-10-2026"
+ },
+ "IBRX": {
+  "shares": 1059.8,
+  "doc": "portada 31-07-2026"
+ },
+ "AAPL": {
+  "shares": 14532.2,
+  "debt": 81567.0,
+  "doc": "portada; 10-K"
+ },
+ "ERF.PA": {
+  "shares": 194.5,
+  "doc": "ESEF FY24 (no hay ESEF FY25)"
+ },
+ "GOOGL": {
+  "debt": 129823.0,
+  "doc": "10-Q"
+ },
+ "TSM": {
+  "shares": 25932.5,
+  "doc": "DEI acciones ordinarias (1 ADS = 5)"
+ },
+ "AIR.PA": {
+  "debt": 14249.0,
+  "doc": "ESEF 2025 airbus:Long/ShorttermFinancingLiabilities"
+ },
+ "META": {
+  "debt": 83669.0,
+  "doc": "10-Q"
+ },
+ "AMZN": {
+  "shares": 10813.0,
+  "debt": 195762.0,
+  "doc": "portada; LTD + arrendamientos financieros"
+ },
+ "TSLA": {
+  "shares": 3952.8,
+  "debt": 9267.0,
+  "doc": "portada 15-10-2026; LTD 7.956 + DebtCurrent 1.311"
+ },
+ "FRPH": {
+  "shares": 19.2,
+  "debt": 214.6,
+  "doc": "portada; LongTermDebt"
+ },
+ "CNQ": {
+  "shares": 2097.9,
+  "debt": 19723.0,
+  "doc": "40-F: Borrowings 16.617 + LeaseLiabilities 3.106"
+ },
+ "FFH.TO": {
+  "shares": 20.9,
+  "revenue": 46674.0,
+  "doc": "informe anual 2025 (patrimonio / VC por acción)"
+ }
+}

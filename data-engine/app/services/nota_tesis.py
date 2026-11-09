@@ -574,3 +574,254 @@ def grade_equipo(x: Mapping[str, Any]) -> dict[str, Any]:
             ),
         }
     )
+
+
+# ----------------------------------------------------------------------------------------- baremo v2
+#: Baremo estricto v2 (sí de Nico, 8-nov-2026 21:53 Madrid). CONGELADO: no se cambia para mover notas sin su sí.
+#: El v1 de arriba se conserva solo para dar el «antes».
+NOTA_VERSION_V2 = "nota-tesis-v2"
+
+PESOS_RIGOR_V2: dict[str, float] = {
+    "cifras_libres": 0.20,
+    "citas_literales": 0.15,
+    "metodo_tipo": 0.20,
+    "datos_fuente": 0.30,
+    "secciones": 0.05,
+    "kill_switches": 0.10,
+}
+
+#: Tolerancias frente a la fuente primaria (dato de la tesis vs documento oficial).
+TOL_PRIMARIA = {"price": 0.01, "shares": 0.02, "net_debt": 0.05}
+#: Un dato sin valor primario contra el que comprobar vale la mitad: ni aprobado ni suspenso.
+NO_VERIFICADO = 0.5
+#: Sin citas: la tesis no cita nada literal; ni premio ni castigo.
+SIN_CITAS = 0.5
+#: Juez: 10 = igualar o superar a Numantia; cada punto (de 5) por debajo resta 5; −2/5 o peor = 0.
+JUEZ_DELTA_CERO = -2.0
+
+FORMULAS_RIGOR_V2: dict[str, str] = {
+    "cifras_libres": "0 si la tesis salió «recortada» por la guardia (quitó texto) o quedan cifras sin marcador; "
+    "si no, 1 − (cifras sin marcador de la primera pasada, sin falsos positivos 10b5-1/Form 4) / 10, mínimo 0",
+    "citas_literales": "1 − (citas no literales en la evidencia, contando TODAS las citas entre comillas, incluidas "
+    "las traducidas) / citas; 0,5 si no hay ninguna cita",
+    "metodo_tipo": "1 si el método encaja con el tipo de empresa, 0,5 si a medias, 0 si no",
+    "datos_fuente": "0 si AUDIT marca un ERROR en un dato de entrada; si no, media de precio, acciones y deuda "
+    "neta contra la FUENTE PRIMARIA (cierre guardado; SEC/ESEF/emisor; tolerancia 1 %, 2 %, 5 %; sin valor "
+    "primario = 0,5) × máx(0, 1 − 0,25 × avisos de AUDIT que no son ERROR)",
+    "secciones": "secciones con contenido / secciones esperadas",
+    "kill_switches": "kill switches que el código puede comprobar (métrica + umbral numérico + valor actual "
+    "calculado) / kill switches; 0 si no hay",
+}
+
+_SIN_VALOR = re.compile(r"^\s*(n/?d|sin |—|-|none|nan)?\s*$", re.IGNORECASE)
+
+
+def kill_switch_checkable(switch: Mapping[str, Any]) -> bool:
+    """Comprobable por el código: nombra métrica, umbral numérico con comparador y el código calculó el valor."""
+    if not str(switch.get("metric") or "").strip():
+        return False
+    if not re.search(r"[<>≤≥]\s*[−+-]?\d", str(switch.get("threshold") or "")):
+        return False
+    cur = switch.get("current")
+    if cur is None:
+        return False
+    s = str(cur).strip()
+    return bool(re.search(r"\d", s)) and not s.lower().startswith(("sin ", "n/d"))
+
+
+def kill_switch_report_v2(switches: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    bad = [str(s.get("key") or s.get("metric")) for s in switches if not kill_switch_checkable(s)]
+    return {"count": len(switches), "checkable": len(switches) - len(bad), "not_checkable": bad}
+
+
+def _rel(a: float | None, b: float | None) -> float | None:
+    if a is None or b is None:
+        return None
+    den = max(abs(b), 1e-9)
+    return abs(a - b) / den
+
+
+def primary_checks(
+    source: Mapping[str, Any] | None, primary: Mapping[str, Any] | None, mcap: float | None = None
+) -> dict[str, dict[str, Any]]:
+    """Precio, acciones y deuda neta de la tesis contra la fuente primaria.
+
+    - precio: el valor citado contra el cierre guardado por la app (la fuente primaria del precio);
+    - acciones (millones): contra ``primary['shares']`` (portada/10-Q/40-F/ESEF/emisor), NO contra la propia cita;
+    - deuda neta: contra ``primary['net_debt']``; la tolerancia es el 5 % de la deuda neta o el 1 % de la
+      capitalización, lo que sea mayor (una deuda neta casi nula no se suspende por céntimos).
+    Sin valor primario: «no verificado» (vale ``NO_VERIFICADO``).
+    """
+    src = source or {}
+    prim = primary or {}
+    out: dict[str, dict[str, Any]] = {}
+    p = src.get("price") or {}
+    rp = _rel(_f(p.get("cited")), _f(p.get("value")))
+    out["price"] = {
+        "estado": "no_verificado" if rp is None else ("ok" if rp <= TOL_PRIMARIA["price"] else "mal"),
+        "tesis": _f(p.get("cited")),
+        "primaria": _f(p.get("value")),
+    }
+    sh = _f((src.get("shares") or {}).get("value"))
+    ps = _f(prim.get("shares"))
+    rs = _rel(sh, ps)
+    out["shares"] = {
+        "estado": "no_verificado" if rs is None else ("ok" if rs <= TOL_PRIMARIA["shares"] else "mal"),
+        "tesis": sh,
+        "primaria": ps,
+    }
+    nd = _f((src.get("net_debt") or {}).get("value"))
+    pn = _f(prim.get("net_debt"))
+    if nd is None or pn is None:
+        est = "no_verificado"
+    else:
+        tol = max(TOL_PRIMARIA["net_debt"] * abs(pn), 0.01 * (mcap or 0.0))
+        est = "ok" if abs(nd - pn) <= tol else "mal"
+    out["net_debt"] = {"estado": est, "tesis": nd, "primaria": pn}
+    return out
+
+
+def _check_value(estado: str) -> float:
+    return {"ok": 1.0, "mal": 0.0}.get(estado, NO_VERIFICADO)
+
+
+def rigor_components_v2(
+    rigor: Mapping[str, Any],
+    audit_flags: Sequence[Mapping[str, Any]] = (),
+    primary: Mapping[str, Any] | None = None,
+    kill_v2: Mapping[str, Any] | None = None,
+    mcap: float | None = None,
+) -> dict[str, Any]:
+    """Rigor v2 (0–10). Mismas métricas deterministas que v1, con el baremo estricto (ver FORMULAS_RIGOR_V2)."""
+    gp = rigor.get("guard_problems") or {}
+    first_real = max(0, int(gp.get("free_numbers") or 0) - int(gp.get("false_positive_10b5_1") or 0))
+    final = int(rigor.get("free_numbers_final") or 0) + int(rigor.get("unknown_markers_final") or 0)
+    recortada = str(rigor.get("status") or "") == "stripped"
+    cifras = 0.0 if (recortada or final > 0) else max(0.0, 1 - first_real / 10)
+
+    qa = rigor.get("quotes") or {}
+    n_q = int(qa.get("quotes") or 0)
+    citas = SIN_CITAS if n_q == 0 else 1 - _ratio(float(qa.get("not_literal") or 0), float(n_q))
+
+    m = rigor.get("method") or {}
+    metodo = 1.0 if m.get("ok") else (0.5 if m.get("kind_ok") or m.get("partial") else 0.0)
+
+    datos_flags = [f for f in audit_flags if f.get("dato")]
+    errores = sum(1 for f in datos_flags if int(f.get("puntos") or 0) >= 2)
+    avisos = sum(1 for f in datos_flags if int(f.get("puntos") or 0) < 2)
+    checks = primary_checks(rigor.get("source"), primary, mcap)
+    base = sum(_check_value(c["estado"]) for c in checks.values()) / 3
+    datos = 0.0 if errores else base * max(0.0, 1 - 0.25 * avisos)
+
+    sec = rigor.get("sections") or {}
+    secciones = _ratio(float(sec.get("filled") or 0), float(sec.get("expected") or 0), empty=0.0)
+
+    if kill_v2 is not None:  # informe de kill_switch_report_v2 sobre la lista de la tesis
+        ks = kill_v2
+        kill = _ratio(float(ks["checkable"]), float(ks["count"]), empty=0.0)
+        kdet = f"{ks['checkable']}/{ks['count']} comprobables por el código"
+    else:  # sin la lista: solo los que nombran métrica y umbral (v1), y se dice
+        k1 = rigor.get("kill_switches") or {}
+        kill = _ratio(float(k1.get("as_threshold") or 0), float(k1.get("count") or 0), empty=0.0)
+        kdet = f"{k1.get('as_threshold')}/{k1.get('count')} con métrica y umbral (sin lista: valor actual no comprobado)"
+
+    est = {k: v["estado"] for k, v in checks.items()}
+    vals = {
+        "cifras_libres": (
+            cifras,
+            ("RECORTADA por la guardia; " if recortada else "") + f"final {final}, 1.ª pasada {first_real}",
+        ),
+        "citas_literales": (
+            citas,
+            f"{qa.get('not_literal') or 0} de {n_q} citas no literales"
+            f" ({qa.get('translated') or 0} traducidas)"
+            if n_q
+            else "sin citas",
+        ),
+        "metodo_tipo": (metodo, f"{m.get('type')} → {m.get('chosen')}"),
+        "datos_fuente": (datos, f"fuente primaria {est}; AUDIT {errores} ERROR, {avisos} avisos"),
+        "secciones": (secciones, f"{sec.get('filled')}/{sec.get('expected')}"),
+        "kill_switches": (kill, kdet),
+    }
+    comps = {
+        k: {"valor": round(v, 4), "peso": PESOS_RIGOR_V2[k], "detalle": d, "formula": FORMULAS_RIGOR_V2[k]}
+        for k, (v, d) in vals.items()
+    }
+    total = 10 * sum(c["valor"] * c["peso"] for c in comps.values())
+    return {
+        "componentes": comps,
+        "rigor_10": round(total, 2),
+        "fuente_primaria": checks,
+        "recortada": recortada,
+    }
+
+
+def judge_vs_numantia_10(delta_5: float | None, nota_5: float | None = None) -> float | None:
+    """Juez v2 sobre 10 con Numantia como OBJETIVO: Δ ≥ 0 → 10; Δ ≤ −2 → 0; lineal entre medias.
+
+    Sin ancla (Δ desconocido) se usa la nota absoluta × 2, y el informe lo dice."""
+    if delta_5 is None:
+        return None if nota_5 is None else 2 * float(nota_5)
+    return round(10 * _clamp01(1 - float(delta_5) / JUEZ_DELTA_CERO), 3)
+
+
+def grade_v2(rigor_10: float | None, juez_10: float | None) -> dict[str, Any]:
+    """Nota v2 = 0,8 × rigor v2 + 0,2 × juez contra Numantia (0–10). Sin tesis: 0 (cuenta en la media)."""
+    if rigor_10 is None:
+        return {"nota": 0.0, "formula": "sin tesis: 0"}
+    if juez_10 is None:
+        return {"nota": round(rigor_10, 1), "formula": "rigor solo (sin veredicto del juez)"}
+    nota = PESO_RIGOR * rigor_10 + PESO_JUEZ * juez_10
+    return {
+        "nota": round(nota, 1),
+        "juez_10": round(juez_10, 2),
+        "formula": f"{PESO_RIGOR} × rigor {rigor_10:.2f} + {PESO_JUEZ} × juez vs Numantia {juez_10:.2f}",
+    }
+
+
+def grade_cerebro_v2(x: Mapping[str, Any]) -> dict[str, Any]:
+    """Cerebro v2: los aciertos salen del CONTROL (holdout, preguntas nuevas guardadas antes de correrlas) y un
+    «No puedo…» no es acierto (control «contesta» de bench_grade). Dentro de muestra se informa aparte.
+    El juez es el de ANTES de los arreglos (``juez_antes_5``): el de después solo puntuó pares dentro de muestra."""
+    hold = int(x["holdout_aciertos"]), int(x["holdout_casos"])
+    ins = int(x["muestra_aciertos"]), int(x["muestra_casos"])
+    inv = int(x["cifras_inventadas"])
+    parts = {
+        "aciertos_control": (
+            hold[0] / hold[1],
+            0.6,
+            "casos del control (holdout) que pasan todos los controles, «no puedo» incluido / casos",
+            f"{hold[0]}/{hold[1]} (dentro de muestra {ins[0]}/{ins[1]}, no puntúa)",
+        ),
+        "juez": (
+            float(x["juez_antes_5"]) / 5,
+            0.2,
+            "nota media del juez ciego (antes de los arreglos) / 5",
+            f"{float(x['juez_antes_5']):.2f}/5",
+        ),
+        "latencia": (
+            _clamp01(10 / float(x["p95_s"])),
+            0.2,
+            "mín(1, 10 s / latencia p95 del control)",
+            f"p95 {float(x['p95_s']):.1f} s",
+        ),
+    }
+    out = _module(parts)
+    if inv > 0:
+        out["nota"] = round(out["nota"] / 2, 1)
+    out["cifras_inventadas"] = inv
+    out["dentro_de_muestra"] = round(10 * ins[0] / ins[1], 1)
+    return out
+
+
+def module_tesis_v2(notas: Mapping[str, float | None], universo: Sequence[str]) -> dict[str, Any]:
+    """Media de la nota v2 sobre TODO el universo: una empresa sin tesis cuenta 0."""
+    vals = [float(notas.get(t) or 0.0) for t in universo]
+    return {
+        "nota": round(sum(vals) / len(vals), 1) if vals else None,
+        "n": len(vals),
+        "sin_tesis": [t for t in universo if notas.get(t) is None],
+        "min": round(min(vals), 1) if vals else None,
+        "max": round(max(vals), 1) if vals else None,
+        "formula": "media de las notas v2 de las 24 empresas; sin tesis = 0",
+    }

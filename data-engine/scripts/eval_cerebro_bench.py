@@ -219,7 +219,7 @@ async def snapshot(client: _Client, cases: list[dict]) -> dict:
 
 async def cmd_run(args) -> int:
     _install_capture()
-    cases = load_cases()
+    cases = load_cases(Path(args.cases))
     if args.only:
         keep = set(args.only.split(","))
         cases = [c for c in cases if c["id"] in keep or c["category"] in keep]
@@ -279,8 +279,8 @@ async def cmd_run(args) -> int:
     return 0 if stopped is None else 3
 
 
-def grade_dir(run_dir: Path) -> dict:
-    cases = {c["id"]: c for c in load_cases()}
+def grade_dir(run_dir: Path, cases_path: Path = CASES) -> dict:
+    cases = {c["id"]: c for c in load_cases(cases_path)}
     snap = json.loads((run_dir / "snapshot.json").read_text(encoding="utf-8"))
     rows, graded = [], []
     for line in (run_dir / "results.jsonl").read_text(encoding="utf-8").splitlines():
@@ -482,8 +482,11 @@ def main() -> int:
     r.add_argument("--user", default="u-bench")
     r.add_argument("--only", default="")
     r.add_argument("--cap-usd", type=float, default=1.5)
+    # bench_v1 (dentro de muestra) por defecto; evals/cerebro/holdout_v1/cases.jsonl es el control.
+    r.add_argument("--cases", default=str(CASES))
     g = sub.add_parser("grade")
     g.add_argument("run_dir")
+    g.add_argument("--cases", default=str(CASES))
     j = sub.add_parser("judge")
     j.add_argument("before")
     j.add_argument("after")
@@ -492,7 +495,7 @@ def main() -> int:
     s.add_argument("--user", default="u-bench")
     args = ap.parse_args()
     if args.cmd == "grade":
-        print(json.dumps(grade_dir(Path(args.run_dir)), ensure_ascii=False, indent=1))
+        print(json.dumps(grade_dir(Path(args.run_dir), Path(args.cases)), ensure_ascii=False, indent=1))
         return 0
     return asyncio.run({"run": cmd_run, "judge": cmd_judge, "seed": cmd_seed}[args.cmd](args))
 

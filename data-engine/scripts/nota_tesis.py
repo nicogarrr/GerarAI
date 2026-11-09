@@ -198,6 +198,8 @@ def cmd_collect(args) -> None:
                 rec["rigor"] = xb.rigor_for(
                     db, t, doc, today=row.as_of or date.today(), stored_markers=markers
                 )
+                if company is not None:  # baremo v2: kill switches comprobables (valor actual calculado)
+                    rec["rigor"]["kill_switches_v2"] = nt.kill_switch_report_v2(ctx.switches)
                 text = "\n\n".join(render(doc.get("sections") or {}, markers).values())
                 (out / "texts" / f"{t}.txt").write_text(text)
         except Exception as exc:  # noqa: BLE001 - se anota y se sigue
@@ -307,9 +309,31 @@ def _judge_for(out: Path, t: str, fp: str | None) -> dict[str, Any] | None:
     return None
 
 
+def _score_v2(
+    rec: dict[str, Any], flags: list, primary: dict[str, Any], j: dict[str, Any] | None
+) -> dict[str, Any]:
+    """Baremo estricto v2 (congelado) sobre la misma recogida que v1."""
+    t = rec["ticker"]
+    prim = primary.get(t) or primary.get(t.split(".")[0]) or {}
+    rig = rec["rigor"]
+    sh = _num(((rig.get("source") or {}).get("shares") or {}).get("value"))
+    mcap = (sh or 0) * float(rec.get("price") or 0) or None
+    rc = nt.rigor_components_v2(rig, flags, prim, rig.get("kill_switches_v2"), mcap)
+    jz = nt.judge_vs_numantia_10((j or {}).get("delta_vs_ancla"), (j or {}).get("nota_5"))
+    return {"rigor": rc, "juez_10": jz, **nt.grade_v2(rc["rigor_10"], jz)}
+
+
+def _num(v: Any) -> float | None:
+    try:
+        return None if v is None else float(v)
+    except (TypeError, ValueError):
+        return None
+
+
 def cmd_score(args) -> None:
     out = Path(args.out)
     audit = json.loads(Path(args.audit).read_text())
+    primary = json.loads(Path(args.primary).read_text()) if args.primary else {}
     collect = json.loads((out / "collect.json").read_text())
     placebo = [json.loads(f.read_text()) for f in sorted((out / "judge").glob("placebo__*.json"))]
     res = []
@@ -339,8 +363,10 @@ def cmd_score(args) -> None:
             j = _judge_for(out, t, (rec.get("thesis") or {}).get("fingerprint"))
             g = nt.grade(rc["rigor_10"], (j or {}).get("nota_5"))
             r.update(rigor=rc, juez=j, **g)
+            r["v2"] = _score_v2(rec, flags, primary, j)
         else:
             r.update(nota=None, formula="sin tesis v2 guardada: sin nota")
+            r["v2"] = nt.grade_v2(None, None)
         cons = rec.get("consensus") or {}
         r["analistas"] = nt.analyst_gap(
             rec.get("value_per_share") or {}, rec.get("currency"), cons.get("converted") or cons
@@ -363,6 +389,16 @@ def cmd_score(args) -> None:
         "pesos": {"rigor": nt.PESO_RIGOR, "juez": nt.PESO_JUEZ, "rigor_componentes": nt.PESOS_RIGOR},
         "formulas": nt.FORMULAS_RIGOR,
         "placebo": nt.placebo_noise(placebo),
+        "v2": {
+            "version": nt.NOTA_VERSION_V2,
+            "pesos": {"rigor": nt.PESO_RIGOR, "juez": nt.PESO_JUEZ, "rigor_componentes": nt.PESOS_RIGOR_V2},
+            "formulas": nt.FORMULAS_RIGOR_V2,
+            "juez": "10 × mín(1, máx(0, 1 + Δ/2)), Δ = nuestra nota − Numantia (sobre 5)",
+            "modulo": nt.module_tesis_v2(
+                {r["ticker"]: (None if r.get("nota") is None else r["v2"]["nota"]) for r in res},
+                [r["ticker"] for r in res],
+            ),
+        },
         "tesis": res,
     }
     (out / "notas.json").write_text(json.dumps(doc, ensure_ascii=False, indent=1, default=str))
@@ -391,6 +427,15 @@ def cmd_modules(args) -> None:
             "n": len(graded),
         },
     }
+    if x.get("cerebro_v2"):
+        res["cerebro_v2"] = nt.grade_cerebro_v2(x["cerebro_v2"])
+    if notas.get("v2"):
+        res["tesis_v2"] = notas["v2"]["modulo"]
+        eq2 = dict(x["equipo"])
+        jud = [r for r in notas["tesis"] if (r.get("juez") or {}).get("delta_vs_ancla") is not None]
+        eq2["tesis_juzgadas"] = len(notas["tesis"])  # v2: las que no tienen tesis cuentan como no alcanzadas
+        eq2["tesis_en_suelo"] = sum(1 for r in jud if r["juez"]["delta_vs_ancla"] >= -0.05)
+        res["equipo_v2"] = nt.grade_equipo(eq2)
     (out / "modulos.json").write_text(json.dumps(res, ensure_ascii=False, indent=1))
     print({k: v.get("nota") for k, v in res.items() if isinstance(v, dict)})
 
@@ -476,6 +521,7 @@ def main(argv: list[str] | None = None) -> None:
     s = sub.add_parser("score")
     s.add_argument("--out", required=True)
     s.add_argument("--audit", required=True)
+    s.add_argument("--primary", default="", help="benchmarks/fuente_primaria_AAAA-MM-DD.json (baremo v2)")
     s.add_argument("--as-of", default=date.today().isoformat())
     s.add_argument("--provisional", action=argparse.BooleanOptionalAction, default=True)
     fl = sub.add_parser("forecast-log")
