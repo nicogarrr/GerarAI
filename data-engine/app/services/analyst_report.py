@@ -221,8 +221,14 @@ def build_market(
     volumes: list[int],
     points: dict[str, Any],
     adr_ratio: float | None = None,
+    cover: dict | None = None,
 ) -> dict:
     """Bloque de datos de mercado. ``points`` = TtmValue de acciones, caja y deuda.
+
+    ``cover`` = portada del último informe (con TODAS las clases sumadas si hay varias; regla «acciones-
+    vigentes-v1», la del motor de valoración): si no es más antigua que el recuento elegido, manda. Sin ella el
+    Informe valoraba ASTS con la media diluida de la clase A (299 M) frente a 389 M (A + B + C) en la ficha,
+    y RXRX con las acciones del balance de septiembre (561 M) frente a 623 M de la portada de octubre.
 
     ``adr_ratio`` = acciones ordinarias por ADR (``adr_ratio`` del motor de valoración).
     Si el precio es de un ADR, las acciones del filing son ordinarias: capitalización =
@@ -238,6 +244,10 @@ def build_market(
 
     shares = point("shares_outstanding")
     diluted = point("shares_diluted")
+    if cover is not None and cover.get("value") and cover["value"] > 0:
+        ends = [p["period_end"] for p in (shares, diluted) if p and p.get("period_end")]
+        if not ends or all(cover["period_end"] >= e for e in ends):
+            shares = cover
     cash = point("cash_and_equivalents")
     debt = point("total_debt")
     avg_volume = round(sum(volumes) / len(volumes)) if volumes else None
@@ -284,6 +294,47 @@ def build_market(
         "enterprise_value": enterprise_value,
         "enterprise_value_reason": ev_reason,
     }
+
+
+def latest_cover(facts: list[FinancialFact]) -> dict | None:
+    """La portada más reciente del último informe (regla «acciones-vigentes-v1», la de la valoración), en el
+    formato de los puntos del Informe: la suma de TODAS las clases (hecho derivado de dei:EntityCommonStock-
+    SharesOutstanding por clase, con su procedencia en el documento) o la portada SEC sin desglose
+    (``<fecha>:DEI``). La portada sin desglose se descarta, con la misma regla, si queda por debajo del 80 % o
+    por encima de 3× la media diluida más reciente (puede ser una sola clase o una escala distinta)."""
+    from app.valuation import current_shares as cs
+
+    def meta(fact: FinancialFact) -> Any:
+        return getattr(getattr(fact, "source", None), "metadata_", None)
+
+    diluted = [(end, f) for f in facts if f.metric == "shares_diluted" and f.value is not None
+               and (end := _period_end(f)) is not None]
+    last_diluted = float(max(diluted, key=lambda p: p[0])[1].value) if diluted else None
+    best: tuple[date, bool, FinancialFact] | None = None
+    for fact in facts:
+        if fact.metric != "shares_outstanding" or fact.value is None or float(fact.value) <= 0:
+            continue
+        end = _period_end(fact)
+        if end is None:
+            continue
+        source = fact.source_type or ""
+        by_class = source == "derived" and cs.is_class_sum(meta(fact), fact.period)
+        dei = source == "SEC" and str(fact.period or "").endswith(":DEI")
+        if not (by_class or dei):
+            continue
+        if not by_class and cs.cover_check(float(fact.value), last_diluted, by_class=False) is not None:
+            continue
+        if best is None or (end, by_class) > (best[0], best[1]):
+            best = (end, by_class, fact)
+    if best is None:
+        return None
+    end, by_class, fact = best
+    out = {"value": _num(Decimal(fact.value)), "unit": "shares", "period_end": end, "provenance": "OFICIAL",
+           "basis": "class_sum" if by_class else "cover"}
+    if by_class:
+        members = cs.class_members(meta(fact), fact.period) or {}
+        out["class_members"] = {cs.short(k): v for k, v in sorted(members.items())}
+    return out
 
 
 def _fact_rows(facts: list[FinancialFact], cik: str | None = None) -> list[FactRow]:
@@ -361,6 +412,7 @@ def build_company_report(db: Session, company: Company, *, today: date | None = 
             volumes=volumes,
             points=points,
             adr_ratio=company_adr_ratio(company),
+            cover=latest_cover(facts),
         ),
         "estimates": build_estimates(_fact_rows(flow, getattr(company, "cik", None)),
                                      derive_ebitda=not interest_is_operating(company)),
@@ -385,5 +437,7 @@ def build_company_report(db: Session, company: Company, *, today: date | None = 
             "url": "Cada cifra enlaza al filing del que sale (índice EDGAR por número de acceso o el documento ESEF).",
             "user_estimates": "Las estimaciones del usuario salen de su desglose por partes y su tesis, etiquetadas como suyas.",
             "nav": "NAV por acción tal como lo publica la empresa (último documento publicado); descuento = precio / NAV − 1.",
+            "shares": ("Acciones en circulación: la portada del último informe; con varias clases, la suma de todas "
+                       "(la misma regla que la valoración)."),
         },
     }
