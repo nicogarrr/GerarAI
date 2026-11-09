@@ -69,6 +69,28 @@ def insert_alert_once(db: Session, alert: ResearchAlert) -> bool:
     return True
 
 
+def _ensure_in_app_delivery(db: Session, *, tenant_id: Any, fingerprint: str) -> None:
+    """Backfill perezoso: registra la entrega in_app de una alerta ya persistida.
+
+    Las alertas de los watchdogs creadas antes de que insert_alert_once
+    registrara la entrega (09-nov-2026) quedaron marcadas en la UI "sin
+    registro de entrega" aunque estan en la app. Al reencontrarlas por dedup
+    (un tick por ciclo) se graba la entrega de la fila existente: idempotente
+    (record_in_app_delivery dedup por alerta+canal), sin script ops y sin
+    tocar nada que no pase por esta funcion (solo la usan los watchdogs).
+    Si la carrera de IntegrityError aun no es visible, el siguiente tick lo
+    recoge.
+    """
+    existing_alert = db.scalar(
+        select(ResearchAlert).where(
+            ResearchAlert.tenant_id == tenant_id,
+            ResearchAlert.fingerprint == fingerprint,
+        )
+    )
+    if existing_alert is not None:
+        record_in_app_delivery(db, existing_alert)
+
+
 def persist_in_app_alerts(
     db: Session,
     *,
@@ -104,5 +126,6 @@ def persist_in_app_alerts(
             created.append(alert.id)
         else:
             existing += 1
+            _ensure_in_app_delivery(db, tenant_id=tenant_id, fingerprint=item.fingerprint)
     db.commit()
     return created, existing

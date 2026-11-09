@@ -146,3 +146,58 @@ def test_insert_alert_once_registra_entrega_en_la_primitiva(db):
     assert deliveries[0].channel == "in_app"
     assert insert_alert_once(db, alert) is False  # dedup: sin segunda entrega
     assert len(db.scalars(select(AlertDelivery)).all()) == 1
+
+
+def test_dedup_backfilla_la_entrega_de_alerta_pre_fix(db):
+    # Alerta persistida ANTES del fix (sin fila de entrega, como las "Cola X
+    # atascada" del 09-nov-2026 en prod): el reencuentro por dedup la cura.
+    from app.models import AlertDelivery
+
+    tenant = _tenant(db)
+    legacy = ResearchAlert(
+        tenant_id=tenant.id, company_id=None, severity="high", status="open",
+        alert_type="queue_stuck", title="Cola yahoo atascada", message="m",
+        fingerprint="fp-legacy", channels=["in_app"], last_triggered_at=NOW, metadata_={},
+    )
+    db.add(legacy)
+    db.commit()
+    assert db.scalars(select(AlertDelivery)).all() == []
+
+    created, existing = persist_in_app_alerts(
+        db, tenant_id=tenant.id, now=NOW, alerts=[_alert("fp-legacy")]
+    )
+    assert created == []
+    assert existing == 1
+    deliveries = db.scalars(select(AlertDelivery)).all()
+    assert len(deliveries) == 1
+    assert deliveries[0].alert_id == legacy.id
+    assert deliveries[0].channel == "in_app"
+    assert deliveries[0].status == "delivered"
+    assert deliveries[0].attempts == 1
+
+    # Idempotente: otro tick no duplica la entrega.
+    persist_in_app_alerts(db, tenant_id=tenant.id, now=NOW, alerts=[_alert("fp-legacy")])
+    assert len(db.scalars(select(AlertDelivery)).all()) == 1
+
+
+def test_dedup_no_toca_alertas_ajenas_al_fingerprint(db):
+    # El backfill es por (tenant, fingerprint): una alerta de otro tenant con
+    # el mismo fingerprint no recibe entrega.
+    from app.models import AlertDelivery
+
+    tenant_a = _tenant(db)
+    tenant_b = Tenant(external_id="alerts-tenant-b2", name="B2")
+    db.add(tenant_b)
+    db.commit()
+    legacy_b = ResearchAlert(
+        tenant_id=tenant_b.id, company_id=None, severity="high", status="open",
+        alert_type="queue_stuck", title="t", message="m", fingerprint="fp-x",
+        channels=["in_app"], last_triggered_at=NOW, metadata_={},
+    )
+    db.add(legacy_b)
+    db.commit()
+    persist_in_app_alerts(db, tenant_id=tenant_a.id, now=NOW, alerts=[_alert("fp-x")])
+    deliveries_b = db.scalars(
+        select(AlertDelivery).where(AlertDelivery.alert_id == legacy_b.id)
+    ).all()
+    assert deliveries_b == []
