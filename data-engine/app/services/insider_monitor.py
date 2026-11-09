@@ -84,8 +84,15 @@ def resolve_ciks(
 ) -> dict[str, str]:
     """ticker -> CIK, usando Company.cik y rellenando desde la SEC."""
     resolved: dict[str, str] = {}
+    # Lote único de empresas por ticker (anti N+1): una consulta con IN en vez
+    # de una por ticker de la watchlist. Empate de ticker duplicado: gana el
+    # id menor, como el primer resultado por orden de inserción anterior.
+    company_by_ticker: dict[str, Company] = {}
+    if tickers:
+        for company in db.scalars(select(Company).where(Company.ticker.in_(tickers)).order_by(Company.id)).all():
+            company_by_ticker.setdefault(company.ticker, company)
     for ticker in tickers:
-        company = db.scalar(select(Company).where(Company.ticker == ticker))
+        company = company_by_ticker.get(ticker)
         cik = (company.cik or "").strip() if company else ""
         if not cik and company is not None and is_foreign_listing(company.exchange):
             # El ticker de EDGAR es un símbolo de EE. UU.: para un listado
