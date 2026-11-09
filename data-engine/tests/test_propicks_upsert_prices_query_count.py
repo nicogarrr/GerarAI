@@ -150,7 +150,19 @@ def test_upsert_hidratacion_acotada_por_la_tanda():
     _seed(db, company, 120)
     db.expire_all()
     loaded = {"n": 0}
-    event.listen(MarketPrice, "load", lambda *a: loaded.__setitem__("n", loaded["n"] + 1))
-    upsert_prices(db, company, _bars(60))  # solo 60 dias en la tanda
-    assert loaded["n"] <= 60, loaded
-    db.close()
+
+    def _on_load(*a):
+        loaded["n"] += 1
+
+    # Listener nombrado y retirado en finally: un listener sobre la clase
+    # mapeada es global y sobrevive al engine si no se quita.
+    engine = db.bind
+    event.listen(MarketPrice, "load", _on_load)
+    try:
+        upsert_prices(db, company, _bars(60))  # solo 60 dias en la tanda
+        assert loaded["n"] <= 60, loaded
+    finally:
+        event.remove(MarketPrice, "load", _on_load)
+        db.close()
+        if engine is not None:
+            engine.dispose()
