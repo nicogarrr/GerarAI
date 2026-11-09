@@ -391,3 +391,118 @@ def test_fmp_derivatives_use_only_own_annual_pair(db):
     assert fact.value == Decimal("80")
     assert fact.source_type == "FMP"
     assert fact.fiscal_quarter == "FY"
+
+
+# --------------------------------------------------------------------------
+# Fail-closed de red y entidad en refresh_from_sec (caminos async, clientes
+# doblados, SQLite real en memoria). NO prueba: red real, el indice DEI con
+# accessiones verificadas, ni la deduplicacion por fingerprint (otros tests).
+# --------------------------------------------------------------------------
+
+
+class _FakeSECSinCik:
+    async def cik_for_ticker(self, ticker):
+        return None
+
+
+def test_refresh_from_sec_sin_cik_fail_closed(db, monkeypatch):
+    """Un ticker sin CIK resoluble no reporta a la SEC: RuntimeError y la
+    ficha queda sin hechos (el emisor usa la fuente de su mercado local)."""
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECSinCik)
+    company = _company(db)
+    with pytest.raises(RuntimeError, match="Sin CIK"):
+        asyncio.run(FinancialIngestionService().refresh_from_sec(db=db, company=company))
+    assert _facts(db, company, "revenue") == []
+
+
+class _FakeSECCaidaEnCik:
+    async def cik_for_ticker(self, ticker):
+        raise ConnectionError("red caida")
+
+
+def test_refresh_from_sec_error_resolviendo_cik_es_runtime_error(db, monkeypatch):
+    """Un fallo de red resolviendo el CIK no se traga: RuntimeError 'SEC
+    fetch failed' y sin hechos persistidos."""
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECCaidaEnCik)
+    company = _company(db)
+    with pytest.raises(RuntimeError, match="SEC fetch failed"):
+        asyncio.run(FinancialIngestionService().refresh_from_sec(db=db, company=company))
+    assert _facts(db, company, "revenue") == []
+
+
+class _FakeSECCaidaEnFacts:
+    async def cik_for_ticker(self, ticker):
+        return "0000000001"
+
+    async def company_facts(self, cik):
+        raise TimeoutError("timeout")
+
+
+def test_refresh_from_sec_error_leyendo_facts_es_runtime_error(db, monkeypatch):
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECCaidaEnFacts)
+    company = _company(db)
+    with pytest.raises(RuntimeError, match="SEC fetch failed"):
+        asyncio.run(FinancialIngestionService().refresh_from_sec(db=db, company=company))
+    assert _facts(db, company, "revenue") == []
+
+
+class _FakeSECEntidadAjena:
+    """Mismo ticker, otro emisor (PRIM en BME vs Perimeter en NYSE)."""
+
+    async def cik_for_ticker(self, ticker):
+        return "0000000001"
+
+    async def company_facts(self, cik):
+        return {"cik": 1, "entityName": "Perimeter Solutions Inc.",
+                "facts": {"us-gaap": {}}}
+
+    async def annual_report_anchors(self, cik):
+        return {}
+
+
+def test_refresh_from_sec_entidad_ajena_en_bolsa_extranjera_falla(db, monkeypatch):
+    """Listado no estadounidense cuya razon social SEC no casa con la ficha:
+    RuntimeError y ningun hecho del homonimo entra."""
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECEntidadAjena)
+    company = Company(
+        ticker="PRM", name="Prim SA", exchange="BME", currency="EUR",
+        sector="S", industry="I", company_type="holding",
+        valuation_model="unassigned", special_sources=[], special_risks=[],
+        factor_tags=[], cik=None,
+    )
+    db.add(company)
+    db.commit()
+    with pytest.raises(RuntimeError, match="no es el emisor"):
+        asyncio.run(FinancialIngestionService().refresh_from_sec(db=db, company=company))
+    assert _facts(db, company, "revenue") == []
+
+
+class _FakeSECAnclasCaidas:
+    payload = {"cik": 1, "facts": {"us-gaap": {
+        "Revenues": {"units": {"USD": [
+            {"fy": 2025, "fp": "FY", "form": "10-K", "start": "2025-01-01",
+             "end": "2025-12-31", "val": 5000000000, "filed": "2026-02-10",
+             "accn": "0000000001-25-000001"},
+        ]}}}}}
+
+    async def cik_for_ticker(self, ticker):
+        return "0000000001"
+
+    async def company_facts(self, cik):
+        return self.payload
+
+    async def annual_report_anchors(self, cik):
+        raise ConnectionError("submissions caido")
+
+
+def test_refresh_from_sec_anclas_caidas_fail_closed_anual(db, monkeypatch):
+    """Sin anclas de filing no entra NINGUN hecho anual (fail closed): el
+    refresh termina 'ingested', declara 0 anclas y no persiste el FY."""
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECAnclasCaidas)
+    company = _company(db)
+    result = asyncio.run(
+        FinancialIngestionService().refresh_from_sec(db=db, company=company)
+    )
+    assert result["status"] == "ingested"
+    assert result["annual_anchored_filings"] == 0
+    assert _facts(db, company, "revenue") == []

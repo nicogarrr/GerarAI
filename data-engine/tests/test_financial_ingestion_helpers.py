@@ -160,6 +160,20 @@ def test_mes_modal_primera_semana_es_mes_anterior():
     assert m._current_fiscal_month_from_anchors(anchors) == "03"
 
 
+def test_mes_modal_ventana_cinco_recientes_gana_a_la_historia():
+    # La moda se computa sobre los ~5 filings mas recientes, no sobre toda
+    # la historia: con 8 anclas donde los 5 recientes son 3x"03" + 2x"12"
+    # y los 3 antiguos son "12", la historia completa daria "12" (5 vs 3)
+    # y la ventana da "03". Caso real: emisores que cambian de calendario
+    # fiscal (BRT Sep->Dec, VFC Dic->Mar) quedaban congelados en el ano viejo.
+    anchors = {
+        "a1": "2026-03-31", "a2": "2025-03-29", "a3": "2024-03-30",
+        "a4": "2023-12-31", "a5": "2022-12-31",
+        "a6": "2021-12-31", "a7": "2020-12-31", "a8": "2019-12-31",
+    }
+    assert m._current_fiscal_month_from_anchors(anchors) == "03"
+
+
 # --- _esef_annual_ends ------------------------------------------------------
 
 
@@ -239,7 +253,9 @@ def test_quarters_from_ytd_deriva_el_trimestre_que_falta():
     q2 = derivados["2025-06-30"]
     assert q2["val"] == 150
     assert q2["_derived_from_ytd"] is True
+    # Hereda accn Y filed del acumulado mas reciente (el filing conocible).
     assert q2["accn"] == "a2"
+    assert q2["filed"] == "2025-07-25"
 
 
 def test_quarters_from_ytd_no_pisa_trimestre_presentado():
