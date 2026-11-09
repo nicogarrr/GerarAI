@@ -14,6 +14,7 @@ descargas, la verificacion del emisor (13D/G) y los backfills (Form 4).
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -22,6 +23,8 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
 from app.models.entities import ConnectorState
+
+logger = logging.getLogger(__name__)
 
 
 def utcnow() -> datetime:
@@ -104,13 +107,23 @@ def record_fatal(
         stats["errors"].append(f"fatal: {public_reason}")
     else:
         stats["errors"].append(f"fatal: {fatal_error}")
-    db.rollback()
-    state = connector_state(db, tenant_id, connector)
-    state.consecutive_errors = (state.consecutive_errors or 0) + 1
-    state.last_error = fatal_error
-    meta = dict(state.metadata_ or {})
-    meta["runs"] = int(meta.get("runs", 0)) + 1
-    meta["last_run"] = stats
-    state.metadata_ = meta
-    db.add(state)
-    db.commit()
+    try:
+        db.rollback()
+        state = connector_state(db, tenant_id, connector)
+        state.consecutive_errors = (state.consecutive_errors or 0) + 1
+        state.last_error = fatal_error
+        meta = dict(state.metadata_ or {})
+        meta["runs"] = int(meta.get("runs", 0)) + 1
+        meta["last_run"] = stats
+        state.metadata_ = meta
+        db.add(state)
+        db.commit()
+    except Exception:  # noqa: BLE001 - el actor jamas recibe una excepcion
+        # Segundo fallo de BD (la caida NO era transitoria): el estado no se
+        # puede persistir. El contrato "el actor jamas recibe una excepcion"
+        # manda y el detalle queda en logs; el watermark se recupera solo en
+        # la siguiente corrida con la BD sana (consecutive_errors vuelve a
+        # contar desde el ultimo estado persistido).
+        logger.exception(
+            "record_fatal: no se pudo persistir el fallo de %s", connector
+        )
