@@ -5,16 +5,13 @@ import EmailNotifications from '@/components/alerts/EmailNotifications';
 import PushNotifications from '@/components/alerts/PushNotifications';
 import { PageHeader } from '@/components/ui/page-header';
 import { getT } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
-    const ti = await getT();
-    return {
-        title: ti('alerts.meta.title'),
-        description: ti('alerts.meta.description'),
-    };
+    return i18nPageMetadata('alerts.meta.title', 'alerts.meta.description');
 }
 
 export default async function AlertsPage() {

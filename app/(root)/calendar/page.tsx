@@ -8,16 +8,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarEvents } from '@/components/calendar/CalendarEvents';
 import { getCatalystCalendar, type CatalystCalendar } from '@/lib/actions/catalysts.actions';
 import { getT, getFormat } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
-    const ti = await getT();
-    return {
-        title: ti('calendar.meta.catalystsTitle'),
-        description: ti('calendar.meta.catalystsDescription'),
-    };
+    return i18nPageMetadata('calendar.meta.catalystsTitle', 'calendar.meta.catalystsDescription');
 }
 
 
