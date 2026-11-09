@@ -16,7 +16,10 @@ arrendamientos operativos dentro) se restaba de la caja del último 10-Q. Reglas
 """
 from __future__ import annotations
 
+import math
+import re
 from collections.abc import Callable, Mapping
+from datetime import date
 from typing import Any
 
 RULE = "caja-deuda-v1"
@@ -27,14 +30,21 @@ ZERO_TOLERANCE = 0.005
 
 
 def _end(cite: Mapping[str, Any] | None) -> str:
-    return str((cite or {}).get("period") or "").split(":")[0]
+    end = str((cite or {}).get("period") or "").split(":")[0]
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", end):
+        return ""
+    try:
+        return date.fromisoformat(end).isoformat()
+    except ValueError:
+        return ""
 
 
 def _val(cite: Mapping[str, Any] | None) -> float | None:
     try:
         v = (cite or {}).get("value")
-        return None if v is None else float(v) / 1_000_000.0
-    except (TypeError, ValueError):
+        value = None if v is None else float(v) / 1_000_000.0
+        return value if value is not None and math.isfinite(value) else None
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
@@ -52,6 +62,8 @@ def short_term_investments(point: Mapping[str, Mapping[str, Any]]) -> tuple[floa
     v = _val(sti)
     if v is None:
         return 0.0, None, None
+    if not end or not anchor:
+        return 0.0, None, f"inversiones a corto: cierre desconocido de caja o inversiones; no se suman ({RULE})"
     if end != anchor:
         if not v:
             return 0.0, None, None
@@ -73,6 +85,8 @@ def financial_debt(point: Mapping[str, Mapping[str, Any]], *, ifrs: bool,
     if debt is None or v is None:
         return None, None, False, warnings
     anchor, end = _end(point.get("cash_and_equivalents")), _end(debt)
+    if not anchor or not end:
+        return None, None, False, [f"deuda total: cierre desconocido de caja o deuda; no se usa ({RULE})"]
     cite: dict[str, Any] = dict(debt)
     if is_primary(debt):
         if anchor and end and end != anchor:
@@ -110,7 +124,8 @@ def financial_debt(point: Mapping[str, Mapping[str, Any]], *, ifrs: bool,
 def same_close(point: Mapping[str, Mapping[str, Any]], metric: str) -> bool:
     """El saldo ``metric`` es del mismo cierre que la caja (el ancla del punto de partida)."""
     cite = point.get(metric)
-    return bool(cite) and _end(cite) == _end(point.get("cash_and_equivalents"))
+    end, anchor = _end(cite), _end(point.get("cash_and_equivalents"))
+    return bool(cite) and bool(end) and bool(anchor) and end == anchor
 
 
 def stale_note(point: Mapping[str, Mapping[str, Any]], metric: str, label: str) -> str | None:
