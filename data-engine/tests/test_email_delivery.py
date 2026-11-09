@@ -258,3 +258,27 @@ def test_malformed_config_never_touches_the_network():
     )
     assert result["status"] == "failed"
     assert FakeSMTP.instances == []
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"smtp_port": 99999},
+        {"smtp_port": 0},
+        {"smtp_port": -1},
+        {"smtp_timeout_seconds": float("nan")},
+        {"smtp_timeout_seconds": float("inf")},
+        {"smtp_timeout_seconds": 0},
+        {"smtp_timeout_seconds": -1},
+    ],
+    ids=["puerto-alto", "puerto-cero", "puerto-neg", "timeout-nan", "timeout-inf", "timeout-cero", "timeout-neg"],
+)
+def test_out_of_range_config_is_failed_and_never_touches_the_network(override):
+    """Puerto fuera de 1..65535 o timeout no finito/no positivo: sin la
+    guarda cae como unknown/pending y el outbox reintenta PARA SIEMPRE una
+    config que no se sanea sola. Failed es terminal y honesto."""
+    FakeSMTP.instances = []
+    result = send_email(_settings(**override), _content(), smtp_factory=FakeSMTP)
+    assert result["status"] == "failed"
+    assert "SMTP config invalida" in result["error"]
+    assert FakeSMTP.instances == []
