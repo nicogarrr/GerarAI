@@ -8,7 +8,7 @@ import { getDcaWatchCard } from '@/lib/actions/dca-watch-card.actions';
 import { getPublicShorts } from '@/lib/actions/public-shorts.actions';
 import { getResearchValuationWorkspace } from '@/lib/actions/research.actions';
 import { getValuationSummaries } from '@/lib/actions/valuation-summary.actions';
-import { engineRangeFrom, getAnalystReport, getPublishedThesis, type ReportInputs } from '@/lib/research/analyst-report';
+import { engineRangeFrom, getAnalystReport, getOwnConsensus, getPublishedThesis, type ReportInputs } from '@/lib/research/analyst-report';
 import { getFormat, getLocale, getT } from '@/lib/i18n/server';
 import { getKeyStats } from '@/lib/research/key-stats';
 import { getSotp } from '@/lib/research/sotp';
@@ -33,7 +33,7 @@ export default async function InformePage({ params }: { params: Promise<{ ticker
   await requireAuthenticatedUser();
   const ticker = (await params).ticker.toUpperCase();
   const [t, fmt, locale] = await Promise.all([getT(), getFormat(), getLocale()]);
-  const [report, card, summaries, thesis, sotp, valuation, keyStats, shorts, thesisV2] = await Promise.all([
+  const [report, card, summaries, thesis, sotp, valuation, keyStats, shorts, thesisV2, consensus] = await Promise.all([
     getAnalystReport(ticker),
     getDcaWatchCard(ticker),
     getValuationSummaries([ticker]).catch(() => ({} as Awaited<ReturnType<typeof getValuationSummaries>>)),
@@ -43,6 +43,7 @@ export default async function InformePage({ params }: { params: Promise<{ ticker
     getKeyStats(ticker),
     getPublicShorts(ticker).catch(() => null),
     getThesisV2(ticker),
+    getOwnConsensus(ticker),
   ]);
   const summary = summaries[ticker] ?? null;
   const data: ReportInputs = {
@@ -61,6 +62,7 @@ export default async function InformePage({ params }: { params: Promise<{ ticker
       baseRate: baseRateText(summary?.base_rate, locale),
       impliedGrowth: impliedGrowthText(valuation?.implied_growth, locale),
     },
+    consensus,
     today: new Date().toISOString().slice(0, 10),
   };
   return (

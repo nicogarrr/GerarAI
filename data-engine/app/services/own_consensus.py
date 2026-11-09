@@ -654,16 +654,20 @@ def _model_candidate(metric: str, period: str, actuals: Mapping[str, Actual], se
 def _facts(db: Any, company: Any, fact_metric: str) -> list[tuple[str, float, date | None, str | None]]:
     from sqlalchemy import select
 
+    from app.core.source_urls import sec_filing_url
     from app.models import FinancialFact
 
     rows = db.scalars(select(FinancialFact).where(FinancialFact.company_id == company.id,
                                                   FinancialFact.metric == fact_metric)).all()
+    cik = getattr(company, "cik", None)
     out = []
     for r in rows:
         try:
             url = r.source_url
         except Exception:  # noqa: BLE001 - la relación puede no estar cargada
             url = None
+        # El filing exacto de la cifra, no el listado genérico de la empresa.
+        url = sec_filing_url(url, getattr(r, "accession_number", None), cik)
         out.append((str(r.period), float(r.value), r.filed, url))
     return out
 

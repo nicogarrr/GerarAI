@@ -13,7 +13,7 @@ import type { PublicShorts } from '@/lib/actions/public-shorts.actions';
  * de APIs que ya existen: tarjeta DCA, valor justo, tesis publicada y
  * desglose por partes). Aquí solo tipos y helpers puros para pintarlo.
  */
-export type ReportCell = { value: number | null; unit: string; source: string; reported: boolean; basis: string; derived_q4: boolean } | null;
+export type ReportCell = { value: number | null; unit: string; source: string; reported: boolean; basis: string; derived_q4: boolean; url?: string | null } | null;
 export type ReportPeriod = { period_end: string; fiscal_quarter: string; revenue: ReportCell; ebitda: ReportCell };
 export type ReportPoint = { value: number | null; unit: string | null; period_end: string | null; provenance: string } | null;
 
@@ -86,9 +86,59 @@ export type ReportInputs = {
   engineRange: { low: number; high: number; currency?: string | null } | null;
   keyStats: KeyStats | null;
   shorts: PublicShorts | null;
+  /** Consenso propio de GerarAI (data-engine app/services/own_consensus.py); null si falla la lectura. */
+  consensus?: OwnConsensusData | null;
   /** Fecha de hoy (YYYY-MM-DD) en la que se compone el informe. */
   today: string;
 };
+
+/** Una celda de ``GET /api/companies/{t}/own-consensus`` (solo lo que pinta el informe). */
+export type OwnConsensusCell = {
+  metric: string;
+  period: string;
+  period_end: string;
+  status: string;
+  source?: string | null;
+  low?: number | null;
+  mid?: number | null;
+  high?: number | null;
+  formula?: string | null;
+  reason?: string | null;
+  citations?: { kind?: string; url?: string | null; date?: string | null }[] | null;
+  confidence?: { level?: string | null; reason?: string | null } | null;
+};
+export type OwnConsensusData = { version?: string; as_of?: string; cells: OwnConsensusCell[] };
+
+export const CONSENSUS_METRICS = ['revenue', 'operating_income', 'eps'] as const;
+export type ConsensusRow = { period: string; period_end: string; isYear: boolean; cells: Record<(typeof CONSENSUS_METRICS)[number], OwnConsensusCell | null> };
+
+/** Filas del consenso propio por periodo (los trimestres y años que aún no se han presentado), en orden. */
+export function consensusRows(data: OwnConsensusData | null | undefined): ConsensusRow[] {
+  const rows = new Map<string, ConsensusRow>();
+  for (const cell of data?.cells ?? []) {
+    if (!(CONSENSUS_METRICS as readonly string[]).includes(cell.metric) || cell.status === 'vencido') continue;
+    const row = rows.get(cell.period) ?? { period: cell.period, period_end: cell.period_end, isYear: cell.period.startsWith('fy'), cells: { revenue: null, operating_income: null, eps: null } };
+    row.cells[cell.metric as (typeof CONSENSUS_METRICS)[number]] = cell;
+    rows.set(cell.period, row);
+  }
+  return [...rows.values()]
+    .filter((row) => Object.values(row.cells).some((c) => c && c.status === 'estimado'))
+    .sort((a, b) => (a.period_end === b.period_end ? Number(a.isYear) - Number(b.isYear) : a.period_end.localeCompare(b.period_end)));
+}
+
+/** Primer enlace citado de una celda (filing, guía o nota de prensa), si lo hay. */
+export function consensusSourceUrl(cell: OwnConsensusCell | null): string | null {
+  const url = cell?.citations?.find((c) => typeof c?.url === 'string' && /^https?:\/\//.test(c.url))?.url;
+  return url ?? null;
+}
+
+export async function getOwnConsensus(ticker: string): Promise<OwnConsensusData | null> {
+  try {
+    return await researchRequest<OwnConsensusData>(`/api/companies/${encodeURIComponent(ticker)}/own-consensus`, { timeoutMs: 12000 });
+  } catch {
+    return null;
+  }
+}
 
 export const getAnalystReport = cache(async (ticker: string): Promise<AnalystReportData | null> => {
   try {

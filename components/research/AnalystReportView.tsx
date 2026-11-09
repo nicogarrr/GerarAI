@@ -4,7 +4,7 @@ import { chartPriceUnit } from '@/lib/market/chart-price-units';
 import DcaWatchCard from '@/components/watchlist/DcaWatchCard';
 import { SotpBreakdownView } from '@/components/research/SotpBreakdownSection';
 import { AnalystReportNav, publishedNav } from '@/components/research/AnalystReportNav';
-import { fairValueRange, thesisRisks, userEstimates, reportVsPrice, type ReportCell, type ReportInputs, type ReportPeriod } from '@/lib/research/analyst-report';
+import { consensusRows, consensusSourceUrl, fairValueRange, thesisRisks, userEstimates, reportVsPrice, type ConsensusRow, type OwnConsensusCell, type ReportCell, type ReportInputs, type ReportPeriod } from '@/lib/research/analyst-report';
 import { thesisCatalystLabel } from '@/lib/research/catalyst-label';
 import { cleanThesisText } from '@/lib/research/thesis-text';
 import { readingSections } from '@/lib/research/thesis-reading-sections';
@@ -117,6 +117,7 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
         <PeriodTable t={t} fmt={fmt} big={big} title={t('research.informe.annual')} rows={report?.estimates.annual ?? []} kind="FY" />
         <PeriodTable t={t} fmt={fmt} big={big} title={t('research.informe.quarterly')} rows={report?.estimates.quarterly ?? []} kind="Q" />
         <p className="mt-2 text-xs text-gray-500">{t('research.informe.actualsNote')}</p>
+        <ConsensusTable t={t} fmt={fmt} big={big} rows={consensusRows(data.consensus)} unit={report?.estimates.annual.at(-1)?.revenue?.unit ?? market?.currency ?? null} />
         <div className="mt-3 rounded-lg border border-amber-700/60 bg-amber-950/30 p-3 text-sm" data-testid="informe-user-estimates">
           <p className="text-xs font-semibold text-amber-200">{mine?.author ? t('research.informe.userEstimatesBy', { author: mine.author }) : t('research.informe.userEstimates')}</p>
           {mine ? (
@@ -197,6 +198,12 @@ function cellText(cell: ReportCell, big: (v: number | null | undefined, unit?: s
   return `${big(cell.value, cell.unit)}${marks}`;
 }
 
+/** La cifra real enlazada al filing del que sale (si el informe trae su URL). */
+function SourcedValue({ cell, text }: { cell: ReportCell; text: string }) {
+  const url = cell?.url && /^https?:\/\//.test(cell.url) ? cell.url : null;
+  return url ? <a className="underline decoration-dotted underline-offset-2 hover:text-teal-300" href={url} target="_blank" rel="noopener noreferrer">{text}</a> : <>{text}</>;
+}
+
 function PeriodTable({ t, fmt, big, title, rows, kind }: { t: T; fmt: Formatters; big: (v: number | null | undefined, unit?: string | null) => string; title: string; rows: ReportPeriod[]; kind: 'FY' | 'Q' }) {
   if (!rows.length) return <p className="mb-2 text-sm text-gray-400">{title}: {t('research.informe.noActuals')}</p>;
   const head = (row: ReportPeriod) => {
@@ -216,12 +223,72 @@ function PeriodTable({ t, fmt, big, title, rows, kind }: { t: T; fmt: Formatters
           {rows.map((row) => (
             <tr className="border-t border-gray-800" key={row.period_end}>
               <th className="whitespace-nowrap py-1 text-left font-normal text-gray-300" scope="row">{head(row)}</th>
-              <td className="whitespace-nowrap py-1 pl-2 text-gray-100">{cellText(row.revenue, big)}</td>
-              <td className="whitespace-nowrap py-1 pl-2 text-gray-100">{cellText(row.ebitda, big)}</td>
+              <td className="whitespace-nowrap py-1 pl-2 text-gray-100"><SourcedValue cell={row.revenue} text={cellText(row.revenue, big)} /></td>
+              <td className="whitespace-nowrap py-1 pl-2 text-gray-100"><SourcedValue cell={row.ebitda} text={cellText(row.ebitda, big)} /></td>
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+const CONSENSUS_SOURCE_KEYS = {
+  guia: 'research.informe.consensusSource.guia',
+  guia_trimestre_calculado: 'research.informe.consensusSource.guiaTrimestreCalculado',
+  guia_ajustada: 'research.informe.consensusSource.guiaAjustada',
+  analista_citado: 'research.informe.consensusSource.analistaCitado',
+  modelo: 'research.informe.consensusSource.modelo',
+  tasa_base: 'research.informe.consensusSource.tasaBase',
+} as const;
+
+function ConsensusCellView({ cell, t, fmt, big, unit, eps }: { cell: OwnConsensusCell | null; t: T; fmt: Formatters; big: (v: number | null | undefined, unit?: string | null) => string; unit: string | null; eps: boolean }) {
+  if (!cell || cell.status !== 'estimado' || cell.mid == null) {
+    return <td className="whitespace-nowrap py-1 pl-2 text-gray-500" title={cell?.reason ?? undefined}>{t('research.informe.na')}</td>;
+  }
+  const value = eps ? fmt.formatNumber(cell.mid, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : big(cell.mid, unit);
+  const key = CONSENSUS_SOURCE_KEYS[(cell.source ?? '') as keyof typeof CONSENSUS_SOURCE_KEYS];
+  const source = key ? t(key) : (cell.source ?? '');
+  const url = consensusSourceUrl(cell);
+  return (
+    <td className="py-1 pl-2 text-gray-100" title={cell.formula ?? undefined}>
+      <span className="whitespace-nowrap">{value}</span>
+      <span className="block text-[11px] text-gray-500">
+        {url ? <a className="underline decoration-dotted hover:text-teal-300" href={url} target="_blank" rel="noopener noreferrer">{source}</a> : source}
+      </span>
+    </td>
+  );
+}
+
+function ConsensusTable({ t, fmt, big, rows, unit }: { t: T; fmt: Formatters; big: (v: number | null | undefined, unit?: string | null) => string; rows: ConsensusRow[]; unit: string | null }) {
+  const title = t('research.informe.consensusTitle');
+  if (!rows.length) return <p className="mt-3 text-sm text-gray-400" data-testid="informe-consensus">{title}: {t('research.informe.consensusNone')}</p>;
+  const head = (row: ConsensusRow) => {
+    const date = fmt.formatMarketDate(row.period_end, { year: '2-digit', month: 'short' });
+    return row.isYear ? `${t('research.informe.fyHead', { date })}E` : `${row.period.slice(0, 2).toUpperCase()} · ${date}E`;
+  };
+  return (
+    <div className="mt-3 overflow-x-auto" role="region" aria-label={title} tabIndex={0} data-testid="informe-consensus">
+      <table className="w-full text-right text-sm">
+        <caption className="mb-1 text-left text-xs font-semibold text-gray-400">{title}</caption>
+        <thead className="text-xs text-gray-500"><tr>
+          <th className="py-1 text-left" scope="col">{t('research.informe.period')}</th>
+          <th className="py-1" scope="col">{t('research.informe.revenue')}</th>
+          <th className="py-1" scope="col">{t('research.informe.operatingIncome')}</th>
+          <th className="py-1" scope="col">{t('research.informe.eps')}</th>
+        </tr></thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr className="border-t border-gray-800" key={row.period}>
+              <th className="whitespace-nowrap py-1 text-left font-normal text-gray-300" scope="row">{head(row)}</th>
+              <ConsensusCellView cell={row.cells.revenue} t={t} fmt={fmt} big={big} unit={unit} eps={false} />
+              <ConsensusCellView cell={row.cells.operating_income} t={t} fmt={fmt} big={big} unit={unit} eps={false} />
+              <ConsensusCellView cell={row.cells.eps} t={t} fmt={fmt} big={big} unit={unit} eps />
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-1 text-xs text-gray-500">{t('research.informe.consensusNote')}</p>
     </div>
   );
 }

@@ -76,7 +76,7 @@ def test_revenue_by_year_and_quarter_with_derived_q4(db):
     assert q4["revenue"]["value"] == 102_466 * M
     assert q4["revenue"]["derived_q4"] is True and q4["revenue"]["reported"] is False
     assert quarterly[-1]["revenue"] == {"value": 109_417 * M, "unit": "USD", "source": "SEC",
-                                        "reported": True, "basis": "reported", "derived_q4": False}
+                                        "reported": True, "basis": "reported", "derived_q4": False, "url": None}
 
 
 def test_q4_ignores_previous_year_q4(db):
@@ -227,3 +227,17 @@ def test_market_minor_units_keep_quote_and_normalize_cap_ev(db, quote, price, un
     assert market["market_cap"] == pytest.approx(42_550_000)
     assert market["enterprise_value"] == pytest.approx(37_550_000)
     assert market["enterprise_value_reason"] is None
+
+
+def test_each_actual_links_to_its_filing(db):
+    company = _company(db)
+    company.cik = "0000320193"
+    db.add(FinancialFact(
+        company_id=company.id, metric="revenue", value=Decimal("416161000000"), unit="USD",
+        period="2025-09-27:FY", fiscal_year=2025, fiscal_quarter="FY", source_type="SEC", is_reported=True,
+        accession_number="0000320193-25-000079",
+    ))
+    db.commit()
+    cell = build_company_report(db, company, today=date(2026, 8, 1))["estimates"]["annual"][0]["revenue"]
+    assert cell["url"] == ("https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/"
+                           "0000320193-25-000079-index.htm")

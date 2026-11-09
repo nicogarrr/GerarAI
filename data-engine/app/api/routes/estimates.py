@@ -97,7 +97,10 @@ def fact_source_link(ticker: str, metric: str = Query(..., max_length=60),
                            "accession": fact.accession_number, "filed": fact.filed.isoformat() if fact.filed else None}
     cik = (getattr(company, "cik", None) or "").strip()
     if not fact.accession_number or not cik.isdigit():
-        out.update({"calc_type": "reported" if fact.is_reported else "derived", "url": fact.source_url,
+        from app.core.source_urls import sec_filing_url
+
+        out.update({"calc_type": "reported" if fact.is_reported else "derived",
+                    "url": sec_filing_url(fact.source_url, fact.accession_number, cik),
                     "anchor": None, "reason": "sin filing de la SEC con el que anclar la cifra"})
         return out
     try:
