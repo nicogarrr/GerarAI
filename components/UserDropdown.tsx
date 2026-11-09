@@ -45,7 +45,13 @@ const UserDropdown = ({ user }: { user: User }) => {
                             {user.name[0]}
                         </AvatarFallback>
                     </Avatar>
-                    <span aria-hidden="true" className="sr-only text-sm font-medium text-gray-400 md:not-sr-only md:inline">{user.name}</span>
+                    {/* max-w + truncate: un nombre largo (p. ej. cuentas de
+                        prueba) se comía el hueco del buscador a 768-1024px y
+                        rompía su caja; el nombre completo sigue en el menú. */}
+                    {/* md:whitespace-nowrap + md:overflow-hidden: not-sr-only
+                        resetea white-space y overflow a normal/visible y se
+                        cargaba el truncate (el nombre envolvía a 3 líneas). */}
+                    <span aria-hidden="true" className="sr-only max-w-36 truncate text-sm font-medium text-gray-400 md:not-sr-only md:inline md:overflow-hidden md:whitespace-nowrap lg:max-w-60">{user.name}</span>
                     <span className="sr-only">{t('shell.user.menuLabel', { name: user.name })}</span>
                     <ChevronDown aria-hidden="true" className="hidden h-4 w-4 text-gray-500 md:inline" />
                 </Button>
