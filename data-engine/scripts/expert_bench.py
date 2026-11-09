@@ -579,10 +579,11 @@ def cmd_forecast_log(args) -> None:
         ctx = build_context(db, company, today=today, tenant_id=1)
         val = ctx.valuation
         sp = val.get("starting_point") or {}
-        price, ccy = sp.get("price"), sp.get("currency")
-        if price is None:
-            price, ccy, _ = _price(db, company)
-        if price is None:
+        # Precio y divisa del LISTADO (la misma cotización con la que puntúa forecast-score), no los de
+        # la valuación: esa ya va pasada a la divisa de los informes (FFH.TO cotiza en CAD y presenta en
+        # USD). Sin precio de listado no hay registro.
+        price, ccy, _ = _price(db, company)
+        if price is None or not ccy:
             db.rollback()
             continue
         claims: list[str] = []
@@ -599,7 +600,7 @@ def cmd_forecast_log(args) -> None:
             ticker=ticker,
             as_of=today,
             price=float(price),
-            currency=str(ccy or ""),
+            currency=str(ccy),
             scenarios=val.get("scenarios") or {},
             weighted=val.get("weighted"),
             method=(val.get("method") or {}).get("chosen"),
@@ -608,6 +609,8 @@ def cmd_forecast_log(args) -> None:
             claims=claims,
             thesis_fingerprint=doc.get("fingerprint"),
             commit=commit,
+            valuation_price=sp.get("price"),
+            valuation_currency=sp.get("currency"),
         )
         rec["valuation_status"] = val.get("status")
         rec["has_thesis_v2"] = bool(doc)
@@ -621,24 +624,17 @@ def cmd_forecast_log(args) -> None:
     print("forecast-log", len(lines), args.out)
 
 
-def _close_on_or_before(db, company, day: date) -> float | None:
+def _close_on_or_before(db, company, day: date) -> tuple[float, str] | None:
+    """Cierre del listado en la semana hasta ``day``, en su divisa principal (la del listado, no la de
+    los informes ni un USD por defecto): GBX → GBP, FFH.TO → CAD."""
     from datetime import timedelta
 
-    from sqlalchemy import desc, select
+    from app.services.valuation_service import resolve_model_price
 
-    from app.models.entities import MarketPrice
-
-    row = db.scalars(
-        select(MarketPrice)
-        .where(
-            MarketPrice.company_id == company.id,
-            MarketPrice.date <= day,
-            MarketPrice.date >= day - timedelta(days=7),
-            MarketPrice.close > 0,
-        )
-        .order_by(desc(MarketPrice.date))
-    ).first()
-    return float(row.close) if row is not None else None
+    listed = resolve_model_price(db, company.id, as_of=day)
+    if listed is None or listed.as_of is None or listed.as_of < day - timedelta(days=7) or not listed.currency:
+        return None
+    return float(listed.value), listed.currency.upper()
 
 
 def _dividends_between(db, company, start: date, end: date) -> float:
@@ -667,12 +663,24 @@ def cmd_forecast_score(args) -> None:
             pending += 1
             continue
         company = _company(db, rec["ticker"])
-        price = _close_on_or_before(db, company, due) if company is not None else None
-        if price is None:
+        close = _close_on_or_before(db, company, due) if company is not None else None
+        if close is None:
             continue
+        price, ccy = close
+        rec_ccy = str(rec.get("currency") or "").upper()
+        if rec_ccy and ccy != rec_ccy:
+            # Registros antiguos llevan el precio pasado a la divisa de los informes: el cierre se pasa a
+            # esa divisa con el tipo guardado de esa fecha; sin tipo, score_forecast lo deja N/D.
+            from app.services.user_sotp_service import convert_amount
+
+            conv = convert_amount(db, price, ccy, rec_ccy, due)
+            if conv is not None:
+                price, ccy = conv[0], rec_ccy
         divs = _dividends_between(db, company, date.fromisoformat(rec["as_of"]), due)
         scores.append(
-            eb.score_forecast(rec, horizon_years=args.horizon, price_then=price, dividends_per_share=divs)
+            eb.score_forecast(
+                rec, horizon_years=args.horizon, price_then=price, dividends_per_share=divs, price_then_currency=ccy
+            )
         )
     print(
         json.dumps(

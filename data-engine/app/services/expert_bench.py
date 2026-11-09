@@ -539,8 +539,15 @@ def forecast_record(
     claims: Sequence[str],
     thesis_fingerprint: str | None,
     commit: str | None,
+    valuation_price: float | None = None,
+    valuation_currency: str | None = None,
 ) -> dict[str, Any]:
-    """Una previsión con fecha. Lo que se puntúa después son las TIR y los kill switches, no la prosa."""
+    """Una previsión con fecha. Lo que se puntúa después son las TIR y los kill switches, no la prosa.
+
+    ``price``/``currency`` son los del LISTADO (la misma cotización con la que se puntúa después: FFH.TO
+    en CAD aunque presente en USD). El precio que usó la valuación, ya pasado a la divisa de los
+    informes, va aparte en ``valuation_price``/``valuation_currency`` cuando se conoce.
+    """
 
     def irr(key: str, horizon: str) -> float | None:
         return _num((((scenarios.get(key) or {}).get("horizons") or {}).get(horizon) or {}).get("irr"))
@@ -565,6 +572,9 @@ def forecast_record(
             f"{h}y": date(as_of.year + h, as_of.month, min(as_of.day, 28)).isoformat() for h in HORIZONS
         },
     }
+    if valuation_price is not None:
+        rec["valuation_price"] = valuation_price
+        rec["valuation_currency"] = valuation_currency
     rec["id"] = hashlib.sha256(
         json.dumps({k: rec[k] for k in ("ticker", "as_of", "price", "irr")}, sort_keys=True).encode()
     ).hexdigest()[:16]
@@ -572,12 +582,33 @@ def forecast_record(
 
 
 def score_forecast(
-    record: Mapping[str, Any], *, horizon_years: int, price_then: float, dividends_per_share: float = 0.0
+    record: Mapping[str, Any],
+    *,
+    horizon_years: int,
+    price_then: float,
+    dividends_per_share: float = 0.0,
+    price_then_currency: str | None = None,
 ) -> dict[str, Any]:
     """Rentabilidad real anualizada (con dividendos) frente a la TIR bajista/base/alcista prevista a 5 años.
 
     La TIR es a 5 y 10 años; a 1 y 3 años se compara con la de 5 años como ritmo anual, y se dice así.
+    Con ``price_then_currency`` distinta de la divisa del registro no se puntúa: rentabilidad N/D con su
+    motivo (antes un registro en USD se comparaba con un cierre en CAD y salía un +40 % inventado).
     """
+    rec_ccy = str(record.get("currency") or "").strip().upper()
+    then_ccy = str(price_then_currency or "").strip().upper()
+    if then_ccy and rec_ccy and then_ccy != rec_ccy:
+        return {
+            "ticker": record["ticker"],
+            "as_of": record["as_of"],
+            "horizon_years": horizon_years,
+            "realized_annual": None,
+            "base_irr5": None,
+            "error_vs_base": None,
+            "inside_bear_bull": None,
+            "compared_with": "TIR a 5 años como ritmo anual",
+            "reason": f"N/D: el registro está en {rec_ccy} y el cierre en {then_ccy}; sin la misma divisa no se puntúa",
+        }
     p0 = float(record["price"])
     total = (price_then + dividends_per_share) / p0
     realized = total ** (1 / horizon_years) - 1 if total > 0 else -1.0
