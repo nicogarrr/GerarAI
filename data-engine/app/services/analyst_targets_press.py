@@ -96,8 +96,14 @@ def _trusted(url: str) -> bool:
 # atribuible se descarta entera: fail-closed (auditor, ronda 3).
 _PT_WORD = re.compile(r"\bprice targets?\b", re.I)
 _MONEY_FIGURE = re.compile(r"\$\s?\d")
+# Token monetario COMPLETO: miles con comas y hasta 2 decimales. Lo que no
+# cumple el formato (más de 2 decimales, mezcla rara tipo «$1.090,50») no
+# casa y descarta la fila entera: nunca se recorta un prefijo («$1,090.00»
+# no es 1, «$90.125» no es 90.12, «$900000» no es 90000).
+_MONEY_TOKEN = r"\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?"
+_MONEY_TAIL = r"(?![\d]|,(?=\d)|\.(?=\d))"
 _PRIOR_TARGET = re.compile(
-    r"\bfrom\s(?:[A-Z]{1,3})?\$\s?(?P<prior>\d{1,5}(?:\.\d{1,2})?)", re.I)
+    r"\bfrom\s(?:[A-Z]{1,3})?\$\s?(?P<prior>" + _MONEY_TOKEN + r")" + _MONEY_TAIL, re.I)
 
 # Alias LOCALES del panel (no se toca FIRM_ALIASES de analyst_history_service:
 # es compartido con thesis_service y analyst_blend). La prensa cita a la casa
@@ -262,7 +268,7 @@ def _tail_clean(sentence: str, end: int) -> bool:
     return re.sub(r"[()\[\]{},;:.!$]", "", token).lower() in _TAIL_CONNECTORS
 
 
-_MONEY = r"(?:[A-Z]{1,3})?\$\s?(\d{1,5}(?:\.\d{1,2})?)"
+_MONEY = r"(?:[A-Z]{1,3})?\$\s?(" + _MONEY_TOKEN + r")" + _MONEY_TAIL
 
 
 def bound_value(sentence: str, symbol: str, aliases: set[str]) -> tuple[float, int] | None:
@@ -283,7 +289,7 @@ def bound_value(sentence: str, symbol: str, aliases: set[str]) -> tuple[float, i
     ):
         match = re.search(pattern, sentence, re.I)
         if match and _tail_clean(sentence, match.end()):
-            return float(match.group(1)), match.start(1)
+            return float(match.group(1).replace(",", "")), match.start(1)
     return None
 
 
@@ -445,7 +451,7 @@ def extract_targets(text: str, *, symbol: str, published: date, url: str, full_t
         prior = None
         prior_match = _PRIOR_TARGET.search(sentence)
         if prior_match:
-            prior_value = float(prior_match.group("prior"))
+            prior_value = float(prior_match.group("prior").replace(",", ""))
             # «raised to 54 from 98»: el anterior no puede ser el mismo número.
             if 0 < prior_value != target:
                 prior = prior_value

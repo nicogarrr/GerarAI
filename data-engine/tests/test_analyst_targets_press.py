@@ -589,3 +589,35 @@ def test_paced_fetch_serializes_same_host(monkeypatch):
                      ("end", "https://m.example.com/b"),
                      ("start", "https://m.example.com/a"),
                      ("end", "https://m.example.com/a")]
+
+
+# --- Bloqueo del auditor (ronda 4): token monetario completo, nunca prefijo -
+
+def test_extract_full_money_token_with_thousands():
+    rows = _extract("Cantor Fitzgerald raised its price target on ASTS to $1,090.00.")
+    assert len(rows) == 1 and rows[0].price_target == 1090.0
+    rows = _extract("Cantor Fitzgerald raised its price target on ASTS to $1,090.")
+    assert len(rows) == 1 and rows[0].price_target == 1090.0
+    rows = _extract("Cantor Fitzgerald raised its price target on ASTS to $900000.")
+    assert len(rows) == 1 and rows[0].price_target == 900000.0
+    rows = _extract("Cantor Fitzgerald raised its price target on ASTS to $90.5.")
+    assert len(rows) == 1 and rows[0].price_target == 90.5
+
+
+def test_extract_malformed_money_token_produces_no_row():
+    # Más de 2 decimales o mezcla rara: la fila entera se descarta.
+    assert _extract("Cantor Fitzgerald raised its price target on ASTS to $90.125.") == []
+    assert _extract("Cantor Fitzgerald raised its price target on ASTS to $1.090,50.") == []
+
+
+# --- Guarda de años ambiguos: test negativo a nivel de note_date ------------
+
+def test_note_date_year_guard_kills_mutant():
+    # Si la guarda de años se quita (mutante), estas frases fabricarían una
+    # fecha con pubDate y el test se pondría rojo.
+    assert press.note_date("Kept the call in 2024.", published=TODAY, today=TODAY) is None
+    assert press.note_date("Reiterated on November 3 in 2024.", published=TODAY, today=TODAY) is None
+    assert press.note_date("Nota de hace tiempo, en '24.", published=TODAY, today=TODAY) is None
+    # Sanos: sin año ajeno, la fecha se mantiene.
+    assert press.note_date("On November 3.", published=TODAY, today=TODAY) == date(2026, 11, 3)
+    assert press.note_date("In 2026 terms.", published=TODAY, today=TODAY) == TODAY
