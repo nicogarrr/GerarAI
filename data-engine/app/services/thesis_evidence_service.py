@@ -240,6 +240,21 @@ def _dedupe_news_rows(rows: list, limit: int, ticker: str | None = None) -> list
             break
     return out
 
+def _existing_document_urls(db: Session, urls: list[str]) -> set[str]:
+    """URLs de la lista que YA tienen Document en el tenant: una sola query
+    con IN (anti N+1) en vez de una comprobación por candidato."""
+    if not urls:
+        return set()
+    return set(
+        db.scalars(
+            select(Document.source_url).where(
+                Document.source_url.in_(urls),
+                *tenant_filters(db, Document),
+            )
+        ).all()
+    )
+
+
 def select_filings(filings: list[dict[str, Any]], limit: int = MAX_FILING_DOCUMENTS) -> list[dict[str, Any]]:
     """Los ``limit`` filings a guardar: el ultimo informe anual y el ultimo
     intermedio siempre, el resto por fecha de presentacion (lo mas reciente).
@@ -998,23 +1013,18 @@ class ThesisEvidenceService:
         created = 0
         items: list[dict[str, Any]] = []
         filings = select_filings(filings)
+        candidate_urls = [f.get("document_url") or f.get("index_url") for f in filings]
+        # Las URLs añadidas en este mismo bucle cuentan como existentes para
+        # los siguientes (mismo criterio que el autoflush del chequeo antiguo).
+        known_urls = _existing_document_urls(db, [u for u in candidate_urls if u])
         for filing in filings:
             form = filing.get("form")
             url = filing.get("document_url") or filing.get("index_url")
             filed = filing.get("filing_date")
             items.append({"form": form, "filing_date": filed, "url": url})
-            if not url:
+            if not url or url in known_urls:
                 continue
-            exists = db.scalar(
-                select(Document.id)
-                .where(
-                    Document.source_url == url,
-                    *tenant_filters(db, Document),
-                )
-                .limit(1)
-            )
-            if exists:
-                continue
+            known_urls.add(url)
             db.add(
                 Document(
                     company_id=company.id,
@@ -1288,20 +1298,13 @@ class ThesisEvidenceService:
         items = getattr(result, "items", None) or []
         created = 0
         listed: list[dict[str, Any]] = []
-        for item in items[:MAX_IR_DOCUMENTS]:
+        candidates = items[:MAX_IR_DOCUMENTS]
+        known_urls = _existing_document_urls(db, [item.url for item in candidates if item.url])
+        for item in candidates:
             listed.append({"title": item.title, "url": item.url})
-            if not item.url:
+            if not item.url or item.url in known_urls:
                 continue
-            exists = db.scalar(
-                select(Document.id)
-                .where(
-                    Document.source_url == item.url,
-                    *tenant_filters(db, Document),
-                )
-                .limit(1)
-            )
-            if exists:
-                continue
+            known_urls.add(item.url)
             db.add(
                 Document(
                     company_id=company.id,
