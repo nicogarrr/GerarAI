@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from app.core.database import Base
@@ -102,9 +102,9 @@ def test_run_retention_entrypoint(session_local_doblada):
 
 
 def test_purge_tombstona_documento_sin_uri_externa(monkeypatch):
-    # Documento viejo sin storage_uri: tombstone real sin borrado externo
-    # (rama `if uri:` falsa), chunks eliminados y metadata de tombstone.
-    # store/index doblados: sin red.
+    """Documento viejo sin storage_uri: tombstone en BD con chunks eliminados
+    y metadata de tombstone exacta; store.delete NO se llama (no hay URI
+    externa que borrar) y delete_document_points sí."""
     from app.core.database import Base as BaseDB
     from app.models import Company, Document, DocumentChunk
 
@@ -144,8 +144,14 @@ def test_purge_tombstona_documento_sin_uri_externa(monkeypatch):
         doc_id = document.id
 
         service = rs.RetentionService()
-        monkeypatch.setattr(service.store, "delete", lambda uri: None)
-        monkeypatch.setattr(service.index, "delete_document_points", lambda *args: None)
+        borradas_store: list[str] = []
+        borrados_index: list[tuple[int, int]] = []
+        monkeypatch.setattr(service.store, "delete", borradas_store.append)
+        monkeypatch.setattr(
+            service.index,
+            "delete_document_points",
+            lambda tenant_id, doc_id: borrados_index.append((tenant_id, doc_id)),
+        )
         result = service.purge_tenant(
             session,
             now=NOW,
@@ -153,6 +159,8 @@ def test_purge_tombstona_documento_sin_uri_externa(monkeypatch):
             retention_days=2555,
             telemetry_days=90,
         )
+        assert borradas_store == []
+        assert borrados_index == [(tenant.id, doc_id)]
 
         assert result["documents_examined"] == 1
         assert result["documents_tombstoned"] == 1
@@ -167,3 +175,99 @@ def test_purge_tombstona_documento_sin_uri_externa(monkeypatch):
             "policy_days": 2555,
             "reason": "financial_document_retention",
         }
+
+
+def test_purge_difiere_evidencia_insertada_entre_comprobaciones(monkeypatch):
+    """EvidenceSuggestion insertada tras la preselección y antes de la
+    comprobación del bucle: la guarda TOCTOU difiere el documento (196-198).
+    La inserción se hace en la primera consulta del bucle (db.scalar), cuando
+    el documento ya fue seleccionado pero aún no comprobado."""
+    from app.models import Company, Document, DocumentChunk, EvidenceSuggestion
+
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        tenant = Tenant(external_id="ret-toctou", name="Toctou")
+        session.add(tenant)
+        session.flush()
+        session.info["tenant_id"] = tenant.id
+        company = Company(
+            ticker="TOCT",
+            name="Toctou Co",
+            exchange="NASDAQ",
+            currency="USD",
+            sector="Technology",
+            industry="Software",
+            company_type="holding",
+            valuation_model="unassigned",
+            special_sources=[],
+            special_risks=[],
+            factor_tags=[],
+        )
+        session.add(company)
+        session.flush()
+        document = Document(
+            company_id=company.id,
+            title="Ventana",
+            source_type="SEC",
+            storage_uri="minio://toctou.pdf",
+            published_at=NOW - timedelta(days=3000),
+        )
+        session.add(document)
+        session.flush()
+        session.add(DocumentChunk(document_id=document.id, chunk_index=0, text="texto"))
+        session.flush()
+        chunk = session.scalars(
+            select(DocumentChunk.id).where(DocumentChunk.document_id == document.id)
+        ).first()
+        doc_id = document.id
+
+        service = rs.RetentionService()
+        monkeypatch.setattr(service.store, "delete", lambda uri: pytest.fail("no debe borrar"))
+        monkeypatch.setattr(service.index, "delete_document_points", lambda *a: pytest.fail("no debe borrar"))
+
+        documentos_listos: list[bool] = []
+        insertada: list[bool] = []
+        scalars_real = session.scalars
+        scalar_real = session.scalar
+
+        def scalars_wrapper(statement, *args, **kwargs):
+            resultado = scalars_real(statement, *args, **kwargs)
+            try:
+                if statement.column_descriptions[0]["entity"] is Document:
+                    documentos_listos.append(True)
+            except (KeyError, IndexError, TypeError):
+                pass
+            return resultado
+
+        def scalar_wrapper(statement, *args, **kwargs):
+            if documentos_listos and not insertada:
+                insertada.append(True)
+                session.add(
+                    EvidenceSuggestion(
+                        document_id=doc_id,
+                        document_chunk_id=chunk,
+                        statement="ingresos documentados en la ventana",
+                    )
+                )
+                session.flush()
+            return scalar_real(statement, *args, **kwargs)
+
+        monkeypatch.setattr(session, "scalars", scalars_wrapper)
+        monkeypatch.setattr(session, "scalar", scalar_wrapper)
+
+        result = service.purge_tenant(
+            session,
+            now=NOW,
+            dry_run=False,
+            retention_days=2555,
+            telemetry_days=90,
+        )
+
+        assert insertada == [True]
+        assert result["documents_examined"] == 1
+        assert result["documents_deferred_evidence"] == 1
+        assert result["documents_tombstoned"] == 0
+        assert result["chunks_deleted"] == 0
+        session.expire_all()
+        assert session.get(Document, doc_id).retention_tombstoned_at is None
