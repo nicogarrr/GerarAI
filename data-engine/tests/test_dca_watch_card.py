@@ -141,6 +141,8 @@ def test_too_short_history_says_so():
 
 
 def test_route_uses_the_daily_signal_series(monkeypatch):
+    import asyncio
+
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
 
@@ -148,14 +150,23 @@ def test_route_uses_the_daily_signal_series(monkeypatch):
     from app.models.entities import Base
     from app.services import dca_signal_service as svc
     from app.services.dca_signal_service import PriceRow
+    from app.services.extended_quote_service import ExtendedQuote, extended_quote_service
 
     bars = _bars(RISE_THEN_CRASH, start=date(2020, 1, 6))
     rows = [PriceRow(day=b.day, close=b.close, adj_close=b.close) for b in bars]
     monkeypatch.setattr(svc, "fetch_yahoo_history_cached", lambda symbol: SimpleNamespace(rows=rows, currency="USD"))
+
+    async def _sin_precio_actual(ticker):
+        return ExtendedQuote(ticker=ticker, fetched_at=0)
+
+    monkeypatch.setattr(extended_quote_service, "get", _sin_precio_actual)
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
-        out = route.dca_watch_card("intc", db)
+        out = asyncio.run(route.dca_watch_card("intc", db))
     assert out["symbol"] == "INTC" and out["available"] is True
     assert out["currency"] == "USD"
     assert [tf["short"] for tf in out["timeframes"]] == ["S", "M", "T", "A"]
+    # Sin precio actual: la tarjeta sigue con cierres y lo declara, sin vetar.
+    assert out["live"] == {"used": False, "reason": "unavailable"}
+    assert out["current"]["close_kind"] == "close"

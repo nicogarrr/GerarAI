@@ -10,8 +10,10 @@ cierres de ese periodo, como contexto. Puro: sin DB ni red.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from app.services.dca_signal_engine import (
     DEFAULT_PARAMS,
@@ -28,6 +30,88 @@ TIMEFRAMES: tuple[tuple[str, str, str], ...] = (
     ("quarter", "T", "Trimestral"),
     ("year", "A", "Anual"),
 )
+
+# Sesiones con precio en vivo (la de ahora o la del ultimo print). Con
+# "cerrado" el ultimo cierre asentado ya es la verdad mas fresca: no se
+# sustituye nada y no es un dato que falte.
+LIVE_SESSIONS: tuple[str, ...] = ("pre", "regular", "post")
+
+# Banda de cordura del precio actual frente al ultimo cierre asentado: una
+# cotización que difiere mas de esto se descarta como dato erroneo (no se
+# veta la tarjeta: sigue con cierres y avisa).
+MAX_LIVE_DEVIATION = 0.30
+
+# Mismo mapa de subunidades que extended_quote_service._SUBUNIT_CURRENCY: la
+# historia diaria declara "GBp" crudo y la cotización extendida lo normaliza
+# a "GBX"; sin normalizar ambos lados la comparación descartaría un precio
+# correcto por falsa diferencia de divisa.
+_SUBUNIT_CURRENCY = {"GBp": "GBX", "ZAc": "ZAC"}
+
+
+def _norm_currency(value: str | None) -> str | None:
+    if not value:
+        return None
+    raw = value.strip()
+    return _SUBUNIT_CURRENCY.get(raw) or raw or None
+
+
+def usable_current_price(
+    *,
+    status: str | None,
+    session: str | None,
+    price_session: str | None,
+    price: float | None,
+    timestamp: int | None,
+    quote_currency: str | None,
+    history_currency: str | None,
+    last_settled_close: float | None,
+    today: date,
+    max_deviation: float = MAX_LIVE_DEVIATION,
+) -> tuple[float | None, str | None]:
+    """Precio actual apto para el periodo en formación, o por qué no.
+
+    Devuelve ``(precio, None)`` usable o ``(None, motivo)``; el motivo es una
+    clave estable para i18n (``unavailable``, ``closed``, ``no_price``,
+    ``stale``, ``currency_mismatch``, ``out_of_band``). Nunca lanza: sin
+    precio actual la tarjeta sigue con cierres y lo declara.
+    """
+    if status == "unavailable":
+        return None, "unavailable"
+    if session not in LIVE_SESSIONS:
+        # Mercado cerrado: el cierre asentado es el dato mas fresco; no falta
+        # nada y un print viejo de la ultima sesion no es un precio actual.
+        return None, "closed"
+    if price_session is not None and price_session not in LIVE_SESSIONS:
+        # La sesion actual esta abierta pero el print seleccionado no es de
+        # una sesion en vivo (p. ej. un punto fuera de horario): no es un
+        # precio actual aunque la sesion diga "pre".
+        return None, "closed"
+    if price is None or isinstance(price, bool) or not math.isfinite(price) or price <= 0:
+        return None, "no_price"
+    # ``today`` es la fecha de mercado (America/New_York) del llamante.
+    if timestamp is None:
+        return None, "stale"
+    try:
+        ts_date = datetime.fromtimestamp(timestamp, tz=UTC).astimezone(ZoneInfo("America/New_York")).date()
+    except (OverflowError, OSError, ValueError):
+        # Epoch fuera de rango o invalido: mismo fallback que un print viejo.
+        return None, "stale"
+    if ts_date != today:
+        return None, "stale"
+    quote_ccy, history_ccy = _norm_currency(quote_currency), _norm_currency(history_currency)
+    # Fail-closed: sin divisa declarada en cualquiera de los dos lados no se
+    # puede descartar una falsa equivalencia (GBp vs GBP, etc.); fallback a
+    # cierres.
+    if not quote_ccy or not history_ccy or quote_ccy != history_ccy:
+        return None, "currency_mismatch"
+    if (
+        last_settled_close is not None
+        and math.isfinite(last_settled_close)
+        and last_settled_close > 0
+        and abs(price / last_settled_close - 1.0) > max_deviation
+    ):
+        return None, "out_of_band"
+    return float(price), None
 
 # Bandas de riesgo por volatilidad anualizada (mensual, 36 meses). 25 % es el
 # corte de «poco volátil» medido en el backtest del plan (#4730).
@@ -156,12 +240,20 @@ def build_watch_card(
     params: DcaParams = DEFAULT_PARAMS,
     pre_revenue: bool = False,
     stale: bool = False,
+    current_price: float | None = None,
+    live: dict | None = None,
 ) -> dict:
-    """Tarjeta completa a partir de las barras diarias asentadas (las de la señal diaria)."""
-    monthly = evaluate_series(bars, params=params, today=today)
+    """Tarjeta completa a partir de las barras diarias asentadas (las de la señal diaria).
+
+    ``current_price`` (ya validado por ``usable_current_price`` y en la unidad
+    de la serie) entra solo como cierre provisional del periodo en formación,
+    etiquetado ``close_kind="live"``; ``live`` es el bloque descriptivo para
+    la UI (precio real, sesión, hora) o el motivo de no usarlo.
+    """
+    monthly = evaluate_series(bars, params=params, today=today, current_price=current_price)
     timeframes = []
     for key, short, label in TIMEFRAMES:
-        series = monthly if key == "month" else evaluate_series(bars, params=params, today=today, period=key)
+        series = monthly if key == "month" else evaluate_series(bars, params=params, today=today, period=key, current_price=current_price)
         if not series:
             timeframes.append({"key": key, "short": short, "label": label, "available": False,
                                "reason": f"hacen falta {params.min_months} periodos de historia"})
@@ -185,10 +277,12 @@ def build_watch_card(
             "period": last.period,
             "signal_date": last.signal_date.isoformat(),
             "close": last.close,
+            "close_kind": last.close_kind,
             "months_in_zone": _streak(monthly),
         },
         "timeframes": timeframes,
         "last_change": _last_change(monthly),
         "risk": _risk(last, pre_revenue=pre_revenue, stale=stale),
         "why": _why(last, params),
+        "live": live,
     }

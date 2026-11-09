@@ -164,6 +164,10 @@ class MonthlyVerdict:
     status: str  # "confirmed" | "forming"
     signal_date: date  # fecha del cierre diario usado
     close: float
+    # "close": ``close`` es un cierre diario asentado. "live": es un precio
+    # actual (p. ej. premercado) inyectado SOLO en el periodo en formacion;
+    # nunca entra en meses confirmados ni se persiste como cierre.
+    close_kind: str = "close"
     metrics: dict[str, float | int | str | None] = field(default_factory=dict)
     # Precio de cierre a partir del cual se entraria en cada nivel de compra
     # (solo informativo; None si el nivel no se puede expresar como precio).
@@ -272,6 +276,11 @@ def _buy_level(dd: float, thresholds: Sequence[float]) -> int:
     return level
 
 
+def _valid_current_price(value: float | None) -> bool:
+    """Precio actual usable en la formula: numero finito y positivo."""
+    return value is not None and isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value > 0
+
+
 def evaluate_series(
     bars: Iterable[DailyBar],
     *,
@@ -279,6 +288,7 @@ def evaluate_series(
     today: date | None = None,
     month_complete: bool | None = None,
     period: str = "month",
+    current_price: float | None = None,
 ) -> list[MonthlyVerdict]:
     """Veredicto de cada mes con historia suficiente.
 
@@ -288,9 +298,31 @@ def evaluate_series(
     ``period`` (``"week"``, ``"quarter"``, ``"year"``) aplica la misma fórmula a
     cierres de ese periodo para la tarjeta de la watchlist; por defecto
     ``"month"``, la señal oficial (idéntica a antes).
+
+    ``current_price`` es un precio actual etiquetado (premercado, sesion
+    regular o post) que entra SOLO como cierre provisional del periodo en
+    formacion: sustituye al ultimo cierre asentado si el periodo ya existe o
+    abre el periodo nuevo cuando la historia aun no llega a el (p. ej. dia 1
+    de mes en premercado). Nunca se añade como barra: los periodos
+    confirmados, ``hit_rates``, ``zone_visits`` y los backtests quedan
+    identicos, y los precios de nivel (umbrales) no dependen de el. El
+    veredicto formado con el lleva ``close_kind="live"``. Un valor no finito
+    o no positivo se ignora (la formula sigue con cierres).
     """
     months = period_closes(bars, period)
     periods_per_year = PERIODS_PER_YEAR[period]
+    live_period: str | None = None
+    if _valid_current_price(current_price) and today is not None:
+        live_key = period_key(today, period)
+        price = float(current_price)
+        assert price > 0  # garantizado por _valid_current_price
+        if months and months[-1][0] == live_key:
+            key, _day, _close, low = months[-1]
+            months[-1] = (key, today, price, min(low, price))
+            live_period = key
+        elif not months or live_key > months[-1][0]:
+            months = [*months, (live_key, today, price, price)]
+            live_period = live_key
     if not months:
         return []
     closes = [m[2] for m in months]
@@ -300,7 +332,9 @@ def evaluate_series(
     log_returns = [0.0] + [math.log(closes[j] / closes[j - 1]) for j in range(1, len(closes))]
     verdicts: list[MonthlyVerdict] = []
     last_index = len(months) - 1
-    if month_complete is None:
+    if live_period is not None:
+        month_complete = False
+    elif month_complete is None:
         if today is None:
             month_complete = False
         else:
@@ -413,6 +447,7 @@ def evaluate_series(
                 status="forming" if (i == last_index and not month_complete) else "confirmed",
                 signal_date=day,
                 close=close,
+                close_kind="live" if key == live_period else "close",
                 metrics={
                     "signal": signal_used,
                     "drawdown": round(dd, 6),
@@ -449,13 +484,18 @@ def current_verdict(
     params: DcaParams = DEFAULT_PARAMS,
     today: date | None = None,
     verdicts: Sequence[MonthlyVerdict] | None = None,
+    current_price: float | None = None,
 ) -> MonthlyVerdict | None:
     """Veredicto mas reciente (normalmente el del mes en formacion).
 
     ``verdicts``: la salida de ``evaluate_series`` con las MISMAS barras,
     parametros y fecha, si el llamante ya la tiene (evita recalcularla).
+    ``current_price`` solo se usa cuando no se pasan ``verdicts`` ya hechos.
     """
-    series = verdicts if verdicts is not None else evaluate_series(bars, params=params, today=today)
+    if verdicts is None:
+        series = evaluate_series(bars, params=params, today=today, current_price=current_price)
+    else:
+        series = verdicts
     return series[-1] if series else None
 
 

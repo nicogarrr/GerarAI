@@ -17,6 +17,11 @@ export interface DcaSignalState extends Omit<DcaZone, 'level'> {
     period: string;
     signal_date: string;
     close: number;
+    /** "live": el nivel se calculó con el precio actual descrito en live_*; close/signal_date siguen siendo el cierre asentado. Ausente en backends antiguos. */
+    close_kind?: 'close' | 'live';
+    live_price?: number | null;
+    live_session?: 'pre' | 'regular' | 'post' | string | null;
+    live_at?: string | null;
     currency: string | null;
     currency_label: string | null;
     metrics: Record<string, number | string | null>;
@@ -218,7 +223,20 @@ export interface DcaWatchCardData {
     currency?: string | null;
     currency_label?: string | null;
     official_timeframe?: 'month';
-    current?: DcaWatchZone & { status: string; period: string; signal_date: string; close: number; months_in_zone: number };
+    current?: DcaWatchZone & {
+        status: string;
+        period: string;
+        signal_date: string;
+        close: number;
+        /** "live": el cierre mostrado es un precio actual etiquetado (premercado/sesión/post), nunca un cierre. */
+        close_kind?: 'close' | 'live';
+        months_in_zone: number;
+    };
+    /** Precio actual usado en el periodo en formación, o por qué no se usó. Ausente en backends antiguos. */
+    live?:
+        | { used: true; price: number; session: 'pre' | 'regular' | 'post' | string; timestamp: number | null; currency?: string | null; source?: string }
+        | { used: false; reason: 'unavailable' | 'closed' | 'no_price' | 'stale' | 'currency_mismatch' | 'out_of_band' | string }
+        | null;
     timeframes: DcaWatchTimeframe[];
     last_change?: { from: DcaWatchZone; to: DcaWatchZone; period: string; signal_date: string; close: number; change: number | null } | null;
     risk?: { key: 'low' | 'medium' | 'high'; label: string; reasons: Array<{ key: string; value: number | null }> };

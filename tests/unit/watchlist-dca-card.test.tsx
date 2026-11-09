@@ -27,6 +27,38 @@ describe('DcaWatchCard', () => {
     expect(screen.getByText('¿Por qué?')).toBeTruthy();
   });
 
+  it('etiqueta el precio actual cuando el periodo en formación lo usa, y avisa cuando falta sin vetar', () => {
+    const withLive: DcaWatchCardData = {
+      ...data,
+      current: { ...data.current!, close_kind: 'live' },
+      live: { used: true, price: 175.75, session: 'pre', timestamp: 1763044200, currency: 'USD' },
+    };
+    const { unmount } = render(<DcaWatchCard data={withLive} ti={createTranslator('es')} locale="es" />);
+    const liveLine = screen.getByTestId('dca-card-live').textContent ?? '';
+    expect(liveLine).toContain('precio premercado');
+    expect(liveLine).toContain('175,75');
+    expect(liveLine).toContain('nunca como cierre');
+    unmount();
+
+    const missing: DcaWatchCardData = { ...data, live: { used: false, reason: 'unavailable' } };
+    const { unmount: unmountMissing } = render(<DcaWatchCard data={missing} ti={createTranslator('es')} locale="es" />);
+    const warning = screen.getByTestId('dca-card-live-missing').textContent ?? '';
+    expect(warning).toContain('Sin precio actual');
+    expect(warning).toContain('6 nov 2026');
+    unmountMissing();
+
+    const discarded: DcaWatchCardData = { ...data, live: { used: false, reason: 'out_of_band' } };
+    render(<DcaWatchCard data={discarded} ti={createTranslator('en')} locale="en" />);
+    expect(screen.getByTestId('dca-card-live-missing').textContent).toContain('discarded');
+  });
+
+  it('mercado cerrado no es un dato que falte: sin línea ni aviso', () => {
+    const closed: DcaWatchCardData = { ...data, live: { used: false, reason: 'closed' } };
+    render(<DcaWatchCard data={closed} ti={createTranslator('es')} locale="es" />);
+    expect(screen.queryByTestId('dca-card-live')).toBeNull();
+    expect(screen.queryByTestId('dca-card-live-missing')).toBeNull();
+  });
+
   it('en inglés y sin datos', () => {
     const { unmount } = render(<DcaWatchCard data={data} ti={createTranslator('en')} locale="en" />);
     expect(screen.getByTestId('dca-card-risk').textContent).toBe('High risk');

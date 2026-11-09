@@ -92,7 +92,7 @@ def _verdict(level=3, touched=3):
 def _payload(level=3, previous=2):
     item = svc.TrackedSymbol(symbol="UBER", sources=["watchlist"])
     return svc._dca_payload(
-        item, _verdict(level), close=70.0, level_prices={"2x": 85.0, "3x": 75.0},
+        item, _verdict(level), close=70.0, close_date=date(2026, 10, 27), level_prices={"2x": 85.0, "3x": 75.0},
         currency="USD", previous_level=previous, params=PARAMS,
     )
 
@@ -123,7 +123,7 @@ def test_payload_sin_parametros_opcionales_los_deja_en_none():
     item = svc.TrackedSymbol(symbol="UBER")
     params = SimpleNamespace(version="v-min")
     dca = svc._dca_payload(
-        item, _verdict(), close=70.0, level_prices={}, currency=None,
+        item, _verdict(), close=70.0, close_date=date(2026, 10, 27), level_prices={}, currency=None,
         previous_level=None, params=params,
     )
     assert dca["sma_months"] is None and dca["high_lookback_months"] is None

@@ -108,6 +108,12 @@
       "provisional": "(provisional)",
       "status": "Estado: mes {status} ({period})",
       "settledClose": "Cierre asentado: {close} · {date}",
+      "liveLevel": "Nivel con {session} {price} ({time}): no es un cierre.",
+      "liveSession": {
+        "pre": "precio premercado",
+        "regular": "precio de sesión",
+        "post": "precio post-mercado"
+      },
       "monthlyRsi": "RSI mensual: {rsi}",
       "triggerClose": "Cierre que activaría: {prices}",
       "forming": "El mes no ha cerrado: el veredicto puede cambiar.",
@@ -284,6 +290,12 @@
     "tfMissing": "Sin historia suficiente en este marco",
     "monthsInZone": "{count} meses en zona",
     "forming": "provisional: el mes no ha cerrado",
+    "livePre": "Con precio premercado {price} ({time})",
+    "liveRegular": "Con precio actual {price} ({time})",
+    "livePost": "Con precio post-mercado {price} ({time})",
+    "liveNote": "El precio actual solo entra en el mes en curso, nunca como cierre. La señal oficial y los avisos se confirman con el cierre.",
+    "liveMissing": "Sin precio actual ahora: el nivel usa el cierre del {date}.",
+    "liveDiscarded": "Precio actual descartado por dato incoherente: el nivel usa el cierre del {date}.",
     "risk": {
       "low": "Riesgo bajo",
       "medium": "Riesgo medio",

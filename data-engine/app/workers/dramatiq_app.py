@@ -2903,6 +2903,59 @@ def sync_official_closes(
         client.close()
 
 
+def _run_dca_evaluation(
+    actor: str,
+    tenant_id: int | None,
+    user_id: str | None,
+    *,
+    review_savings: bool,
+) -> dict[str, Any]:
+    """Cuerpo compartido de las pasadas DCA (cierre diario y premercado).
+
+    Con el mercado abierto (premercado/sesion/post) el nivel del periodo en
+    formacion incorpora el precio actual etiquetado; con el mercado cerrado la
+    misma pasada confirma con cierres (los guardarrailes del servicio deciden).
+    """
+    from app.core.config import get_settings
+    from app.services.dca_signal_service import evaluate_watchlist
+
+    if not get_settings().dca_evaluation_enabled:
+        return {"status": "skipped", "actor": actor, "reason": "disabled"}
+    db = _session(tenant_id, user_id)
+    try:
+        lease = acquire_job_lease(
+            f"evaluate_dca_signals:{tenant_id}",
+            ttl_seconds=1800,
+            redis_url=_lease_redis_url(),
+        )
+    except Exception:
+        db.close()
+        raise
+    if lease is None:
+        db.close()
+        return {"status": "skipped", "actor": actor, "reason": "lease_held"}
+    from app.services import dca_run_log
+
+    run = dca_run_log.start_run(db, "scheduler")
+    try:
+        # Pasada diaria: no evalua tickers cuya bolsa no abrio el dia del cierre.
+        summary = evaluate_watchlist(db, skip_closed_markets=True)
+        if review_savings:
+            from app.services.plan_proactivity import review_savings_plan
+
+            summary["savings_plan_review"] = review_savings_plan(db)
+        db.commit()
+        dca_run_log.finish_run(db, run, summary=summary)
+        return {"actor": actor, "status": "ok", **summary}
+    except Exception as exc:
+        _rollback(db)
+        dca_run_log.finish_run(db, run, error=f"{type(exc).__name__}: {exc}")
+        return _handle_actor_error(actor, exc, tenant_id=tenant_id)
+    finally:
+        release_job_lease(f"evaluate_dca_signals:{tenant_id}", lease, redis_url=_lease_redis_url())
+        db.close()
+
+
 @dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=1_800_000)
 @_coalesce_on_success("evaluate_dca_signals", 20 * 3600, ("tenant_id",), stale_after_seconds=None)
 def evaluate_dca_signals(
@@ -2916,43 +2969,25 @@ def evaluate_dca_signals(
     servicio con DCA_ALERTS_ENABLED: con los avisos apagados se sigue evaluando
     y guardando el nivel, pero no sale ningun aviso ni correo.
     """
-    from app.core.config import get_settings
-    from app.services.dca_signal_service import evaluate_watchlist
+    return _run_dca_evaluation("evaluate_dca_signals", tenant_id, user_id, review_savings=True)
 
-    if not get_settings().dca_evaluation_enabled:
-        return {"status": "skipped", "actor": "evaluate_dca_signals", "reason": "disabled"}
-    db = _session(tenant_id, user_id)
-    try:
-        lease = acquire_job_lease(
-            f"evaluate_dca_signals:{tenant_id}",
-            ttl_seconds=1800,
-            redis_url=_lease_redis_url(),
-        )
-    except Exception:
-        db.close()
-        raise
-    if lease is None:
-        db.close()
-        return {"status": "skipped", "actor": "evaluate_dca_signals", "reason": "lease_held"}
-    from app.services import dca_run_log
 
-    run = dca_run_log.start_run(db, "scheduler")
-    try:
-        # Pasada diaria: no evalua tickers cuya bolsa no abrio el dia del cierre.
-        summary = evaluate_watchlist(db, skip_closed_markets=True)
-        from app.services.plan_proactivity import review_savings_plan
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=1_800_000)
+@_coalesce_on_success("evaluate_dca_signals_live", 8 * 3600, ("tenant_id",), stale_after_seconds=None)
+def evaluate_dca_signals_live(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Pasada premercado de las senales DCA: el nivel oficial reacciona al precio actual.
 
-        summary["savings_plan_review"] = review_savings_plan(db)
-        db.commit()
-        dca_run_log.finish_run(db, run, summary=summary)
-        return {"actor": "evaluate_dca_signals", "status": "ok", **summary}
-    except Exception as exc:
-        _rollback(db)
-        dca_run_log.finish_run(db, run, error=f"{type(exc).__name__}: {exc}")
-        return _handle_actor_error("evaluate_dca_signals", exc, tenant_id=tenant_id)
-    finally:
-        release_job_lease(f"evaluate_dca_signals:{tenant_id}", lease, redis_url=_lease_redis_url())
-        db.close()
+    Actor PROPIO (no un segundo encolado del diario): con clave de coalescencia
+    separada, una pasada premercado con exito NO suprime la confirmacion con el
+    cierre oficial de las 23:15 UTC (la ventana de 20 h del diario contaria
+    desde el inicio premercado y se la saltaria). Mismo lease por tenant que la
+    diaria: nunca evaluan el mismo tenant a la vez. Sin revision del plan de
+    ahorro (eso es de la pasada diaria).
+    """
+    return _run_dca_evaluation("evaluate_dca_signals_live", tenant_id, user_id, review_savings=False)
 
 
 @dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=600_000, queue_name=YAHOO_QUEUE_NAME)
