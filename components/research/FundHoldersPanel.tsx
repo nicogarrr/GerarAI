@@ -1,4 +1,5 @@
-import { DEFAULT_LOCALE, intlLocale, type Locale } from '@/lib/i18n/locale';
+import { naFor } from '@/lib/format';
+import { DEFAULT_LOCALE, intlLocale, parseLocale, type Locale } from '@/lib/i18n/locale';
 import { createTranslator } from '@/lib/i18n/translate';
 import { datasetLabel, type FundHolder, type FundHolders } from '@/lib/research/fund-holders';
 import { compactShares, pct } from '@/lib/research/institutional-holders';
@@ -16,6 +17,9 @@ function usd(value: number | null, intl: string): string {
 
 function Row({ fund, intl, t, mode }: { fund: FundHolder; intl: string; t: ReturnType<typeof createTranslator>; mode: 'shares' | 'weight' }) {
   const weight = pct(fund.weight_pct, intl);
+  const shares = typeof fund.shares === 'number' && Number.isFinite(fund.shares)
+    ? compactShares(fund.shares, intl)
+    : naFor(parseLocale(intl));
   return (
     <li className="flex flex-col gap-1 border-b border-gray-800/70 py-2 last:border-0">
       <div className="flex items-baseline justify-between gap-3">
@@ -25,14 +29,14 @@ function Row({ fund, intl, t, mode }: { fund: FundHolder; intl: string; t: Retur
           <span className="min-w-0 truncate text-sm font-medium text-gray-100">{fund.name}</span>
         )}
         <span className="shrink-0 text-sm tabular-nums text-gray-100">
-          {mode === 'shares' ? compactShares(fund.shares ?? 0, intl) : (weight ?? '—')}
+          {mode === 'shares' ? shares : (weight ?? '—')}
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
         {mode === 'shares' ? (
           <span>{t('research.fondos.weightOfFund', { pct: weight ?? '—' })}</span>
         ) : (
-          <span>{t('research.fondos.sharesValue', { shares: compactShares(fund.shares ?? 0, intl), value: usd(fund.value_usd, intl) })}</span>
+          <span>{t('research.fondos.sharesValue', { shares: shares, value: usd(fund.value_usd, intl) })}</span>
         )}
         <span>{t('research.fondos.portfolioAt', { date: fmtDate(fund.report_date, intl) })}</span>
         {fund.net_assets_usd !== null ? <span>{t('research.fondos.netAssets', { value: usd(fund.net_assets_usd, intl) })}</span> : null}

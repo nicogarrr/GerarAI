@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { FundHoldersPanel } from '@/components/research/FundHoldersPanel';
@@ -62,5 +62,31 @@ describe('FundHoldersPanel', () => {
     const zero: FundHolders = { ...data, totals: { funds: 0, shares: 0, value_usd: 0 }, top_funds: [], by_weight: [] };
     render(<FundHoldersPanel data={zero} locale="en" />);
     expect(screen.getByRole('status')).toHaveTextContent(/does not appear in the Q3 2026 N-PORT file/);
+  });
+});
+
+
+describe('FundHoldersPanel: acciones ausentes no son cero', () => {
+  it.each(['es', 'en'] as const)('acciones null: N/D localizado en ambas listas (%s)', (locale) => {
+    const missing: FundHolders = { ...data,
+      top_funds: [fund({ shares: null })],
+      by_weight: [fund({ accession: 'B2', name: 'Theme ETF', shares: null })],
+    };
+    render(<FundHoldersPanel data={missing} locale={locale} />);
+    const na = locale === 'es' ? 'N/D' : 'N/A';
+    const rows = screen.getAllByRole('listitem');
+    expect(within(rows[0]).getByText(na)).toBeInTheDocument();
+    expect(rows[1]).toHaveTextContent(locale === 'es' ? `${na} acciones` : `${na} shares`);
+    expect(rows[1]).not.toHaveTextContent(locale === 'es' ? /\b0 acciones/ : /\b0 shares/);
+  });
+
+  it.each([NaN, Infinity, -Infinity])('acciones no finitas: N/D, no %s', (shares) => {
+    render(<FundHoldersPanel data={{ ...data, top_funds: [fund({ shares })] }} locale="es" />);
+    expect(within(screen.getAllByRole('listitem')[0]).getByText('N/D')).toBeInTheDocument();
+  });
+
+  it('cero reportado conserva 0, no lo confunde con ausencia', () => {
+    render(<FundHoldersPanel data={{ ...data, top_funds: [fund({ shares: 0 })] }} locale="es" />);
+    expect(within(screen.getAllByRole('listitem')[0]).getByText('0')).toBeInTheDocument();
   });
 });
