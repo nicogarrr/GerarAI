@@ -500,6 +500,8 @@ class StandardDCFEngine(ValuationEngine):
         # minoritarios y las acciones preferentes cuando el emisor los declara
         # (sin hecho = no existen; se deja constancia en la traza).
         minority_interest = snapshot.value("minority_interest") or 0.0
+        if getattr(snapshot, "nci_in_shares", None):
+            minority_interest = 0.0  # Up-C: ya contados en las acciones (todas las clases)
         preferred_stock = snapshot.value("preferred_stock") or 0.0
         base_inputs = DCFInputs(
             revenue=revenue,

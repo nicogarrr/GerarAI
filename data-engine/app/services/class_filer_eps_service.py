@@ -277,6 +277,28 @@ def backfill_class_based_eps(
 # ---------------------------------------------------------------------------
 
 CLASS_SHARES_FILERS: tuple[str, ...] = ("META", "GOOGL", "BRK.B", "ASTS", "V")
+#: Una portada SEC sin dimensión más antigua que esto se considera ausente (la portada se refresca cada 10-Q).
+CLASS_COVER_STALE_DAYS = 200
+
+
+def class_cover_candidates(db: Session, *, today: date | None = None) -> list[Company]:
+    """Emisores con CIK SIN portada consolidada reciente (``shares_outstanding`` SEC con sufijo ``:DEI``): la
+    señal general de un filer multi-clase (la SEC no consolida las clases en companyfacts). Sin lista por ticker:
+    ``CLASS_SHARES_FILERS`` queda solo como semilla documental. Orden por ticker (determinista)."""
+    from datetime import timedelta
+
+    cutoff = ((today or date.today()) - timedelta(days=CLASS_COVER_STALE_DAYS)).isoformat()
+    fresh = select(FinancialFact.company_id).where(
+        FinancialFact.metric == "shares_outstanding",
+        FinancialFact.source_type == "SEC",
+        FinancialFact.period.like("%:DEI"),
+        FinancialFact.period >= cutoff,
+        *tenant_filters(db, FinancialFact),
+    ).distinct()
+    return list(db.scalars(
+        select(Company).where(Company.cik.is_not(None), Company.cik != "", Company.id.not_in(fresh))
+        .order_by(Company.ticker)
+    ).all())
 
 # Ratio de conversion de cada clase a la clase COTIZADA del ticker (acciones
 # de la clase cotizada por cada accion de esa clase). Revisado a mano: sumar

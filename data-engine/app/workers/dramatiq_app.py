@@ -2093,32 +2093,26 @@ def ingest_class_shares_outstanding(
     user_id: str | None = None,
 ) -> dict[str, Any]:
     """shares_outstanding derivado (suma de clases dei ECSO) para filers
-    multi-clase (META, GOOGL, BRK.B, ASTS, V): la SEC no consolida las
+    multi-clase (todo emisor con CIK sin portada consolidada reciente;
+    p. ej. META, GOOGL, BRK.B, ASTS): la SEC no consolida las
     clases en companyfacts, asi que sin este carril no tienen saldo de
     acciones y el market cap derivado (#1555) no puede calcularse.
 
     Idempotente (mismo periodo = no reescribe). CIK del Company; sin CIK o
     sin Company queda contado, nunca inventado.
     """
-    from sqlalchemy import select as _select
-
-    from app.models import Company
     from app.services.class_filer_eps_service import (
-        CLASS_SHARES_FILERS,
         backfill_class_shares_outstanding,
+        class_cover_candidates,
     )
 
     db = _session(tenant_id, user_id)
     try:
         results: dict[str, str] = {}
-        for ticker in CLASS_SHARES_FILERS:
-            company = db.scalar(_select(Company).where(Company.ticker == ticker))
-            if company is None:
-                results[ticker] = "no_company"
-                continue
-            if not company.cik:
-                results[ticker] = "no_cik"
-                continue
+        # General (regla «acciones-vigentes-v1»): todo emisor con CIK sin portada consolidada reciente, no una
+        # lista por ticker.
+        for company in class_cover_candidates(db):
+            ticker = company.ticker
             try:
                 outcome = backfill_class_shares_outstanding(db, company, cik=company.cik)
                 db.commit()

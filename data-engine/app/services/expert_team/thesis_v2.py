@@ -1040,7 +1040,9 @@ def pre_revenue_rows(note: dict[str, Any], val: Mapping[str, Any], ccy: str) -> 
         (["EV/ventas de comparables maduros (p25 / mediana / p75)",
           " / ".join(times(stats.get(k)) for k in ("p25", "median", "p75")) if stats else
           f"N/D ({pre.get('peers_missing') or ''})",
-          f"{int(stats.get('n') or 0)} comparables; capa: {pre.get('peer_layer') or 'ninguna'}; {f.get('multiplo', '')}"], None),
+          f"{int(stats.get('n') or 0)} comparables; capa: {pre.get('peer_layer') or 'ninguna'}; {f.get('multiplo', '')}"
+          + "".join(f"; {x.get('name') or x.get('ticker')}: {x.get('motivo')}" for x in pre.get("peers_excluded") or [])],
+         None),
     ]
     for k in keys:
         row = scen.get(k) or {}

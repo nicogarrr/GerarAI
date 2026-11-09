@@ -210,11 +210,88 @@ def fill_from_sic(db: Any, *, lookup: Callable[[Any], tuple[int | None, str | No
     for c in rows:
         sic, desc = sics.get(c.id, (None, None))
         got = apply(c, sic, desc, calib)
+        if tag_sic(c, sic):
+            got = {**got, "tag": f"{SIC_TAG_PREFIX}{sic}"}
         if got:
             changed[c.ticker] = {**got, "sic": sic}
     return {"rules": RULES_VERSION, "with_sic": sum(1 for v in sics.values() if v[0] is not None),
             "changed": changed, "calibration": {str(k): v for k, v in sorted(calib.items())}}
 
 
-__all__ = ["SIC_SECTOR_RANGES", "apply", "base_calibration", "calibration", "classify", "declared_sector",
-           "fill_from_sic", "industry_label", "sec_submissions_sic", "sic_in_text"]
+# --- Grupos de industria por SIC (regla «comparables-sic-v1», pre-registrada el 9-nov-2026) -----------------
+#
+# Algunos competidores directos caen en códigos SIC distintos de la SEC: un operador de satélites
+# (4899, servicios de comunicaciones), un fabricante de satélites y equipos (3663), un lanzador o una nave
+# (3760–3769) o un sistema de navegación o alunizaje (3812). El grupo declarado los junta; cualquier emisor de
+# esos códigos entra igual (no hay lista de tickers). Dentro del grupo, los comparables son los de
+# capitalización más cercana (ver ``pre_revenue_valuation.mature_peers``), para que un gigante del mismo código
+# (defensa, redes) no fije el múltiplo.
+SIC_INDUSTRY_GROUPS: tuple[tuple[str, tuple[tuple[int, int], ...]], ...] = (
+    ("espacio y satélite", ((3663, 3663), (3760, 3769), (3812, 3812), (4899, 4899))),
+)
+#: Etiqueta en ``Company.factor_tags`` con el SIC de la SEC (mismo patrón que ``adr:N``).
+SIC_TAG_PREFIX = "sic:"
+
+
+def sic_from_tags(tags: Iterable[Any] | None) -> int | None:
+    for tag in tags or []:
+        text = str(tag).strip().lower()
+        if text.startswith(SIC_TAG_PREFIX):
+            try:
+                return int(text[len(SIC_TAG_PREFIX):])
+            except ValueError:
+                return None
+    return None
+
+
+def company_sic(company: Any) -> int | None:
+    """SIC de la ficha: la etiqueta ``sic:nnnn`` o el «(SIC nnnn)» de la industria."""
+    return sic_from_tags(getattr(company, "factor_tags", None)) or sic_in_text(getattr(company, "industry", None))
+
+
+def industry_group(sic: int | None) -> tuple[str, tuple[tuple[int, int], ...]] | None:
+    if sic is None:
+        return None
+    for label, ranges in SIC_INDUSTRY_GROUPS:
+        if any(lo <= sic <= hi for lo, hi in ranges):
+            return label, ranges
+    return None
+
+
+def group_label(group: tuple[str, tuple[tuple[int, int], ...]]) -> str:
+    label, ranges = group
+    codes = ", ".join(str(lo) if lo == hi else f"{lo}–{hi}" for lo, hi in ranges)
+    return f"{label} (SIC {codes})"
+
+
+def tag_sic(company: Any, sic: int | None) -> bool:
+    """Guarda ``sic:nnnn`` en las etiquetas de la ficha (sustituye otra ``sic:``). True si cambió."""
+    if sic is None:
+        return False
+    tags = [t for t in list(getattr(company, "factor_tags", None) or []) if not str(t).lower().startswith(SIC_TAG_PREFIX)]
+    new = [*tags, f"{SIC_TAG_PREFIX}{int(sic)}"]
+    if list(getattr(company, "factor_tags", None) or []) == new:
+        return False
+    company.factor_tags = new
+    return True
+
+
+__all__ = [
+    "SIC_INDUSTRY_GROUPS",
+    "SIC_SECTOR_RANGES",
+    "SIC_TAG_PREFIX",
+    "apply",
+    "base_calibration",
+    "calibration",
+    "classify",
+    "company_sic",
+    "declared_sector",
+    "fill_from_sic",
+    "group_label",
+    "industry_group",
+    "industry_label",
+    "sec_submissions_sic",
+    "sic_from_tags",
+    "sic_in_text",
+    "tag_sic",
+]

@@ -14,6 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import case, desc, select
 from sqlalchemy.orm import Session, selectinload
@@ -105,6 +106,9 @@ class FinancialSnapshot:
     # Cruce de fuentes de los inputs YA presentes (confirmado / discrepancia);
     # no son estimaciones: van a la traza, no a «inputs estimados».
     source_checks: dict[str, dict] = field(default_factory=dict)
+    # Up-C (``current_shares.up_c``): las acciones ya incluyen las clases emparejadas con las unidades
+    # canjeables, que SON los minoritarios: el puente EV → capital no los resta otra vez.
+    nci_in_shares: dict | None = None
 
     def value(self, metric: str) -> float | None:
         """Return a finite float, or ``None``.
@@ -1072,7 +1076,20 @@ class FinancialSnapshotBuilder:
             return max(facts, key=lambda f: (_period_end(f.period) or date.min, f.filed or date.min), default=None)
 
         quarter = newest(later("shares_diluted", quarterly_only=True))
-        outstanding = newest(later("shares_outstanding", quarterly_only=False))
+        from app.valuation import current_shares as cs
+
+        def _meta(fact: FinancialFact) -> Any:
+            src = getattr(fact, "source", None)
+            return getattr(src, "metadata_", None) if src is not None else None
+
+        # Portada con TODAS las clases (suma derivada por clase de dei ECSO): es el total por construcción y
+        # vale aunque la fuente de la media anual sea otra (regla «acciones-vigentes-v1»).
+        class_sums = [
+            f for f in facts_for("shares_outstanding")
+            if (f.source_type or "") == "derived" and f.value is not None and float(f.value) > 0
+            and (end := _period_end(f.period)) is not None and end > annual_end and cs.is_class_sum(_meta(f), f.period)
+        ]
+        outstanding = newest(later("shares_outstanding", quarterly_only=False) + class_sums)
         if quarter is None and outstanding is None:
             return
         chosen, reason = annual, "media diluida del ejercicio"
@@ -1126,6 +1143,23 @@ class FinancialSnapshotBuilder:
             f"shares_diluted {float(chosen.value):,.0f}: {reason}; media del ejercicio {annual.period}: "
             f"{float(annual.value):,.0f}."
         )
+        if chosen is outstanding and outstanding in class_sums:
+            members = cs.class_members(_meta(outstanding), outstanding.period)
+            nci = snapshot.value("minority_interest")
+
+            def _latest_value(metric: str) -> float | None:
+                rows = [f for f in facts_for(metric) if f.value is not None and _period_end(f.period)]
+                best = max(rows, key=lambda f: (_period_end(f.period) or date.min, f.filed or date.min), default=None)
+                return float(best.value) if best is not None else None
+
+            upc = cs.up_c(members, minority_interest=nci, total_equity=_latest_value("total_equity"),
+                          ni_minority=_latest_value("net_income_minority"), ni_total=_latest_value("net_income_total"))
+            if upc is not None:
+                snapshot.nci_in_shares = upc
+                snapshot.warnings.append(
+                    f"Up-C: clases {', '.join(cs.short(m) for m in upc['paired_classes'])} "
+                    f"({upc['paired_shares']:,.0f}) canjeables cuentan como acciones; los minoritarios no se restan."
+                )
 
     @staticmethod
     def _apply_share_scale(

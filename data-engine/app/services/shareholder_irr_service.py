@@ -83,6 +83,20 @@ def _cite(fact: FinancialFact) -> dict[str, Any]:
     }
 
 
+def _share_cite(fact: FinancialFact) -> dict[str, Any]:
+    """Cita de una portada de acciones con su desglose por clase (hecho derivado de la suma de clases)."""
+    from app.valuation.current_shares import class_members, is_class_sum
+
+    cite = _cite(fact)
+    meta = getattr(fact.source, "metadata_", None) if fact.source is not None else None
+    if is_class_sum(meta, fact.period):
+        cite["class_sum"] = True
+        members = class_members(meta, fact.period)
+        if members:
+            cite["class_members"] = members
+    return cite
+
+
 def _end(period: str) -> str:
     return str(period or "").split(":")[0]
 
@@ -128,7 +142,7 @@ def company_facts(db: Session, company: Company) -> tuple[dict[str, dict[int, di
                         slot[year] = (rank, _cite(fact))
             cur = point.get(fact.metric)
             if cur is None or end > cur[0] or (end == cur[0] and rank < cur[1]):
-                point[fact.metric] = (end, rank, _cite(fact))
+                point[fact.metric] = (end, rank, _share_cite(fact) if fact.metric == "shares_outstanding" else _cite(fact))
     return ({m: {y: c for y, (_, c) in v.items()} for m, v in annual.items()},
             {m: c for m, (_, _, c) in point.items()})
 
@@ -608,9 +622,13 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
         price, fx_note = conv[0], "; ".join(x for x in (fx_note, conv[1]) if x)
     cites["price"] = {"value": price, "as_of": price_as_of, "currency": reporting, "fx": fx_note,
                       "document": "Cierre de mercado guardado por GerarAI"}
-    # acciones: las de la portada del último informe (dei:EntityCommonStockSharesOutstanding) si son
-    # posteriores al cierre y coherentes con la media diluida (±20 %: una portada por clase no es el total);
-    # si no, la media diluida del último ejercicio; si falta, beneficio / BPA diluido (derivado)
+    # acciones (regla «acciones-vigentes-v1», app.valuation.current_shares): las de la portada del último informe
+    # (dei:EntityCommonStockSharesOutstanding, TODAS las clases) si es posterior al cierre; si no vale, la media
+    # diluida del último ejercicio, avisando; si falta, beneficio / BPA diluido (derivado). Up-C: las clases
+    # emparejadas con unidades canjeables se cuentan como acciones (bases EV) o quedan fuera con los
+    # minoritarios (bases sobre beneficio atribuible), nunca las dos cosas.
+    from app.valuation import current_shares as cs
+
     shares = _mill(annual.get("shares_diluted", {}).get(last))
     cover = point.get("shares_outstanding")
     cover_sh = _mill(cover)
@@ -624,14 +642,41 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
                                  "references": [x for x in (cover, annual.get("eps_diluted", {}).get(last)) if x]}
     fy_end = _end(str((annual.get("revenue", {}).get(last) or annual.get("net_income", {}).get(last) or {}).get("period") or ""))
     cover_end = _end(str((cover or {}).get("period") or ""))
-    if cover_sh and cover_end > fy_end and (shares is None or 0.8 <= cover_sh / shares <= 1.2):
+    by_class = bool((cover or {}).get("class_sum"))
+    cover_reject = (cs.cover_check(cover_sh, shares, by_class=by_class) if cover_sh and cover_end > fy_end
+                    else ("sin portada posterior al cierre del ejercicio" if cover_sh else "sin portada"))
+    upc = None
+    if cover_reject is None:
+        assert cover_sh is not None
+        members = (cover or {}).get("class_members")
+        nci_now = _mill(point.get("minority_interest"))
+        eq_now = _mill(point.get("total_equity"))
+        upc = cs.up_c({k: float(v) / 1_000_000.0 for k, v in members.items()} if members else None,
+                      minority_interest=nci_now, total_equity=eq_now,
+                      ni_minority=series("net_income_minority")[-1], ni_total=series("net_income_total")[-1])
         if shares is not None and cover_sh < shares:
             warnings.append("acciones de la portada del último informe (sin opciones ni convertibles): por debajo "
                             "de la media diluida del ejercicio")
+        if members:
+            warnings.append("acciones de la portada: suma de todas las clases (" + ", ".join(
+                f"{cs.short(k)} {float(v) / 1e6:,.1f} M" for k, v in sorted(members.items())) + f") a {cover_end}")
         shares = cover_sh
         cites["shares"] = cover
+        if upc is not None:
+            paired = ", ".join(cs.short(m) for m in upc["paired_classes"])
+            if chosen_basis in cs.EV_BASES:
+                warnings.append(f"Up-C: las clases {paired} ({upc['paired_shares']:,.1f} M) van con unidades canjeables "
+                                f"({upc['share_of_paired_classes']:.0%} de las acciones, minoritarios "
+                                f"{upc['share_of_minorities']:.0%} según {upc['minorities_basis']}): cuentan como "
+                                "acciones y los minoritarios no se restan")
+            else:
+                shares = float(upc["listed_shares"])
+                warnings.append(f"Up-C: beneficio atribuible por acción de la clase {cs.short(upc['listed_class'])} "
+                                f"({shares:,.1f} M); las clases {paired} van con los minoritarios")
+            cites["shares_up_c"] = {**upc, "basis": chosen_basis}
     elif shares is not None:
         cites["shares"] = annual["shares_diluted"][last]
+        warnings.append(f"acciones: media diluida del ejercicio {last} ({cover_reject})")
     else:
         eps = _f((annual.get("eps_diluted", {}).get(last) or {}).get("value"))
         ni = net_income[-1]
@@ -682,6 +727,8 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     if not hybrids:
         warnings.append("capital híbrido: sin dato etiquetado (si existe, se trataría como deuda)")
     minorities = _mill(point.get("minority_interest")) or 0.0
+    if upc is not None and chosen_basis in cs.EV_BASES:
+        minorities = 0.0  # Up-C: ya están en las acciones (todas las clases)
     sbc = _mill(annual.get("stock_based_compensation", {}).get(last))
     sp = engine.StartingPoint(
         price=float(price), shares_diluted=shares, revenue=revenue[-1] or 0.0,
