@@ -4,14 +4,14 @@ import BackendOffline from "@/components/system/BackendOffline";
 import { getInvestor, getInvestors } from "@/lib/actions/investors.actions";
 import { isBackendUnavailableError } from "@/lib/backend-offline";
 import { getT } from "@/lib/i18n/server";
+import { i18nPageTitle } from "@/lib/i18n/metadata";
 import { InvestorVideos } from "../_components/InvestorVideos";
 import { InvestorAvatar } from "../_components/Avatar";
 import { Pagination, paginate } from "../_components/Pagination";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
-  return { title: t('investors.videos.metaTitle') };
+    return i18nPageTitle('investors.videos.metaTitle');
 }
 
 export default async function VideosPage({

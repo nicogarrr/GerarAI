@@ -73,3 +73,31 @@ test('los layouts de auth ya no importan getT sin usarlo', () => {
     assert.ok(!readFileSync(file, 'utf8').includes('getT'), file + ' conserva getT');
   }
 });
+
+const pagesTitleOnly: Array<[string, string]> = [
+  ['app/(root)/discover/page.tsx', 'discover.metaTitle'],
+  ['app/(root)/inversores/conceptos/page.tsx', 'investors.concepts.metaTitle'],
+  ['app/(root)/inversores/videos/page.tsx', 'investors.videos.metaTitle'],
+  ['app/(root)/security/page.tsx', 'security.page.metaTitle'],
+  ['app/not-found.tsx', 'errors.notFound.metaTitle'],
+];
+
+test('el helper de solo titulo mantiene la cadena original', () => {
+  assert.ok(helper.includes('export async function i18nPageTitle('));
+  assert.ok(helper.includes('return { title: t(titleKey) };'));
+});
+
+for (const [file, titleKey] of pagesTitleOnly) {
+  test(file + ' usa i18nPageTitle con su clave', () => {
+    const src = readFileSync(file, 'utf8');
+    const start = src.indexOf('generateMetadata');
+    assert.ok(start >= 0, 'generateMetadata ausente');
+    const block = src.slice(start, start + 200);
+    assert.ok(
+      block.includes('return i18nPageTitle(\'' + titleKey + '\');'),
+      'la pagina no llama al helper con su clave',
+    );
+    assert.ok(!block.includes('{ title: t('), 'queda el objeto inline');
+    assert.ok(src.includes('i18n/metadata'), 'falta el import del helper');
+  });
+}

@@ -6,10 +6,10 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { readSessionWhenCookies } from '@/lib/anonymous-session';
 import { GerarAIWordmark } from '@/components/GerarAIWordmark';
 import { getT } from '@/lib/i18n/server';
+import { i18nPageTitle } from '@/lib/i18n/metadata';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
-  return { title: t('errors.notFound.metaTitle') };
+    return i18nPageTitle('errors.notFound.metaTitle');
 }
 
 async function NotFoundContent() {

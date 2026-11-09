@@ -15,3 +15,9 @@ export async function i18nPageMetadata(
   const t = await getT();
   return { title: t(titleKey), description: t(descriptionKey) };
 }
+
+/** Variante solo titulo de i18nPageMetadata (paginas sin description). */
+export async function i18nPageTitle(titleKey: TranslationKey): Promise<Metadata> {
+  const t = await getT();
+  return { title: t(titleKey) };
+}
