@@ -22,6 +22,12 @@ exactamente las que añadio; el downgrade borra unicamente lo anotado, asi
 las columnas que venian del ORM (y sus datos) sobreviven al downgrade.
 Offline (--sql) no puede inspeccionar: emite el alta de las 4 y del registro
 tal cual, coherente con una cadena desde cero (0083 crea la tabla sin ellas).
+
+La tabla `migration_added_columns` es infraestructura compartida (esta en
+Base.metadata: la crean create_all y las migraciones, la que llegue primero)
+y la escribiran futuras revisiones: el downgrade borra las filas de ESTA
+revision pero NUNCA la tabla - hacerlo destruiria registros ajenos y, en
+bases ORM, una tabla que el propio create_all repone.
 """
 import sqlalchemy as sa
 
@@ -97,7 +103,7 @@ def downgrade() -> None:
     if _is_offline():
         for column in reversed(_LIVE_COLUMNS):
             op.drop_column(_TABLE, column.name)
-        op.drop_table(_LOG)
+        op.execute(f"DELETE FROM {_LOG} WHERE revision = '{revision}' AND table_name = '{_TABLE}'")
         return
     bind = op.get_bind()
     if not sa.inspect(bind).has_table(_LOG):
@@ -117,4 +123,4 @@ def downgrade() -> None:
         sa.text(f"DELETE FROM {_LOG} WHERE revision = :revision AND table_name = :table"),
         {"revision": revision, "table": _TABLE},
     )
-    op.drop_table(_LOG)
+    # La tabla de registro NO se borra: es compartida y esta en Base.metadata.
