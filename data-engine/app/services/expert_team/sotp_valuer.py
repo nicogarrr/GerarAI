@@ -292,6 +292,7 @@ def build_model(classification: Mapping[str, Any], anchors: Mapping[str, Any]) -
     if anchors.get("debt_millions") is None:
         warnings.append("Falta la deuda en los datos SEC: «caja menos deuda» no la resta y el valor puede estar "
                         "sobreestimado.")
+    warnings.extend(str(note) + "." for note in anchors.get("stale_annual_notes") or [])
     if anchors.get("discount_rate_source") == "tag_default":
         warnings.append("Sin CAPM calculable para esta empresa (faltan beta o tipos): se usa la tasa por defecto.")
     if anchors.get("shares_basis") != "shares_outstanding":
@@ -442,7 +443,35 @@ def build_model(classification: Mapping[str, Any], anchors: Mapping[str, Any]) -
         "warnings": warnings,
         "rules_version": sotp_rules.RULES_VERSION,
     }
-    return normalize_user_sotp(model_raw)
+    model, problems = normalize_user_sotp(model_raw)
+    if model is not None and not problems:
+        note = partial_value_warning(model)
+        if note:
+            model.setdefault("warnings", []).append(note)
+    return model, problems
+
+
+def partial_value_warning(model: Mapping[str, Any]) -> str | None:
+    """Aviso cuando hay partes del negocio sin valorar: el total es un suelo y la deuda del grupo se resta entera.
+
+    Con partes sin cifra, la deuda que financia TODO el grupo se resta igual (FRPH: alquileres sin valorar y
+    214,6 M de deuda → valor por acción negativo). La cifra no se toca; se dice qué es.
+    """
+    missing = [str(u.get("name") or "") for u in model.get("unvalued") or []
+               if not str(u.get("reason") or "").startswith("dilución")]
+    missing = [m for m in missing if m]
+    if not missing:
+        return None
+    names = ", ".join(f"«{m[:60]}»" for m in missing[:3]) + (f" y {len(missing) - 3} más" if len(missing) > 3 else "")
+    text = (f"Valor parcial: {len(missing)} parte(s) sin valorar ({names}); la caja menos deuda de todo el grupo "
+            "se resta entera, así que el valor por acción es un suelo de las partes con cifra, no el de la empresa")
+    try:
+        vps = run_user_sotp(dict(model))["value_per_share"]
+    except Exception:  # noqa: BLE001 - el aviso nunca rompe el modelo
+        vps = None
+    if vps is not None and vps <= 0:
+        text += f"; sale {vps:.2f} {model.get('currency') or ''}/acción porque la deuda pesa más que las partes valoradas"
+    return text + "."
 
 
 def parse_proposal(parsed: Any, ledger: EvidenceLedger, anchors: Mapping[str, Any], *,
@@ -533,6 +562,21 @@ def _fact_millions(db: Session, company: Company, metric: str, *, period_prefix:
     return None, None
 
 
+def _latest_annual_end(db: Session, company: Company) -> str | None:
+    """Cierre del ejercicio más reciente que la empresa tiene presentado (cualquier hecho anual SEC)."""
+    from sqlalchemy import func, select
+
+    from app.models import FinancialFact
+
+    period = db.scalar(select(func.max(FinancialFact.period)).where(FinancialFact.company_id == company.id,
+                                                                 FinancialFact.period.like("%:FY")))
+    return str(period).split(":")[0] if period else None
+
+
+def _older_than(end: str | None, latest: str | None) -> bool:
+    return bool(end and latest and str(end)[:10] < str(latest)[:10])
+
+
 def _capm_cost_of_equity(db: Session, company: Company) -> tuple[float, str] | None:
     from sqlalchemy import desc, select
 
@@ -612,6 +656,17 @@ def sotp_anchors(db: Session, company: Company, *, today: date | None = None) ->
     short_term, _ = _fact_millions(db, company, "short_term_investments", period_prefix=balance_end) if balance_end else (None, None)
     sbc, sbc_end = _fact_millions(db, company, "stock_based_compensation", annual=True)
     fcf, fcf_end = _fact_millions(db, company, "free_cash_flow", annual=True)
+    # Un flujo anual de un ejercicio anterior al último presentado no es «el anual» de hoy (FRPH:
+    # SBC de 2020 con cuentas de 2025): N/D con su motivo, nunca la cifra vieja como si fuera actual.
+    latest_fy = _latest_annual_end(db, company)
+    stale: dict[str, str] = {}
+    if sbc is not None and _older_than(sbc_end, latest_fy):
+        stale["sbc"] = f"SBC anual N/D: el último dato es de {sbc_end} y el ejercicio más reciente cierra el {latest_fy}"
+        sbc = None
+    if fcf is not None and _older_than(fcf_end, latest_fy):
+        stale["burn"] = (f"Consumo de caja anual N/D: el último flujo de caja libre es de {fcf_end} y el ejercicio "
+                         f"más reciente cierra el {latest_fy}")
+        fcf = None
     # Moneda de los informes (unidad de los hechos SEC; un 40-F canadiense va en CAD) frente a la del precio:
     # todo el modelo va en la de los informes y el precio se convierte con el tipo guardado (BCE).
     reporting = _reporting_currency(db, company)
@@ -642,9 +697,10 @@ def sotp_anchors(db: Session, company: Company, *, today: date | None = None) ->
         "cash_millions": _millions(cash),
         "short_term_investments_millions": short_term,
         "sbc_annual_millions": sbc,
-        "sbc_period_end": sbc_end,
+        "sbc_period_end": sbc_end if sbc is not None else None,
         "annual_burn_millions": -fcf if fcf is not None and fcf < 0 else None,
-        "burn_period_end": fcf_end,
+        "burn_period_end": fcf_end if fcf is not None else None,
+        "stale_annual_notes": list(stale.values()),
         "debt_millions": _millions(debt),
         "balance_period_end": str((cash or debt or {}).get("period_end") or "") or None,
         "discount_rate": rate,
@@ -1398,7 +1454,76 @@ def _attach_narrative(db: Session, company: Company, tenant_id: int, result: Sot
         result.narrative = {"status": "error", "problems": [type(exc).__name__]}
 
 
+
+def _model_without_date(model: Mapping[str, Any] | None) -> dict[str, Any]:
+    """El modelo sin su línea «source» (lleva la fecha de la corrida): dos cálculos iguales salen iguales."""
+    return {k: v for k, v in (model or {}).items() if k != "source"}
+
+
+def recompute_saved_proposal(db: Session, company: Company, *, today: date | None = None,
+                             dry_run: bool = False) -> dict[str, Any]:
+    """Rehace SIN MODELO la propuesta guardada de los agentes: su clasificación guardada + anclas y reglas de hoy.
+
+    La clasificación (qué partes hay y qué cita cada una) es lo único que puso el modelo; las cifras
+    (acciones, caja, deuda, precio, divisa de cada ancla, crecimiento, múltiplos) las pone el código. Cuando
+    cambian las reglas o los datos del código, la propuesta vieja se queda con cifras de antes: esto la
+    recalcula y guarda una versión nueva (``trigger="recompute"``, 0 llamadas al modelo) solo si el cálculo
+    cambia. La huella y la tesis larga se conservan (sus marcadores se rellenan con el cálculo al leerla).
+    Una clasificación que las reglas de hoy ya no aceptan NO se guarda: queda la anterior y se dice por qué.
+    """
+    from app.services.user_sotp_service import AGENTS_SEGMENT, SOTP_INPUT_KEY, UserSotpService
+
+    tenant_id = db.info.get("tenant_id")
+    if type(tenant_id) is not int or tenant_id <= 0:
+        return {"ticker": company.ticker, "status": "no_tenant"}
+    service = UserSotpService()
+    rows = service.inputs.history(db, company_id=company.id, tenant_id=tenant_id,
+                                  input_key=SOTP_INPUT_KEY, segment_key=AGENTS_SEGMENT)
+    if not rows:
+        return {"ticker": company.ticker, "status": "no_proposal"}
+    row = rows[-1]
+    meta = dict(row.metadata_ or {})
+    old_vps = float(row.base) if row.base is not None else None
+    out: dict[str, Any] = {"ticker": company.ticker, "row_id": row.id, "old_value_per_share": old_vps,
+                           "old_rules_version": meta.get("rules_version"),
+                           "old_generated_at": meta.get("generated_at")}
+    classification = meta.get("classification")
+    if not classification:
+        return {**out, "status": "no_classification"}
+    anchors = sotp_anchors(db, company, today=today)
+    model, problems = build_model(classification, anchors)
+    if model is None:
+        return {**out, "status": "rejected_by_rules", "problems": list(problems)[:10]}
+    new_vps = run_user_sotp(model)["value_per_share"]
+    out.update({"new_value_per_share": new_vps, "currency": model.get("currency")})
+    if _model_without_date(model) == _model_without_date(meta.get("model")):
+        return {**out, "status": "unchanged"}
+    if dry_run:
+        return {**out, "status": "would_store"}
+    reasons = []
+    if meta.get("rules_version") != sotp_rules.RULES_VERSION:
+        reasons.append(f"reglas {meta.get('rules_version')} → {sotp_rules.RULES_VERSION}")
+    reasons.append("recalculado sin modelo con las cifras de hoy (acciones, caja, deuda, precio, divisas)")
+    new_meta = {k: meta.get(k) for k in ("thesis_version_id", "prompt_version", "fingerprint", "classification",
+                                          "readings_differ", "narrative") if meta.get(k) is not None}
+    new_meta.update({
+        "generated_at": datetime.now(UTC).isoformat(),
+        "price": anchors.get("price"),
+        "price_currency": anchors.get("currency"),
+        "price_as_of": anchors.get("price_as_of"),
+        "trigger": "recompute",
+        "rules_version": sotp_rules.RULES_VERSION,
+        "llm_calls": 0,
+        "cache_hit": True,
+        "changed_by": reasons,
+        "recomputed_from_row": row.id,
+    })
+    saved = service.save_agents(db, company, tenant_id, model, meta=new_meta)
+    return {**out, "status": "stored", "new_row_id": saved.id}
+
+
 __all__ = [
+    "recompute_saved_proposal",
     "AGENTS_LABEL",
     "SOTP_CONTRACT",
     "SOTP_VALUER_NAME",
