@@ -132,8 +132,11 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     BABA: {
         name: 'Alibaba Group',
         section: { url: 'https://www.alibabagroup.com/en-US/ir-financial-reports-quarterly-results', labelKey: 'quarterlyResults' },
-        events: [],
-        verifiedOn: '2026-11-08',
+        events: [
+            // Anuncio oficial de la fecha (19 nov 2026, trimestre de septiembre).
+            { date: '2026-11-19', period: 'T3 2026', url: 'https://home.alibabagroup.com/en-US/document-2054756418245885952' },
+        ],
+        verifiedOn: '2026-11-09',
     },
     BWMX: {
         name: 'Betterware de México',
