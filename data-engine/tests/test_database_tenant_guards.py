@@ -258,7 +258,7 @@ def test_flush_filas_de_tenant_sin_contexto_con_auth_obligatoria(
         db.rollback()
 
 
-def test_batch_refresh_recarga_con_una_consulta(engine, empresa):
+def test_batch_refresh_recarga_los_valores(engine, empresa):
     a = _documento(engine, tenant=1, titulo="a")
     b = _documento(engine, tenant=1, titulo="b")
     with Session(engine) as db:
