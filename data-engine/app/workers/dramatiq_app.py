@@ -5713,7 +5713,11 @@ def dispatch_source_health_watchdog(
 
 
 @dramatiq.actor(max_retries=2, min_backoff=30_000)
-@_coalesce_on_success("ingest_house_ptr", 6 * 60 * 60, ("tenant_id",))
+# Ventana 5,5 h < cadencia 6 h: con la ventana igual a la cadencia, el tick
+# siguiente podia consumirse con el claim anterior aun fresco (jitter y
+# arranques adelantados) y skippearse: cadencia efectiva de 12 h intermitente.
+# Mismo valor que el resto de ingests de 6 h (sec_bottleneck, ca_insider, pdmr).
+@_coalesce_on_success("ingest_house_ptr", 19800, ("tenant_id",))
 def ingest_house_ptr(
     tenant_id: int | None = None,
     user_id: str | None = None,
