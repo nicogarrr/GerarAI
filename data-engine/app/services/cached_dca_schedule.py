@@ -25,9 +25,10 @@ logger = logging.getLogger(__name__)
 
 def _extract_tenant_from_db(args, kwargs) -> int | None:
     """Extrae tenant_id del primer argumento (Session db)."""
-    if len(args) >= 2 and hasattr(args[1], 'info'):  # args[0] es self, args[1] es db
-        return args[1].info.get("tenant_id")
-    return None
+    db = kwargs.get("db")
+    if db is None and len(args) >= 2:
+        db = args[1]
+    return db.info.get("tenant_id") if db is not None and hasattr(db, "info") else None
 
 
 class CachedDcaScheduleService:

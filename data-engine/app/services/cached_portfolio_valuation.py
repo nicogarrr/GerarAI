@@ -21,7 +21,6 @@ from app.core.cache import (
     invalidate_portfolio_cache,
     tenant_from_first_db_arg,
 )
-from app.core.tenancy import tenant_cache_scope
 from app.models import Position
 
 logger = logging.getLogger(__name__)
@@ -29,11 +28,10 @@ logger = logging.getLogger(__name__)
 
 def _extract_tenant_from_db(args, kwargs) -> int | None:
     """Extrae tenant_id del primer argumento (Session db)."""
-    if len(args) >= 2 and hasattr(args[1], 'info'):  # args[0] es self, args[1] es db
-        tenant_id = args[1].info.get("tenant_id")
-        if tenant_id is not None:
-            return tenant_id
-    return tenant_cache_scope.get()
+    db = kwargs.get("db")
+    if db is None and len(args) >= 2:
+        db = args[1]
+    return db.info.get("tenant_id") if db is not None and hasattr(db, "info") else None
 
 
 class CachedPortfolioValuationService:
