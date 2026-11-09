@@ -36,6 +36,21 @@ SECRET = "research-security-test-secret-at-least-32-chars"
 PROD_TEST_DATABASE_URL = "postgresql:" + "//app_user" + ":" + "not-a-real-secret-fixture" + "@db:5432/app"
 
 
+@pytest.fixture(autouse=True)
+def _ensure_db_schema():
+    """Crea el esquema en la BD efimera del proceso antes de cada test.
+
+    Con pytest-xdist los tests de este archivo se reparten entre workers y
+    cada worker abre su propio fichero SQLite (conftest): un test que toca
+    SessionLocal sin init_db() previo falla con "no such table" si en su
+    worker no corrio antes otro test de boundaries que creara el esquema
+    (los archivos vecinos, p. ej. test_share_capital_service.py, usan un
+    engine sqlite :memory: propio y no crean nada en la BD del worker).
+    init_db() es idempotente (create_all con checkfirst).
+    """
+    init_db()
+
+
 @pytest.fixture
 def required_auth(monkeypatch):
     monkeypatch.setattr(
