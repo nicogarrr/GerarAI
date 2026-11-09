@@ -570,19 +570,32 @@ def sync_form4(db: Session, slug: str, *, limit: int = 20, fetch=None, filings=N
 
     # Fase 2: persistencia corta.
     created = 0
+    # Lote único de existencias (anti N+1): pares (accession, línea) ya
+    # persistidos en una consulta en vez de una POR transacción.
+    from sqlalchemy import tuple_
+
+    pairs = [
+        (filing["accession_number"], line_no)
+        for filing, parsed in fetched
+        for line_no, _ in enumerate([t for t in parsed["transactions"] if not t["is_derivative"]])
+    ]
+    existing: set[tuple[str, int]] = set()
+    if pairs:
+        existing = set(
+            db.execute(
+                select(InvestorMovement.accession_number, InvestorMovement.line_no).where(
+                    InvestorMovement.investor_slug == slug,
+                    tuple_(InvestorMovement.accession_number, InvestorMovement.line_no).in_(pairs),
+                    *tenant_filters(db, InvestorMovement),
+                )
+            ).all()
+        )
     for filing, parsed in fetched:
         lines = [t for t in parsed["transactions"] if not t["is_derivative"]]
         for line_no, tx in enumerate(lines):
-            exists = db.scalar(
-                select(InvestorMovement.id).where(
-                    InvestorMovement.investor_slug == slug,
-                    InvestorMovement.accession_number == filing["accession_number"],
-                    InvestorMovement.line_no == line_no,
-                    *tenant_filters(db, InvestorMovement),
-                )
-            )
-            if exists:
+            if (filing["accession_number"], line_no) in existing:
                 continue
+            existing.add((filing["accession_number"], line_no))
             code = tx["type"] or ""
             shares = tx["shares"]
             db.add(
