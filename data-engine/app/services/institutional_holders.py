@@ -218,38 +218,72 @@ def _holder_out(cik: str, name: str, shares: Decimal, prev: Decimal, status: str
     }
 
 
-def institutional_holders(db: Session, ticker: str) -> dict[str, Any] | None:
-    """Lectura para la ficha (sin red): el último trimestre guardado. None si el ticker no existe."""
+@dataclass
+class LinkedSnapshot:
+    """Empresa + snapshot calculado para su CUSIP actual (o el motivo de no servir)."""
+
+    company: Company
+    cusip: str | None
+    identity: str | None
+    doc: PublicSourceDocument | None
+    status: str | None = None  # None = hay documento vinculado que servir
+    reason: str | None = None
+
+
+def linked_cusip_snapshot(db: Session, ticker: str, *, provider: str) -> LinkedSnapshot | None:
+    """Localiza el último snapshot del proveedor vinculado al CUSIP actual del ticker.
+
+    None si el ticker no existe. ``status`` queda None cuando hay documento
+    vinculado que servir; si no, indica el motivo (``sin_identificador``,
+    ``sin_snapshot_vinculado`` o ``sin_datos``).
+
+    Fail-closed: solo se sirve el snapshot calculado para el CUSIP actual.
+    Un documento legado (listing_key sin CUSIP, de antes de la vinculación)
+    se calculó para otra identidad o para ninguna: servirlo mostraría
+    posiciones de otro identificador, así que la lectura da N/D con motivo
+    hasta que el refresh grabe uno vinculado. La historia no se borra. El
+    filtro va en SQL: sin tope arbitrario que pueda tapar el válido.
+    """
     normalized = ticker.strip().upper()
     company = db.scalar(select(Company).where(Company.ticker == normalized))
     if company is None:
         return None
     reference = db.scalar(select(InstrumentReference).where(InstrumentReference.ticker_normalized == normalized))
     cusip, identity = _cusip(company, reference)
-    base: dict[str, Any] = {"ticker": company.ticker, "name": company.name, "cusip": cusip, "identity_source": identity,
-                            "limitations": list(LIMITATIONS), "top_holders": [], "buyers": [], "sellers": []}
     if cusip is None:
-        return {**base, "status": "sin_identificador"}
-    # Fail-closed: solo se sirve el snapshot calculado para el CUSIP actual.
-    # Un documento legado (listing_key sin CUSIP, de antes de la vinculación)
-    # se calculó para otra identidad o para ninguna: servirlo mostraría
-    # posiciones de otro identificador, así que la lectura da N/D con motivo
-    # hasta que el refresh grabe uno vinculado. La historia no se borra. El
-    # filtro va en SQL: sin tope arbitrario que pueda tapar el válido.
+        return LinkedSnapshot(company=company, cusip=cusip, identity=identity, doc=None, status="sin_identificador")
     listing = PublicSourceDocument.listing_key
     doc = db.scalars(select(PublicSourceDocument).where(
-        PublicSourceDocument.company_id == company.id, PublicSourceDocument.provider == PROVIDER,
+        PublicSourceDocument.company_id == company.id, PublicSourceDocument.provider == provider,
         listing.like(f"%:{cusip}"))
         .order_by(listing.desc(), PublicSourceDocument.fetched_at.desc(), PublicSourceDocument.id.desc())).first()
     if doc is None:
         pendiente = db.scalar(select(PublicSourceDocument.id).where(
             PublicSourceDocument.company_id == company.id,
-            PublicSourceDocument.provider == PROVIDER).limit(1))
+            PublicSourceDocument.provider == provider).limit(1))
         if pendiente is not None:
-            return {**base, "status": "sin_snapshot_vinculado",
-                    "reason": "hay snapshots guardados pero ninguno calculado para el CUSIP actual; "
-                              "el refresh lo recalcula (un snapshot legado u otro identificador no se sirve)"}
-        return {**base, "status": "sin_datos"}
+            return LinkedSnapshot(company=company, cusip=cusip, identity=identity, doc=None,
+                                  status="sin_snapshot_vinculado",
+                                  reason="hay snapshots guardados pero ninguno calculado para el CUSIP actual; "
+                                         "el refresh lo recalcula (un snapshot legado u otro identificador no se sirve)")
+        return LinkedSnapshot(company=company, cusip=cusip, identity=identity, doc=None, status="sin_datos")
+    return LinkedSnapshot(company=company, cusip=cusip, identity=identity, doc=doc)
+
+
+def institutional_holders(db: Session, ticker: str) -> dict[str, Any] | None:
+    """Lectura para la ficha (sin red): el último trimestre guardado. None si el ticker no existe."""
+    snap = linked_cusip_snapshot(db, ticker, provider=PROVIDER)
+    if snap is None:
+        return None
+    base: dict[str, Any] = {"ticker": snap.company.ticker, "name": snap.company.name, "cusip": snap.cusip,
+                            "identity_source": snap.identity, "limitations": list(LIMITATIONS),
+                            "top_holders": [], "buyers": [], "sellers": []}
+    if snap.status is not None:
+        out_status: dict[str, Any] = {**base, "status": snap.status}
+        if snap.reason is not None:
+            out_status["reason"] = snap.reason
+        return out_status
+    doc = snap.doc
     facts = list(db.scalars(select(PublicFinancialFact).where(PublicFinancialFact.source_document_id == doc.id).order_by(PublicFinancialFact.id)))
     current = date.fromisoformat(doc.listing_key.split(":")[1])
     totals: dict[str, Any] = {}
