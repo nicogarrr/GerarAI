@@ -333,7 +333,7 @@ def test_corregir_el_cusip_invalida_el_snapshot_y_se_recalcula():
     db.commit()
     assert set(ih.universe_cusips(db)) == {OTHER}
     # La lectura no sirve el snapshot del CUSIP anterior.
-    assert ih.institutional_holders(db, "AAPL")["status"] == "sin_datos"
+    assert ih.institutional_holders(db, "AAPL")["status"] == "sin_snapshot_vinculado"
     # Re-ingerir los mismos ZIP crea un snapshot nuevo (no choca con el viejo).
     out = ih.ingest_parsed(db, _parsed_con({OTHER}), ["c2", "c1"], ih.universe_cusips(db))
     assert out["companies"] == 1
@@ -343,16 +343,34 @@ def test_corregir_el_cusip_invalida_el_snapshot_y_se_recalcula():
     assert view["totals"]["shares"] == 10 and view["totals"]["shares_prior"] == 3
 
 
-def test_documento_sin_cusip_grabado_sigue_sirviendo():
-    """Documentos de antes de la vinculación (listing_key sin CUSIP) se siguen
-    sirviendo tal cual: no se rompe lo ya guardado."""
+def test_documento_legado_sin_cusip_no_se_sirve():
+    """Fail-closed (#4992): un snapshot legado (listing_key sin CUSIP, de antes
+    de la vinculación) se calculó para otra identidad o para ninguna: la lectura
+    da N/D con motivo explícito en vez de servir posiciones que pueden ser de
+    otro identificador. La historia NO se borra: el documento sigue en base y
+    el refresh lo recalcula vinculado (test_refresh_recalcula_...)."""
     db = _db()
     ih.ingest_parsed(db, _parsed(), ["c2", "c1"], ih.universe_cusips(db))
     doc = db.query(PublicSourceDocument).one()
     doc.listing_key = "13f:2026-06-30"  # como quedó antes de la vinculación
     db.commit()
     view = ih.institutional_holders(db, "AAPL")
-    assert view["status"] == "ok" and view["period"] == "2026-06-30" and view["totals"]["shares"] == 1165
+    assert view["status"] == "sin_snapshot_vinculado" and view["reason"]
+    assert view["top_holders"] == [] and view["buyers"] == [] and "totals" not in view
+    assert db.query(PublicSourceDocument).count() == 1  # historia intacta
+
+
+def test_snapshot_vinculado_se_sirve_y_el_de_otro_cusip_se_rechaza():
+    """El snapshot calculado para el CUSIP actual se sirve; uno vinculado a
+    OTRO identificador se rechaza con motivo (nunca posiciones ajenas)."""
+    db = _db()
+    ih.ingest_parsed(db, _parsed(), ["c2", "c1"], ih.universe_cusips(db))
+    assert ih.institutional_holders(db, "AAPL")["status"] == "ok"
+    doc = db.query(PublicSourceDocument).one()
+    doc.listing_key = f"13f:2026-06-30:{OTHER}"
+    db.commit()
+    view = ih.institutional_holders(db, "AAPL")
+    assert view["status"] == "sin_snapshot_vinculado" and "totals" not in view
 
 
 def test_refresh_recalcula_si_el_snapshot_no_es_del_cusip_actual():

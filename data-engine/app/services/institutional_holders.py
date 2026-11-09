@@ -230,16 +230,25 @@ def institutional_holders(db: Session, ticker: str) -> dict[str, Any] | None:
                             "limitations": list(LIMITATIONS), "top_holders": [], "buyers": [], "sellers": []}
     if cusip is None:
         return {**base, "status": "sin_identificador"}
-    # El snapshot solo se sirve si se calculó para el CUSIP actual: uno
-    # grabado con otro CUSIP no es válido para esta identidad (los documentos
-    # de antes de la vinculación, sin CUSIP grabado, se aceptan tal cual). El
+    # Fail-closed: solo se sirve el snapshot calculado para el CUSIP actual.
+    # Un documento legado (listing_key sin CUSIP, de antes de la vinculación)
+    # se calculó para otra identidad o para ninguna: servirlo mostraría
+    # posiciones de otro identificador, así que la lectura da N/D con motivo
+    # hasta que el refresh grabe uno vinculado. La historia no se borra. El
     # filtro va en SQL: sin tope arbitrario que pueda tapar el válido.
     listing = PublicSourceDocument.listing_key
     doc = db.scalars(select(PublicSourceDocument).where(
         PublicSourceDocument.company_id == company.id, PublicSourceDocument.provider == PROVIDER,
-        listing.like(f"%:{cusip}") | ~listing.like("%:%:%"))
+        listing.like(f"%:{cusip}"))
         .order_by(listing.desc(), PublicSourceDocument.fetched_at.desc(), PublicSourceDocument.id.desc())).first()
     if doc is None:
+        pendiente = db.scalar(select(PublicSourceDocument.id).where(
+            PublicSourceDocument.company_id == company.id,
+            PublicSourceDocument.provider == PROVIDER).limit(1))
+        if pendiente is not None:
+            return {**base, "status": "sin_snapshot_vinculado",
+                    "reason": "hay snapshots guardados pero ninguno calculado para el CUSIP actual; "
+                              "el refresh lo recalcula (un snapshot legado u otro identificador no se sirve)"}
         return {**base, "status": "sin_datos"}
     facts = list(db.scalars(select(PublicFinancialFact).where(PublicFinancialFact.source_document_id == doc.id).order_by(PublicFinancialFact.id)))
     current = date.fromisoformat(doc.listing_key.split(":")[1])

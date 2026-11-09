@@ -17,7 +17,10 @@ export interface InstitutionalHolder {
 }
 
 export interface InstitutionalHolders {
-  status: 'ok' | 'sin_datos' | 'sin_identificador';
+  // 'sin_snapshot_vinculado': la lectura es fail-closed y devuelve N/D con
+  // `reason` hasta que el refresh graba un snapshot ligado al CUSIP actual.
+  status: 'ok' | 'sin_datos' | 'sin_identificador' | 'sin_snapshot_vinculado';
+  reason?: string;
   ticker: string;
   name: string;
   cusip: string | null;

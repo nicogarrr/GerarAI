@@ -195,7 +195,7 @@ def test_corregir_el_cusip_invalida_el_snapshot_y_se_recalcula():
     cusips = fh.universe_cusips(db)
     assert set(cusips) == {MSFT}
     # La lectura no sirve el snapshot del CUSIP anterior.
-    assert fh.fund_holders(db, "AAPL")["status"] == "sin_datos"
+    assert fh.fund_holders(db, "AAPL")["status"] == "sin_snapshot_vinculado"
     # Re-ingerir el mismo fichero crea un snapshot nuevo para el CUSIP corregido.
     reports = nport.parse_dataset(_zip_con_solo_msft(), set(cusips))
     assert fh.ingest_reports(db, reports, REF, "x1", cusips)["companies"] == 1
@@ -204,9 +204,12 @@ def test_corregir_el_cusip_invalida_el_snapshot_y_se_recalcula():
     assert view["totals"] == {"funds": 1, "shares": 500.0, "value_usd": 60000.0}
 
 
-def test_documento_sin_cusip_grabado_sigue_sirviendo():
-    """Documentos de antes de la vinculación (listing_key sin CUSIP) se siguen
-    sirviendo tal cual: no se rompe lo ya guardado."""
+def test_documento_legado_sin_cusip_no_se_sirve():
+    """Fail-closed (#4992): un snapshot legado (listing_key sin CUSIP, de antes
+    de la vinculación) se calculó para otra identidad o para ninguna: la lectura
+    da N/D con motivo explícito en vez de servir posiciones que pueden ser de
+    otro identificador. La historia NO se borra: el documento sigue en base y
+    el refresh lo recalcula vinculado (test_refresh_recalcula_...)."""
     db = _db()
     cusips = fh.universe_cusips(db)
     fh.ingest_reports(db, nport.parse_dataset(_zip(), set(cusips)), REF, "x1", cusips)
@@ -214,7 +217,25 @@ def test_documento_sin_cusip_grabado_sigue_sirviendo():
     doc.listing_key = "nport:2026q3"  # como quedó antes de la vinculación
     db.commit()
     view = fh.fund_holders(db, "AAPL")
+    assert view["status"] == "sin_snapshot_vinculado" and view["reason"]
+    assert view["top_funds"] == [] and view["by_weight"] == [] and "totals" not in view
+    assert db.query(PublicSourceDocument).count() == 1  # historia intacta
+
+
+def test_snapshot_vinculado_se_sirve_y_el_de_otro_cusip_se_rechaza():
+    """El snapshot calculado para el CUSIP actual se sirve; uno vinculado a
+    OTRO identificador se rechaza con motivo (nunca posiciones ajenas)."""
+    db = _db()
+    cusips = fh.universe_cusips(db)
+    fh.ingest_reports(db, nport.parse_dataset(_zip(), set(cusips)), REF, "x1", cusips)
+    view = fh.fund_holders(db, "AAPL")
     assert view["status"] == "ok" and view["dataset"] == "2026q3" and view["totals"]["funds"] == 2
+    # Solo queda un snapshot vinculado a OTRO CUSIP: N/D, no esas posiciones.
+    doc = db.query(PublicSourceDocument).one()
+    doc.listing_key = f"nport:2026q3:{MSFT}"
+    db.commit()
+    view = fh.fund_holders(db, "AAPL")
+    assert view["status"] == "sin_snapshot_vinculado" and "totals" not in view
 
 
 def test_refresh_recalcula_si_el_snapshot_no_es_del_cusip_actual():
