@@ -121,9 +121,17 @@ def test_ingesta_spy_hidratacion_acotada_por_la_tanda():
     engine, db = _session(120)
     db.expire_all()
     loaded = {"n": 0}
-    event.listen(
-        BenchmarkPrice, "load", lambda *a: loaded.__setitem__("n", loaded["n"] + 1)
-    )
-    ingest_spy_prices(db, fetcher=_fetcher(_bars(120)))
-    assert loaded["n"] <= 120, loaded
-    db.close()
+
+    def _on_load(*a):
+        loaded["n"] += 1
+
+    # Listener nombrado y retirado en finally: un listener sobre la clase
+    # mapeada es global y sobrevive al engine si no se quita.
+    event.listen(BenchmarkPrice, "load", _on_load)
+    try:
+        ingest_spy_prices(db, fetcher=_fetcher(_bars(120)))
+        assert loaded["n"] <= 120, loaded
+    finally:
+        event.remove(BenchmarkPrice, "load", _on_load)
+        db.close()
+        engine.dispose()
