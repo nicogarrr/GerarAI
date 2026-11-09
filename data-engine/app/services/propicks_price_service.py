@@ -320,10 +320,24 @@ def upsert_prices(
     if not prepared:
         return 0
     if db.bind is not None and db.bind.dialect.name == "postgresql":
-        # Una sola sentencia por tanda. Con fecha duplicada en la tanda gana
-        # la ultima barra, igual que en el upsert fila a fila anterior (PG no
-        # admite afectar dos veces la misma fila en un multi-VALUES).
-        by_day = {row["date"]: row for row in prepared}
+        # Una sola sentencia por tanda (PG no admite afectar dos veces la
+        # misma fila en un multi-VALUES). La reduccion por dia conserva la
+        # semantica del upsert fila a fila anterior: OHLC de la primera
+        # barra del dia (el UPDATE nunca los tocaba), close/adj_close/divisa
+        # y fuente de la ultima, y el ultimo volumen CON dato (None =
+        # ausente, no borra: coalesce dentro de la tanda).
+        by_day: dict[Any, dict[str, Any]] = {}
+        for row in prepared:
+            prev = by_day.get(row["date"])
+            if prev is None:
+                by_day[row["date"]] = row
+                continue
+            prev["close"] = row["close"]
+            prev["adj_close"] = row["adj_close"]
+            prev["quote_currency"] = row["quote_currency"]
+            prev["source"] = row["source"]
+            if row["volume"] is not None:
+                prev["volume"] = row["volume"]
         stmt = pg_insert(MarketPrice).values(list(by_day.values()))
         stmt = stmt.on_conflict_do_update(
             constraint="uq_market_price_company_date",

@@ -166,3 +166,83 @@ def test_upsert_hidratacion_acotada_por_la_tanda():
         db.close()
         if engine is not None:
             engine.dispose()
+
+
+class _PGDialectStub:
+    name = "postgresql"
+
+
+class _PGBindStub:
+    dialect = _PGDialectStub()
+
+
+class _PGCapturingDB:
+    """Sesion minima con bind Postgres falsa: captura la sentencia ejecutada."""
+
+    def __init__(self) -> None:
+        self.bind = _PGBindStub()
+        self.executed: list = []
+        self.info: dict = {}
+
+    def execute(self, stmt, *args, **kwargs):
+        self.executed.append(stmt)
+        return None
+
+
+def _pg_insert(sql: str, params: dict, suffix: str = "_m0") -> dict:
+    """Campos del primer registro del multi-VALUES compilado."""
+    return {k[: -len(suffix)]: v for k, v in params.items() if k.endswith(suffix)}
+
+
+def _captura_pg(bars) -> tuple[str, dict, _PGCapturingDB]:
+    from sqlalchemy.dialects import postgresql
+
+    db = _PGCapturingDB()
+    company = _make_company("UPG")
+    company.id = 7
+    assert upsert_prices(db, company, bars) == len(bars)
+    assert len(db.executed) == 1  # una sola sentencia por tanda
+    stmt = db.executed[0]
+    compiled = stmt.compile(dialect=postgresql.dialect())
+    return str(compiled), dict(compiled.params), db
+
+
+def test_pg_dup_en_tanda_conserva_secuencia_fila_a_fila():
+    # Secuencia vieja (upsert fila a fila) con (close 100, vol 2000) y luego
+    # (close 101, vol None): la fila queda OHLC=100 (la 1.a barra), close/
+    # adj_close=101 (la ultima) y volumen 2000 (coalesce: ausente no borra).
+    day = date(2026, 1, 5)
+    sql, params, _ = _captura_pg([
+        PriceBar(day=day, close=Decimal("100"), adj_close=Decimal("100"), volume=2000, quote_currency="USD"),
+        PriceBar(day=day, close=Decimal("101"), adj_close=Decimal("101"), volume=None, quote_currency="USD"),
+    ])
+    row = _pg_insert(sql, params)
+    esperado = {
+        "company_id": 7,
+        "date": day,
+        "open": Decimal("100"),  # primer OHLC, no el de la ultima barra
+        "high": Decimal("100"),
+        "low": Decimal("100"),
+        "close": Decimal("101"),  # ultimo cierre
+        "adj_close": Decimal("101"),
+        "volume": 2000,  # ultimo volumen con dato
+        "source": "yfinance",
+        "quote_currency": "USD",
+    }
+    assert row == esperado
+    assert "ON CONFLICT" in sql
+    assert "coalesce" in sql.lower()  # volumen ausente no pisa el guardado
+
+
+def test_pg_dup_en_tanda_ultimo_volumen_con_dato_gana():
+    # Fila a fila: (close 100, vol 1000) y luego (close 101, vol 3000) ->
+    # coalesce(3000, 1000) = 3000. La reduccion por tanda debe dar lo mismo.
+    day = date(2026, 1, 5)
+    _, params, _ = _captura_pg([
+        PriceBar(day=day, close=Decimal("100"), adj_close=Decimal("100"), volume=1000, quote_currency="USD"),
+        PriceBar(day=day, close=Decimal("101"), adj_close=Decimal("101"), volume=3000, quote_currency="USD"),
+    ])
+    row = _pg_insert("x", params)
+    assert row["volume"] == 3000
+    assert row["close"] == Decimal("101")
+    assert row["open"] == Decimal("100")
