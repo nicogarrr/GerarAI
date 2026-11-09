@@ -149,8 +149,12 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     KKR: {
         name: 'KKR & Co.',
         section: { url: 'https://ir.kkr.com/', labelKey: 'eventsAndPresentations' },
-        events: [],
-        verifiedOn: '2026-11-08',
+        events: [
+            // Nota oficial en media.kkr.com (listado de press releases, 2026-11-09);
+            // la nota apunta a ir.kkr.com/events-presentations/ para los materiales.
+            { date: '2026-11-09', period: 'T3 2026', url: 'https://media.kkr.com/news-details?news_id=7de02651-80a6-4c76-8c9e-09ca75b83478' },
+        ],
+        verifiedOn: '2026-11-09',
     },
     POOL: {
         name: 'Pool Corporation',
