@@ -71,8 +71,6 @@ FIRM_ALIASES: dict[str, str] = {
     "cowen & co.": "TD Cowen",
     "exane bnp paribas": "BNP Paribas",
     "roth mkm": "Roth Capital",
-    # La prensa cita a la casa como «Roth» a secas (es la misma firma).
-    "roth": "Roth Capital",
     "citizens capital markets": "Citizens",
     "redburn partners": "Redburn Atlantic",
     "suntrust robinson humphrey": "Truist Securities",

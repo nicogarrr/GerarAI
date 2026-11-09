@@ -31,6 +31,12 @@ FETCH_TIMEOUT_SECONDS = 12.0
 PRESS_TIMEOUT_SECONDS = 9.0
 # Segunda pasada de prensa (consultas por firma envejecida), tras Yahoo.
 PRESS_FIRM_TIMEOUT_SECONDS = 6.0
+# Presupuesto TOTAL de la petición con press=1 (Yahoo + ambas pasadas de
+# prensa): el front corta a 14 s, así que la segunda pasada solo corre con el
+# tiempo que quede; si no llega, se devuelve lo de Yahoo (o la primera
+# pasada) sin ruido. Medido por el auditor: sin deadline, el peor caso eran
+# ~18 s y el panel no llegaba a pintar.
+TOTAL_BUDGET_SECONDS = 12.5
 # Una fila de Yahoo más vieja que esto dispara la consulta por firma en prensa.
 STALE_FIRM_DAYS = 7
 MAX_AGE_DAYS = 365
@@ -335,7 +341,7 @@ def merge_press_rows(
 
     merged = {row.firm.casefold(): row for row in rows}
     for target in press_targets:
-        if not currency_matches(target.currency_mark, currency):
+        if not currency_matches(target.currency_mark, currency, target.currency_mentions):
             continue
         key = target.firm.casefold()
         current = merged.get(key)
@@ -372,6 +378,7 @@ class AnalystTargetsService:
         if hit is not None and now - hit[0] < CACHE_TTL_SECONDS:
             return hit[1]
         fetched_at = int(now)
+        deadline = time.monotonic() + TOTAL_BUDGET_SECONDS
         press_targets: list[Any] = []
         if press:
             from app.services.analyst_targets_press import fetch_press_targets
@@ -380,7 +387,7 @@ class AnalystTargetsService:
                 asyncio.wait_for(asyncio.to_thread(_fetch_sync, key), timeout=FETCH_TIMEOUT_SECONDS),
                 asyncio.wait_for(
                     fetch_press_targets(key, today=datetime.now(UTC).date()),
-                    timeout=PRESS_TIMEOUT_SECONDS,
+                    timeout=min(PRESS_TIMEOUT_SECONDS, TOTAL_BUDGET_SECONDS),
                 ),
                 return_exceptions=True,
             )
@@ -452,16 +459,18 @@ class AnalystTargetsService:
             today = datetime.now(UTC).date()
             cutoff = (today - timedelta(days=STALE_FIRM_DAYS)).isoformat()
             stale_firms = [row.firm for row in rows if row.date < cutoff]
-            if stale_firms:
+            remaining = deadline - time.monotonic()
+            if stale_firms and remaining > 0.75:
                 from app.services.analyst_targets_press import fetch_press_targets, firm_queries
 
+                # nosemgrep: gerarai-broad-except-pass -- prensa de mejor esfuerzo: sin ella o sin tiempo, el panel devuelve Yahoo tal cual
                 try:
                     more = await asyncio.wait_for(
                         fetch_press_targets(key, today=today, queries=firm_queries(key, stale_firms)),
-                        timeout=PRESS_FIRM_TIMEOUT_SECONDS,
+                        timeout=min(PRESS_FIRM_TIMEOUT_SECONDS, remaining),
                     )
                     press_targets = [*press_targets, *more]
-                except Exception:  # noqa: BLE001 - mejor esfuerzo
+                except Exception:  # noqa: BLE001 - mejor esfuerzo: sin tiempo, Yahoo tal cual
                     pass
         if press_targets:
             rows = merge_press_rows(

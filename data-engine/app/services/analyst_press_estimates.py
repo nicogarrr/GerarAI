@@ -597,5 +597,6 @@ def press_estimates_stale(db: Any, company: Any, tenant_id: int, *, today: date 
 # importar privados entre módulos. Comportamiento intacto.
 Robots = _Robots
 published_from_html = _published_from_html
+DOLLAR_MARKS = _DOLLAR_MARKS
 press_actions = lambda: _ACTIONS  # noqa: E731 - alias estable de la tabla
 sentence_split = lambda text: _SENTENCE.split(text)  # noqa: E731 - alias estable

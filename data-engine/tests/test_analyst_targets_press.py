@@ -105,6 +105,45 @@ def test_sin_ticker_en_el_texto_no_hay_fila() -> None:
     assert rows == []
 
 
+def test_contraejemplo_del_auditor_objetivo_de_otra_empresa_en_articulo_que_menciona_al_ticker() -> None:
+    # El artículo menciona ASTS de pasada; el objetivo es de AAPL. Antes de la
+    # guardia esto producía una fila Cantor 250 para ASTS: contaminación cruzada.
+    rows = press.extract_targets(
+        "ASTS is in the news. Cantor Fitzgerald reiterated a $250 price target on AAPL.",
+        symbol="ASTS", published=TODAY, url="https://www.streetinsider.com/x", full_text=True)
+    assert rows == []
+
+
+def test_ticker_en_otra_frase_no_vincula_el_objetivo() -> None:
+    rows = press.extract_targets(
+        "AST SpaceMobile (ASTS) fell on Monday. Cantor Fitzgerald reiterated a $90.00 price target.",
+        symbol="ASTS", published=TODAY, url="https://www.streetinsider.com/x", full_text=True)
+    assert rows == []
+
+
+def test_otro_ticker_en_la_misma_frase_descarta_la_fila() -> None:
+    rows = press.extract_targets(
+        "Roth Capital kept its $108.00 price target on ASTS while cutting AAPL to $190.00.",
+        symbol="ASTS", published=TODAY, url="https://www.streetinsider.com/x", full_text=True)
+    assert rows == []
+
+
+def test_siglas_del_nombre_de_la_firma_no_son_tickers_ajenos() -> None:
+    rows = press.extract_targets(
+        "UBS raised its price target on ASTS to $50.00 from $45.00.",
+        symbol="ASTS", published=TODAY, url="https://www.benzinga.com/x", full_text=False)
+    assert len(rows) == 1 and rows[0].firm == "UBS" and rows[0].price_target == 50.0
+
+
+def test_roth_a_secas_se_normaliza_a_roth_capital_en_el_panel() -> None:
+    rows = press.extract_targets(
+        "Roth reiterates $108 price target on AST SpaceMobile (ASTS) and maintains Buy rating.",
+        symbol="ASTS", published=TODAY, url="https://www.benzinga.com/x", full_text=False)
+    assert len(rows) == 1
+    assert rows[0].firm == "Roth Capital" and rows[0].price_target == 108.0
+    assert rows[0].rating == "Buy"
+
+
 def test_sin_firma_atribuible_no_hay_fila() -> None:
     rows = press.extract_targets(
         "An analyst reiterated a Buy rating and $90.00 price target on ASTS.",
@@ -125,6 +164,86 @@ def test_varias_firmas_en_un_articulo() -> None:
     assert by_firm["Deutsche Bank"].price_target == 93.0
     assert by_firm["Deutsche Bank"].prior_target == 81.0
     assert by_firm["Deutsche Bank"].action == "reiterate" or by_firm["Deutsche Bank"].action is None
+
+
+# -- divisa fail-closed (auditor) ---------------------------------------------
+
+
+def test_marca_de_divisa_no_reconocida_descarta_la_fila() -> None:
+    rows = press.extract_targets(
+        "Cantor Fitzgerald reiterated a XYZ$90.00 price target on ASTS.",
+        symbol="ASTS", published=TODAY, url="https://www.streetinsider.com/x", full_text=False,
+        today=TODAY)
+    assert rows == []
+
+
+def test_divisa_mencionada_distinta_de_la_declarada_descarta_al_fusionar() -> None:
+    rows = press.extract_targets(
+        "Cantor Fitzgerald reiterated a $90.00 price target on ASTS (CAD).",
+        symbol="ASTS", published=TODAY, url="https://www.streetinsider.com/x", full_text=False,
+        today=TODAY)
+    assert len(rows) == 1 and rows[0].currency_mentions == ("CAD",)
+    assert not press.currency_matches(rows[0].currency_mark, "USD", rows[0].currency_mentions)
+    assert press.currency_matches(rows[0].currency_mark, "CAD", rows[0].currency_mentions)
+    # Y al fusionar, la fila no entra en un listado declarado en USD.
+    merged = svc.merge_press_rows([_yahoo_row("TD Cowen", date(2026, 10, 1), 80.0)], rows,
+                                  reference_price=50.0, currency="USD")
+    assert len(merged) == 1 and merged[0].source == svc.SOURCE
+
+
+# -- fecha de la nota respaldada por el texto (auditor) -----------------------
+
+
+def test_pubdate_futura_descarta_el_item() -> None:
+    rss = _rss(("https://www.streetinsider.com/x", "Cantor keeps PT on ASTS",
+                "Cantor Fitzgerald keeps $90.00 price target on ASTS", "Tue, 10 Nov 2026 11:39:00 GMT"))
+    assert asyncio.run(press.fetch_press_targets("ASTS", today=TODAY, fetch=_fetch_map({}, rss))) == []
+
+
+def test_retrospectiva_usa_la_fecha_que_respalda_el_texto() -> None:
+    rows = press.extract_targets(
+        "On November 3, Cantor Fitzgerald raised its price target on ASTS to $90.00 from $80.00.",
+        symbol="ASTS", published=TODAY, url="https://www.benzinga.com/x", full_text=True, today=TODAY)
+    assert len(rows) == 1 and rows[0].date == date(2026, 11, 3)
+
+
+def test_dia_de_semana_ancla_a_la_semana_de_publicacion() -> None:
+    rows = press.extract_targets(
+        "Cantor Fitzgerald reiterated a $90.00 price target on ASTS on Monday.",
+        symbol="ASTS", published=date(2026, 11, 11), url="https://www.benzinga.com/x",
+        full_text=True, today=date(2026, 11, 11))
+    assert len(rows) == 1 and rows[0].date == date(2026, 11, 9)
+
+
+def test_ancla_en_futuro_descarta_la_fila() -> None:
+    rows = press.extract_targets(
+        "Cantor Fitzgerald reiterated a $90.00 price target on ASTS on Friday.",
+        symbol="ASTS", published=TODAY, url="https://www.benzinga.com/x",
+        full_text=True, today=TODAY)
+    # Lunes 9 nov: «on Friday» apunta al 6 nov (pasado), válido; al futuro no.
+    assert len(rows) == 1 and rows[0].date == date(2026, 11, 6)
+    rows = press.extract_targets(
+        "On November 13, Cantor Fitzgerald will review its $90.00 price target on ASTS.",
+        symbol="ASTS", published=TODAY, url="https://www.benzinga.com/x",
+        full_text=True, today=TODAY)
+    assert rows == []
+
+
+# -- whitelist de medios (auditor) --------------------------------------------
+
+
+def test_medio_fuera_de_la_whitelist_no_produce_fila() -> None:
+    rss = _rss(("https://blog-financiero.example.com/x", "Cantor keeps PT on ASTS",
+                "Cantor Fitzgerald keeps $90.00 price target on ASTS", "Mon, 09 Nov 2026 11:39:00 GMT"))
+    assert asyncio.run(press.fetch_press_targets("ASTS", today=TODAY, fetch=_fetch_map({}, rss))) == []
+
+
+def test_subdominios_de_medios_confiados_entran() -> None:
+    assert press._trusted("https://au.investing.com/news/x")
+    assert press._trusted("https://www.streetinsider.com/x")
+    assert press._trusted("https://finance.yahoo.com/news/x")
+    assert not press._trusted("https://stocktwits.com/x")
+    assert not press._trusted("https://investing.com.evil.example/x")
 
 
 # -- currency_matches ---------------------------------------------------------
@@ -306,6 +425,25 @@ def test_segunda_pasada_con_consultas_por_firma_envejecida(monkeypatch) -> None:
     # La fila de Yahoo es del 11 ago: envejecida, dispara la consulta por firma.
     assert calls == [None, ['"ASTS" "Cantor Fitzgerald"']]
     assert result.status == "available"
+
+
+def test_sin_presupuesto_no_hay_segunda_pasada_y_yahoo_se_devuelve(monkeypatch) -> None:
+    # Presupuesto agotado (auditor: 18 s de peor caso frente a 14 s del front):
+    # la segunda pasada no corre y el panel devuelve Yahoo tal cual.
+    monkeypatch.setattr(svc, "TOTAL_BUDGET_SECONDS", 0)
+    monkeypatch.setattr(svc, "_fetch_sync", lambda symbol: _payload())
+    calls: list = []
+
+    async def fake_press(symbol: str, *, today: date, queries: list[str] | None = None):
+        calls.append(queries)
+        return []
+
+    monkeypatch.setattr(press, "fetch_press_targets", fake_press)
+    result = asyncio.run(svc.AnalystTargetsService().get("ASTS", press=True))
+    # La segunda pasada NO corre sin presupuesto: ninguna consulta por firma.
+    assert not any(isinstance(queries, list) for queries in calls)
+    assert result.status == "available" and result.rows[0].source == svc.SOURCE
+    assert result.note is None and result.note_code is None
 
 
 def test_segunda_pasada_omite_firmas_frescas(monkeypatch) -> None:
