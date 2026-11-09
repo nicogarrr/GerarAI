@@ -132,3 +132,17 @@ def test_pasajes_tesis_v2_identicos_al_bucle_anterior():
     assert actual == esperado
     assert len(actual) > 0
     db.close()
+
+
+def test_tope_por_documento_se_aplica_en_sql_sin_hidratar_de_mas(monkeypatch):
+    # Tope 5 en vez de 1500: sin el row_number de SQL se hidratarían los 40
+    # chunks; con él, solo 5 por documento. El contador de loads del ORM
+    # mide filas hidratadas, no statements.
+    monkeypatch.setattr("app.services.expert_team.thesis_v2.MAX_CHUNKS_PER_DOC", 5)
+    engine, db, tenant, company = _session(2, 20)
+    loaded = {"n": 0}
+    event.listen(DocumentChunk, "load", lambda *a: loaded.__setitem__("n", loaded["n"] + 1))
+    out = evidence_passages(db, company, tenant.id)
+    assert loaded["n"] <= 2 * 5, loaded
+    assert len(out) > 0
+    db.close()

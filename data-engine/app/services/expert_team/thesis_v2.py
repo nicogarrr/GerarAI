@@ -464,17 +464,29 @@ def evidence_passages(db: Session, company: Company, tenant_id: int | None) -> l
     prose_docs = [doc for doc in docs if not (doc.title or "").startswith("SEC XBRL facts")]
     # Lote único de chunks para todos los documentos (anti N+1): una consulta
     # con IN + agrupación en memoria conserva el orden por documento y
-    # chunk_index y el tope por documento del bucle anterior (1 query por doc).
+    # chunk_index del bucle anterior (1 query por doc). El tope por documento
+    # se queda EN SQL (row_number por documento), como el LIMIT anterior: no
+    # se hidrata más texto del que hidrataba el bucle.
     chunks_by_doc: dict[int, list[DocumentChunk]] = {}
     if prose_docs:
-        for chunk in db.scalars(
-            select(DocumentChunk)
+        from sqlalchemy import func
+        from sqlalchemy.orm import aliased
+
+        rn = func.row_number().over(
+            partition_by=DocumentChunk.document_id, order_by=DocumentChunk.chunk_index
+        ).label("_rn")
+        numbered = (
+            select(DocumentChunk, rn)
             .where(DocumentChunk.document_id.in_([doc.id for doc in prose_docs]))
-            .order_by(DocumentChunk.document_id, DocumentChunk.chunk_index)
+            .subquery()
+        )
+        chunk_alias = aliased(DocumentChunk, numbered)
+        for chunk in db.scalars(
+            select(chunk_alias)
+            .where(numbered.c._rn <= MAX_CHUNKS_PER_DOC)
+            .order_by(chunk_alias.document_id, chunk_alias.chunk_index)
         ).all():
-            per_doc = chunks_by_doc.setdefault(chunk.document_id, [])
-            if len(per_doc) < MAX_CHUNKS_PER_DOC:
-                per_doc.append(chunk)
+            chunks_by_doc.setdefault(chunk.document_id, []).append(chunk)
     for doc in prose_docs:
         for ch in chunks_by_doc.get(doc.id, []):
             text = " ".join((ch.text or "").split())
