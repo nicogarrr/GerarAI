@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 import app.services.document_ingestion_service as dis
-from app.models.entities import Base, Company, Document
+from app.models.entities import Base, Company, Document, DocumentChunk
 from app.services.document_ingestion_service import DocumentIngestionService
 
 TENANT = "tenant-test"
@@ -155,6 +155,14 @@ def test_ficha_stub_se_completa_con_la_ingesta_real(db):
     filas = db.scalar(select(func.count(Document.id)).where(
         Document.source_url == SEC_URL))
     assert filas == 1
+    chunks = db.scalars(select(DocumentChunk).where(
+        DocumentChunk.document_id == stub_id)).all()
+    assert len(chunks) == resultado["chunks"] > 0
+    assert all("Contenido del documento" in chunk.text for chunk in chunks)
+    assert all("evidence_source_id" in chunk.metadata_ for chunk in chunks)
+    contrato = completada.metadata_["evidence_contract"]
+    assert all(chunk.metadata_["evidence_source_id"] == contrato.get("source_id")
+               for chunk in chunks)
 
 
 def test_filing_intelligence_caido_no_disfraza_la_ingesta(db, monkeypatch):
