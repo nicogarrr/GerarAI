@@ -33,7 +33,8 @@ def test_starting_point_con_acciones_en_miles(monkeypatch):
         "shares_diluted": {y: _cite(9_609.0, y, "shares_diluted", "shares") for y in years},
         "eps_diluted": {y: _cite(v, y, "eps_diluted", "USD/shares") for y, v in zip(years, (0.47, 0.63, 0.56), strict=True)},
     }
-    point = {"cash_and_equivalents": _cite(150e6, 2024, "cash")}
+    # deuda del balance FY2024 del 10-K de FRPH (SEC total_debt 178.853.000 $): sin ella la deuda neta es N/D
+    point = {"cash_and_equivalents": _cite(150e6, 2024, "cash"), "total_debt": _cite(178_853_000.0, 2024, "total_debt")}
     monkeypatch.setattr(svc, "company_facts", lambda db, company: (annual, point))
     import app.services.user_sotp_service as us
 

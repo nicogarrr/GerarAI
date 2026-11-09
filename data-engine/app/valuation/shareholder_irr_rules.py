@@ -158,11 +158,18 @@ def build_scenarios(sp: StartingPoint, hist: History, *, peer_multiples: Sequenc
     margin_last3 = margins[-3:]
     # conversión de caja por año
     conv = []
-    for e, o, c in zip(hist.earnings, hist.operating_cash_flow or [None] * len(hist.years),
-                       hist.capex or [None] * len(hist.years), strict=False):
+    no_capex: list[int] = []  # años con flujo operativo pero sin capex en ninguna fuente: su conversión es N/D
+    for y, e, o, c in zip(hist.years, hist.earnings, hist.operating_cash_flow or [None] * len(hist.years),
+                          hist.capex or [None] * len(hist.years), strict=False):
         if e and e > 0 and o is not None:
-            conv.append((o - abs(c or 0.0)) / e)
+            if c is None:
+                no_capex.append(y)
+                continue
+            conv.append((o - abs(c)) / e)
     conv = conv[-3:]
+    if no_capex:
+        out.warnings.append("capex N/D en " + ", ".join(str(y) for y in no_capex)
+                            + ": la conversión de caja y el flujo libre de esos años quedan N/D (no capex = 0)")
     rev_last3 = _last(hist.revenue)
     acq_last3 = [abs(a) for a in _last(hist.acquisitions)] if hist.acquisitions else []
     mna_pct = (sum(acq_last3) / sum(rev_last3[-len(acq_last3):])) if acq_last3 and rev_last3 else 0.0
@@ -200,7 +207,8 @@ def build_scenarios(sp: StartingPoint, hist: History, *, peer_multiples: Sequenc
         cv = {"bear": min(conv), "base": median(conv), "bull": max(conv)}
     else:
         cv = dict.fromkeys(SCENARIOS, 0.5)
-        out.warnings.append("sin flujo de caja operativo y capex: conversión supuesta del 50 %")
+        out.warnings.append("conversión de caja N/D (capex N/D en todos los años con flujo operativo): se supone el 50 %"
+                            if no_capex else "sin flujo de caja operativo y capex: conversión supuesta del 50 %")
     cv = {k: _clamp(v, lo_c, hi_c) for k, v in cv.items()}
     if sp.basis == "pb":
         # Valor contable: lo que no se reparte se queda en el balance y compone al ROE. Un único reparto (el
@@ -217,8 +225,8 @@ def build_scenarios(sp: StartingPoint, hist: History, *, peer_multiples: Sequenc
     mna = {"bear": mna_pct / 2, "base": mna_pct, "bull": mna_pct}
     out.trace["mna"] = {"gasto_pct_ingresos": mna_pct, "multiplo_pagado": m0, "valores": mna}
     # reparto
-    fcfs = [(o - abs(c or 0.0)) for o, c in zip(hist.operating_cash_flow or [], hist.capex or [None] * 99, strict=False)
-            if o is not None][-3:]
+    fcfs = [(o - abs(c)) for o, c in zip(hist.operating_cash_flow or [], hist.capex or [None] * 99, strict=False)
+            if o is not None and c is not None][-3:]
     acq_for = acq_last3[-len(fcfs):] if acq_last3 else [0.0] * len(fcfs)
     pool = sum(fcfs) - sum(acq_for)
     div3 = sum(abs(x) for x in _last(hist.dividends)) if hist.dividends else 0.0
