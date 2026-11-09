@@ -2430,4 +2430,87 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     return None
 
 
-__all__ = ["affordability_answer", "answer_account_question", "asks_affordability"]
+# ------------------------------------------------------------ efectivo + aportación hipotética
+
+#: «¿Y si este mes aporto los 600 € del plan, cuánto tendría?» tras «¿Cuánto
+#: efectivo tengo?» (benchmark Cerebro 2026-11-08, seg06): el seguimiento iba a
+#: la vía general sin el saldo. Pide una suma hipotética, no una orden.
+_CONTRIB_VERB = re.compile(r"\b(?:aport\w*|ingres\w*|meto|metiera|metiese|anado|anadiera|add|contribute|deposit|put\s+in)\b")
+_CONTRIB_RESULT = re.compile(
+    r"\bcuanto\s+(?:dinero\s+|efectivo\s+)?(?:tendria|tendre|me\s+quedaria|me\s+quedara|habria|sumaria)\b"
+    r"|\bcon\s+cuanto\s+me\s+quedo\b|\bhow\s+much\s+(?:cash\s+)?(?:would|will)\s+i\s+have\b"
+)
+_CONTRIB_AMOUNT = re.compile(
+    r"(?<![\w.,])(?P<num>\d{1,3}(?:[.\s]\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?P<cur>€|eur\b|euros?\b|usd\b|\$|dolares\b|dollars?\b)"
+    r"|(?P<cur2>€|\$)\s*(?P<num2>\d+(?:[.,]\d{1,2})?)"
+)
+_CONTRIB_CURRENCY = {"€": "EUR", "eur": "EUR", "euro": "EUR", "euros": "EUR",
+                     "usd": "USD", "$": "USD", "dolares": "USD", "dollar": "USD", "dollars": "USD"}
+
+
+def _contribution_amount(text: str) -> tuple[Decimal, str] | None:
+    match = _CONTRIB_AMOUNT.search(text)
+    if match is None:
+        return None
+    raw = match.group("num") or match.group("num2")
+    cur = _CONTRIB_CURRENCY.get((match.group("cur") or match.group("cur2") or "").strip())
+    if cur is None:
+        return None
+    if re.fullmatch(r"\d{1,3}(?:[.\s]\d{3})+(?:,\d{1,2})?", raw):
+        raw = re.sub(r"[.\s]", "", raw).replace(",", ".")
+    else:
+        raw = raw.replace(",", ".")
+    return Decimal(raw), cur
+
+
+def asks_cash_contribution(question: str, history_user_turns: list[str]) -> bool:
+    text = _fold(question)
+    if not (_CONTRIB_VERB.search(text) and _CONTRIB_RESULT.search(text)):
+        return False
+    if _contribution_amount(text) is None:
+        return False
+    if _CASH.search(text) and not _CASH_NOT.search(text):
+        return True
+    # Seguimiento: el último turno del usuario preguntaba por su efectivo.
+    for turn in reversed(history_user_turns[-4:]):
+        folded = _fold(turn)
+        return bool(_asks_cash(folded, turn))
+    return False
+
+
+def cash_contribution_answer(db: Session, question: str, history_user_turns: list[str]) -> ChatResponse | None:
+    """Efectivo guardado + la aportación que indica el usuario (suma con su fórmula), o None."""
+    tenant = _tenant(db)
+    if tenant is None or not asks_cash_contribution(question, history_user_turns):
+        return None
+    from app.models import CashBalance
+
+    english = _english()
+    amount, currency = _contribution_amount(_fold(question)) or (Decimal("0"), "EUR")
+    base = _cash_answer(db, tenant)
+    rows = list(db.scalars(select(CashBalance).where(CashBalance.tenant_id == tenant, CashBalance.currency == currency)))
+    balance: Decimal | None = Decimal("0") if rows else None
+    for row in rows:
+        balance = None if balance is None or row.balance is None else balance + Decimal(row.balance)
+    contribution = _money(float(amount), currency, english=english)
+    if not rows:
+        line = (f"N/A: missing your saved cash in {currency} (reason: there is no balance in that currency), "
+                f"so I can't add the {contribution}." if english else
+                f"N/D: falta tu efectivo guardado en {currency} (motivo: no hay saldo en esa divisa), "
+                f"así que no puedo sumarle los {contribution}.")
+    elif balance is None:
+        line = (f"N/A: missing the amount of your {currency} cash (reason: a saved balance has no amount)." if english
+                else f"N/D: falta el importe de tu efectivo en {currency} (motivo: un saldo guardado no tiene importe).")
+    else:
+        total = balance + amount
+        line = (
+            f"If you add {contribution}: {_money(float(balance), currency, english=True)} + {contribution} = "
+            f"{_money(float(total), currency, english=True)} in cash (saved cash plus the amount you give; not an order)."
+            if english else
+            f"Si aportas {contribution}: {_money(float(balance), currency)} + {contribution} = "
+            f"{_money(float(total), currency)} de efectivo (cálculo: efectivo guardado + la aportación que indicas; no es una orden)."
+        )
+    return _response(f"{base.answer}\n{line}", base.sources, "account_cash_contribution")
+
+
+__all__ = ["affordability_answer", "answer_account_question", "asks_affordability", "cash_contribution_answer"]
