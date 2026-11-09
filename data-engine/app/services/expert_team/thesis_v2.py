@@ -18,11 +18,14 @@ descuenta el precio», «Qué vigilar» (kill switches como umbrales de métrica
 """
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import hashlib
 import json
 import logging
 import re
 import statistics
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
@@ -50,6 +53,12 @@ MAX_ATTEMPTS = 2
 #: Plazo por petición y total de cada llamada al modelo de la tesis v2 (respuesta de hasta 24.000 tokens).
 CALL_TIMEOUT_SECONDS = 600.0
 CALL_TOTAL_TIMEOUT_SECONDS = 900.0
+#: Plazo TOTAL de la redacción: las dos partes, sus reintentos y los del control de salida, todo junto. El
+#: plazo por llamada del adaptador corre dentro de su event loop y no ve lo que se acumula fuera de él
+#: (reintento del validador + reintento por idioma + segunda parte: hasta 8 llamadas de 900 s) ni un loop
+#: congelado (tesis-3: CPT y AMZN, una llamada de 1.901 s con el loop parado por E/S del disco).
+TOTAL_DEADLINE_SECONDS = 1500.0
+TIMEOUT_REASON = "tiempo agotado"
 PASSAGES_PER_GROUP = 6
 MAX_CHUNKS_PER_DOC = 1500
 
@@ -1146,8 +1155,13 @@ def _cite_text(c: Any) -> str:
 
 @dataclass
 class ThesisResult:
-    status: str  # ok | cached | stripped | rejected | error | insufficient
+    status: str  # ok | cached | stripped | rejected | error | insufficient | partial | timeout | provider_stopped
     sections: dict[str, str] = field(default_factory=dict)
+    #: Secciones sin texto y por qué («tiempo agotado», «proveedor del modelo: HTTP 402 (sin saldo)»): se pintan
+    #: como N/D con su motivo y la próxima generación con la misma huella solo pide estas.
+    missing: dict[str, str] = field(default_factory=dict)
+    #: Motivo por el que el proveedor paró la tesis (402/429): visible en el job y en los avisos, sin reintento.
+    stopped: str | None = None
     problems: list[str] = field(default_factory=list)
     llm_calls: int = 0
     fingerprint: str | None = None
@@ -1346,6 +1360,42 @@ def _parse(text: str, keys: Sequence[str]) -> tuple[dict[str, str] | None, dict[
     return (out if any(out.values()) else None), parsed
 
 
+class _Clock:
+    """Tiempo transcurrido que nunca se queda corto: el mayor entre el reloj monotónico y el de pared (un
+    proceso congelado por E/S o una VM en pausa adelantan el de pared aunque el loop no haya corrido)."""
+
+    def __init__(self) -> None:
+        self._mono, self._wall = time.monotonic(), time.time()
+
+    def elapsed(self) -> float:
+        return max(time.monotonic() - self._mono, time.time() - self._wall)
+
+
+#: Respuestas del proveedor que paran la tesis en seco: reintentar no las arregla y cada intento cuesta.
+STOP_HTTP = {402: "proveedor del modelo: HTTP 402 (sin saldo)",
+             429: "proveedor del modelo: HTTP 429 (límite de peticiones)"}
+
+
+def provider_stop_reason(exc: BaseException) -> str | None:
+    """Motivo legible si ``exc`` (o su causa) es un 402/429 del proveedor; None en otro caso."""
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        code = getattr(cur, "status_code", None)
+        if type(code) is int and code in STOP_HTTP:
+            return STOP_HTTP[code]
+        cur = cur.__cause__ or cur.__context__
+    return None
+
+
+def _is_timeout(exc: BaseException) -> bool:
+    from app.llm.errors import ProviderTransportError
+
+    return isinstance(exc, TimeoutError) or (
+        isinstance(exc, ProviderTransportError) and exc.reason.endswith("timeout"))
+
+
 async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mapping[str, Any] | None = None,
                        max_tokens: int = 24000) -> ThesisResult:
     """Dos llamadas (secciones 1–8 y 9–15), validadas; nunca lanza."""
@@ -1353,9 +1403,11 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
 
     fp = thesis_fingerprint(ctx)
     resume: dict[str, str] = {}
-    if cached and cached.get("fingerprint") == fp and cached.get("sections") and cached.get("status") == "error":
+    if cached and cached.get("fingerprint") == fp and cached.get("sections") and \
+            cached.get("status") in ("error", "partial", "timeout", "provider_stopped"):
         # Una tesis que se cortó a medias (fallo del modelo en la 2.ª llamada) NO se sirve como hecha:
-        # se reanuda con lo ya aceptado y solo se piden las secciones que faltan.
+        # se reanuda con lo ya aceptado y solo se piden las secciones que faltan (también las que quedaron N/D
+        # por tiempo agotado o porque el proveedor paró).
         resume = {k: v for k, v in dict(cached["sections"]).items() if v}
     elif cached and cached.get("fingerprint") == fp and cached.get("sections") and not (
             cached.get("status") == "stripped" and "guard" not in cached):
@@ -1401,12 +1453,23 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
         return render({"x": text}, {**markers, **out.figure_markers})["x"]
 
     stripped = False
-    for part in ("a", "b"):
-        secs = [s for s in active_sections(ctx) if s[2] == part and s[0] not in resume]
+    clock = _Clock()
+    plan = {part: [s for s in active_sections(ctx) if s[2] == part and s[0] not in resume] for part in ("a", "b")}
+    for index, part in enumerate(plan):
+        secs = plan[part]
         out.sections.update({s[0]: resume[s[0]] for s in active_sections(ctx) if s[2] == part and s[0] in resume})
         if not secs:
             continue
         keys = [s[0] for s in secs]
+        if out.stopped:
+            # El proveedor ya dijo 402/429: la otra parte no se pide (sería otra llamada al mismo muro).
+            out.missing.update(dict.fromkeys(keys, out.stopped))
+            continue
+        # Plazo de esta parte: lo que queda del total, repartido entre las partes que aún tienen secciones,
+        # para que una parte lenta no deje a la otra sin tiempo.
+        parts_left = sum(1 for p in list(plan)[index:] if plan[p])
+        part_end = clock.elapsed() + max(0.0, TOTAL_DEADLINE_SECONDS - clock.elapsed()) / parts_left
+        timed_out = stopped_here = False
         payload = {**base_payload, "secciones": [{"clave": k, "titulo": title,
                                                     "tablas_debajo": {n: tabs[n] for n in tn}} for k, title, _, tn in secs]}
         extra = PROB_FIELD.format(choices=list(PROBABILITY_SETS)) if part == "b" else ""
@@ -1415,11 +1478,28 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
         pending: dict[str, str] = {}  # texto con problemas: si no se arregla, se limpia al final
         todo = list(keys)
         for _ in range(MAX_ATTEMPTS):
+            left = part_end - clock.elapsed()
+            if left <= 0:
+                # También si la respuesta anterior llegó tarde (loop congelado): no se empieza otra llamada.
+                timed_out = True
+                break
             out.llm_calls += 1
             try:
-                text = await reasoner(system, json.dumps(payload, ensure_ascii=False, default=str), max_tokens,
-                                      f"expert_team.tesis_v2_{part}")
+                text = await asyncio.wait_for(
+                    reasoner(system, json.dumps(payload, ensure_ascii=False, default=str), max_tokens,
+                             f"expert_team.tesis_v2_{part}"),
+                    timeout=left)
             except Exception as exc:  # noqa: BLE001
+                if _is_timeout(exc):
+                    timed_out = True
+                    out.problems.append(f"llm:{TIMEOUT_REASON} (parte {part})")
+                    break
+                stop = provider_stop_reason(exc)
+                if stop:
+                    out.stopped, stopped_here = stop, True
+                    out.problems.append(f"llm:{stop}")
+                    break
+                out.sections.update(accepted)  # lo ya validado en un intento anterior no se pierde
                 out.status, out.problems = "error", [f"llm:{type(exc).__name__}"]
                 return out
             sections, parsed = _parse(text, todo)
@@ -1472,6 +1552,9 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
             system = PROMPT + ("\n\n" + system_note if system_note else "") + "\n\n" + CONTRACT.format(
                 keys=", ".join(f'"{k}": str' for k in todo), extra=extra)
         out.sections.update(accepted)
+        why = out.stopped if stopped_here else (TIMEOUT_REASON if timed_out else None)
+        if why:
+            out.missing.update({k: why for k in keys if k not in accepted and k not in pending})
         if pending:
             stripped = True
             known = {**markers, **out.figure_markers}
@@ -1485,7 +1568,9 @@ async def write_thesis(*, reasoner: Reasoner, ctx: ThesisContext, cached: Mappin
                 g.unquoted.extend(touched)
                 out.sections[k] = MARKER.sub(lambda mm: mm.group(0) if mm.group(1) in known else "", strip_loose(v))
     _finish_guard(out, guards, ctx.ticker)
-    if not out.sections:
+    if out.missing:
+        out.status = "partial" if out.sections else ("provider_stopped" if out.stopped else "timeout")
+    elif not out.sections:
         out.status = "rejected"
     elif stripped:
         out.status = "stripped"
@@ -1556,7 +1641,7 @@ def _latest_row(db: Session, company: Company):
 
 
 def generate_thesis_v2(db: Session, company: Company, *, reasoner: Reasoner | None = None, today: date | None = None,
-                       tenant_id: int | None = None, timeout: float = 900) -> dict[str, Any]:
+                       tenant_id: int | None = None, timeout: float | None = None) -> dict[str, Any]:
     """Calcula, redacta (o reutiliza por huella) y guarda. Devuelve la tesis lista para mostrar."""
     from datetime import UTC, datetime
 
@@ -1575,16 +1660,19 @@ def generate_thesis_v2(db: Session, company: Company, *, reasoner: Reasoner | No
         # Cada parte pide hasta 24.000 tokens: con el plazo general (120 s por petición) el proveedor la corta
         # a mitad y la tesis sale en error (POOL: 120,1 s y fuera). Plazo propio de esta llamada larga, y gasto
         # anotado con commit: sin él la sesión queda «idle in transaction» durante la llamada y Postgres la corta.
-        reasoner = provider_reasoner(
-            create_llm_provider(timeout_seconds=CALL_TIMEOUT_SECONDS, total_timeout_seconds=CALL_TOTAL_TIMEOUT_SECONDS),
-            db=db, commit_usage=True, temperature=0.0,
-        )
+        llm = create_llm_provider(timeout_seconds=CALL_TIMEOUT_SECONDS, total_timeout_seconds=CALL_TOTAL_TIMEOUT_SECONDS)
+        with contextlib.suppress(AttributeError):
+            llm.retry_rate_limited = False  # un 429 para la tesis en el primer intento (ver STOP_HTTP)
+        reasoner = provider_reasoner(llm, db=db, commit_usage=True, temperature=0.0)
     if ctx.valuation.get("status") not in ("ok", "not_meaningful"):
         return {"status": ctx.valuation.get("status"), "reason": ctx.valuation.get("reason"),
                 "ticker": company.ticker, "valuation": ctx.valuation}
     row = _latest_row(db, company)
     cached = (row.metadata_ or {}).get("thesis") if row is not None else None
-    res = run_from_any_context(write_thesis(reasoner=reasoner, ctx=ctx, cached=cached), timeout=timeout)
+    # Desde un hilo con loop activo el puente espera con tope: el plazo total de la redacción más un margen
+    # para guardar (antes 900 s fijos, por debajo de lo que la redacción podía tardar de verdad).
+    wait = TOTAL_DEADLINE_SECONDS + 60 if timeout is None else timeout
+    res = run_from_any_context(write_thesis(reasoner=reasoner, ctx=ctx, cached=cached), timeout=wait)
     if res.probability_choice and ctx.valuation.get("probabilities") and \
             res.probability_choice != ctx.valuation["probabilities"]["choice"]:
         from app.services.shareholder_irr_service import value_company
@@ -1597,6 +1685,7 @@ def generate_thesis_v2(db: Session, company: Company, *, reasoner: Reasoner | No
         "sections": res.sections, "problems": res.problems[:20], "llm_calls": res.llm_calls,
         "probability_choice": res.probability_choice, "probability_reason": res.probability_reason,
         "figure_markers": res.figure_markers, "guard": res.guard,
+        "missing": res.missing, "stopped": res.stopped,
     }
     markers = {**res.figure_markers, **markers}
     if res.sections and not (res.status == "cached" and row is not None):
@@ -1639,11 +1728,16 @@ def present(ctx: ThesisContext, doc: Mapping[str, Any], markers: Mapping[str, st
     line = guard_warning(doc.get("guard"))
     if line and line not in warnings:
         warnings.append(line)
+    missing = {k: str(v) for k, v in dict(doc.get("missing") or {}).items() if not rendered.get(k)}
+    for line in missing_warnings(missing, len(active_sections(ctx)), doc.get("stopped")):
+        if line not in warnings:
+            warnings.append(line)
     return {
         "status": doc.get("status"), "ticker": ctx.ticker, "company": ctx.company, "version": THESIS_V2_VERSION,
         "as_of": as_of, "fingerprint": doc.get("fingerprint"),
         "probability_choice": doc.get("probability_choice"), "probability_reason": doc.get("probability_reason"),
-        "sections": [{"key": k, "title": _title(k, title, ctx), "text": rendered.get(k, ""),
+        "sections": [{"key": k, "title": _title(k, title, ctx),
+                      "text": rendered.get(k) or (f"N/D ({missing[k]})" if k in missing else ""),
                       "tables": [tabs[n] for n in tn if n != "expertos" or tabs[n]["rows"]]}
                      for k, title, _, tn in active_sections(ctx)],
         "headline": {"price": markers.get("punto.precio"), "tir5": markers.get("pond.tir5"),
@@ -1653,7 +1747,20 @@ def present(ctx: ThesisContext, doc: Mapping[str, Any], markers: Mapping[str, st
         "warnings": warnings,
         "sources": sorted({p["document"] for p in ctx.passages if p.get("document")}),
         "llm_calls": doc.get("llm_calls"),
+        **({"stopped": doc["stopped"]} if doc.get("stopped") else {}),
     }
+
+
+def missing_warnings(missing: Mapping[str, str], total: int, stopped: str | None) -> list[str]:
+    """Avisos visibles de una tesis incompleta: cuántas secciones quedaron N/D y por qué."""
+    out: list[str] = []
+    if stopped:
+        out.append(f"tesis v2 parada sin reintentar: {stopped}")
+    if missing:
+        reasons = ", ".join(sorted(set(missing.values())))
+        out.append(f"tesis incompleta: {len(missing)} de {total} secciones N/D ({reasons}); "
+                   "al regenerarla solo se piden esas")
+    return out
 
 
 def _title(key: str, title: str, ctx: ThesisContext) -> str:
@@ -1700,13 +1807,23 @@ def attach_to_thesis_run(db: Session, run_id: int, ticker: str) -> dict[str, Any
             out = generate_thesis_v2(db, company, tenant_id=tenant_id)
             outcome = {"status": out.get("status"), "llm_calls": out.get("llm_calls"),
                        "fingerprint": out.get("fingerprint")}
+            nd = [sec["key"] for sec in out.get("sections") or [] if str(sec.get("text") or "").startswith("N/D (")]
+            if nd:
+                outcome["missing"] = nd
+            if out.get("stopped"):
+                outcome["stopped"] = out["stopped"]
     except Exception as exc:  # noqa: BLE001 - la tesis ya está publicada
         db.rollback()
         outcome = {"status": "error", "problems": [type(exc).__name__]}
     try:
         run = db.get(WorkflowRun, run_id)
         if run is not None:
-            run.result_payload = {**(run.result_payload or {}), "thesis_v2": outcome}
+            payload: dict[str, Any] = {**(run.result_payload or {}), "thesis_v2": outcome}
+            if outcome.get("stopped"):
+                # Visible en el job (no solo en el log): el run termina, pero degradado y con el motivo.
+                payload["degraded"] = {"step": "thesis_v2", "reason": outcome["stopped"]}
+                logger.warning("tesis v2 degradada run=%s ticker=%s: %s", run_id, ticker, outcome["stopped"])
+            run.result_payload = payload
             db.commit()
     except Exception:  # noqa: BLE001
         db.rollback()

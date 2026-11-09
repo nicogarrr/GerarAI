@@ -25,8 +25,10 @@ def test_error_a_medias_se_reanuda_solo_con_lo_que_falta():
 
     half = asyncio.run(T.write_thesis(reasoner=flaky, ctx=ctx))
     part_a = {k for k, _t, p, _tn in T.active_sections(ctx) if p == "a"}
-    assert half.status == "error" and set(half.sections) == part_a
-    cached = {"fingerprint": half.fingerprint, "sections": half.sections, "status": "error"}
+    # El plazo agotado en la parte b ya no deja la tesis en «error»: la parte a se conserva y la b queda N/D.
+    assert half.status == "partial" and set(half.sections) == part_a
+    assert set(half.missing) == {k for k, *_ in T.active_sections(ctx)} - part_a
+    cached = {"fingerprint": half.fingerprint, "sections": half.sections, "status": half.status}
 
     asked: list[set[str]] = []
 
