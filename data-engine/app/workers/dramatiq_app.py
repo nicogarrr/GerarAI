@@ -3832,6 +3832,317 @@ def refresh_ticker_news(
         return _handle_actor_error(actor_name, exc, tenant_id=tenant_id, user_id=user_id, ticker=ticker)
 
 
+# --- Universo US: una descarga de red global, persistencia explicita por tenant ---
+#
+# Medido en prod (9-nov-2026): ticker_news_refresh_universe encolaba una
+# pasada del universo US completo POR tenant activo (enqueue_for_all_tenants
+# con scope="all"): ~34 min de red cada una y cabeza de cola medida de
+# ~104 min. La descarga solo depende del ticker (misma URL de Yahoo para
+# todos los tenants); lo estrictamente de tenant es el etiquetado y la
+# ingesta. Mismo patron que refresh_asts_catalog («One global network fetch,
+# explicit tenant-scoped persisted copies»): refresh_ticker_news_universe
+# descarga cada feed UNA vez y deja el resultado crudo en Redis;
+# persist_ticker_news_universe (un mensaje por tenant) etiqueta e ingiere su
+# propio universo desde esa cache, con fail-open a red en miss. Ningun
+# tenant ve mas ni menos datos que antes: mismo universo, mismo etiquetado,
+# misma ingesta y TTL de cache (3 h) menor que la cadencia (6 h).
+_YAHOO_UNIVERSE_CACHE_TTL_SECONDS = 3 * 3600
+
+
+def _yahoo_universe_cache_key(ticker: str) -> str:
+    return f"ticker_news:universe:yahoo:{ticker.upper()}"
+
+
+def _yahoo_universe_cache_get(client, ticker: str):
+    """Resultado crudo cacheado del feed Yahoo de un ticker, o None (sin Redis, miss o payload corrupto)."""
+    if client is None:
+        return None
+    try:
+        raw = client.get(_yahoo_universe_cache_key(ticker))
+    except Exception:  # noqa: BLE001 — cache fail-open
+        return None
+    if not raw:
+        return None
+    try:
+        import json as _json
+
+        from app.services.connectors.base import ConnectorItem, ConnectorResult
+
+        payload = _json.loads(raw)
+        items = [
+            ConnectorItem(
+                source=item.get("source", "rss"),
+                title=item.get("title", ""),
+                url=item.get("url"),
+                summary=item.get("summary", ""),
+                published_at=(
+                    datetime.fromisoformat(item["published_at"]) if item.get("published_at") else None
+                ),
+                ticker=item.get("ticker"),
+                item_type=item.get("item_type", "news"),
+                external_id=item.get("external_id"),
+                headline_from_source=item.get("headline_from_source", True),
+                metadata=item.get("metadata") or {},
+            )
+            for item in payload.get("items", [])
+        ]
+        return ConnectorResult(
+            source=payload.get("source", "rss"),
+            items=items,
+            errors=list(payload.get("errors", [])),
+            metadata={**(payload.get("metadata") or {}), "ticker_news_cache": "hit"},
+        )
+    except Exception:  # noqa: BLE001 — payload corrupto: como un miss
+        return None
+
+
+def _yahoo_universe_cache_set(client, ticker: str, result) -> None:
+    """Cachea el feed crudo (tambien vacio: una respuesta fresca sin items)."""
+    if client is None:
+        return
+    try:
+        import json as _json
+
+        payload = {
+            "source": result.source,
+            "errors": list(result.errors),
+            "metadata": dict(result.metadata or {}),
+            "items": [
+                {**item.as_dict(), "headline_from_source": item.headline_from_source}
+                for item in result.items
+            ],
+        }
+        # redis-py depreco setex (DeprecationWarning desde 2.6.12): set con ex=ttl
+        client.set(
+            _yahoo_universe_cache_key(ticker),
+            _json.dumps(payload, ensure_ascii=False),
+            ex=_YAHOO_UNIVERSE_CACHE_TTL_SECONDS,
+        )
+    except Exception:  # noqa: BLE001 — cache fail-open
+        return
+
+
+@dramatiq.actor(max_retries=2, min_backoff=15_000, time_limit=2 * 3600 * 1000,
+              queue_name=YAHOO_QUEUE_NAME)
+@_coalesce_on_success("refresh_ticker_news_universe", 5 * 3600)
+def refresh_ticker_news_universe() -> dict[str, Any]:
+    """Descarga global del universo US: cada feed Yahoo UNA vez por ciclo.
+
+    Sin tenant: la URL solo depende del ticker. Al terminar encola un
+    persist_ticker_news_universe por tenant activo (copias persistidas
+    explicitas). Relevo del antiguo enqueue_for_all_tenants(scope="all").
+    """
+    actor_name = "refresh_ticker_news_universe"
+    from app.services.provider_brake import PROVIDER_BRAKES, is_open, record_429, record_success
+    from app.services.ticker_news_lane import Deadline, finalize_status, is_us_listed, yahoo_feed_url
+
+    contexts = tenant_contexts()
+    if not contexts:
+        return {"status": "skipped", "actor": actor_name, "reason": "no_tenants"}
+    try:
+        brake_client = _redis_client()
+    except Exception:  # noqa: BLE001 - fail-open
+        brake_client = None
+    if is_open(brake_client, "yahoo"):
+        if _current_message_is_retry_or_delayed():
+            # Trabajo ya aceptado: no ack sin trabajar; reprogramar tras la pausa.
+            raise dramatiq.Retry(
+                "Freno de Yahoo abierto (429): descarga global reprogramada tras la pausa",
+                delay=PROVIDER_BRAKES["yahoo"].cooldown_s * 1000,
+            )
+        return {"status": "skipped", "actor": actor_name, "reason": "provider_brakes_open"}
+    # Union del universo US de todos los tenants: la URL solo depende del ticker.
+    universe: dict[str, str] = {}
+    for ctx_tenant, ctx_user in contexts:
+        db = _session(ctx_tenant, ctx_user)
+        try:
+            for company in _companies(db):
+                if company.ticker and is_us_listed(company):
+                    universe[company.ticker.upper()] = company.ticker
+        finally:
+            db.close()
+    from app.services.feed_ingestion_service import FeedIngestionService
+
+    service = FeedIngestionService()
+    deadline = Deadline(6600)  # margen de 10 min bajo el time_limit de 2 h
+    processed = 0
+    errors: list[dict] = []
+    for key in sorted(universe):
+        if deadline.expired():
+            break
+        if is_open(brake_client, "yahoo"):
+            # Recheck por unidad: el freno se abrio a mitad de ciclo (429 de
+            # un feed anterior). Cortar la descarga en vez de seguir pegando
+            # al proveedor; el viejo carril por tenant filtraba con is_open
+            # en CADA compania. En mensaje reintentado/retrasado se reprograma
+            # el resto tras la pausa; en primer intento se reporta y el hueco
+            # lo repone el siguiente ciclo (los tenants ingieren lo cacheado).
+            if _current_message_is_retry_or_delayed():
+                raise dramatiq.Retry(
+                    "Freno de Yahoo abierto (429) a mitad de descarga: resto reprogramado tras la pausa",
+                    delay=PROVIDER_BRAKES["yahoo"].cooldown_s * 1000,
+                )
+            errors.append({
+                "source": "yahoo",
+                "message": "freno abierto (429) a mitad de ciclo: descarga cortada",
+            })
+            break
+        ticker = universe[key]
+        try:
+            result = _run(service.poll_rss(yahoo_feed_url(ticker), ticker=ticker, max_items=30))
+            errors.extend(
+                {"ticker": ticker, "source": "yahoo", "message": message}
+                for message in result.errors
+            )
+            if result.status == "error":
+                # Solo el 429 alimenta el freno (fallo de cuota del
+                # proveedor); un 404/500 es otro problema.
+                if any(_status_from_message(str(m)) == 429 for m in result.errors):
+                    record_429(brake_client, "yahoo")
+            else:
+                record_success(brake_client, "yahoo")
+                # Solo se cachea lo descargado con exito: en miss la
+                # persistencia por tenant reintenta ese feed (fail-open).
+                _yahoo_universe_cache_set(brake_client, ticker, result)
+                processed += 1
+        except Exception as exc:  # noqa: BLE001 - un feed roto no tumba la descarga
+            errors.append(
+                {"ticker": ticker, "source": "yahoo",
+                 "type": type(exc).__name__, "message": redact_secrets(str(exc))}
+            )
+        time.sleep(1.5)
+        if deadline.expired():  # post-unidad: el ultimo feed tambien cuenta
+            break
+    # Copias persistidas explicitas por tenant: cada una etiqueta e ingiere
+    # su propio universo desde la cache global.
+    queued = []
+    for ctx_tenant, ctx_user in contexts:
+        message = coalesced_send(persist_ticker_news_universe, ctx_tenant, ctx_user)
+        entry: dict[str, Any] = {"tenant_id": ctx_tenant, "user_id": ctx_user}
+        if message is None:
+            entry["suppressed"] = True
+        else:
+            entry["message_id"] = str(message.message_id)
+        queued.append(entry)
+    return {
+        "status": finalize_status(_batch_status(processed, errors), deadline.truncated),
+        "actor": actor_name,
+        "universe": len(universe),
+        "feeds_fetched": processed,
+        "truncated": deadline.truncated,
+        "errors": errors,
+        "queued": queued,
+    }
+
+
+@dramatiq.actor(max_retries=2, min_backoff=15_000, time_limit=3600 * 1000,
+              queue_name=YAHOO_QUEUE_NAME)
+@_coalesce_on_success("persist_ticker_news_universe", 5 * 3600, ("tenant_id",))
+def persist_ticker_news_universe(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
+    """Persistencia por tenant del universo US desde la cache global.
+
+    Etiqueta e ingiere el universo US propio del tenant con los resultados
+    crudos que dejo refresh_ticker_news_universe. En miss de cache (Redis
+    caido, TTL agotado o feed no descargado por freno o truncado) cae a la
+    red SOLO para ese feed: el split nunca deja al tenant con menos datos.
+    """
+    actor_name = "persist_ticker_news_universe"
+    from app.services.provider_brake import is_open, record_429, record_success
+
+    try:
+        brake_client = _redis_client()
+    except Exception:  # noqa: BLE001 - fail-open
+        brake_client = None
+    try:
+        from app.services.connectors.base import ConnectorResult
+        from app.services.feed_ingestion_service import FeedIngestionService
+        from app.services.news_service import _ticker_evidence_level
+        from app.services.ticker_news_lane import (
+            Deadline,
+            finalize_status,
+            is_us_listed,
+            label_yahoo,
+            sweep,
+            yahoo_feed_url,
+        )
+
+        db = _session(tenant_id, user_id)
+        try:
+            service = FeedIngestionService()
+            companies = [c for c in _companies(db) if is_us_listed(c)]
+            deadline = Deadline(3300)  # margen de 5 min bajo el time_limit de 1 h
+            stats = {"cache_hits": 0, "live_fetches": 0}
+            state = {"live": False}
+
+            def _lanes(company):
+                return [("yahoo", yahoo_feed_url(company.ticker))]
+
+            def _fetch(company, lane, url):
+                state["live"] = False
+                cached = _yahoo_universe_cache_get(brake_client, company.ticker)
+                if cached is not None:
+                    stats["cache_hits"] += 1
+                    return label_yahoo(cached, company, _ticker_evidence_level)
+                if is_open(brake_client, "yahoo"):
+                    # Freno abierto y feed sin cache: no reintentar contra el
+                    # proveedor; el siguiente ciclo repone el hueco.
+                    return ConnectorResult(
+                        source="rss",
+                        items=[],
+                        errors=["freno yahoo abierto: feed sin cache no reintentado"],
+                    )
+                result = _run(service.poll_rss(url, ticker=company.ticker, max_items=30))
+                stats["live_fetches"] += 1
+                state["live"] = True
+                if result.status == "error":
+                    if any(_status_from_message(str(m)) == 429 for m in result.errors):
+                        record_429(brake_client, "yahoo")
+                else:
+                    record_success(brake_client, "yahoo")
+                    _yahoo_universe_cache_set(brake_client, company.ticker, result)
+                return label_yahoo(result, company, _ticker_evidence_level)
+
+            def _ingest(company, part):
+                return service.ingest_news_result(
+                    db,
+                    part,
+                    ticker=company.ticker,
+                    news_lane=part.metadata.get("news_lane"),
+                )
+
+            outcome = sweep(
+                companies,
+                _lanes,
+                _fetch,
+                _ingest,
+                deadline,
+                # La red ya se pago en la descarga global: el pacing de 1,5 s
+                # solo aplica a los fail-open en vivo.
+                pause=lambda: time.sleep(1.5) if state["live"] else None,
+                on_error=lambda: _rollback(db),
+            )
+            processed, ingested, errors = (
+                outcome["processed"],
+                outcome["ingested"],
+                outcome["errors"],
+            )
+            return {
+                "status": finalize_status(_batch_status(processed, errors), deadline.truncated),
+                "actor": actor_name,
+                "scope": "all",
+                "feeds_processed": processed,
+                "news_ingested": ingested,
+                "cache_hits": stats["cache_hits"],
+                "live_fetches": stats["live_fetches"],
+                "truncated": deadline.truncated,
+                "errors": errors,
+            }
+        finally:
+            db.close()
+    except Exception as exc:
+        return _handle_actor_error(actor_name, exc, tenant_id=tenant_id, user_id=user_id)
+
+
 @dramatiq.actor(max_retries=2, min_backoff=15_000, queue_name=ALERT_QUEUE_NAME)
 def reconcile_alert_analyses(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Queue AlertAnalysis rows for tracked_news alerts that never got one.

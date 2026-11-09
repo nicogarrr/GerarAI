@@ -37,6 +37,8 @@ _ComposeLoader.add_multi_constructor(
 # carril de tests rojos encontro 4 actores Yahoo sueltos en default).
 ACTORES_YAHOO = [
     "refresh_ticker_news",        # Yahoo + Google RSS
+    "refresh_ticker_news_universe",   # Yahoo RSS: descarga global del universo US
+    "persist_ticker_news_universe",   # Yahoo RSS: fail-open en miss de cache
     "ingest_ca_insider_yahoo",    # Yahoo quoteSummary
     "ingest_corporate_splits",    # Yahoo (FMP de respaldo)
     "sync_portfolio_dividends",   # Yahoo (FMP de respaldo)
