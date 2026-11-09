@@ -66,7 +66,8 @@ export default function DcaWatchCard({ data, ti, locale }: { data: DcaWatchCardD
     const why = data.why;
     const risk = data.risk;
     const live = data.live;
-    const liveTime = live?.used && live.timestamp ? f.formatDateTime(new Date(live.timestamp * 1000), { hour: '2-digit', minute: '2-digit' }) : null;
+    // Hora de mercado (ET), con zona explicita: formatDateTime usaria la zona del proceso y romperia SSR/hidratacion.
+    const liveTime = live?.used && live.timestamp ? f.formatMarketDateTime(new Date(live.timestamp * 1000), { hour: '2-digit', minute: '2-digit' }) : null;
     const liveLine = live?.used
         ? ti(live.session === 'pre' ? 'watchlist.dcaCard.livePre' : live.session === 'post' ? 'watchlist.dcaCard.livePost' : 'watchlist.dcaCard.liveRegular', {
             price: price(live.price),
