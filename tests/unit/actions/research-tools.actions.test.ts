@@ -200,6 +200,9 @@ describe('búsqueda universal', () => {
     });
 
     it('normaliza ticker a mayúsculas, csv y nulos explícitos', async () => {
+        // Respuesta con la forma del contrato (sin lista real el adaptador
+        // rechaza el cuerpo, aunque este test solo mira la petición).
+        fetchMock.mockResolvedValue(okJson({ query: 'buffett', total: 0, retrieval: {}, results: [] }));
         await searchResearchLibrary({ query: 'buffett', ticker: 'aapl', entityTypes: 'document, principle', collectionId: 0 });
         expect(lastBody()).toMatchObject({
             query: 'buffett', ticker: 'AAPL', entity_types: ['document', 'principle'],
@@ -221,7 +224,15 @@ describe('búsqueda universal', () => {
             query: 'revenue', filters: {}, retrieval: { fusion: 'reciprocal_rank_fusion' },
         }));
         const out = await searchResearchLibrary({ query: 'revenue' });
-        expect(out.results).toEqual([item]);
+        // Contrato completo (ref 760826059): cada ítem se normaliza a la forma
+        // de la página y las métricas ausentes quedan null/'' (la ficha pinta
+        // N/D), nunca ceros inventados. Igualdad exacta: prueba los defaults.
+        expect(out.results).toEqual([{
+            ...item,
+            ticker: null, collection: null, status: '', source_type: '', source_tier: '',
+            source_trust: null, as_of: null, citation: '',
+            scores: { lexical: null, vector: null, rrf: null, reranker: null },
+        }]);
         expect(out.total).toBe(7);
         expect(out.query).toBe('revenue');
         expect(out.retrieval).toEqual({ fusion: 'reciprocal_rank_fusion' });
@@ -231,7 +242,12 @@ describe('búsqueda universal', () => {
         const item = { entity_type: 'claim', entity_id: 2, title: 'x', text: 'x' };
         fetchMock.mockResolvedValue(okJson({ query: 'x', total: 1, retrieval: {}, results: [item] }));
         const out = await searchResearchLibrary({ query: 'x' });
-        expect(out.results).toEqual([item]);
+        expect(out.results).toEqual([{
+            ...item,
+            ticker: null, collection: null, status: '', source_type: '', source_tier: '',
+            source_trust: null, as_of: null, citation: '',
+            scores: { lexical: null, vector: null, rrf: null, reranker: null },
+        }]);
         expect(out.total).toBe(1);
     });
 });
