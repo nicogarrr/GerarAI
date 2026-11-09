@@ -156,6 +156,10 @@ def official_contract_anchor(db: Any, company: Company, *, last_fy: int, ccy: st
 UNLISTED_EXCHANGES = frozenset({"", "PRIVATE", "PRIVADA", "UNLISTED", "NONE", "N/A", "UNKNOWN"})
 #: Comparables del grupo SIC declarado: los de capitalización más cercana (distancia logarítmica).
 GROUP_NEAREST = 12
+#: Regla de afinidad de negocio dentro del grupo SIC (:mod:`app.services.business_affinity`).
+AFFINITY_RULE = "afinidad-negocio-v1"
+#: Banda de tamaño de los afines: capitalización a menos de 30 veces la del emisor (en los dos sentidos).
+AFFINE_SIZE_RATIO = 30.0
 PRIVATE_REASON = "N/D (privada, sin cotización)"
 
 
@@ -277,11 +281,8 @@ def _derived_cap_usd(db: Any, company: Company) -> float | None:
         return None
 
 
-def _nearest_by_cap(db: Any, company: Company, cands: list[Company], n: int) -> list[Company]:
-    """Los ``n`` candidatos de capitalización más cercana a la de ``company`` (|log(cap/cap_empresa)|); sin
-    capitalización de la empresa, los mayores; sin la del candidato, al final. Desempate por ticker."""
-    import math
-
+def _caps_usd(db: Any, company: Company, cands: list[Company]) -> dict[int, float]:
+    """Capitalización en USD de la empresa y los candidatos (la de mercado o, si falta, la derivada)."""
     caps: dict[int, Any] = {}
     try:
         from app.services.peer_comparison_service import PeerComparisonService
@@ -295,6 +296,15 @@ def _nearest_by_cap(db: Any, company: Company, cands: list[Company], n: int) -> 
             derived = _derived_cap_usd(db, c)
             if derived:
                 caps[c.id] = derived
+    return {k: float(v) for k, v in caps.items() if v}
+
+
+def _nearest_by_cap(db: Any, company: Company, cands: list[Company], n: int) -> list[Company]:
+    """Los ``n`` candidatos de capitalización más cercana a la de ``company`` (|log(cap/cap_empresa)|); sin
+    capitalización de la empresa, los mayores; sin la del candidato, al final. Desempate por ticker."""
+    import math
+
+    caps = _caps_usd(db, company, cands)
     own = float(caps.get(company.id) or 0)
 
     def key(c: Company) -> tuple[Any, ...]:
@@ -306,13 +316,44 @@ def _nearest_by_cap(db: Any, company: Company, cands: list[Company], n: int) -> 
     return sorted(cands, key=key)[:n]
 
 
+def _affine_members(db: Any, company: Company, members: list[Company], n: int) -> list[Company]:
+    """Los ``n`` ``members`` más afines que la ficha guarda (``afin:<CIK>:<coseno>``), de más a menos afín,
+    quitando los de tamaño más de ``AFFINE_SIZE_RATIO`` veces distinto (cuando las dos capitalizaciones se
+    conocen): parecerse en el texto no hace comparable a una empresa cien veces más pequeña."""
+    from app.services.business_affinity import affine_from_tags
+
+    affine = affine_from_tags(company)
+    if not affine:
+        return []
+    by_cik: list[tuple[float, str, Company]] = []
+    for c in members:
+        try:
+            cik = int(str(c.cik or "").strip())
+        except ValueError:
+            continue
+        if cik in affine:
+            by_cik.append((-affine[cik], str(c.ticker or ""), c))
+    ranked = [c for _s, _t, c in sorted(by_cik, key=lambda r: (r[0], r[1]))]
+    caps = _caps_usd(db, company, ranked) if ranked else {}
+    own = caps.get(company.id) or 0.0
+
+    def in_band(c: Company) -> bool:
+        cap = caps.get(c.id) or 0.0
+        return not (own > 0 and cap > 0) or max(own, cap) / min(own, cap) <= AFFINE_SIZE_RATIO
+
+    return [c for c in ranked if in_band(c)][:n]
+
+
 def mature_peers(db: Any, company: Company, today: date, excluded_out: list[dict[str, Any]] | None = None
                  ) -> tuple[list[rules.PeerMultiple], str | None, str | None, list[dict[str, Any]]]:
     """(comparables maduros, capa usada, motivo si no hay, intentos por capa).
 
-    Capas (regla «comparables-sic-v1»): grupo SIC declarado (``sic_classification.SIC_INDUSTRY_GROUPS``, los
-    ``GROUP_NEAREST`` de capitalización más cercana) o, fuera de un grupo, el mismo SIC; después el servicio de
-    comparables, la industria, el sector y la base. Los candidatos sin cotización de la capa usada van a
+    Capas (regla «comparables-sic-v1» + «afinidad-negocio-v1»): grupo SIC declarado
+    (``sic_classification.SIC_INDUSTRY_GROUPS``) o, fuera de un grupo, el mismo SIC — primero solo los de negocio
+    afín guardados en la ficha (``afin:``, los ``GROUP_NEAREST`` más afines dentro de la banda de tamaño), después
+    todo el grupo (los ``GROUP_NEAREST`` de capitalización más cercana) —; después el servicio de
+    comparables, la industria y el sector (la base entera, no: regla «comparables-sin-base-v1»). Los candidatos
+    sin cotización de la capa usada van a
     ``excluded_out`` con su motivo («N/D (privada, sin cotización)») y nunca dan múltiplo."""
     from app.services.peer_comparison_service import _same_issuer
     from app.services.sic_classification import company_sic, group_label, industry_group
@@ -358,13 +399,24 @@ def mature_peers(db: Any, company: Company, today: date, excluded_out: list[dict
     tiers: list[tuple[str, list[Company]]] = []
     sic = company_sic(company)
     group = industry_group(sic)
+    sic_members: list[Company] = []
+    sic_label = ""
     if group is not None:
-        members = [c for c in everyone if industry_group(company_sic(c)) == group]
-        tiers.append((f"mismo grupo de industria: {group_label(group)}, las {GROUP_NEAREST} de capitalización más "
-                      "cercana", _nearest_by_cap(db, company, members, GROUP_NEAREST)))
+        sic_members = [c for c in everyone if industry_group(company_sic(c)) == group]
+        sic_label = f"mismo grupo de industria: {group_label(group)}"
     elif sic is not None:
-        tiers.append((f"mismo código SIC ({sic})",
-                      _nearest_by_cap(db, company, [c for c in everyone if company_sic(c) == sic], GROUP_NEAREST)))
+        sic_members = [c for c in everyone if company_sic(c) == sic]
+        sic_label = f"mismo código SIC ({sic})"
+    if sic_label:
+        # Regla «afinidad-negocio-v1»: primero los del grupo cuyo negocio se parece de verdad (descripción del
+        # informe anual en la SEC); el SIC solo, que junta satélites con equipos de red, queda como respaldo.
+        affine = _affine_members(db, company, sic_members, GROUP_NEAREST)
+        if affine:
+            tiers.append((f"{sic_label}, de negocio afín: las {len(affine)} con la descripción del informe anual más "
+                          f"parecida y tamaño a menos de {AFFINE_SIZE_RATIO:g} veces (regla {AFFINITY_RULE})",
+                          affine))
+        tiers.append((f"{sic_label}, las {GROUP_NEAREST} de capitalización más cercana",
+                      _nearest_by_cap(db, company, sic_members, GROUP_NEAREST)))
     # Comparables declarados (servicio): los que no cotizan salen excluidos con su motivo, nunca con múltiplo.
     tiers.append(("comparables del servicio de comparables", list(svc_peers)))
     if industry:
@@ -372,8 +424,9 @@ def mature_peers(db: Any, company: Company, today: date, excluded_out: list[dict
                       [c for c in ranked if c.industry == company.industry][:MAX_CANDIDATES]))
     if sector:
         tiers.append((f"mismo sector ({sector})", [c for c in ranked if c.sector == company.sector][:MAX_CANDIDATES]))
-    tiers.append(("toda la base no financiera, las mayores por capitalización (sin comparables suficientes del sector)",
-                  ranked[:MAX_CANDIDATES]))
+    # Regla «comparables-sin-base-v1» (9-nov-2026): la base entera (las mayores por capitalización, sin relación de
+    # negocio) no es un comparable: un biotec de anticuerpos salía con el EV/ventas de UNH, SNAP o POOL. Sin
+    # comparables maduros del SIC, del servicio, de la industria ni del sector, el múltiplo de salida es N/D.
     declared = list(svc_peers)
     for label, cands in tiers:
         got = run(label, cands)
@@ -381,8 +434,8 @@ def mature_peers(db: Any, company: Company, today: date, excluded_out: list[dict
             done([*cands, *[c for c in declared if c not in cands]], cands)
             return got, label, None, tried
     done(declared, [])
-    return [], None, (f"menos de {rules.MIN_PEERS} comparables maduros con ingresos y EV positivos en ninguna capa "
-                      "(grupo SIC, servicio, industria, sector, base)"), tried
+    return [], None, (f"N/D: menos de {rules.MIN_PEERS} comparables maduros con ingresos y EV positivos en su SIC, "
+                      "sus comparables, su industria o su sector (la base entera no se usa: no es comparable)"), tried
 
 
 def value_pre_revenue(db: Any, company: Company, *, sp: Any, hist: Any, cites: Mapping[str, Any],

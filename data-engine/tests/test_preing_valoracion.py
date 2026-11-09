@@ -155,9 +155,11 @@ def test_comparables_caen_a_capas_mas_anchas_y_lo_dicen(monkeypatch):
     monkeypatch.setattr(pcs.PeerComparisonService, "_latest_market_caps_usd", lambda self, db, ids: {})
     monkeypatch.setattr(pcs, "_same_issuer", lambda a, b: False)
     got, layer, missing, tried = svc.mature_peers(_FakeDB([base]), target, TODAY)
-    assert missing is None and layer.startswith("toda la base no financiera")
-    assert sorted(p.ticker for p in got) == ["P1", "P2", "P3"]
-    assert [t["maduros"] for t in tried] == [1, 1, 2, 3]
+    # Regla «comparables-sin-base-v1»: sin tres maduros en su servicio, industria o sector, N/D; la base entera
+    # (P3, de otro sector) nunca da el múltiplo de salida.
+    assert got == [] and layer is None and missing.startswith("N/D: menos de 3 comparables maduros")
+    assert "la base entera no se usa" in missing
+    assert [t["maduros"] for t in tried] == [1, 1, 2]
     # Con tres maduros en el sector, se queda en el sector.
     base3 = [_co(2, "P1"), _co(3, "P2", industry="Other"), _co(4, "P3", industry="Other")]
     got, layer, _m, _t = svc.mature_peers(_FakeDB([base3]), target, TODAY)
