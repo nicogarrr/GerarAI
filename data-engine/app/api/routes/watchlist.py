@@ -1141,8 +1141,10 @@ async def dca_watch_card(symbol: str, db: Session = Depends(get_db)) -> dict:
     Misma serie que la señal diaria (Yahoo, cierre ajustado, sin la barra del día
     en curso) y mismo motor; la señal oficial es la mensual. El periodo en
     formación usa el precio actual (premercado/sesión/post) cuando hay uno
-    fiable, siempre etiquetado como precio actual y nunca como cierre; la
-    señal oficial, el estado guardado y los avisos siguen solo con cierres.
+    fiable, siempre etiquetado como precio actual y nunca como cierre. La
+    señal oficial, el estado guardado y los avisos incorporan ese precio
+    actual en el periodo en formación (close_kind="live"), sin persistirlo
+    como cierre: close y signal_date siguen siendo el cierre asentado.
     """
     from zoneinfo import ZoneInfo
 

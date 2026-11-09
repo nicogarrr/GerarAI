@@ -1165,7 +1165,9 @@ export interface paths {
          *     declaring symbol and currency; a currency mismatch is never adopted.
          *     With press=1 (company page only) recent press notes complement Yahoo:
          *     deterministic extraction, each row attributed with outlet, link and the
-         *     article's publication date; the aggregate consensus stays Yahoo's.
+         *     article's publication date; the aggregate consensus stays Yahoo's. One
+         *     shared deadline covers Yahoo, both press passes AND the listing fallback,
+         *     so the endpoint always answers before the frontend's 14 s cutoff.
          */
         get: operations["company_analyst_targets_api_companies__ticker__analyst_targets_get"];
         put?: never;
@@ -6858,7 +6860,12 @@ export interface paths {
          *     riesgo, «¿por qué?» y movimiento desde el último cambio de nivel.
          *
          *     Misma serie que la señal diaria (Yahoo, cierre ajustado, sin la barra del día
-         *     en curso) y mismo motor; la señal oficial es la mensual.
+         *     en curso) y mismo motor; la señal oficial es la mensual. El periodo en
+         *     formación usa el precio actual (premercado/sesión/post) cuando hay uno
+         *     fiable, siempre etiquetado como precio actual y nunca como cierre. La
+         *     señal oficial, el estado guardado y los avisos incorporan ese precio
+         *     actual en el periodo en formación (close_kind="live"), sin persistirlo
+         *     como cierre: close y signal_date siguen siendo el cierre asentado.
          */
         get: operations["dca_watch_card_api_watchlist_dca_signals__symbol__card_get"];
         put?: never;
@@ -8785,6 +8792,11 @@ export interface components {
         DcaSignalStateOut: {
             /** Close */
             close: number;
+            /**
+             * Close Kind
+             * @default close
+             */
+            close_kind: string;
             /** Color */
             color: string;
             /** Currency */
@@ -8816,6 +8828,12 @@ export interface components {
             level_prices?: {
                 [key: string]: number | null;
             };
+            /** Live At */
+            live_at?: string | null;
+            /** Live Price */
+            live_price?: number | null;
+            /** Live Session */
+            live_session?: string | null;
             /** Metrics */
             metrics?: {
                 [key: string]: number | string | null;
