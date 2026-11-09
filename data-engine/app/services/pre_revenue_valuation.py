@@ -50,7 +50,8 @@ def _convert(db: Any, value: float, unit: str | None, ccy: str, today: date) -> 
     return conv[0], conv[1]
 
 
-def revenue_anchors(db: Any, company: Company, *, last_fy: int, ccy: str, today: date) -> list[rules.RevenueAnchor]:
+def revenue_anchors(db: Any, company: Company, *, last_fy: int, ccy: str, today: date,
+                    last_revenue: float | None = None) -> list[rules.RevenueAnchor]:
     """Todas las anclas de ingresos (millones de ``ccy``) a 3–5 años que GerarAI ya tiene, con su cita."""
     out: list[rules.RevenueAnchor] = []
     years = range(last_fy + rules.HORIZON_MIN, last_fy + rules.HORIZON_MAX + 1)
@@ -124,7 +125,25 @@ def revenue_anchors(db: Any, company: Company, *, last_fy: int, ccy: str, today:
         filed = [a for a in out if a.source == "backlog"]
         if not filed or contract.cite["total_millions"] > float(filed[0].cite.get("total_millions") or 0):
             out.insert(out.index(filed[0]) if filed else len(out), contract)
+    own = own_estimate_anchor(company, last_fy=last_fy, last_revenue=last_revenue)
+    if own is not None:
+        out.append(own)
     return out
+
+
+def own_estimate_anchor(company: Company, *, last_fy: int, last_revenue: float | None) -> rules.RevenueAnchor | None:
+    """Ancla e. del paso 3: estimación propia por fase e industria (solo la usa ``choose_anchor`` si no hay otra)."""
+    from app.services.sic_classification import company_sic
+    from app.valuation import revenue_phase_rates as phase_rates
+
+    est, label = phase_rates.estimate(company_sic(company), last_revenue, rules.HORIZON_MAX)
+    if est is None:
+        return None
+    return rules.RevenueAnchor(last_fy + rules.HORIZON_MAX, est["base"], est["low"], est["high"], "estimacion_propia",
+                               label, {"rules": phase_rates.RULES_VERSION, "source": phase_rates.SOURCE,
+                                       "phase": est["phase"], "sic_group": est["group"], "n": est["n"],
+                                       "inactive_share": est["inactivas"], "ratios": est["ratios"],
+                                       "last_revenue_millions": last_revenue, "last_fiscal_year": last_fy})
 
 
 def official_contract_anchor(db: Any, company: Company, *, last_fy: int, ccy: str, today: date
@@ -450,7 +469,8 @@ def value_pre_revenue(db: Any, company: Company, *, sp: Any, hist: Any, cites: M
         fy_month = 12
     fcf = runway.get("free_cash_flow")
     rw = rules.runway(sp.cash, fcf, missing=runway.get("missing"))
-    anchors = revenue_anchors(db, company, last_fy=last_fy, ccy=ccy, today=today)
+    anchors = revenue_anchors(db, company, last_fy=last_fy, ccy=ccy, today=today,
+                              last_revenue=float(sp.revenue) if sp.revenue and ccy == "USD" else None)
     anchor, anchor_missing = rules.choose_anchor(anchors, last_fy)
     excluded: list[dict[str, Any]] = []
     peers, layer, peers_missing, tried = mature_peers(db, company, today, excluded)
@@ -487,4 +507,4 @@ def value_pre_revenue(db: Any, company: Company, *, sp: Any, hist: Any, cites: M
     return payload
 
 
-__all__ = ["by_market_cap", "mature_peers", "official_contract_anchor", "revenue_cagr", "revenue_anchors", "value_pre_revenue"]
+__all__ = ["by_market_cap", "mature_peers", "official_contract_anchor", "own_estimate_anchor", "revenue_cagr", "revenue_anchors", "value_pre_revenue"]
