@@ -18,7 +18,7 @@ export const ROUTE_AREAS: Readonly<Record<string, readonly string[]>> = {
   "/corporate-actions": ["auth","brain","calendar","corporateActions","data","researchShared","signals"],
   "/cuellos": ["auth","bottlenecks","brain","researchShared","signals","themes"],
   "/cuenta-pendiente": ["auth","brain","researchShared","signals"],
-  "/discover": ["auth","brain","researchShared","signals"],
+  "/discover": ["auth","brain","discover","researchShared","signals"],
   "/export": ["auth","brain","export","researchShared","signals"],
   "/forgot-password": ["auth","brain","researchShared","signals"],
   "/help": ["auth","brain","researchShared","signals"],
