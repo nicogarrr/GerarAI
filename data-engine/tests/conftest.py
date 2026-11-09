@@ -206,6 +206,8 @@ _BREAKER_STATES = (
     "_free_tier_breaker_until",
     "_interactive_quota_breaker_until",
     "_free_quota_breaker_until",
+    "_payment_required_breaker",
+    "_payment_required_breaker_until",
 )
 
 

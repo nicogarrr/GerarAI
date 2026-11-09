@@ -51,6 +51,12 @@ _interactive_quota_breaker: dict[tuple[str, str], float] = {}
 # interactivos (chat/debate) usan su propio breaker de arriba.
 # Clave: (proveedor, modelo, huella de la credencial) - la cuota es de UNA clave.
 _free_quota_breaker: dict[tuple[str, str, str], float] = {}
+# Sin saldo (HTTP 402, p. ej. la clave Zen sin créditos): ningún reintento lo arregla y cada llamada
+# siguiente del mismo job volvía a pagar el viaje para recibir otro 402. Se corta EN el primer 402 y las
+# llamadas con la misma clave fallan al instante (sin red) hasta que pase el enfriamiento; después, una
+# sonda real. Clave: (proveedor, modelo, huella de la credencial), como la cuota.
+_PAYMENT_REQUIRED_BREAKER_SECONDS = 600.0
+_payment_required_breaker: dict[tuple[str, str, str], float] = {}
 
 # Marca de pared (epoch UTC) de cuando reabre cada breaker: el monotonic de
 # arriba gobierna la logica, estas copias alimentan el panel de uso de
@@ -58,6 +64,7 @@ _free_quota_breaker: dict[tuple[str, str, str], float] = {}
 _free_tier_breaker_until: dict[tuple[str, str], float] = {}
 _interactive_quota_breaker_until: dict[tuple[str, str], float] = {}
 _free_quota_breaker_until: dict[tuple[str, str, str], float] = {}
+_payment_required_breaker_until: dict[tuple[str, str, str], float] = {}
 
 
 def _set_breaker(registry, wallclock, key, seconds: float) -> None:
@@ -68,7 +75,7 @@ def _set_breaker(registry, wallclock, key, seconds: float) -> None:
 def breaker_snapshot() -> list[dict[str, object]]:
     """Breakers abiertos ahora mismo, en hora de pared, para el panel de uso.
 
-    Cada entrada: kind (quota | interactive_quota | origin), provider, model,
+    Cada entrada: kind (quota | interactive_quota | origin | payment_required), provider, model,
     until (epoch UTC) y seconds_remaining. Las llaves de cuota incluyen la
     huella de credencial, que no se expone.
     """
@@ -91,6 +98,7 @@ def breaker_snapshot() -> list[dict[str, object]]:
     collect(_free_quota_breaker, _free_quota_breaker_until, "quota")
     collect(_interactive_quota_breaker, _interactive_quota_breaker_until, "interactive_quota")
     collect(_free_tier_breaker, _free_tier_breaker_until, "origin")
+    collect(_payment_required_breaker, _payment_required_breaker_until, "payment_required")
     return out
 _QUOTA_429_BODY_MARKERS = (
     "exhausted", "quota", "insufficient credit", "billing",
@@ -286,6 +294,8 @@ class LLMProvider(ABC):
         quota_key = (*breaker_key, _credential_fingerprint(headers))
         if _free_quota_breaker.get(quota_key, 0.0) > time.monotonic():
             raise ProviderHTTPError(self.name, 429)
+        if _payment_required_breaker.get(quota_key, 0.0) > time.monotonic():
+            raise ProviderHTTPError(self.name, 402)
         interactive_quota = getattr(self, "interactive_quota_breaker", False)
         if interactive_quota and _interactive_quota_breaker.get(breaker_key, 0.0) > time.monotonic():
             raise ProviderHTTPError(self.name, 429)
@@ -308,6 +318,14 @@ class LLMProvider(ABC):
             if response.status_code < 400:
                 return response
             self._log_http_error(response, headers, payload, attempt)
+            if response.status_code == 402:
+                cooldown = parse_retry_after(response.headers.get("retry-after")) or _PAYMENT_REQUIRED_BREAKER_SECONDS
+                _set_breaker(_payment_required_breaker, _payment_required_breaker_until, quota_key, cooldown)
+                raise ProviderHTTPError(self.name, 402)
+            if response.status_code == 429 and not getattr(self, "retry_rate_limited", True):
+                # Quien lo pide (la tesis v2: llamadas de minutos) se para en el primer 429 y lo dice, en vez
+                # de reintentar contra un límite que no ha vuelto en 0,25 s.
+                raise ProviderHTTPError(self.name, 429)
             if interactive_quota and response.status_code == 429:
                 # Cuota agotada: sin reintentos hasta el reset/ventana. El
                 # Retry-After del proveedor (OpenCode Go manda ~24 h en su
