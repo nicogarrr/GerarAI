@@ -661,7 +661,14 @@ def market_changes(
     Un ticker sin cierres comparables devuelve change_pct null (la UI muestra
     N/D), nunca un valor de otra fuente."""
     wanted = {t.strip().upper() for t in tickers.split(",") if t.strip()}
-    movers, _, session_day = market_change.compute_session_changes(db, tickers=wanted)
+    # La watchlist lo pedía en cada carga y recalculaba siempre (prod
+    # 2026-11-09: 8,2-9,0 s con 12 tickers con la BD lenta; el frontend
+    # corta a 8 s y se queda sin el cierre datado de respaldo). Misma caché
+    # (TTL + invalidación al escribir cierres) que Movers, por conjunto.
+    movers, _, session_day = movers_cache.get_or_compute_keyed(
+        ",".join(sorted(wanted)),
+        lambda: market_change.compute_session_changes(db, tickers=wanted),
+    )
     items = {
         m["ticker"].upper(): {
             "price": m["price"],
