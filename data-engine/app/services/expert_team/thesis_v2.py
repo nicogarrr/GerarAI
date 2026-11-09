@@ -709,6 +709,17 @@ def thesis_markers(ctx: ThesisContext) -> dict[str, str]:
               "caja.meses": (_es(rw["months"], 0) + " meses") if rw.get("months") else "sin consumo",
               "caja.dilucion": pct(rw.get("dilution_cagr"), signed=True), "caja.ev_caja": times(rw.get("ev_to_cash")),
               "caja.ev_ingresos": times(rw.get("ev_to_revenue")), "caja.ejercicio": str(rw.get("year") or "")}
+    pre = val.get("pre_revenue") or {}
+    if pre and not pre.get("error"):
+        prw = pre.get("runway") or {}
+        m["caja.trimestres"] = (_es(prw["quarters"], 1) + " trimestres") if prw.get("quarters") else "N/D"
+        stats = pre.get("peer_stats") or {}
+        m["preing.ev_ventas_mediana"] = times(stats.get("median")) if stats else "N/D"
+        m["preing.ano_salida"] = str((pre.get("revenue_anchor") or {}).get("year") or "N/D")
+        for k, row in (pre.get("scenarios") or {}).items():
+            m[f"preing.{k}.tir"] = _scenario_text(row)
+            m[f"preing.{k}.dilucion"] = pct(row.get("dilution"), signed=True) if row.get("dilution") is not None else "N/D"
+            m[f"preing.{k}.ingresos"] = millions(row.get("revenue"), ccy) if row.get("revenue") is not None else "N/D"
     _insider_markers(m, ctx)
     if val.get("status") == "not_meaningful":
         m["valoracion.motivo"] = str(val.get("reason") or "")
@@ -962,6 +973,72 @@ def estimate_switches(guidance: Sequence[Mapping[str, Any]], ccy: str,
     return out
 
 
+
+def _scenario_text(row: Mapping[str, Any]) -> str:
+    return pct(row.get("irr"), signed=True) if row.get("irr") is not None else f"N/D ({row.get('missing') or 'sin dato'})"
+
+
+def pre_revenue_rows(note: dict[str, Any], val: Mapping[str, Any], ccy: str) -> None:
+    """Filas de la ruta de preingresos (runway en trimestres, dilución proyectada y TIR por escenario) en el
+    bloque de caja de la ficha. Cada fila con su fórmula o su fuente; un escenario sin input es N/D con su motivo."""
+    pre = val.get("pre_revenue") or {}
+    if not pre or pre.get("error") or not note.get("rows") or len(note.get("head") or []) != 3:
+        return
+    f = pre.get("formulas") or {}
+    rw = pre.get("runway") or {}
+    scen = pre.get("scenarios") or {}
+    keys = ("bear", "base", "bull")
+    anchor = pre.get("revenue_anchor") or {}
+    stats = pre.get("peer_stats") or {}
+
+    def trio(field: str, fmt: Any) -> str:
+        vals = [(scen.get(k) or {}).get(field) for k in keys]
+        return " / ".join(fmt(v) if v is not None else "N/D" for v in vals)
+
+    anchor_src = anchor.get("label") or ""
+    cite = anchor.get("cite") or {}
+    if cite.get("as_of"):
+        anchor_src += f" ({cite['as_of']})"
+    rows: list[tuple[list[str], Any]] = [
+        (["Runway (trimestres)", _es(rw["quarters"], 1) if rw.get("quarters") else (
+            f"N/D ({rw['missing']})" if rw.get("missing") else "sin consumo"), f.get("runway", "")], None),
+        (["Dilución proyectada hasta el break-even (bajista / base / alcista)",
+          trio("dilution", lambda v: pct(v, signed=True)), f.get("dilucion_proyectada", "")], None),
+        ([f"Ingresos {anchor.get('year') or ''} (bajista / base / alcista)".replace("  ", " "),
+          trio("revenue", lambda v: millions(v, ccy)) if anchor else f"N/D ({pre.get('revenue_anchor_missing') or ''})",
+          anchor_src or f.get("ingresos", "")], cite.get("url")),
+        (["EV/ventas de comparables maduros (p25 / mediana / p75)",
+          " / ".join(times(stats.get(k)) for k in ("p25", "median", "p75")) if stats else
+          f"N/D ({pre.get('peers_missing') or ''})",
+          f"{int(stats.get('n') or 0)} comparables; capa: {pre.get('peer_layer') or 'ninguna'}; {f.get('multiplo', '')}"], None),
+    ]
+    for k in keys:
+        row = scen.get(k) or {}
+        rows.append(([f"TIR anual {str(row.get('label') or k).lower()} hasta {row.get('year') or anchor.get('year') or 'T'}",
+                      _scenario_text(row), f.get("tir", "")], None))
+    note["title"] = str(note.get("title") or "").replace("Caja, consumo y dilución", "Caja, consumo, dilución y TIR por escenarios")
+    note["rows"] = list(note["rows"]) + [r for r, _ in rows]
+    if note.get("links") is not None:
+        note["links"] = list(note["links"]) + [source_link({"url": u}, None) if u else None for _, u in rows]
+
+
+def _pre_revenue_partida(t: dict[str, Any], val: Mapping[str, Any]) -> None:
+    """En una empresa preingresos la mediana de comparables del punto de partida es la de EV/ventas de los
+    comparables maduros (la del EV/EBITDA no existe: no hay EBITDA positivo que dividir)."""
+    pre = val.get("pre_revenue") or {}
+    stats = pre.get("peer_stats") or {}
+    if not pre or pre.get("error"):
+        return
+    for row in t["partida"]["rows"]:
+        if row and row[0] == "Mediana de comparables":
+            if stats:
+                row[1] = times(stats.get("median")) + " EV/ventas"
+                row[2] = (f"{int(stats.get('n') or 0)} comparables maduros con la misma fórmula (EV / ingresos); "
+                          f"capa: {pre.get('peer_layer')}")
+            else:
+                row[2] = f"N/D: {pre.get('peers_missing') or 'sin comparables maduros'}"
+
+
 def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
     """Las tablas que pinta el código (cabecera + filas de texto ya formateado)."""
     val = ctx.valuation
@@ -1003,6 +1080,7 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
         None, link(cites.get("shares")), None, link(cites.get("cash_and_equivalents")), link(cites.get("total_debt")),
         None, None, None, None, link((annual.get("operating_income") or {}).get(last_year)
                                      or (annual.get("net_income") or {}).get(last_year)), None, None]
+    _pre_revenue_partida(t, val)
     t["historial"] = {"title": "Historial (millones, ejercicio fiscal)", "head": [
         "Año", "Ingresos", "Crec.", lab["margin"], "FCF", "Conv.", "FCF/acción", "Acciones", "ROIC"], "rows": [
         [str(r["year"]), millions(r["revenue"], ccy), pct(r["growth"], signed=True), pct(r["margin"]),
@@ -1031,6 +1109,9 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
         "Empresa", "Múltiplo", "Margen", "Crec. 3 años", "Deuda neta / EBITDA", "Nota"], "rows": [
         [f"{p.get('name') or p['ticker']} ({p['ticker']})", times(p.get("multiple")), pct(p.get("margin")),
          pct(p.get("growth")), times(p.get("leverage")), p.get("note") or ""] for p in ctx.peers]}
+    if (val.get("pre_revenue") or {}).get("peers"):
+        t["comparables"]["title"] = "Comparables maduros (EV/ventas con la misma fórmula)"
+        t["comparables"]["head"][1] = "EV/ventas"
     ins = ctx.insiders or {}
     t["insiders"] = {"title": "Insiders: Form 4 de la SEC (compras y ventas en mercado; sin ejercicios, concesiones, retenciones ni regalos)",
                      "head": ["Ventana", "Compras", "Importe compras", "Ventas", "Importe ventas", "Con plan 10b5-1", "Neto"],
@@ -1090,6 +1171,7 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
             ], "links": [link(cites.get("cash_and_equivalents")), link(cites.get("total_debt")),
                          link((rw.get("sources") or {}).get("ocf")), link((rw.get("sources") or {}).get("capex")),
                          None, None, None, None, None]}
+        pre_revenue_rows(note, val, ccy)
         t["escenarios"] = note
         t["descomposicion"] = {"title": "", "head": [], "rows": []}
         t["sensibilidad"] = {"title": "", "head": [], "rows": []}
