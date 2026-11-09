@@ -1,7 +1,20 @@
+import { GlobalBrain } from '@/components/brain/GlobalBrain';
+import { markBrainReady, OPEN_BRAIN_PENDING_KEY } from '@/lib/brain/open-brain';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ pathname: vi.fn(() => '/inicio') }));
+// El shell real consume el handoff; el panel de chat tiene su suite propia.
+vi.mock('@/components/brain/GlobalBrainPanel', () => ({
+    GlobalBrainPanel: ({ openDetail }: { openDetail: { seq: number } | null }) =>
+        <div role="dialog" aria-label="Cerebro de prueba" data-open-seq={openDetail?.seq} />,
+}));
+
+afterEach(() => {
+    markBrainReady(false);
+    window.sessionStorage.removeItem(OPEN_BRAIN_PENDING_KEY);
+});
+
 vi.mock('next/navigation', () => ({ usePathname: () => mocks.pathname() }));
 
 import NavItems from '@/components/NavItems';
@@ -9,6 +22,8 @@ import BottomNav from '@/components/layout/BottomNav';
 import SectionNav from '@/components/layout/SectionNav';
 
 beforeEach(() => {
+    markBrainReady(false);
+    window.sessionStorage.removeItem(OPEN_BRAIN_PENDING_KEY);
     mocks.pathname.mockReturnValue('/inicio');
     window.localStorage.clear();
 });
@@ -42,12 +57,25 @@ describe('BottomNav', () => {
         expect(nav.querySelectorAll('li')).toHaveLength(6);
         expect(screen.getByRole('button', { name: 'Abrir el cerebro' })).toBeInTheDocument();
     });
-    it('el botón Cerebro emite el evento de apertura, no navega', () => {
+    it.each([true, false])('el botón Cerebro entrega la apertura sin navegar (ready=%s)', async (ready) => {
+        markBrainReady(ready);
         const onOpen = vi.fn();
         window.addEventListener('gerarai:open-brain', onOpen);
-        render(<BottomNav />);
+        const entry = render(<BottomNav />);
         fireEvent.click(screen.getByRole('button', { name: 'Abrir el cerebro' }));
-        expect(onOpen).toHaveBeenCalledTimes(1);
+        expect(screen.getByRole('button', { name: 'Abrir el cerebro' }).closest('a')).toBeNull();
+        expect(onOpen).toHaveBeenCalledTimes(ready ? 1 : 0);
+        expect(window.sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBe(ready ? null : 'null');
+        if (!ready) {
+            entry.unmount();
+            const brain = render(<GlobalBrain userId="u1" />);
+            expect(await screen.findByRole('dialog', { name: 'Cerebro de prueba' })).toHaveAttribute('data-open-seq', '1');
+            expect(window.sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBeNull();
+            expect(onOpen).not.toHaveBeenCalled();
+            brain.unmount();
+            render(<GlobalBrain userId="u1" />);
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        }
         window.removeEventListener('gerarai:open-brain', onOpen);
     });
     it('la pestaña activa lleva aria-current', () => {

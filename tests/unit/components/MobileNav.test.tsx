@@ -1,5 +1,18 @@
+import { GlobalBrain } from '@/components/brain/GlobalBrain';
+import { markBrainReady, OPEN_BRAIN_PENDING_KEY } from '@/lib/brain/open-brain';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// El shell real consume el handoff; el panel de chat tiene su suite propia.
+vi.mock('@/components/brain/GlobalBrainPanel', () => ({
+    GlobalBrainPanel: ({ openDetail }: { openDetail: { seq: number } | null }) =>
+        <div role="dialog" aria-label="Cerebro de prueba" data-open-seq={openDetail?.seq} />,
+}));
+
+afterEach(() => {
+    markBrainReady(false);
+    window.sessionStorage.removeItem(OPEN_BRAIN_PENDING_KEY);
+});
 
 vi.mock('next/navigation', () => ({
     usePathname: () => '/inicio',
@@ -25,6 +38,8 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
+    markBrainReady(false);
+    window.sessionStorage.removeItem(OPEN_BRAIN_PENDING_KEY);
     vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
         matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn(),
     })));
@@ -76,14 +91,27 @@ describe('MobileNav (trampas de foco y breakpoints)', () => {
         return listeners;
     }
 
-    it('el botón Cerebro cierra el drawer y emite gerarai:open-brain', async () => {
+    it.each([true, false])('el botón Cerebro cierra el drawer y entrega la apertura (ready=%s)', async (ready) => {
+        markBrainReady(ready);
         const onBrain = vi.fn();
         window.addEventListener('gerarai:open-brain', onBrain);
-        render(<MobileNav />);
+        const entry = render(<MobileNav />);
         await openDrawer();
         fireEvent.click(screen.getByRole('button', { name: /Cerebro/ }));
-        expect(onBrain).toHaveBeenCalledTimes(1);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(document.body.style.overflow).toBe('');
+        expect(onBrain).toHaveBeenCalledTimes(ready ? 1 : 0);
+        expect(window.sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBe(ready ? null : 'null');
+        if (!ready) {
+            entry.unmount();
+            const brain = render(<GlobalBrain userId="u1" />);
+            expect(await screen.findByRole('dialog', { name: 'Cerebro de prueba' })).toHaveAttribute('data-open-seq', '1');
+            expect(window.sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBeNull();
+            expect(onBrain).not.toHaveBeenCalled();
+            brain.unmount();
+            render(<GlobalBrain userId="u1" />);
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        }
         window.removeEventListener('gerarai:open-brain', onBrain);
     });
 
