@@ -92,8 +92,10 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     ZETA: {
         name: 'Zeta Global',
         section: { url: 'https://investors.zetaglobal.com/events-and-presentations/default.aspx', labelKey: 'eventsAndPresentations' },
-        events: [],
-        verifiedOn: '2026-11-08',
+        events: [
+            { date: '2026-11-09', period: 'T3 2026', url: 'https://www.investors.zetaglobal.com/events-and-presentations/event-details/2026/Zeta-Q3-2026-Earnings-Call-2026-bhoMhuFrO0/default.aspx' },
+        ],
+        verifiedOn: '2026-11-09',
     },
     'CGEO.L': {
         name: 'Georgia Capital',
@@ -116,8 +118,10 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     BWMX: {
         name: 'Betterware de México',
         section: { url: 'https://www.befra.com/financials/quarterly-results', labelKey: 'quarterlyResults' },
-        events: [],
-        verifiedOn: '2026-11-08',
+        events: [
+            { date: '2026-10-22', period: 'T3 2026', url: 'https://www.befra.com/news-events/press-releases/detail/108/befra-reports-third-quarter-2026-results' },
+        ],
+        verifiedOn: '2026-11-09',
     },
     KKR: {
         name: 'KKR & Co.',
@@ -128,20 +132,27 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     POOL: {
         name: 'Pool Corporation',
         section: { url: 'https://ir.poolcorp.com/', labelKey: 'investorRelations' },
-        events: [],
-        verifiedOn: '2026-11-08',
+        events: [
+            { date: '2026-10-22', period: 'T3 2026', url: 'https://ir.poolcorp.com/pool-corporation-reports-third-quarter-results-confirms-annual-earnings-guidance-range/' },
+        ],
+        verifiedOn: '2026-11-09',
     },
     CB: {
         name: 'Chubb',
         section: { url: 'https://investors.chubb.com/', labelKey: 'investorRelations' },
-        events: [],
-        verifiedOn: '2026-11-08',
+        events: [
+            // Resultados publicados el 2026-10-20 (nota oficial); la llamada fue el 21.
+            { date: '2026-10-20', period: 'T3 2026', url: 'https://investors.chubb.com/News--Events/news/news-details/2026/Chubb-Reports-Third-Quarter-Per-Share-Net-Income-and-Record-Core-Operating-Income-of-7-30-and-7-66-Respectively-Up-4-4-and-0-8-Consolidated-Net-Premiums-Written-of-15-1-Billion-Up-1-9-with-PC-and-Life-Insurance-Up-1-9-and-1-4-PC-Combined-Ratio-of-84-/default.aspx' },
+        ],
+        verifiedOn: '2026-11-09',
     },
     CPT: {
         name: 'Camden Property Trust',
         section: { url: 'https://investors.camdenliving.com/', labelKey: 'investorRelations' },
-        events: [],
-        verifiedOn: '2026-11-08',
+        events: [
+            { date: '2026-11-05', period: 'T3 2026', url: 'https://investors.camdenliving.com/investors/news-events-presentations/news/news-details/2026/Camden-Property-Trust-Announces-Third-Quarter-2026-Operating-Results/default.aspx' },
+        ],
+        verifiedOn: '2026-11-09',
     },
     UBER: {
         name: 'Uber Technologies',
