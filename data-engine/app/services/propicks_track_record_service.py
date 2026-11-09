@@ -57,29 +57,46 @@ def ingest_spy_prices(
 
         fetcher = fetch_history_yfinance
     history = fetcher([SPY_SYMBOL], period=period)
-    bars = history.get(SPY_SYMBOL) or []
+    bars = list(history.get(SPY_SYMBOL) or [])
     written = 0
-    for bar in bars:
-        existing = db.scalar(
-            select(BenchmarkPrice).where(
-                BenchmarkPrice.symbol == SPY_SYMBOL,
-                BenchmarkPrice.date == bar.day,
-            )
-        )
-        if existing is not None:
-            existing.close = bar.close
-            existing.adj_close = bar.adj_close
-            existing.source = "yfinance"
-        else:
-            db.add(
-                BenchmarkPrice(
-                    symbol=SPY_SYMBOL,
-                    date=bar.day,
-                    close=bar.close,
-                    adj_close=bar.adj_close,
-                    source="yfinance",
+    # Una sola lectura por tanda: la clave (symbol, date) es unica y la
+    # lista de dias acota la query (sin historial que hidratar de mas).
+    days = {bar.day for bar in bars}
+    existing_by_day: dict[date, BenchmarkPrice] = {}
+    if days:
+        existing_by_day = {
+            row.date: row
+            for row in db.scalars(
+                select(BenchmarkPrice).where(
+                    BenchmarkPrice.symbol == SPY_SYMBOL,
+                    BenchmarkPrice.date.in_(days),
                 )
             )
+        }
+    for bar in bars:
+        existing = existing_by_day.get(bar.day)
+        if existing is not None:
+            # Mismo valor: no se reescribe la fila (ni su updated_at).
+            if (
+                existing.close != bar.close
+                or existing.adj_close != bar.adj_close
+                or existing.source != "yfinance"
+            ):
+                existing.close = bar.close
+                existing.adj_close = bar.adj_close
+                existing.source = "yfinance"
+        else:
+            existing = BenchmarkPrice(
+                symbol=SPY_SYMBOL,
+                date=bar.day,
+                close=bar.close,
+                adj_close=bar.adj_close,
+                source="yfinance",
+            )
+            db.add(existing)
+            # Un dia duplicado en la misma tanda actualiza el pendiente,
+            # como hacia el SELECT por barra con autoflush.
+            existing_by_day[bar.day] = existing
         written += 1
     db.commit()
     latest = db.scalar(
