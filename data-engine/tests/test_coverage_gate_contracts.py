@@ -622,3 +622,14 @@ def test_skip_guard_funciona_con_junit_con_namespace(tmp_path):
         encoding="utf-8",
     )
     assert gate.skipped_guard_failures(junit) == ["tests.test_queue_watchdog::t"]
+
+
+def test_los_ficheros_vigilados_por_el_guard_existen_y_siguen_pudiendo_saltar():
+    """SKIP_GUARD_FILES es hardcodeada: si un fichero se renombra o deja de
+    tener skips opt-in, la red vigila un fantasma y nadie avisa."""
+    for rel in gate.SKIP_GUARD_FILES:
+        path = ENGINE_ROOT / rel
+        assert path.is_file(), f"fichero vigilado inexistente (renombrado?): {rel}"
+        assert "importorskip(" in path.read_text(encoding="utf-8"), (
+            f"{rel} ya no tiene skips opt-in: sacarlo de SKIP_GUARD_FILES a proposito"
+        )
