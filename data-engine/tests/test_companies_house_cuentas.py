@@ -9,7 +9,8 @@ excepcion, fail closed por documento).
 
 NO prueba (declarado): la API real, el contenido real de los documentos, ni la
 cache de cuentas escaneadas (attach_scanned_figures va doblada con un spy en el
-test del PDF, que ademas demuestra que NO se llama cuando no hay PDF).
+test del formato no legible -un CSV-, que demuestra que NO se llama cuando el
+documento no es un PDF).
 """
 
 from __future__ import annotations
