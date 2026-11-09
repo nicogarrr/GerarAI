@@ -877,8 +877,10 @@ class _FakeSECDedupeDei:
 
 
 def test_refresh_from_sec_dei_no_duplica_el_saldo_us_gaap(db, monkeypatch):
-    """El concepto us-gaap ya informo el mismo saldo con el mismo end (mismo
-    filing): la fila de portada DEI no se duplica; queda una sola, la FY."""
+    """El concepto us-gaap ya informo el mismo saldo con el mismo end: la
+    fila de portada DEI no se duplica; queda una sola, la FY. El dedupe es
+    por `end` (los accessions de los fixtures difieren a proposito: no se
+    prueba identidad de filing)."""
     monkeypatch.setattr(ingestion, "SECClient", _FakeSECDedupeDei)
     company = _company(db)
     result = asyncio.run(
@@ -889,3 +891,37 @@ def test_refresh_from_sec_dei_no_duplica_el_saldo_us_gaap(db, monkeypatch):
     assert len(shares) == 1
     assert shares[0].period == "2025-12-31:FY"
     assert shares[0].value == Decimal("100")
+
+
+class _FakeSECDedupeValoresDistintos(_FakeSECDedupeDei):
+    """Mismo end pero saldo DEI distinto del us-gaap (recast de portada)."""
+
+    payload = {"cik": 1, "facts": {
+        "us-gaap": {
+            "CommonStockSharesOutstanding": {"units": {"shares": [
+                {"fy": 2025, "fp": "FY", "form": "10-K",
+                 "end": "2025-12-31", "val": 100, "filed": "2026-02-10",
+                 "accn": "0000000001-25-000001"},
+            ]}},
+        },
+        "dei": {
+            "EntityCommonStockSharesOutstanding": {"units": {"shares": [
+                {"form": "10-K", "end": "2025-12-31", "val": 105,
+                 "filed": "2026-02-10", "accn": _DEDUPE_ACCN},
+            ]}},
+        },
+    }}
+
+
+def test_refresh_from_sec_dedupe_mismo_end_gana_el_us_gaap(db, monkeypatch):
+    """Con el mismo end y valores DISTINTOS la seleccion tambien es por end:
+    la fila DEI no entra y el valor persistido es el del concepto us-gaap."""
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECDedupeValoresDistintos)
+    company = _company(db)
+    result = asyncio.run(
+        FinancialIngestionService().refresh_from_sec(db=db, company=company)
+    )
+    assert result["status"] == "ingested"
+    (shares,) = _facts(db, company, "shares_outstanding")
+    assert shares.period == "2025-12-31:FY"
+    assert shares.value == Decimal("100")
