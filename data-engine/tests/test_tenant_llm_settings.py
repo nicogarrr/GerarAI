@@ -110,8 +110,14 @@ def test_two_tenants_keep_distinct_configs_and_rows() -> None:
             api_key="sk-tenant-b-2222",
         )
         db.info.pop("tenant_id", None)
+        # Recuento acotado a los tenants del propio test: los tests hermanos
+        # (factorias, caps, endpoints) hacen commit contra la BD de sesion y
+        # no borran sus filas; en orden aleatorio (pytest-randomly) corren
+        # antes e inflaban un recuento global de la tabla.
         rows = db.scalars(
-            select(TenantLLMSettings).execution_options(include_all_tenants=True)
+            select(TenantLLMSettings)
+            .where(TenantLLMSettings.tenant_id.in_([tenant_a.id, tenant_b.id]))
+            .execution_options(include_all_tenants=True)
         ).all()
         assert len(rows) == 2
         assert len({row.api_key_ciphertext for row in rows}) == 2
