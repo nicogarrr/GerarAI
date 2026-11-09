@@ -42,3 +42,34 @@ for (const [file, titleKey, descriptionKey] of pages) {
     assert.ok(src.includes("from '@/lib/i18n/metadata';"), 'falta el import del helper');
   });
 }
+
+const pages2: Array<[string, string, string]> = [
+  ['app/(auth)/cuenta-pendiente/layout.tsx', 'auth.pendingAccount.metaTitle', 'auth.pendingAccount.metaDescription'],
+  ['app/(auth)/sign-in/layout.tsx', 'auth.signIn.metaTitle', 'auth.signIn.metaDescription'],
+  ['app/(auth)/sign-up/layout.tsx', 'auth.signUp.metaTitle', 'auth.signUp.metaDescription'],
+  ['app/(root)/corporate-actions/page.tsx', 'corporateActions.meta.title', 'corporateActions.meta.description'],
+  ['app/(root)/export/page.tsx', 'export.meta.title', 'export.meta.description'],
+  ['app/(root)/risk/page.tsx', 'risk.meta.title', 'risk.meta.description'],
+  ['app/(root)/search/page.tsx', 'search.title', 'search.metadataDescription'],
+];
+
+for (const [file, titleKey, descriptionKey] of pages2) {
+  test(file + ' usa el helper con sus claves', () => {
+    const src = readFileSync(file, 'utf8');
+    const start = src.indexOf('generateMetadata');
+    assert.ok(start >= 0, 'generateMetadata ausente');
+    const block = src.slice(start, start + 220);
+    assert.ok(
+      block.includes('return i18nPageMetadata(\'' + titleKey + '\', \'' + descriptionKey + '\');'),
+      'la pagina no llama al helper con sus claves',
+    );
+    assert.ok(!block.includes('{ title: t('), 'queda el objeto inline');
+    assert.ok(src.includes("from '@/lib/i18n/metadata';"), 'falta el import del helper');
+  });
+}
+
+test('los layouts de auth ya no importan getT sin usarlo', () => {
+  for (const file of ['app/(auth)/cuenta-pendiente/layout.tsx', 'app/(auth)/sign-in/layout.tsx', 'app/(auth)/sign-up/layout.tsx']) {
+    assert.ok(!readFileSync(file, 'utf8').includes('getT'), file + ' conserva getT');
+  }
+});

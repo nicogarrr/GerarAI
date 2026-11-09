@@ -1,14 +1,10 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
-import { getT } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
-  return {
-    title: t('auth.pendingAccount.metaTitle'),
-    description: t('auth.pendingAccount.metaDescription'),
-  };
+    return i18nPageMetadata('auth.pendingAccount.metaTitle', 'auth.pendingAccount.metaDescription');
 }
 
 export default function CuentaPendienteLayout({ children }: { children: ReactNode }) {
