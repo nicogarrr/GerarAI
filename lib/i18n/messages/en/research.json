@@ -2035,6 +2035,7 @@
     "marketData": "Market data",
     "marketCap": "Market cap",
     "marketCapDiluted": "With diluted shares (no shares outstanding figure)",
+    "marketCapAdr": "1 ADR = {ratio} ordinary shares: market cap = price × shares / {ratio}",
     "range52w": "52-week range",
     "avgVolume": "Average volume",
     "avgVolumeNote": "Average of {n} sessions",

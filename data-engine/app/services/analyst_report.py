@@ -35,6 +35,7 @@ from app.services.holding_nav import latest_published_nav
 from app.services.split_adjustment import split_events_by_company
 from app.services.ttm_service import _is_segment, _period_end, compute_company_ttm
 from app.valuation.currency import normalize_currency
+from app.valuation.engines.base import adr_ratio as company_adr_ratio
 
 REPORT_VERSION = "analyst-report-v1"
 AVG_VOLUME_SESSIONS = 63  # ~3 meses de sesiones
@@ -161,8 +162,14 @@ def build_market(
     price_currency: str | None,
     volumes: list[int],
     points: dict[str, Any],
+    adr_ratio: float | None = None,
 ) -> dict:
-    """Bloque de datos de mercado. ``points`` = TtmValue de acciones, caja y deuda."""
+    """Bloque de datos de mercado. ``points`` = TtmValue de acciones, caja y deuda.
+
+    ``adr_ratio`` = acciones ordinarias por ADR (``adr_ratio`` del motor de valoración).
+    Si el precio es de un ADR, las acciones del filing son ordinarias: capitalización =
+    precio × acciones / ratio (TSM: 1 ADR = 5 ordinarias; sin el ratio salía ×5).
+    """
 
     def point(metric: str) -> dict | None:
         item = points.get(metric)
@@ -181,10 +188,11 @@ def build_market(
     market_cap_basis = None
     if price is not None and price > 0:
         major_price = price / price_divisor
+        per_listed = adr_ratio if adr_ratio is not None and adr_ratio > 0 else 1.0
         if shares and shares["value"] and shares["value"] > 0:
-            market_cap, market_cap_basis = float(major_price) * shares["value"], "shares_outstanding"
+            market_cap, market_cap_basis = float(major_price) * shares["value"] / per_listed, "shares_outstanding"
         elif diluted and diluted["value"] and diluted["value"] > 0:
-            market_cap, market_cap_basis = float(major_price) * diluted["value"], "shares_diluted"
+            market_cap, market_cap_basis = float(major_price) * diluted["value"] / per_listed, "shares_diluted"
     enterprise_value = None
     ev_reason = None
     if market_cap is None:
@@ -210,6 +218,7 @@ def build_market(
         "shares_diluted": diluted,
         "market_cap": market_cap,
         "market_cap_basis": market_cap_basis,
+        "market_cap_adr_ratio": adr_ratio if market_cap is not None and adr_ratio is not None and adr_ratio > 0 else None,
         "market_cap_currency": major_currency,
         "enterprise_value_currency": major_currency,
         "cash": cash,
@@ -277,6 +286,7 @@ def build_company_report(db: Session, company: Company, *, today: date | None = 
             price_currency=currency,
             volumes=volumes,
             points=points,
+            adr_ratio=company_adr_ratio(company),
         ),
         "estimates": build_estimates(_fact_rows(flow, getattr(company, "cik", None))),
         # Holdings (p. ej. Georgia Capital): NAV por acción que publica la propia

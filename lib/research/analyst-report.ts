@@ -33,6 +33,8 @@ export type AnalystReportData = {
     market_cap_currency?: string | null;
     enterprise_value_currency?: string | null;
     market_cap_basis: 'shares_outstanding' | 'shares_diluted' | null;
+    /** Acciones ordinarias por ADR cuando el precio es de un ADR (capitalización = precio × acciones / ratio). */
+    market_cap_adr_ratio?: number | null;
     cash: ReportPoint;
     total_debt: ReportPoint;
     enterprise_value: number | null;

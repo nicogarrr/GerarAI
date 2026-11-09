@@ -198,3 +198,13 @@ describe('cifras reales con enlace al filing', () => {
     expect(links.some((a) => a.getAttribute('href') === row.revenue?.url)).toBe(true);
   });
 });
+
+describe('capitalización de un ADR', () => {
+  it('con ratio de ADR la nota explica la conversión de acciones ordinarias', () => {
+    const report = data.report!;
+    view('es', { report: { ...report, market: { ...report.market, market_cap_basis: 'shares_outstanding', market_cap_adr_ratio: 5 } } });
+    const market = screen.getByTestId('informe-market');
+    expect(market.textContent).toContain('1 ADR = 5 acciones ordinarias');
+    expect(market.textContent).not.toContain('Con acciones diluidas');
+  });
+});
