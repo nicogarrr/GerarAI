@@ -91,6 +91,7 @@ describe('irLinksFor', () => {
         ['CB', '2026-10-20', 'investors.chubb.com'],
         ['CPT', '2026-11-05', 'camdenliving.com'],
         ['BABA', '2026-11-19', 'alibabagroup.com'],
+        ['UBER', '2026-11-04', 'investor.uber.com'],
     ])('el evento T3 2026 de %s enlaza solo en su dia exacto', (ticker, date, host) => {
         const exact = irLinksFor(ticker, date);
         expect(exact?.eventPage?.period).toBe('T3 2026');

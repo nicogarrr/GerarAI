@@ -180,7 +180,9 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     UBER: {
         name: 'Uber Technologies',
         section: { url: 'https://investor.uber.com/news-events/', labelKey: 'eventsAndPresentations' },
-        events: [],
+        events: [
+            { date: '2026-11-04', period: 'T3 2026', url: 'https://investor.uber.com/news-events/news/press-release-details/2026/Uber-Announces-Results-for-Third-Quarter-2026/default.aspx' },
+        ],
         verifiedOn: '2026-11-09',
     },
     RKLB: {
