@@ -64,3 +64,37 @@ def test_eps_loss_or_missing_anchor_stays_without_estimate() -> None:
 def test_without_operating_cells_eps_behaves_as_before() -> None:
     eps = build_cells("eps", _series("eps", {"2024-12-31:FY": 4.0, "2025-12-31:FY": 5.0}), today=TODAY)
     assert all(c.published is None for c in eps.values())
+
+
+def test_q4_eps_derived_from_year_minus_nine_months() -> None:
+    # bpa_4t_año_menos_9m v1: el 10-K no da el BPA del 4T; 4T ≈ año − 9M, marcado aproximado.
+    vals = {"2024-12-31:FY": 4.0, "2025-12-31:FY": 5.0, "2025-03-31:Q1": 1.2, "2025-06-30:Q2": 1.2,
+            "2025-09-30:Q3": 1.25}
+    eps, oi_cells = _cells(vals)
+    q4 = eps["q4_2026"]
+    assert q4.published is not None and q4.published.source == "modelo"
+    oi_q4_prev = _oi_quarters()["2025-12-31:Q4"]
+    assert abs(q4.published.mid - 1.35 * oi_cells["q4_2026"].published.mid / oi_q4_prev) < 1e-9
+    assert "q4_2025 derivado" in q4.published.formula and "aproximado" in q4.published.formula
+    kinds = [c["kind"] for c in q4.published.citations]
+    assert "dato_derivado" in kinds
+
+
+def test_q4_eps_not_derived_when_inconsistent() -> None:
+    from app.services.own_consensus import derived_q4_eps
+    oi = _series("operating_income", _oi_quarters())
+    # división de acciones no reexpresada en los 10-Q: el 9M supera al año → sin estimación
+    split = _series("eps", {"2025-12-31:FY": 5.0, "2025-03-31:Q1": 2.4, "2025-06-30:Q2": 2.4,
+                            "2025-09-30:Q3": 2.5})
+    assert derived_q4_eps("q4_2025", split, oi) is None
+    # peso del 4T muy distinto al del beneficio operativo (×2 o más) → sin estimación
+    odd = _series("eps", {"2025-12-31:FY": 5.0, "2025-03-31:Q1": 0.4, "2025-06-30:Q2": 0.4,
+                          "2025-09-30:Q3": 0.4})
+    assert derived_q4_eps("q4_2025", odd, oi) is None
+    # falta un trimestre → sin estimación
+    gap = _series("eps", {"2025-12-31:FY": 5.0, "2025-03-31:Q1": 1.2, "2025-09-30:Q3": 1.25})
+    assert derived_q4_eps("q4_2025", gap, oi) is None
+    ok = _series("eps", {"2025-12-31:FY": 5.0, "2025-03-31:Q1": 1.2, "2025-06-30:Q2": 1.2,
+                         "2025-09-30:Q3": 1.25})
+    d = derived_q4_eps("q4_2025", ok, oi)
+    assert d is not None and d.derived and abs(d.value - 1.35) < 1e-9
