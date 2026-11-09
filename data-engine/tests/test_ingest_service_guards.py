@@ -791,3 +791,101 @@ def test_refresh_from_sec_plan_b_no_se_dispara_si_ya_esta(db, monkeypatch):
     assert _PLANB_LLAMADAS["n"] == 0
     (revenue,) = _facts(db, company, "revenue")
     assert revenue.value == Decimal("9000000000")
+
+
+# --------------------------------------------------------------------------
+# Flujo trimestral SEC: trimestre directo (10-Q) etiquetado con la moda de
+# cierre y Q derivado de acumulados YTD. Y dedupe DEI vs us-gaap con el
+# mismo end. NO prueba: bancos, alias fusionados, ni el cap de 12 trimestres.
+# --------------------------------------------------------------------------
+
+
+class _FakeSECQuarterly:
+    payload = {"cik": 1, "facts": {"us-gaap": {
+        "Revenues": {"units": {"USD": [
+            {"fy": 2026, "fp": "Q1", "form": "10-Q", "start": "2026-01-01",
+             "end": "2026-03-31", "val": 1000, "filed": "2026-04-25",
+             "accn": "0000000001-26-000010"},
+            {"fy": 2026, "fp": "Q2", "form": "10-Q", "start": "2026-01-01",
+             "end": "2026-06-30", "val": 2500, "filed": "2026-07-25",
+             "accn": "0000000001-26-000011"},
+        ]}}}}}
+
+    async def cik_for_ticker(self, ticker):
+        return "0000000001"
+
+    async def company_facts(self, cik):
+        return self.payload
+
+    async def annual_report_anchors(self, cik):
+        return {"0000000001-25-000001": "2025-12-31"}
+
+
+def test_refresh_from_sec_trimestre_directo_y_derivado_de_ytd(db, monkeypatch):
+    """Q1 directo de 10-Q queda '2026-03-31:Q1' (reportado, moda dic); Q2 no
+    presentado se deriva del acumulado H1 - Q1 (1500) con is_reported False y
+    el filed del acumulado mas reciente."""
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECQuarterly)
+    company = _company(db)
+    result = asyncio.run(
+        FinancialIngestionService().refresh_from_sec(db=db, company=company)
+    )
+    assert result["status"] == "ingested"
+    revenues = {f.period: f for f in _facts(db, company, "revenue")}
+    q1 = revenues["2026-03-31:Q1"]
+    assert q1.value == Decimal("1000")
+    assert q1.is_reported is True
+    assert q1.fiscal_quarter == "Q1"
+    assert str(q1.filed) == "2026-04-25"
+    q2 = revenues["2026-06-30:Q2"]
+    assert q2.value == Decimal("1500")
+    assert q2.is_reported is False
+    assert str(q2.filed) == "2026-07-25"
+
+
+_DEDUPE_ACCN = "0000000001-26-000020"
+
+
+class _FakeSECDedupeDei:
+    payload = {"cik": 1, "facts": {
+        "us-gaap": {
+            "CommonStockSharesOutstanding": {"units": {"shares": [
+                {"fy": 2025, "fp": "FY", "form": "10-K",
+                 "end": "2025-12-31", "val": 100, "filed": "2026-02-10",
+                 "accn": "0000000001-25-000001"},
+            ]}},
+        },
+        "dei": {
+            "EntityCommonStockSharesOutstanding": {"units": {"shares": [
+                {"form": "10-K", "end": "2025-12-31", "val": 100,
+                 "filed": "2026-02-10", "accn": _DEDUPE_ACCN},
+            ]}},
+        },
+    }}
+
+    async def cik_for_ticker(self, ticker):
+        return "0000000001"
+
+    async def company_facts(self, cik):
+        return self.payload
+
+    async def annual_report_anchors(self, cik):
+        return {"0000000001-25-000001": "2025-12-31"}
+
+    async def index_accessions(self, cik):
+        return {_DEDUPE_ACCN}
+
+
+def test_refresh_from_sec_dei_no_duplica_el_saldo_us_gaap(db, monkeypatch):
+    """El concepto us-gaap ya informo el mismo saldo con el mismo end (mismo
+    filing): la fila de portada DEI no se duplica; queda una sola, la FY."""
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECDedupeDei)
+    company = _company(db)
+    result = asyncio.run(
+        FinancialIngestionService().refresh_from_sec(db=db, company=company)
+    )
+    assert result["status"] == "ingested"
+    shares = _facts(db, company, "shares_outstanding")
+    assert len(shares) == 1
+    assert shares[0].period == "2025-12-31:FY"
+    assert shares[0].value == Decimal("100")
