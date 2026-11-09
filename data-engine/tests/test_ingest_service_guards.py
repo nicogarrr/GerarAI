@@ -685,3 +685,109 @@ def test_refresh_from_sec_payload_cambiado_reingiere(db, monkeypatch):
     assert segundo["facts_imported"] > 0
     (revenue,) = _facts(db, company, "revenue")
     assert revenue.value == Decimal("5200000000")
+
+
+# --------------------------------------------------------------------------
+# Plan B SEC: el ultimo filing anual que companyfacts no trae se lee de su
+# propia instancia XBRL (caso real: 20-F de TSM 2025). XML sintetico con la
+# forma de una instancia EDGAR; submissions doblado. NO prueba: la URL real
+# de EDGAR, instancias con dimensiones ni traduccion de conveniencia.
+# --------------------------------------------------------------------------
+
+
+_PLANB_ACCN = "0000000001-26-000050"
+
+_PLANB_XML = b"""<?xml version="1.0"?>
+<xbrl xmlns="http://www.xbrl.org/2003/instance"
+      xmlns:us-gaap="http://fasb.org/us-gaap/2025"
+      xmlns:iso4217="http://www.xbrl.org/2003/iso4217">
+  <context id="c1">
+    <entity><identifier scheme="http://www.sec.gov/CIK">0000000001</identifier></entity>
+    <period><startDate>2025-01-01</startDate><endDate>2025-12-31</endDate></period>
+  </context>
+  <unit id="u1"><measure>iso4217:USD</measure></unit>
+  <us-gaap:Revenues contextRef="c1" unitRef="u1">9000000000</us-gaap:Revenues>
+</xbrl>
+"""
+
+
+# Contador compartido (sin sombra por subclase): los tests lo resetean con
+# monkeypatch.setitem, que restaura el valor al terminar.
+_PLANB_LLAMADAS = {"n": 0}
+
+
+class _FakeSECPlanB:
+    """companyfacts no trae el 10-K de 2025 (sin hechos us-gaap); submissions
+    lo lista con XBRL y la instancia se sirve doblada."""
+
+    async def cik_for_ticker(self, ticker):
+        return "0000000001"
+
+    async def company_facts(self, cik):
+        return {"cik": 1, "facts": {"us-gaap": {}}}
+
+    async def annual_report_anchors(self, cik):
+        return {_PLANB_ACCN: "2025-12-31"}
+
+    async def submissions(self, cik):
+        return {"filings": {"recent": {
+            "form": ["10-K"],
+            "accessionNumber": [_PLANB_ACCN],
+            "filingDate": ["2026-02-10"],
+            "reportDate": ["2025-12-31"],
+            "primaryDocument": ["acme-20251231.htm"],
+            "isXBRL": [1],
+        }}}
+
+    async def filing_document(self, url):
+        _PLANB_LLAMADAS["n"] += 1
+        return _PLANB_XML, "application/xml"
+
+
+def test_refresh_from_sec_plan_b_lee_la_instancia_del_filing(db, monkeypatch):
+    """El 10-K ausente de companyfacts se lee de su instancia XBRL: el
+    revenue FY entra con valor y filed exactos y la procedencia queda en
+    los metadatos del documento."""
+    from app.models import Document
+
+    monkeypatch.setitem(_PLANB_LLAMADAS, "n", 0)
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECPlanB)
+    company = _company(db)
+    result = asyncio.run(
+        FinancialIngestionService().refresh_from_sec(db=db, company=company)
+    )
+    assert result["status"] == "ingested"
+    assert _PLANB_LLAMADAS["n"] == 1
+    (revenue,) = _facts(db, company, "revenue")
+    assert revenue.value == Decimal("9000000000")
+    assert revenue.period == "2025-12-31:FY"
+    assert str(revenue.filed) == "2026-02-10"
+    document = db.get(Document, result["source_document_id"])
+    instancia = (document.metadata_ or {}).get("sec_filing_instance")
+    assert instancia["accession"] == _PLANB_ACCN
+    assert instancia["facts_added"] == 1
+
+
+class _FakeSECPlanBInnecesario(_FakeSECPlanB):
+    """companyfacts YA trae el unico filing anual: Plan B no se dispara."""
+
+    async def company_facts(self, cik):
+        return {"cik": 1, "facts": {"us-gaap": {
+            "Revenues": {"units": {"USD": [
+                {"fy": 2025, "fp": "FY", "form": "10-K", "start": "2025-01-01",
+                 "end": "2025-12-31", "val": 9000000000, "filed": "2026-02-10",
+                 "accn": _PLANB_ACCN},
+            ]}}}}}
+
+
+def test_refresh_from_sec_plan_b_no_se_dispara_si_ya_esta(db, monkeypatch):
+    monkeypatch.setitem(_PLANB_LLAMADAS, "n", 0)
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECPlanBInnecesario)
+    company = _company(db)
+    result = asyncio.run(
+        FinancialIngestionService().refresh_from_sec(db=db, company=company)
+    )
+    assert result["status"] == "ingested"
+    assert _PLANB_LLAMADAS["n"] == 0
+    (revenue,) = _facts(db, company, "revenue")
+    assert revenue.value == Decimal("9000000000")
