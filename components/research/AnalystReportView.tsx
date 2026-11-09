@@ -99,7 +99,7 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
         <h2 className={H2} id="informe-mercado">{t('research.informe.marketData')}</h2>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm" data-testid="informe-market">
           <Item label={t('research.informe.price')} value={money(price, priceCurrency)} />
-          <Item label={t('research.informe.marketCap')} value={big(market?.market_cap, market?.market_cap_currency)} note={market?.market_cap_basis === 'shares_diluted' ? t('research.informe.marketCapDiluted') : undefined} />
+          <Item label={t('research.informe.marketCap')} value={big(market?.market_cap, market?.market_cap_currency)} note={marketCapNote(t, market)} />
           <Item label={t('research.informe.range52w')} value={r52 ? `${money(r52.low, keyStats?.currency)} – ${money(r52.high, keyStats?.currency)}` : na} />
           <Item label={t('research.informe.avgVolume')} value={count(market?.avg_volume)} note={market?.avg_volume ? t('research.informe.avgVolumeNote', { n: market.avg_volume_sessions }) : undefined} />
           <Item label={t('research.informe.shortVolume')} value={shortRatio == null ? na : fmt.formatPercent(shortRatio, { fromRatio: true, digits: 1 })} note={shortRatio == null ? undefined : t('research.informe.shortVolumeNote')} />
@@ -291,4 +291,11 @@ function ConsensusTable({ t, fmt, big, rows, unit }: { t: T; fmt: Formatters; bi
       <p className="mt-1 text-xs text-gray-500">{t('research.informe.consensusNote')}</p>
     </div>
   );
+}
+
+function marketCapNote(t: T, market: NonNullable<ReportInputs['report']>['market'] | undefined): string | undefined {
+  const notes: string[] = [];
+  if (market?.market_cap_basis === 'shares_diluted') notes.push(t('research.informe.marketCapDiluted'));
+  if (market?.market_cap != null && market.market_cap_adr_ratio) notes.push(t('research.informe.marketCapAdr', { ratio: market.market_cap_adr_ratio }));
+  return notes.length ? notes.join(' · ') : undefined;
 }

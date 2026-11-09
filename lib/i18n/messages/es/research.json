@@ -2035,6 +2035,7 @@
     "marketData": "Datos de mercado",
     "marketCap": "Capitalización",
     "marketCapDiluted": "Con acciones diluidas (no hay dato de acciones en circulación)",
+    "marketCapAdr": "1 ADR = {ratio} acciones ordinarias: capitalización = precio × acciones / {ratio}",
     "range52w": "Rango 52 semanas",
     "avgVolume": "Volumen medio",
     "avgVolumeNote": "Media de {n} sesiones",

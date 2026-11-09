@@ -241,3 +241,21 @@ def test_each_actual_links_to_its_filing(db):
     cell = build_company_report(db, company, today=date(2026, 8, 1))["estimates"]["annual"][0]["revenue"]
     assert cell["url"] == ("https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/"
                            "0000320193-25-000079-index.htm")
+
+def test_adr_market_cap_uses_ordinary_shares_per_adr(db):
+    # El filing da acciones ordinarias y el precio es del ADR: capitalización =
+    # precio × acciones / ratio (etiqueta adr:5 del motor de valoración).
+    company = _company(db, "ADRX")
+    company.factor_tags = ["adr:5"]
+    _prices(db, company, [100.0])
+    _fact(db, company, "shares_outstanding", "2026-09-30:Q3", 500 * M, "Q3")
+    db.commit()
+    market = build_company_report(db, company, today=date(2026, 11, 8))["market"]
+    assert market["market_cap"] == pytest.approx(100.0 * 500 * M / 5)
+    assert market["market_cap_adr_ratio"] == 5
+    plain = _company(db, "PLAIN")
+    _prices(db, plain, [100.0])
+    _fact(db, plain, "shares_outstanding", "2026-09-30:Q3", 500 * M, "Q3")
+    db.commit()
+    market = build_company_report(db, plain, today=date(2026, 11, 8))["market"]
+    assert market["market_cap"] == pytest.approx(100.0 * 500 * M) and market["market_cap_adr_ratio"] is None
