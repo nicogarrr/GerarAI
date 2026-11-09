@@ -40,7 +40,7 @@ describe('#2969 corporate actions regression', () => {
   it('does not request sync status when visible actions exist', async () => {
     const html = renderToStaticMarkup(await CorporatePage({ searchParams: Promise.resolve({ticker: 'AAPL'}) }));
     expect(mocks.status).not.toHaveBeenCalled();
-    expect(html).toContain('1 eventos');
+    expect(html).toMatch(/1 evento(?!s)/); // singular tras #4877 (header.countOne); '1 eventos' contiene '1 evento' como subcadena
   });
 });
 
