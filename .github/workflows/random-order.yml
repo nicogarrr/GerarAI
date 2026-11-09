@@ -9,7 +9,8 @@ name: Orden aleatorio (pytest-randomly)
 # solos (router_contracts /api/news sin tablas, ticker_news_lane con un fake
 # que no devolvia bytes, tenant_llm_settings contando filas de otros tests).
 #
-# Si falla: el log imprime `Using --randomly-seed=N`. Reproduce en local con
+# Si falla: el paso "Suite en orden aleatorio" imprime `pytest-randomly seed: N`
+# (con -q el plugin no llega a imprimir su cabecera). Reproduce en local con
 #   python -m pytest -p randomly --randomly-seed=N <tests que fallan>
 # o lanza este workflow a mano con ese seed.
 
@@ -42,6 +43,10 @@ jobs:
       DATABASE_URL: sqlite:///./cavaai_random.db
       CAVAAI_ENABLE_VECTOR_INGEST: "0"
       CAVAAI_ENABLE_VECTOR_CHAT: "0"
+      # Redis del job declarado desechable: sin este opt-in el conftest no
+      # reasigna DB por worker ni limpia coalesce/leases/pacers/breakers y el
+      # estado se fuga entre tests en orden aleatorio (rojo cronico del job).
+      TEST_REDIS_EPHEMERAL: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -65,8 +70,12 @@ jobs:
           SEED: ${{ github.event.inputs.seed }}
         run: |
           set -o pipefail
-          SEED_ARG=""
-          if [ -n "$SEED" ]; then SEED_ARG="--randomly-seed=$SEED"; fi
+          # Seed siempre conocida y reproducible: con -q pytest-randomly no
+          # imprime "Using --randomly-seed=N", asi que la generamos aqui cuando
+          # no viene del input y queda registrada en el log.
+          SEED="${SEED:-$((RANDOM * 32768 + RANDOM))}"
+          echo "pytest-randomly seed: $SEED"
+          SEED_ARG="--randomly-seed=$SEED"
           # test_divisa_base::test_fiscalidad_en_eur...: rojo conocido en main
           # (criterio DGT de #2581 vs ese test de #2376), pendiente de Nico.
           # Quitar el --deselect cuando se decida.
