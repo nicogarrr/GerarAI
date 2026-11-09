@@ -29,7 +29,7 @@ import app.services.document_ingestion_service as dis
 from app.models.entities import Base, Company, Document, DocumentChunk
 from app.services.document_ingestion_service import DocumentIngestionService
 
-TENANT = "tenant-test"
+TENANT = 1  # int >= 1: el contrato de evidencia exige tenant ligado (evidence_contract.py:282)
 SEC_URL = "https://www.sec.gov/Archives/edgar/data/320193/0001/aapl-20250329.htm"
 TEXTO = b"Contenido del documento con texto suficiente para superar el minimo. " * 2
 
@@ -159,10 +159,11 @@ def test_ficha_stub_se_completa_con_la_ingesta_real(db):
         DocumentChunk.document_id == stub_id)).all()
     assert len(chunks) == resultado["chunks"] > 0
     assert all("Contenido del documento" in chunk.text for chunk in chunks)
-    assert all("evidence_source_id" in chunk.metadata_ for chunk in chunks)
     contrato = completada.metadata_["evidence_contract"]
-    assert all(chunk.metadata_["evidence_source_id"] == contrato.get("source_id")
+    assert contrato.get("source_id")  # no vacio: la igualdad siguiente no es None==None
+    assert all(chunk.metadata_.get("evidence_source_id") == contrato["source_id"]
                for chunk in chunks)
+    assert all(chunk.metadata_.get("evidence_chunk_id") for chunk in chunks)
 
 
 def test_filing_intelligence_caido_no_disfraza_la_ingesta(db, monkeypatch):

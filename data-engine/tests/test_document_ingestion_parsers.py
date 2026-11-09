@@ -206,8 +206,12 @@ def test_chunker_linea_larga_sin_espacios_y_respeto_de_parraros():
     for chunk in chunks:
         for linea in chunk["text"].splitlines():
             assert len(linea) <= 100
-    unido = " ".join(c["text"] for c in chunks).replace(" ", "")
-    assert "x" * 120 in unido  # el token sin espacios no pierde letras
+    # Equivalencia de todo el texto: quitando blancos, la union de los chunks
+    # es exactamente la entrada (el corte no pierde ni reordena caracteres).
+    entrada = "cabecera" + "palabra " * 30 + "x" * 120
+    unido = "".join(c["text"] for c in chunks)
+    sin_blancos = lambda t: "".join(t.split())
+    assert sin_blancos(unido) == sin_blancos(entrada)
 
 
 def test_chunker_flush_al_superar_el_maximo_con_bloques_pequenos():
