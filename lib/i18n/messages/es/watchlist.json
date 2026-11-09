@@ -195,7 +195,7 @@
     "failed": "No se pudo añadir a la watchlist",
     "title": "Añadir a la watchlist",
     "description": "Busca por símbolo o empresa y añádela a tu seguimiento.",
-    "placeholder": "Buscar acciones (p. ej. SAN o Santander)",
+    "placeholder": "Buscar por símbolo o empresa",
     "searchLabel": "Buscar acciones para añadir a la watchlist",
     "notListed": "¿No aparece en la lista?",
     "bySymbol": "Añadir «{symbol}» por su símbolo",
