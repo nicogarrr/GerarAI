@@ -164,8 +164,46 @@ def test_offline_sql_coherent_no_duplicate_live_columns(tmp_path: Path) -> None:
     assert sql.count("ADD COLUMN close_kind") == 1
     assert sql.count("ADD COLUMN live_price") == 1
     assert sql.count("CREATE TABLE migration_added_columns") == 1
-    # El downgrade offline emite los DROP y la bajada del registro.
+    # El downgrade offline emite los DROP de columna y limpia SU registro,
+    # pero nunca borra la tabla compartida (esta en Base.metadata).
     result = _alembic(url, "downgrade", "0132_dca_state_live_price:0131_documents_ingest_idx", "--sql")
     assert result.returncode == 0, result.stderr
     assert "DROP COLUMN close_kind" in result.stdout
-    assert "DROP TABLE migration_added_columns" in result.stdout
+    assert "DELETE FROM migration_added_columns" in result.stdout
+    assert "DROP TABLE migration_added_columns" not in result.stdout
+
+
+def test_migration_added_columns_matches_base_metadata(tmp_path: Path) -> None:
+    """La tabla de registro esta en Base.metadata con el MISMO esquema que
+    crea la cadena de migraciones: si faltara o difiriese, el ratchet de
+    deriva (compare_metadata sobre el Postgres de CI) la marcaria como
+    remove_table nueva, y create_all divergiria de la cadena Alembic."""
+    import sqlalchemy as sa
+
+    from app.models.entities import Base
+
+    table = Base.metadata.tables.get("migration_added_columns")
+    assert table is not None, "migration_added_columns debe estar en Base.metadata"
+    # Esquema exacto que crea 0132 (y que create_all debe reproducir).
+    expected = {"revision": 64, "table_name": 128, "column_name": 128}
+    for name, length in expected.items():
+        col = table.columns[name]
+        assert isinstance(col.type, sa.String) and col.type.length == length
+        assert col.primary_key and not col.nullable
+    added = table.columns["added_at"]
+    assert isinstance(added.type, sa.DateTime) and added.type.timezone is True
+    assert not added.nullable and added.server_default is not None
+    assert len(table.columns) == 4
+    # Y la cadena fresca migrada a head crea la misma tabla con la misma PK.
+    url = f"sqlite:///{(tmp_path / 'meta.db').as_posix()}"
+    result = _alembic(url, "upgrade", "head")
+    assert result.returncode == 0, result.stderr
+    engine = create_engine(url)
+    try:
+        reflected = sa.Table("migration_added_columns", sa.MetaData(), autoload_with=engine)
+    finally:
+        engine.dispose()
+    assert {c.name for c in reflected.columns} == {c.name for c in table.columns}
+    assert {c.name for c in reflected.primary_key.columns} == set(expected)
+    for col in table.columns:
+        assert str(reflected.columns[col.name].type) == str(col.type)

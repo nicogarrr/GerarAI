@@ -24,6 +24,7 @@ from sqlalchemy import (
     UniqueConstraint,
     desc,
     event,
+    func,
     text,
 )
 from sqlalchemy.ext.compiler import compiles
@@ -214,6 +215,28 @@ class DcaAlertOverride(TenantOwnedMixin, Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     symbol: Mapped[str] = mapped_column(String(20), index=True)
     min_level: Mapped[int] = mapped_column(Integer)
+
+
+class MigrationAddedColumn(Base):
+    """Registro de que columna añadio que migracion a que tabla.
+
+    Infraestructura de migraciones (la escribe 0132 y las futuras que la
+    necesiten): el downgrade de cada revision borra SOLO las columnas que
+    registro aqui, en vez de inferir propiedad. Vive en Base.metadata para
+    que una base arrancada con ``create_all`` tenga exactamente el mismo
+    esquema que una migrada por Alembic (ratchet de deriva de
+    tests/test_alembic_chain.py); las migraciones la crean solo si falta y
+    ninguna la borra en downgrade: es compartida entre revisiones.
+    """
+
+    __tablename__ = "migration_added_columns"
+
+    revision: Mapped[str] = mapped_column(String(64), primary_key=True)
+    table_name: Mapped[str] = mapped_column(String(128), primary_key=True)
+    column_name: Mapped[str] = mapped_column(String(128), primary_key=True)
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class EarningsDate(Base, TimestampMixin):
