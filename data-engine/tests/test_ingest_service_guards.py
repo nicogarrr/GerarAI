@@ -587,3 +587,101 @@ def test_refresh_from_sec_filer_ifrs_ingiere_con_mapa_ifrs(db, monkeypatch):
     (revenue,) = _facts(db, company, "revenue")
     assert revenue.value == Decimal("7000000000")
     assert revenue.period == "2025-12-31:FY"
+
+
+# --------------------------------------------------------------------------
+# Carril DEI (acciones en circulacion de portada) verificado contra el indice
+# de filings. NO prueba: multi-clase por dimension (va por otro carril),
+# formularios /A, ni el dedupe contra shares us-gaap con el mismo end.
+# --------------------------------------------------------------------------
+
+
+_DEI_ACCN = "0000000001-25-000009"
+
+
+class _FakeSECConDei:
+    payload = {"cik": 1, "facts": {"us-gaap": {}, "dei": {
+        "EntityCommonStockSharesOutstanding": {"units": {"shares": [
+            {"form": "10-Q", "end": "2025-10-24", "val": 15200000000,
+             "filed": "2025-10-31", "accn": _DEI_ACCN},
+        ]}}}}}
+
+    async def cik_for_ticker(self, ticker):
+        return "0000000001"
+
+    async def company_facts(self, cik):
+        return self.payload
+
+    async def annual_report_anchors(self, cik):
+        return {}
+
+    async def index_accessions(self, cik):
+        return {_DEI_ACCN}
+
+
+def test_refresh_from_sec_dei_verificado_entra_como_instante(db, monkeypatch):
+    """Saldo de portada cuyo accn SI lista el indice: entra como
+    shares_outstanding con periodo :DEI, sin anclaje fiscal (fiscal_year y
+    fiscal_quarter NULL), con su filed exacto y el accession de procedencia."""
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECConDei)
+    company = _company(db)
+    result = asyncio.run(
+        FinancialIngestionService().refresh_from_sec(db=db, company=company)
+    )
+    assert result["status"] == "ingested"
+    (fact,) = _facts(db, company, "shares_outstanding")
+    assert fact.value == Decimal("15200000000")
+    assert fact.period == "2025-10-24:DEI"
+    assert fact.fiscal_year is None
+    assert fact.fiscal_quarter is None
+    assert fact.accession_number == _DEI_ACCN
+    assert str(fact.filed) == "2025-10-31"
+
+
+class _FakeSECDeiSinIndice(_FakeSECConDei):
+    async def index_accessions(self, cik):
+        raise ConnectionError("indice caido")
+
+
+def test_refresh_from_sec_dei_sin_indice_fail_closed(db, monkeypatch):
+    """Indice caido -> None -> NINGUN hecho de portada entra (regla de oro:
+    OFICIAL solo si el indice lo verifica). El resto del refresh sigue."""
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECDeiSinIndice)
+    company = _company(db)
+    result = asyncio.run(
+        FinancialIngestionService().refresh_from_sec(db=db, company=company)
+    )
+    assert result["status"] == "ingested"
+    assert _facts(db, company, "shares_outstanding") == []
+
+
+class _FakeSECPayloadCambiado(_FakeSECEstable):
+    """Mismo emisor, restatement: el valor anual cambia entre corridas."""
+
+    valor = 5000000000
+
+    async def company_facts(self, cik):
+        payload = {"cik": 1, "facts": {"us-gaap": {
+            "Revenues": {"units": {"USD": [
+                {"fy": 2025, "fp": "FY", "form": "10-K", "start": "2025-01-01",
+                 "end": "2025-12-31", "val": self.valor, "filed": "2026-02-10",
+                 "accn": "0000000001-25-000001"},
+            ]}}}}}
+        return payload
+
+
+def test_refresh_from_sec_payload_cambiado_reingiere(db, monkeypatch):
+    """Un payload DISTINTO no sale por el atajo unchanged: reingiere y el
+    restatement machaca la cifra vieja (una sola fila, valor nuevo)."""
+    monkeypatch.setattr(ingestion, "SECClient", _FakeSECPayloadCambiado)
+    company = _company(db)
+    servicio = FinancialIngestionService()
+    primero = asyncio.run(servicio.refresh_from_sec(db=db, company=company))
+    assert primero["status"] == "ingested"
+    # via monkeypatch: la clase queda restaurada al terminar el test.
+    monkeypatch.setattr(_FakeSECPayloadCambiado, "valor", 5200000000)
+    segundo = asyncio.run(servicio.refresh_from_sec(db=db, company=company))
+    assert segundo["status"] == "ingested"
+    assert segundo["facts_imported"] > 0
+    (revenue,) = _facts(db, company, "revenue")
+    assert revenue.value == Decimal("5200000000")
