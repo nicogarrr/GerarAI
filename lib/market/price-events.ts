@@ -136,6 +136,20 @@ export function markerSize(count: number, wide: boolean): number {
     return wide ? 1 : 0.6;
 }
 
+/**
+ * Más allá de ~1.500 barras (≈6 años diarios; el rango Máx supera las 11.000)
+ * los marcadores de eventos se funden en una banda continua que tapa la línea
+ * de precio: con 34 barras por píxel ya no hay nada que leer encima de cada
+ * barra. En esos tramos el gráfico va limpio y los eventos se consultan en la
+ * lista «Eventos del período», que sigue mostrándolos todos. Hasta 5A
+ * (1.256 barras) los marcadores siguen siendo legibles y se conservan.
+ */
+export const MARKERS_MAX_BARS = 1500;
+
+export function markersForBars<T>(markers: T[], barCount: number): T[] {
+    return barCount > MARKERS_MAX_BARS ? [] : markers;
+}
+
 /** Velas desde la primera compra (incluida). */
 export function barsSince<T extends { date: string }>(bars: T[], firstDate: string | null | undefined): T[] {
     if (!firstDate) return bars;
