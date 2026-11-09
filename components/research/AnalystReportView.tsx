@@ -194,7 +194,8 @@ function evReason(t: T, reason: string | null | undefined): string | undefined {
 
 function cellText(cell: ReportCell, big: (v: number | null | undefined, unit?: string | null) => string): string {
   if (!cell || cell.value == null) return '—';
-  const marks = `${cell.derived_q4 ? '¹' : ''}${cell.basis === 'source_ebitda' ? '²' : ''}`;
+  const derived = cell.basis === 'pretax_less_net_finance_result_plus_da' || cell.basis === 'pretax_plus_finance_costs_plus_da';
+  const marks = `${cell.derived_q4 ? '¹' : ''}${cell.basis === 'source_ebitda' ? '²' : ''}${derived ? '³' : ''}`;
   return `${big(cell.value, cell.unit)}${marks}`;
 }
 

@@ -208,3 +208,16 @@ describe('capitalización de un ADR', () => {
     expect(market.textContent).not.toContain('Con acciones diluidas');
   });
 });
+
+describe('EBITDA derivado de emisores IFRS', () => {
+  it('sin resultado operativo etiquetado, el EBITDA por componentes lleva ³ y su nota', () => {
+    const report = (data.report ? JSON.parse(JSON.stringify(data.report)) : null) as ReportInputs['report'];
+    const row = report?.estimates.annual.at(-1);
+    if (!report || !row) throw new Error('fixture sin ejercicios');
+    row.ebitda = { value: 23459e6, unit: 'USD', source: 'SEC', reported: false, basis: 'pretax_less_net_finance_result_plus_da', derived_q4: false, url: null };
+    view('es', { report });
+    const annual = screen.getByRole('region', { name: /Por ejercicio/ });
+    expect(annual.textContent).toContain('³');
+    expect(document.body.textContent).toContain('beneficio antes de impuestos − resultado financiero neto + amortizaciones');
+  });
+});

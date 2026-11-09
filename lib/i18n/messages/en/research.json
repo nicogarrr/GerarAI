@@ -2059,7 +2059,7 @@
     "ebitda": "EBITDA",
     "fyHead": "FY {date}",
     "noActuals": "no stored figures",
-    "actualsNote": "Actuals from the filings (SEC/ESEF) stored in GerarAI. EBITDA = operating income + D&A. ¹ Derived Q4: fiscal year − Q1 − Q2 − Q3. ² EBITDA as given by the source. Each figure links to its filing.",
+    "actualsNote": "Actuals from the filings (SEC/ESEF) stored in GerarAI. EBITDA = operating income + D&A. ¹ Derived Q4: fiscal year − Q1 − Q2 − Q3. ² EBITDA as given by the source. ³ No operating profit tagged (IFRS): profit before tax − net finance result + D&A. Each figure links to its filing.",
     "userEstimates": "Your estimates",
     "userEstimatesBy": "{author}'s estimates",
     "userEstimatesLine": "{year}E: revenue {revenue}, EBITDA {ebitda} (sum of your sum-of-the-parts)",

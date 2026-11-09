@@ -10,7 +10,11 @@ Junta lo que ya guarda GerarAI, sin inventar nada:
   (solo si deuda y caja son del MISMO cierre y su divisa es la del precio).
 * **Cifras reales**: ingresos y EBITDA por ejercicio y trimestre. EBITDA =
   resultado operativo + amortizaciones del mismo periodo (SEC/ESEF); si falta
-  alguno, el EBITDA que traiga la fuente (FMP...) con su nombre; si no, vacío.
+  alguno, el EBITDA que traiga la fuente (FMP...) con su nombre; si tampoco hay,
+  y el emisor no etiqueta resultado operativo (IFRS: CNQ, Airbus), el EBITDA por
+  componentes de la valoración (:mod:`app.valuation.ebitda_components`), solo con el
+  resultado financiero neto etiquetado: beneficio antes de impuestos − resultado
+  financiero neto + amortizaciones, marcado como derivado; si no, vacío.
   Un Q4 que no se presenta se deriva como FY − Q1 − Q2 − Q3 y se marca.
 
 Las estimaciones del usuario NO salen de aquí: viven en su desglose por partes
@@ -35,6 +39,8 @@ from app.services.holding_nav import latest_published_nav
 from app.services.split_adjustment import split_events_by_company
 from app.services.ttm_service import _is_segment, _period_end, compute_company_ttm
 from app.valuation.currency import normalize_currency
+from app.valuation.ebitda_components import DERIVED as EBITDA_DERIVED
+from app.valuation.ebitda_components import ebitda_from_components, pretax_income
 from app.valuation.engines.base import adr_ratio as company_adr_ratio
 
 REPORT_VERSION = "analyst-report-v1"
@@ -43,6 +49,8 @@ ANNUAL_PERIODS = 4
 QUARTER_PERIODS = 6
 _QUARTERS = ("Q1", "Q2", "Q3", "Q4")
 FLOW_METRICS = ("revenue", "operating_income", "depreciation_amortization", "ebitda")
+# Componentes del EBITDA derivado (sin resultado operativo etiquetado); no abren periodos por sí solos.
+EBITDA_COMPONENT_METRICS = ("income_before_tax", "net_income_total", "income_tax_expense", "finance_income_cost")
 _POINT_METRICS = ("shares_outstanding", "shares_diluted", "cash_and_equivalents", "total_debt")
 
 
@@ -116,7 +124,8 @@ def _derive_q4(best: dict[tuple[str, str, date], FactRow], metric: str) -> None:
         )
 
 
-def _ebitda(best: dict[tuple[str, str, date], FactRow], kind: str, end: date) -> dict | None:
+def _ebitda(best: dict[tuple[str, str, date], FactRow], kind: str, end: date, *,
+            derive: bool = True) -> dict | None:
     op = best.get(("operating_income", kind, end))
     da = best.get(("depreciation_amortization", kind, end))
     if op is not None and da is not None and op.unit == da.unit:
@@ -129,13 +138,62 @@ def _ebitda(best: dict[tuple[str, str, date], FactRow], kind: str, end: date) ->
             "derived_q4": op.derived or da.derived,
             "url": op.url,
         }
-    return _cell(best.get(("ebitda", kind, end)), basis="source_ebitda")
+    source = _cell(best.get(("ebitda", kind, end)), basis="source_ebitda")
+    if source is not None or not derive or op is not None or da is None:
+        return source
+    return _ebitda_from_components(best, kind, end, da)
 
 
-def build_estimates(rows: list[FactRow], *, annual: int = ANNUAL_PERIODS, quarters: int = QUARTER_PERIODS) -> dict:
-    """Ingresos y EBITDA reales por ejercicio (últimos ``annual``) y trimestre (últimos ``quarters``)."""
+def _ebitda_from_components(best: dict[tuple[str, str, date], FactRow], kind: str, end: date,
+                            da: FactRow) -> dict | None:
+    """Sin resultado operativo etiquetado (IFRS): beneficio antes de impuestos − resultado financiero neto + D&A.
+
+    La fórmula de la valoración (:func:`app.valuation.ebitda_components.ebitda_from_components`), pero SOLO con el
+    resultado financiero NETO etiquetado (``FinanceIncomeCost``): «antes de impuestos + gastos financieros» mete
+    ingresos y otros resultados no operativos (en US GAAP, p. ej., el valor razonable de warrants) y aquí se
+    presentaría como cifra real. Todo en la MISMA unidad y cierre; si no, ``None``.
+    """
+    parts = {m: best.get((m, kind, end)) for m in EBITDA_COMPONENT_METRICS}
+    finance = parts["finance_income_cost"]
+    if finance is None:
+        return None
+    pretax_metrics = (("income_before_tax",) if parts["income_before_tax"] is not None
+                      else ("net_income_total", "income_tax_expense"))
+    rows = [da, finance, *(parts[m] for m in pretax_metrics)]
+    if any(row is None or row.unit != da.unit for row in rows):
+        return None
+
+    def val(metric: str) -> float | None:
+        row = parts[metric]
+        return None if row is None else float(row.value)
+
+    pretax = pretax_income(income_before_tax=val("income_before_tax"), profit_loss=val("net_income_total"),
+                           income_tax_expense=val("income_tax_expense"))
+    value, basis = ebitda_from_components(
+        operating_income=None, depreciation_amortization=float(da.value), income_before_tax=pretax,
+        net_finance_result=float(finance.value))
+    if value is None or basis not in EBITDA_DERIVED:
+        return None
+    anchor = parts[pretax_metrics[0]] or da
+    return {
+        "value": value,
+        "unit": da.unit,
+        "source": anchor.source,
+        "reported": False,
+        "basis": basis,
+        "derived_q4": any(row is not None and row.derived for row in rows),
+        "url": anchor.url,
+    }
+
+
+def build_estimates(rows: list[FactRow], *, annual: int = ANNUAL_PERIODS, quarters: int = QUARTER_PERIODS,
+                    derive_ebitda: bool = True) -> dict:
+    """Ingresos y EBITDA reales por ejercicio (últimos ``annual``) y trimestre (últimos ``quarters``).
+
+    ``derive_ebitda=False`` (bancos y aseguradoras): sin EBITDA por componentes, sus intereses son operativos.
+    """
     best = best_rows(rows)
-    for metric in FLOW_METRICS:
+    for metric in FLOW_METRICS + EBITDA_COMPONENT_METRICS:
         _derive_q4(best, metric)
 
     def periods(kind: str, limit: int) -> list[dict[str, Any]]:
@@ -146,7 +204,7 @@ def build_estimates(rows: list[FactRow], *, annual: int = ANNUAL_PERIODS, quarte
             if kind == "Q":
                 quarter = next((best[(m, "Q", end)].quarter for m in FLOW_METRICS if (m, "Q", end) in best), "Q")
             revenue = _cell(best.get(("revenue", kind, end)))
-            ebitda = _ebitda(best, kind, end)
+            ebitda = _ebitda(best, kind, end, derive=derive_ebitda)
             if revenue is None and ebitda is None:
                 continue
             out.append({"period_end": end, "fiscal_quarter": quarter, "revenue": revenue, "ebitda": ebitda})
@@ -252,16 +310,32 @@ def _fact_rows(facts: list[FinancialFact], cik: str | None = None) -> list[FactR
     return rows
 
 
+_LENDER_INSURER_SIC = (range(6000, 6200), range(6300, 6500))
+_LENDER_INSURER_WORDS = ("bank", "banco", "insurance", "insurer", "aseguradora", "seguros", "reinsurance")
+
+
+def interest_is_operating(company: Company) -> bool:
+    """Bancos y aseguradoras: sus intereses y resultados financieros son el negocio, no hay EBITDA por componentes."""
+    sic = getattr(company, "sic_code", None) or getattr(company, "sic", None)
+    try:
+        if sic is not None and any(int(sic) in band for band in _LENDER_INSURER_SIC):
+            return True
+    except (TypeError, ValueError):
+        pass
+    text = " ".join(str(getattr(company, a, "") or "") for a in ("sector", "industry", "company_type")).lower()
+    return any(word in text for word in _LENDER_INSURER_WORDS)
+
+
 def build_company_report(db: Session, company: Company, *, today: date | None = None) -> dict:
     """Respuesta de ``GET /api/companies/{ticker}/analyst-report``."""
     today = today or date.today()
     facts = list(db.scalars(
         select(FinancialFact)
         .where(FinancialFact.company_id == company.id,
-               FinancialFact.metric.in_(FLOW_METRICS + _POINT_METRICS))
+               FinancialFact.metric.in_(FLOW_METRICS + EBITDA_COMPONENT_METRICS + _POINT_METRICS))
         .options(selectinload(FinancialFact.source))
     ).all())
-    flow = [fact for fact in facts if fact.metric in FLOW_METRICS]
+    flow = [fact for fact in facts if fact.metric in FLOW_METRICS + EBITDA_COMPONENT_METRICS]
     points = compute_company_ttm(
         [fact for fact in facts if fact.metric in _POINT_METRICS],
         split_events_by_company(db, [company.id]).get(company.id, []),
@@ -288,7 +362,8 @@ def build_company_report(db: Session, company: Company, *, today: date | None = 
             points=points,
             adr_ratio=company_adr_ratio(company),
         ),
-        "estimates": build_estimates(_fact_rows(flow, getattr(company, "cik", None))),
+        "estimates": build_estimates(_fact_rows(flow, getattr(company, "cik", None)),
+                                     derive_ebitda=not interest_is_operating(company)),
         # Holdings (p. ej. Georgia Capital): NAV por acción que publica la propia
         # empresa en sus resultados (NSM / web de inversores) y descuento del
         # precio sobre él, con documento, fecha y cita.
@@ -302,7 +377,10 @@ def build_company_report(db: Session, company: Company, *, today: date | None = 
         ),
         "notes": {
             "avg_volume": f"Media de las últimas {AVG_VOLUME_SESSIONS} sesiones con volumen en nuestros cierres.",
-            "ebitda": "EBITDA = resultado operativo + amortizaciones del mismo periodo; si falta, el EBITDA de la fuente.",
+            "ebitda": ("EBITDA = resultado operativo + amortizaciones del mismo periodo; si falta, el EBITDA de la fuente; "
+                       "si el emisor no etiqueta resultado operativo (IFRS), beneficio antes de impuestos − resultado "
+                       "financiero neto + amortizaciones, marcado como derivado. Bancos y aseguradoras sin EBITDA "
+                       "derivado."),
             "q4": "Un Q4 sin 10-Q se deriva como ejercicio − Q1 − Q2 − Q3.",
             "url": "Cada cifra enlaza al filing del que sale (índice EDGAR por número de acceso o el documento ESEF).",
             "user_estimates": "Las estimaciones del usuario salen de su desglose por partes y su tesis, etiquetadas como suyas.",
