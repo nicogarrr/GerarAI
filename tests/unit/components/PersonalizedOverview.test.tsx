@@ -1,5 +1,18 @@
+import { GlobalBrain } from '@/components/brain/GlobalBrain';
+import { markBrainReady, OPEN_BRAIN_PENDING_KEY } from '@/lib/brain/open-brain';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// El shell real consume el handoff; el panel de chat tiene su suite propia.
+vi.mock('@/components/brain/GlobalBrainPanel', () => ({
+    GlobalBrainPanel: ({ openDetail }: { openDetail: { seq: number } | null }) =>
+        <div role="dialog" aria-label="Cerebro de prueba" data-open-seq={openDetail?.seq} />,
+}));
+
+afterEach(() => {
+    markBrainReady(false);
+    window.sessionStorage.removeItem(OPEN_BRAIN_PENDING_KEY);
+});
 
 vi.mock('@/components/HomeAttention', () => ({ default: () => <div>Atención aislada</div> }));
 
@@ -79,6 +92,8 @@ async function renderHome(props: Partial<React.ComponentProps<typeof Personalize
 }
 
 beforeEach(() => {
+    markBrainReady(false);
+    window.sessionStorage.removeItem(OPEN_BRAIN_PENDING_KEY);
     [getPortfolioSummary, getUserAlerts, getRecentTriggeredAlerts, getHomeWatchlistPreview, getHomeOpportunities, getHoldingSignals].forEach((m) => m.mockReset());
 });
 
@@ -114,13 +129,14 @@ describe('PersonalizedOverview', () => {
         expect(screen.getByRole('link', { name: /Ver\s*empresas a la watchlist/ })).toHaveAttribute('href', '/watchlist');
     });
 
-    it('primeros pasos: singular, sin watchlist y botón que abre el Cerebro', async () => {
+    it.each([true, false])('primeros pasos: singular, sin watchlist y apertura del Cerebro (ready=%s)', async (ready) => {
+        markBrainReady(ready);
         setup({ watch: { unavailable: false, total: 1, items: [watch('AAPL')] } });
         const { unmount } = await renderHome();
         expect(screen.getByText('Hecho: sigues 1 empresa.')).toBeInTheDocument();
         unmount();
         setup();
-        await renderHome();
+        const entry = await renderHome();
         expect(screen.getByText(/Añádelas a la watchlist/)).toBeInTheDocument();
         // «Añadir» abre directamente el alta en destino, sin un segundo clic.
         expect(screen.getByRole('link', { name: /Añadir\s*empresas a la watchlist/ })).toHaveAttribute('href', '/watchlist?anadir=1');
@@ -128,7 +144,18 @@ describe('PersonalizedOverview', () => {
         const listener = vi.fn();
         window.addEventListener('gerarai:open-brain', listener);
         fireEvent.click(screen.getByRole('button', { name: /Abrir\s*el Cerebro/ }));
-        expect(listener).toHaveBeenCalledTimes(1);
+        expect(listener).toHaveBeenCalledTimes(ready ? 1 : 0);
+        expect(window.sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBe(ready ? null : 'null');
+        if (!ready) {
+            entry.unmount();
+            const brain = render(<GlobalBrain userId="u1" />);
+            expect(await screen.findByRole('dialog', { name: 'Cerebro de prueba' })).toHaveAttribute('data-open-seq', '1');
+            expect(window.sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBeNull();
+            expect(listener).not.toHaveBeenCalled();
+            brain.unmount();
+            render(<GlobalBrain userId="u1" />);
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        }
         window.removeEventListener('gerarai:open-brain', listener);
     });
 
