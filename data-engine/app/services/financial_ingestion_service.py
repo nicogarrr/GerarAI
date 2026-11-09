@@ -291,7 +291,10 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 #    una N/D por fallo de descarga (BX 10-K 2025: FRE N/D → 5.737,5 M$; DE N/D → 7.882,2 M$).
 # 19 (9-nov-2026): FRE/DE totales sin XBRL desde una tabla anual del HTML del MISMO informe anual
 #    (filing_html_tables; BN 40-F 2025: DE N/D → 6.008 M$, FRE N/D → 2.995 M$).
-SEC_INGESTION_RULES_VERSION = 19
+# 20 (9-nov-2026): IFRS (20-F/40-F) sin DepreciationAndAmortisationExpense: el ajuste del estado de flujos
+#    (AdjustmentsForDepreciationAndAmortisationExpense) y, si tampoco, DepreciationExpense + AmortisationExpense del
+#    MISMO filing y periodo (TSM 20-F 2024: 653.610,5 + 9.186,1 = 662.796,6 M TWD; antes N/D y EBITDA «—»).
+SEC_INGESTION_RULES_VERSION = 20
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Arrendadores (REIT): su ingreso principal es el del arrendamiento (ASC 842),
@@ -466,7 +469,10 @@ SEC_IFRS_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("short_term_investments", ["ShorttermDepositsNotClassifiedAsCashEquivalents"],                     "USD"),
     ("operating_cash_flow", ["CashFlowsFromUsedInOperatingActivities"],                                "USD"),
     ("capital_expenditure", ["PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"],    "USD"),
-    ("depreciation_amortization", ["DepreciationAndAmortisationExpense"],                              "USD"),
+    # Sin el total en la cuenta de resultados, el ajuste del estado de flujos (CNQ, BN lo etiquetan) y, detrás,
+    # depreciación + amortización del MISMO filing (regla 20, with_derived_ifrs_depreciation_amortisation; TSM).
+    ("depreciation_amortization", ["DepreciationAndAmortisationExpense",
+                                   "AdjustmentsForDepreciationAndAmortisationExpense"],               "USD"),
     ("dividends_paid",    ["DividendsPaidClassifiedAsFinancingActivities", "DividendsPaid"],          "USD"),
     ("acquisitions",      ["CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities"], "USD"),
     ("common_stock_repurchased", ["PaymentsToAcquireOrRedeemEntitysShares"],                            "USD"),
@@ -808,7 +814,60 @@ def with_derived_operating_lease_total(
     return out_facts, out_map
 
 
-SYNTHETIC_CONCEPTS = frozenset({DERIVED_SHORT_TERM_INVESTMENTS, DERIVED_OPERATING_LEASE_TOTAL})
+#: Concepto sintético (no existe en la taxonomía): amortizaciones totales IFRS = depreciación + amortización.
+DERIVED_IFRS_DA = "DepreciationExpensePlusAmortisationExpense"
+_IFRS_DA_TOTALS = ("DepreciationAndAmortisationExpense", "AdjustmentsForDepreciationAndAmortisationExpense")
+_IFRS_DEPRECIATION = "DepreciationExpense"
+_IFRS_AMORTISATION = "AmortisationExpense"
+
+
+def with_derived_ifrs_depreciation_amortisation(
+    facts: dict[str, Any], metric_map: list[tuple[str, list[str], str]],
+) -> tuple[dict[str, Any], list[tuple[str, list[str], str]]]:
+    """Amortizaciones IFRS = ``DepreciationExpense`` + ``AmortisationExpense`` del MISMO filing (regla 20).
+
+    Hay emisores IFRS que presentan a la SEC sin el total ``DepreciationAndAmortisationExpense`` ni el ajuste del
+    estado de flujos: solo las dos partes de la nota de gastos por naturaleza (TSM 20-F 2024: depreciación
+    653.610,5 + amortización 9.186,1 M TWD). Sin amortizaciones el EBITDA salía «—». Regla general y conservadora:
+
+    - solo con los DOS hechos en el MISMO filing (``accn``), periodo (``start``–``end``) y unidad, ambos ≥ 0;
+    - solo para periodos sin un total presentado (cualquiera de :data:`_IFRS_DA_TOTALS` gana siempre);
+    - sin una de las dos partes no se suma nada (N/D como hasta ahora).
+
+    Devuelve una copia superficial con :data:`DERIVED_IFRS_DA` y el mapa con ese concepto al FINAL de la lista de
+    ``depreciation_amortization`` (detrás de los totales). Puro.
+    """
+    if not any(m == "depreciation_amortization" and _IFRS_DA_TOTALS[0] in cs for m, cs, _u in metric_map):
+        return facts, metric_map
+    if _IFRS_DEPRECIATION not in facts or _IFRS_AMORTISATION not in facts:
+        return facts, metric_map
+    covered = {(str(e.get("start")), str(e.get("end")))
+               for concept in _IFRS_DA_TOTALS
+               for entries in (((facts.get(concept) or {}).get("units") or {}).values())
+               for e in entries if isinstance(e, dict)}
+    derived: dict[str, list[dict[str, Any]]] = {}
+    for unit, depreciation in ((facts[_IFRS_DEPRECIATION] or {}).get("units") or {}).items():
+        amortisation = {(e.get("accn"), e.get("start"), e.get("end")): e
+                        for e in ((facts[_IFRS_AMORTISATION] or {}).get("units") or {}).get(unit, [])
+                        if isinstance(e, dict) and e.get("start")}
+        for e in depreciation:
+            if not isinstance(e, dict) or not e.get("start") or (str(e.get("start")), str(e.get("end"))) in covered:
+                continue
+            am = amortisation.get((e.get("accn"), e.get("start"), e.get("end")))
+            dep, amv = _decimal(e.get("val")), _decimal(am.get("val")) if am else None
+            if dep is None or amv is None or dep < 0 or amv < 0:
+                continue
+            derived.setdefault(unit, []).append({**e, "val": float(dep + amv), "_derived_from": (
+                f"{_IFRS_DEPRECIATION} {dep} + {_IFRS_AMORTISATION} {amv} (mismo filing {e.get('accn')})")})
+    if not derived:
+        return facts, metric_map
+    out_facts = {**facts, DERIVED_IFRS_DA: {"units": derived}}
+    out_map = [(m, [*cs, DERIVED_IFRS_DA] if m == "depreciation_amortization" and DERIVED_IFRS_DA not in cs
+                else list(cs), u) for m, cs, u in metric_map]
+    return out_facts, out_map
+
+
+SYNTHETIC_CONCEPTS = frozenset({DERIVED_SHORT_TERM_INVESTMENTS, DERIVED_OPERATING_LEASE_TOTAL, DERIVED_IFRS_DA})
 
 
 def _synthetic(entry: dict[str, Any]) -> bool:
@@ -2335,6 +2394,8 @@ class FinancialIngestionService:
         us_gaap, metric_map = with_derived_short_term_investments(us_gaap, metric_map)
         # Arrendamiento operativo total de los 10-Q que solo etiquetan no corriente + corriente (regla 17).
         us_gaap, metric_map = with_derived_operating_lease_total(us_gaap, metric_map)
+        # Amortizaciones IFRS como depreciación + amortización del mismo filing (regla 20).
+        us_gaap, metric_map = with_derived_ifrs_depreciation_amortisation(us_gaap, metric_map)
         # Divisa de reporte del filer (10-K: USD; 20-F en US GAAP: CNY, TWD...).
         # Cada hecho monetario se guarda con ELLA como unidad.
         reporting_currency = _sec_reporting_currency(us_gaap)

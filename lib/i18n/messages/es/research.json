@@ -2059,7 +2059,7 @@
     "ebitda": "EBITDA",
     "fyHead": "Ej. {date}",
     "noActuals": "sin cifras guardadas",
-    "actualsNote": "Reales de los filings (SEC/ESEF) guardados en GerarAI. EBITDA = resultado operativo + amortizaciones. ¹ Q4 derivado: ejercicio − Q1 − Q2 − Q3. ² EBITDA que da la fuente. Cada cifra enlaza a su filing.",
+    "actualsNote": "Reales de los filings (SEC/ESEF) guardados en GerarAI. EBITDA = resultado operativo + amortizaciones. ¹ Q4 derivado: ejercicio − Q1 − Q2 − Q3. ² EBITDA que da la fuente. ³ Sin resultado operativo etiquetado (IFRS): beneficio antes de impuestos − resultado financiero neto + amortizaciones. Cada cifra enlaza a su filing.",
     "userEstimates": "Tus estimaciones",
     "userEstimatesBy": "Estimaciones de {author}",
     "userEstimatesLine": "{year}E: ingresos {revenue}, EBITDA {ebitda} (suma de tu desglose por partes)",
