@@ -6,16 +6,13 @@ import { MethodologyDisclosure } from '@/components/ui/methodology-disclosure';
 import { getRiskDashboard, type RiskDashboardRecord } from '@/lib/actions/risk.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getT } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
-    const t = await getT();
-    return {
-        title: t('risk.meta.title'),
-        description: t('risk.meta.description'),
-    };
+    return i18nPageMetadata('risk.meta.title', 'risk.meta.description');
 }
 
 export default async function RiskPage() {

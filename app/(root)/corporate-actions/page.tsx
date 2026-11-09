@@ -6,17 +6,14 @@ import BackendOffline from '@/components/system/BackendOffline';
 import { getCorporateActions, getCorporateActionsSyncStatus, type CorporateActionRecord } from '@/lib/actions/corporate-actions.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getT, getFormat } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 import { corporateActionsEmptyMessage } from '@/lib/research/corporate-actions-empty';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
-    const t = await getT();
-    return {
-        title: t('corporateActions.meta.title'),
-        description: t('corporateActions.meta.description'),
-    };
+    return i18nPageMetadata('corporateActions.meta.title', 'corporateActions.meta.description');
 }
 
 type PageProps = { searchParams: Promise<{ ticker?: string }> };

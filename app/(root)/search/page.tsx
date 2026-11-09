@@ -13,16 +13,13 @@ import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { formatDate, formatNumber, formatPercent } from '@/lib/format';
 import { entityTypeDisplay, evidenceStatusDisplay, sourceDisplay, sourceTierDisplay } from '@/lib/research/source-display';
 import { getLocale, getT } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
-  return {
-    title: t('search.title'),
-    description: t('search.metadataDescription'),
-  };
+    return i18nPageMetadata('search.title', 'search.metadataDescription');
 }
 
 type PageProps = {

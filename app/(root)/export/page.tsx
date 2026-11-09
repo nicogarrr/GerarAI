@@ -2,16 +2,13 @@ import type { Metadata } from 'next';
 import ExportView from '@/components/export/ExportView';
 import ObsidianVaultCard from '@/components/export/ObsidianVaultCard';
 import { getT } from '@/lib/i18n/server';
+import { i18nPageMetadata } from '@/lib/i18n/metadata';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
-    const t = await getT();
-    return {
-        title: t('export.meta.title'),
-        description: t('export.meta.description'),
-    };
+    return i18nPageMetadata('export.meta.title', 'export.meta.description');
 }
 
 export default async function ExportPage() {
