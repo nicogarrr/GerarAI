@@ -146,8 +146,14 @@ def send_email(
         if not targets or not smtp_host_configured(settings):
             return _result("not_configured", "SMTP sin configurar")
     host = str(settings.smtp_host).strip()
-    port = int(settings.smtp_port)
-    timeout = float(settings.smtp_timeout_seconds)
+    try:
+        port = int(settings.smtp_port)
+        timeout = float(settings.smtp_timeout_seconds)
+    except (TypeError, ValueError) as exc:
+        # Config malformada (una env con texto en SMTP_PORT o el timeout):
+        # el docstring promete no lanzar, y reintentar no sanea la config,
+        # asi que se clasifica como failed, como la autenticacion.
+        return _result("failed", f"SMTP config invalida: {type(exc).__name__}: {exc}")
     use_ssl = bool(settings.smtp_ssl)
     message = build_message(settings, content, to=None if to is None else targets)
     session_started = False

@@ -227,3 +227,34 @@ def test_email_falls_back_to_webhook_when_smtp_unset(db):
     deliveries = NotificationService().dispatch(db, alert)
     assert deliveries["email"]["status"] == "not_configured"
     assert "No webhook configured" in deliveries["email"]["error"]
+
+
+def test_malformed_port_is_classified_failed_never_raised():
+    """SMTP_PORT con texto: el contrato es "no lanza, clasifica". Config rota
+    no se sanea reintentando -> failed, como la autenticacion."""
+    result = send_email(_settings(smtp_port="587garbage"), _content())
+    assert result["status"] == "failed"
+    assert "ValueError" in result["error"]
+    assert "587garbage" in result["error"]
+
+
+def test_none_port_is_classified_failed_never_raised():
+    result = send_email(_settings(smtp_port=None), _content())
+    assert result["status"] == "failed"
+    assert "TypeError" in result["error"]
+
+
+def test_malformed_timeout_is_classified_failed_never_raised():
+    result = send_email(_settings(smtp_timeout_seconds="cinco"), _content())
+    assert result["status"] == "failed"
+    assert "ValueError" in result["error"]
+
+
+def test_malformed_config_never_touches_the_network():
+    """Clasificar la config rota no puede abrir sesion SMTP."""
+    FakeSMTP.instances = []
+    result = send_email(
+        _settings(smtp_port="587garbage"), _content(), smtp_factory=FakeSMTP
+    )
+    assert result["status"] == "failed"
+    assert FakeSMTP.instances == []
