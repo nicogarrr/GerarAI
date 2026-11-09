@@ -1,4 +1,5 @@
 'use client';
+import { openBrain } from '@/lib/brain/open-brain';
 
 import { formatNumber as formatNumberFor, isValidCurrencyCode, naFor } from '@/lib/format';
 import {
@@ -157,7 +158,7 @@ function FirstSteps({ watchlistCount }: { watchlistCount: number | null }) {
                     </div>
                     <button
                         type="button"
-                        onClick={() => window.dispatchEvent(new Event('gerarai:open-brain'))}
+                        onClick={() => openBrain()}
                         className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200"
                     >
                         {t('home.steps.open')}<span className="sr-only">{t('home.steps.brainSr')}</span>

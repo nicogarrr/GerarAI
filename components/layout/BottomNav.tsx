@@ -1,4 +1,5 @@
 'use client';
+import { openBrain } from '@/lib/brain/open-brain';
 
 import IntentLink from '@/components/layout/IntentLink';
 import { usePathname } from 'next/navigation';
@@ -36,7 +37,7 @@ export default function BottomNav() {
                                 <button
                                     aria-label={t('brain.openAria')}
                                     className="flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-teal-300 transition-colors hover:text-teal-200"
-                                    onClick={() => window.dispatchEvent(new Event('gerarai:open-brain'))}
+                                    onClick={() => openBrain()}
                                     type="button"
                                 >
                                     <BrainGlassesIcon aria-hidden="true" className="h-5 w-5" />

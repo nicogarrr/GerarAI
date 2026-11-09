@@ -37,14 +37,14 @@ export function markBrainReady(ready: boolean): void {
  * evento; si aún no (carga directa), deja el handoff en sessionStorage, que
  * GlobalBrain recoge al montar. Nunca los dos a la vez: no se abre dos veces.
  */
-export function openBrain(detail: OpenBrainDetail): void {
+export function openBrain(detail?: OpenBrainDetail): void {
     if (typeof window === 'undefined') return;
     if (document.documentElement.hasAttribute(READY_ATTR)) {
         window.dispatchEvent(new CustomEvent<OpenBrainDetail>('gerarai:open-brain', { detail }));
         return;
     }
     try {
-        window.sessionStorage.setItem(OPEN_BRAIN_PENDING_KEY, JSON.stringify(detail));
+        window.sessionStorage.setItem(OPEN_BRAIN_PENDING_KEY, JSON.stringify(detail ?? null));
     } catch {
         // sessionStorage bloqueado: el usuario abre el Cerebro a mano.
     }
