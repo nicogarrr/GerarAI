@@ -1451,13 +1451,21 @@ def _saved_screens_answer(db: Session, tenant: int) -> ChatResponse:
     count = len(screens)
     lines = [f"You have {count} saved screen{'s' if count != 1 else ''}:" if english else
              f"Tienes {count} pantalla{'s' if count != 1 else ''} guardada{'s' if count != 1 else ''} en el screener:"]
-    for screen in screens[:15]:
-        tickers = list(db.scalars(
-            select(Company.ticker).join(SavedScreenMatch, SavedScreenMatch.company_id == Company.id)
-            .where(SavedScreenMatch.tenant_id == tenant, SavedScreenMatch.saved_screen_id == screen.id,
-                   SavedScreenMatch.active.is_(True))
-            .order_by(SavedScreenMatch.id)
-        ).all())
+    # Lote único de coincidencias para todas las pantallas (anti N+1): una
+    # consulta con IN + agrupación en memoria conserva el orden por id de
+    # coincidencia del bucle anterior (1 query por pantalla).
+    shown = screens[:15]
+    tickers_by_screen: dict[int, list[str]] = {screen.id: [] for screen in shown}
+    for screen_id, ticker in db.execute(
+        select(SavedScreenMatch.saved_screen_id, Company.ticker)
+        .join(Company, SavedScreenMatch.company_id == Company.id)
+        .where(SavedScreenMatch.tenant_id == tenant, SavedScreenMatch.saved_screen_id.in_([s.id for s in shown]),
+               SavedScreenMatch.active.is_(True))
+        .order_by(SavedScreenMatch.id)
+    ).all():
+        tickers_by_screen[screen_id].append(ticker)
+    for screen in shown:
+        tickers = tickers_by_screen[screen.id]
         n = len(screen.criteria or [])
         if english:
             crit = f"{n} criteri{'a' if n != 1 else 'on'}"
