@@ -4,6 +4,7 @@ import { TrackedAnalysisStatus } from '@/components/common/TrackedAnalysisStatus
 import type { TrackedAnalysisStatus as AnalysisStatus } from '@/lib/tracked-analysis-status';
 import type { Metadata } from 'next';
 import { getFormat, getLocale, getT } from '@/lib/i18n/server';
+import { withTimeoutFallback } from '@/lib/watchlist/with-timeout-fallback';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { getWatchlistState, getWatchlistEntryData, getWatchlistMonitor, type WatchlistEntryData, type WatchlistMonitorItem } from '@/lib/actions/watchlist.actions';
 import { getResearchCompaniesBasics, getResearchCompanyBasics, type ResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
@@ -176,7 +177,12 @@ export default async function WatchlistPage({
             })
             .catch(() => false),
     );
-    const [datedChanges, monitorData, basicsList, notFoundList] = await Promise.all([datedChangesPromise, monitorPromise, Promise.all(basicsPromises), Promise.all(notFoundPromises)]);
+    const [datedChanges, monitorData, basicsList, notFoundList] = await Promise.all([
+        // El respaldo de cierre datado no puede esperar detrás del mismo cuello
+        // que alivia: si /api/market/changes se demora (prod 2026-11-09: 8-9 s por
+        // HTTP), las filas quedan N/D antes de que llegue. Presupuesto propio igual
+        // al del resto de la entrada.
+        withTimeoutFallback(datedChangesPromise, ENTRY_DATA_BUDGET_MS, {}), monitorPromise, Promise.all(basicsPromises), Promise.all(notFoundPromises)]);
     const watchlistStocks: WatchlistStock[] = await Promise.all(
         pageItems.map(async (item, index) => {
             try {
