@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
+from app.core.sql_chunks import sql_in_chunks
 from app.core.tenancy import tenant_filters
 from app.models import Company, FinancialFact, PeerRelationship
 from app.models.entities import InstrumentReference
@@ -333,11 +334,11 @@ class PeerComparisonService:
                 candidate_ref=ref_taxonomy.get(str(row.ticker or "").strip().upper()),
             )
         ]
-        candidates = (
-            list(db.scalars(select(Company).where(Company.id.in_(keep_ids))).all())
-            if keep_ids
-            else []
-        )
+        candidates = [
+            hydrated
+            for chunk in sql_in_chunks(keep_ids)
+            for hydrated in db.scalars(select(Company).where(Company.id.in_(chunk))).all()
+        ]
         # Una sola query de market cap para el target y los candidatos que
         # superan el prefiltro (antes: una por compañía del universo; después:
         # el universo entero en el IN — maestro + stubs + importaciones IBKR).
@@ -625,32 +626,37 @@ class PeerComparisonService:
         """
         if not company_ids:
             return []
-        ranked = (
-            select(
-                FinancialFact.id,
-                func.row_number()
-                .over(
-                    partition_by=FinancialFact.company_id,
-                    order_by=(
-                        FinancialFact.fiscal_year.desc().nullslast(),
-                        desc(FinancialFact.created_at),
-                        desc(FinancialFact.id),
-                    ),
+        # IN troceado: el row_number particiona por compañía, así que un lote
+        # no cambia el ranking de otra; universo grande => varias sentencias.
+        facts: list[FinancialFact] = []
+        for chunk in sql_in_chunks(set(company_ids)):
+            ranked = (
+                select(
+                    FinancialFact.id,
+                    func.row_number()
+                    .over(
+                        partition_by=FinancialFact.company_id,
+                        order_by=(
+                            FinancialFact.fiscal_year.desc().nullslast(),
+                            desc(FinancialFact.created_at),
+                            desc(FinancialFact.id),
+                        ),
+                    )
+                    .label("rank"),
                 )
-                .label("rank"),
+                .where(
+                    FinancialFact.company_id.in_(chunk),
+                    FinancialFact.metric == "market_cap",
+                    *tenant_filters(db, FinancialFact),
+                )
+                .subquery()
             )
-            .where(
-                FinancialFact.company_id.in_(set(company_ids)),
-                FinancialFact.metric == "market_cap",
-                *tenant_filters(db, FinancialFact),
-            )
-            .subquery()
-        )
-        return list(db.scalars(
-            select(FinancialFact)
-            .join(ranked, FinancialFact.id == ranked.c.id)
-            .where(ranked.c.rank == 1)
-        ).all())
+            facts.extend(db.scalars(
+                select(FinancialFact)
+                .join(ranked, FinancialFact.id == ranked.c.id)
+                .where(ranked.c.rank == 1)
+            ).all())
+        return facts
 
     def _latest_market_cap(
         self, db: Session, company_id: int
