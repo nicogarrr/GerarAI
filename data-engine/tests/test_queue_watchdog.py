@@ -163,6 +163,101 @@ def test_detect_stuck_no_alerta_si_decrece_joven_o_sin_previa():
     assert wd.detect_stuck(viejo, {"prices": None}, max_age=900.0, now=now) == []
 
 
+# --- Trabajo en vuelo de workers con heartbeat fresco ------------------------
+
+def _heartbeat(client, worker: str, *, at_ms: float, namespace: str = "dramatiq"):
+    client.zadd(f"{namespace}:__heartbeats__", {worker: at_ms})
+
+
+def test_en_vuelo_suma_workers_con_heartbeat_fresco_sin_cruzar_colas(redis_client):
+    now_ms = NOW.timestamp() * 1000
+    redis_client.sadd("dramatiq:__acks__.w1.yahoo", "a", "b")
+    redis_client.sadd("dramatiq:__acks__.w2.yahoo", "c")
+    redis_client.sadd("dramatiq:__acks__.w1.prices", "z")
+    redis_client.sadd("dramatiq:__acks__.muerto.yahoo", "huerfano")
+    _heartbeat(redis_client, "w1", at_ms=now_ms)
+    _heartbeat(redis_client, "w2", at_ms=now_ms - 30_000)  # fresco (< 60 s)
+    _heartbeat(redis_client, "muerto", at_ms=now_ms - 120_000)  # vencido
+    count = wd._in_flight_count(redis_client, namespace="dramatiq", queue="yahoo", now_ms=now_ms)
+    assert count == 3  # w1 + w2; el ack huerfano del worker muerto NO cuenta
+    assert wd._in_flight_count(redis_client, namespace="dramatiq", queue="prices", now_ms=now_ms) == 1
+    assert wd._in_flight_count(redis_client, namespace="dramatiq", queue="gdelt", now_ms=now_ms) == 0
+
+
+def test_en_vuelo_respeta_el_env_de_timeout_de_heartbeat(redis_client, monkeypatch):
+    now_ms = NOW.timestamp() * 1000
+    redis_client.sadd("dramatiq:__acks__.w1.yahoo", "a")
+    _heartbeat(redis_client, "w1", at_ms=now_ms - 5_000)
+    monkeypatch.setenv("QUEUE_WATCHDOG_WORKER_HEARTBEAT_TIMEOUT_MS", "10000")
+    assert wd._in_flight_count(redis_client, namespace="dramatiq", queue="yahoo", now_ms=now_ms) == 1
+    monkeypatch.setenv("QUEUE_WATCHDOG_WORKER_HEARTBEAT_TIMEOUT_MS", "1000")
+    assert wd._in_flight_count(redis_client, namespace="dramatiq", queue="yahoo", now_ms=now_ms) == 0
+
+
+def test_detect_stuck_no_alerta_con_trabajo_en_vuelo_bajo_el_techo():
+    # Barrido largo en marcha (p. ej. yahoo scope=all, ~34 min medido en prod
+    # el 09-nov-2026): la cabeza ready envejece y la profundidad neta no
+    # decrece, pero hay trabajo en vuelo de un worker con heartbeat fresco y
+    # la cabeza esta bajo el techo duro -> no es atasco.
+    now = time.time()
+    prev = {"yahoo": {"ts": now - 300, "depth": 10.0}}
+    samples = [wd.QueueSample(queue="yahoo", depth=12, ready_age_seconds=1000.0, in_flight=1)]
+    assert wd.detect_stuck(samples, prev, max_age=900.0, now=now) == []
+
+
+def test_detect_stuck_alerta_con_trabajo_en_vuelo_sobre_el_techo():
+    # Cabeza de 5 h con trabajo en vuelo: por encima del techo (4 h) ni el
+    # heartbeat fresco absuelve (posible worker colgado reteniendo acks).
+    now = time.time()
+    prev = {"yahoo": {"ts": now - 300, "depth": 10.0}}
+    samples = [wd.QueueSample(queue="yahoo", depth=12, ready_age_seconds=5 * 3600.0, in_flight=3)]
+    (stuck,) = wd.detect_stuck(samples, prev, max_age=900.0, now=now)
+    assert stuck["queue"] == "yahoo"
+    assert stuck["in_flight"] == 3  # metadata de diagnostico
+
+
+def test_tick_no_marca_atascada_con_trabajo_en_vuelo_fresco(redis_client, monkeypatch):
+    monkeypatch.setenv("QUEUE_WATCHDOG_MAX_SAMPLE_GAP_SECONDS", "3600")
+    _push(redis_client, "yahoo")
+    wd.sample_tick(redis_client, namespace="dramatiq", queues=("yahoo",), now=NOW)
+    now_ms = (NOW + timedelta(seconds=1200)).timestamp() * 1000
+    redis_client.sadd("dramatiq:__acks__.w1.yahoo", "m1")
+    _heartbeat(redis_client, "w1", at_ms=now_ms)
+    result = wd.sample_tick(redis_client, namespace="dramatiq", queues=("yahoo",),
+                            now=NOW + timedelta(seconds=1200))
+    assert result["stuck"] == []
+
+
+def test_tick_marca_atascada_la_misma_cola_sin_trabajo_en_vuelo(redis_client, monkeypatch):
+    # Control: el mismo escenario sin trabajo en vuelo SI se marca atascada.
+    monkeypatch.setenv("QUEUE_WATCHDOG_MAX_SAMPLE_GAP_SECONDS", "3600")
+    _push(redis_client, "yahoo")
+    wd.sample_tick(redis_client, namespace="dramatiq", queues=("yahoo",), now=NOW)
+    result = wd.sample_tick(redis_client, namespace="dramatiq", queues=("yahoo",),
+                            now=NOW + timedelta(seconds=1200))
+    assert [item["queue"] for item in result["stuck"]] == ["yahoo"]
+
+
+def test_tick_marca_atascada_con_ack_huerfano_de_worker_muerto(redis_client, monkeypatch):
+    # Escenario del auditor: worker muerto con acks y sin heartbeat (o con el
+    # vencido) NO absuelve: sus acks huerfanos no cuentan como en vuelo.
+    monkeypatch.setenv("QUEUE_WATCHDOG_MAX_SAMPLE_GAP_SECONDS", "3600")
+    _push(redis_client, "yahoo")
+    wd.sample_tick(redis_client, namespace="dramatiq", queues=("yahoo",), now=NOW)
+    redis_client.sadd("dramatiq:__acks__.muerto.yahoo", "m1", "m2")
+    # Sin entrada en __heartbeats__: el worker ya no existe para el broker.
+    result = wd.sample_tick(redis_client, namespace="dramatiq", queues=("yahoo",),
+                            now=NOW + timedelta(seconds=1200))
+    assert [item["queue"] for item in result["stuck"]] == ["yahoo"]
+    # Con heartbeat vencido (> 60 s), tampoco.
+    redis_client.delete(wd._SAMPLE_PREFIX + "yahoo")
+    wd.sample_tick(redis_client, namespace="dramatiq", queues=("yahoo",), now=NOW)
+    _heartbeat(redis_client, "muerto", at_ms=(NOW + timedelta(seconds=1200)).timestamp() * 1000 - 120_000)
+    result = wd.sample_tick(redis_client, namespace="dramatiq", queues=("yahoo",),
+                            now=NOW + timedelta(seconds=1200))
+    assert [item["queue"] for item in result["stuck"]] == ["yahoo"]
+
+
 # --- Punto 1: una medición por tick aunque el actor corra por tenant ---------
 
 def test_una_medicion_por_tick_los_demas_tenants_reusan(db, redis_client, monkeypatch):

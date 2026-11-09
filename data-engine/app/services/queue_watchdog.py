@@ -86,6 +86,35 @@ def max_age_seconds() -> float:
         return 900.0
 
 
+def hard_max_age_seconds() -> float:
+    """Techo duro de edad de cabeza: ni el trabajo en vuelo lo justifica.
+
+    Por encima se alerta aunque haya trabajo en vuelo de workers con
+    heartbeat fresco (posible worker colgado reteniendo acks). El defecto
+    (4 h) supera con margen el TimeLimit del actor mas largo declarado
+    (refresh_ticker_news, 2 h) mas sus reintentos. Heuristico: la edad
+    medida es la de la cabeza READY y un backlog legitimo podria superar
+    el techo; no es una prueba universal de atasco.
+    """
+    try:
+        return max(300.0, float(os.getenv("QUEUE_WATCHDOG_HARD_MAX_AGE_SECONDS", str(4 * 3600))))
+    except ValueError:
+        return float(4 * 3600)
+
+
+def worker_heartbeat_timeout_ms() -> float:
+    """Ventana de frescura del heartbeat del broker para dar vivo a un worker.
+
+    Mismo concepto que heartbeat_timeout del RedisBroker de dramatiq
+    (DEFAULT_HEARTBEAT_TIMEOUT = 60_000 ms; BoundedRedisBroker no lo
+    sobreescribe): pasada, el mantenimiento del broker reencola sus acks.
+    """
+    try:
+        return max(1000.0, float(os.getenv("QUEUE_WATCHDOG_WORKER_HEARTBEAT_TIMEOUT_MS", "60000")))
+    except ValueError:
+        return 60_000.0
+
+
 def watched_queues(broker: Any = None) -> tuple[str, ...]:
     raw = os.getenv("QUEUE_WATCHDOG_QUEUES")
     if raw:
@@ -111,6 +140,33 @@ class QueueSample:
     queue: str
     depth: int
     ready_age_seconds: float | None  # None: cola vacia; 0: cabeza vista por primera vez
+    in_flight: int = 0  # mensajes fetched-sin-ack en los sets __acks__.<worker>.<queue>
+
+
+def _in_flight_count(client: Any, *, namespace: str, queue: str, now_ms: float) -> int:
+    """Mensajes fetched-sin-ack de workers con heartbeat fresco sobre la cola.
+
+    El broker Redis de dramatiq mueve cada id al set
+    ``<namespace>:__acks__.<worker_id>.<queue>`` al entregarlo y lo saca al
+    ack/nack. Un set de acks NO prueba por si solo trabajo real en marcha
+    (revision del auditor, 09-nov-2026): puede ser un ack huerfano de un
+    worker muerto aun no reencolado por el mantenimiento. Por eso solo
+    cuentan los acks de workers con heartbeat fresco en
+    ``<namespace>:__heartbeats__`` (el broker lo refresca en cada dispatch;
+    vencido heartbeat_timeout, el mantenimiento reencola sus acks y borra
+    el set). Es trabajo en vuelo de workers con heartbeat fresco, no una
+    prueba de progreso: una cabeza ready vieja junto a el es compatible
+    con un job largo en marcha (p. ej. el barrido yahoo scope=all de ~34
+    min medido en prod el 09-nov-2026), y detect_stuck lo absuelve solo
+    bajo el techo duro de edad. Sin esta senal el watchdog marcaba
+    "atascada" cualquier cola cuyos jobs duran mas que max_age.
+    """
+    heartbeats = f"{namespace}:__heartbeats__"
+    live = client.zrangebyscore(heartbeats, now_ms - worker_heartbeat_timeout_ms(), "+inf")
+    total = 0
+    for worker in live:
+        total += int(client.scard(f"{namespace}:__acks__.{_as_str(worker)}.{queue}"))
+    return total
 
 
 def _as_str(raw: Any) -> str:
@@ -184,7 +240,9 @@ def sample_queues(client: Any, *, namespace: str = "dramatiq", queues: tuple[str
         base = f"{namespace}:{queue}"
         depth = int(client.hlen(f"{base}.msgs")) + int(client.hlen(f"{base}.DQ.msgs"))
         samples.append(QueueSample(queue=queue, depth=depth,
-                                   ready_age_seconds=_ready_head_age(client, base, queue, now_ms)))
+                                   ready_age_seconds=_ready_head_age(client, base, queue, now_ms),
+                                   in_flight=_in_flight_count(client, namespace=namespace,
+                                                              queue=queue, now_ms=now_ms)))
     return samples
 
 
@@ -206,13 +264,27 @@ def save_sample(client: Any, queue: str, *, ts: float, depth: int) -> None:
 
 
 def detect_stuck(samples: list[QueueSample], previous: dict[str, dict[str, float] | None],
-                 *, max_age: float, now: float) -> list[dict[str, Any]]:
-    """Colas atascadas: cabeza vieja y profundidad que no decrece. Funcion pura."""
+                 *, max_age: float, now: float,
+                 hard_max_age: float = 4 * 3600) -> list[dict[str, Any]]:
+    """Colas atascadas: cabeza vieja, profundidad que no decrece y sin trabajo
+    en vuelo de workers con heartbeat fresco.
+
+    El trabajo en vuelo solo absuelve bajo el techo duro hard_max_age: por
+    encima se alerta aunque exista (posible worker colgado reteniendo acks).
+    Funcion pura.
+    """
     stuck = []
     for sample in samples:
         age = sample.ready_age_seconds
         prev = previous.get(sample.queue)
         if age is None or age < max_age or prev is None:
+            continue
+        if sample.in_flight > 0 and age < hard_max_age:
+            # Hay trabajo en vuelo de workers con heartbeat fresco y la
+            # cabeza no supera el techo: compatible con un job largo en
+            # marcha (p. ej. barrido yahoo de ~34 min) que retiene la cabeza
+            # ready. "Atascada" exige ausencia de ese trabajo en vuelo o
+            # una cabeza mas vieja que cualquier job legitimo.
             continue
         elapsed = max(1.0, now - prev["ts"])
         # Variacion neta de profundidad (mensajes/s); <= 0: no decrece.
@@ -224,6 +296,7 @@ def detect_stuck(samples: list[QueueSample], previous: dict[str, dict[str, float
             "depth": sample.depth,
             "ready_age_seconds": round(age, 1),
             "net_rate_per_s": round(net_rate, 4),
+            "in_flight": sample.in_flight,
         })
     return stuck
 
@@ -233,7 +306,8 @@ def sample_tick(client: Any, *, namespace: str, queues: tuple[str, ...], now: da
     now_ms = now.timestamp() * 1000
     samples = sample_queues(client, namespace=namespace, queues=queues, now_ms=now_ms)
     previous = {sample.queue: load_previous(client, sample.queue) for sample in samples}
-    stuck = detect_stuck(samples, previous, max_age=max_age_seconds(), now=now.timestamp())
+    stuck = detect_stuck(samples, previous, max_age=max_age_seconds(),
+                         hard_max_age=hard_max_age_seconds(), now=now.timestamp())
     for sample in samples:
         save_sample(client, sample.queue, ts=now.timestamp(), depth=sample.depth)
     return {"ts": now.timestamp(), "queues": len(samples), "stuck": stuck}
