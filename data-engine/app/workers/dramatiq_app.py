@@ -566,6 +566,61 @@ def _coalesce_on_success(job, window_seconds, key_parts=(), stale_after_seconds=
     return decorator
 
 
+def _single_flight(name, ttl_seconds):
+    """Una sola corrida del actor a la vez en todo el despliegue.
+
+    El claim de _coalesce_on_success expira pasada su ventana: una corrida
+    mas larga que la ventana dejaba entrar una copia paralela (OOM del
+    2026-11-09 02:47/02:58 CET: dos refresh_bottlenecks a la vez, ~3,85 GB
+    RSS). Este candado vive con un TTL muy por encima de cualquier corrida
+    medida; si el worker muere, expira solo y el tick siguiente reintenta.
+    Clave GLOBAL (sin tenant): la memoria del contenedor es el recurso
+    compartido que hay que proteger; la corrida saltada la repone el
+    siguiente tick (trabajo idempotente). Un resultado "skipped" libera el
+    claim de coalescencia, asi el siguiente tick no hereda el bloqueo.
+    Redis caido es fail-open (ejecuta siempre), como _coalesce_on_success.
+    """
+    import functools
+    import uuid
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            key = f"running:{name}"
+            token = uuid.uuid4().hex
+            try:
+                client = _redis_client()
+                acquired = client is None or bool(
+                    client.set(key, token, nx=True, ex=ttl_seconds)
+                )
+            except Exception:  # noqa: BLE001 - sonda best-effort, fail-open
+                client, acquired = None, True
+            if not acquired:
+                return {"status": "skipped", "actor": name, "reason": "already_running"}
+            try:
+                return fn(*args, **kwargs)
+            finally:
+                if client is not None:
+                    # nosemgrep: gerarai-broad-except-pass -- lock Redis best-effort con caducidad por TTL documentada
+                    try:
+                        # Compare-and-delete atomico (Lua), como el claim de
+                        # coalescencia: nunca borra el candado de otro dueno.
+                        client.eval(
+                            "if redis.call('get', KEYS[1]) == ARGV[1] then"
+                            " return redis.call('del', KEYS[1])"
+                            " else return 0 end",
+                            1,
+                            key,
+                            token,
+                        )
+                    except Exception:  # noqa: BLE001 - expira por TTL solo
+                        pass
+
+        return wrapper
+
+    return decorator
+
+
 def coalesced_send(actor, *args, **kwargs):
     """actor.send con dedup "una copia en vuelo por clave" para actores con politica.
 
@@ -1612,6 +1667,7 @@ def refresh_subtel_decrees() -> dict[str, Any]:
 
 @dramatiq.actor(max_retries=2, min_backoff=30_000)
 @_coalesce_on_success("refresh_bottlenecks", 50 * 60, ("tenant_id",))
+@_single_flight("refresh_bottlenecks", 6 * 60 * 60)
 def refresh_bottlenecks(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Reconcile all local evidence, including historical letters, without AI."""
     from app.services.bottleneck_service import refresh_signals
