@@ -9,7 +9,7 @@ y otros por el año en que empiezan (Home Depot, Target, Lowe's: el que cierra e
 Regla (general, sin lista de emisores): en los informes anuales recientes, el desfase del emisor es
 ``año nominal del cierre del propio periodo del filing − DocumentFiscalYearFocus`` (el periodo propio es el
 ejercicio que más tarde cierra ANTES de presentarse el filing). El 1 (año de inicio) exige que lo declaren
-los dos últimos informes anuales y un cierre nominal entre enero y junio; en cualquier otro caso, 0 (la
+los dos últimos ejercicios distintos (sin contar enmiendas dos veces) y un cierre nominal entre enero y junio; en cualquier otro caso, 0 (la
 etiqueta de siempre: el año nominal del cierre). Así manda la convención vigente: un emisor que corrigió su
 etiqueta (CrowdStrike: FY2024 → FY2026 para cierres de enero de 2025 y 2026) o un filing suelto mal
 etiquetado no mueven la historia.
@@ -26,7 +26,7 @@ from typing import Any
 WEEKLY_CALENDAR_DAYS = 7
 ANNUAL_FORMS = frozenset({"10-K", "10-K/A", "10-KT", "20-F", "20-F/A", "40-F", "40-F/A"})
 ALLOWED_OFFSETS = (0, 1)
-#: Últimos informes anuales que tienen que declarar el año de inicio.
+#: Últimos ejercicios distintos que tienen que declarar el año de inicio.
 MIN_FILINGS_FOR_SHIFT = 2
 
 
@@ -93,10 +93,16 @@ def _nominal_month(end: date) -> int:
 def dei_label_offset(us_gaap: Mapping[str, Any]) -> int:
     """Desfase de la etiqueta del ejercicio del emisor (0: año del cierre; 1: año de inicio).
 
-    Manda la convención vigente: 1 solo si los DOS últimos informes anuales la declaran (un emisor que
-    corrige su etiqueta, o un filing suelto mal etiquetado, no arrastra la historia); si no, 0."""
-    recent = filing_offsets(us_gaap)[:MIN_FILINGS_FOR_SHIFT]
-    if len(recent) == MIN_FILINGS_FOR_SHIFT and all(o == 1 and _admissible(end, o) for end, o, _ in recent):
+    Manda la convención vigente: 1 solo si los DOS últimos ejercicios distintos la declaran.
+    Las enmiendas del mismo cierre no son confirmaciones independientes; si discrepan,
+    ese cierre no confirma el desfase. Si no se confirma, 0."""
+    by_end: dict[date, set[int]] = {}
+    for end, offset, _accn in filing_offsets(us_gaap):
+        by_end.setdefault(end, set()).add(offset)
+    recent = sorted(by_end, reverse=True)[:MIN_FILINGS_FOR_SHIFT]
+    if len(recent) == MIN_FILINGS_FOR_SHIFT and all(
+        by_end[end] == {1} and _admissible(end, 1) for end in recent
+    ):
         return 1
     return 0
 
