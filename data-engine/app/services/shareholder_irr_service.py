@@ -101,6 +101,17 @@ def _end(period: str) -> str:
     return str(period or "").split(":")[0]
 
 
+def _fiscal_year(period: str) -> int | None:
+    """Ejercicio de un cierre anual por su mes nominal: un año de 52/53 semanas que cierra el 2-ene-2026 es el
+    ejercicio 2025 (el año del calendario lo contaba como 2026 y chocaba con el cierre del 31-dic-2026)."""
+    from app.services.own_consensus import fiscal_year_of
+
+    try:
+        return fiscal_year_of(date.fromisoformat(_end(period)[:10]))
+    except ValueError:
+        return None
+
+
 def company_facts(db: Session, company: Company) -> tuple[dict[str, dict[int, dict]], dict[str, dict]]:
     """Ejercicios anuales {métrica: {año: cita}} y último dato de balance {métrica: cita}, mejor fuente."""
     from app.services.analyst_report import SOURCE_PRIORITY
@@ -122,9 +133,8 @@ def company_facts(db: Session, company: Company) -> tuple[dict[str, dict[int, di
                 -(fact.created_at.timestamp() if fact.created_at else 0.0))
         period = str(fact.period or "")
         if fact.metric in _FLOW and period.endswith(":FY"):
-            try:
-                year = int(_end(period)[:4])
-            except ValueError:
+            year = _fiscal_year(period)
+            if year is None:
                 continue
             slot = annual.setdefault(fact.metric, {})
             if year not in slot or rank < slot[year][0]:
@@ -132,10 +142,7 @@ def company_facts(db: Session, company: Company) -> tuple[dict[str, dict[int, di
         elif fact.metric in _POINT:
             end = _end(period)
             if fact.metric in _POINT_ANNUAL and period.endswith(":FY"):
-                try:
-                    year = int(end[:4])
-                except ValueError:
-                    year = None
+                year = _fiscal_year(period)
                 if year is not None:
                     slot = annual.setdefault(fact.metric, {})
                     if year not in slot or rank < slot[year][0]:
@@ -219,10 +226,18 @@ def company_kind(company: Company, annual: Mapping[str, Mapping[int, dict]]) -> 
         return "real_estate", "REIT según la industria de la ficha"
     if lease and (not rev or lease >= 0.5 * rev) and (unknown or "real estate" in industry or "reit" in industry):
         return "real_estate", f"ingresos por arrendamiento ≥ 50 % de los ingresos de {last}"
-    top = max(x for x in (rev, lease, 0.0) if x is not None)
-    if key == "pre_revenue" or top < PRE_REVENUE_MAX:
-        return "pre_revenue", (f"ingresos de {last} por debajo de {PRE_REVENUE_MAX:g} M" if top < PRE_REVENUE_MAX
-                               else "preingresos según la clasificación de la ficha")
+    # Regla «preingresos-ejercicios-v1» (9-nov-2026): por ingresos, solo con ingresos PUBLICADOS. Un ejercicio
+    # sin dato de ingresos no es un ejercicio sin ingresos (L3Harris: beneficio de 2025 cargado y sus ingresos
+    # no) y un solo año bajo no basta: los dos últimos ejercicios con dato deben estar por debajo del umbral.
+    reported = sorted({y for m in ("revenue", "lease_income") for y, c in (annual.get(m) or {}).items()
+                       if _mill(c) is not None})
+    tops = [max(x for x in (v("revenue", y), v("lease_income", y), 0.0) if x is not None) for y in reported[-2:]]
+    low = max(tops) < PRE_REVENUE_MAX if tops else True
+    if key == "pre_revenue" or low:
+        span = (f"{reported[-1]}" if len(reported) == 1 else f"{reported[-2]} y {reported[-1]}") if reported else ""
+        why = (f"ingresos de {span} por debajo de {PRE_REVENUE_MAX:g} M" if span
+               else "sin ingresos publicados en ningún ejercicio")
+        return "pre_revenue", (why if low else "preingresos según la clasificación de la ficha")
     burning = 0
     for y in years[-2:]:
         oi, da, ni = v("operating_income", y), v("depreciation_amortization", y), v("net_income", y)

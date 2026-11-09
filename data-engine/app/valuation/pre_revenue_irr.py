@@ -28,7 +28,8 @@ una lleva su fuente.
 4. **Múltiplo EV/ventas**: el de comparables MADUROS (operativos, con ingresos y EV positivos), calculado
    con la misma fórmula (EV / ingresos del último ejercicio) que la empresa. Bajista p25, base mediana,
    alcista p75. La selección es la primera de estas capas con al menos ``MIN_PEERS``: comparables del
-   servicio → misma industria → mismo sector → toda la base no financiera; la capa usada se dice.
+   servicio → misma industria → mismo sector; la capa usada se dice. Sin ninguna, N/D (la base entera no es
+   comparable: regla «comparables-sin-base-v1», 9-nov-2026).
 5. **Valor en T**: EV_T = ingresos_T × múltiplo; caja_T = caja + capital nuevo − consumo acumulado;
    capital_T = EV_T + caja_T − deuda − minoritarios − híbridos (deuda constante); precio_T = capital_T /
    acciones_T; **TIR** = (precio_T / precio)^(1/N) − 1, con N = años desde hoy hasta el cierre de T.
