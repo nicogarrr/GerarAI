@@ -143,6 +143,28 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
         events: [],
         verifiedOn: '2026-11-08',
     },
+    UBER: {
+        name: 'Uber Technologies',
+        section: { url: 'https://investor.uber.com/news-events/', labelKey: 'eventsAndPresentations' },
+        events: [],
+        verifiedOn: '2026-11-09',
+    },
+    RKLB: {
+        name: 'Rocket Lab',
+        section: { url: 'https://investors.rocketlabcorp.com/events-presentations/events', labelKey: 'eventsAndPresentations' },
+        events: [
+            { date: '2026-11-09', period: 'T3 2026', url: 'https://investors.rocketlabcorp.com/events/event-details/third-quarter-2026-financial-results-update-and-conference-call' },
+        ],
+        verifiedOn: '2026-11-09',
+    },
+    ONDS: {
+        name: 'Ondas',
+        section: { url: 'https://ir.ondas.com/financial-results', labelKey: 'quarterlyResults' },
+        events: [
+            { date: '2026-11-12', period: 'T3 2026', url: 'https://ir.ondas.com/ir-calendar/detail/4846/third-quarter-2026-earnings-conference-call' },
+        ],
+        verifiedOn: '2026-11-09',
+    },
 };
 
 export type IrLinks = {
