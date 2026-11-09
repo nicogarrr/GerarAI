@@ -78,7 +78,7 @@ SECTIONS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
      ("escenarios", "supuestos", "descomposicion", "sensibilidad")),
     ("que_descuenta", "11. Qué descuenta el precio", "b", ("descuenta",)),
     ("riesgos", "12. Riesgos y kill switches", "b", ("expertos",)),
-    ("que_vigilar", "13. Qué vigilar", "b", ("vigilar",)),
+    ("que_vigilar", "13. Qué vigilar", "b", ("vigilar", "catalizadores")),
     ("pre_mortem", "14. Pre-mortem: la inversión mirada desde dentro de cinco años", "b", ()),
     ("conclusion", "15. Conclusión: ¿empresa excelente? ¿oportunidad al precio?", "b", ()),
 )
@@ -528,6 +528,9 @@ class ThesisContext:
     analysts: list[dict[str, Any]] = field(default_factory=list)  # estimaciones citadas de prensa (#4753)
     price_targets: list[dict[str, Any]] = field(default_factory=list)
     experts: dict[str, Any] | None = None  # trabajo del equipo de expertos (thesis_v2_experts.expert_block)
+    # Catalizadores oficiales (8-K/6-K y notas de prensa propias o de la contraparte; official_catalysts). No entran
+    # en la huella: solo pintan una tabla, y una tesis guardada la enseña sin regenerarse.
+    catalysts: list[dict[str, Any]] = field(default_factory=list)
 
 
 def insider_block(db: Session, company: Company, today: date) -> dict[str, Any] | None:
@@ -621,8 +624,15 @@ def build_context(db: Session, company: Company, *, today: date, tenant_id: int 
     except Exception as exc:  # noqa: BLE001 - sin el equipo la tesis sigue, pero se registra
         logger.warning("tesis v2 %s: no se pudo leer el trabajo del equipo de expertos (%s)", company.ticker,
                        type(exc).__name__)
+    try:
+        from app.services.official_catalysts import catalysts_for
+
+        catalysts = catalysts_for(db, company, today=today)
+    except Exception as exc:  # noqa: BLE001 - sin catalizadores la tesis sigue
+        logger.info("tesis v2 %s catalizadores: %s", company.ticker, type(exc).__name__)
+        catalysts = []
     return ThesisContext(company.ticker, name, val, hist, peers, switches, ig, passages, optional, guidance,
-                         getattr(company, "cik", None), insiders, analysts, targets, experts)
+                         getattr(company, "cik", None), insiders, analysts, targets, experts, catalysts)
 
 
 def display_name(name: str) -> str:
@@ -715,7 +725,8 @@ def thesis_markers(ctx: ThesisContext) -> dict[str, str]:
         m["caja.trimestres"] = (_es(prw["quarters"], 1) + " trimestres") if prw.get("quarters") else "N/D"
         stats = pre.get("peer_stats") or {}
         m["preing.ev_ventas_mediana"] = times(stats.get("median")) if stats else "N/D"
-        m["preing.ano_salida"] = str((pre.get("revenue_anchor") or {}).get("year") or "N/D")
+        m["preing.ano_salida"] = str(((pre.get("scenarios") or {}).get("base") or {}).get("year")
+                                     or (pre.get("revenue_anchor") or {}).get("year") or "N/D")
         for k, row in (pre.get("scenarios") or {}).items():
             m[f"preing.{k}.tir"] = _scenario_text(row)
             m[f"preing.{k}.dilucion"] = pct(row.get("dilution"), signed=True) if row.get("dilution") is not None else "N/D"
@@ -978,6 +989,16 @@ def _scenario_text(row: Mapping[str, Any]) -> str:
     return pct(row.get("irr"), signed=True) if row.get("irr") is not None else f"N/D ({row.get('missing') or 'sin dato'})"
 
 
+def _anchor_trio(anchor: Mapping[str, Any], ccy: str) -> str:
+    """Ingresos del ancla por escenario (sin rango en la fuente, ±50 %), antes de prolongar hasta la salida."""
+    from app.valuation.pre_revenue_irr import REVENUE_SPREAD
+
+    base = float(anchor.get("base") or 0)
+    low = anchor.get("low") if anchor.get("low") is not None else base * (1 - REVENUE_SPREAD)
+    high = anchor.get("high") if anchor.get("high") is not None else base * (1 + REVENUE_SPREAD)
+    return " / ".join(millions(v, ccy) for v in (low, base, high))
+
+
 def pre_revenue_rows(note: dict[str, Any], val: Mapping[str, Any], ccy: str) -> None:
     """Filas de la ruta de preingresos (runway en trimestres, dilución proyectada y TIR por escenario) en el
     bloque de caja de la ficha. Cada fila con su fórmula o su fuente; un escenario sin input es N/D con su motivo."""
@@ -1005,8 +1026,17 @@ def pre_revenue_rows(note: dict[str, Any], val: Mapping[str, Any], ccy: str) -> 
         (["Dilución proyectada hasta el break-even (bajista / base / alcista)",
           trio("dilution", lambda v: pct(v, signed=True)), f.get("dilucion_proyectada", "")], None),
         ([f"Ingresos {anchor.get('year') or ''} (bajista / base / alcista)".replace("  ", " "),
-          trio("revenue", lambda v: millions(v, ccy)) if anchor else f"N/D ({pre.get('revenue_anchor_missing') or ''})",
+          (_anchor_trio(anchor, ccy) if anchor.get("base") else trio("revenue", lambda v: millions(v, ccy)))
+          if anchor else f"N/D ({pre.get('revenue_anchor_missing') or ''})",
           anchor_src or f.get("ingresos", "")], cite.get("url")),
+    ]
+    exits = [(scen.get(k) or {}) for k in keys]
+    if anchor and any(r.get("year") and r.get("year") != anchor.get("year") for r in exits):
+        fade = ((scen.get("base") or {}).get("exit") or {}).get("fade") or ""
+        rows.append(([f"Ingresos al año de salida {'/'.join(str(r.get('year') or 'N/D') for r in exits)} (bajista / base / alcista)",
+                      trio("revenue", lambda v: millions(v, ccy)), f"{fade}; {f.get('salida', '')}".strip("; ")], None))
+    rows += [
+
         (["EV/ventas de comparables maduros (p25 / mediana / p75)",
           " / ".join(times(stats.get(k)) for k in ("p25", "median", "p75")) if stats else
           f"N/D ({pre.get('peers_missing') or ''})",
@@ -1037,6 +1067,19 @@ def _pre_revenue_partida(t: dict[str, Any], val: Mapping[str, Any]) -> None:
                           f"capa: {pre.get('peer_layer')}")
             else:
                 row[2] = f"N/D: {pre.get('peers_missing') or 'sin comparables maduros'}"
+
+
+def catalyst_table(catalysts: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Catalizadores oficiales: fecha, tipo, fuente, resumen literal, importes citados y el atribuible a la empresa."""
+    return {"title": "Catalizadores oficiales (8-K/6-K y notas de prensa de la empresa o su contraparte; cada fila con su fuente)",
+            "head": ["Fecha", "Tipo", "Fuente", "Resumen literal", "Importes citados", "Importe para la empresa"],
+            "rows": [[c.get("date") or "N/D (sin fecha en la fuente)", str(c.get("kind_label") or c.get("kind") or ""),
+                      str(c.get("publisher") or ""), str(c.get("summary") or ""),
+                      ", ".join(c.get("amounts") or []) or "—",
+                      (str(c["amount_for_company"]) if c.get("amount_for_company")
+                       else f"importe para la empresa {c.get('amount_reason') or 'N/D (no publicado)'}")]
+                     for c in catalysts],
+            "links": [source_link({"url": c.get("url")}, None) for c in catalysts]}
 
 
 def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
@@ -1180,6 +1223,7 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
         t["vigilar"] = {"title": "Qué vigilar: kill switches", "head": ["Métrica", "Umbral", "Hoy", "Estado", "Acción", "Por qué"],
                         "rows": [[s["metric"], s["threshold"], s["current"], s["status"], s["action"], s["why"]] for s in ctx.switches]}
         t["expertos"] = experts_table(ctx.experts)
+        t["catalizadores"] = catalyst_table(ctx.catalysts)
         return t
     t["escenarios"] = {"title": "Escenarios", "head": [
         "Escenario", "Prob.", "Crec. 1–5", "Margen año 5", "Conversión", "Múltiplo salida", "TIR 5 a", "TIR 10 a",
@@ -1221,6 +1265,7 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
     t["vigilar"] = {"title": "Qué vigilar: kill switches", "head": ["Métrica", "Umbral", "Hoy", "Estado", "Acción", "Por qué"],
                     "rows": [[s["metric"], s["threshold"], s["current"], s["status"], s["action"], s["why"]] for s in ctx.switches]}
     t["expertos"] = experts_table(ctx.experts)
+    t["catalizadores"] = catalyst_table(ctx.catalysts)
     return t
 
 
@@ -1820,7 +1865,7 @@ def present(ctx: ThesisContext, doc: Mapping[str, Any], markers: Mapping[str, st
         "probability_choice": doc.get("probability_choice"), "probability_reason": doc.get("probability_reason"),
         "sections": [{"key": k, "title": _title(k, title, ctx),
                       "text": rendered.get(k) or (f"N/D ({missing[k]})" if k in missing else ""),
-                      "tables": [tabs[n] for n in tn if n != "expertos" or tabs[n]["rows"]]}
+                      "tables": [tabs[n] for n in tn if n in tabs and (n not in ("expertos", "catalizadores") or tabs[n]["rows"])]}
                      for k, title, _, tn in active_sections(ctx)],
         "headline": {"price": markers.get("punto.precio"), "tir5": markers.get("pond.tir5"),
                      "tir10": markers.get("pond.tir10"), "base_tir10": markers.get("esc.base.tir10"),

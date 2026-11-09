@@ -107,8 +107,15 @@ def sector_for_industry(industry: str | None) -> str | None:
 class CompanyEnrichmentService:
     """Completa Company.name/exchange/sector/currency desde Finnhub."""
 
-    def __init__(self, settings=None, client: httpx.Client | None = None) -> None:
+    def __init__(self, settings=None, client: httpx.Client | None = None, sic_lookup=None) -> None:
         self.settings = settings or get_settings()
+        # Sector/industria de reserva por el SIC de la SEC (sic_classification) cuando Finnhub no clasifica.
+        # Con un cliente inyectado (tests) solo si se pasa explícitamente: no sale a la red sin pedirlo.
+        if sic_lookup is None and client is None:
+            from app.services.sic_classification import sec_submissions_sic
+
+            sic_lookup = sec_submissions_sic
+        self._sic_lookup = sic_lookup
         self._client = client or httpx.Client(timeout=15)
 
     def close(self) -> None:
@@ -220,9 +227,10 @@ class CompanyEnrichmentService:
         company.enrichment_attempted_at = datetime.now(UTC)
         profile = self._finnhub_profile(company.ticker)
         if not profile:
+            changed = self._sic_fallback(db, company)
             if persist:
                 db.add(company)
-            return False
+            return changed
         changed = False
 
         if self._name_is_placeholder(company):
@@ -252,10 +260,26 @@ class CompanyEnrichmentService:
             if currency:
                 company.currency = currency
                 changed = True
+        changed = self._sic_fallback(db, company) or changed
 
         if persist:
             db.add(company)
         return changed
+
+    def _sic_fallback(self, db: Session, company: Company) -> bool:
+        """Sector/industria en «Unknown» tras Finnhub: el SIC de la SEC (solo placeholders). Nunca lanza."""
+        if self._sic_lookup is None or not getattr(company, "cik", None):
+            return False
+        if company.sector not in _PLACEHOLDER_SECTORS and (company.industry or "").strip() not in ("", "Unknown"):
+            return False
+        try:
+            from app.services import sic_classification
+
+            sic, desc = self._sic_lookup(company.cik)
+            return bool(sic_classification.apply(company, sic, desc, sic_classification.base_calibration(db)))
+        except Exception as exc:  # noqa: BLE001 - sin SIC la ficha sigue como estaba
+            logger.info("SIC de reserva %s: %s", company.ticker, type(exc).__name__)
+            return False
 
     def enrich_all(self, db: Session, sleep_between: float = 0.8) -> dict:
         """Barre companies con datos debiles y las enriquece (respetando rate limit)."""

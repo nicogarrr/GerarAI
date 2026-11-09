@@ -73,14 +73,18 @@ def test_escenarios_ordenados_y_formula_a_mano():
     assert s["bear"]["revenue"] == pytest.approx(865.0) and s["bull"]["revenue"] == pytest.approx(2595.0)
 
 
-def test_bajista_toma_la_dilucion_historica_sin_sumar_caja():
+def test_bajista_sin_hueco_no_diluye_y_con_hueco_toma_la_historica_sin_sumar_caja():
+    # v2 (e): con el consumo financiado (hueco 0) no hay dilución en ningún escenario.
     s = _scen()
     bear = s["bear"]
     n = R.years_to(TODAY, 2028)
-    assert bear["dilution_from"] == "dilución histórica compuesta"
+    assert bear["funding_need"] == 0 and bear["dilution"] == 0 and bear["dilution_from"] == "hueco de financiación"
+    # Con hueco, el bajista toma como mínimo la dilución histórica compuesta, y las acciones de más no suman caja.
+    s = _scen(cash=1000.0)
+    bear = s["bear"]
+    assert bear["funding_need"] > 0 and bear["dilution_from"] == "dilución histórica compuesta"
     assert bear["dilution"] == pytest.approx(1.675 ** n - 1)
-    # Las acciones de más no suman caja: la caja final es la de hoy menos el consumo (más el hueco, 0 aquí).
-    assert bear["cash_end"] == pytest.approx(4588.0 - 1136.0 * n)
+    assert bear["cash_end"] == pytest.approx(1000.0 + bear["funding_need"] - 1136.0 * n)
 
 
 def test_hueco_de_financiacion_al_precio_actual():
@@ -134,11 +138,11 @@ def _co(i, ticker, **kw):
 
 
 def test_comparables_caen_a_capas_mas_anchas_y_lo_dicen(monkeypatch):
+    # Una sola consulta (la base con ingresos FY); industria y sector se filtran sobre ella, ordenada por tamaño.
     target = _co(1, "TGT")
     peers_svc = [_co(2, "P1")]
-    industry = [_co(2, "P1")]
-    sector = [_co(2, "P1"), _co(3, "P2")]
-    base = [_co(2, "P1"), _co(3, "P2"), _co(4, "P3"), _co(5, "PRE")]
+    base = [_co(2, "P1"), _co(3, "P2", industry="Other"), _co(4, "P3", industry="Other", sector="Other"),
+            _co(5, "PRE", industry="Other", sector="Other")]
     mature = {"P1": 2.0, "P2": 4.0, "P3": 6.0}
 
     def fake_mult(_db, peer, _today, memo):
@@ -148,14 +152,15 @@ def test_comparables_caen_a_capas_mas_anchas_y_lo_dicen(monkeypatch):
 
     monkeypatch.setattr(svc, "_mature_multiple", fake_mult)
     monkeypatch.setattr(pcs.PeerComparisonService, "_find_peers", lambda self, db, c, n: (peers_svc, "x", {}))
+    monkeypatch.setattr(pcs.PeerComparisonService, "_latest_market_caps_usd", lambda self, db, ids: {})
     monkeypatch.setattr(pcs, "_same_issuer", lambda a, b: False)
-    got, layer, missing, tried = svc.mature_peers(_FakeDB([industry, sector, base]), target, TODAY)
+    got, layer, missing, tried = svc.mature_peers(_FakeDB([base]), target, TODAY)
     assert missing is None and layer.startswith("toda la base no financiera")
     assert sorted(p.ticker for p in got) == ["P1", "P2", "P3"]
     assert [t["maduros"] for t in tried] == [1, 1, 2, 3]
     # Con tres maduros en el sector, se queda en el sector.
-    sector3 = [_co(2, "P1"), _co(3, "P2"), _co(4, "P3")]
-    got, layer, _m, _t = svc.mature_peers(_FakeDB([industry, sector3, base]), target, TODAY)
+    base3 = [_co(2, "P1"), _co(3, "P2", industry="Other"), _co(4, "P3", industry="Other")]
+    got, layer, _m, _t = svc.mature_peers(_FakeDB([base3]), target, TODAY)
     assert layer == "mismo sector (Comms)" and len(got) == 3
 
 
@@ -216,3 +221,23 @@ def test_sin_ruta_de_preingresos_la_ficha_no_cambia():
     ctx = T.ThesisContext("ZZZ", "Z", val, [], [], T.kill_switches(val, []), None, [])
     note = T.tables(ctx)["escenarios"]
     assert len(note["rows"]) == 9 and "TIR" not in note["title"]
+
+
+def test_v2_crecimiento_muy_superior_a_los_maduros_prolonga_hasta_el_ano_5():
+    peers = {"p25": 2.0, "median": 4.0, "p75": 6.0, "n": 4.0, "growth_p50": 0.10, "growth_p75": 0.15, "growth_n": 4.0}
+    rev, year, trace = R.exit_revenue(1000.0, anchor_year=2028, last_fy=2025, last_revenue=100.0, peers=peers)
+    g = (1000.0 / 100.0) ** (1 / 3) - 1
+    assert year == 2030 and trace["growth_company"] == pytest.approx(g)
+    g29 = g + (0.10 - g) / 2
+    assert rev == pytest.approx(1000.0 * (1 + g29) * 1.10)
+    assert "estimación propia" in trace["fade"]
+    # Creciendo como los maduros, el múltiplo se aplica al año del ancla.
+    rev, year, _t = R.exit_revenue(115.0, anchor_year=2028, last_fy=2025, last_revenue=100.0, peers=peers)
+    assert (rev, year) == (115.0, 2028)
+    # Ancla ya en el año 5 y crecimiento muy superior: N/D, no un múltiplo sin sentido.
+    rev, year, _t = R.exit_revenue(1000.0, anchor_year=2030, last_fy=2025, last_revenue=10.0, peers=peers)
+    assert rev is None
+    s = R.scenarios(today=TODAY, price=10.0, shares=100.0, cash=1000.0, debt=0.0, minorities=0.0, hybrids=0.0,
+                    fcf=-10.0, dilution_hist=None, anchor=R.RevenueAnchor(2030, 1000.0, None, None, "consenso_prensa", "x", {}),
+                    anchor_missing=None, peers=peers, peers_missing=None, last_fy=2025, last_revenue=10.0)
+    assert s["base"]["irr"] is None and "el múltiplo maduro no aplica" in s["base"]["missing"]
