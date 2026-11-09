@@ -11,20 +11,26 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 from app.services.connectors.edgartools_facts import (
-    _collapse_aliases,
-    _collapse_by_scope,
     _compose_bank_revenue_entries,
     _decimal,
     _iso,
     _modal_month,
     _normalized_month,
     _span_days,
-    _sum_disjoint,
     anchors_from_submissions,
     entries_from_companyfacts,
     entries_from_edgartools_facts,
     merge_entries,
     quarter_label,
+)
+
+# Los helpers de fusion viven en la ingesta; el conector los comparte.
+from app.services.financial_ingestion_service import (
+    _collapse_aliases,
+    _collapse_by_scope,
+)
+from app.services.financial_ingestion_service import (
+    _sum_disjoint_components as _sum_disjoint,
 )
 
 # -- helpers puros ----------------------------------------------------------
