@@ -147,6 +147,28 @@ def company_facts(db: Session, company: Company) -> tuple[dict[str, dict[int, di
             {m: c for m, (_, _, c) in point.items()})
 
 
+def _primary_point_at(db: Session, company: Company, metric: str, period: str) -> dict[str, Any] | None:
+    """Cita primaria del saldo ``metric`` en ``period`` (``AAAA-MM-DD:FY``): primero el mismo tipo de periodo
+    (el 10-K del cierre anual, no la comparativa de un 10-Q posterior, que puede traer solo la parte no
+    corriente), después cualquier filing del mismo cierre, el más reciente."""
+    end = period.split(":")[0]
+    from app.services.ttm_service import _is_segment
+    from app.valuation.balance_bridge import PRIMARY_SOURCES
+
+    rows = db.scalars(
+        select(FinancialFact)
+        .where(FinancialFact.company_id == company.id, FinancialFact.metric == metric,
+               FinancialFact.period.like(f"{end}:%"), FinancialFact.source_type.in_(PRIMARY_SOURCES))
+        .options(selectinload(FinancialFact.source))
+        .order_by(desc(FinancialFact.filed), desc(FinancialFact.id))
+    ).all()
+    rows = sorted(rows, key=lambda f: f.period != period)  # estable: dentro de cada grupo, el más reciente
+    for fact in rows:
+        if fact.value is not None and not _is_segment(fact):
+            return _cite(fact)
+    return None
+
+
 def _mill(cite: Mapping[str, Any] | None) -> float | None:
     v = _f((cite or {}).get("value"))
     return None if v is None else v / 1_000_000.0
@@ -691,26 +713,41 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     if cash_eq is None:
         # Sin caja la deuda neta no se sabe: N/D con motivo, no caja = 0.
         raise ValueError("sin caja en el último balance: la deuda neta no se puede calcular")
-    cash = cash_eq + (_mill(point.get("short_term_investments")) or 0.0)
-    for k in ("cash_and_equivalents", "short_term_investments", "total_debt", "minority_interest", "hybrid_capital"):
+    from app.valuation import balance_bridge as bb
+
+    sti, sti_cite, sti_warn = bb.short_term_investments(point)
+    cash = cash_eq + sti
+    if sti_warn:
+        warnings.append(sti_warn)
+    for k in ("cash_and_equivalents", "minority_interest", "hybrid_capital"):
         if k in point:
             cites[k] = point[k]
-    debt = _mill(point.get("total_debt"))
-    if debt is None and nav_path:
-        debt, debt_cite = nav_holding_debt(db, company, last, warnings)
-        if debt_cite is not None:
-            cites["total_debt"] = debt_cite
-    if debt is None:
-        debt = _mill(point.get("long_term_debt"))
-        if debt is None:
-            # Ausencia de etiqueta no prueba deuda 0 (la ingesta ya escribe 0 cuando el balance lo prueba).
-            raise ValueError("sin deuda en el último balance: la deuda neta no se puede calcular")
+    if sti_cite is not None:
+        cites["short_term_investments"] = sti_cite
     # Los pasivos por arrendamiento ``lease_liabilities*`` solo salen de los mapas IFRS (US GAAP usa
     # operating_lease_liabilities): su presencia identifica a un filer IFRS de la SEC que reporta en USD (BN).
     ifrs = (reporting != "USD"
             or any(str((c or {}).get("source_type") or "").lower().startswith("esef")
                    for c in annual.get("revenue", {}).values())
             or any(k in point for k in ("lease_liabilities", "lease_liabilities_current", "lease_liabilities_noncurrent")))
+    debt, debt_cite0, leases_inside, debt_warns = bb.financial_debt(
+        point, ifrs=ifrs, lease_at=lambda period: _primary_point_at(db, company, "operating_lease_liabilities", period))
+    warnings.extend(debt_warns)
+    if debt_cite0 is not None:
+        cites["total_debt"] = debt_cite0
+    if debt is None and nav_path:
+        debt, debt_cite = nav_holding_debt(db, company, last, warnings)
+        if debt_cite is not None:
+            cites["total_debt"] = debt_cite
+    if debt is None:
+        # Deuda a largo como último recurso, solo del MISMO balance que la caja: un saldo de otro cierre
+        # (TSLA: LongTermDebtNoncurrent de 2014 con la caja de 2026) no es la deuda de hoy.
+        debt = _mill(point.get("long_term_debt")) if bb.same_close(point, "long_term_debt") else None
+        if debt is not None:
+            cites["total_debt"] = point["long_term_debt"]
+        if debt is None:
+            # Ausencia de etiqueta no prueba deuda 0 (la ingesta ya escribe 0 cuando el balance lo prueba).
+            raise ValueError("sin deuda en el último balance: la deuda neta no se puede calcular")
     # El total declarado por el emisor manda; sin él, corriente + no corriente.
     leases_total = _mill(point.get("lease_liabilities"))
     leases_ifrs = leases_total if leases_total else (
@@ -719,6 +756,8 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
         if k in point:
             cites[k] = point[k]
     use_leases = ifrs if include_leases is None else include_leases
+    if use_leases and leases_inside:
+        use_leases = False  # el total del agregador ya los lleva dentro: una sola vez (caja-deuda-v1)
     leases = leases_ifrs if use_leases else 0.0
     if use_leases and not leases_ifrs:
         warnings.append("EBITDA bajo IFRS 16 (incluye los alquileres) pero sin dato de pasivos por arrendamiento: "
@@ -727,6 +766,8 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     if not hybrids:
         warnings.append("capital híbrido: sin dato etiquetado (si existe, se trataría como deuda)")
     minorities = _mill(point.get("minority_interest")) or 0.0
+    if minorities and chosen_basis == "ev_ebitda" and (note := bb.stale_note(point, "minority_interest", "minoritarios")):
+        warnings.append(note)
     if upc is not None and chosen_basis in cs.EV_BASES:
         minorities = 0.0  # Up-C: ya están en las acciones (todas las clases)
     sbc = _mill(annual.get("stock_based_compensation", {}).get(last))

@@ -30,16 +30,36 @@ INVESTING_TOTALS = (
     "CashFlowsFromUsedInInvestingActivities",
 )
 ASSET_MANAGER_METRICS = ("fee_related_earnings", "distributable_earnings")
-_ASSET_MANAGER_WORDS = ("asset management", "capital markets", "private equity", "alternative asset")
+_ASSET_MANAGER_WORDS = ("asset management", "capital markets", "private equity", "alternative asset",
+                        "investment advice")
+#: SIC de EDGAR de las gestoras (6282 «Investment Advice»: KKR, BX, APO, ARES, BAM…). La industria de la
+#: ficha puede venir de un agregador con una etiqueta genérica («Financial Services» en KKR) y entonces
+#: las palabras no bastan: el FRE etiquetado en su 10-K nunca se pedía.
+ASSET_MANAGER_SIC = frozenset({6282})
 
 
-def is_asset_manager(company: Any) -> bool:
-    """Gestora de activos por la industria o el sector de la ficha; sin red.
+def _sic(value: Any) -> int | None:
+    try:
+        return int(str(value).strip()) if value not in (None, "") else None
+    except ValueError:
+        return None
+
+
+def is_asset_manager(company: Any, sic: Any = None) -> bool:
+    """Gestora de activos por la industria o el sector de la ficha, o por el SIC (el de EDGAR si se pasa,
+    si no la etiqueta ``sic:nnnn`` de la ficha); sin red.
 
     Ser «holding» no basta: un conglomerado (Berkshire) no publica FRE ni DE y
     cada refresh pagaría la descarga de su filing para nada."""
     text = " ".join(str(getattr(company, a, None) or "") for a in ("industry", "sector")).lower()
-    return any(word in text for word in _ASSET_MANAGER_WORDS)
+    if any(word in text for word in _ASSET_MANAGER_WORDS):
+        return True
+    code = _sic(sic)
+    if code is None:
+        from app.services.sic_classification import company_sic
+
+        code = company_sic(company)
+    return code in ASSET_MANAGER_SIC
 
 
 def latest_annual_filing(submissions: dict[str, Any], forms: set[str]) -> dict[str, Any] | None:
@@ -67,7 +87,7 @@ def _has_annual(taxonomy: dict[str, Any], concepts: list[str], report_end: str) 
 
 
 def wanted_metrics(company: Any, taxonomy: dict[str, Any], metric_map: list[tuple[str, list[str], str]],
-                   report_end: str) -> list[str]:
+                   report_end: str, sic: Any = None) -> list[str]:
     """Métricas objetivo que el último ejercicio NO tiene con un concepto estándar."""
     wanted: list[str] = []
     concepts = {metric: list(c) for metric, c, _unit in metric_map}
@@ -77,7 +97,7 @@ def wanted_metrics(company: Any, taxonomy: dict[str, Any], metric_map: list[tupl
     if _has_annual(taxonomy, list(INVESTING_TOTALS), report_end) and not _has_annual(
             taxonomy, concepts.get(SEC_CAPEX_METRIC, []), report_end):
         wanted.append(SEC_CAPEX_METRIC)
-    if is_asset_manager(company):
+    if is_asset_manager(company, sic):
         wanted.extend(m for m in ASSET_MANAGER_METRICS if not _has_annual(taxonomy, concepts.get(m, []), report_end))
     return wanted
 
@@ -150,7 +170,7 @@ async def resolve_latest_filing(
     if filing is None:
         return None
     taxonomy = (facts_data.get("facts") or {}).get(taxonomy_key) or {}
-    wanted = wanted_metrics(company, taxonomy, metric_map, str(filing["report"]))
+    wanted = wanted_metrics(company, taxonomy, metric_map, str(filing["report"]), sic=(submissions or {}).get("sic"))
     if not wanted:
         return None
     if cached and (cached.get("filing") or {}).get("accn") == filing["accn"] and set(wanted) <= set(
