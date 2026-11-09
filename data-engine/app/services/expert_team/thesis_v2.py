@@ -385,6 +385,9 @@ def history_rows(cites: Mapping[str, Any], basis: str, points: Mapping[str, Mapp
         return None if not c or c.get("value") is None else float(c["value"]) / 1e6
 
     years = sorted(int(y) for y in (annual.get("revenue") or {}))
+    if not years and basis == "pb":
+        # holding sin ingresos operativos valorada por NAV: los ejercicios son los de su beneficio y su NAV
+        years = sorted(int(y) for y in (annual.get("net_income") or {}))
     rows: list[dict] = []
     prev_rev = None
     for y in years:
@@ -682,6 +685,12 @@ def thesis_markers(ctx: ThesisContext) -> dict[str, str]:
         m["punto.valor_contable"] = millions(sp["revenue"], ccy)
         m["punto.roe"] = pct(sp.get("margin"))
         m["punto.vc_accion"] = money(sp["revenue"] / sp["shares_diluted"] if sp.get("shares_diluted") else None, ccy)
+        nav = (val.get("citations") or {}).get("nav") or {}
+        if nav:  # holding sin ingresos valorada por su NAV (shareholder_irr_service.nav_from_filing)
+            m["punto.nav_accion"] = money(nav.get("nav_per_share"), ccy)
+            m["punto.nav_descuento"] = pct(nav.get("discount"), signed=True)
+            if nav.get("listing_currency") and nav.get("listing_currency") != ccy:
+                m["punto.nav_accion_cotizacion"] = money(nav.get("nav_per_share_listing"), nav["listing_currency"])
     if sp.get("earnings_label") == "FFO":
         m["punto.ffo"] = millions(sp["net_income"], ccy)
         m["punto.ffo_accion"] = money(sp["net_income"] / sp["shares_diluted"] if sp.get("shares_diluted") else None, ccy)
@@ -968,6 +977,10 @@ def tables(ctx: ThesisContext) -> dict[str, dict[str, Any]]:
          millions({"pe": sp["net_income"], "pb": sp["revenue"]}.get(sp["basis"], sp["ebitda"]), ccy),
          lab["earnings_formula"]],
         ["Múltiplo de partida", times(sp["multiple"]), lab["multiple"]],
+        *([["NAV por acción", money((cites.get("nav") or {}).get("nav_per_share"), ccy),
+            f"{(cites.get('nav') or {}).get('formula')}; NAV: {_cite_text((cites.get('nav') or {}).get('source'))}"],
+           ["Prima (+) o descuento (−) sobre el NAV", pct((cites.get("nav") or {}).get("discount"), signed=True),
+            "precio / NAV por acción − 1"]] if cites.get("nav") else []),
         ["Mediana de comparables", times(((val.get("trace") or {}).get("multiplo") or {}).get("mediana_comparables")),
          f"{((val.get('trace') or {}).get('multiplo') or {}).get('n_comparables', 0)} comparables calculados con la misma fórmula"],
     ]}

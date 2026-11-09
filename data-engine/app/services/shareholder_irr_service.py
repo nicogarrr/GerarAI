@@ -343,6 +343,111 @@ def _to_listed_share_basis(company: Any, annual: dict[str, dict[int, dict]], poi
         warnings.append("ADR: recuentos que no cuadran ni en ordinarias ni en ADS, sin convertir: " + ", ".join(unresolved))
 
 
+#: Patrimonio / activo a partir del cual un balance sin ingresos es el de una sociedad de inversión (sin
+#: deuda propia relevante: el activo son participadas y caja).
+INVESTMENT_EQUITY_RATIO = 0.8
+
+
+def _latest_fy_value(db: Session, company: Company, metric: str, year: int) -> float | None:
+    fact = db.scalars(
+        select(FinancialFact).where(FinancialFact.company_id == company.id, FinancialFact.metric == metric,
+                                    FinancialFact.period.like(f"{year}-%:FY"))
+        .order_by(desc(FinancialFact.id))
+    ).first()
+    return _f(fact.value) if fact is not None and fact.value is not None else None
+
+
+def investment_holding_reason(db: Session, company: Company, annual: Mapping[str, Mapping[int, dict]],
+                              kind: str, kind_reason: str) -> str | None:
+    """Por qué una empresa SIN ingresos operativos es una holding/sociedad de inversión que se valora por NAV,
+    o None. General, nunca por emisor:
+    - tipo de entidad: la ficha la clasifica como holding o gestora; o
+    - estructura del filing: ninguna línea de ingresos (ni arrendamientos ni primas) en ningún ejercicio,
+      beneficio positivo el último año (plusvalías y dividendos de participadas) y patrimonio ≥ 80 % del
+      activo (el balance de una sociedad de inversión: participadas a valor razonable, sin deuda propia).
+    Necesita patrimonio y beneficio por ejercicio: sin ellos no hay NAV que seguir."""
+    if any(annual.get(m) for m in ("revenue", "lease_income", "earned_premiums")):
+        return None
+    equity_years = sorted(set(annual.get("total_equity", {})) & set(annual.get("net_income", {})))
+    if not equity_years:
+        return None
+    last = equity_years[-1]
+    if kind == "holding":
+        return f"{kind_reason}; sin ingresos operativos: su valor es el NAV (patrimonio a valor razonable)"
+    equity, income = _mill(annual["total_equity"][last]), _mill(annual["net_income"][last])
+    assets = _latest_fy_value(db, company, "total_assets", last)
+    if equity is None or income is None or assets is None or assets <= 0 or equity <= 0 or income <= 0:
+        return None
+    ratio = equity * 1_000_000 / assets
+    if ratio < INVESTMENT_EQUITY_RATIO:
+        return None
+    return (f"sin ingresos operativos, beneficio positivo y patrimonio = {ratio:.0%} del activo en {last}: "
+            "balance de sociedad de inversión, su valor es el NAV")
+
+
+def nav_from_filing(company: Company, year: int, currency: str, aggregator_nav: float | None,
+                    warnings: list[str]) -> dict[str, Any] | None:
+    """NAV del último ejercicio leído de las cuentas depositadas (OCR de Companies House, ya en caché: sin
+    red), con su página y su línea. Solo si el balance cuadró, el cierre es de ``year`` y la divisa es la de
+    los informes. Si difiere más de un 1 % del dato del agregador, manda el del filing y se avisa."""
+    try:
+        from app.services.scanned_accounts import for_ticker, page_url
+    except Exception:  # noqa: BLE001
+        return None
+    best: dict[str, Any] | None = None
+    for read in for_ticker(getattr(company, "ticker", "") or ""):
+        for fig in read.get("figures") or []:
+            if fig.get("metric") != "net_assets" or fig.get("value_millions") is None:
+                continue
+            if str(fig.get("period_end") or "")[:4] != str(year) or str(fig.get("currency") or "").upper() != currency:
+                continue
+            cand = {**fig, "document": read.get("company_name"), "document_url": read.get("document_url"),
+                    "url": page_url(read.get("document_url"), fig.get("page")), "source_type": "companies_house_ocr",
+                    "made_up_to": read.get("made_up_to")}
+            # Las cuentas de la matriz (sociedad de inversión) antes que unas consolidadas de otra entidad.
+            if best is None or (fig.get("consolidated") is False and best.get("consolidated") is not False):
+                best = cand
+    if best is None:
+        return None
+    if aggregator_nav and abs(best["value_millions"] / aggregator_nav - 1) > 0.01:
+        warnings.append(f"NAV {year}: las cuentas depositadas dicen {best['value_millions']:,.1f} M {currency} "
+                        f"(pág. {best.get('page')}) y el agregador {aggregator_nav:,.1f} M: manda el filing")
+    return best
+
+
+def nav_holding_debt(db: Session, company: Company, year: int, warnings: list[str]
+                     ) -> tuple[float | None, dict[str, Any] | None]:
+    """Deuda de una sociedad de inversión sin deuda etiquetada (millones), con su fuente, o (None, None).
+
+    1. Las cuentas depositadas (OCR) con el balance CUADRADO y sin ninguna línea de préstamos: deuda 0
+       probada por el filing (un 0 explícito con su página), no supuesta.
+    2. Si no, el pasivo total del ejercicio como cota superior (todo el pasivo tratado como deuda).
+    3. Sin ninguno de los dos: N/D (el llamador lo dice)."""
+    try:
+        from app.services.scanned_accounts import for_ticker, page_url
+    except Exception:  # noqa: BLE001
+        for_ticker = None  # type: ignore[assignment]
+    for read in (for_ticker(getattr(company, "ticker", "") or "") if for_ticker else []):
+        figs = read.get("figures") or []
+        bal = ((read.get("checks") or {}).get("balance") or {})
+        nav = next((f for f in figs if f.get("metric") == "net_assets"
+                    and str(f.get("period_end") or "")[:4] == str(year)), None)
+        if nav is None or not bal.get("ok") or any(f.get("metric") == "borrowings" for f in figs):
+            continue
+        return 0.0, {"metric": "total_debt", "value": 0.0, "period": f"{nav.get('period_end')}",
+                     "unit": nav.get("currency"), "source_type": "companies_house_ocr",
+                     "document": read.get("company_name"), "url": page_url(read.get("document_url"), nav.get("page")),
+                     "formula": (f"balance cuadrado ({bal.get('why')}) sin línea de préstamos: deuda financiera 0 "
+                                 "según las cuentas depositadas")}
+    liabilities = _latest_fy_value(db, company, "total_liabilities", year)
+    if liabilities is not None and liabilities >= 0:
+        warnings.append(f"deuda sin etiquetar: se toma todo el pasivo de {year} ({liabilities / 1e6:,.1f} M) como deuda, "
+                        "cota superior")
+        return liabilities / 1e6, {"metric": "total_debt", "value": liabilities, "period": f"{year}:FY",
+                                   "formula": "pasivo total del ejercicio (cota superior: todo el pasivo como deuda)"}
+    return None, None
+
+
 def starting_point(db: Session, company: Company, *, today: date, basis: str | None = None,
                    include_leases: bool | None = None
                    ) -> tuple[engine.StartingPoint, rules.History, list[str], dict[str, Any]]:
@@ -362,6 +467,14 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
             if _mill(cite) is not None and (_mill(rev_slot.get(y)) or 0.0) < (_mill(cite) or 0.0):
                 rev_slot[y] = cite
     years = sorted(set(annual.get("revenue", {})))[-HISTORY_YEARS:]
+    nav_path = False
+    if not years:
+        # Holding o sociedad de inversión sin ingresos operativos (CGEO.L): su valor es el NAV (patrimonio a
+        # valor razonable). Se valora por el valor contable = NAV y el P/VC = descuento sobre el NAV.
+        holding_reason = investment_holding_reason(db, company, annual, kind, kind_reason)
+        if holding_reason:
+            kind, kind_reason, nav_path = "holding", holding_reason, True
+            years = sorted(set(annual.get("total_equity", {})) & set(annual.get("net_income", {})))[-HISTORY_YEARS:]
     if not years and kind == "pre_revenue":
         years = sorted(set(annual.get("net_income", {})))[-HISTORY_YEARS:]
     if not years:
@@ -399,7 +512,9 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
                         "minoritarios; el PER y el P/VC quedan N/D y el puente EV → capital resta 0 minoritarios sin verificar")
         cites["attributable_unverified"] = {"year": last, "total": annual.get("net_income_total", {}).get(last),
                                             "reason": "atribuible no verificable"}
-    reporting = str((annual.get("revenue", {}).get(last) or {}).get("unit") or company.currency or "USD").upper()[:3]
+    reporting = str((annual.get("revenue", {}).get(last)
+                     or (annual.get("total_equity", {}).get(last) if nav_path else None)
+                     or {}).get("unit") or company.currency or "USD").upper()[:3]
     financial = _is_financial(company) or kind in ("insurer", "bank", "holding")
     method = choose_method(revenue=revenue[-1], ebitda_years=ebitda, net_income=net_income[-1],
                            financial=financial, segment_ebitda=False)
@@ -408,6 +523,11 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     if kind in ("insurer", "bank", "holding"):
         eq, pref = series("total_equity"), series("preferred_stock")
         book = [None if e is None else e - (p or 0.0) for e, p in zip(eq, pref, strict=True)]
+        nav_cite = None
+        if nav_path:
+            nav_cite = nav_from_filing(company, last, reporting, book[-1], warnings)
+            if nav_cite is not None:
+                book[-1] = nav_cite["value_millions"]
         if book[-1] is not None and book[-1] > 0 and net_income[-1] is not None:
             method = {"chosen": "tir_pb", "discarded": {
                 "tir_ev_ebitda": ("el EBITDA de una aseguradora, un banco o un holding no es del accionista: la deuda y "
@@ -421,6 +541,11 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
             cites["book_value"] = {"formula": "patrimonio atribuible a la matriz − preferentes al cierre del ejercicio",
                                    "inputs": [annual.get("total_equity", {}).get(last),
                                               annual.get("preferred_stock", {}).get(last)]}
+            if nav_path:
+                cites["book_value"] = {
+                    "formula": ("NAV = patrimonio de la sociedad de inversión (participadas a valor razonable) al "
+                                "cierre del ejercicio"),
+                    "inputs": [nav_cite or annual.get("total_equity", {}).get(last)]}
         else:
             warnings.append("sin valor contable por ejercicio: se valora por el beneficio (PER) y se avisa")
     elif kind == "real_estate":
@@ -475,6 +600,7 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
     if factor and factor != 1:  # cotiza en peniques (GBp/GBX) o centavos: a la unidad de los informes
         price = float(price) / factor
         fx_note = f"cotización en subunidad (÷{factor})"
+    listing_price, listing_ccy = float(price), price_ccy
     if price_ccy != reporting:
         conv = convert_amount(db, float(price), price_ccy, reporting, today)
         if conv is None:
@@ -525,6 +651,10 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
         if k in point:
             cites[k] = point[k]
     debt = _mill(point.get("total_debt"))
+    if debt is None and nav_path:
+        debt, debt_cite = nav_holding_debt(db, company, last, warnings)
+        if debt_cite is not None:
+            cites["total_debt"] = debt_cite
     if debt is None:
         debt = _mill(point.get("long_term_debt"))
         if debt is None:
@@ -605,6 +735,24 @@ def starting_point(db: Session, company: Company, *, today: date, basis: str | N
         )
     if chosen_basis != "pb" and not any(a for a in hist.acquisitions if a):
         warnings.append("adquisiciones sin dato: el crecimiento histórico (que puede incluir compras) se toma como orgánico")
+    if nav_path and chosen_basis == "pb" and book[-1] and shares:
+        nav_ps = book[-1] / shares
+        discount = float(price) / nav_ps - 1 if nav_ps > 0 else None
+        cites["nav"] = {
+            "nav": book[-1], "shares": shares, "nav_per_share": nav_ps, "price": float(price),
+            "discount": discount, "currency": reporting, "year": last,
+            "nav_per_share_listing": (nav_ps * listing_price / float(price)) if float(price) else None,
+            "listing_currency": listing_ccy,
+            "formula": "NAV por acción = NAV / acciones; descuento = precio / NAV por acción − 1",
+            "source": (cites.get("book_value") or {}).get("inputs", [None])[0],
+        }
+        warnings.append(
+            f"holding sin ingresos operativos: se valora por su NAV ({book[-1]:,.1f} M {reporting}, "
+            f"{nav_ps:,.2f} {reporting} por acción a {last}"
+            + (f", {nav_ps * listing_price / float(price):,.2f} {listing_ccy} al tipo del precio"
+               if listing_ccy != reporting and float(price) else "") + ")"
+            + (f"; el precio cotiza un {abs(discount):.0%} {'por debajo' if discount < 0 else 'por encima'} del NAV"
+               if discount is not None else ""))
     cites["annual"] = {m: {str(y): annual[m][y] for y in years if y in annual.get(m, {})} for m in _FLOW if m in annual}
     cites["method"] = method
     cites["ifrs16_leases_in_debt"] = use_leases
