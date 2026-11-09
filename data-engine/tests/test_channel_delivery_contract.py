@@ -43,21 +43,26 @@ def _alert(db, channels):
     return alert
 
 
-class _Client:
-    calls: list = []
+def _client_que_registra(calls: list):
+    """Client httpx de mentira, uno por test: la lista de llamadas vive en el
+    test, no en un atributo de clase que se reasignaba sin restaurar y fugaba
+    estado entre tests (salvedad del auditor de #5007)."""
 
-    def __init__(self, **_kwargs):
-        pass
+    class Client:
+        def __init__(self, **_kwargs):
+            pass
 
-    def __enter__(self):
-        return self
+        def __enter__(self):
+            return self
 
-    def __exit__(self, *_args):
-        return None
+        def __exit__(self, *_args):
+            return None
 
-    def post(self, url, json):
-        type(self).calls.append((url, json))
-        return SimpleNamespace(raise_for_status=lambda: None)
+        def post(self, url, json):
+            calls.append((url, json))
+            return SimpleNamespace(raise_for_status=lambda: None)
+
+    return Client
 
 
 def _settings(**over):
@@ -73,8 +78,8 @@ def _settings(**over):
 
 def test_canal_desconocido_cae_a_webhook_y_deja_fila_sin_romper_la_pasada(monkeypatch, db):
     alert = _alert(db, ["in_app", "pichon"])
-    _Client.calls = []
-    monkeypatch.setattr(notification_service.httpx, "Client", _Client)
+    calls: list = []
+    monkeypatch.setattr(notification_service.httpx, "Client", _client_que_registra(calls))
     monkeypatch.setattr(notification_service, "get_settings", lambda: _settings())
 
     deliveries = NotificationService().dispatch(db, alert)
@@ -84,7 +89,7 @@ def test_canal_desconocido_cae_a_webhook_y_deja_fila_sin_romper_la_pasada(monkey
     # El desconocido: catch-all webhook, sin endpoint -> not_configured, con fila.
     assert deliveries["pichon"]["status"] == "not_configured"
     assert "pichon" in (deliveries["pichon"]["error"] or "")
-    assert _Client.calls == []  # sin endpoint no hay llamada de red
+    assert calls == []  # sin endpoint no hay llamada de red
     rows = db.scalars(
         select(AlertDelivery).where(AlertDelivery.alert_id == alert.id)
     ).all()
@@ -97,8 +102,8 @@ def test_canal_desconocido_con_webhook_generico_no_aplica_solo_email_push(monkey
     """El catch-all solo tiene endpoint para email/push; un canal nuevo aunque
     haya webhooks de email/push configurados NO se cuela por ellos."""
     alert = _alert(db, ["pichon"])
-    _Client.calls = []
-    monkeypatch.setattr(notification_service.httpx, "Client", _Client)
+    calls = []
+    monkeypatch.setattr(notification_service.httpx, "Client", _client_que_registra(calls))
     monkeypatch.setattr(
         notification_service, "get_settings",
         lambda: _settings(
@@ -110,4 +115,4 @@ def test_canal_desconocido_con_webhook_generico_no_aplica_solo_email_push(monkey
     deliveries = NotificationService().dispatch(db, alert)
 
     assert deliveries["pichon"]["status"] == "not_configured"
-    assert _Client.calls == []
+    assert calls == []
