@@ -174,13 +174,23 @@ def test_nasdaq_day_reintenta_una_vez_y_rinde(monkeypatch):
     assert out == [] and cliente.intentos == 2
 
 
+def test_nasdaq_day_exito_en_el_segundo_intento(monkeypatch):
+    dia = date(2026, 11, 10)
+    cliente = _AsyncClientFalso(filas_por_dia={dia: [{"symbol": "AAPL"}]}, fallos=1)
+    out = asyncio.run(eds._nasdaq_day(cliente, dia, asyncio.Semaphore(4)))
+    assert out == [{"symbol": "AAPL"}] and cliente.intentos == 2
+
+
 def test_nasdaq_scan_primera_fecha_futura_y_sesion(monkeypatch):
     hoy = date(2026, 11, 9)  # lunes
     dia1, dia2 = date(2026, 11, 10), date(2026, 11, 11)
     cliente = _AsyncClientFalso(
         filas_por_dia={
             dia1: [{"symbol": "AAPL", "time": "time-after-hours", "fiscalQuarterEnding": "Sep/2026"}],
-            dia2: [{"symbol": "AAPL", "time": "time-pre-market", "fiscalQuarterEnding": ""}],
+            dia2: [
+                {"symbol": "AAPL", "time": "time-pre-market", "fiscalQuarterEnding": ""},
+                {"symbol": "MSFT", "time": "", "fiscalQuarterEnding": ""},
+            ],
         }
     )
     monkeypatch.setattr(
@@ -188,8 +198,10 @@ def test_nasdaq_scan_primera_fecha_futura_y_sesion(monkeypatch):
     )
     out = asyncio.run(eds._nasdaq_scan({"AAPL", "MSFT"}, hoy))
     assert out == {
-        "AAPL": {"date": dia1, "session": "after_market", "fiscal": "Sep/2026"}
-    }  # MSFT sin fila: ausente; fiscal vacio -> None lo cubre el segundo dia si ganara
+        "AAPL": {"date": dia1, "session": "after_market", "fiscal": "Sep/2026"},
+        # la primera fecha futura gana; fiscal vacio y sesion desconocida -> None
+        "MSFT": {"date": dia2, "session": None, "fiscal": None},
+    }
 
 
 def test_fetch_nasdaq_dates_sin_tickers_no_llama(monkeypatch):
