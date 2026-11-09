@@ -74,13 +74,26 @@ def test_sin_parametro_filtra_por_tenant_de_sesion(db):
     c = _company(db, "SRAC")
     # Dos splits duplicados en cada tenant: con el filtro solo se ve el
     # par del tenant de la sesion.
-    _split(db, c, date(2020, 8, 31), "4", t1)
-    _split(db, c, date(2020, 8, 31), "4", t1)
-    _split(db, c, date(2020, 8, 31), "4", t2)
-    _split(db, c, date(2020, 8, 31), "4", t2)
+    s1 = _split(db, c, date(2020, 8, 31), "4", t1)
+    s2 = _split(db, c, date(2020, 8, 31), "4", t1)
+    o1 = _split(db, c, date(2020, 8, 31), "4", t2)
+    o2 = _split(db, c, date(2020, 8, 31), "4", t2)
     db.info["tenant_id"] = t1.id
     plan = plan_split_reconciliation(db, tenant_id=None, all_tenants=False)
     body = plan.as_dict()
     assert body["rows_examined"] == 2
     assert body["duplicate_group_count"] == 1
     assert body["proposed_removal_count"] == 1
+    # Identidad exacta: el grupo es del tenant de la sesion y sus miembros
+    # son las dos filas de ese tenant (nunca las del otro).
+    (group,) = body["duplicate_groups"]
+    assert group["tenant_id"] == t1.id
+    assert group["company_id"] == c.id
+    assert group["kind"] == "exact_duplicate"
+    assert group["status"] == "proposed"
+    assert sorted(m["id"] for m in group["members"]) == sorted([s1.id, s2.id])
+    # Empate aplicado/fetched: se queda la fila de id menor (determinista).
+    assert group["keep"]["id"] == s1.id
+    assert group["propose_remove_unapplied_ids"] == [s2.id]
+    assert o1.id not in [m["id"] for m in group["members"]]
+    assert o2.id not in [m["id"] for m in group["members"]]
