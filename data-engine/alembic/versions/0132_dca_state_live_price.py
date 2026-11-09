@@ -14,6 +14,14 @@ columnas nuevas, todas con valor por defecto seguro para las filas existentes:
 - live_price / live_session ('pre'|'regular'|'post') / live_at: el precio
   actual usado, su sesion y su hora; NULL cuando el nivel es solo de cierres
   (se limpian en cada evaluacion sin precio actual usable).
+
+PROPIEDAD REGISTRADA, no inferida: una base arrancada con `create_all` del
+ORM llega aqui con las 4 columnas ya puestas (0083 las adopta con la tabla).
+Esta migracion añade SOLO las que falten y anota en `migration_added_columns`
+exactamente las que añadio; el downgrade borra unicamente lo anotado, asi
+las columnas que venian del ORM (y sus datos) sobreviven al downgrade.
+Offline (--sql) no puede inspeccionar: emite el alta de las 4 y del registro
+tal cual, coherente con una cadena desde cero (0083 crea la tabla sin ellas).
 """
 import sqlalchemy as sa
 
@@ -25,18 +33,88 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade() -> None:
-    op.add_column(
-        "dca_signal_states",
-        sa.Column("close_kind", sa.String(length=8), server_default="close", nullable=False),
+_TABLE = "dca_signal_states"
+_LOG = "migration_added_columns"
+_LIVE_COLUMNS = (
+    sa.Column("close_kind", sa.String(length=8), server_default="close", nullable=False),
+    sa.Column("live_price", sa.Numeric(20, 6), nullable=True),
+    sa.Column("live_session", sa.String(length=8), nullable=True),
+    sa.Column("live_at", sa.DateTime(timezone=True), nullable=True),
+)
+
+
+def _is_offline() -> bool:
+    import sqlalchemy.engine.mock
+
+    return isinstance(op.get_bind(), sqlalchemy.engine.mock.MockConnection)
+
+
+def _copy(column: sa.Column) -> sa.Column:
+    return sa.Column(column.name, column.type, server_default=column.server_default, nullable=column.nullable)
+
+
+def _create_log_table() -> None:
+    op.create_table(
+        _LOG,
+        sa.Column("revision", sa.String(64), nullable=False),
+        sa.Column("table_name", sa.String(128), nullable=False),
+        sa.Column("column_name", sa.String(128), nullable=False),
+        sa.Column("added_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.PrimaryKeyConstraint("revision", "table_name", "column_name"),
     )
-    op.add_column("dca_signal_states", sa.Column("live_price", sa.Numeric(20, 6), nullable=True))
-    op.add_column("dca_signal_states", sa.Column("live_session", sa.String(length=8), nullable=True))
-    op.add_column("dca_signal_states", sa.Column("live_at", sa.DateTime(timezone=True), nullable=True))
+
+
+def upgrade() -> None:
+    if _is_offline():
+        # Sin inspeccion: cadena desde cero (0083 crea la tabla sin estas
+        # columnas), asi que el alta de las 4 y del registro es exacta.
+        _create_log_table()
+        for column in _LIVE_COLUMNS:
+            op.add_column(_TABLE, _copy(column))
+            op.execute(
+                f"INSERT INTO {_LOG} (revision, table_name, column_name) VALUES ('{revision}', '{_TABLE}', '{column.name}')"
+            )
+        return
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if not inspector.has_table(_LOG):
+        _create_log_table()
+    existing = {col["name"] for col in sa.inspect(bind).get_columns(_TABLE)}
+    for column in _LIVE_COLUMNS:
+        if column.name in existing:
+            continue
+        op.add_column(_TABLE, _copy(column))
+        bind.execute(
+            sa.text(
+                f"INSERT INTO {_LOG} (revision, table_name, column_name)"
+                " VALUES (:revision, :table_name, :column_name)"
+            ),
+            {"revision": revision, "table_name": _TABLE, "column_name": column.name},
+        )
 
 
 def downgrade() -> None:
-    op.drop_column("dca_signal_states", "live_at")
-    op.drop_column("dca_signal_states", "live_session")
-    op.drop_column("dca_signal_states", "live_price")
-    op.drop_column("dca_signal_states", "close_kind")
+    if _is_offline():
+        for column in reversed(_LIVE_COLUMNS):
+            op.drop_column(_TABLE, column.name)
+        op.drop_table(_LOG)
+        return
+    bind = op.get_bind()
+    if not sa.inspect(bind).has_table(_LOG):
+        # Nada registrado: esta migracion no añadio nada aqui (p. ej. SQL
+        # offline aplicado a mano). No se toca ninguna columna.
+        return
+    rows = bind.execute(
+        sa.text(f"SELECT column_name FROM {_LOG} WHERE revision = :revision AND table_name = :table"),
+        {"revision": revision, "table": _TABLE},
+    ).fetchall()
+    owned = {row[0] for row in rows}
+    existing = {col["name"] for col in sa.inspect(bind).get_columns(_TABLE)}
+    for column in reversed(_LIVE_COLUMNS):
+        if column.name in owned and column.name in existing:
+            op.drop_column(_TABLE, column.name)
+    bind.execute(
+        sa.text(f"DELETE FROM {_LOG} WHERE revision = :revision AND table_name = :table"),
+        {"revision": revision, "table": _TABLE},
+    )
+    op.drop_table(_LOG)
