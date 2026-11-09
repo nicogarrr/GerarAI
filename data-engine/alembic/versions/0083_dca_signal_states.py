@@ -12,6 +12,16 @@ contra la definicion congelada; cualquier divergencia FALLA sin tocar nada.
 Si coinciden se adoptan: solo se crean los indices que falten y se anota la
 adopcion en `migration_adoption_log`, para que downgrade no borre una tabla
 que esta migracion no creo.
+
+La definicion congelada NO incluye las columnas del precio actual
+(close_kind, live_price, live_session, live_at): en bases gestionadas por
+Alembic las añade 0132_dca_state_live_price. Pero el ORM las crea desde el
+primer `create_all`, asi que una tabla preexistente puede traerlas DE MAS:
+se aceptan exactamente esas 4 (validando nombre, tipo y nullability contra
+la definicion de 0132) y se adoptan con la tabla. La propiedad de esas
+columnas es de 0132: su upgrade registra en `migration_added_columns` solo
+lo que añade y su downgrade borra solo eso, asi las columnas que venian del
+ORM sobreviven al downgrade.
 """
 
 import sqlalchemy as sa
@@ -107,17 +117,40 @@ def _create(table: str) -> None:
         op.create_index(name, table, list(cols))
 
 
+def _live_extra_columns() -> dict[str, sa.Column]:
+    """Columnas de 0132_dca_state_live_price: identicas a su _LIVE_COLUMNS.
+
+    Una tabla preexistente creada por el ORM (create_all) las trae de mas;
+    se aceptan con esta forma exacta y su propiedad es de 0132.
+    """
+    return {
+        "close_kind": sa.Column("close_kind", sa.String(length=8), nullable=False),
+        "live_price": sa.Column("live_price", sa.Numeric(20, 6), nullable=True),
+        "live_session": sa.Column("live_session", sa.String(length=8), nullable=True),
+        "live_at": sa.Column("live_at", sa.DateTime(timezone=True), nullable=True),
+    }
+
+
 def _divergences(inspector: sa.Inspector, dialect: sa.engine.Dialect, table: str) -> list[str]:
     spec = _SPECS[table]
     reflected = {col["name"]: col for col in inspector.get_columns(table)}
     expected = {col.name: col for col in spec["columns"]()}
+    allowed_extra = _live_extra_columns() if table == _STATES else {}
     out: list[str] = []
     missing = set(expected) - set(reflected)
     extra = set(reflected) - set(expected)
     if missing:
         out.append(f"{table}: columnas ausentes {sorted(missing)}")
-    if extra:
-        out.append(f"{table}: columnas de mas {sorted(extra)}")
+    unknown_extra = extra - set(allowed_extra)
+    if unknown_extra:
+        out.append(f"{table}: columnas de mas {sorted(unknown_extra)}")
+    for name in extra & set(allowed_extra):
+        got = reflected[name]["type"].compile(dialect=dialect)
+        want = allowed_extra[name].type.compile(dialect=dialect)
+        if got != want:
+            out.append(f"{table}.{name}: tipo {got} != {want}")
+        if bool(reflected[name]["nullable"]) != bool(allowed_extra[name].nullable):
+            out.append(f"{table}.{name}: nullable={reflected[name]['nullable']} != {allowed_extra[name].nullable}")
     for name, column in expected.items():
         if name not in reflected:
             continue
