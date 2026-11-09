@@ -99,7 +99,7 @@ def test_create_con_telegram_configurado(db, monkeypatch):
 
 
 def test_price_in_threshold_unit_sin_empresa_devuelve_valor(db):
-    rule = SimpleNamespace(company_id=999999)
+    rule = AlertRule(company_id=999999, name="x")
     result = AlertRuleService._price_in_threshold_unit(
         db, rule, Decimal("5"), unit="USD", on=date(2025, 6, 2)
     )
