@@ -239,7 +239,11 @@ class NotificationService:
         reintento infinito del outbox (salvedad del FAV de #5033). Valor no
         entero o <=0: cooldown por defecto.
         """
-        raw = (body.get("parameters") or {}).get("retry_after")
+        # parameters con forma no-dict (lista, string) haria .get lanzar
+        # AttributeError hacia el except generico -> 'unknown' -> reintento
+        # infinito (salvedad del FAV de #5039): se trata como ausente.
+        params = body.get("parameters")
+        raw = params.get("retry_after") if isinstance(params, dict) else None
         try:
             seconds = int(raw)
         except (TypeError, ValueError, OverflowError):
