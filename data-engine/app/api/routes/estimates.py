@@ -84,7 +84,7 @@ def fact_source_link(ticker: str, metric: str = Query(..., max_length=60),
     if fact is None and period.endswith(":Q4") and additive:
         rows = db.scalars(select(FinancialFact).where(FinancialFact.company_id == company.id,
                                                       FinancialFact.metric == metric)).all()
-        acts = actuals_from_facts([(str(r.period), float(r.value), r.filed, r.source_url) for r in rows],
+        acts = actuals_from_facts([(str(r.period), float(r.value), r.filed, r.source_url, getattr(r, "fiscal_year", None)) for r in rows],
                                   metric=metric)
         derived = next((a for a in acts.values() if a.derived and a.end.isoformat() == period[:10]), None)
         if derived is not None:

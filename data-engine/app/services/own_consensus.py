@@ -170,28 +170,46 @@ def _month_end(year: int, month: int) -> date:
     return nxt - timedelta(days=1)
 
 
-def period_end(period: str, fy_month: int) -> date:
+def label_offset_of(actuals: Mapping[str, Actual]) -> int:
+    """Desfase entre la etiqueta del ejercicio de las claves ``fy`` y el año nominal de su cierre
+    (1 en los emisores que nombran el ejercicio por su año de inicio; ver ``fiscal_label``)."""
+    from app.services.fiscal_label import label_offset_from_facts
+
+    return label_offset_from_facts((a.end, int(k[2:])) for k, a in actuals.items() if k.startswith("fy"))
+
+
+def period_end(period: str, fy_month: int, label_offset: int = 0) -> date:
+    """Cierre de un periodo por su clave; ``label_offset`` = 1 cuando el ejercicio «fy2025» del emisor
+    cierra en el año siguiente (cierre a finales de enero nombrado por su año de inicio)."""
     if period.startswith("fy"):
-        return _month_end(int(period[2:]), fy_month)
+        return _month_end(int(period[2:]) + label_offset, fy_month)
     if period.startswith("h"):
-        half, year = int(period[1]), int(period[3:])
+        half, year = int(period[1]), int(period[3:]) + label_offset
         months = fy_month - (6 if half == 1 else 0)
         y = year if months > 0 else year - 1
         return _month_end(y, months if months > 0 else months + 12)
-    q, year = int(period[1]), int(period[3:])
+    q, year = int(period[1]), int(period[3:]) + label_offset
     month = fy_month - 3 * (4 - q)
     y = year if month > 0 else year - 1
     return _month_end(y, month if month > 0 else month + 12)
 
 
-def actuals_from_facts(rows: Sequence[tuple[str, float, date | None, str | None]], *, metric: str
-                       ) -> dict[str, Actual]:
-    """Hechos ``(period "YYYY-MM-DD:Q3|FY", valor, filed, url)`` → datos por clave fy/q.
+def actuals_from_facts(rows: Sequence[tuple[Any, ...]], *, metric: str) -> dict[str, Actual]:
+    """Hechos ``(period "YYYY-MM-DD:Q3|FY", valor, filed, url[, fiscal_year])`` → datos por clave fy/q.
+
+    La clave del ejercicio es la etiqueta del emisor: con ``fiscal_year`` en los hechos anuales
+    (dei:DocumentFiscalYearFocus en la ingesta SEC) un emisor que nombra el ejercicio por su año de
+    inicio (cierre 30-ene-2026 = «fiscal 2025») queda en ``fy2025``, como su guía; sin él, el año
+    nominal del cierre.
 
     Si falta el 4T y están el año y los otros tres, se deriva (4T = año − 9M) y se marca
     ``derived`` con su fórmula (solo métricas sumables)."""
+    from app.services.fiscal_label import label_offset_from_facts
+
     parsed: list[tuple[date, str, float, date | None, str | None]] = []
-    for period, value, filed, url in rows:
+    labels: list[tuple[date, int | None]] = []
+    for row in rows:
+        period, value, filed, url = row[:4]
         try:
             end_s, kind = str(period).split(":", 1)
             end = date.fromisoformat(end_s)
@@ -200,16 +218,19 @@ def actuals_from_facts(rows: Sequence[tuple[str, float, date | None, str | None]
         if value is None or not math.isfinite(float(value)):
             continue
         parsed.append((end, kind.upper(), float(value), filed, url))
+        if kind.upper() == "FY" and len(row) > 4 and row[4] is not None:
+            labels.append((end, int(row[4])))
+    offset = label_offset_from_facts(labels)
     fy_month = fy_end_month([p[0] for p in parsed if p[1] == "FY"])
     out: dict[str, Actual] = {}
     for end, kind, value, filed, url in sorted(parsed, key=lambda p: (p[0], p[3] or date.min)):
         if kind == "FY":
-            key = f"fy{fiscal_year_of(end)}"
+            key = f"fy{fiscal_year_of(end) - offset}"
         elif kind in {"Q1", "Q2", "Q3", "Q4"}:
             # El trimestre ya viene declarado por la fuente. En ejercicios de
             # 52/53 semanas su cierre puede caer en el mes del trimestre siguiente.
             _, fy = quarter_of(end, fy_month)
-            key = f"q{kind[1:]}_{fy}"
+            key = f"q{kind[1:]}_{fy - offset}"
         else:
             continue
         out[key] = Actual(key, end, value, filed, url)
@@ -265,8 +286,9 @@ def guidance_beat(history: Sequence[GuidanceRow], actuals: Mapping[str, Actual],
     """Desvío histórico de la guía: mediana de (real ÷ punto medio − 1), con la última
     guía de cada periodo emitida ANTES de su cierre (congelada antes del resultado)."""
     last: dict[str, GuidanceRow] = {}
+    offset = label_offset_of(actuals)
     for row in sorted(history, key=lambda r: r.as_of):
-        end = period_end(row.period, fy_month)
+        end = period_end(row.period, fy_month, offset)
         if row.as_of < end:
             last[row.period] = row
     cases: list[dict[str, Any]] = []
@@ -366,6 +388,7 @@ def build_cells(metric: str, actuals: Mapping[str, Actual], *, today: date,
     measured = measured_errors or {}
     fy_ends = [a.end for k, a in actuals.items() if k.startswith("fy")]
     fy_month = fy_end_month(fy_ends)
+    offset = label_offset_of(actuals)
     last_fy = max((int(k[2:]) for k in actuals if k.startswith("fy")), default=today.year - 1)
     targets: set[str] = {f"fy{last_fy + 1}", f"fy{last_fy + 2}"}
     targets |= {f"q{q}_{last_fy + 1}" for q in (1, 2, 3, 4) if f"q{q}_{last_fy + 1}" not in actuals}
@@ -384,9 +407,9 @@ def build_cells(metric: str, actuals: Mapping[str, Actual], *, today: date,
         return actuals.get(f"{q}_{int(y) - 1}")
 
     cells: dict[str, Cell] = {}
-    order = sorted(targets, key=lambda p: (period_end(p, fy_month), p.startswith("fy")))
+    order = sorted(targets, key=lambda p: (period_end(p, fy_month, offset), p.startswith("fy")))
     for period in order:
-        end = period_end(period, fy_month)
+        end = period_end(period, fy_month, offset)
         is_fy = period.startswith("fy")
         cands: list[Candidate] = []
         fy_key = period if is_fy else f"fy{period.split('_')[1]}"
@@ -699,7 +722,7 @@ def _facts(db: Any, company: Any, fact_metric: str) -> list[tuple[str, float, da
     rows = db.scalars(select(FinancialFact).where(FinancialFact.company_id == company.id,
                                                   FinancialFact.metric == fact_metric)).all()
     cik = getattr(company, "cik", None)
-    out = []
+    out: list[Any] = []  # (period, valor, filed, url, fiscal_year): la etiqueta del ejercicio va al final
     for r in rows:
         try:
             url = r.source_url
@@ -707,7 +730,7 @@ def _facts(db: Any, company: Any, fact_metric: str) -> list[tuple[str, float, da
             url = None
         # El filing exacto de la cifra, no el listado genérico de la empresa.
         url = sec_filing_url(url, getattr(r, "accession_number", None), cik)
-        out.append((str(r.period), float(r.value), r.filed, url))
+        out.append((str(r.period), float(r.value), r.filed, url, getattr(r, "fiscal_year", None)))
     return out
 
 

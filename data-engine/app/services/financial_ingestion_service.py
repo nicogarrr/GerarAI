@@ -25,6 +25,7 @@ from app.services.fact_deletion import (
     drop_shadowed_facts,
     tenant_condition,
 )
+from app.services.fiscal_label import dei_label_offset
 from app.services.number_parsing import parse_machine_decimal as _decimal
 from app.services.price_units import price_in_currency
 from app.services.source_documents import get_or_create_source_document
@@ -297,7 +298,10 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # 21 (9-nov-2026): US GAAP sin OperatingIncomeLoss: resultado operativo = antes de impuestos − NonoperatingIncomeExpense
 #    del MISMO filing y periodo, solo si cuadra con ingresos − gastos operativos (o bruto − gastos operativos) del mismo
 #    filing (ASTS 10-K 2025: −457,1 + 169,4 = −287,7 M$ = 70,9 − 358,6; antes N/D desde 2021 y EBITDA «—»).
-SEC_INGESTION_RULES_VERSION = 21
+# 22 (9-nov-2026): año fiscal de los informes anuales con la etiqueta del emisor (dei:DocumentFiscalYearFocus):
+#    los que nombran el ejercicio por su año de inicio (cierre a finales de enero) ya no salen un año por delante
+#    de su guía (Lowe's: cierre 30-ene-2026 FY2026 → FY2025, su «fiscal 2025»).
+SEC_INGESTION_RULES_VERSION = 22
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Arrendadores (REIT): su ingreso principal es el del arrendamiento (ASC 842),
@@ -2500,6 +2504,10 @@ class FinancialIngestionService:
             annual_anchors
         ) or _modal_fiscal_end_month(us_gaap)
         bank_like = _is_bank_like(company)
+        # Etiqueta del ejercicio que usa el propio emisor (dei:DocumentFiscalYearFocus, campo `fy` de su
+        # periodo propio en cada 10-K): 1 en los que nombran el ejercicio por su año de inicio (cierre a
+        # finales de enero: «fiscal 2025» = cierre 30-ene-2026), 0 en el resto (regla 22).
+        fy_label_offset = dei_label_offset(us_gaap)
 
         # Pre-computo anual (funciones puras sobre companyfacts), ANTES del
         # replace, para que el borrado sea selectivo por (metric, period):
@@ -2732,7 +2740,7 @@ class FinancialIngestionService:
                         and entry.get("_concept")
                         == "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"
                     ):
-                        cash_restricted_years.add(_annual_fiscal_year(str(entry["end"]), modal_fy_month))
+                        cash_restricted_years.add(_annual_fiscal_year(str(entry["end"]), modal_fy_month) - fy_label_offset)
                     _queue_fact(
                         db,
                         **{
@@ -2741,7 +2749,7 @@ class FinancialIngestionService:
                             "value": val,
                             "unit": unit,
                             "period": f"{entry['end']}:FY",
-                            "fiscal_year": _annual_fiscal_year(str(entry["end"]), modal_fy_month),
+                            "fiscal_year": _annual_fiscal_year(str(entry["end"]), modal_fy_month) - fy_label_offset,
                             "fiscal_quarter": "FY",
                             "source_id": document.id,
                             "source_type": "SEC",
@@ -2862,6 +2870,17 @@ class FinancialIngestionService:
         # lectura de hechos (shadows, derivadas, conflictos, chunks).
         _flush_fact_buffer(db)
         drop_shadowed_facts(db, company.id, document.id, tenant_condition(db))
+        if fy_label_offset:
+            # Los ejercicios SEC conservados de imports anteriores (fuera de la ventana re-anclable) pasan
+            # a la misma etiqueta: dos cierres distintos no pueden compartir año fiscal.
+            for fact in db.scalars(select(FinancialFact).where(
+                    FinancialFact.company_id == company.id, FinancialFact.source_type == "SEC",
+                    FinancialFact.fiscal_quarter == "FY", FinancialFact.fiscal_year.is_not(None),
+                    tenant_condition(db))):
+                want = _annual_fiscal_year(str(fact.period)[:10], modal_fy_month) - fy_label_offset
+                if fact.fiscal_year != want:
+                    fact.fiscal_year = want
+            db.flush()
 
         if cash_restricted_years:
             document.metadata_ = {

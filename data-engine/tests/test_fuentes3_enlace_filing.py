@@ -34,4 +34,4 @@ def test_own_consensus_citations_point_to_the_filing() -> None:
             return SimpleNamespace(all=lambda: [fact])
 
     rows = own_consensus._facts(_DB(), SimpleNamespace(id=1, cik="0000320193"), "eps_diluted")  # noqa: SLF001
-    assert rows == [("2025-09-27:FY", 7.46, None, INDEX)]
+    assert rows == [("2025-09-27:FY", 7.46, None, INDEX, None)]
