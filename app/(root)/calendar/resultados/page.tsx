@@ -6,7 +6,7 @@ import { getFollowedEarnings, type FollowedEarningsCalendar } from '@/lib/action
 import { getEarningsMaterials } from '@/lib/actions/earnings-materials.actions';
 import { HISTORY_DAYS, type EventMaterials } from '@/lib/earnings-materials';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
-import { getT } from '@/lib/i18n/server';
+import { getT, getFormat } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -31,6 +31,7 @@ function todayInMadrid(): string {
 
 export default async function FollowedEarningsPage() {
     const ti = await getT();
+    const f = await getFormat();
     const today = todayInMadrid();
     let calendar: FollowedEarningsCalendar;
     try {
@@ -51,7 +52,7 @@ export default async function FollowedEarningsPage() {
     const renderDay = (day: FollowedEarningsCalendar['days'][number]) => (
         <section key={day.date} aria-labelledby={`d-${day.date}`}>
             <h2 id={`d-${day.date}`} className="mb-2 text-lg font-semibold text-gray-100 first-letter:uppercase">
-                {dayHeading(day.date, today, ti)}
+                {dayHeading(day.date, today, ti, f)}
             </h2>
             <ul className="divide-y divide-gray-800 overflow-hidden rounded-2xl bg-surface-1">
                 {day.events.map((event) => (
@@ -62,7 +63,7 @@ export default async function FollowedEarningsPage() {
                         materialsSlot={
                             event.date <= today ? (
                                 <Suspense fallback={null}>
-                                    <EventMaterialsLine ti={ti} promise={materialsPromise} eventKey={`${event.ticker}|${event.date}`} />
+                                    <EventMaterialsLine ti={ti} f={f} promise={materialsPromise} eventKey={`${event.ticker}|${event.date}`} />
                                 </Suspense>
                             ) : null
                         }

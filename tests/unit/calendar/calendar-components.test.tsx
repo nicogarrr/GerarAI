@@ -19,6 +19,7 @@ vi.mock('@/components/calendar/CompanyLogo', () => ({
     CompanyLogo: ({ ticker, className }: { ticker: string; className?: string }) => <span data-testid="logo" className={className}>{ticker}</span>,
 }));
 
+import { createFormatters } from '@/lib/format';
 import { CalendarTabs } from '@/components/calendar/CalendarTabs';
 import EarningsDayStrip from '@/components/calendar/EarningsDayStrip';
 import SubscriptionManager, { SubscribeButtons } from '@/components/calendar/SubscriptionManager';
@@ -247,6 +248,13 @@ describe('FollowedEarningsList helpers', () => {
         expect(other).not.toMatch(/^Hoy|^Mañana/);
         expect(other).toMatch(/23/);
     });
+    it('dayHeading usa el idioma del formateador recibido (sin él, español)', () => {
+        // Repro: la página en inglés mostraba los títulos de día en español.
+        const en = createFormatters('en');
+        expect(dayHeading('2026-10-23', '2026-10-20', undefined, en)).toContain('Oct 23');
+        expect(dayHeading('2026-10-23', '2026-10-20', undefined, en)).not.toContain('23 oct');
+        expect(dayHeading('2026-10-23', '2026-10-20')).toContain('23 oct');
+    });
 });
 
 describe('MaterialsLine', () => {
@@ -273,6 +281,13 @@ describe('MaterialsLine', () => {
         expect(link).toHaveAttribute('target', '_blank');
         expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
         expect(screen.getByText('SEC · 20 oct 2026')).toBeInTheDocument();
+    });
+    it('la fecha de la SEC sigue el idioma del formateador recibido', () => {
+        // Repro: con la interfaz en inglés la fecha salía en español («20 oct 2026»).
+        const en = createFormatters('en');
+        render(<MaterialsLine materials={{ ...base, status: 'ok', documents: [{ kind: 'nota_prensa', url: 'https://sec.gov/a', label: 'Nota de resultados', exhibit: 'EX-99.1' }] }} f={en} />);
+        expect(screen.getByText('SEC · Oct 20, 2026')).toBeInTheDocument();
+        expect(screen.queryByText('SEC · 20 oct 2026')).not.toBeInTheDocument();
     });
     it('EventMaterialsLine toma solo la fila de su clave', async () => {
         const promise = Promise.resolve({ 'KO#1': { ...base, status: 'no_disponible' as const } });
