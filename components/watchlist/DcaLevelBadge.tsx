@@ -46,6 +46,23 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
     const metric = dcaSignalMetric(state, signalMonths, t, locale);
     const rsi = dcaRsi(state.metrics?.rsi, locale);
     const close = dcaPrice(state.close, state.currency_label, locale);
+    const livePrice = state.close_kind === 'live' ? dcaPrice(state.live_price ?? null, state.currency_label, locale) : null;
+    const liveTime = state.close_kind === 'live' && state.live_at
+        ? `${new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' }).format(new Date(state.live_at))} ET`
+        : null;
+    const LIVE_SESSION_KEYS = {
+        pre: 'watchlist.dca.badge.liveSession.pre',
+        regular: 'watchlist.dca.badge.liveSession.regular',
+        post: 'watchlist.dca.badge.liveSession.post',
+    } as const;
+    const liveSession = state.live_session === 'pre' || state.live_session === 'post' ? state.live_session : 'regular';
+    const liveLine = livePrice
+        ? t('watchlist.dca.badge.liveLevel', {
+            session: t(LIVE_SESSION_KEYS[liveSession]),
+            price: livePrice,
+            time: liveTime ?? '—',
+        })
+        : null;
     const prices = (['2x', '3x', '4x'] as const)
         .map((key) => ({ key, value: dcaPrice(state.level_prices?.[key], state.currency_label, locale) }))
         .filter((entry) => entry.value);
@@ -75,6 +92,7 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
                 <p className="font-semibold">{dcaEngineText(state.zone, t)}</p>
                 <p>{t('watchlist.dca.badge.status', { status: dcaStatusLabel(state.status, t), period: state.period })}</p>
                 {close ? <p>{t('watchlist.dca.badge.settledClose', { close, date: state.signal_date })}</p> : null}
+                {state.close_kind === 'live' && liveLine ? <p data-testid="dca-badge-live">{liveLine}</p> : null}
                 {metric ? <p>{metric.label}: {metric.value}</p> : null}
                 {rsi ? <p>{t('watchlist.dca.badge.monthlyRsi', { rsi })}</p> : null}
                 {prices.length > 0 ? (

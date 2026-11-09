@@ -108,6 +108,12 @@
       "provisional": "(provisional)",
       "status": "Status: month {status} ({period})",
       "settledClose": "Settled close: {close} · {date}",
+      "liveLevel": "Level with {session} {price} ({time}): not a close.",
+      "liveSession": {
+        "pre": "pre-market price",
+        "regular": "session price",
+        "post": "after-hours price"
+      },
       "monthlyRsi": "Monthly RSI: {rsi}",
       "triggerClose": "Close that would trigger it: {prices}",
       "forming": "The month hasn't closed: the verdict may change.",
@@ -284,6 +290,12 @@
     "tfMissing": "Not enough history in this timeframe",
     "monthsInZone": "{count} months in zone",
     "forming": "provisional: the month has not closed",
+    "livePre": "With pre-market price {price} ({time})",
+    "liveRegular": "With current price {price} ({time})",
+    "livePost": "With after-hours price {price} ({time})",
+    "liveNote": "The current price only feeds the month in progress, never as a close. The official signal and alerts are confirmed at the close.",
+    "liveMissing": "No current price right now: the level uses the {date} close.",
+    "liveDiscarded": "Current price discarded as incoherent data: the level uses the {date} close.",
     "risk": {
       "low": "Low risk",
       "medium": "Medium risk",

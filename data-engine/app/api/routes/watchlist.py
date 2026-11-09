@@ -562,6 +562,12 @@ class DcaSignalStateOut(BaseModel):
     period: str
     signal_date: date
     close: float
+    # "live": el nivel del periodo en formacion se calculo con el precio
+    # actual descrito en live_*; close/signal_date siguen siendo el cierre.
+    close_kind: str = "close"
+    live_price: float | None = None
+    live_session: str | None = None
+    live_at: datetime | None = None
     currency: str | None = None
     currency_label: str | None = None
     metrics: dict[str, float | str | int | None] = Field(default_factory=dict)
@@ -794,6 +800,10 @@ def _dca_state_payload(state: DcaSignalState, *, today: date | None = None) -> d
         "period": state.period,
         "signal_date": state.signal_date,
         "close": float(state.close),
+        "close_kind": state.close_kind,
+        "live_price": float(state.live_price) if state.live_price is not None else None,
+        "live_session": state.live_session,
+        "live_at": state.live_at,
         "currency": state.currency,
         "currency_label": currency_label(state.currency),
         "metrics": state.metrics or {},
@@ -1124,18 +1134,22 @@ def home_attention_thesis(db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/dca-signals/{symbol}/card")
-def dca_watch_card(symbol: str, db: Session = Depends(get_db)) -> dict:
+async def dca_watch_card(symbol: str, db: Session = Depends(get_db)) -> dict:
     """Tarjeta DCA de la watchlist: nivel por semana/mes/trimestre/año, meses en zona,
     riesgo, «¿por qué?» y movimiento desde el último cambio de nivel.
 
     Misma serie que la señal diaria (Yahoo, cierre ajustado, sin la barra del día
-    en curso) y mismo motor; la señal oficial es la mensual.
+    en curso) y mismo motor; la señal oficial es la mensual. El periodo en
+    formación usa el precio actual (premercado/sesión/post) cuando hay uno
+    fiable, siempre etiquetado como precio actual y nunca como cierre; la
+    señal oficial, el estado guardado y los avisos siguen solo con cierres.
     """
     from zoneinfo import ZoneInfo
 
     from app.services import dca_signal_service as svc
     from app.services.dca_alert_copy import currency_label
-    from app.services.dca_watch_card import build_watch_card
+    from app.services.dca_watch_card import build_watch_card, usable_current_price
+    from app.services.extended_quote_service import extended_quote_service
 
     key = symbol.strip().upper()
     if not key or len(key) > 24:
@@ -1151,13 +1165,43 @@ def dca_watch_card(symbol: str, db: Session = Depends(get_db)) -> dict:
     except Exception as exc:  # proveedor caido o ticker desconocido: se dice, no se inventa
         raise HTTPException(status_code=502, detail=ui_error(502, "history_download_failed", key=key).detail) from exc
     now = datetime.now(UTC)
-    bars, _factor = svc.build_bars(svc.settled_rows(fetched.rows, now))
+    bars, factor = svc.build_bars(svc.settled_rows(fetched.rows, now))
     if not bars:
         return {"symbol": key, "available": False, "reason": "Sin histórico de precios para este ticker", "timeframes": []}
     today = now.astimezone(ZoneInfo("America/New_York")).date()
     _age, stale = _dca_staleness(bars[-1].day, today)
     pre_revenue = (getattr(company, "valuation_model", "") or "") == "pre_revenue"
-    card = build_watch_card(bars, today=today, pre_revenue=pre_revenue, stale=stale)
     currency = fetched.currency or (company.currency if company is not None else None)
+    # Precio actual etiquetado (premercado/sesión/post) para el periodo en
+    # formación. El servicio de cotización nunca lanza: en error devuelve
+    # status="unavailable" y la tarjeta sigue con cierres, declarándolo.
+    quote = await extended_quote_service.get(yahoo)
+    last_settled_close = bars[-1].close * factor  # unidad real de cotización
+    live_price, live_reason = usable_current_price(
+        status=quote.status,
+        session=quote.session,
+        price_session=quote.price_session,
+        price=quote.price,
+        timestamp=quote.timestamp,
+        quote_currency=quote.currency,
+        history_currency=currency,
+        last_settled_close=last_settled_close,
+        today=today,
+    )
+    current_price = live_price / factor if live_price is not None and factor > 0 else None
+    live_block = (
+        {
+            "used": True,
+            "price": live_price,
+            "session": quote.price_session or quote.session,
+            "timestamp": quote.timestamp,
+            "currency": quote.currency or currency,
+            "source": quote.source,
+        }
+        if live_price is not None
+        else {"used": False, "reason": live_reason}
+    )
+    card = build_watch_card(bars, today=today, pre_revenue=pre_revenue, stale=stale,
+                            current_price=current_price, live=live_block)
     return {"symbol": key, "currency": currency, "currency_label": currency_label(currency),
             "data_source": "yfinance", **card}

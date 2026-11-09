@@ -65,6 +65,20 @@ export default function DcaWatchCard({ data, ti, locale }: { data: DcaWatchCardD
     const change = data.last_change;
     const why = data.why;
     const risk = data.risk;
+    const live = data.live;
+    const liveTime = live?.used && live.timestamp ? f.formatDateTime(new Date(live.timestamp * 1000), { hour: '2-digit', minute: '2-digit' }) : null;
+    const liveLine = live?.used
+        ? ti(live.session === 'pre' ? 'watchlist.dcaCard.livePre' : live.session === 'post' ? 'watchlist.dcaCard.livePost' : 'watchlist.dcaCard.liveRegular', {
+            price: price(live.price),
+            time: liveTime ?? '—',
+        })
+        : null;
+    // Mercado cerrado ("closed") no es un dato que falte: el cierre es lo más fresco.
+    const liveWarning = live && !live.used && live.reason !== 'closed'
+        ? ti(live.reason === 'currency_mismatch' || live.reason === 'out_of_band' ? 'watchlist.dcaCard.liveDiscarded' : 'watchlist.dcaCard.liveMissing', {
+            date: f.formatDate(cur.signal_date),
+        })
+        : null;
     return (
         <section aria-label={ti('watchlist.dcaCard.label', { symbol: data.symbol })} className="space-y-3 rounded-lg border border-gray-700 bg-gray-900/60 p-3" data-testid="dca-watch-card">
             <ul aria-label={ti('watchlist.dcaCard.timeframes')} className="flex flex-wrap gap-1.5">
@@ -95,6 +109,12 @@ export default function DcaWatchCard({ data, ti, locale }: { data: DcaWatchCardD
                 {risk ? <span className={`rounded-full border px-2 py-0.5 text-xs ${RISK_TONE[risk.key] ?? ''}`} data-testid="dca-card-risk">{ti(RISK_KEYS[risk.key as keyof typeof RISK_KEYS])}</span> : null}
                 {cur.status === 'forming' ? <span className="text-[11px] text-gray-400">{ti('watchlist.dcaCard.forming')}</span> : null}
             </div>
+            {liveLine ? (
+                <p className="text-xs text-gray-300" data-testid="dca-card-live">
+                    {liveLine} <span className="text-gray-500">· {ti('watchlist.dcaCard.liveNote')}</span>
+                </p>
+            ) : null}
+            {liveWarning ? <p className="text-xs text-amber-300" role="status" data-testid="dca-card-live-missing">{liveWarning}</p> : null}
             {change ? (
                 <p className="text-xs text-gray-300" data-testid="dca-card-change">
                     {ti('watchlist.dcaCard.sinceChange', {

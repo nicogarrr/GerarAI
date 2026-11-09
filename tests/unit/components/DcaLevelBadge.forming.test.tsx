@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import DcaLevelBadge from '@/components/watchlist/DcaLevelBadge';
 import type { DcaSignalItem } from '@/lib/dca/types';
@@ -48,5 +48,30 @@ describe('DcaLevelBadge en formación', () => {
         expect(badge).toHaveTextContent('(provisional)');
         expect(badge.textContent?.trim().endsWith('·')).toBe(false);
         expect(container.textContent?.includes('·')).toBe(false);
+    });
+});
+
+describe('DcaLevelBadge con precio actual (premercado)', () => {
+    it('declara la base premercado en el tooltip, nunca como cierre', async () => {
+        const item = formingItem();
+        item.state = {
+            ...item.state!,
+            level: 3,
+            key: '3x',
+            label: '3X DCA',
+            close_kind: 'live',
+            live_price: 175.75,
+            live_session: 'pre',
+            live_at: '2026-11-09T13:32:00+00:00',
+        };
+        render(<DcaLevelBadge item={item} signalMonths={null} />);
+        // El tooltip se abre al tocar (patrón móvil del propio componente).
+        fireEvent.click(screen.getByRole('button'));
+        const live = await screen.findByTestId('dca-badge-live');
+        expect(live.textContent).toContain('precio premercado');
+        expect(live.textContent).toContain('175,75');
+        expect(live.textContent).toContain('no es un cierre');
+        // El cierre asentado se sigue mostrando como cierre.
+        expect(screen.getByText(/Cierre asentado/).textContent).toContain('280');
     });
 });

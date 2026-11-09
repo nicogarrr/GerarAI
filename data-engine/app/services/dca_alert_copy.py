@@ -240,6 +240,13 @@ def detail_rows(dca: dict[str, Any], language: str = "es") -> list[tuple[str, st
     close = price_es(dca.get("close"), dca.get("currency"), language)
     if close:
         rows.append(("Settled close" if en else "Cierre asentado", close))
+    live = dca.get("live") or {}
+    live_price = price_es(live.get("price"), live.get("currency") or dca.get("currency"), language)
+    if dca.get("close_kind") == "live" and live_price:
+        rows.append((
+            "Level computed with" if en else "Nivel calculado con",
+            f"{live_session_label(live.get('session'), language)} {live_price} ({live_time_label(live.get('at'))})",
+        ))
     metric = signal_metric(dca, language)
     if metric:
         rows.append(metric)
@@ -258,6 +265,37 @@ def detail_rows(dca: dict[str, Any], language: str = "es") -> list[tuple[str, st
     return rows
 
 
+LIVE_SESSION_LABELS = {"pre": "precio premercado", "regular": "precio de sesión", "post": "precio post-mercado"}
+LIVE_SESSION_LABELS_EN = {"pre": "pre-market price", "regular": "session price", "post": "after-hours price"}
+LIVE_NOTE = (
+    "Este nivel usa el precio actual indicado, no un cierre: puede cambiar con el cierre oficial "
+    "y no confirma el nivel por sí solo."
+)
+LIVE_NOTE_EN = (
+    "This level uses the quoted current price, not a close: it can change at the official close "
+    "and does not confirm the level on its own."
+)
+
+
+def live_session_label(session: Any, language: str = "es") -> str:
+    labels = LIVE_SESSION_LABELS_EN if _en(language) else LIVE_SESSION_LABELS
+    return labels.get(str(session or ""), labels["regular"])
+
+
+def live_time_label(value: Any) -> str:
+    """Hora de mercado (America/New_York) del precio actual: '08:32 ET'."""
+    from datetime import UTC, datetime
+    from zoneinfo import ZoneInfo
+
+    try:
+        moment = datetime.fromisoformat(str(value)) if not isinstance(value, datetime) else value
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=UTC)
+        return moment.astimezone(ZoneInfo("America/New_York")).strftime("%H:%M ET")
+    except (TypeError, ValueError):
+        return ""
+
+
 def message_text(dca: dict[str, Any], language: str = "es") -> str:
     en = _en(language)
     lines = [title(dca, language)]
@@ -273,6 +311,8 @@ def message_text(dca: dict[str, Any], language: str = "es") -> str:
         lines += ["", low_vol]
     if dca.get("status") == "forming":
         lines += ["", FORMING_NOTE_EN if en else FORMING_NOTE]
+    if dca.get("close_kind") == "live":
+        lines += ["", LIVE_NOTE_EN if en else LIVE_NOTE]
     lines += ["", DISCLAIMER_EN if en else DISCLAIMER]
     return "\n".join(lines)
 
@@ -316,6 +356,11 @@ def email_content(dca: dict[str, Any], language: str = "es") -> EmailContent:
             else ""
         )
         + forming_note
+        + (
+            f"<p style=\"font-size:12px;color:#555;margin:12px 0 0\">{escape(LIVE_NOTE_EN if en else LIVE_NOTE)}</p>"
+            if dca.get("close_kind") == "live"
+            else ""
+        )
         + f"<p style=\"font-size:11px;color:#777;margin:20px 0 0\">{escape(DISCLAIMER_EN if en else DISCLAIMER)} "
         f"{escape(FOOTER_EN if en else FOOTER)}</p>"
         "</div></body></html>"

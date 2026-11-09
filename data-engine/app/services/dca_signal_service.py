@@ -362,6 +362,35 @@ def _db_history(db: Session, company: Company | None) -> FetchedHistory:
     return FetchedHistory(rows=rows, currency=unit)
 
 
+def fetch_live_quotes(symbols: Sequence[str]) -> dict[str, Any]:
+    """Cotizacion extendida (premercado/sesion/post) de cada simbolo Yahoo.
+
+    Una pasada concurrente con el servicio ya existente (gratuito, con cache
+    y timeouts propios, NUNCA lanza: en error devuelve status=\"unavailable\").
+    Si la pasada entera falla (p. ej. sin event loop posible), devuelve {} y
+    la evaluacion sigue solo con cierres.
+    """
+    import asyncio
+
+    from app.services.extended_quote_service import extended_quote_service
+
+    async def _gather() -> list[Any]:
+        semaphore = asyncio.Semaphore(8)
+
+        async def _one(symbol: str) -> Any:
+            async with semaphore:
+                return await extended_quote_service.get(symbol)
+
+        return await asyncio.gather(*[_one(s) for s in symbols])
+
+    try:
+        quotes = asyncio.run(_gather())
+    except Exception:  # noqa: BLE001 - sin precio actual no se veta: solo cierres
+        logger.warning("dca live quotes gather failed; evaluating with closes only", exc_info=True)
+        return {}
+    return {symbol: quote for symbol, quote in zip(symbols, quotes, strict=True)}
+
+
 def settled_rows(rows: Sequence[PriceRow], now: datetime) -> list[PriceRow]:
     """Descarta barras futuras y la del dia en curso con la sesion US abierta."""
     local = now.astimezone(_NY)
@@ -419,10 +448,12 @@ def _dca_payload(
     verdict: MonthlyVerdict,
     *,
     close: float,
+    close_date: date,
     level_prices: dict[str, float | None],
     currency: str | None,
     previous_level: int | None,
     params: DcaParams,
+    live: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     zone = ZONES[verdict.level]
     direction = alert_direction(verdict.level, previous_level)
@@ -442,8 +473,12 @@ def _dca_payload(
         "fg": zone["fg"],
         "status": verdict.status,
         "period": verdict.period,
-        "signal_date": verdict.signal_date.isoformat(),
+        # Fecha de senal = la del cierre asentado; el precio actual, si lo
+        # hay, viaja etiquetado en ``live`` y NUNCA como cierre.
+        "signal_date": close_date.isoformat(),
         "close": close,
+        "close_kind": verdict.close_kind,
+        "live": live,
         "currency": currency,
         "metrics": dict(verdict.metrics),
         "level_prices": level_prices,
@@ -562,6 +597,13 @@ def evaluate_watchlist(
         "alerts_enabled": bool(settings.dca_alerts_enabled),
         "params_version": params.version,
     }
+    # Precio actual (premercado/sesion/post) para el periodo en formacion de
+    # la senal oficial: UNA pasada concurrente por simbolo Yahoo. Si falta o
+    # no es fiable, el ticker sigue con cierres y el motivo queda declarado.
+    yahoo_by_symbol = {symbol: _yahoo_symbol_for(item) for symbol, item in tracked.items()}
+    live_quotes = fetch_live_quotes(sorted({y for y in yahoo_by_symbol.values() if y}))
+    live_used: list[str] = []
+    live_missing: dict[str, str] = {}
     for symbol, item in tracked.items():
         if symbols is not None and symbol not in symbols:
             continue
@@ -570,7 +612,7 @@ def evaluate_watchlist(
             continue
         history = FetchedHistory(rows=[])
         source = None
-        yahoo = _yahoo_symbol_for(item)
+        yahoo = yahoo_by_symbol.get(symbol)
         if yahoo:
             try:
                 history = fetch(yahoo)
@@ -596,10 +638,42 @@ def evaluate_watchlist(
                 )
                 continue
         bars, factor = build_bars(rows)
+        # La unidad real de las filas USADAS, no la divisa general de la ficha:
+        # el respaldo de market_prices normaliza a la unidad declarada (p. ej.
+        # peniques GBp); etiquetarlas con company.currency (GBP) mostraba el
+        # cierre en peniques como libras (x100) en el estado, la UI y el correo.
+        currency = history.currency or (item.company.currency if item.company is not None else None)
+        # Precio actual etiquetado para el periodo en formacion (mismas
+        # salvaguardas que la tarjeta: sesion viva, timestamp de hoy, divisa,
+        # banda de cordura del 30 %). NUNCA entra como cierre: ``state.close``
+        # sigue siendo el ultimo cierre asentado y la base se declara en
+        # ``close_kind``/``live_*``.
+        from app.services.dca_watch_card import usable_current_price
+
+        quote = live_quotes.get(yahoo) if yahoo else None
+        live_price = None
+        live_reason = None
+        if quote is not None and bars:
+            live_price, live_reason = usable_current_price(
+                status=quote.status,
+                session=quote.session,
+                price_session=quote.price_session,
+                price=quote.price,
+                timestamp=quote.timestamp,
+                quote_currency=quote.currency,
+                history_currency=currency,
+                last_settled_close=bars[-1].close * factor,
+                today=today,
+            )
+        current_price = live_price / factor if live_price is not None and factor > 0 else None
+        if live_price is not None:
+            live_used.append(symbol)
+        elif live_reason is not None and live_reason != "closed":
+            live_missing[symbol] = live_reason
         # Una sola evaluacion de la serie por ticker: veredicto, tabla de
         # aciertos y visitas salen de la MISMA salida (antes se recalculaba 3
         # veces con las mismas barras, parametros y fecha).
-        verdicts = evaluate_series(bars, params=params, today=today) if bars else []
+        verdicts = evaluate_series(bars, params=params, today=today, current_price=current_price) if bars else []
         verdict = current_verdict(bars, params=params, today=today, verdicts=verdicts) if bars else None
         if verdict is None:
             reason = "sin_datos" if not bars else "historia_insuficiente"
@@ -608,11 +682,6 @@ def evaluate_watchlist(
             summary["skipped"].append({"symbol": symbol, "reason": reason, "daily_bars": len(bars)})
             continue
         last_row = max(rows, key=lambda r: r.day)
-        # La unidad real de las filas USADAS, no la divisa general de la ficha:
-        # el respaldo de market_prices normaliza a la unidad declarada (p. ej.
-        # peniques GBp); etiquetarlas con company.currency (GBP) mostraba el
-        # cierre en peniques como libras (x100) en el estado, la UI y el correo.
-        currency = history.currency or (item.company.currency if item.company is not None else None)
         level_prices = {key: _scaled(value, factor) for key, value in verdict.level_prices.items()}
         state = states.get(symbol)
         previous_level = state.level if state is not None else None
@@ -626,8 +695,23 @@ def evaluate_watchlist(
         state.level = verdict.level
         state.status = verdict.status
         state.period = verdict.period
-        state.signal_date = verdict.signal_date
+        # Fecha y cierre SIEMPRE asentados (con precio actual el veredicto
+        # trae el dia de hoy en el periodo en formacion; no se persiste).
+        state.signal_date = last_row.day
         state.close = Decimal(str(round(last_row.close, 6)))
+        state.close_kind = verdict.close_kind
+        if live_price is not None and quote is not None:
+            state.live_price = Decimal(str(round(live_price, 6)))
+            state.live_session = quote.price_session or quote.session
+            state.live_at = (
+                datetime.fromtimestamp(quote.timestamp, UTC) if quote.timestamp is not None else None
+            )
+        else:
+            # Sin precio actual usable (mercado cerrado o dato no fiable): la
+            # etiqueta live de una evaluacion anterior no puede quedar vieja.
+            state.live_price = None
+            state.live_session = None
+            state.live_at = None
         state.currency = currency
         state.metrics = dict(verdict.metrics)
         state.level_prices = level_prices
@@ -659,10 +743,21 @@ def evaluate_watchlist(
             item,
             verdict,
             close=last_row.close,
+            close_date=last_row.day,
             level_prices=level_prices,
             currency=currency,
             previous_level=previous_level,
             params=params,
+            live=(
+                {
+                    "price": round(float(state.live_price), 6),
+                    "session": state.live_session,
+                    "at": state.live_at.isoformat() if state.live_at else None,
+                    "currency": currency,
+                }
+                if verdict.close_kind == "live" and state.live_price is not None
+                else None
+            ),
         )
         # Estado y alerta en UNA transaccion: un fallo entre ambos deja el nivel
         # sin guardar y el reintento vuelve a emitir el aviso.
@@ -677,6 +772,7 @@ def evaluate_watchlist(
         if status == "alerted":
             outcome = _dispatch_alert(db, emitted)
             summary["alerted"].append({"symbol": symbol, "level": verdict.level, **outcome})
+    summary["live_quotes"] = {"used": live_used, "missing": live_missing}
     # Los tickers que ya no se siguen dejan de mostrarse.
     for symbol, state in states.items():
         if symbol not in tracked:

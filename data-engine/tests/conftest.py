@@ -180,6 +180,16 @@ def _no_live_benchmark(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_live_dca_quotes(monkeypatch):
+    """Los tests nunca llaman a Yahoo para el precio actual DCA: por defecto no
+    hay cotizacion en vivo y la evaluacion sigue solo con cierres. Un test que
+    quiera precio actual inyecta su propio fetch_live_quotes encima."""
+    from app.services import dca_signal_service
+
+    monkeypatch.setattr(dca_signal_service, "fetch_live_quotes", lambda symbols: {})
+
+
+@pytest.fixture(autouse=True)
 def _reset_movers_cache():
     """La caché de Movers es por proceso; cada test parte de una BD distinta."""
     from app.services import movers_cache

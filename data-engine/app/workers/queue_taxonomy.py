@@ -105,6 +105,7 @@ ACTOR_CLASS: dict[str, str] = {
     "consolidate_memory": CALCULO,
     "refresh_thesis_track_record": CALCULO,  # «Nuestro acierto», diario
     "evaluate_dca_signals": CALCULO,
+    "evaluate_dca_signals_live": CALCULO,
     "evaluate_dca_on_add": CALCULO,  # DCA al añadir a watchlist/cartera (cola dca-manual)
     "extract_document_kpis": CALCULO,
     "freeze_propicks_snapshot": CALCULO,

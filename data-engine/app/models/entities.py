@@ -148,7 +148,14 @@ class DcaSignalState(TenantOwnedMixin, Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(20))
     period: Mapped[str] = mapped_column(String(7))
     signal_date: Mapped[_DateT] = mapped_column(Date)
+    # SIEMPRE el cierre asentado: el precio actual nunca se guarda aqui.
     close: Mapped[Decimal] = mapped_column(Numeric(20, 6))
+    # "close": el nivel sale solo de cierres. "live": el nivel del periodo en
+    # formacion se calculo con el precio actual descrito en live_*.
+    close_kind: Mapped[str] = mapped_column(String(8), default="close", server_default="close")
+    live_price: Mapped[Decimal | None] = mapped_column(Numeric(20, 6), nullable=True)
+    live_session: Mapped[str | None] = mapped_column(String(8), nullable=True)  # pre | regular | post
+    live_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     currency: Mapped[str | None] = mapped_column(String(10), nullable=True)
     metrics: Mapped[dict] = mapped_column(JSON, default=dict)
     level_prices: Mapped[dict] = mapped_column(JSON, default=dict)

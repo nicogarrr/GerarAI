@@ -125,3 +125,138 @@ def test_actor_lease_held(monkeypatch):
     monkeypatch.setattr(dramatiq_app, "acquire_job_lease", lambda name, **kw: None)
     out = dramatiq_app.evaluate_dca_signals.fn(7, "u-1")
     assert out["reason"] == "lease_held"
+
+
+class _FakeRedis:
+    """Redis minimo en memoria para las sondas de coalescencia (set NX EX, get, delete, eval CAS)."""
+
+    def __init__(self):
+        self.store: dict[str, str] = {}
+
+    def set(self, key, value, nx=False, ex=None):
+        if nx and key in self.store:
+            return None
+        self.store[key] = value
+        return True
+
+    def get(self, key):
+        return self.store.get(key)
+
+    def delete(self, *keys):
+        removed = 0
+        for key in keys:
+            removed += self.store.pop(key, None) is not None
+        return removed
+
+    def eval(self, script, numkeys, key, token):  # compare-and-delete
+        if self.store.get(key) == token:
+            del self.store[key]
+            return 1
+        return 0
+
+
+def test_premarket_job_registered_separate_from_close_confirmation(monkeypatch):
+    """dca_signals_premarket (12:30 UTC) y dca_signals_daily (23:15 UTC) encolan actores distintos."""
+    seen: dict[str, tuple[str, dict, Any]] = {}
+    orig = sched._register
+
+    def spy(scheduler, func, trigger, *, job_id, **kw):
+        orig(scheduler, func, trigger, job_id=job_id, **kw)
+        seen[job_id] = (trigger, dict(kw), func)
+
+    monkeypatch.setattr(sched, "_register", spy)
+    sched.build_scheduler(background=True)
+    trigger, kwargs, func = seen["dca_signals_premarket"]
+    assert trigger == "cron"
+    assert (kwargs["day_of_week"], kwargs["hour"], kwargs["minute"]) == ("mon-fri", 12, 30)
+    assert func.func is sched.enqueue_for_all_tenants
+    assert func.args == (dramatiq_app.evaluate_dca_signals_live,)
+    _, daily_kwargs, daily_func = seen["dca_signals_daily"]
+    assert (daily_kwargs["hour"], daily_kwargs["minute"]) == (23, 15)
+    assert daily_func.args == (dramatiq_app.evaluate_dca_signals,)
+    # Politicas de coalescencia con claves separadas: nunca comparten semaforo.
+    policies = dramatiq_app._COALESCE_POLICIES
+    assert "evaluate_dca_signals" in policies and "evaluate_dca_signals_live" in policies
+
+
+def test_live_claim_does_not_suppress_close_confirmation(monkeypatch):
+    """Con el claim live FRESCO (pasada premercado con exito), la confirmacion
+    de cierre de las 23:15 UTC reclama su propia clave y TRABAJA; el claim
+    live solo suprime otra live."""
+    fake = _FakeRedis()
+    monkeypatch.setattr(dramatiq_app, "_redis_client", lambda: fake)
+    ran: list[str] = []
+    monkeypatch.setattr(
+        dramatiq_app,
+        "_run_dca_evaluation",
+        lambda actor, tenant_id, user_id, review_savings: ran.append(actor) or {"status": "ok"},
+    )
+
+    out_live = dramatiq_app.evaluate_dca_signals_live.fn(7, "u-1")
+    assert out_live == {"status": "ok"}
+    assert fake.get("coalesce:evaluate_dca_signals_live:7")  # claim fresco de la premercado
+
+    out_close = dramatiq_app.evaluate_dca_signals.fn(7, "u-1")
+    assert out_close == {"status": "ok"}  # NO skipped: la confirmacion corre
+    assert ran == ["evaluate_dca_signals_live", "evaluate_dca_signals"]
+
+    # El mecanismo es real: una segunda live con claim fresco SI se salta,
+    # pero la confirmacion de cierre sigue sin verse afectada por esa clave.
+    out_live2 = dramatiq_app.evaluate_dca_signals_live.fn(7, "u-1")
+    assert out_live2["status"] == "skipped" and out_live2["reason"] == "fresh_or_running"
+    assert fake.get("coalesce:evaluate_dca_signals:7")
+
+
+def test_live_enqueue_mark_does_not_suppress_close_enqueue(monkeypatch):
+    """coalesced_send: una live en cola (marca coalesce-enq live) NO suprime
+    el encolado de la confirmacion de cierre, solo el de otra live."""
+    fake = _FakeRedis()
+    monkeypatch.setattr(dramatiq_app, "_redis_client", lambda: fake)
+    sent: list[str] = []
+    monkeypatch.setattr(dramatiq_app.evaluate_dca_signals_live, "send", lambda *a, **k: sent.append("live") or "m-live")
+    monkeypatch.setattr(dramatiq_app.evaluate_dca_signals, "send", lambda *a, **k: sent.append("close") or "m-close")
+
+    first = dramatiq_app.coalesced_send(dramatiq_app.evaluate_dca_signals_live, 7, "u-1")
+    dup = dramatiq_app.coalesced_send(dramatiq_app.evaluate_dca_signals_live, 7, "u-1")
+    assert first == "m-live" and dup is None  # una copia en vuelo por clave
+
+    close = dramatiq_app.coalesced_send(dramatiq_app.evaluate_dca_signals, 7, "u-1")
+    assert close == "m-close"  # la 23:15 UTC encola aunque la live siga en cola
+    assert sent == ["live", "close"]
+
+
+def test_run_dca_evaluation_error_path_records_and_reports(monkeypatch):
+    """La excepcion dentro de la evaluacion hace rollback, cierra el run con
+    error y devuelve el resultado estructurado (camino de _handle_actor_error)."""
+    from app.workers import dramatiq_app as dapp
+
+    class FakeDb:
+        info: dict = {}
+
+        def commit(self):
+            pass
+
+        def rollback(self):
+            pass
+
+        def close(self):
+            pass
+
+    finished: list[dict] = []
+    monkeypatch.setattr(dapp, "_session", lambda tenant_id, user_id: FakeDb())
+    monkeypatch.setattr(dapp, "acquire_job_lease", lambda name, **kw: "tok")
+    monkeypatch.setattr(dapp, "release_job_lease", lambda name, token, **kw: None)
+
+    from app.services import dca_run_log
+
+    monkeypatch.setattr(dca_run_log, "start_run", lambda db, origin: object())
+    monkeypatch.setattr(dca_run_log, "finish_run", lambda db, run, **kw: finished.append(kw))
+
+    def boom(db, **kw):
+        raise ValueError("permanente")
+
+    monkeypatch.setattr("app.services.dca_signal_service.evaluate_watchlist", boom)
+    out = dapp._run_dca_evaluation("evaluate_dca_signals_live", 7, "u-1", review_savings=False)
+    assert out["actor"] == "evaluate_dca_signals_live" and out["status"] == "error"
+    assert out["error"]["type"] == "ValueError" and "permanente" in out["error"]["message"]
+    assert finished and "error" in finished[0]
