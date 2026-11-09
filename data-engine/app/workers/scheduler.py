@@ -59,6 +59,7 @@ from app.workers.dramatiq_app import (
     refresh_sec_filings,
     refresh_subtel_decrees,
     refresh_ticker_news,
+    refresh_ticker_news_universe,
     refresh_valuation_metrics,
     retry_deferred_tenant_ibkr_connections,
     review_theses,
@@ -326,9 +327,14 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         job_id="ticker_news_refresh",
         minutes=30,
     )
+    # Universo US cada 6 h: UNA descarga global por ciclo
+    # (refresh_ticker_news_universe cachea cada feed una vez) + persistencia
+    # explicita por tenant desde la cache (persist_ticker_news_universe).
+    # Antes: enqueue_for_all_tenants(scope="all") repetia la red por tenant
+    # (~34 min de red cada uno, cabeza medida ~104 min, 9-nov-2026).
     _register(
         scheduler,
-        partial(enqueue_for_all_tenants, refresh_ticker_news, scope="all"),
+        partial(coalesced_send, refresh_ticker_news_universe),
         "interval",
         job_id="ticker_news_refresh_universe",
         hours=6,
