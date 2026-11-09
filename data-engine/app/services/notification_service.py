@@ -1,3 +1,4 @@
+import math
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -467,7 +468,19 @@ class NotificationService:
             f"{settings.telegram_api_base_url.rstrip('/')}/bot{token}/sendMessage"
         )
         try:
-            with httpx.Client(timeout=settings.telegram_timeout_seconds) as client:
+            timeout = float(settings.telegram_timeout_seconds)
+            if not math.isfinite(timeout) or timeout <= 0:
+                raise ValueError(f"timeout={timeout!r} fuera de rango")
+        except (TypeError, ValueError) as exc:
+            # Config malformada: como en email_delivery.send_email, failed y
+            # no unknown — el outbox reintentaria para siempre lo que no se
+            # sanea solo. httpx no valida el timeout hasta la peticion.
+            return self._result(
+                "failed",
+                error=f"Telegram config invalida: {type(exc).__name__}: {exc}",
+            )
+        try:
+            with httpx.Client(timeout=timeout) as client:
                 response = client.post(
                     endpoint,
                     json={"chat_id": chat_id, "text": text},

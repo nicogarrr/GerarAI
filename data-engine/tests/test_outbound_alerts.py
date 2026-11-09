@@ -234,3 +234,22 @@ def test_dispatch_pending_skips_earnings_without_valid_binding(db, monkeypatch):
     delivery = db.scalar(select(AlertDelivery).where(
         AlertDelivery.alert_id == row.id, AlertDelivery.channel == "telegram"))
     assert delivery is not None and delivery.status == "skipped"
+
+
+def test_telegram_timeout_malformed_config_is_failed(monkeypatch):
+    """telegram_timeout_seconds malformado o fuera de rango clasifica en
+    ``failed`` (como la config SMTP en send_email) y nunca llega a construir
+    el cliente: en ``unknown`` el outbox reintentaria para siempre una config
+    que no se sanea sola. httpx no valida el timeout hasta la peticion."""
+    class Client:
+        def __init__(self, **kw):
+            raise AssertionError("config invalida no debe construir httpx.Client")
+    monkeypatch.setattr(notification_service.httpx, "Client", Client)
+    payload = {"severity": "high", "title": "Alerta", "message": "Fuente",
+               "company_id": 1, "alert_id": 1, "chat_id": "12345"}
+    for bad in ("diez", None, float("nan"), float("inf"), 0, -5):
+        settings = SimpleNamespace(telegram_enabled=True, telegram_bot_token="test-only",
+                                   telegram_chat_id="dest", telegram_api_base_url="https://api.telegram.org",
+                                   telegram_timeout_seconds=bad)
+        result = notification_service.NotificationService()._dispatch_telegram(settings, payload)
+        assert result["status"] == "failed" and "config invalida" in result["error"], bad
