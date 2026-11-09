@@ -6,11 +6,12 @@ Los documentos docling son SimpleNamespace con la superficie justa (provenance
 best-effort: lo que no se puede leer se declara, nunca rompe el carril).
 
 NO prueba (declarado): docling/markitdown reales, el conversor DocumentConverter
-de verdad (linea 488: requiere los ~500 MB de modelos), _doc_page_count con un
-objeto cuyo isinstance lanza (387-388, defensivo), el unlink que falla se prueba
-con os.unlink doblado (el fichero temporal de ese test queda sin borrar,
-declarado), ni la linea 703 del orquestador (defensiva: todo camino al fallback
-ya lleva un warning con «pypdf»).
+de verdad (los ~500 MB de modelos; la construccion con import doblado, linea
+488, y _doc_page_count defensivo, 387-388, se cubren en
+test_docling_pipeline_bordes.py), el unlink que falla se prueba con os.unlink
+doblado (el fichero temporal de ese test queda sin borrar, declarado), ni la
+linea 703 del orquestador (defensiva: todo camino al fallback ya lleva un
+warning con «pypdf»).
 """
 
 from __future__ import annotations
