@@ -198,26 +198,34 @@ def _reset_chat_quota_cooldowns():
     reset_quota_cooldowns()
 
 
+_BREAKER_STATES = (
+    "_free_tier_breaker",
+    "_free_tier_breaker_status",
+    "_interactive_quota_breaker",
+    "_free_quota_breaker",
+    "_free_tier_breaker_until",
+    "_interactive_quota_breaker_until",
+    "_free_quota_breaker_until",
+)
+
+
 @pytest.fixture(autouse=True)
 def isolate_llm_free_tier_breaker():
-    """Quota cooldowns persist in production, never across hermetic test cases."""
+    """Quota cooldowns persist in production, never across hermetic test cases.
+
+    Snapshot + restauracion: un clear() pelado destruiria el contenido que
+    los dicts tuvieran antes de la sesion de tests.
+    """
     from app.llm import base
 
-    base._free_tier_breaker.clear()
-    base._free_tier_breaker_status.clear()
-    base._interactive_quota_breaker.clear()
-    base._free_quota_breaker.clear()
-    base._free_tier_breaker_until.clear()
-    base._interactive_quota_breaker_until.clear()
-    base._free_quota_breaker_until.clear()
+    original = {name: dict(getattr(base, name)) for name in _BREAKER_STATES}
+    for name in _BREAKER_STATES:
+        getattr(base, name).clear()
     yield
-    base._free_tier_breaker.clear()
-    base._free_tier_breaker_status.clear()
-    base._interactive_quota_breaker.clear()
-    base._free_quota_breaker.clear()
-    base._free_tier_breaker_until.clear()
-    base._interactive_quota_breaker_until.clear()
-    base._free_quota_breaker_until.clear()
+    for name in _BREAKER_STATES:
+        state = getattr(base, name)
+        state.clear()
+        state.update(original[name])
 
 
 @pytest.fixture(autouse=True)
@@ -238,21 +246,32 @@ def _reset_filing_deadline_failure_cache():
 
 @pytest.fixture(autouse=True)
 def _reset_company_filings_sec_down():
-    """La memoria corta de "SEC sin respuesta" de /filings es estado de proceso."""
+    """La memoria corta de "SEC sin respuesta" de /filings es estado de proceso.
+
+    Snapshot + restauracion: un clear() pelado destruiria el contenido que
+    el dict tuviera antes de la sesion de tests.
+    """
     from app.services import company_events_service
 
+    original = dict(company_events_service._FAILED_UNTIL)
     company_events_service._FAILED_UNTIL.clear()
     yield
     company_events_service._FAILED_UNTIL.clear()
+    company_events_service._FAILED_UNTIL.update(original)
 
 
 @pytest.fixture(autouse=True)
 def _reset_historical_stress_failure_cache():
+    """Snapshot + restauracion: un clear() pelado destruiria el contenido que
+    el dict tuviera antes de la sesion de tests.
+    """
     from app.services import historical_stress_service
 
+    original = dict(historical_stress_service._FAILED_UNTIL)
     historical_stress_service._FAILED_UNTIL.clear()
     yield
     historical_stress_service._FAILED_UNTIL.clear()
+    historical_stress_service._FAILED_UNTIL.update(original)
 
 
 @pytest.fixture(autouse=True)
