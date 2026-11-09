@@ -16,6 +16,7 @@ import {
 } from '@/lib/actions/research.actions';
 import { createFormatters } from '@/lib/format';
 import { getLocale, getT } from '@/lib/i18n/server';
+import { i18nPageTitle } from '@/lib/i18n/metadata';
 import type { TranslateFn } from '@/lib/i18n/translate';
 import type { TranslationKey } from '@/lib/i18n/t';
 import { firstSearchParam, normalizeSourcesQuery, normalizeSourcesScope, normalizeSourcesTicker, normalizeSourcesType, sourcesHref } from '@/lib/research/sources-inventory';
@@ -77,8 +78,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
-  return { title: t('research.sourcesMetaTitle') };
+    return i18nPageTitle('research.sourcesMetaTitle');
 }
 
 export default async function ResearchSourcesPage({

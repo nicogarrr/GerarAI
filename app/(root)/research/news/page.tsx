@@ -12,6 +12,7 @@ import { NewsFeedSection } from './NewsFeedSection';
 import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 import { NewsLoadingSkeleton } from '@/components/LoadingState';
 import { getT } from '@/lib/i18n/server';
+import { i18nPageTitle } from '@/lib/i18n/metadata';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -29,8 +30,7 @@ async function submitIngestFeed(formData: FormData): Promise<void> {
 type PageProps = { searchParams: Promise<{ lane?: string; pagina?: string; ticker?: string }> };
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
-  return { title: t('research.newsMetaTitle') };
+    return i18nPageTitle('research.newsMetaTitle');
 }
 
 
