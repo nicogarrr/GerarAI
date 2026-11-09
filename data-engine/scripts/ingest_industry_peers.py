@@ -3,7 +3,8 @@ dados) y crea/actualiza sus fichas con hechos SEC, precios y etiqueta ``sic:``. 
 
 Después guarda en cada ficha del grupo sus afines de negocio (``afin:<CIK>:<coseno>``, regla
 «afinidad-negocio-v1»: descripción del 10-K/20-F de la SEC, dos peticiones por emisor). ``--affinity-only``
-hace solo ese paso sobre las fichas que ya están en la base.
+hace solo ese paso sobre las fichas que ya están en la base. Con ``--dry-run`` el paso de afines
+no descarga nada, no toca etiquetas y no hace commit: lista los miembros del grupo.
 
 Uso: python scripts/ingest_industry_peers.py (--ticker ASTS | --sic 4899,3663,3760-3769) [--dry-run] [--max N]
      [--tenant N] [--affinity-only | --no-affinity]
@@ -86,12 +87,14 @@ async def _ingest(db, row: dict) -> dict:
     return res
 
 
-def _affinity(db, ranges) -> dict:
-    """Afines de negocio de cada ficha del grupo (con CIK), por la descripción de su informe anual."""
+def _affinity(db, ranges, dry: bool = False) -> dict:
+    """Afines de negocio de cada ficha del grupo (con CIK), por la descripción de su informe anual.
+
+    Con ``dry`` no se descarga nada, no se tocan etiquetas y no se hace
+    commit: solo se devuelve sobre qué miembros del grupo se trabajaría.
+    """
     members = [c for c in db.scalars(select(Company).where(Company.cik.is_not(None))).all()
                if (s := sc.company_sic(c)) is not None and any(lo <= s <= hi for lo, hi in ranges)]
-    docs: dict[int, list[str]] = {}
-    missing: dict[str, str] = {}
     by_cik: dict[int, Company] = {}
     for c in members:
         try:
@@ -99,6 +102,19 @@ def _affinity(db, ranges) -> dict:
         except ValueError:
             continue
         by_cik[cik] = c
+    if dry:
+        return {
+            "rule": ba.RULE,
+            "dry_run": True,
+            "members": len(by_cik),
+            "tickers": sorted(c.ticker for c in by_cik.values()),
+            "accion": "se descargaria la descripcion del informe anual de cada miembro y se "
+            "recalcularian sus etiquetas afin: (con --dry-run no se descarga, "
+            "no se tocan tags y no se hace commit)",
+        }
+    docs: dict[int, list[str]] = {}
+    missing: dict[str, str] = {}
+    for cik, c in by_cik.items():
         d = ba.describe(cik, c.name, _get)  # SecRefused corta la pasada (sin reintentos)
         time.sleep(0.25)
         if d.get("tokens"):
@@ -143,7 +159,7 @@ def main() -> None:
             print(json.dumps({"error": "sin SIC ni grupo"}))
             return
         if a.affinity_only:
-            print(json.dumps(_affinity(db, ranges), ensure_ascii=False, indent=1, default=str))
+            print(json.dumps(_affinity(db, ranges, a.dry_run), ensure_ascii=False, indent=1, default=str))
             return
         tickers = json.loads(_get(ipi.TICKERS_URL))
         cands = ipi.group_candidates(ranges, _get, tickers, pause=lambda: time.sleep(0.15))
