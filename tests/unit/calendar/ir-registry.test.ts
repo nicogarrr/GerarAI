@@ -97,6 +97,13 @@ describe('irLinksFor', () => {
         expect(irLinksFor(ticker, '2026-12-31')?.eventPage).toBeNull();
     });
 
+    it('el evento ASTS del 2026-11-09 enlaza su webcast solo ese dia', () => {
+        const exact = irLinksFor('ASTS', '2026-11-09');
+        expect(exact?.eventPage?.period).toBe('T3 2026');
+        expect(exact?.eventPage?.assets.map((a) => a.kind)).toEqual(['webcast']);
+        expect(irLinksFor('ASTS', '2026-11-10')?.eventPage).toBeNull();
+    });
+
     it('una entrada sin eventos devuelve seccion y eventPage null', () => {
         const links = irLinksFor('TSLA', '2026-10-22');
         expect(links?.eventPage).toBeNull();
