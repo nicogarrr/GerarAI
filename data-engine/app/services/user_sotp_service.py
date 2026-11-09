@@ -394,6 +394,10 @@ def _rules_of(row: DeclaredInputValue) -> tuple:
     return (meta.get("rules_version"), meta.get("prompt_version"))
 
 
+def _classification_of(row: DeclaredInputValue) -> object:
+    return (row.metadata_ or {}).get("classification")
+
+
 def agents_stability(history: list[DeclaredInputValue]) -> dict | None:
     """Compara la propuesta vigente con la anterior de los agentes (mismo tenant y empresa).
 
@@ -410,8 +414,13 @@ def agents_stability(history: list[DeclaredInputValue]) -> dict | None:
         return None
     previous, current = float(rows[-2].base), float(rows[-1].base)
     change = (current / previous - 1.0) if previous else None
-    unstable = previous * current <= 0 or change is None or abs(change) > AGENTS_UNSTABLE_CHANGE
+    # Misma clasificación del modelo: lo que cambió son las cifras del código (precio, acciones, caja…,
+    # p. ej. un recálculo sin modelo), no la corrida; eso no es inestabilidad del modelo.
+    same_classification = bool(_classification_of(rows[-1])) and _classification_of(rows[-1]) == _classification_of(rows[-2])
+    unstable = not same_classification and (
+        previous * current <= 0 or change is None or abs(change) > AGENTS_UNSTABLE_CHANGE)
     return {
+        "same_classification": same_classification,
         "previous_value_per_share": previous,
         "previous_generated_at": (rows[-2].metadata_ or {}).get("generated_at"),
         "current_value_per_share": current,
