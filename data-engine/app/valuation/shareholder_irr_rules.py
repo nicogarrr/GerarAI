@@ -12,6 +12,10 @@ Reglas (``RULES_VERSION``):
 * Histórico orgánico = TCAC de ingresos de los últimos (hasta) 3 ejercicios menos el crecimiento comprado
   (gasto en adquisiciones / múltiplo de partida / margen / ingresos).
 * Margen en el año 5: base = mediana de los 3 últimos; bajista = mínimo; alcista = máximo.
+  Regla «pérdidas recientes» (pre-registrada el 9-nov-2026, ``LOSS_MARGIN_RULE``): en PER y EV/EBITDA, si
+  alguno de esos 3 márgenes es ≤ 0, los escenarios se calculan solo con los positivos (sin ninguno, el de
+  partida): una pérdida proyectada como margen permanente y valorada a un múltiplo positivo daría capital
+  cero por construcción, no un escenario. El riesgo sigue en el crecimiento y el múltiplo bajistas.
 * Conversión de caja (flujo libre / EBITDA, o / beneficio): base = mediana de los 3 últimos; bajista = mínimo;
   alcista = máximo; acotada a [0, 1,2] ([0,3, 1,5] en PER).
 * M&A: gasto medio en adquisiciones / ingresos de los 3 últimos (tope 15 %); bajista la mitad.
@@ -37,7 +41,10 @@ from typing import Any
 
 from app.valuation.shareholder_irr import Drivers, StartingPoint
 
-RULES_VERSION = "shareholder-irr-rules-v2"
+RULES_VERSION = "shareholder-irr-rules-v3"  # v3: pérdidas recientes (PREREG bear 9-nov-2026)
+#: Regla «pérdidas recientes» (PREREG bear, 9-nov-2026): "both" = bajista, base y alcista con los márgenes
+#: positivos de los 3 últimos; "bear" = solo el bajista; None = sin la regla (mínimo/mediana/máximo de los 3).
+LOSS_MARGIN_RULE: str | None = "both"
 LONG_RUN_GROWTH = 0.04
 SCENARIOS = ("bear", "base", "bull")
 SCENARIO_LABELS = {"bear": "Bajista", "base": "Base", "bull": "Alcista"}
@@ -153,8 +160,9 @@ def build_scenarios(sp: StartingPoint, hist: History, *, peer_multiples: Sequenc
             f"múltiplo de partida {m0:.1f}x fuera del rango que la regla puede proyectar ({lo_b / 2:g}–{hi_b * 2:g}x): "
             "el EBITDA o el beneficio contable no representa lo que gana el accionista"
         )
-    margins = [e / r for r, e in zip(hist.revenue, hist.earnings, strict=False)
-               if r is not None and e is not None and r > 0]
+    margin_years = [(y, e / r) for y, r, e in zip(hist.years, hist.revenue, hist.earnings, strict=False)
+                    if r is not None and e is not None and r > 0]
+    margins = [m for _, m in margin_years]
     margin_last3 = margins[-3:]
     # conversión de caja por año
     conv = []
@@ -198,6 +206,19 @@ def build_scenarios(sp: StartingPoint, hist: History, *, peer_multiples: Sequenc
     # margen
     if margin_last3:
         mg = {"bear": min(margin_last3), "base": median(margin_last3), "bull": max(margin_last3)}
+        loss_years = [y for y, m in margin_years[-3:] if m <= 0]
+        if loss_years and LOSS_MARGIN_RULE and sp.basis in ("pe", "ev_ebitda"):
+            pos = [m for m in margin_last3 if m > 0] or [margin0]
+            keys = SCENARIOS if LOSS_MARGIN_RULE == "both" else ("bear",)
+            fixed = {"bear": min(pos), "base": median(pos), "bull": max(pos)}
+            mg |= {k: fixed[k] for k in keys}
+            out.warnings.append(
+                "pérdidas en " + ", ".join(str(y) for y in loss_years) + ": "
+                + ("los escenarios usan" if LOSS_MARGIN_RULE == "both" else "el bajista usa")
+                + " solo los márgenes positivos de los 3 últimos ejercicios"
+                + ("" if any(m > 0 for m in margin_last3) else " (ninguno: el de partida)")
+                + ", no proyectan pérdidas permanentes")
+            out.trace["margen_perdidas"] = {"anos": loss_years, "regla": LOSS_MARGIN_RULE, "positivos": pos}
     else:
         mg = dict.fromkeys(SCENARIOS, margin0)
         out.warnings.append("sin margen histórico: margen constante")
