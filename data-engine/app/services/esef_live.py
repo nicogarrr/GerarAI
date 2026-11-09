@@ -300,6 +300,8 @@ async def fetch_live_snapshot(
         if not normalized:
             return None, "filings_ilegibles"
         latest = sources[0]
+        merged = merge_facts(normalized)
+        extension_map = await _extension_map(esef, [row for row in selected if row[1] == 0][:1], merged)
         entity_name = identity.legal_name
         if chosen:
             try:
@@ -320,7 +322,8 @@ async def fetch_live_snapshot(
                 "fxo_id": latest["fxo_id"],
                 "sha256": latest["sha256"],
                 "fetched_at": datetime.now(UTC).isoformat(),
-                "facts": merge_facts(normalized),
+                "facts": merged,
+                **({"extension_map": extension_map} if extension_map else {}),
                 "origin": "live",
                 "source": source_label,
                 "filing_sources": sources,
@@ -335,6 +338,64 @@ async def fetch_live_snapshot(
     finally:
         if own_http:
             await http.aclose()
+
+
+ESEF_EXTENSION_METRICS = ("capital_expenditure", "financial_liabilities_noncurrent", "financial_liabilities_current")
+_LEASE_PARTS = {
+    "financial_liabilities_noncurrent": "ifrs-full:NoncurrentLeaseLiabilities",
+    "financial_liabilities_current": "ifrs-full:CurrentLeaseLiabilities",
+}
+
+
+def _metrics_without_standard(facts: dict[str, Any]) -> list[str]:
+    """Métricas ESEF objetivo sin NINGÚN hecho de sus conceptos estándar (alias o partes)."""
+    from app.services.financial_ingestion_service import (
+        ESEF_METRIC_MAP,
+        ESEF_PART_CONCEPTS,
+        ESEF_SUPERSET_CONCEPTS,
+    )
+
+    concepts = {metric: set(c) for metric, c, _unit in ESEF_METRIC_MAP}
+    out: list[str] = []
+    for metric in ESEF_EXTENSION_METRICS:
+        known = concepts.get(metric, set()) | set(ESEF_PART_CONCEPTS.get(metric, [])) | set(
+            ESEF_SUPERSET_CONCEPTS.get(metric, []))
+        if not any(any(not e.get("dims") for es in (facts.get(c) or {}).values() for e in es) for c in known):
+            out.append(metric)
+    return out
+
+
+async def _extension_map(esef: Any, latest: list[tuple[str, int, Any]], facts: dict[str, Any]) -> dict[str, Any]:
+    """Conceptos propios del emisor que equivalen a métricas sin concepto estándar (``xbrl_extension_map``).
+
+    Lee la taxonomía del paquete del último ejercicio del índice. Nunca lanza:
+    sin paquete o ilegible no hay mapa (las métricas siguen N/D como hoy)."""
+    from app.services import xbrl_extension_map as xm
+
+    wanted = _metrics_without_standard(facts)
+    if not wanted or not latest or not hasattr(esef, "fetch_package"):
+        return {}
+    filing = latest[0][2]
+    try:
+        tax = xm.taxonomy_from_package(await esef.fetch_package(filing))
+    except Exception as exc:  # noqa: BLE001 - paquete ausente o ilegible: N/D con motivo
+        motivo = f"taxonomía de extensión no legible ({type(exc).__name__})"
+        return {m: xm.NotAvailable(m, motivo).as_dict() for m in wanted}
+    out: dict[str, Any] = {}
+    for metric, res in xm.resolve_extensions(tax, xm.facts_from_xbrl_json(facts), metrics=wanted).items():
+        row = res.as_dict()
+        lease = _LEASE_PARTS.get(metric)
+        if isinstance(res, xm.ExtensionMapping) and lease and lease in tax.narrower.get(res.concept, set()):
+            if any(not e.get("dims") for es in (facts.get(lease) or {}).values() for e in es):
+                row = xm.NotAvailable(metric, (
+                    f"{res.concept} incluye arrendamientos ({lease}) que el emisor también declara aparte: "
+                    "se contarían dos veces")).as_dict()
+            else:
+                row["includes_leases"] = True
+        row.pop("values", None)
+        row["source"] = ESEF_BASE_URL + str(getattr(filing, "package_url", "") or "")
+        out[metric] = row
+    return out
 
 
 def reporting_currency(facts: dict[str, Any], default: str = "EUR") -> str:

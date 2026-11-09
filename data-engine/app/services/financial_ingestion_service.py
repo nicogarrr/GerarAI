@@ -273,7 +273,8 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # 12 (8-nov-2026): plan B: el último filing anual que companyfacts no trae se lee de su instancia XBRL (TSM 20-F 2025).
 # 13 (9-nov-2026): IFRS: ProfitLoss/Equity solo pasan a atribuibles con señal positiva de minoritarios = 0;
 #    sin ella se guardan como total (net_income_total / total_equity_total) y lo atribuible queda no verificable (CNQ).
-SEC_INGESTION_RULES_VERSION = 13
+# 14 (9-nov-2026): extensiones del emisor (sec_extension_facts: capex propio, FRE/DE de gestoras).
+SEC_INGESTION_RULES_VERSION = 14
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Arrendadores (REIT): su ingreso principal es el del arrendamiento (ASC 842),
@@ -542,7 +543,7 @@ def sec_ifrs_metric_map_for(ifrs_facts: dict[str, Any]) -> list[tuple[str, list[
 # ``shares_diluted`` = AdjustedWeightedAverageShares cuando el emisor la etiqueta (sin derivar).
 # 4 (8-nov-2026): ``net_income_total`` (ProfitLoss) y ``finance_income_cost`` (EBITDA por componentes).
 # 5 (8-nov-2026): ``minority_interest`` (NoncontrollingInterests) y ``net_income_minority``.
-ESEF_INGESTION_RULES_VERSION = 5
+ESEF_INGESTION_RULES_VERSION = 6  # v6: extensiones ancladas (xbrl_extension_map)
 
 ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # RevenueFromContractsWithCustomers: emisores que solo etiquetan la cifra
@@ -1422,6 +1423,27 @@ def _opening_instant_as_closing(
     return previous if previous in annual_ends else None
 
 
+def esef_extension_concepts(snapshot: dict[str, Any], facts_data: dict[str, Any]) -> dict[str, str]:
+    """Métrica -> concepto de extensión resuelto en el snapshot (``extension_map`` de esef_live).
+
+    Con signo contrario al estándar (``sign`` = -1) se usa una copia con el
+    signo orientado, nunca el crudo. Una deuda propia que INCLUYE
+    arrendamientos no se usa si el emisor también declara esos arrendamientos
+    aparte: se contarían dos veces (queda N/D en ``extension_map``)."""
+    out: dict[str, str] = {}
+    for metric, mapping in (snapshot.get("extension_map") or {}).items():
+        concept = (mapping or {}).get("concept")
+        if not concept or mapping.get("status") == "N/D" or concept not in facts_data:
+            continue
+        if int(mapping.get("sign") or 1) == -1:
+            facts_data[concept] = {
+                unit: [{**e, "val": str(-(_decimal(e.get("val")) or Decimal(0)))} for e in entries]
+                for unit, entries in facts_data[concept].items()
+            }
+        out[metric] = concept
+    return out
+
+
 def _merge_esef_periods(
     facts_data: dict[str, Any], concepts: list[str], unit: str, metric: str
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
@@ -2151,6 +2173,28 @@ class FinancialIngestionService:
             us_gaap = facts_data["facts"]["ifrs-full"]
             metric_map = sec_ifrs_metric_map_for(us_gaap)
             taxonomy = "ifrs-full"
+        # Plan C: lo que el emisor etiqueta con conceptos PROPIOS (capex de CNQ,
+        # FRE de KKR) no está en companyfacts; se lee del último anual y entra
+        # al final de la lista de su métrica (el concepto estándar siempre
+        # gana). Solo valoración vigente; sin red si la resolución del mismo
+        # accession ya está en el documento. Un fallo nunca rompe la ingesta.
+        if as_of is None:
+            from app.services import sec_extension_facts
+
+            try:
+                extension_map = await sec_extension_facts.resolve_latest_filing(
+                    sec, cik, company, facts_data, taxonomy, metric_map, set(ANNUAL_REPORT_FORMS),
+                    cached=(document.metadata_ or {}).get("sec_extension_map"),
+                )
+            except Exception:  # noqa: BLE001 - plan C: sin él, companyfacts sigue igual
+                extension_map = None
+            if extension_map:
+                metric_map = sec_extension_facts.apply_resolution(facts_data, taxonomy, metric_map, extension_map)
+                us_gaap = facts_data["facts"][taxonomy]
+                document.metadata_ = {
+                    **(document.metadata_ or {}),
+                    "sec_extension_map": {k: v for k, v in extension_map.items() if k != "reused"},
+                }
         # Divisa de reporte del filer (10-K: USD; 20-F en US GAAP: CNY, TWD...).
         # Cada hecho monetario se guarda con ELLA como unidad.
         reporting_currency = _sec_reporting_currency(us_gaap)
@@ -2773,6 +2817,8 @@ class FinancialIngestionService:
         snapshot_fingerprint = (
             f"{ESEF_INGESTION_RULES_VERSION}:{_esef_snapshot_fingerprint(snapshot)}"
         )
+        if snapshot.get("extension_map"):
+            snapshot_fingerprint += ":" + _esef_snapshot_fingerprint({"facts": snapshot["extension_map"]})[:16]
         if (document.metadata_ or {}).get("esef_snapshot_fingerprint") == (
             snapshot_fingerprint
         ):
@@ -2811,8 +2857,12 @@ class FinancialIngestionService:
 
         ccy = reporting_currency(facts_data)
         esef_coverage: dict[str, Any] = {}
+        extension_concepts = esef_extension_concepts(snapshot, facts_data)
         for metric, concepts, map_unit in ESEF_METRIC_MAP:
             unit = map_unit.replace("iso4217:EUR", f"iso4217:{ccy}")
+            if metric in extension_concepts:
+                # Concepto propio anclado (xbrl_extension_map): al final, el estándar gana.
+                concepts = [*concepts, extension_concepts[metric]]
             by_period, coverage = _merge_esef_periods(facts_data, concepts, unit, metric)
             if coverage["ambiguous"] or coverage["partial"]:
                 esef_coverage[metric] = coverage
@@ -2854,6 +2904,7 @@ class FinancialIngestionService:
             "fxo_id": snapshot.get("fxo_id"),
             "snapshot_fetched_at": snapshot.get("fetched_at"),
             "esef_coverage": esef_coverage,
+            **({"extension_map": snapshot["extension_map"]} if snapshot.get("extension_map") else {}),
             "reporting_currency": ccy,
             "origin": snapshot.get("origin") or "local_snapshot",
             "esef_snapshot_fingerprint": snapshot_fingerprint,
