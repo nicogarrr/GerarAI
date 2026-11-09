@@ -86,8 +86,28 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     ASTS: {
         name: 'AST SpaceMobile',
         section: { url: 'https://investors.ast-science.com/', labelKey: 'quarterlyResults' },
-        events: [],
-        verifiedOn: '2026-10-21',
+        events: [
+            // La web de ASTS no tiene pagina por evento: se enlaza la pagina oficial
+            // de eventos, donde figura la convocatoria con su fecha y su webcast.
+            {
+                date: '2026-11-09',
+                period: 'T3 2026',
+                url: 'https://investors.ast-science.com/events',
+                assets: [
+                    { kind: 'webcast', url: 'https://event.choruscall.com/mediaframe/webcast.html?webcastid=QKToBNQI', source: 'https://investors.ast-science.com/events' },
+                ],
+            },
+            {
+                date: '2026-08-10',
+                period: 'T2 2026',
+                url: 'https://investors.ast-science.com/events',
+                assets: [
+                    { kind: 'webcast', url: 'https://event.choruscall.com/mediaframe/webcast.html?webcastid=LzBpQrob', source: 'https://investors.ast-science.com/events' },
+                    { kind: 'presentacion', url: 'https://irp.cdn-website.com/bbb776b9/files/uploaded/AST+SpaceMobile+Q2+2026+Business+Update_vF.pdf', source: 'https://investors.ast-science.com/events' },
+                ],
+            },
+        ],
+        verifiedOn: '2026-11-09',
     },
     ZETA: {
         name: 'Zeta Global',
