@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { waitForHydration } from "./fixtures/wait-for-hydration";
 
 const runUiE2E = process.env.E2E_UI_RUN === "1";
 
@@ -9,6 +10,9 @@ test.describe("investor thesis alert flow", () => {
     await page.goto("/research/MSFT");
 
     await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
+    // La ficha hidrata tarde sus secciones en streaming: sin esta espera el
+    // clic podía caer antes de hidratar (ver wait-for-hydration.ts).
+    await waitForHydration(page);
     // El formulario de alerta vive en un popover tras el botón campana.
     await page.getByRole("button", { name: "Alerta de precio" }).click();
     await expect(page.getByPlaceholder("Precio objetivo $")).toBeVisible();
@@ -23,6 +27,7 @@ test.describe("investor thesis alert flow", () => {
     await page.goto("/research/MSFT");
 
     await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
+    await waitForHydration(page);
     await page.getByRole("button", { name: "Alerta de precio" }).click();
     await page.getByRole("button", { name: "+ Alerta" }).click();
     await expect(page.getByText("Introduce un precio objetivo válido")).toBeVisible();

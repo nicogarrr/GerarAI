@@ -54,10 +54,26 @@ describe('quick alert trigger before hydration',()=>{
   document.body.append(host);
   fireEvent.click(host.querySelector('button')!);
   // Sin retención este clic se pierde en silencio (el rojo E2E del piloto).
-  expect(sessionStorage.getItem(ALERT_PENDING_KEY)).toBe('1');
+  // La intención guarda la identidad del gatillo: solo esta ficha la consume.
+  expect(sessionStorage.getItem(ALERT_PENDING_KEY)).toBe(JSON.stringify({ticker:'MSFT'}));
   host.remove();
   render(<QuickAlertButton ticker="MSFT" currency="USD" compact/>);
   expect(await screen.findByRole('combobox',{name:'Tipo de alerta'})).toBeVisible();
+  expect(sessionStorage.getItem(ALERT_PENDING_KEY)).toBeNull();
+ });
+ it('discards a retained click from another ticker without opening',async()=>{
+  // Regresión cruzada (hallazgo del auditor): clic SSR en MSFT, navegar antes
+  // de hidratar y montar AAPL — el popover de AAPL NO puede abrirse y la
+  // intención ajena queda descartada (borrada), no aplazada.
+  const host=document.createElement('div');
+  host.innerHTML=renderToString(<QuickAlertButton ticker="MSFT" currency="USD" compact/>);
+  document.body.append(host);
+  fireEvent.click(host.querySelector('button')!);
+  expect(sessionStorage.getItem(ALERT_PENDING_KEY)).toBeTruthy();
+  host.remove();
+  render(<QuickAlertButton ticker="AAPL" currency="USD" compact/>);
+  await act(async()=>{});
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   expect(sessionStorage.getItem(ALERT_PENDING_KEY)).toBeNull();
  });
  it('marks the mounted trigger hydrated: later clicks belong to React alone',async()=>{

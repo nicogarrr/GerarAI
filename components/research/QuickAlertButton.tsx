@@ -35,17 +35,18 @@ export default function QuickAlertButton({ ticker, currency = 'USD', compact = f
   const [openedOnce, setOpenedOnce] = useState(false);
 
   // Un clic sobre el gatillo antes de hidratar queda retenido por el script
-  // del layout (data-early-open="alert"): al montar se consume aquí y el
-  // popover se abre como si React hubiera atendido ese primer clic.
+  // del layout (data-early-open="alert" + identidad en el detalle): al montar
+  // se consume aquí — solo si el ticker coincide — y el popover se abre como
+  // si React hubiera atendido ese primer clic.
   useEffect(() => {
-    if (consumeEarlyAlertOpen()) {
+    if (consumeEarlyAlertOpen(ticker)) {
       void loadQuickAlertPopoverBody();
       queueMicrotask(() => {
         setOpenedOnce(true);
         setOpen(true);
       });
     }
-  }, []);
+  }, [ticker]);
 
   return (
     <Popover
@@ -59,6 +60,7 @@ export default function QuickAlertButton({ ticker, currency = 'USD', compact = f
         <Button
           ref={markEarlyOpenHydrated}
           data-early-open="alert"
+          data-early-open-detail={JSON.stringify({ ticker })}
           size="sm"
           variant={compact ? 'ghost' : 'outline'}
           aria-label={t('alerts.quick.button')}

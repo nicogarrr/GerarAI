@@ -86,9 +86,12 @@ export const EARLY_OPEN_CAPTURE_JS = `(function(){
             try { window.sessionStorage.setItem(${JSON.stringify(EARLY_OPEN_NAV_KEY)}, '1'); } catch (err) {}
             // sessionStorage bloqueado: el usuario reintenta ya hidratado.
         } else if (kind === 'alert') {
-            // Alerta rápida de la ficha: QuickAlertButton consume la marca al
-            // montar y abre el popover como si React hubiera atendido el clic.
-            try { window.sessionStorage.setItem(${JSON.stringify(EARLY_OPEN_ALERT_KEY)}, '1'); } catch (err) {}
+            // Alerta rápida de la ficha: la intención guarda la IDENTIDAD del
+            // gatillo (data-early-open-detail con {ticker}). Si el usuario
+            // navega a otra ficha antes de hidratar, el montaje de aquella la
+            // descarta: solo el ticker retenido abre su popover.
+            var alertDetail = trigger.getAttribute('${EARLY_OPEN_DETAIL_ATTR}');
+            try { window.sessionStorage.setItem(${JSON.stringify(EARLY_OPEN_ALERT_KEY)}, alertDetail || '{}'); } catch (err) {}
         }
     }, true);
     // Enter en el input de un formulario aún sin onSubmit hidratado: no hay
@@ -109,26 +112,37 @@ export function markEarlyOpenHydrated(el: Element | null): void {
     el?.setAttribute('data-hydrated', '1');
 }
 
-/** Lee y borra una marca de apertura pendiente (una sola vez). */
-function consumePendingOpen(key: string): boolean {
-    if (typeof window === 'undefined') return false;
+/** Lee y borra una marca de apertura pendiente (una sola vez); null si no hay. */
+function takePendingOpen(key: string): string | null {
+    if (typeof window === 'undefined') return null;
     try {
-        if (window.sessionStorage.getItem(key)) {
-            window.sessionStorage.removeItem(key);
-            return true;
-        }
+        const raw = window.sessionStorage.getItem(key);
+        if (raw) window.sessionStorage.removeItem(key);
+        return raw;
     } catch {
         // sessionStorage bloqueado: nada que consumir.
+        return null;
     }
-    return false;
 }
 
 /** Lee y borra la marca de apertura pendiente del menú móvil (una sola vez). */
 export function consumeEarlyNavOpen(): boolean {
-    return consumePendingOpen(EARLY_OPEN_NAV_KEY);
+    return Boolean(takePendingOpen(EARLY_OPEN_NAV_KEY));
 }
 
-/** Lee y borra la marca de apertura pendiente de la alerta rápida (una sola vez). */
-export function consumeEarlyAlertOpen(): boolean {
-    return consumePendingOpen(EARLY_OPEN_ALERT_KEY);
+/**
+ * Consume la intención de alerta retenida pre-hidratación (una sola vez):
+ * devuelve true solo si el ticker retenido es el de ESTE gatillo. La
+ * intención de otra ficha se descarta (se borra igualmente), nunca se aplaza.
+ */
+export function consumeEarlyAlertOpen(ticker: string): boolean {
+    const raw = takePendingOpen(EARLY_OPEN_ALERT_KEY);
+    if (!raw) return false;
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        const pending = (parsed as { ticker?: unknown } | null)?.ticker;
+        return typeof pending === 'string' && pending.trim().toUpperCase() === ticker.trim().toUpperCase();
+    } catch {
+        return false;
+    }
 }
