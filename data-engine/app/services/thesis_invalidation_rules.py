@@ -35,6 +35,7 @@ from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.sql_chunks import sql_in_chunks
 from app.models import (
     AlertRule,
     CalculatedMetric,
@@ -280,8 +281,14 @@ def sync_all_thesis_rules(db: Session) -> None:
             )
         ).all()
     )
+    # Un db.get por empresa era un N+1 en cada pasada global; INs acotados
+    # (un IN unico sin cota aborta en SQLite con suficientes empresas).
+    companies: dict[int, Company] = {}
+    for batch in sql_in_chunks(sorted(company_ids)):
+        for company in db.scalars(select(Company).where(Company.id.in_(batch))):
+            companies[company.id] = company
     for company_id in sorted(company_ids):
-        company = db.get(Company, company_id)
+        company = companies.get(company_id)
         if company is not None:
             sync_thesis_rules(db, company)
 
