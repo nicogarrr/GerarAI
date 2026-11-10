@@ -2,6 +2,14 @@ import { translateMessage } from '@/lib/i18n/translate';
 import { chartPriceUnit } from '@/lib/market/chart-price-units';
 import { metricLabel } from '@/lib/research/metric-labels';
 
+/** «¿Con qué frecuencia lo consiguieron?» (data-engine app/services/estimate_base_rates.share_reaching). */
+export type BaseRateCheck = { share: number | null; bound?: '=' | '<' | '>' | string | null; growth?: number | null; horizon_years?: number | null; n?: number | null; group?: string | null; formula?: string | null; reason?: string | null };
+/** Sufijo de la clave i18n (reachEq | reachLt | reachGt) y la fracción, o null si no hay cifra (N/D). */
+export function baseRateReach(check: BaseRateCheck | null | undefined): { key: 'reachEq' | 'reachLt' | 'reachGt'; share: number } | null {
+  if (!check || typeof check.share !== 'number' || !Number.isFinite(check.share)) return null;
+  const key = check.bound === '<' ? 'reachLt' : check.bound === '>' ? 'reachGt' : 'reachEq';
+  return { key, share: check.share };
+}
 export type HealthEvidence = { fact_id: number; metric: string; value: number; unit: string; period_end: string; source_url: string; source_type: string };
 export type FinancialHealth = {
   status: string; reason?: string; period_end?: string; notice: string;
@@ -11,7 +19,7 @@ export type FinancialHealth = {
 export type ValuationSummary = {
   ticker: string;
   fair_value: { value: number | null; currency: string | null; label: string; as_of: string | null; publishable: boolean; stale: boolean; reason?: string | null; missing_inputs?: string[] };
-  reverse_dcf: { status: string; required_revenue_growth: number | null; as_of: string | null; source: string; market_price: number | null; model_version_id: number | null; reason?: string | null };
+  reverse_dcf: { status: string; required_revenue_growth: number | null; as_of: string | null; source: string; market_price: number | null; model_version_id: number | null; reason?: string | null; base_rate_check?: BaseRateCheck | null };
   health: FinancialHealth;
   /** Empresa que quema caja: tasas base medidas (data-engine app/valuation/cash_burn_base_rate.py). */
   base_rate?: { message_es?: string | null; message_en?: string | null } | null;

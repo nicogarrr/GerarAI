@@ -28,7 +28,10 @@
       "missingScore": "Faltan puntos verificables; no se publica un F-score parcial",
       "noVerifiedPoints": "Ningún punto verificable con los datos disponibles",
       "outsideScenarios": "El precio de mercado queda fuera de todo escenario que el modelo puede valorar con el margen FCF actual; hace falta un método acorde al tipo de empresa."
-    }
+    },
+    "reachEq": "Lo logró el {pct} de empresas comparables en {years} años (tasa base SEC, primera cifra publicada)",
+    "reachLt": "Lo logró menos del {pct} de empresas comparables en {years} años (tasa base SEC, primera cifra publicada)",
+    "reachGt": "Lo logró más del {pct} de empresas comparables en {years} años (tasa base SEC, primera cifra publicada)"
   },
   "translate": {
     "reason": {

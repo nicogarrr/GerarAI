@@ -2109,7 +2109,10 @@
       "footer": "Todas las cifras y tablas las calcula el código con los informes citados; el texto lo redactan los agentes expertos con esas cifras como marcadores y un validador rechaza cualquier número escrito a mano. Es un análisis, no una recomendación de compra o venta.",
       "warnings": "Avisos de datos",
       "sources": "Documentos leídos: {list}"
-    }
+    },
+    "reachEq": "Lo logró el {pct} de comparables en 1 año",
+    "reachLt": "Lo logró menos del {pct} de comparables en 1 año",
+    "reachGt": "Lo logró más del {pct} de comparables en 1 año"
   },
   "insidersV2": {
     "title": "Insiders (Form 4 y 5)",

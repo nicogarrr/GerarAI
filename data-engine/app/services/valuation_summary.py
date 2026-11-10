@@ -31,6 +31,30 @@ def _number(raw: Any) -> float | None:
     return val if isfinite(val) else None
 
 
+def _reverse_base_rate_check(company: Company, facts: list[HealthFact], reverse: object,
+                             growth: float | None) -> dict | None:
+    """¿Con qué frecuencia lo consiguieron? % de empresas comparables (tamaño, crecimiento previo y
+    sector, primera cifra publicada en la SEC) cuyos ingresos crecieron al menos lo que exige el
+    precio en el mismo plazo del DCF inverso. Sin plazo guardado o sin ese plazo en la tabla: None."""
+    if growth is None or not isinstance(reverse, dict):
+        return None
+    horizon = (reverse.get("trace") or {}).get("horizon_years") if isinstance(reverse.get("trace"), dict) else None
+    if not isinstance(horizon, int) or isinstance(horizon, bool) or horizon < 1:
+        return None
+    from app.services.estimate_base_rates import for_annual_revenue, sector_of_cik, share_reaching
+
+    # Los tramos de tamaño están en dólares: ingresos en otra divisa no se clasifican (N/D).
+    annual = {f.year: f.value for f in facts if f.metric == "revenue" and str(f.unit or "").upper().startswith("USD")}
+    if not annual:
+        return None
+    reach = share_reaching(for_annual_revenue(annual, sector=sector_of_cik(getattr(company, "cik", None)),
+                                              horizon=horizon), growth)
+    if reach is None:
+        return None
+    return reach.as_dict(implied_formula=f"el precio exige {growth:+.1%}/año de ingresos durante {horizon} años "
+                                         f"(DCF inverso)")
+
+
 def build_summaries(db: Session, companies: list[Company], *, today: date | None = None) -> dict[str, dict]:
     today = today or date.today()
     if not companies:
@@ -109,6 +133,7 @@ def build_summaries(db: Session, companies: list[Company], *, today: date | None
             "market_price": _number(snapshot.current_price) if snapshot else None,
             "reason": reverse_reason}
         company_facts = [entry[1] for key, entry in selected.items() if key[0] == company.id]
+        reverse_summary["base_rate_check"] = _reverse_base_rate_check(company, company_facts, reverse, growth)
         out[company.ticker.upper()] = {
             "ticker": company.ticker.upper(), "fair_value": reading,
             "margin_convention": "discount_to_value_v1",

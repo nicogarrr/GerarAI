@@ -4,6 +4,7 @@ import { chartPriceUnit } from '@/lib/market/chart-price-units';
 import DcaWatchCard from '@/components/watchlist/DcaWatchCard';
 import { SotpBreakdownView } from '@/components/research/SotpBreakdownSection';
 import { AnalystReportNav, publishedNav } from '@/components/research/AnalystReportNav';
+import { baseRateReach } from '@/lib/research/valuation-summary';
 import { consensusRows, consensusSourceUrl, fairValueRange, thesisRisks, userEstimates, reportVsPrice, type ConsensusRow, type OwnConsensusCell, type ReportCell, type ReportInputs, type ReportPeriod } from '@/lib/research/analyst-report';
 import { thesisCatalystLabel } from '@/lib/research/catalyst-label';
 import { cleanThesisText } from '@/lib/research/thesis-text';
@@ -234,6 +235,12 @@ function PeriodTable({ t, fmt, big, title, rows, kind }: { t: T; fmt: Formatters
   );
 }
 
+const REACH_KEYS = {
+  reachEq: 'research.informe.reachEq',
+  reachLt: 'research.informe.reachLt',
+  reachGt: 'research.informe.reachGt',
+} as const;
+
 const CONSENSUS_SOURCE_KEYS = {
   guia: 'research.informe.consensusSource.guia',
   guia_trimestre_calculado: 'research.informe.consensusSource.guiaTrimestreCalculado',
@@ -251,12 +258,14 @@ function ConsensusCellView({ cell, t, fmt, big, unit, eps }: { cell: OwnConsensu
   const key = CONSENSUS_SOURCE_KEYS[(cell.source ?? '') as keyof typeof CONSENSUS_SOURCE_KEYS];
   const source = key ? t(key) : (cell.source ?? '');
   const url = consensusSourceUrl(cell);
+  const reach = eps ? null : baseRateReach(cell.base_rate_check);
   return (
     <td className="py-1 pl-2 text-gray-100" title={cell.formula ?? undefined}>
       <span className="whitespace-nowrap">{value}</span>
       <span className="block text-[11px] text-gray-500">
         {url ? <a className="underline decoration-dotted hover:text-teal-300" href={url} target="_blank" rel="noopener noreferrer">{source}</a> : source}
       </span>
+      {reach ? <span className="block text-[11px] text-gray-500" title={cell.base_rate_check?.formula ?? undefined} data-testid="consensus-base-rate-reach">{t(REACH_KEYS[reach.key], { pct: fmt.formatPercent(reach.share, { digits: 0 }) })}</span> : null}
     </td>
   );
 }

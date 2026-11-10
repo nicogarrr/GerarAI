@@ -28,7 +28,10 @@
       "missingScore": "Verifiable points are missing; a partial F-score is not published",
       "noVerifiedPoints": "No verifiable point with the available data",
       "outsideScenarios": "The market price is outside every scenario the model can value with the current FCF margin; a method suited to the company type is needed."
-    }
+    },
+    "reachEq": "Reached by {pct} of comparable companies over {years} years (SEC base rate, first published figures)",
+    "reachLt": "Reached by under {pct} of comparable companies over {years} years (SEC base rate, first published figures)",
+    "reachGt": "Reached by over {pct} of comparable companies over {years} years (SEC base rate, first published figures)"
   },
   "translate": {
     "reason": {

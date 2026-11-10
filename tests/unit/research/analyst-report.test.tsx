@@ -6,6 +6,7 @@ import { createFormatters } from '@/lib/format';
 import { createTranslator } from '@/lib/i18n/translate';
 import { engineRangeFrom, fairValueRange, thesisRisks, userEstimates, vsPrice, reportVsPrice, type ReportInputs } from '@/lib/research/analyst-report';
 import type { SotpResponse } from '@/lib/research/sotp';
+import type { BaseRateCheck } from '@/lib/research/valuation-summary';
 import fixture from './analyst-report-asts.fixture.json';
 import sotpFixture from './sotp-asts.fixture.json';
 
@@ -183,6 +184,27 @@ describe('consenso propio en el informe', () => {
     expect(within(table).getByText('tasa base SEC')).toBeTruthy();
     view('en', { consensus: null });
     expect(screen.getAllByTestId('informe-consensus').at(-1)?.textContent).toContain('no own estimate');
+  });
+});
+
+describe('tasa base: con qué frecuencia lo consiguieron', () => {
+  const cell = (check: BaseRateCheck | null) => ({ version: 'v', cells: [
+    { metric: 'revenue', period: 'fy2027', period_end: '2027-12-31', status: 'estimado', source: 'modelo', mid: 512_000_000, formula: 'f', citations: [], base_rate_check: check },
+  ] });
+
+  it('la celda de ingresos dice qué % de comparables lo logró, con la fórmula al pasar el ratón', () => {
+    const formula = 'crecimiento implícito (fy2027 estimado 512 / fy2026 estimado 253) − 1 = +102,1 %; el 6% …';
+    view('es', { consensus: cell({ share: 0.065, bound: '=', formula, n: 63 }) });
+    const reach = screen.getByTestId('consensus-base-rate-reach');
+    expect(reach.textContent).toMatch(/Lo logró el 7\s?% de comparables en 1 año/);
+    expect(reach.getAttribute('title')).toBe(formula);
+  });
+
+  it('fuera de la rejilla dice «menos del»; sin cifra (N/D con motivo) no pinta nada', () => {
+    view('en', { consensus: cell({ share: 0.05, bound: '<', formula: 'x' }) });
+    expect(screen.getByTestId('consensus-base-rate-reach').textContent).toMatch(/Reached by under 5\s?% of peers/);
+    view('es', { consensus: cell({ share: null, reason: 'ejercicio en curso' }) });
+    expect(screen.getAllByTestId('consensus-base-rate-reach')).toHaveLength(1);
   });
 });
 

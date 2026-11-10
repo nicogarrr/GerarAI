@@ -117,6 +117,9 @@ class Cell:
     flags: list[str]
     confidence: dict[str, Any]
     reason: str = ""
+    # Ingresos anuales: qué parte de las empresas comparables creció al menos lo que implica la
+    # celda (tasas base de la primera cifra publicada, :func:`estimate_base_rates.share_reaching`).
+    base_rate_check: dict[str, Any] | None = None
 
     @property
     def key(self) -> str:
@@ -130,7 +133,7 @@ class Cell:
                 "formula": pub.formula if pub else "", "citations": pub.citations if pub else [],
                 "flags": list(self.flags) + (list(pub.flags) if pub else []), "confidence": self.confidence,
                 "reason": self.reason, "alternatives": [c.as_dict() for c in self.alternatives],
-                "version": CONSENSUS_VERSION}
+                "base_rate_check": self.base_rate_check, "version": CONSENSUS_VERSION}
 
 
 # ---------------------------------------------------------------------- periodos
@@ -713,6 +716,20 @@ def _model_candidate(metric: str, period: str, actuals: Mapping[str, Actual], se
 
 
 # ---------------------------------------------------------------------- lectura de la BD
+def _revenue_in_usd(db: Any, company: Any) -> bool:
+    """Los tramos de tamaño de las tasas base están en dólares: otra divisa no se clasifica (N/D)."""
+    from sqlalchemy import select
+
+    from app.models import FinancialFact
+
+    try:
+        units = set(db.scalars(select(FinancialFact.unit).where(
+            FinancialFact.company_id == company.id, FinancialFact.metric == FACT_METRIC["revenue"])).all())
+    except Exception:  # noqa: BLE001 - sin lectura no hay comprobación
+        return False
+    return bool(units) and all(str(u or "").upper().startswith("USD") for u in units)
+
+
 def _facts(db: Any, company: Any, fact_metric: str) -> list[tuple[str, float, date | None, str | None]]:
     from sqlalchemy import select
 
@@ -755,6 +772,92 @@ def _guidance_rows(db: Any, company: Any, tenant_id: int, *, current_only: bool)
     return out
 
 
+def attach_base_rate_checks(cells: Mapping[str, Cell], actuals: Mapping[str, Actual],
+                            rate_for_horizon: Any) -> None:
+    """Para cada año de ingresos estimado y aún sin ningún trimestre presentado: crecimiento implícito
+    frente al año anterior (presentado o, si no, su celda estimada) y el % del grupo comparable que
+    creció al menos eso en un año. Un año con trimestres ya presentados no se compara con la tasa
+    base (parte del crecimiento ya es dato): queda N/D con su motivo. ``rate_for_horizon(h)`` da la
+    tasa base a ``h`` años (``None`` si no la hay: N/D, no se inventa)."""
+    from app.services.estimate_base_rates import share_reaching
+
+    for period, cell in cells.items():
+        pub = cell.published
+        if not period.startswith("fy") or cell.status != "estimado" or pub is None or not pub.mid or pub.mid <= 0:
+            continue
+        year = int(period[2:])
+        reported = [q for q in (1, 2, 3, 4) if f"q{q}_{year}" in actuals]
+        if pub.source == "tasa_base":
+            cell.base_rate_check = {"share": None, "reason": (
+                "la estimación publicada es la propia mediana de la tasa base: el 50 % por construcción, no es "
+                "una comprobación")}
+            continue
+        if reported:
+            cell.base_rate_check = {"share": None, "reason": (
+                f"ejercicio en curso con {len(reported)} trimestre(s) ya presentado(s): parte del crecimiento "
+                "ya es dato y la tasa base no lo distingue")}
+            continue
+        prev_actual = actuals.get(f"fy{year - 1}")
+        prev_cell = cells.get(f"fy{year - 1}")
+        if prev_actual is not None and prev_actual.value and prev_actual.value > 0:
+            anchor, label, cite = prev_actual.value, f"fy{year - 1} presentado", _cite_actual(prev_actual)
+        elif prev_cell is not None and prev_cell.published is not None and prev_cell.published.mid > 0:
+            anchor, label, cite = prev_cell.published.mid, f"fy{year - 1} estimado", None
+        else:
+            continue
+        implied = pub.mid / anchor - 1
+        reach = share_reaching(rate_for_horizon(1), implied)
+        if reach is None:
+            continue
+        how = f"crecimiento implícito ({period} estimado {pub.mid:,.0f} / {label} {anchor:,.0f}) − 1 = {implied:+.1%}"
+        cell.base_rate_check = {**reach.as_dict(implied_formula=how), "anchor": cite}
+
+
+def attach_margin_checks(oi_cells: Mapping[str, Cell], oi_actuals: Mapping[str, Actual],
+                         rev_cells: Mapping[str, Cell], rev_actuals: Mapping[str, Actual], rate_for_horizon: Any) -> None:
+    """Beneficio operativo anual estimado: variación del margen operativo que implica (estimado ÷ ingresos del
+    mismo año, frente al año anterior presentado o estimado) y el % del grupo comparable que mejoró su margen
+    al menos eso en un año. Mismas puertas que :func:`attach_base_rate_checks`."""
+    from app.services.estimate_base_rates import share_reaching
+
+    def pair(period: str) -> tuple[float, float, str] | None:
+        oi_a, rev_a = oi_actuals.get(period), rev_actuals.get(period)
+        if oi_a is not None and rev_a is not None and rev_a.value > 0:
+            return oi_a.value, rev_a.value, f"{period} presentado"
+        oi_c, rev_c = oi_cells.get(period), rev_cells.get(period)
+        if (oi_c is not None and oi_c.published is not None and oi_c.status == "estimado" and rev_c is not None
+                and rev_c.published is not None and rev_c.status == "estimado" and rev_c.published.mid > 0):
+            return oi_c.published.mid, rev_c.published.mid, f"{period} estimado"
+        return None
+
+    for period, cell in oi_cells.items():
+        pub = cell.published
+        if not period.startswith("fy") or cell.status != "estimado" or pub is None:
+            continue
+        year = int(period[2:])
+        if pub.source == "tasa_base":
+            cell.base_rate_check = {"share": None, "reason": "la estimación publicada sale de la propia tasa base"}
+            continue
+        reported = [q for q in (1, 2, 3, 4) if f"q{q}_{year}" in oi_actuals]
+        if reported:
+            cell.base_rate_check = {"share": None, "reason": (
+                f"ejercicio en curso con {len(reported)} trimestre(s) ya presentado(s): parte del margen ya es dato")}
+            continue
+        now, before = pair(period), pair(f"fy{year - 1}")
+        if now is None or before is None or not now[2].endswith("estimado"):
+            continue
+        change = now[0] / now[1] - before[0] / before[1]
+        if abs(change) >= 1.0:
+            continue
+        reach = share_reaching(rate_for_horizon(1), change)
+        if reach is None:
+            continue
+        how = (f"margen operativo implícito ({period}: {now[0]:,.0f} / {now[1]:,.0f} = {now[0] / now[1]:.1%}) − "
+               f"({before[2]}: {before[0]:,.0f} / {before[1]:,.0f} = {before[0] / before[1]:.1%}) = "
+               f"{change * 100:+.1f} puntos")
+        cell.base_rate_check = reach.as_dict(implied_formula=how)
+
+
 def build_company_consensus(db: Any, company: Any, tenant_id: int, *, today: date | None = None,
                             base_rate_for: Any = None, measured_errors: Mapping[tuple[str, str], Sequence[float]]
                             | None = None) -> dict[str, Any]:
@@ -779,6 +882,7 @@ def build_company_consensus(db: Any, company: Any, tenant_id: int, *, today: dat
     out: dict[str, Any] = {"ticker": company.ticker, "as_of": today.isoformat(), "version": CONSENSUS_VERSION,
                            "source_order": list(SOURCE_ORDER), "cells": []}
     rev_actuals = actuals_from_facts(_facts(db, company, FACT_METRIC["revenue"]), metric="revenue")
+    rev_in_usd = _revenue_in_usd(db, company)
     if base_rate_for is None:
         from app.services.estimate_base_rates import for_annual_revenue, sector_of_cik
 
@@ -802,8 +906,40 @@ def build_company_consensus(db: Any, company: Any, tenant_id: int, *, today: dat
                             operating_actuals=oi_actuals if metric == "eps" else None)
         if metric == "revenue":
             rev_cells = cells
+            try:
+                if not rev_in_usd:
+                    for _p, _c in cells.items():
+                        if _p.startswith("fy") and _c.status == "estimado":
+                            _c.base_rate_check = {"share": None, "reason": (
+                                "ingresos en otra divisa: los tramos de tamaño de la tasa base están en dólares")}
+                    raise LookupError("ingresos fuera de USD")
+                from app.services.estimate_base_rates import for_annual_revenue as _far
+                from app.services.estimate_base_rates import sector_of_cik as _soc
+
+                _sector = _soc(getattr(company, "cik", None))
+                _annual = {int(k[2:]): a.value for k, a in rev_actuals.items() if k.startswith("fy")}
+                attach_base_rate_checks(cells, rev_actuals,
+                                        lambda h: _far(_annual, sector=_sector, horizon=h))
+            except Exception:  # noqa: BLE001 - sin tabla, la celda sigue sin comprobación (N/D)
+                pass
         elif metric == "operating_income":
             oi_cells, oi_actuals = cells, acts
+            try:
+                if not rev_in_usd:
+                    for _p, _c in cells.items():
+                        if _p.startswith("fy") and _c.status == "estimado":
+                            _c.base_rate_check = {"share": None, "reason": (
+                                "ingresos en otra divisa: los tramos de tamaño de la tasa base están en dólares")}
+                    raise LookupError("ingresos fuera de USD")
+                from app.services.estimate_base_rates import for_annual_revenue as _far2
+                from app.services.estimate_base_rates import sector_of_cik as _soc2
+
+                _sector2 = _soc2(getattr(company, "cik", None))
+                _annual2 = {int(k[2:]): a.value for k, a in rev_actuals.items() if k.startswith("fy")}
+                attach_margin_checks(cells, acts, rev_cells, rev_actuals,
+                                     lambda h: _far2(_annual2, sector=_sector2, horizon=h, metric="margin"))
+            except Exception:  # noqa: BLE001 - sin tabla, la celda sigue sin comprobación (N/D)
+                pass
         out["cells"].extend(c.as_dict() for c in cells.values())
     if rate is not None:
         out["base_rate"] = {"group": rate.group, "p25": rate.p25, "p50": rate.p50, "p75": rate.p75, "n": rate.n,
