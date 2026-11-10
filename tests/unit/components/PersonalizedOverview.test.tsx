@@ -159,6 +159,16 @@ describe('PersonalizedOverview', () => {
         window.removeEventListener('gerarai:open-brain', listener);
     });
 
+    it('primeros pasos: el botón del Cerebro queda cubierto por la captura pre-hidratación', async () => {
+        setup();
+        await renderHome();
+        const button = screen.getByRole('button', { name: /Abrir\s*el Cerebro/ });
+        // El HTML inicial retiene el clic aunque React aún no haya hidratado,
+        // y al montar queda marcado para que la captura no lo intercepte.
+        expect(button).toHaveAttribute('data-early-open', 'brain');
+        expect(button).toHaveAttribute('data-hydrated', '1');
+    });
+
     it('cartera con coste: G/P, desglose, posiciones y enlace a lo que más se mueve', async () => {
         setup({
             portfolio: summary([holding('ASTS', { gainPercent: -35 }), holding('META', { gainPercent: 10 })]),

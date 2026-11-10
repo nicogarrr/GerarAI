@@ -1,5 +1,6 @@
 'use client';
 import { openBrain } from '@/lib/brain/open-brain';
+import { markEarlyOpenHydrated } from '@/lib/early-open';
 
 import { formatNumber as formatNumberFor, isValidCurrencyCode, naFor } from '@/lib/format';
 import {
@@ -158,6 +159,8 @@ function FirstSteps({ watchlistCount }: { watchlistCount: number | null }) {
                     </div>
                     <button
                         type="button"
+                        ref={markEarlyOpenHydrated}
+                        data-early-open="brain"
                         onClick={() => openBrain()}
                         className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200"
                     >

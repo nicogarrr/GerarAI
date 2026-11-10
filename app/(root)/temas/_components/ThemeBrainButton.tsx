@@ -1,5 +1,7 @@
 'use client';
 
+import { openBrain } from '@/lib/brain/open-brain';
+import { markEarlyOpenHydrated } from '@/lib/early-open';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
 import { useT } from '@/lib/i18n/client';
 
@@ -17,9 +19,10 @@ export function ThemeBrainButton({ question }: ThemeBrainButtonProps) {
   return (
     <button
       type="button"
-      onClick={() =>
-        window.dispatchEvent(new CustomEvent('gerarai:open-brain', { detail: { question } }))
-      }
+      ref={markEarlyOpenHydrated}
+      data-early-open="brain"
+      data-early-open-detail={JSON.stringify({ question })}
+      onClick={() => openBrain({ question })}
       className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-800 px-3 text-xs font-semibold text-teal-300 transition hover:border-teal-400/40 hover:text-teal-200"
     >
       <BrainGlassesIcon className="h-4 w-4" />

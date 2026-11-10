@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import CompanyActionsMenu from '@/components/research/CompanyActionsMenu';
+import { markBrainReady } from '@/lib/brain/open-brain';
 
 describe('Company secondary actions navigation', () => {
     it.each([0, 3])('opens only on request, labels changes count %s and escapes route/query ticker', async changeCount => {
@@ -33,6 +34,8 @@ describe('Company secondary actions navigation', () => {
         expect(trigger).toHaveAttribute('aria-expanded', 'false');
     });
     it('opens the research guide with the current ticker without changing accounts or creating work', async () => {
+        // GlobalBrain va siempre montado en el shell: la guía viaja por evento.
+        markBrainReady(true);
         const listener = vi.fn();
         window.addEventListener('gerarai:open-brain', listener);
         try {
@@ -43,6 +46,7 @@ describe('Company secondary actions navigation', () => {
             const event = listener.mock.calls[0][0] as CustomEvent;
             expect(event.detail).toEqual({ ticker: 'BRK.B' });
         } finally {
+            markBrainReady(false);
             window.removeEventListener('gerarai:open-brain', listener);
         }
     });
