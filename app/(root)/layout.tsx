@@ -9,7 +9,8 @@ import { SIDEBAR_COLLAPSED_COOKIE } from "@/lib/ui/sidebar-preference";
 import OnlineBanner from "@/components/OnlineBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { requireAuthenticatedUser } from "@/lib/auth/require-user";
-import { cookies } from "next/headers";
+import { EARLY_OPEN_CAPTURE_JS } from "@/lib/early-open";
+import { cookies, headers } from "next/headers";
 import { redirectToSignIn } from "@/lib/auth/sign-in-redirect";
 import React from "react";
 import { getT } from "@/lib/i18n/server";
@@ -47,8 +48,11 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
         (jar) => jar.get(SIDEBAR_COLLAPSED_COOKIE)?.value === '1',
     );
 
+    const nonce = (await headers()).get('x-nonce') ?? undefined;
+
     return (
         <div className="flex min-h-dvh flex-col text-gray-300">
+            <script nonce={nonce} dangerouslySetInnerHTML={{ __html: EARLY_OPEN_CAPTURE_JS }} />
             <a href="#content" className="skip-link">{t('landing.shell.skipLink')}</a>
 
             {/* Banner y header comparten un unico contenedor pegajoso: asi el
