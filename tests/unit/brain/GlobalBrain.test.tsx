@@ -28,6 +28,9 @@ vi.mock('@/components/brain/BrainGuideAnswer', () => ({
 }));
 
 import BottomNav from '@/components/layout/BottomNav';
+import { LibraryChat } from '@/app/(root)/inversores/_components/LibraryChat';
+import { renderToString } from 'react-dom/server';
+import { EARLY_OPEN_CAPTURE_JS } from '@/lib/early-open';
 import { GlobalBrain } from '@/components/brain/GlobalBrain';
 import { OPEN_BRAIN_PENDING_KEY, openBrain } from '@/lib/brain/open-brain';
 import { brainStorageKey } from '@/lib/brain/conversation';
@@ -71,6 +74,24 @@ describe('GlobalBrain: botón y apertura', () => {
         brain.unmount();
         render(<GlobalBrain userId="u1" />);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('a click on the library SSR button before hydration opens the brain with the library context', async () => {
+        window.eval(EARLY_OPEN_CAPTURE_JS);
+        const html = document.createElement('div');
+        html.innerHTML = renderToString(<LibraryChat scope="library" authors={['Buffett']} />);
+        document.body.append(html);
+        try {
+            fireEvent.click(html.querySelector('button')!);
+            expect(sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBe('null');
+            render(<GlobalBrain userId="u1" />);
+            expect(await screen.findByRole('dialog', { name: 'Cerebro GerarAI' })).toBeVisible();
+            // Sin replay: el contexto biblioteca del marcador debe sobrevivir.
+            expect(screen.getByRole('button', { name: 'Volver al chat general' })).toBeVisible();
+            expect(sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBeNull();
+        } finally {
+            html.remove();
+        }
     });
 
     it('cerrado: solo el botón flotante; la pista se pliega a los 4 s', () => {
