@@ -173,6 +173,8 @@ def sec_submissions_sic(cik: Any, get_text: Callable[[str], str] | None = None) 
     except Exception as exc:  # noqa: BLE001 - sin SIC, el sector sigue «Unknown»
         logger.info("SIC de la SEC %s: %s", cik, type(exc).__name__)
         return None, None
+    if not isinstance(data, dict):
+        return None, None
     try:
         sic = int(str(data.get("sic") or "").strip())
     except ValueError:
