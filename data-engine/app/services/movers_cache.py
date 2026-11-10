@@ -36,6 +36,12 @@ _SESSION_FLAG = "market_prices_written"
 _lock = threading.Lock()
 _compute_lock = threading.Lock()
 _entry: dict[str, Any] | None = None
+# Variante por clave (/api/market/changes con conjuntos de tickers): cada
+# conjunto tiene su entrada con la misma semántica de TTL + versión.
+_entry_by_key: dict[str, dict[str, Any]] = {}
+# Tope de conjuntos distintos retenidos (los tickers de watchlist/cartera de
+# cada tenant): al superarlo se vacía entero; peor caso = un recálculo.
+_KEYED_MAX = 64
 _generation = 0
 _redis_state: dict[str, Any] = {"client": None, "down_until": 0.0}
 
@@ -78,6 +84,7 @@ def invalidate() -> None:
     global _entry, _generation
     with _lock:
         _entry = None
+        _entry_by_key.clear()
         _generation += 1
     _bump_version()
 
@@ -87,6 +94,7 @@ def clear_local() -> None:
     global _entry
     with _lock:
         _entry = None
+        _entry_by_key.clear()
 
 
 def get_or_compute(compute: Callable[[], Any], *, ttl: float = TTL_SECONDS) -> Any:
@@ -114,6 +122,35 @@ def get_or_compute(compute: Callable[[], Any], *, ttl: float = TTL_SECONDS) -> A
             # podría ser anterior a esa escritura.
             if generation == _generation:
                 _entry = {"at": started, "version": version, "value": value}
+        return value
+
+
+def get_or_compute_keyed(key: str, compute: Callable[[], Any], *, ttl: float = TTL_SECONDS) -> Any:
+    """get_or_compute con una entrada por clave (p. ej. conjunto de tickers).
+
+    /api/market/changes recalculaba en cada carga de /watchlist (prod
+    2026-11-09: 8-9 s con 12 tickers cuando la BD va lenta). Mismo TTL y la
+    misma invalidación por escritura de cierres que la caché de Movers."""
+    version = _read_version()
+    now = time.monotonic()
+    with _lock:
+        entry = _entry_by_key.get(key)
+    if entry is not None and now - entry["at"] < ttl and entry["version"] == version:
+        return entry["value"]
+    with _compute_lock:
+        with _lock:
+            entry = _entry_by_key.get(key)
+        if entry is not None and time.monotonic() - entry["at"] < ttl and entry["version"] == version:
+            return entry["value"]
+        with _lock:
+            generation = _generation
+        started = time.monotonic()
+        value = compute()
+        with _lock:
+            if generation == _generation:
+                if len(_entry_by_key) >= _KEYED_MAX:
+                    _entry_by_key.clear()
+                _entry_by_key[key] = {"at": started, "version": version, "value": value}
         return value
 
 
