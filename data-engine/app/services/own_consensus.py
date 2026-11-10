@@ -42,6 +42,7 @@ horizonte, de :mod:`estimate_accuracy`) o «bajo · muestra pequeña» con menos
 """
 from __future__ import annotations
 
+import logging
 import math
 import statistics
 from collections.abc import Mapping, Sequence
@@ -50,6 +51,8 @@ from datetime import date, timedelta
 from typing import Any
 
 from app.services.estimate_base_rates import BaseRate
+
+logger = logging.getLogger(__name__)
 
 CONSENSUS_VERSION = "consenso_propio v1"
 SOURCE_ORDER = ("guia", "guia_trimestre_calculado", "guia_ajustada", "analista_citado", "modelo", "tasa_base")
@@ -858,6 +861,13 @@ def attach_margin_checks(oi_cells: Mapping[str, Cell], oi_actuals: Mapping[str, 
         cell.base_rate_check = reach.as_dict(implied_formula=how)
 
 
+def _unavailable_base_rate_checks(cells: Mapping[str, Cell], reason: str) -> None:
+    """Descarta también un resultado parcial: un fallo nunca deja un check positivo."""
+    for period, cell in cells.items():
+        if period.startswith("fy") and cell.status == "estimado":
+            cell.base_rate_check = {"share": None, "reason": reason}
+
+
 def build_company_consensus(db: Any, company: Any, tenant_id: int, *, today: date | None = None,
                             base_rate_for: Any = None, measured_errors: Mapping[tuple[str, str], Sequence[float]]
                             | None = None) -> dict[str, Any]:
@@ -906,40 +916,28 @@ def build_company_consensus(db: Any, company: Any, tenant_id: int, *, today: dat
                             operating_actuals=oi_actuals if metric == "eps" else None)
         if metric == "revenue":
             rev_cells = cells
-            try:
-                if not rev_in_usd:
-                    for _p, _c in cells.items():
-                        if _p.startswith("fy") and _c.status == "estimado":
-                            _c.base_rate_check = {"share": None, "reason": (
-                                "ingresos en otra divisa: los tramos de tamaño de la tasa base están en dólares")}
-                    raise LookupError("ingresos fuera de USD")
-                from app.services.estimate_base_rates import for_annual_revenue as _far
-                from app.services.estimate_base_rates import sector_of_cik as _soc
-
-                _sector = _soc(getattr(company, "cik", None))
-                _annual = {int(k[2:]): a.value for k, a in rev_actuals.items() if k.startswith("fy")}
-                attach_base_rate_checks(cells, rev_actuals,
-                                        lambda h: _far(_annual, sector=_sector, horizon=h))
-            except Exception:  # noqa: BLE001 - sin tabla, la celda sigue sin comprobación (N/D)
-                pass
         elif metric == "operating_income":
             oi_cells, oi_actuals = cells, acts
-            try:
-                if not rev_in_usd:
-                    for _p, _c in cells.items():
-                        if _p.startswith("fy") and _c.status == "estimado":
-                            _c.base_rate_check = {"share": None, "reason": (
-                                "ingresos en otra divisa: los tramos de tamaño de la tasa base están en dólares")}
-                    raise LookupError("ingresos fuera de USD")
-                from app.services.estimate_base_rates import for_annual_revenue as _far2
-                from app.services.estimate_base_rates import sector_of_cik as _soc2
+        if metric in {"revenue", "operating_income"}:
+            if not rev_in_usd:
+                _unavailable_base_rate_checks(cells, "ingresos en otra divisa: los tramos de tamaño de la tasa base están en dólares")
+            else:
+                try:
+                    from app.services.estimate_base_rates import for_annual_revenue as _far
+                    from app.services.estimate_base_rates import sector_of_cik as _soc
 
-                _sector2 = _soc2(getattr(company, "cik", None))
-                _annual2 = {int(k[2:]): a.value for k, a in rev_actuals.items() if k.startswith("fy")}
-                attach_margin_checks(cells, acts, rev_cells, rev_actuals,
-                                     lambda h: _far2(_annual2, sector=_sector2, horizon=h, metric="margin"))
-            except Exception:  # noqa: BLE001 - sin tabla, la celda sigue sin comprobación (N/D)
-                pass
+                    _sector = _soc(getattr(company, "cik", None))
+                    _annual = {int(k[2:]): a.value for k, a in rev_actuals.items() if k.startswith("fy")}
+                    if metric == "revenue":
+                        attach_base_rate_checks(cells, rev_actuals,
+                                                lambda h: _far(_annual, sector=_sector, horizon=h))
+                    else:
+                        attach_margin_checks(cells, acts, rev_cells, rev_actuals,
+                                             lambda h: _far(_annual, sector=_sector, horizon=h, metric="margin"))
+                except Exception:  # noqa: BLE001 - comprobación opcional; fallo registrado y N/D explícito
+                    logger.warning("No se pudo comprobar la tasa base de %s para %s", metric, company.ticker,
+                                   exc_info=True)
+                    _unavailable_base_rate_checks(cells, "tasa base no disponible: fallo al comprobar la tabla")
         out["cells"].extend(c.as_dict() for c in cells.values())
     if rate is not None:
         out["base_rate"] = {"group": rate.group, "p25": rate.p25, "p50": rate.p50, "p75": rate.p75, "n": rate.n,
