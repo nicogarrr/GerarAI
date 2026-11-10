@@ -34,6 +34,7 @@ from typing import Any
 from sqlalchemy import delete, desc, func, select, text
 from sqlalchemy.orm import Session
 
+from app.core.sql_chunks import sql_in_chunks
 from app.core.tenancy import tenant_filters
 from app.models import (
     Company,
@@ -241,6 +242,15 @@ class ThesisProjectionService:
             )
             .order_by(FinancialFact.fiscal_year, desc(FinancialFact.id))
         ).all()
+        # Un db.get por fact era un N+1 por metrica/ejercicio; INs acotados
+        # con las fechas de publicacion de todos los documentos fuente (un IN
+        # unico con decenas de miles de ids aborta en SQLite).
+        doc_ids = {row.source_id for row in rows if row.source_id}
+        doc_published: dict[int, Any] = {}
+        for batch in sql_in_chunks(sorted(doc_ids)):
+            doc_published.update(
+                db.execute(select(Document.id, Document.published_at).where(Document.id.in_(batch))).all()
+            )
         out: dict[str, dict[int, FinancialFact]] = {}
         for row in rows:
             assert_period_no_lookahead(
@@ -259,17 +269,15 @@ class ThesisProjectionService:
             # los extremos del CAGR por igual) exige fuente no futura: un
             # restatement publicado despues del corte es lookahead aunque
             # cuelgue de un ejercicio viejo.
-            if row.source_id:
-                doc = db.get(Document, row.source_id)
-                if doc is not None:
-                    assert_no_lookahead(
-                        as_of=as_of,
-                        data_date=_known_date(doc.published_at),
-                        label=(
-                            f"documento fuente de FinancialFact {company.ticker} "
-                            f"{row.metric} FY{row.fiscal_year}"
-                        ),
-                    )
+            if row.source_id and row.source_id in doc_published:
+                assert_no_lookahead(
+                    as_of=as_of,
+                    data_date=_known_date(doc_published[row.source_id]),
+                    label=(
+                        f"documento fuente de FinancialFact {company.ticker} "
+                        f"{row.metric} FY{row.fiscal_year}"
+                    ),
+                )
             # Ordenado por id descendente: el primero por ejercicio es el mas
             # reciente; setdefault conserva ese y descarta restatements viejos.
             out.setdefault(row.metric, {}).setdefault(row.fiscal_year, row)  # type: ignore[arg-type]
