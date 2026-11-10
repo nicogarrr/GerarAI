@@ -109,6 +109,9 @@ def test_flag_on_lists_and_runs_with_fake_llm(flag_on, monkeypatch):
 
 
 def test_flag_on_requires_ticker_and_known_company(flag_on):
+    # El endpoint consulta companies: el esquema no puede depender de que
+    # otro test del modulo haya llamado antes a init_db (random-order).
+    init_db()
     assert client.post(f"/api/workflows/{NAME}/run", json={}).status_code == 422
     assert client.post(f"/api/workflows/{NAME}/run", json={"ticker": "NOPE-ZZ"}).status_code == 404
 
