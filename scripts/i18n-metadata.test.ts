@@ -101,3 +101,23 @@ for (const [file, titleKey] of pagesTitleOnly) {
     assert.ok(src.includes('i18n/metadata'), 'falta el import del helper');
   });
 }
+
+const pagesTitleResearch: Array<[string, string]> = [
+  ['app/(root)/research/news/page.tsx', 'research.newsMetaTitle'],
+  ['app/(root)/research/sources/page.tsx', 'research.sourcesMetaTitle'],
+];
+
+for (const [file, titleKey] of pagesTitleResearch) {
+  test(file + ' usa i18nPageTitle con su clave', () => {
+    const src = readFileSync(file, 'utf8');
+    const start = src.indexOf('generateMetadata');
+    assert.ok(start >= 0, 'generateMetadata ausente');
+    const block = src.slice(start, start + 200);
+    assert.ok(
+      block.includes('return i18nPageTitle(\'' + titleKey + '\');'),
+      'la pagina no llama al helper con su clave',
+    );
+    assert.ok(!block.includes('{ title: t('), 'queda el objeto inline');
+    assert.ok(src.includes('i18n/metadata'), 'falta el import del helper');
+  });
+}
