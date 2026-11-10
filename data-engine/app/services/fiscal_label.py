@@ -30,11 +30,19 @@ ALLOWED_OFFSETS = (0, 1)
 MIN_FILINGS_FOR_SHIFT = 2
 
 
+def nominal_month(end: date) -> tuple[int, int]:
+    """(año, mes) al que pertenece un cierre: el mismo mes, o el anterior si cae en sus primeros 7 días.
+
+    Regla única del calendario 52/53 semanas; la usan también el consenso propio y la etiqueta dei."""
+    if end.day <= WEEKLY_CALENDAR_DAYS:
+        prev = end.replace(day=1) - timedelta(days=1)
+        return prev.year, prev.month
+    return end.year, end.month
+
+
 def nominal_year(end: date) -> int:
     """Año del mes al que pertenece un cierre (el anterior si cae en sus primeros 7 días)."""
-    if end.day <= WEEKLY_CALENDAR_DAYS:
-        return (end.replace(day=1) - timedelta(days=1)).year
-    return end.year
+    return nominal_month(end)[0]
 
 
 def _iso(value: Any) -> date | None:
@@ -87,7 +95,7 @@ def _admissible(end: date, offset: int) -> bool:
 
 
 def _nominal_month(end: date) -> int:
-    return (end.replace(day=1) - timedelta(days=1)).month if end.day <= WEEKLY_CALENDAR_DAYS else end.month
+    return nominal_month(end)[1]
 
 
 def dei_label_offset(us_gaap: Mapping[str, Any]) -> int:
