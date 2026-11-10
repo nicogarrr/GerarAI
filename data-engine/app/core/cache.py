@@ -290,7 +290,10 @@ def cached(
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             # Extraer tenant_id del primer argumento Session (db)
             tenant_id = None
-            if len(args) >= 2 and hasattr(args[1], 'info'):  # args[0] es self, args[1] es db
+            db = kwargs.get("db")
+            if db is not None:
+                tenant_id = _tenant_from_db(db)
+            elif len(args) >= 2 and hasattr(args[1], 'info'):  # args[0] es self, args[1] es db
                 tenant_id = _tenant_from_db(args[1])
             
             if extract_tenant is not None and tenant_id is None:
@@ -304,6 +307,16 @@ def cached(
                         exc_info=True,
                     )
             
+            # Private caches must never read or write a shared unscoped key.
+            # Extractor failures still allow computation, but not memoization.
+            private_cache = extract_tenant is not None or category in {"portfolio_valuation", "dca_schedule"}
+            known_tenant = (
+                type(tenant_id) is int and tenant_id > 0
+                or isinstance(tenant_id, str) and bool(tenant_id.strip())
+            )
+            if private_cache and not known_tenant:
+                return func(*args, **kwargs)
+
             # Filtrar self y Session para una clave determinista entre requests
             clean_args = []
             for i, arg in enumerate(args):
