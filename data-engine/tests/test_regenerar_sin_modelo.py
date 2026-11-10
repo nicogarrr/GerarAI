@@ -105,3 +105,74 @@ def test_stale_consensus_keys_flags_old_52_53_week_keys():
     out = mod.stale_consensus_keys([old, fine, other], cells)
     assert out == [{"row_id": 1, "key": "estimate.revenue.fy2026", "period_end": "2026-03-01",
                     "current_key": "estimate.revenue.fy2025", "as_of": "2026-01-05"}]
+
+
+def _cargar_regen():
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent.parent / "scripts" / "regenerar_sin_modelo.py"
+    spec = importlib.util.spec_from_file_location("regenerar_sin_modelo", path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _preparar_filiales_uk(mod, monkeypatch):
+    """API key presente, una empresa resuelta y espía en la ruta que recoge/encola."""
+    from types import SimpleNamespace
+
+    from app.core import config as app_config
+    from app.services.thesis_evidence_service import ThesisEvidenceService
+
+    monkeypatch.setattr(app_config, "get_settings", lambda: SimpleNamespace(companies_house_api_key="k"))
+    company = SimpleNamespace(ticker="MSFT")
+    monkeypatch.setattr(mod, "_companies", lambda db, tickers: [company])
+    llamadas = []
+    monkeypatch.setattr(
+        ThesisEvidenceService, "_uk_subsidiary_reports", lambda self, db, c: llamadas.append(c) or []
+    )
+    return company, llamadas
+
+
+def test_filiales_uk_dry_run_no_recoge_ni_encola(monkeypatch):
+    """--dry-run lista lo que se haría sin llamar a la ruta que recoge y encola."""
+    from types import SimpleNamespace
+
+    mod = _cargar_regen()
+    _company, llamadas = _preparar_filiales_uk(mod, monkeypatch)
+    out = mod.run_filiales_uk(SimpleNamespace(info={}), ["MSFT"], None, True)
+    assert llamadas == []
+    assert out == {
+        "MSFT": {
+            "status": "dry_run",
+            "accion": "se recogerian las cuentas de las filiales UK y se encolaria su lectura"
+            " (con --dry-run no se recoge ni se encola nada)",
+        }
+    }
+
+
+def test_filiales_uk_sin_dry_run_si_recoge(monkeypatch):
+    """Sin --dry-run la ruta se llama una vez por empresa (el flag sí llega)."""
+    from types import SimpleNamespace
+
+    mod = _cargar_regen()
+    company, llamadas = _preparar_filiales_uk(mod, monkeypatch)
+    out = mod.run_filiales_uk(SimpleNamespace(info={}), ["MSFT"], None, False)
+    assert llamadas == [company]
+    assert out == {"MSFT": []}
+
+
+def test_main_filiales_uk_dry_run_no_llama_la_ruta(monkeypatch, capsys):
+    """El probe del auditor: main(['filiales-uk','--dry-run','MSFT']) no llama a la ruta."""
+    from types import SimpleNamespace
+
+    mod = _cargar_regen()
+    _company, llamadas = _preparar_filiales_uk(mod, monkeypatch)
+    monkeypatch.setattr(mod, "SessionLocal", lambda: SimpleNamespace(info={}, close=lambda: None))
+    mod.main(["filiales-uk", "--dry-run", "MSFT"])
+    assert llamadas == []
+    salida = json.loads(capsys.readouterr().out)
+    assert salida["dry_run"] is True
+    assert salida["result"]["MSFT"]["status"] == "dry_run"
