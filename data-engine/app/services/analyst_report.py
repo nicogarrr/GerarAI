@@ -272,6 +272,8 @@ def build_market(
     ev_reason = None
     if market_cap is None:
         ev_reason = "no_market_cap"
+    elif debt is not None and debt.get("reason") == "currency_mismatch":
+        ev_reason = "currency_mismatch"
     elif cash is None or debt is None:
         ev_reason = "missing_cash_or_debt"
     elif cash["period_end"] != debt["period_end"]:
@@ -351,7 +353,9 @@ def debt_without_operating_leases(point: dict | None, facts: list[FinancialFact]
     El «total debt» de un agregador (Yahoo/FMP) incluye los pasivos por arrendamiento operativo. En US GAAP el
     alquiler operativo ya resta en el EBITDA, así que se descuentan los del filing primario del MISMO cierre (una
     sola vez); si queda ≈ 0 (≤ 0,5 % del bruto), la deuda financiera es 0 con su fórmula. En IFRS, o sin ese dato,
-    la cifra queda como estaba. Sin esto el Informe daba a NAUT 30 M de «deuda» que eran su arrendamiento y la
+    la cifra queda como estaba. Con arrendamiento de otra divisa o unidad no verificada,
+    la deuda financiera y el EV son N/D con motivo; solo se convierten subunidades de la misma divisa.
+    Sin esto el Informe daba a NAUT 30 M de «deuda» que eran su arrendamiento y la
     valoración 0."""
     from app.valuation.balance_bridge import PRIMARY_SOURCES, ZERO_TOLERANCE
 
@@ -372,7 +376,21 @@ def debt_without_operating_leases(point: dict | None, facts: list[FinancialFact]
         return point
     # El mismo tipo de periodo primero (el 10-K del cierre anual, no la comparativa de un 10-Q), luego el más reciente.
     lease = sorted(leases, key=lambda f: (f.period != debt.period, -(f.filed.toordinal() if f.filed else 0)))[0]
-    v, lv = float(debt.value), float(lease.value)
+    # La misma fecha no permite restar USD y EUR. Solo convertir subunidades
+    # verificadas de la misma divisa; sin FX fechado no se calcula otra divisa.
+    from app.valuation.currency import is_currency_code
+
+    debt_currency, debt_divisor = normalize_currency(debt.unit)
+    lease_currency, lease_divisor = normalize_currency(lease.unit)
+    point_unit = point.get("unit") or debt.unit
+    if (not is_currency_code(debt.unit)
+            or debt_currency != lease_currency
+            or normalize_currency(point_unit) != (debt_currency, debt_divisor)):
+        return {**point, "value": None, "provenance": "N/D", "reason": "currency_mismatch",
+                "basis": "unverified_lease_currency",
+                "formula": "N/D: deuda y arrendamientos sin divisa/unidad coincidente verificada; no se aplica FX."}
+    v = float(debt.value)
+    lv = float(Decimal(lease.value) * Decimal(debt_divisor) / Decimal(lease_divisor))
     if not 0 < lv <= v * (1 + ZERO_TOLERANCE):
         return point
     rest = v - lv

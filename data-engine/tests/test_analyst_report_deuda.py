@@ -76,3 +76,51 @@ def test_deuda_del_filing_no_se_toca(db):
 def test_ifrs_no_se_resta(db):
     # IFRS: los arrendamientos ya van en el total del agregador y en la deuda; no se descuentan.
     assert _debt(db, debt=30_019_000, lease=30_019_000, lease_metric="lease_liabilities")["value"] == 30_019_000
+
+
+@pytest.mark.parametrize("lease_unit", ["EUR", "", "shares", "XYZ"])
+def test_divisa_arrendamiento_no_verificada_no_inventa_deuda_cero(db, lease_unit):
+    company = _seed(db, debt=100, lease=100)
+    lease = db.query(FinancialFact).filter_by(metric="operating_lease_liabilities").one()
+    lease.unit = lease_unit
+    db.commit()
+    market = build_company_report(db, company, today=date(2026, 11, 9))["market"]
+    assert market["total_debt"]["value"] is None
+    assert market["total_debt"]["provenance"] == "N/D"
+    assert market["total_debt"]["reason"] == "currency_mismatch"
+    assert market["enterprise_value"] is None
+    assert market["enterprise_value_reason"] == "currency_mismatch"
+
+
+@pytest.mark.parametrize("debt_unit,lease_unit,expected", [("GBP", "GBp", 99.0), ("GBp", "GBP", 0.0), ("usd", "USD", 0.0)])
+def test_subunidad_arrendamiento_se_convierte_a_la_unidad_de_deuda(db, debt_unit, lease_unit, expected):
+    from app.services.analyst_report import debt_without_operating_leases
+
+    _seed(db, debt=100, lease=100)
+    rows = db.query(FinancialFact).filter(FinancialFact.metric.in_(
+        ["total_debt", "operating_lease_liabilities"])).all()
+    debt = next(f for f in rows if f.metric == "total_debt")
+    lease = next(f for f in rows if f.metric == "operating_lease_liabilities")
+    debt.unit, lease.unit = debt_unit, lease_unit
+    if debt_unit == "GBp":
+        lease.value = Decimal("1")
+    result = debt_without_operating_leases(
+        {"value": 100.0, "unit": debt_unit, "period_end": date(2025, 12, 31)}, rows, [debt.id])
+    assert result["value"] == expected  # 100 pence = 1 GBP, not 100 GBP.
+    assert result["unit"] == debt_unit and result["provenance"] == "INFERIDO"
+
+
+@pytest.mark.parametrize("debt_unit,point_unit", [("", ""), ("XYZ", "XYZ"), ("USD", "EUR"), ("GBP", "GBp")])
+def test_unidad_deuda_o_punto_no_verificada_da_nd(db, debt_unit, point_unit):
+    from app.services.analyst_report import debt_without_operating_leases
+
+    _seed(db, debt=100, lease=100)
+    rows = db.query(FinancialFact).all()
+    debt = next(f for f in rows if f.metric == "total_debt")
+    lease = next(f for f in rows if f.metric == "operating_lease_liabilities")
+    debt.unit = debt_unit
+    lease.unit = debt_unit
+    result = debt_without_operating_leases(
+        {"value": 100.0, "unit": point_unit}, rows, [debt.id])
+    assert result["value"] is None and result["reason"] == "currency_mismatch"
+    assert result["provenance"] == "N/D" and "N/D" in result["formula"]
