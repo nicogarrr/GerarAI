@@ -215,13 +215,21 @@ def company_documents_tool(db: Session) -> ToolSpec:
             .order_by(Document.published_at.desc().nullslast(), Document.id.desc())
             .limit(DOC_MAX_DOCUMENTS)
         ).all()
+        # Lote único de chunks para todos los documentos (anti N+1): una
+        # consulta con IN + agrupación en memoria conserva el orden por
+        # documento y chunk_index del bucle anterior (1 query por documento).
+        chunks_by_doc: dict[int, list[DocumentChunk]] = {}
+        if docs:
+            doc_ids = [doc.id for doc in docs]
+            for chunk in db.scalars(
+                select(DocumentChunk)
+                .where(DocumentChunk.tenant_id == ctx.tenant_id, DocumentChunk.document_id.in_(doc_ids))
+                .order_by(DocumentChunk.document_id, DocumentChunk.chunk_index)
+            ).all():
+                chunks_by_doc.setdefault(chunk.document_id, []).append(chunk)
         out: list[ToolOutput] = []
         for doc in docs:
-            chunks = db.scalars(
-                select(DocumentChunk)
-                .where(DocumentChunk.tenant_id == ctx.tenant_id, DocumentChunk.document_id == doc.id)
-                .order_by(DocumentChunk.chunk_index)
-            ).all()
+            chunks = chunks_by_doc.get(doc.id, [])
             hits = [c for c in chunks if any(w in _fold(c.text) for w in DRIVER_SIGNAL_WORDS)]
             for chunk in hits[:DOC_MAX_PASSAGES_PER_DOC]:
                 out.append(
