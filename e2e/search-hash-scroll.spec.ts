@@ -77,6 +77,9 @@ test.describe('paleta: comandos de ficha (ancla y destino)', () => {
         await page.setViewportSize({ width: 1280, height: 860 });
         await page.goto('/research/MSFT', { waitUntil: 'networkidle' });
         await waitForHydration(page);
+        // Como ALERT arriba, compila el destino antes de medir la navegación.
+        // El App Router espera al payload RSC para comprometer la URL.
+        await page.request.get('/research/MSFT/tesis');
         await warmUpPalette(page);
         await page.keyboard.press('Control+k');
         const input = page.locator('[role="dialog"] input');
