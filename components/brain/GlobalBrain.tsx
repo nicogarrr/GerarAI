@@ -116,18 +116,20 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     // en la carga directa, donde los efectos hijos corren antes que este).
     useEffect(() => {
         let pending: OpenBrainDetail | null = null;
+        let hasPending = false;
         try {
             const raw = window.sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY);
             if (raw) {
                 window.sessionStorage.removeItem(OPEN_BRAIN_PENDING_KEY);
-                pending = JSON.parse(raw) as OpenBrainDetail;
+                pending = JSON.parse(raw) as OpenBrainDetail | null;
+                hasPending = true;
             }
         } catch {
             pending = null;
         }
         // Handoff desde un almacén externo (sessionStorage) tras montar o
         // cambiar de ruta: el setState no puede ser síncrono en el efecto.
-        if (pending) {
+        if (hasPending) {
             const detail = pending;
             queueMicrotask(() => openWithDetail(detail));
         }

@@ -18,5 +18,7 @@ test('mobile access is in its reserved navigation row, not over page controls', 
   assert.ok(nav.includes('grid-cols-6'));
   assert.ok(nav.includes("{t('brain.name')}"));
   assert.ok(nav.indexOf('<ul') < nav.indexOf("{t('brain.name')}"));
-  assert.ok(nav.includes("new Event('gerarai:open-brain')"));
+  assert.ok(nav.includes("onClick={() => openBrain()}"));
+  assert.ok(nav.includes("from '@/lib/brain/open-brain'"));
+  assert.ok(!nav.includes('dispatchEvent'));
 });

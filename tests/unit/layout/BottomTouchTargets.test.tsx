@@ -2,6 +2,7 @@ import React from 'react';
 import {fireEvent,render,screen} from '@testing-library/react';
 import {describe,it,expect,vi} from 'vitest';
 import {readFileSync} from 'node:fs';
+import { markBrainReady } from '@/lib/brain/open-brain';
 import BottomNav from '@/components/layout/BottomNav';
 vi.mock('next/navigation',()=>({usePathname:()=>'/portfolio'}));
 vi.mock('next/link',()=>({default:({children,...p}:React.ComponentProps<'a'>)=><a {...p}>{children}</a>}));
@@ -9,7 +10,8 @@ describe('compact mobile targets',()=>{
  it('preserves all six destinations and brain action',()=>{
   render(<BottomNav/>);expect(screen.getAllByRole('link')).toHaveLength(5);
   expect(screen.getByText('Research')).toBeVisible();
-  const spy=vi.fn();window.addEventListener('gerarai:open-brain',spy);fireEvent.click(screen.getByRole('button',{name:'Abrir el cerebro'}));expect(spy).toHaveBeenCalledOnce();window.removeEventListener('gerarai:open-brain',spy);
+  markBrainReady(true);
+  const spy=vi.fn();window.addEventListener('gerarai:open-brain',spy);fireEvent.click(screen.getByRole('button',{name:'Abrir el cerebro'}));expect(spy).toHaveBeenCalledOnce();window.removeEventListener('gerarai:open-brain',spy);markBrainReady(false);
  });
  it('keeps controls at44px and wraps chart ranges rather than overflowing',()=>{
   const source=(p:string)=>readFileSync(p,'utf8');

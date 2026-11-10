@@ -1,4 +1,5 @@
 'use client';
+import { openBrain } from '@/lib/brain/open-brain';
 
 import { useRef, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
@@ -86,7 +87,7 @@ export default function MobileNavDrawer({ onClose, triggerRef, initialStocks }: 
                         if ((event.target as HTMLElement).closest('a[href]')) onClose();
                     }}
                 >
-                    <button type="button" className="mb-3 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-teal-300 hover:bg-gray-800" onClick={() => { onClose(); window.dispatchEvent(new Event('gerarai:open-brain')); }}>
+                    <button type="button" className="mb-3 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-teal-300 hover:bg-gray-800" onClick={() => { onClose(); openBrain(); }}>
                         <BrainGlassesIcon className="h-5 w-5" />Cerebro
                     </button>
                     <NavItems />
