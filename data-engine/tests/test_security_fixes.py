@@ -18,17 +18,30 @@ import json
 import logging
 import re
 import time
+import warnings as _warnings  # noqa: E402
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
 import httpx
+
+# main -> router -> routes/propicks:33 usa `class Config` (deprecado en pydantic v2,
+# preexistente en main): sin este filtro, -W error rompe la coleccion del archivo.
+# Acotado: solo ese warning, solo durante el import de main.
+import pydantic.warnings as _pydantic_warnings  # noqa: E402
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import delete, select, update
 
-import main
+with _warnings.catch_warnings():
+    _warnings.filterwarnings(
+        "ignore",
+        message=r"Support for class-based `config` is deprecated",
+        category=_pydantic_warnings.PydanticDeprecatedSince20,
+        module=r"app\.api\.routes\.propicks",
+    )
+    import main  # noqa: E402
 from app.core import auth as auth_module
 from app.core import replay as replay_module
 from app.core.auth import body_digest, sign_research_identity
