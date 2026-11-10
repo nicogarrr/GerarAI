@@ -32,7 +32,7 @@ export default function BrainAskForm({ ticker }: { ticker: string }) {
         required
         className="h-11 text-base sm:h-9 sm:text-sm"
       />
-      <Button type="submit" ref={markEarlyOpenHydrated} data-early-open="brain" data-early-open-detail={JSON.stringify({ ticker })} className="min-h-[44px] sm:min-h-0">
+      <Button type="submit" ref={markEarlyOpenHydrated} data-early-open="brain" data-early-open-detail={JSON.stringify({ ticker })} data-early-open-question="chat" className="min-h-[44px] sm:min-h-0">
         <Search aria-hidden="true" className="mr-2 h-4 w-4" />
         Preguntar
       </Button>
