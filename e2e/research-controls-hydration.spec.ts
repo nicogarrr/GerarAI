@@ -38,7 +38,9 @@ test('research controls cannot accept input before their client handlers exist',
     release();
     await page.waitForLoadState('load', { timeout: 60_000 });
     await expect(history).toBeEnabled();
-    await trigger.click();
+    // La intención del clic pre-hidratación se retiene (data-early-open) y, ya
+    // hidratado, deja el popover abierto: sin un segundo clic que lo cierre.
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
     const alert = page.getByRole('button', { name: '+ Alerta', exact: true });
     await expect(alert).toBeEnabled();
     if ((page.viewportSize()?.width ?? 1440) < 768) {
