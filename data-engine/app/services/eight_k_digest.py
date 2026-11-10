@@ -13,7 +13,7 @@ from datetime import date
 from typing import Any
 from urllib.parse import urlsplit
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.models import Company, Document, DocumentChunk, Position, WatchItem
@@ -218,13 +218,51 @@ def is_material(items: list[dict[str, Any]]) -> bool:
     return any(item["code"] not in NON_MATERIAL_ONLY for item in items)
 
 
-def _load_chunks(db: Session, document: Document) -> list[dict] | None:
-    rows = db.scalars(select(DocumentChunk).where(
-        DocumentChunk.tenant_id == document.tenant_id, DocumentChunk.document_id == document.id,
-    ).order_by(DocumentChunk.chunk_index).limit(MAX_CHUNKS + 1)).all()
-    if len(rows) > MAX_CHUNKS:
-        return None
-    return [{"id": r.id, "chunk_index": r.chunk_index, "text": r.text} for r in rows]
+def _load_chunks_batch(
+    db: Session, tenant: int, document_ids: list[int]
+) -> dict[int, list[dict] | None]:
+    """Chunks de todos los documentos en UNA sola query.
+
+    Misma semántica que el antiguo ``_load_chunks`` por documento: orden
+    ``chunk_index`` y tope MAX_CHUNKS+1 por documento, ahora con una ventana
+    row_number en SQL (rn <= MAX_CHUNKS+1 por document_id), sin hidratar
+    instancias ORM. None = el documento supera MAX_CHUNKS (no se resume).
+    """
+    if not document_ids:
+        return {}
+    ranked = (
+        select(
+            DocumentChunk.id,
+            DocumentChunk.document_id,
+            DocumentChunk.chunk_index,
+            DocumentChunk.text,
+            func.row_number()
+            .over(
+                partition_by=DocumentChunk.document_id,
+                order_by=DocumentChunk.chunk_index,
+            )
+            .label("rn"),
+        )
+        .where(
+            DocumentChunk.tenant_id == tenant,
+            DocumentChunk.document_id.in_(document_ids),
+        )
+        .subquery()
+    )
+    rows = db.execute(
+        select(ranked.c.id, ranked.c.document_id, ranked.c.chunk_index, ranked.c.text)
+        .where(ranked.c.rn <= MAX_CHUNKS + 1)
+        .order_by(ranked.c.document_id, ranked.c.chunk_index)
+    ).all()
+    grouped: dict[int, list[dict]] = {}
+    for row in rows:
+        grouped.setdefault(row.document_id, []).append(
+            {"id": row.id, "chunk_index": row.chunk_index, "text": row.text}
+        )
+    return {
+        doc_id: (None if len(chunks) > MAX_CHUNKS else chunks)
+        for doc_id, chunks in grouped.items()
+    }
 
 
 def eight_k_digest(db: Session, *, page: int = 1, page_size: int = 10) -> dict[str, Any]:
@@ -240,19 +278,31 @@ def eight_k_digest(db: Session, *, page: int = 1, page_size: int = 10) -> dict[s
         Document.tenant_id == tenant, Document.company_id.in_(tracked),
         Document.metadata_["form"].as_string() == "8-K",
     ).order_by(desc(Document.published_at).nullslast(), desc(Document.id)).limit(MAX_SCAN)).all()
+    qualifying = [
+        d for d in documents if d.company_id is not None and official_document(d)
+    ]
+    # Lote en vez de una query por documento: compañías en una IN y chunks en
+    # una ventana row_number con el tope por documento en SQL.
+    company_ids = {d.company_id for d in qualifying}
+    companies = (
+        {c.id: c for c in db.scalars(select(Company).where(Company.id.in_(company_ids)))}
+        if company_ids
+        else {}
+    )
+    chunks_by_doc = _load_chunks_batch(db, tenant, [d.id for d in qualifying])
     entries: list[dict[str, Any]] = []
     seen: dict[tuple[int, str], dict[str, Any]] = {}
     for document in documents:
         if document.company_id is None or not official_document(document):
             continue
-        company = db.get(Company, document.company_id)
+        company = companies.get(document.company_id)
         if company is None:
             continue
         parsed_url = urlsplit(document.source_url or "")
         # Query y fragmento no identifican otro formulario SEC. Nunca por ticker:
         # dos 8-K distintos de una empresa deben seguir siendo dos entradas.
         identity = (company.id, f"{parsed_url.hostname}{parsed_url.path}")
-        chunks = _load_chunks(db, document)
+        chunks = chunks_by_doc.get(document.id)
         previous = seen.get(identity)
         if previous is not None:
             if chunks and previous["status"] == "insufficient_data":
