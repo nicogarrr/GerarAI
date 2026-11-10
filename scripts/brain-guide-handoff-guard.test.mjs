@@ -58,11 +58,21 @@ test('3b. modo guía: ticker y review_id llegan al asistente de research (solo l
   assert.match(client, /response\.writeback !== false/);
 });
 
-test('3c. los puntos de entrada despachan el detalle correcto', () => {
-  // Ficha: «Guía de investigación» abre el Cerebro con el ticker.
-  assert.match(button, /new CustomEvent\('gerarai:open-brain', \{ detail: \{ ticker \} \}\)/);
-  // Pestaña Seguir: cada revisión abierta ancla su review_id.
-  assert.match(seguir, /new CustomEvent\('gerarai:open-brain', \{ detail: \{ ticker, review_id: reviewId \} \}\)/);
+test('3c. los puntos de entrada llevan el detalle correcto al Cerebro, con captura pre-hidratación', () => {
+  // Ficha: «Guía de investigación» y pestaña Seguir abren el Cerebro vía
+  // openBrain (camino unificado: evento si el Cerebro escucha, handoff por
+  // sessionStorage si aún no); nunca un dispatch a mano que se pierda.
+  assert.match(button, /openBrain\(\{ ticker \}\)/);
+  assert.match(seguir, /openBrain\(\{ ticker, review_id: reviewId \}\)/);
+  for (const [nombre, src] of [['GuideBrainButton', button], ['GuideContextPanel', seguir]]) {
+    assert.ok(!src.includes("new CustomEvent('gerarai:open-brain'"), `${nombre} debe abrir vía openBrain, no con un dispatch a mano`);
+    // El clic pre-hidratación queda cubierto: marcador, detalle en el HTML
+    // del servidor y marca de hidratado al montar.
+    assert.match(src, /data-early-open="brain"/, `${nombre} sin marcador de captura pre-hidratación`);
+    assert.match(src, /ref=\{markEarlyOpenHydrated\}/, `${nombre} sin marca de hidratado`);
+  }
+  assert.match(button, /data-early-open-detail=\{JSON\.stringify\(\{ ticker \}\)\}/);
+  assert.match(seguir, /data-early-open-detail=\{JSON\.stringify\(\{ ticker, review_id: review\.id \}\)\}/);
 });
 
 test('4. ningún enlace interno apunta a /research/assistant (la página es un redirect)', () => {
