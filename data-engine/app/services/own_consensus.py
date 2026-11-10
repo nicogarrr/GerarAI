@@ -728,12 +728,15 @@ def _revenue_in_usd(db: Any, company: Any) -> bool:
 
 def _facts(db: Any, company: Any, fact_metric: str) -> list[tuple[str, float, date | None, str | None]]:
     from sqlalchemy import select
+    from sqlalchemy.orm import joinedload
 
     from app.core.source_urls import sec_filing_url
     from app.models import FinancialFact
 
-    rows = db.scalars(select(FinancialFact).where(FinancialFact.company_id == company.id,
-                                                  FinancialFact.metric == fact_metric)).all()
+    # source_url lee la relación source. Cargarla en el mismo SELECT evita
+    # una consulta por documento (N+1); LEFT JOIN conserva hechos sin fuente.
+    rows = db.scalars(select(FinancialFact).options(joinedload(FinancialFact.source)).where(
+        FinancialFact.company_id == company.id, FinancialFact.metric == fact_metric)).all()
     cik = getattr(company, "cik", None)
     out: list[Any] = []  # (period, valor, filed, url, fiscal_year): la etiqueta del ejercicio va al final
     for r in rows:
