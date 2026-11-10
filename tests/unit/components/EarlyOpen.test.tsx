@@ -3,6 +3,7 @@ import { renderToString } from 'react-dom/server';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MobileNav from '@/components/MobileNav';
 import BottomNav from '@/components/layout/BottomNav';
+import { LibraryChat } from '@/app/(root)/inversores/_components/LibraryChat';
 import { EARLY_OPEN_CAPTURE_JS, EARLY_OPEN_NAV_KEY, consumeEarlyNavOpen } from '@/lib/early-open';
 import { OPEN_BRAIN_PENDING_KEY, markBrainReady } from '@/lib/brain/open-brain';
 
@@ -91,6 +92,22 @@ describe('initial HTML clicks before React hydration', () => {
         vi.stubGlobal('window', undefined);
         expect(consumeEarlyNavOpen()).toBe(false);
         vi.unstubAllGlobals();
+    });
+    it('a hydrated LibraryChat click goes to React alone: nothing retained, no replay', () => {
+        // Mata el mutante data-hydrated="0": con la captura global activa, un
+        // marcador falso dejaría la intención en sessionStorage y GlobalBrain
+        // abriría el panel una segunda vez al montar.
+        markBrainReady(true);
+        const listener = vi.fn();
+        window.addEventListener('gerarai:open-brain', listener);
+        render(<LibraryChat scope="library" authors={['Buffett']} />);
+        const button = screen.getByRole('button', { name: 'Preguntar a la biblioteca' });
+        fireEvent.click(button);
+        expect(listener).toHaveBeenCalledOnce();
+        expect(sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBeNull();
+        // El detalle con el contexto biblioteca llega intacto al evento.
+        expect((listener.mock.calls[0][0] as CustomEvent).detail).toEqual({ knowledge: { scope: 'library', authors: ['Buffett'] } });
+        window.removeEventListener('gerarai:open-brain', listener);
     });
     it('storage denial does not crash either capture or consumer', () => {
         vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('denied'); });
