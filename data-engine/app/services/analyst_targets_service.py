@@ -160,21 +160,19 @@ def normalize_rows(
 def _fetch_records(symbol: str) -> list[dict[str, Any]]:
     import yfinance as yf
 
-    frame = yf.Ticker(symbol).upgrades_downgrades
-    records: list[dict[str, Any]] = []
-    if frame is not None and len(frame) > 0:
-        for index, item in frame.iterrows():
-            records.append(
-                {
-                    "date": index,
-                    "firm": item.get("Firm"),
-                    "rating": item.get("ToGrade"),
-                    "action": item.get("priceTargetAction"),
-                    "price_target": item.get("currentPriceTarget"),
-                    "prior_target": item.get("priorPriceTarget"),
-                }
-            )
-    return records
+    from app.services.analyst_yahoo import fetch_upgrades_downgrades_records
+
+    return [
+        {
+            "date": record["date"],
+            "firm": record["firm"],
+            "rating": record["to_grade"],
+            "action": record["price_target_action"],
+            "price_target": record["price_target"],
+            "prior_target": record["prior_target"],
+        }
+        for record in fetch_upgrades_downgrades_records(yf.Ticker(symbol))
+    ]
 
 
 def _fetch_consensus(symbol: str) -> dict[str, Any]:
