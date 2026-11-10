@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Panel } from '@/components/ui/panel';
 import { safeAssistantSourceUrl, type GuideContext } from '@/lib/research/assistant-contract';
 import { useFormat, useT } from '@/lib/i18n/client';
+import { openBrain } from '@/lib/brain/open-brain';
+import { markEarlyOpenHydrated } from '@/lib/early-open';
 
 /**
  * Contexto de guía en la pestaña Seguir de la ficha: las revisiones abiertas
@@ -15,7 +17,7 @@ export function GuideContextPanel({ ticker, context, hideReviews = false }: { ti
     const t = useT();
     const { formatUserDateTime } = useFormat();
     function askWithReview(reviewId: number) {
-        window.dispatchEvent(new CustomEvent('gerarai:open-brain', { detail: { ticker, review_id: reviewId } }));
+        openBrain({ ticker, review_id: reviewId });
     }
     if (!context) {
         return (
@@ -36,6 +38,9 @@ export function GuideContextPanel({ ticker, context, hideReviews = false }: { ti
                                     <span className="min-w-0 flex-1 break-words text-gray-300">#{review.id} · {review.summary}</span>
                                     <button
                                         type="button"
+                                        ref={markEarlyOpenHydrated}
+                                        data-early-open="brain"
+                                        data-early-open-detail={JSON.stringify({ ticker, review_id: review.id })}
                                         onClick={() => askWithReview(review.id)}
                                         className="min-h-11 rounded-lg border border-teal-700 px-3 text-teal-300 transition hover:border-teal-500 hover:text-teal-200"
                                     >

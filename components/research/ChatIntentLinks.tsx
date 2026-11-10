@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { openBrain } from '@/lib/brain/open-brain';
+import { markEarlyOpenHydrated } from '@/lib/early-open';
 import { CHAT_INTENTS } from '@/lib/research/chat-intents';
 
 /**
@@ -13,7 +14,7 @@ export function ChatIntentLinks({ ticker }: { ticker: string }) {
   return (
     <div className="mb-3 flex flex-wrap gap-2">
       {CHAT_INTENTS.map((intent) => (
-        <Button key={intent.key} type="button" variant="outline" onClick={() => openBrain({ ticker, question: intent.question(ticker) })}>
+        <Button key={intent.key} type="button" variant="outline" ref={markEarlyOpenHydrated} data-early-open="brain" data-early-open-detail={JSON.stringify({ ticker, question: intent.question(ticker) })} onClick={() => openBrain({ ticker, question: intent.question(ticker) })}>
           {intent.label}
         </Button>
       ))}
