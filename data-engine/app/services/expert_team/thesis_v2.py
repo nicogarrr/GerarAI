@@ -515,9 +515,18 @@ def evidence_passages(db: Session, company: Company, tenant_id: int | None) -> l
 def peer_rows(db: Session, company: Company, val: Mapping[str, Any], today: date) -> list[dict[str, Any]]:
     from app.services.shareholder_irr_service import starting_point
 
+    peers_input = val.get("peers") or []
+    # Lote único de empresas por ticker (anti N+1): una consulta con IN en vez
+    # de una por comparable. Empate de ticker duplicado: gana el id menor,
+    # como el .first() por orden de inserción del bucle anterior.
+    peer_by_ticker: dict[str, Company] = {}
+    tickers = [p["ticker"] for p in peers_input]
+    if tickers:
+        for peer in db.scalars(select(Company).where(Company.ticker.in_(tickers)).order_by(Company.id)).all():
+            peer_by_ticker.setdefault(peer.ticker, peer)
     rows = []
-    for p in val.get("peers") or []:
-        peer = db.scalars(select(Company).where(Company.ticker == p["ticker"])).first()
+    for p in peers_input:
+        peer = peer_by_ticker.get(p["ticker"])
         row = {"ticker": p["ticker"], "name": p.get("name"), "multiple": p.get("multiple"), "margin": None,
                "growth": None, "leverage": None, "note": None}
         if peer is not None:
