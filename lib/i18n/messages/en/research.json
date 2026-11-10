@@ -2109,7 +2109,10 @@
       "footer": "Every figure and table is computed by code from the cited filings; the expert agents write the text with those figures as markers and a validator rejects any hand-written number. This is analysis, not a buy or sell recommendation.",
       "warnings": "Data warnings",
       "sources": "Documents read: {list}"
-    }
+    },
+    "reachEq": "Reached by {pct} of peers in 1 year",
+    "reachLt": "Reached by under {pct} of peers in 1 year",
+    "reachGt": "Reached by over {pct} of peers in 1 year"
   },
   "insidersV2": {
     "title": "Insiders (Forms 4 and 5)",

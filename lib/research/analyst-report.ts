@@ -6,6 +6,7 @@ import type { DcaWatchCardData } from '@/lib/dca/types';
 import type { SotpResponse } from '@/lib/research/sotp';
 import type { KeyStats } from '@/lib/research/key-stats';
 import type { PublicShorts } from '@/lib/actions/public-shorts.actions';
+import type { BaseRateCheck } from '@/lib/research/valuation-summary';
 
 /**
  * «Informe» tipo analista de la ficha (data-engine
@@ -108,6 +109,8 @@ export type OwnConsensusCell = {
   reason?: string | null;
   citations?: { kind?: string; url?: string | null; date?: string | null }[] | null;
   confidence?: { level?: string | null; reason?: string | null } | null;
+  /** Años de ingresos: % de empresas comparables que creció al menos lo que implica la celda (tasa base de la primera cifra publicada). */
+  base_rate_check?: BaseRateCheck | null;
 };
 export type OwnConsensusData = { version?: string; as_of?: string; cells: OwnConsensusCell[] };
 

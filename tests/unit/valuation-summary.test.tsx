@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import ValuationSummaryGrid, { ValuationSummaryCard } from '@/components/research/ValuationSummaryGrid';
-import { baseRateText, healthMissingLabel, safetyMargin, type ValuationSummary } from '@/lib/research/valuation-summary';
+import { baseRateReach, baseRateText, healthMissingLabel, safetyMargin, type ValuationSummary } from '@/lib/research/valuation-summary';
 import { getValuationSummaries } from '@/lib/actions/valuation-summary.actions';
 vi.mock('@/lib/actions/valuation-summary.actions', () => ({ getValuationSummaries: vi.fn() }));
 
@@ -25,6 +25,20 @@ describe('shared valuation', () => {
     expect(baseRateText({ message_es: 'es', message_en: 'en' }, 'en')).toBe('en');
     expect(baseRateText({ message_es: 'es' }, 'en')).toBe('es');
     expect(baseRateText(null, 'es')).toBeNull();
+  });
+  it('reverse DCF says how often comparable companies reached the required growth', () => {
+    const formula = 'el precio exige +15.7%/año de ingresos durante 5 años (DCF inverso); menos del 5% …';
+    const check = { share: 0.05, bound: '<', horizon_years: 5, n: 39, formula };
+    const { unmount } = render(<ValuationSummaryCard item={{ ...item, reverse_dcf: { ...item.reverse_dcf, base_rate_check: check } }} quote={quote} />);
+    const reach = screen.getByTestId('reverse-dcf-base-rate-reach');
+    expect(reach.textContent).toMatch(/menos del 5\s?% de empresas comparables en 5 años/);
+    expect(reach.getAttribute('title')).toBe(formula);
+    unmount();
+    render(<ValuationSummaryCard item={{ ...item, reverse_dcf: { ...item.reverse_dcf, base_rate_check: { share: null } } }} quote={quote} />);
+    expect(screen.queryByTestId('reverse-dcf-base-rate-reach')).toBeNull();
+    expect(baseRateReach({ share: 0.4, bound: '=' })).toEqual({ key: 'reachEq', share: 0.4 });
+    expect(baseRateReach({ share: 0.95, bound: '>' })?.key).toBe('reachGt');
+    expect(baseRateReach(null)).toBeNull();
   });
   it('distinguishes discount-to-value from upside and rejects mismatches', () => {
     expect(safetyMargin(80, 'USD', item.fair_value)).toBeCloseTo(.2);
