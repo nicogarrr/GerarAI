@@ -42,15 +42,17 @@ test.describe("investor thesis alert flow", () => {
     const gate = new Promise<void>((resolve) => {
       releaseChunks = resolve;
     });
-    await page.route("**/_next/static/**", async (route) => {
+    await page.route("**/_next/static/**/*.js*", async (route) => {
       await gate;
       await route.continue();
     });
     try {
+      // Solo se retienen los .js (como research-controls-hydration): el CSS y el
+      // resto de estáticos pasan, así el HTML del servidor pinta el botón sin React.
       // "commit": con los chunks retenidos DOMContentLoaded no llega nunca (los
       // scripts diferidos lo bloquean) y un goto a "domcontentloaded" se
       // quedaria colgado antes de liberar la puerta.
-      await page.goto("/research/MSFT", { waitUntil: "commit" });
+      await page.goto("/research/MSFT?view=thesis", { waitUntil: "commit" });
 
       // HTML inicial sin React: el script de captura (inline) es el único dueño.
       const trigger = page.getByRole("button", { name: "Alerta de precio" });
