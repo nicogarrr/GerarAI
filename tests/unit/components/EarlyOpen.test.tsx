@@ -165,15 +165,55 @@ describe('brain entries in the initial HTML', () => {
         expect(JSON.parse(sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)!)).toEqual({ ticker: 'BRK.B', question });
         html.remove();
     });
-    it('retains an SSR ask-form submit without a native form reload', () => {
+    it('retains an SSR ask-form click with the question already typed in the DOM', () => {
         const html = ssr(<BrainAskForm ticker="ASTS" />);
         const submit = within(html).getByRole('button', { name: 'Preguntar' });
         expect(submit).toHaveAttribute('data-early-open', 'brain');
+        // El input nativo acepta texto antes de hidratar: el valor vive en el DOM.
+        (within(html).getByRole('textbox', { name: 'Pregunta sobre ASTS' }) as HTMLInputElement).value = '  ¿Qué riesgos tiene ASTS?  ';
         // preventDefault frena el submit nativo aún sin onSubmit hidratado.
         expect(fireEvent.click(submit)).toBe(false);
-        // La pregunta tecleada no existe en el servidor: se retiene solo el ticker.
-        expect(sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBe(JSON.stringify({ ticker: 'ASTS' }));
+        expect(sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBe(JSON.stringify({ ticker: 'ASTS', question: '¿Qué riesgos tiene ASTS?' }));
         html.remove();
+    });
+    it('retains nothing when the typed question fails the hydrated contract', () => {
+        const html = ssr(<BrainAskForm ticker="ASTS" />);
+        const input = within(html).getByRole('textbox', { name: 'Pregunta sobre ASTS' }) as HTMLInputElement;
+        const submit = within(html).getByRole('button', { name: 'Preguntar' });
+        // Vacío: igual que el submit hidratado (required + trim < 3), sin intento y sin recarga.
+        expect(fireEvent.click(submit)).toBe(false);
+        expect(sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBeNull();
+        input.value = '  ab  ';
+        expect(fireEvent.click(submit)).toBe(false);
+        expect(sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBeNull();
+        html.remove();
+    });
+    it('retains an SSR ask-form Enter with the typed question, without reload', () => {
+        const html = ssr(<BrainAskForm ticker="ASTS" />);
+        (within(html).getByRole('textbox', { name: 'Pregunta sobre ASTS' }) as HTMLInputElement).value = '¿Qué riesgos tiene ASTS?';
+        expect(fireEvent.submit(html.querySelector('form')!)).toBe(false);
+        expect(sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBe(JSON.stringify({ ticker: 'ASTS', question: '¿Qué riesgos tiene ASTS?' }));
+        html.remove();
+    });
+    it('retains nothing on Enter with a short question, without reload', () => {
+        const html = ssr(<BrainAskForm ticker="ASTS" />);
+        (within(html).getByRole('textbox', { name: 'Pregunta sobre ASTS' }) as HTMLInputElement).value = 'ab';
+        expect(fireEvent.submit(html.querySelector('form')!)).toBe(false);
+        expect(sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBeNull();
+        html.remove();
+    });
+    it('dispatches the typed question at once when GlobalBrain already listens', () => {
+        markBrainReady(true);
+        const listener = vi.fn();
+        window.addEventListener('gerarai:open-brain', listener);
+        const html = ssr(<BrainAskForm ticker="ASTS" />);
+        (within(html).getByRole('textbox', { name: 'Pregunta sobre ASTS' }) as HTMLInputElement).value = '¿Qué riesgos tiene ASTS?';
+        fireEvent.click(within(html).getByRole('button', { name: 'Preguntar' }));
+        expect(listener).toHaveBeenCalledOnce();
+        expect((listener.mock.calls[0][0] as CustomEvent).detail).toEqual({ ticker: 'ASTS', question: '¿Qué riesgos tiene ASTS?' });
+        expect(sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBeNull();
+        html.remove();
+        window.removeEventListener('gerarai:open-brain', listener);
     });
     it('retains an SSR guide review click with its review anchor', () => {
         const context = { ticker: 'ASTS', review_id: null, open_reviews: [{ id: 7, status: 'open', summary: 'Revisar guía' }], latest_news: [], missing_data: [] };
