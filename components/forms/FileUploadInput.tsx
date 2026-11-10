@@ -29,12 +29,12 @@ export function FileUploadInput({ maxMB = MAX_UPLOAD_MB, className, id, name, ..
   const inputId = id ?? name ?? 'file-upload';
   const warningId = `${inputId}-limite`;
 
-  function handleChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+  function applyFile(target: HTMLInputElement) {
+    const file = target.files?.[0];
     setFileName(file?.name ?? null);
     if (!file) {
       setWarning(null);
-      event.target.setCustomValidity('');
+      target.setCustomValidity('');
       return;
     }
     const limitBytes = maxMB * 1024 * 1024;
@@ -45,13 +45,29 @@ export function FileUploadInput({ maxMB = MAX_UPLOAD_MB, className, id, name, ..
       });
       const message = t('errors.upload.tooBig', { name: file.name, sizeMb, maxMB });
       setWarning(message);
-      event.target.setCustomValidity(message);
+      target.setCustomValidity(message);
       toast.warning(message);
     } else {
       setWarning(null);
-      event.target.setCustomValidity('');
+      target.setCustomValidity('');
     }
   }
+
+  function handleChange(event: ChangeEvent<HTMLInputElement>) {
+    applyFile(event.target);
+  }
+
+  // Si el usuario elige el archivo ANTES de que React hidrate (p. ej. CI con
+  // CPU justa: setInputFiles gana la carrera al bundle), el onChange nunca se
+  // dispara pero el input nativo conserva el FileList. Al montar se sincroniza
+  // el estado visible (nombre, aviso de tamaño y validez) con lo que el input
+  // ya tiene (rojo F142 en investor-knowledge).
+  useEffect(() => {
+    const input = rootRef.current?.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!input?.files?.length) return;
+    queueMicrotask(() => applyFile(input));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Bloquea el envío del formulario padre mientras el archivo supere el límite:
   // deshabilita sus botones de submit (marcados con data-upload-blocked para no
