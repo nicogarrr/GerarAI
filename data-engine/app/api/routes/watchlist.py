@@ -447,7 +447,7 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
         .where(FinancialFact.company_id == company.id,
                FinancialFact.metric.in_(["eps_diluted", "eps_basic"]),
                FinancialFact.fiscal_quarter == "FY",
-               FinancialFact.value > 0)
+               FinancialFact.value.isnot(None))
         .order_by(desc(FinancialFact.fiscal_year), desc(FinancialFact.created_at))
     ).scalars().all()
     from app.services.esef_fact_quarantine import fact_quarantine_reason
@@ -457,6 +457,14 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
 
     if eps_row is not None and (reason := fact_quarantine_reason(eps_row)):
         sources.append(f"PER: N/D: {reason}")
+        return {"market_cap": market_cap, "per": None,
+                "currency": company.currency, "sources": sources}
+    # Regla «per-ultimo-ejercicio-v1»: el PER es del ÚLTIMO ejercicio, no del último con beneficio. Filtrar
+    # EPS > 0 hacía que una empresa en pérdidas tomara el último año positivo (ABCL: PER 23,8 con el BPA de
+    # 2022 tras tres años de pérdidas). Con pérdidas, N/D con la cifra.
+    if eps_row is not None and float(eps_row.value) <= 0:
+        sources.append(f"PER: N/D: {eps_row.metric} FY{eps_row.fiscal_year} = {float(eps_row.value):g} "
+                       f"({eps_row.source_type}): sin beneficio no hay PER")
         return {"market_cap": market_cap, "per": None,
                 "currency": company.currency, "sources": sources}
     per = None
