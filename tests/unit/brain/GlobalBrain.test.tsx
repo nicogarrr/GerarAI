@@ -64,9 +64,10 @@ describe('GlobalBrain: botón y apertura', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Abrir el cerebro' }));
         expect(window.sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBe('null');
         nav.unmount();
-        const brain = render(<GlobalBrain userId="u1" />);
+        const brain = render(<><div id="brain-library-context" data-scope="library" /><GlobalBrain userId="u1" /></>);
         expect(await screen.findByRole('dialog', { name: 'Cerebro GerarAI' })).toBeVisible();
         expect(window.sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBeNull();
+        expect(screen.getByRole('button', { name: 'Volver al chat general' })).toBeVisible();
         brain.unmount();
         render(<GlobalBrain userId="u1" />);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

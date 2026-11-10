@@ -5,6 +5,7 @@ import IntentLink from '@/components/layout/IntentLink';
 import { usePathname } from 'next/navigation';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
 import { MOBILE_TAB_ITEMS, isNavItemActive, isNavItemExact } from '@/lib/constants';
+import { useEffect, useRef } from 'react';
 import { useT } from '@/lib/i18n/client';
 
 /**
@@ -14,6 +15,11 @@ import { useT } from '@/lib/i18n/client';
  * Solo por debajo de `md`; en escritorio manda la barra lateral.
  */
 export default function BottomNav() {
+    const brainRef = useRef<HTMLButtonElement>(null);
+    // El botón llega en el HTML del servidor, clicable antes de hidratar: el
+    // script inline del layout lo marca y, desde entonces, React es el único
+    // dueño del clic (sin doble apertura ni replay al hidratar).
+    useEffect(() => { brainRef.current?.setAttribute('data-hydrated', '1'); }, []);
     const pathname = usePathname();
     const t = useT();
     const middle = Math.ceil(MOBILE_TAB_ITEMS.length / 2);
@@ -37,6 +43,8 @@ export default function BottomNav() {
                                 <button
                                     aria-label={t('brain.openAria')}
                                     className="flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-teal-300 transition-colors hover:text-teal-200"
+                                    data-early-open="brain"
+                                    ref={brainRef}
                                     onClick={() => openBrain()}
                                     type="button"
                                 >
