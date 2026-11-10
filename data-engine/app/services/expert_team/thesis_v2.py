@@ -461,11 +461,34 @@ def evidence_passages(db: Session, company: Company, tenant_id: int | None) -> l
         query = query.where(Document.tenant_id == tenant_id)
     docs = db.scalars(query.order_by(Document.published_at.desc().nullslast(), Document.id.desc()).limit(8)).all()
     chunks: list[tuple[Any, str]] = []
-    for doc in docs:
-        if (doc.title or "").startswith("SEC XBRL facts"):
-            continue  # las cifras ya llegan como marcadores
-        for ch in db.scalars(select(DocumentChunk).where(DocumentChunk.document_id == doc.id)
-                             .order_by(DocumentChunk.chunk_index).limit(MAX_CHUNKS_PER_DOC)).all():
+    prose_docs = [doc for doc in docs if not (doc.title or "").startswith("SEC XBRL facts")]
+    # Lote único de chunks para todos los documentos (anti N+1): una consulta
+    # con IN + agrupación en memoria conserva el orden por documento y
+    # chunk_index del bucle anterior (1 query por doc). El tope por documento
+    # se queda EN SQL (row_number por documento), como el LIMIT anterior: no
+    # se hidrata más texto del que hidrataba el bucle.
+    chunks_by_doc: dict[int, list[DocumentChunk]] = {}
+    if prose_docs:
+        from sqlalchemy import func
+        from sqlalchemy.orm import aliased
+
+        rn = func.row_number().over(
+            partition_by=DocumentChunk.document_id, order_by=DocumentChunk.chunk_index
+        ).label("_rn")
+        numbered = (
+            select(DocumentChunk, rn)
+            .where(DocumentChunk.document_id.in_([doc.id for doc in prose_docs]))
+            .subquery()
+        )
+        chunk_alias = aliased(DocumentChunk, numbered)
+        for chunk in db.scalars(
+            select(chunk_alias)
+            .where(numbered.c._rn <= MAX_CHUNKS_PER_DOC)
+            .order_by(chunk_alias.document_id, chunk_alias.chunk_index)
+        ).all():
+            chunks_by_doc.setdefault(chunk.document_id, []).append(chunk)
+    for doc in prose_docs:
+        for ch in chunks_by_doc.get(doc.id, []):
             text = " ".join((ch.text or "").split())
             if len(text) >= 200 and text.count(".") >= 3:  # prosa, no índices ni tablas
                 chunks.append((doc, text))
