@@ -11,6 +11,8 @@ import { changeHeadlineCopy, changeSummaryText, changeTypeLabel } from '@/lib/re
 import { groupReviews } from '@/lib/research/review-groups';
 import { buildChangeEvents, isOpenReview, paginate, type ChangeDirection, type ChangeEvent, type EventAlert, type EventReview } from '@/lib/research/change-events';
 import type { ResearchThesisChange } from '@/lib/actions/research.actions';
+import { openBrain } from '@/lib/brain/open-brain';
+import { markEarlyOpenHydrated } from '@/lib/early-open';
 import { Pager } from './Pager';
 
 export const CHANGES_PAGE_SIZE = 10;
@@ -66,7 +68,10 @@ function EventCard({ event, ticker, open, onToggle }: { event: ChangeEvent; tick
         {openReview ? (
           <button
             className="min-h-11 rounded-lg border border-teal-700 px-3 text-sm text-teal-300 transition hover:border-teal-500 hover:text-teal-200"
-            onClick={() => window.dispatchEvent(new CustomEvent('gerarai:open-brain', { detail: { ticker, review_id: openReview.id } }))}
+            ref={markEarlyOpenHydrated}
+            data-early-open="brain"
+            data-early-open-detail={JSON.stringify({ ticker, review_id: openReview.id })}
+            onClick={() => openBrain({ ticker, review_id: openReview.id })}
             type="button"
           >
             {t('research.changesFeed.openInBrain')}

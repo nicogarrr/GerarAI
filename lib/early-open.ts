@@ -12,6 +12,9 @@ export const EARLY_OPEN_NAV_KEY = 'gerarai:open-nav:pending';
 /** Atributo que marca un gatillo cubierto por la captura pre-hidratación. */
 export const EARLY_OPEN_ATTR = 'data-early-open';
 
+/** Detalle opcional del gatillo (JSON ya escapado por React al pintar). */
+export const EARLY_OPEN_DETAIL_ATTR = 'data-early-open-detail';
+
 /**
  * Fuente única del script inline: se evalúa tal cual en jsdom en los tests,
  * así lo probado es exactamente lo que se sirve en el HTML. Sin imports ni
@@ -29,21 +32,41 @@ export const EARLY_OPEN_CAPTURE_JS = `(function(){
         if (kind !== 'brain' && kind !== 'mobile-nav') return;
         // Este clic ya tiene dueño: no dejar que React lo reproduzca además
         // cuando hidrate su raíz. El siguiente clic hidratado sí llega a React.
+        // preventDefault frena el submit nativo de un formulario aún sin
+        // onSubmit hidratado (BrainAskForm): la página no recarga y la
+        // apertura retenida ocurre aquí mismo.
         event.stopPropagation();
+        event.preventDefault();
         if (kind === 'brain') {
+            // El detalle (ticker, pregunta, revisión) viaja en el propio
+            // gatillo: el HTML del servidor ya lo conoce. Solo objetos JSON
+            // válidos; cualquier otra cosa abre sin detalle.
+            var detail = trigger.getAttribute('${EARLY_OPEN_DETAIL_ATTR}');
+            var parsed = null;
+            if (detail) {
+                try {
+                    var candidate = JSON.parse(detail);
+                    if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) parsed = candidate;
+                } catch (err) {}
+            }
             // GlobalBrain ya hidratado: va por evento directo; si no, handoff
             // en sessionStorage (lo recoge al montar). Nunca los dos a la vez.
             if (document.documentElement.hasAttribute('data-brain-ready')) {
-                window.dispatchEvent(new CustomEvent('gerarai:open-brain'));
+                window.dispatchEvent(new CustomEvent('gerarai:open-brain', { detail: parsed }));
                 return;
             }
-            try { window.sessionStorage.setItem(${JSON.stringify(OPEN_BRAIN_PENDING_KEY)}, 'null'); } catch (err) {}
+            try { window.sessionStorage.setItem(${JSON.stringify(OPEN_BRAIN_PENDING_KEY)}, JSON.stringify(parsed)); } catch (err) {}
         } else if (kind === 'mobile-nav') {
             try { window.sessionStorage.setItem(${JSON.stringify(EARLY_OPEN_NAV_KEY)}, '1'); } catch (err) {}
             // sessionStorage bloqueado: el usuario reintenta ya hidratado.
         }
     }, true);
 })();`;
+
+/** Callback-ref que marca un gatillo como hidratado al hacer commit React. */
+export function markEarlyOpenHydrated(el: Element | null): void {
+    el?.setAttribute('data-hydrated', '1');
+}
 
 /** Lee y borra la marca de apertura pendiente del menú móvil (una sola vez). */
 export function consumeEarlyNavOpen(): boolean {
