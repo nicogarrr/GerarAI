@@ -2,7 +2,8 @@
 
 import dynamic from 'next/dynamic';
 import { useT } from '@/lib/i18n/client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { consumeEarlyAlertOpen, markEarlyOpenHydrated } from '@/lib/early-open';
 import { Button } from '@/components/ui/button';
 import { BellPlus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -33,6 +34,19 @@ export default function QuickAlertButton({ ticker, currency = 'USD', compact = f
   // Radix al cerrar) para conservar lo escrito si se cierra sin crear.
   const [openedOnce, setOpenedOnce] = useState(false);
 
+  // Un clic sobre el gatillo antes de hidratar queda retenido por el script
+  // del layout (data-early-open="alert"): al montar se consume aquí y el
+  // popover se abre como si React hubiera atendido ese primer clic.
+  useEffect(() => {
+    if (consumeEarlyAlertOpen()) {
+      void loadQuickAlertPopoverBody();
+      queueMicrotask(() => {
+        setOpenedOnce(true);
+        setOpen(true);
+      });
+    }
+  }, []);
+
   return (
     <Popover
       open={open}
@@ -43,6 +57,8 @@ export default function QuickAlertButton({ ticker, currency = 'USD', compact = f
     >
       <PopoverTrigger asChild>
         <Button
+          ref={markEarlyOpenHydrated}
+          data-early-open="alert"
           size="sm"
           variant={compact ? 'ghost' : 'outline'}
           aria-label={t('alerts.quick.button')}
