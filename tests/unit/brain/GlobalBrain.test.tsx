@@ -27,6 +27,9 @@ vi.mock('@/components/brain/BrainGuideAnswer', () => ({
     BrainGuideAnswer: ({ result }: { result: { answer: string } }) => <div data-testid="guide-answer">{result.answer}</div>,
 }));
 
+import BottomNav from '@/components/layout/BottomNav';
+import { renderToString } from 'react-dom/server';
+import { EARLY_OPEN_CAPTURE_JS } from '@/lib/early-open';
 import { GlobalBrain } from '@/components/brain/GlobalBrain';
 import { OPEN_BRAIN_PENDING_KEY, openBrain } from '@/lib/brain/open-brain';
 import { brainStorageKey } from '@/lib/brain/conversation';
@@ -57,6 +60,23 @@ afterEach(() => {
 });
 
 describe('GlobalBrain: botón y apertura', () => {
+    it('consumes a real SSR BottomNav click without clearing the library context or reopening on remount', async () => {
+        window.eval(EARLY_OPEN_CAPTURE_JS);
+        const html = document.createElement('div');
+        html.innerHTML = renderToString(<BottomNav />);
+        document.body.append(html);
+        fireEvent.click(html.querySelector('button')!);
+        expect(sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBe('null');
+        html.remove();
+        const brain = render(<><div id="brain-library-context" data-scope="library" /><GlobalBrain userId="u1" /></>);
+        expect(await screen.findByRole('dialog', { name: 'Cerebro GerarAI' })).toBeVisible();
+        expect(sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBeNull();
+        expect(screen.getByRole('button', { name: 'Volver al chat general' })).toBeVisible();
+        brain.unmount();
+        render(<GlobalBrain userId="u1" />);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
     it('cerrado: solo el botón flotante; la pista se pliega a los 4 s', () => {
         vi.useFakeTimers();
         const { container } = render(<GlobalBrain userId="u1" />);
