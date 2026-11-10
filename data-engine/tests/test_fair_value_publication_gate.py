@@ -46,14 +46,13 @@ def model(db, company, *, publishable, version=1, tenant_id=None):
 
 @pytest.mark.parametrize("publishable", [False, None])
 def test_home_batch_and_watchlist_never_expose_blocked_thesis(saved, monkeypatch, publishable):
-    import asyncio
 
     db, company, thesis, _ = saved
     if publishable is not None:
         model(db, company, publishable=publishable)
     assert fvs.thesis_candidates(db, [company.id]) == {}
     home = valuation.fair_values("AAPL", db)["items"]["AAPL"]
-    monitor = asyncio.run(watchlist.watchlist_monitor(tickers="AAPL", db=db))["items"]["AAPL"]
+    monitor = watchlist.watchlist_monitor(tickers="AAPL", db=db)["items"]["AAPL"]
     assert home["value"] is None and home["source"] is None
     assert monitor["fair_value"] is None and monitor["fair_value_source"] is None
     assert thesis.expected_value == Decimal("119.92")

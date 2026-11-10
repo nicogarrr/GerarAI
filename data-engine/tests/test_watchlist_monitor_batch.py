@@ -1,5 +1,4 @@
 """Monitor batching preserves values while query count stays constant."""
-import asyncio
 from datetime import date, timedelta
 
 from sqlalchemy import create_engine, event
@@ -34,8 +33,8 @@ def test_monitor_twenty_companies_has_constant_query_count():
     db.commit()
     statements = []
     event.listen(engine, "before_cursor_execute", lambda *a: statements.append(a[2]))
-    result = asyncio.run(watchlist.watchlist_monitor(
-        tickers=','.join(f"BATCH{i}" for i in range(20)), db=db))
+    result = watchlist.watchlist_monitor(
+        tickers=','.join(f"BATCH{i}" for i in range(20)), db=db)
     # 9 consultas anteriores + 4 GROUP BY de frescura: financial_facts,
     # news_events, documents y market_prices (cierre oficial). Las cuatro
     # son batch, sin N+1. Se conserva igualdad con 1 y 20 empresas.
@@ -52,7 +51,7 @@ def test_monitor_twenty_companies_has_constant_query_count():
         assert row["fair_value_thesis_version"] == 1
         assert row["valuation_side"] == "infravalorada"
     statements.clear()
-    asyncio.run(watchlist.watchlist_monitor(tickers="BATCH0", db=db))
+    watchlist.watchlist_monitor(tickers="BATCH0", db=db)
     assert len(statements) == 14
     db.close()
 
@@ -70,7 +69,7 @@ def test_latest_published_inferred_thesis_is_not_replaced_by_older_fair_value():
                              expected_value=150, valuation_basis=basis,
                              thesis_markdown="t", executive_summary="s"))
     db.commit()
-    out = asyncio.run(watchlist.watchlist_monitor(tickers="INFERRED", db=db))
+    out = watchlist.watchlist_monitor(tickers="INFERRED", db=db)
     row = out["items"]["INFERRED"]
     assert row["fair_value"] is None
     assert row["fair_value_thesis_version"] is None

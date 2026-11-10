@@ -1,5 +1,4 @@
 """Valor justo único: una sola precedencia para watchlist, inicio y screener."""
-import asyncio
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
@@ -139,7 +138,7 @@ def test_batch_endpoint_and_watchlist_agree(db, monkeypatch):
     assert batch["items"]["ONLYENG"]["source"] == "motor"
     assert "Tesis publicada" in batch["precedence"]
 
-    monitor = asyncio.run(watchlist.watchlist_monitor(tickers="WITHTH,ONLYENG", db=db))
+    monitor = watchlist.watchlist_monitor(tickers="WITHTH,ONLYENG", db=db)
     for ticker in ("WITHTH", "ONLYENG"):
         row = monitor["items"][ticker]
         assert row["fair_value"] == batch["items"][ticker]["value"]
@@ -402,7 +401,7 @@ def test_watchlist_monitor_exposes_fair_value_reason(db, monkeypatch):
     _insufficient_model(db, company, version=1, missing=("revenue",))
     db.commit()
 
-    monitor = asyncio.run(watchlist.watchlist_monitor(tickers="NOVAL", db=db))
+    monitor = watchlist.watchlist_monitor(tickers="NOVAL", db=db)
     row = monitor["items"]["NOVAL"]
     assert row["fair_value"] is None
     assert row["fair_value_source"] is None

@@ -443,11 +443,11 @@ def test_watchlist_monitor_uses_only_the_active_tenants_thesis(two):
     from app.api.routes.watchlist import watchlist_monitor
 
     _as(db, tenant_a)
-    body_a = asyncio.run(watchlist_monitor(tickers="AAA", db=db))
+    body_a = watchlist_monitor(tickers="AAA", db=db)
     assert body_a["items"]["AAA"]["fair_value"] == 10.0
 
     _as(db, tenant_b)
-    body_b = asyncio.run(watchlist_monitor(tickers="AAA", db=db))
+    body_b = watchlist_monitor(tickers="AAA", db=db)
     assert body_b["items"]["AAA"]["fair_value"] == 20.0
 
 
