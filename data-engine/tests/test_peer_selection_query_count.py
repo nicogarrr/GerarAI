@@ -174,3 +174,40 @@ def test_prefiltro_acota_hidratacion_y_market_cap():
     assert cap_queries, calls
     for raw in cap_queries:
         assert far.id not in _params(raw)
+
+
+def test_sql_in_chunks_helper_preserva_orden_y_lotes():
+    from app.core.sql_chunks import sql_in_chunks
+
+    assert list(sql_in_chunks([], size=3)) == []
+    assert list(sql_in_chunks([1, 2], size=3)) == [[1, 2]]
+    assert list(sql_in_chunks(range(7), size=3)) == [[0, 1, 2], [3, 4, 5], [6]]
+    assert list(sql_in_chunks("abcd", size=2)) == [["a", "b"], ["c", "d"]]
+    try:
+        list(sql_in_chunks([1], size=0))
+        raise AssertionError("size 0 no debe valer")
+    except ValueError:
+        pass
+
+
+def test_in_troceado_mismo_resultado_con_lotes_de_uno(monkeypatch):
+    """Con lote 1, hidratación y market cap van id a id y el resultado no cambia."""
+    import app.core.sql_chunks as chunks
+
+    engine, db, companies = _session(4)
+    service = PeerComparisonService()
+    ids = [c.id for c in companies]
+    expected = service._latest_market_caps_usd(db, ids)
+    statements: list[str] = []
+    event.listen(engine, "before_cursor_execute", lambda *a: statements.append(a[2]))
+    monkeypatch.setattr(chunks, "SQL_IN_CHUNK_SIZE", 1)
+    assert service._latest_market_caps_usd(db, ids) == expected
+    cap_queries = [sql for sql in statements if "financial_facts" in sql and "row_number" in sql.lower()]
+    assert len(cap_queries) == len(ids)  # lote 1: una sentencia por id
+    peers, _basis, trace = service._find_peers(db, companies[0], limit=8)
+    assert [p.ticker for p in peers] == [c.ticker for c in companies[1:8]]
+    assert len(trace["candidates"]) == 39 - 36
+    db.close()
+    monkeypatch.undo()
+    # Y con el tamaño por defecto, el conteo de sentencias no escala (4 vs 40).
+    assert _count_find_peers(4)[0] == _count_find_peers(40)[0]
