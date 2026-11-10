@@ -93,9 +93,12 @@ export default function SearchCommand({ renderAs = 'button', label, initialStock
                 aria-hidden="true"
                 className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-gray-700 bg-gray-800/60 px-4 py-2.5 text-sm text-gray-400 backdrop-blur-sm"
             >
-                <Search aria-hidden="true" className="h-4 w-4 text-gray-500" />
-                <span className="flex-1 text-left">{t('ui.search.stocksPlaceholder')}</span>
-                <kbd className="hidden items-center gap-1 rounded border border-gray-600 bg-gray-900/50 px-2 py-0.5 text-xs text-gray-500 sm:inline-flex">
+                <Search aria-hidden="true" className="h-4 w-4 shrink-0 text-gray-500" />
+                {/* truncate: con un nombre de usuario largo (md+) la caja se
+                    estrecha; sin él el placeholder envolvía a dos líneas y el
+                    kbd se montaba sobre el texto (medido a 768px). */}
+                <span className="min-w-0 flex-1 truncate text-left">{t('ui.search.stocksPlaceholder')}</span>
+                <kbd className="hidden shrink-0 items-center gap-1 rounded border border-gray-600 bg-gray-900/50 px-2 py-0.5 text-xs text-gray-500 sm:inline-flex">
                     Ctrl+K
                 </kbd>
             </button>
@@ -137,9 +140,9 @@ export default function SearchCommand({ renderAs = 'button', label, initialStock
                     className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-gray-700 bg-gray-800/60 px-4 py-2.5 text-sm text-gray-400 backdrop-blur-sm transition-all duration-200 hover:bg-gray-700/60"
                     data-testid="search-command-trigger"
                 >
-                    <Search aria-hidden="true" className="h-4 w-4 text-gray-500" />
-                    <span className="flex-1 text-left">{t('ui.search.stocksPlaceholder')}</span>
-                    <kbd className="hidden items-center gap-1 rounded border border-gray-600 bg-gray-900/50 px-2 py-0.5 text-xs text-gray-500 sm:inline-flex">
+                    <Search aria-hidden="true" className="h-4 w-4 shrink-0 text-gray-500" />
+                    <span className="min-w-0 flex-1 truncate text-left">{t('ui.search.stocksPlaceholder')}</span>
+                    <kbd className="hidden shrink-0 items-center gap-1 rounded border border-gray-600 bg-gray-900/50 px-2 py-0.5 text-xs text-gray-500 sm:inline-flex">
                         Ctrl+K
                     </kbd>
                 </button>
