@@ -111,3 +111,72 @@ def test_company_answer_handles_intrinsic_value_and_comparison(db):
     assert "No puedo comparar dos empresas" in answer
     plain = _natural_company_answer(**base, question="¿Y los ingresos?")
     assert "No puedo comparar" not in plain
+
+
+@pytest.mark.parametrize("versions", [4, 40])
+def test_only_latest_rows_are_hydrated(db, versions):
+    from types import SimpleNamespace
+
+    c = _company(db)
+    cid = c.id
+    for metric in KEY_FACT_METRICS:
+        for i in range(versions):
+            db.add(FinancialFact(
+                company_id=cid, metric=metric, value=Decimal(i + 1),
+                unit="USD", period=f"FY{1980 + i}", fiscal_year=1980 + i,
+                source_type="filing",
+            ))
+    db.commit()
+    db.expunge_all()
+    loaded = []
+    def on_load(_session, obj):
+        if isinstance(obj, FinancialFact):
+            loaded.append(obj.id)
+    event.listen(db, "loaded_as_persistent", on_load)
+    try:
+        facts = ChatService.__new__(ChatService)._key_facts(db, SimpleNamespace(id=cid))
+    finally:
+        event.remove(db, "loaded_as_persistent", on_load)
+    assert [f.metric for f in facts] == KEY_FACT_METRICS
+    assert all(f.value == Decimal(versions) for f in facts)
+    assert len(loaded) == len(KEY_FACT_METRICS)
+
+
+def test_rank_ties_null_year_and_limit(db):
+    from datetime import UTC, datetime
+
+    c = _company(db)
+    stamp = datetime(2025, 1, 1, tzinfo=UTC)
+    for value, year in [(10, 2024), (20, 2024), (999, None)]:
+        db.add(FinancialFact(company_id=c.id, metric="revenue", value=Decimal(value),
+                            unit="USD", period=str(value), fiscal_year=year,
+                            created_at=stamp, source_type="test"))
+    db.commit()
+    service = ChatService.__new__(ChatService)
+    assert service._key_facts(db, c)[0].value == Decimal(20)
+    assert service._key_facts(db, c, limit=0) == []
+
+
+def test_rank_cannot_be_displaced_by_foreign_tenant_or_company(db):
+    from types import SimpleNamespace
+
+    c = _company(db)
+    cid = c.id
+    db.info["tenant_id"] = 1
+    _fact(db, c, "revenue", 100, 2024)
+    other = Company(ticker="OTHER", name="Other", exchange="NYSE", company_type="holding",
+                    valuation_model="unassigned")
+    db.add(other)
+    db.commit()
+    _fact(db, other, "revenue", 800, 2030)
+    db.info["tenant_id"] = 2
+    _fact(db, c, "revenue", 900, 2031)
+    db.info["tenant_id"] = 1
+    db.expunge_all()
+    facts = ChatService.__new__(ChatService)._key_facts(db, SimpleNamespace(id=cid))
+    assert [(f.metric, f.value) for f in facts] == [("revenue", Decimal(100))]
+
+
+def test_key_facts_empty_company(db):
+    c = _company(db)
+    assert ChatService.__new__(ChatService)._key_facts(db, c) == []
