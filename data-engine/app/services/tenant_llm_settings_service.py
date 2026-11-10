@@ -11,6 +11,7 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import Settings, get_settings
 from app.core.database import get_db
@@ -150,7 +151,14 @@ async def bind_tenant_llm_settings(
     token = set_tenant_llm_config(None)
     try:
         tenant_id = db.info.get("tenant_id")
-        config = load_config_for_tenant(db, tenant_id) if tenant_id is not None else None
+        # This dependency runs on every private request, including market reads.
+        # Blocking ORM I/O here stalls the shared event loop under SSR fan-out.
+        # Only the read moves to a worker; ContextVar tokens stay in this task.
+        config = (
+            await run_in_threadpool(load_config_for_tenant, db, tenant_id)
+            if tenant_id is not None
+            else None
+        )
         reset_tenant_llm_config(token)
         token = set_tenant_llm_config(config)
         yield
