@@ -52,6 +52,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
 
     return (
         <div className="flex min-h-dvh flex-col text-gray-300">
+            {/* nosemgrep: semgrep.gerarai-dangerously-set-inner-html -- script estatico de captura pre-hidratacion: constante controlada de lib/early-open.ts, sin datos de usuario ni de terceros; el nonce CSP lo autoriza en cada peticion. */}
             <script nonce={nonce} dangerouslySetInnerHTML={{ __html: EARLY_OPEN_CAPTURE_JS }} />
             <a href="#content" className="skip-link">{t('landing.shell.skipLink')}</a>
 
