@@ -95,6 +95,8 @@ def _number(text: str) -> Decimal | None:
         v = Decimal(t)
     except InvalidOperation:
         return None
+    if not v.is_finite():
+        return None
     return -v if neg else v
 
 
