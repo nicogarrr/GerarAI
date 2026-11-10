@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
 import { BRAIN_LIBRARY_CONTEXT_ID, openBrain, type KnowledgeBrainContext } from '@/lib/brain/open-brain';
 
@@ -25,6 +26,12 @@ type LibraryChatProps = {
  * asistente: es el mismo panel, con la misma conversación.
  */
 export function LibraryChat({ scope = 'letters', authors = [], documentId, documentTitle, label = 'Preguntar a la biblioteca', className = '' }: LibraryChatProps) {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  // El botón llega en el HTML del servidor, clicable antes de hidratar: el
+  // script inline del layout (lib/early-open) retiene ese clic y GlobalBrain
+  // lo consume al montar. `data-hydrated` aparta al script desde que el
+  // onClick vive, así ninguna apertura se produce dos veces.
+  useEffect(() => { buttonRef.current?.setAttribute('data-hydrated', '1'); }, []);
   const knowledge: KnowledgeBrainContext = {
     scope,
     authors,
@@ -43,6 +50,8 @@ export function LibraryChat({ scope = 'letters', authors = [], documentId, docum
       />
       <button
         type="button"
+        ref={buttonRef}
+        data-early-open="brain"
         onClick={() => openBrain({ knowledge })}
         className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-indigo-500/40 bg-indigo-950/30 px-4 text-sm font-medium text-indigo-200 transition hover:border-indigo-400/60 hover:text-white sm:w-auto ${className}`}
       >
