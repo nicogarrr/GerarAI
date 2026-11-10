@@ -1,5 +1,4 @@
 """Puesto relativo por valor justo / precio en el monitor de watchlist (sustituye a la etiqueta binaria)."""
-import asyncio
 from datetime import date, timedelta
 
 from sqlalchemy import create_engine
@@ -85,7 +84,7 @@ def _db_with_peers(n_peers: int) -> Session:
 
 def test_monitor_ranks_against_engine_peers_not_the_binary_side():
     db = _db_with_peers(50)
-    items = asyncio.run(watchlist.watchlist_monitor(tickers="CHEAP,DEAR", db=db))["items"]
+    items = watchlist.watchlist_monitor(tickers="CHEAP,DEAR", db=db)["items"]
     # CHEAP: valor 1,4x el precio, entre el 20 % más barato de 50.
     assert items["CHEAP"]["valuation_rank"]["quintile"] == 1
     assert items["CHEAP"]["valuation_rank"]["peers"] == 50
@@ -97,7 +96,7 @@ def test_monitor_ranks_against_engine_peers_not_the_binary_side():
 
 def test_monitor_without_enough_peers_has_no_rank():
     db = _db_with_peers(5)
-    items = asyncio.run(watchlist.watchlist_monitor(tickers="CHEAP", db=db))["items"]
+    items = watchlist.watchlist_monitor(tickers="CHEAP", db=db)["items"]
     assert items["CHEAP"]["valuation_rank"] is None
     assert items["CHEAP"]["fair_value"] == 140.0
     db.close()
@@ -124,6 +123,6 @@ def test_evidence_carries_the_capm_spread_not_the_old_band_one():
 
 def test_monitor_rank_ships_the_measured_evidence():
     db = _db_with_peers(50)
-    items = asyncio.run(watchlist.watchlist_monitor(tickers="CHEAP", db=db))["items"]
+    items = watchlist.watchlist_monitor(tickers="CHEAP", db=db)["items"]
     assert items["CHEAP"]["valuation_rank"]["evidence"] == rank_evidence()
     db.close()

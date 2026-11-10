@@ -199,7 +199,7 @@ def delete_watch_item(symbol: str, db: Session = Depends(get_db)) -> None:
     invalidate_dca_cache(db=db)
 
 @router.get("/monitor", response_model=WatchlistMonitorOut)
-async def watchlist_monitor(
+def watchlist_monitor(
     tickers: str = Query(..., description="CSV de tickers, max 60"),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -221,6 +221,8 @@ async def watchlist_monitor(
     lleva su ``source_label`` y las automaticas sin renovar en 3 dias se
     ocultan (``is_fresh``), nunca se exhiben como vigentes.
     """
+    # All monitor reads are synchronous ORM/valuation work. A sync endpoint
+    # keeps them in FastAPI's worker pool instead of freezing the event loop.
     wanted = list(dict.fromkeys(t.strip().upper() for t in tickers.split(",") if t.strip()))[:60]
     today = date.today()
     cutoff = today - timedelta(days=365)
