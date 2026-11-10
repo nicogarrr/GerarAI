@@ -83,7 +83,7 @@ def parse_ecb_csv(text: str) -> list[tuple[date, str, Decimal]]:
             day = date.fromisoformat(raw_date)
         except (InvalidOperation, ValueError):
             continue
-        if value <= 0:
+        if not value.is_finite() or value <= 0:
             continue
         out.append((day, currency, value))
     return out
