@@ -23,6 +23,7 @@ y su tesis, y la ficha las pinta etiquetadas como suyas.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
@@ -52,6 +53,9 @@ FLOW_METRICS = ("revenue", "operating_income", "depreciation_amortization", "ebi
 # Componentes del EBITDA derivado (sin resultado operativo etiquetado); no abren periodos por sí solos.
 EBITDA_COMPONENT_METRICS = ("income_before_tax", "net_income_total", "income_tax_expense", "finance_income_cost")
 _POINT_METRICS = ("shares_outstanding", "shares_diluted", "cash_and_equivalents", "total_debt")
+# Arrendamientos: solo para depurar la deuda de un agregador (regla «caja-deuda-v1»), no son puntos del Informe.
+_LEASE_METRICS = ("operating_lease_liabilities", "lease_liabilities", "lease_liabilities_current",
+                  "lease_liabilities_noncurrent")
 
 
 @dataclass(frozen=True)
@@ -222,6 +226,7 @@ def build_market(
     points: dict[str, Any],
     adr_ratio: float | None = None,
     cover: dict | None = None,
+    adjust_debt: Callable[[dict | None], dict | None] | None = None,
 ) -> dict:
     """Bloque de datos de mercado. ``points`` = TtmValue de acciones, caja y deuda.
 
@@ -250,6 +255,8 @@ def build_market(
             shares = cover
     cash = point("cash_and_equivalents")
     debt = point("total_debt")
+    if adjust_debt is not None:
+        debt = adjust_debt(debt)
     avg_volume = round(sum(volumes) / len(volumes)) if volumes else None
     major_currency, price_divisor = normalize_currency(price_currency)
     market_cap = None
@@ -337,6 +344,47 @@ def latest_cover(facts: list[FinancialFact]) -> dict | None:
     return out
 
 
+def debt_without_operating_leases(point: dict | None, facts: list[FinancialFact],
+                                  fact_ids: list[int] | None) -> dict | None:
+    """Deuda total del Informe con la regla «caja-deuda-v1» de la valoración (balance_bridge.financial_debt).
+
+    El «total debt» de un agregador (Yahoo/FMP) incluye los pasivos por arrendamiento operativo. En US GAAP el
+    alquiler operativo ya resta en el EBITDA, así que se descuentan los del filing primario del MISMO cierre (una
+    sola vez); si queda ≈ 0 (≤ 0,5 % del bruto), la deuda financiera es 0 con su fórmula. En IFRS, o sin ese dato,
+    la cifra queda como estaba. Sin esto el Informe daba a NAUT 30 M de «deuda» que eran su arrendamiento y la
+    valoración 0."""
+    from app.valuation.balance_bridge import PRIMARY_SOURCES, ZERO_TOLERANCE
+
+    if point is None or not point.get("value") or not fact_ids:
+        return point
+    by_id = {f.id: f for f in facts if f.id is not None}
+    debt = by_id.get(fact_ids[0])
+    if debt is None or (debt.source_type or "").upper() in PRIMARY_SOURCES:
+        return point
+    ifrs = any(f.metric.startswith("lease_liabilities") or (f.source_type or "").upper().startswith("ESEF")
+               for f in facts)
+    if ifrs:
+        return point
+    end = _period_end(debt)
+    leases = [f for f in facts if f.metric == "operating_lease_liabilities" and f.value is not None
+              and (f.source_type or "").upper() in PRIMARY_SOURCES and _period_end(f) == end]
+    if not leases:
+        return point
+    # El mismo tipo de periodo primero (el 10-K del cierre anual, no la comparativa de un 10-Q), luego el más reciente.
+    lease = sorted(leases, key=lambda f: (f.period != debt.period, -(f.filed.toordinal() if f.filed else 0)))[0]
+    v, lv = float(debt.value), float(lease.value)
+    if not 0 < lv <= v * (1 + ZERO_TOLERANCE):
+        return point
+    rest = v - lv
+    if abs(rest) <= v * ZERO_TOLERANCE:
+        rest = 0.0
+    unit = point.get("unit") or debt.unit
+    return {**point, "value": rest, "provenance": "INFERIDO", "basis": "debt_minus_operating_leases",
+            "formula": (f"deuda total de {debt.source_type} {v / 1e6:,.1f} M − pasivos por arrendamiento operativo "
+                        f"del filing {lv / 1e6:,.1f} M (mismo cierre {end}; US GAAP: el alquiler ya resta en el "
+                        f"EBITDA) = {rest / 1e6:,.1f} M {unit}")}
+
+
 def _fact_rows(facts: list[FinancialFact], cik: str | None = None) -> list[FactRow]:
     from app.core.source_urls import sec_filing_url
 
@@ -383,7 +431,7 @@ def build_company_report(db: Session, company: Company, *, today: date | None = 
     facts = list(db.scalars(
         select(FinancialFact)
         .where(FinancialFact.company_id == company.id,
-               FinancialFact.metric.in_(FLOW_METRICS + EBITDA_COMPONENT_METRICS + _POINT_METRICS))
+               FinancialFact.metric.in_(FLOW_METRICS + EBITDA_COMPONENT_METRICS + _POINT_METRICS + _LEASE_METRICS))
         .options(selectinload(FinancialFact.source))
     ).all())
     flow = [fact for fact in facts if fact.metric in FLOW_METRICS + EBITDA_COMPONENT_METRICS]
@@ -413,6 +461,8 @@ def build_company_report(db: Session, company: Company, *, today: date | None = 
             points=points,
             adr_ratio=company_adr_ratio(company),
             cover=latest_cover(facts),
+            adjust_debt=lambda p: debt_without_operating_leases(
+                p, facts, getattr(points.get("total_debt"), "fact_ids", None)),
         ),
         "estimates": build_estimates(_fact_rows(flow, getattr(company, "cik", None)),
                                      derive_ebitda=not interest_is_operating(company)),
@@ -439,5 +489,7 @@ def build_company_report(db: Session, company: Company, *, today: date | None = 
             "nav": "NAV por acción tal como lo publica la empresa (último documento publicado); descuento = precio / NAV − 1.",
             "shares": ("Acciones en circulación: la portada del último informe; con varias clases, la suma de todas "
                        "(la misma regla que la valoración)."),
+            "debt": ("Deuda total: si viene de un agregador, se le restan los arrendamientos operativos del filing "
+                     "del mismo cierre (US GAAP: el alquiler ya resta en el EBITDA), como en la valoración."),
         },
     }
