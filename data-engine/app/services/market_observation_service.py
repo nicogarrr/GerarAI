@@ -42,18 +42,44 @@ def store_series(db: Session, key: str, rows: list[dict], fetched_at: datetime) 
     series_id, unit, _ = FRED_SERIES[key]
     added = 0
     revisions = 0
-    for day, value in parse_points(rows):
-        if day > fetched_at.astimezone(UTC).date():
-            continue
-        previous = db.scalar(
-            select(MarketObservation).where(
+    points = [(d, v) for d, v in parse_points(rows) if d <= fetched_at.astimezone(UTC).date()]
+    days = [d for d, _ in points]
+    # Lote único por serie (anti N+1) SIN hidratar historia: la última
+    # observación «observed» de cada día sale con row_number por día (rn = 1
+    # en SQL), como el LIMIT 1 por punto del chequeo anterior — las revisiones
+    # viejas (que siguen «observed») no se hidratan.
+    latest_by_day: dict[date, MarketObservation] = {}
+    if days:
+        from sqlalchemy import func
+        from sqlalchemy.orm import aliased
+
+        rn = func.row_number().over(
+            partition_by=MarketObservation.observation_date,
+            order_by=(MarketObservation.fetched_at.desc(), MarketObservation.id.desc()),
+        ).label("_rn")
+        numbered = (
+            select(MarketObservation, rn)
+            .where(
                 MarketObservation.metric_key == key,
                 MarketObservation.geography == "US",
                 MarketObservation.source == "FRED",
-                MarketObservation.observation_date == day,
+                MarketObservation.observation_date.in_(days),
                 MarketObservation.status == "observed",
-            ).order_by(MarketObservation.fetched_at.desc(), MarketObservation.id.desc()).limit(1)
+            )
+            .subquery()
         )
+        observation_alias = aliased(MarketObservation, numbered)
+        for row in db.scalars(select(observation_alias).where(numbered.c._rn == 1)).all():
+            latest_by_day[row.observation_date] = row
+    # Primera pasada: qué falta por escribir y qué vintages hay que comprobar.
+    # La comprobación se hace con una sola query acotada a ESOS pares
+    # (día, vintage) — nunca a toda la historia de la serie.
+    from sqlalchemy import tuple_
+
+    pending: list[tuple[date, Decimal, str]] = []
+    needed: list[tuple[date, str]] = []
+    for day, value in points:
+        previous = latest_by_day.get(day)
         if previous and previous.value == value:
             continue
         if previous:
@@ -63,15 +89,23 @@ def store_series(db: Session, key: str, rows: list[dict], fetched_at: datetime) 
             vintage = fetched_at.astimezone(UTC).strftime("%Y%m%dT%H%M%S.%fZ") + "-" + hashlib.sha256(str(value).encode()).hexdigest()[:12]
         else:
             vintage = "initial"
+        pending.append((day, value, vintage))
+        needed.append((day, vintage))
+    existing_vintages: set[tuple[date, str]] = set()
+    if needed:
+        existing_vintages = set(
+            db.execute(
+                select(MarketObservation.observation_date, MarketObservation.vintage).where(
+                    MarketObservation.metric_key == key,
+                    tuple_(MarketObservation.observation_date, MarketObservation.vintage).in_(needed),
+                )
+            ).all()
+        )
+    for day, value, vintage in pending:
         status = "observed"
-        if db.scalar(
-            select(MarketObservation.id).where(
-                MarketObservation.metric_key == key,
-                MarketObservation.observation_date == day,
-                MarketObservation.vintage == vintage,
-            )
-        ):
+        if (day, vintage) in existing_vintages:
             continue
+        existing_vintages.add((day, vintage))
         db.add(
             MarketObservation(
                 metric_key=key,
