@@ -14,9 +14,11 @@ tablas importadas, no copiadas):
   fiscal_year/fiscal_period/filing_date/form_type/accession). Duck-typed para
   tests hermeticos.
 
-``merge_entries`` replica ``_merge_for_metric``: alias colapsados por ``filed``,
-partes disjuntas sumadas (``is_summed_component``), alcance
-(``SCOPE_PRIORITY_METRICS``). El revenue bancario compone
+``merge_entries`` aplica la fusion de ``_merge_for_metric`` con los mismos
+helpers (``_collapse_aliases``, ``_sum_disjoint_components``,
+``_collapse_by_scope``): alias colapsados por ``filed``, partes disjuntas
+sumadas (``is_summed_component``), alcance (``SCOPE_PRIORITY_METRICS``).
+El revenue bancario compone
 ``InterestIncomeExpenseNet+NoninterestIncome`` fail-closed como
 ``_compose_bank_revenue``.
 
@@ -44,6 +46,9 @@ from app.services.financial_ingestion_service import (
     NESTED_SCOPE_METRICS,
     SCOPE_PRIORITY_METRICS,
     SEC_METRIC_MAP,
+    _collapse_aliases,
+    _collapse_by_scope,
+    _sum_disjoint_components,
     is_summed_component,
     widest_in_same_filing,
 )
@@ -203,58 +208,14 @@ def entries_from_edgartools_facts(entity_facts: Any, concepts: list[str]) -> dic
     return by_concept
 
 
-def _collapse_aliases(by_concept: dict[str, dict[str, dict[str, Any]]]) -> dict[str, dict[str, Any]]:
-    by_end: dict[str, dict[str, Any]] = {}
-    for entries in by_concept.values():
-        for entry in entries.values():
-            end = str(entry.get("end") or "")
-            current = by_end.get(end)
-            if current is None or str(entry.get("filed") or "") > str(current.get("filed") or ""):
-                by_end[end] = entry
-    return by_end
-
-
-def _collapse_by_scope(by_concept: dict[str, dict[str, dict[str, Any]]]) -> dict[str, dict[str, Any]]:
-    by_end: dict[str, dict[str, Any]] = {}
-    for entries in by_concept.values():
-        for end, entry in entries.items():
-            by_end.setdefault(end, entry)
-    return by_end
-
-
-def _sum_disjoint(by_concept: dict[str, dict[str, dict[str, Any]]]) -> dict[str, dict[str, Any]]:
-    totals: dict[str, dict[str, Any]] = {}
-    for concept, entries in by_concept.items():
-        for end, entry in entries.items():
-            value = _decimal(entry.get("val"))
-            if value is None:
-                continue
-            bucket = totals.setdefault(
-                end,
-                {"val": Decimal("0"), "filed": "", "end": end, "_components": {}, "_latest": entry},
-            )
-            bucket["val"] = bucket["val"] + value
-            bucket["_components"][concept] = str(value)
-            filed = str(entry.get("filed") or "")
-            if filed > str(bucket["filed"]):
-                bucket["filed"] = filed
-                bucket["_latest"] = entry
-    for key, bucket in list(totals.items()):
-        latest = bucket.pop("_latest")
-        merged = {**latest, **bucket}
-        if len(merged["_components"]) == 1:
-            merged["_concept"] = next(iter(merged["_components"]))
-        else:
-            merged["_concept"] = "+".join(sorted(merged["_components"]))
-        merged["val"] = float(merged["val"])
-        totals[key] = merged
-    return totals
-
-
 def merge_entries(by_concept: dict[str, dict[str, dict[str, Any]]], metric: str) -> dict[str, dict[str, Any]]:
-    """Fusion por periodo: replica ``_merge_for_metric`` (misma prioridad)."""
+    """Fusion por periodo: los helpers y la prioridad de ``_merge_for_metric``.
+
+    Los casos que no aplican aqui (signo de flujo de caja, composicion de
+    deuda, revenue con arrendamiento) los trata el servicio de ingesta.
+    """
     if is_summed_component(metric):
-        return _sum_disjoint(by_concept)
+        return _sum_disjoint_components(by_concept)
     if metric in NESTED_SCOPE_METRICS:
         return widest_in_same_filing(by_concept, _collapse_by_scope(by_concept))
     if metric in SCOPE_PRIORITY_METRICS:
