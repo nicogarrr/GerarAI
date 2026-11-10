@@ -245,14 +245,14 @@ def _existing_document_urls(db: Session, urls: list[str]) -> set[str]:
     con IN (anti N+1) en vez de una comprobación por candidato."""
     if not urls:
         return set()
-    return set(
-        db.scalars(
-            select(Document.source_url).where(
-                Document.source_url.in_(urls),
-                *tenant_filters(db, Document),
-            )
-        ).all()
-    )
+    found = db.scalars(
+        select(Document.source_url).where(
+            Document.source_url.in_(urls),
+            *tenant_filters(db, Document),
+        )
+    ).all()
+    # source_url es nullable en el modelo; un IN nunca devuelve NULL, pero el tipo lo exige.
+    return {url for url in found if url is not None}
 
 
 def select_filings(filings: list[dict[str, Any]], limit: int = MAX_FILING_DOCUMENTS) -> list[dict[str, Any]]:
