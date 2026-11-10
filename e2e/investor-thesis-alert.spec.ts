@@ -46,11 +46,19 @@ test.describe("investor thesis alert flow", () => {
       await gate;
       await route.continue();
     });
-    await page.goto("/research/MSFT", { waitUntil: "domcontentloaded" });
+    try {
+      // "commit": con los chunks retenidos DOMContentLoaded no llega nunca (los
+      // scripts diferidos lo bloquean) y un goto a "domcontentloaded" se
+      // quedaria colgado antes de liberar la puerta.
+      await page.goto("/research/MSFT", { waitUntil: "commit" });
 
-    // HTML inicial sin React: el script de captura (inline) es el único dueño.
-    await page.getByRole("button", { name: "Alerta de precio" }).click();
-    releaseChunks();
+      // HTML inicial sin React: el script de captura (inline) es el único dueño.
+      const trigger = page.getByRole("button", { name: "Alerta de precio" });
+      await expect(trigger).toBeVisible();
+      await trigger.click();
+    } finally {
+      releaseChunks();
+    }
 
     // Tras hidratar, QuickAlertButton consume la intención retenida y abre.
     await expect(page.getByPlaceholder("Precio objetivo $")).toBeVisible({ timeout: 20_000 });
