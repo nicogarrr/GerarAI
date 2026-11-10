@@ -83,7 +83,7 @@ def config_from_row(
     base_url = ""
     try:
         base_url = validate_base_url(provider, row.base_url)
-    except ValueError:
+    except (KeyError, ValueError):
         error = error or "tenant_llm_base_url_invalid"
         base_url = (row.base_url or "").strip()
     model = (row.model or "").strip()
