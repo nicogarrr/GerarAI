@@ -821,20 +821,35 @@ def passages_tool(db: Session, name: str, words: tuple[str, ...], description: s
             .order_by(Document.published_at.desc().nullslast(), Document.id.desc())
             .limit(PASSAGE_DOCUMENTS)
         ).all()
+        # The previous reader had no chunk LIMIT: a matching passage can be
+        # anywhere in a document. Keep Python's whitespace/casefold semantics
+        # (SQL lower() is not equivalent), but fetch only the two columns used
+        # and retain at most PASSAGES_PER_DOC matches in memory.
+        hits_by_doc: dict[int, list[str]] = {}
+        if docs:
+            rows = db.execute(
+                select(DocumentChunk.document_id, DocumentChunk.text)
+                .where(DocumentChunk.tenant_id == ctx.tenant_id,
+                       DocumentChunk.document_id.in_([doc.id for doc in docs]))
+                .order_by(DocumentChunk.document_id, DocumentChunk.chunk_index)
+                .execution_options(yield_per=256)
+            )
+            for row in rows:
+                hits = hits_by_doc.setdefault(row.document_id, [])
+                if len(hits) >= PASSAGES_PER_DOC:
+                    continue
+                text = row.text or ""
+                folded = " ".join(text.split()).casefold()
+                if any(w in folded for w in words):
+                    hits.append(text[:1500])
         out: list[ToolOutput] = []
         for doc in docs:
-            chunks = db.scalars(
-                select(DocumentChunk)
-                .where(DocumentChunk.tenant_id == ctx.tenant_id, DocumentChunk.document_id == doc.id)
-                .order_by(DocumentChunk.chunk_index)
-            ).all()
-            hits = [c for c in chunks if any(w in " ".join((c.text or "").split()).casefold() for w in words)]
-            for chunk in hits[:PASSAGES_PER_DOC]:
+            for text in hits_by_doc.get(doc.id, []):
                 out.append(ToolOutput(
                     source={"table": "document_chunks", "document_id": str(doc.id), "title": doc.title or "",
                             "url": doc.source_url or "",
                             "date": doc.published_at.date().isoformat() if doc.published_at else ""},
-                    data={"text": (chunk.text or "")[:1500]},
+                    data={"text": text},
                 ))
         return out
 
