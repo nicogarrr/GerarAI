@@ -19,6 +19,7 @@ from app.core.i18n import generation_language
 from app.core.local_date import USER_TIMEZONE
 from app.models import PortfolioMoveDigest, ResearchAlert
 from app.services.date_format import readable_date
+from app.services.notification_service import record_in_app_delivery
 
 VERSION = "daily-digest-alert-v1"
 
@@ -109,6 +110,10 @@ def emit_digest_alert(db: Session, digest: PortfolioMoveDigest, as_of: date) -> 
         ResearchAlert.tenant_id == tenant_id, ResearchAlert.fingerprint == fp,
     ))
     if existing is not None:
+        # Legacy digests were visible in-app but had no delivery receipt.
+        # Repair only this tenant/day, without dispatching external channels.
+        record_in_app_delivery(db, existing)
+        db.commit()
         return None
     items = digest.items or []
     # "disponible" sin variacion finita NO cuenta como dato: pasa a Sin datos.
@@ -213,5 +218,6 @@ def emit_digest_alert(db: Session, digest: PortfolioMoveDigest, as_of: date) -> 
             db.flush()
     except IntegrityError:
         return None
+    record_in_app_delivery(db, alert)
     db.commit()
     return alert

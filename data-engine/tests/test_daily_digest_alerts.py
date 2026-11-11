@@ -351,3 +351,78 @@ def test_digest_stays_spanish_without_saved_language(db, monkeypatch):
     get_settings.cache_clear()
     assert alert.title == "Resumen diario de tu cartera al 9 oct 2026"
     assert "Sin datos: NBIS." in alert.message
+
+
+def test_emit_records_in_app_delivery_in_same_transaction(db):
+    from app.models import AlertDelivery
+
+    alert = emit_digest_alert(db, make_digest(db), AS_OF)
+    delivery = db.scalar(select(AlertDelivery).where(AlertDelivery.alert_id == alert.id))
+    assert delivery is not None
+    assert (delivery.tenant_id, delivery.channel, delivery.status, delivery.attempts) == (
+        1, "in_app", "delivered", 1,
+    )
+
+
+def test_repeat_repairs_legacy_delivery_without_duplicate_or_external_send(db, monkeypatch):
+    from app.models import AlertDelivery
+    from app.services.notification_service import NotificationService
+
+    def no_external_dispatch(*args, **kwargs):
+        pytest.fail("In-app receipt repair must not dispatch external channels")
+
+    monkeypatch.setattr(NotificationService, "dispatch", no_external_dispatch)
+    digest = make_digest(db)
+    alert = emit_digest_alert(db, digest, AS_OF)
+    # Simulate a digest persisted by the old emitter without a delivery row.
+    for delivery in db.scalars(select(AlertDelivery)).all():
+        db.delete(delivery)
+    db.commit()
+    assert emit_digest_alert(db, digest, AS_OF) is None
+    assert emit_digest_alert(db, digest, AS_OF) is None
+    deliveries = db.scalars(select(AlertDelivery)).all()
+    assert len(deliveries) == 1
+    assert (deliveries[0].alert_id, deliveries[0].channel, deliveries[0].status) == (
+        alert.id, "in_app", "delivered",
+    )
+    assert len(db.scalars(select(ResearchAlert)).all()) == 1
+    # Repair must be committed, not lost when the worker closes its session.
+    db.rollback()
+    assert db.scalar(select(AlertDelivery.id)) is not None
+
+
+def test_repeat_does_not_overwrite_existing_delivery(db):
+    from app.models import AlertDelivery
+
+    digest = make_digest(db)
+    alert = emit_digest_alert(db, digest, AS_OF)
+    delivery = db.scalar(select(AlertDelivery).where(AlertDelivery.alert_id == alert.id))
+    assert delivery is not None
+    delivery.attempts = 3
+    db.commit()
+    assert emit_digest_alert(db, digest, AS_OF) is None
+    assert len(db.scalars(select(AlertDelivery)).all()) == 1
+    assert delivery.attempts == 3
+
+
+def test_repair_does_not_touch_another_tenants_digest(db):
+    from app.models import AlertDelivery
+
+    digest = make_digest(db)
+    own = emit_digest_alert(db, digest, AS_OF)
+    db.add(Tenant(id=2, external_id="other"))
+    foreign = ResearchAlert(
+        tenant_id=2, severity="low", status="open", alert_type="daily_digest",
+        title="Other tenant", message="Private", fingerprint=own.fingerprint,
+        channels=["in_app"],
+    )
+    with Session(db.get_bind(), info={"tenant_id": 2, "user_id": "other"}) as other:
+        other.add(foreign)
+        other.commit()
+    assert emit_digest_alert(db, digest, AS_OF) is None
+    # Core table read checks both tenants without ORM tenant filtering.
+    with db.get_bind().connect() as conn:
+        rows = conn.execute(select(AlertDelivery.__table__)).all()
+    assert [(d.tenant_id, d.alert_id) for d in rows] == [(1, own.id)]
+    deliveries = db.scalars(select(AlertDelivery)).all()
+    assert [(d.tenant_id, d.alert_id) for d in deliveries] == [(1, own.id)]
