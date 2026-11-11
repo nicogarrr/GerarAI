@@ -103,3 +103,19 @@ describe('gris informativo en research (tokens reales del tema)', () => {
         expect(checkLegible(['text-xs', 'text-gray-400'], 'surface-0').ok).toBe(true);
     });
 });
+
+describe('ThesisMemo: tinta de los títulos de sección neutros', () => {
+    it('los h3 neutros van en gray-400 (tinta principal), no gray-500', () => {
+        // Pin de diseño: los títulos de sección neutros del memo son tinta
+        // principal (gray-400). Regresión vista al revertir otra PR con un
+        // sed de barrido que los oscureció a gray-500 sin cambio pedido.
+        const src = readFileSync('components/research/ThesisMemo.tsx', 'utf8');
+        const neutral = [...src.matchAll(/<h3 className="([^"]*)"/g)]
+            .map((m) => classTokens(m[1]))
+            .filter((t) => t.includes('text-gray-400') || t.includes('text-gray-500'));
+        expect(neutral.length, 'no se encuentran los h3 neutros del memo').toBeGreaterThanOrEqual(6);
+        for (const t of neutral) {
+            expect(t, 'un h3 neutro del memo bajó a gray-500 (tinta secundaria): debe ser gray-400').not.toContain('text-gray-500');
+        }
+    });
+});
