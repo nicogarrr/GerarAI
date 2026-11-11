@@ -67,7 +67,24 @@ export function ShareCapitalPanel({ data }: { data: ShareCapital }) {
       </div>
       {!count ? <p className="text-sm text-gray-400">{tab === 'balances' ? t('research.shareCapital.emptyBalances') : t('research.shareCapital.emptyFlows')}</p> : <>
         <Pager page={page} pages={pages} onChange={setPage} />
-        <div aria-label={t('research.shareCapital.historyRegion')} className="my-4 overflow-x-auto" role="region" tabIndex={0}>
+        <div className="my-4 space-y-3 md:hidden print:hidden">
+          {tab === 'balances' ? [...data.series].reverse().slice((page - 1) * 10, page * 10).map(row => <section key={row.date} aria-label={`${t('research.shareCapital.balances')} · ${formatMarketDate(row.date)}`} className="min-w-0 rounded border border-gray-800 p-3 [overflow-wrap:anywhere]">
+            <h3 className="text-sm font-medium"><Source fact={row} /></h3>
+            <dl className="mt-3 space-y-3 text-sm">
+              <div><dt className="text-xs text-gray-400">{t('research.shareCapital.shares')}</dt><dd>{compact(row.value)}</dd></div>
+              <div><dt className="text-xs text-gray-400">{t('research.shareCapital.netChangeDerived')}</dt><dd>{row.split_between_dates ? t('research.shareCapital.splitRow') : row.abrupt_jump ? t('research.shareCapital.abruptJump') : percent(row.net_change_pct)}{row.previous_date && <div className="text-xs text-gray-400">{t('research.shareCapital.since', { date: formatMarketDate(row.previous_date) })}</div>}</dd></div>
+            </dl>
+          </section>) : [...data.annual_flows].reverse().slice((page - 1) * 10, page * 10).map(row => <section key={row.date} aria-label={`${t('research.shareCapital.flows')} · ${formatMarketDate(row.date)}`} className="min-w-0 rounded border border-gray-800 p-3 [overflow-wrap:anywhere]">
+            <h3 className="text-sm font-medium">{formatMarketDate(row.date)}</h3>
+            <dl className="mt-3 space-y-3 text-sm">
+              <div><dt className="text-xs text-gray-400">{t('research.shareCapital.buybacks')}</dt><dd><Fact fact={row.common_stock_repurchased} /></dd></div>
+              <div><dt className="text-xs text-gray-400">{t('research.shareCapital.sharesRepurchased')}</dt><dd><Fact fact={row.shares_repurchased} /></dd></div>
+              <div><dt className="text-xs text-gray-400">{t('research.shareCapital.issuances')}</dt><dd><Fact fact={row.common_stock_issued} /></dd></div>
+              <div><dt className="text-xs text-gray-400">{t('research.shareCapital.sbc')}</dt><dd><Fact fact={row.stock_based_compensation} /></dd></div>
+            </dl>
+          </section>)}
+        </div>
+        <div aria-label={t('research.shareCapital.historyRegion')} className="my-4 hidden overflow-x-auto md:block print:block" role="region" tabIndex={0}>
           {tab === 'balances' ? <table className="w-full text-left text-sm"><caption className="sr-only">{t('research.shareCapital.balancesCaption')}</caption><thead><tr className="text-gray-400"><th className="p-2" scope="col">{t('research.shareCapital.dateSource')}</th><th className="p-2" scope="col">{t('research.shareCapital.shares')}</th><th className="p-2" scope="col">{t('research.shareCapital.netChangeDerived')}</th></tr></thead>
             <tbody>{[...data.series].reverse().slice((page - 1) * 10, page * 10).map(row => <tr className="border-t border-gray-800" key={row.date}><th className="p-2 text-left font-normal" scope="row"><Source fact={row} /></th><td className="p-2">{compact(row.value)}</td><td className="p-2">{row.split_between_dates ? t('research.shareCapital.splitRow') : row.abrupt_jump ? t('research.shareCapital.abruptJump') : percent(row.net_change_pct)}{row.previous_date && <div className="text-xs text-gray-500">{t('research.shareCapital.since', { date: formatMarketDate(row.previous_date) })}</div>}</td></tr>)}</tbody>
           </table> : <table className="w-full min-w-[640px] text-left text-sm"><caption className="sr-only">{t('research.shareCapital.flowsCaption')}</caption><thead><tr className="text-gray-400"><th className="p-2" scope="col">{t('research.shareCapital.yearEnd')}</th><th className="p-2" scope="col">{t('research.shareCapital.buybacks')}</th><th className="p-2" scope="col">{t('research.shareCapital.sharesRepurchased')}</th><th className="p-2" scope="col">{t('research.shareCapital.issuances')}</th><th className="p-2" scope="col">{t('research.shareCapital.sbc')}</th></tr></thead>

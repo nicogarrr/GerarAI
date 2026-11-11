@@ -1,0 +1,31 @@
+import { render, screen, within, fireEvent } from '@testing-library/react';
+import { expect, it, vi } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { ShareCapitalPanel } from '@/components/research/ShareCapitalPanel';
+const fact = { value: 1234567890, unit: 'USD', date: '2026-06-30', fact_id: 1, source: 'SEC 10-Q', source_url: 'https://sec.gov/fixture', reported_on: '2026-08-01', source_updated_on: null, status: 'OFICIAL', concept: null, previous_date: '2025-06-30', net_change: null, net_change_pct: -5.5, change_status: 'DERIVADO', split_between_dates: false };
+const data = { ticker:'X',status:'OFICIAL',as_of:'2026-10-01',share_basis:'reported_unadjusted',series:[fact],annual_flows:[{date:'2026-06-30',common_stock_repurchased:fact,shares_repurchased:{...fact,unit:'shares'},stock_based_compensation:fact}] };
+it('mobile annual flows keep every metric and its source, including explicit missing issuance',()=>{
+ vi.stubGlobal('matchMedia',()=>({matches:false,addEventListener(){},removeEventListener(){}}));
+ const {container}=render(<ShareCapitalPanel data={data as never}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Emisiones y recompras anuales'}));
+ if(process.env.CAPITAL_PREVIEW)writeFileSync('/tmp/fact-preview.html',`<!doctype html><html lang="es"><head><link rel="stylesheet" href="/style.css"></head><body class="bg-gray-950 text-gray-100"><main style="padding:16px;max-width:960px;margin:auto">${container.innerHTML}</main></body></html>`);
+ const card=screen.getByRole('region',{name:/Emisiones y recompras.*26/});
+ expect(within(card).getAllByRole('link')).toHaveLength(3);
+ expect(within(card).getByText('N/D')).toBeVisible();
+ const table=screen.getByRole('table');
+ for(const cell of within(table).getAllByRole('cell'))expect(card.textContent).toContain(cell.textContent??'');
+});
+it('balance cards share pagination, signed change, date and source with the table',()=>{
+ vi.stubGlobal('matchMedia',()=>({matches:false,addEventListener(){},removeEventListener(){}}));
+ const series=Array.from({length:12},(_,i)=>({...fact,date:`20${10+i}-06-30`}));
+ render(<ShareCapitalPanel data={{...data,series} as never}/>);
+ expect(screen.getAllByRole('region',{name:/^Saldos ·/})).toHaveLength(10);
+ fireEvent.click(screen.getAllByRole('button',{name:'Siguiente'})[0]);
+ const cards=screen.getAllByRole('region',{name:/^Saldos ·/});
+ expect(cards).toHaveLength(2);
+ expect(within(cards[0]).getByText('-5,50%')).toBeVisible();
+ expect(within(cards[0]).getByRole('link')).toHaveAttribute('href',fact.source_url);
+ expect(screen.getAllByRole('button',{name:'Siguiente'})[0]).toBeDisabled();
+ fireEvent.click(screen.getAllByRole('button',{name:'Anterior'})[0]);
+ expect(screen.getAllByRole('region',{name:/^Saldos ·/})).toHaveLength(10);
+});
