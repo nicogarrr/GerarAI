@@ -14,7 +14,10 @@ vi.mock('@/lib/auth/research-identity', () => ({ researchIdentityHeaders }));
 vi.mock('@/lib/cache/memoryTTL', () => ({ cachedFetch: (_k: string, f: () => Promise<unknown>) => f() }));
 vi.mock('@/lib/cache/requestCache', () => ({ requestCache: { invalidate: requestCacheInvalidate } }));
 vi.mock('next/cache', () => ({ revalidatePath }));
-vi.mock('@/lib/actions/watchlist.actions', () => ({ getWatchlist }));
+vi.mock('@/lib/actions/watchlist.actions', async (importActual) => ({
+    ...(await importActual<typeof import('@/lib/actions/watchlist.actions')>()),
+    getWatchlist,
+}));
 
 import { AppError, ExternalAPIError } from '@/lib/types/errors';
 import { feedPaperProposalsNow, getPaperTrading } from '@/lib/actions/paper-trading.actions';
@@ -162,30 +165,43 @@ describe('portfolio-settings', () => {
 });
 
 describe('ticker-context: ningún badge es una afirmación falsa', () => {
+    // Contrato REAL: la watchlist se lee con el wrapper verdadero
+    // (getWatchlistState) y solo se mockea HTTP (researchRequest) y auth. El
+    // wrapper captura los fallos y devuelve { items: [], unavailable: true }:
+    // availability.watchlist debe mirar ese flag, no una excepción.
+    const positionsOk = [{ ticker: 'aapl', quantity: 10 }];
+    const http = (positions: unknown, watchlist: unknown) =>
+        researchRequest.mockImplementation(async (url: string) => {
+            if (url.startsWith('/api/watchlist')) {
+                if (watchlist instanceof Error) throw watchlist;
+                return watchlist;
+            }
+            if (positions instanceof Error) throw positions;
+            return positions;
+        });
+
     it('posición abierta (incl. corta) lleva badge; quantity 0 o null NO', async () => {
-        researchRequest.mockResolvedValue([
+        http([
             { ticker: 'aapl', quantity: 10 },
             { ticker: 'cerrada', quantity: 0 },
             { ticker: 'sinqty', quantity: null },
             { ticker: 'corta', quantity: -3 },
-        ]);
-        getWatchlist.mockResolvedValue([{ symbol: 'meta' }]);
+        ], [{ symbol: 'meta' }]);
         const ctx = await getTickerContext();
         expect(ctx.portfolioTickers).toEqual(['AAPL', 'CORTA']);
         expect(ctx.watchlistTickers).toEqual(['META']);
+        expect(ctx.availability).toEqual({ portfolio: true, watchlist: true });
     });
 
     it('pide posiciones con page_size=200 (el backend pagina; sin parametro solo llegaban 20)', async () => {
-        researchRequest.mockResolvedValue({ items: [{ ticker: 'aapl', quantity: 10 }] });
-        getWatchlist.mockResolvedValue([]);
+        http({ items: [{ ticker: 'aapl', quantity: 10 }] }, []);
         const ctx = await getTickerContext();
         expect(ctx.portfolioTickers).toEqual(['AAPL']);
         expect(researchRequest).toHaveBeenCalledWith('/api/portfolio/positions?page=1&page_size=200', { fast: true });
     });
 
-    it('lectura caída -> su conjunto vacío, nunca inventado, y availability lo registra', async () => {
-        researchRequest.mockRejectedValue(new Error('500'));
-        getWatchlist.mockRejectedValue(new Error('500'));
+    it('TODO caído -> conjuntos vacíos, nunca inventados, availability false/false', async () => {
+        http(new Error('500'), new Error('500'));
         expect(await getTickerContext()).toEqual({
             portfolioTickers: [],
             watchlistTickers: [],
@@ -193,12 +209,27 @@ describe('ticker-context: ningún badge es una afirmación falsa', () => {
         });
     });
 
-    it('fallo parcial: solo el origen caído queda no disponible', async () => {
-        researchRequest.mockResolvedValue([{ ticker: 'aapl', quantity: 10 }]);
-        getWatchlist.mockRejectedValue(new Error('500'));
+    it('watchlist caída SIN lanzar (contrato real): availability.watchlist=false aunque items=[]', async () => {
+        // Regresión #5347: con el wrapper aplanador, Promise.allSettled la
+        // marcaba disponible y «Para ti» mostraba el vacío normal.
+        http(positionsOk, new Error('500'));
         const ctx = await getTickerContext();
         expect(ctx.portfolioTickers).toEqual(['AAPL']);
         expect(ctx.watchlistTickers).toEqual([]);
         expect(ctx.availability).toEqual({ portfolio: true, watchlist: false });
+    });
+
+    it('respuesta de watchlist que no es array también cuenta como caída', async () => {
+        http(positionsOk, { oops: true });
+        const ctx = await getTickerContext();
+        expect(ctx.availability).toEqual({ portfolio: true, watchlist: false });
+    });
+
+    it('posiciones caídas -> availability.portfolio=false y watchlist intacta', async () => {
+        http(new Error('500'), [{ symbol: 'meta' }]);
+        const ctx = await getTickerContext();
+        expect(ctx.portfolioTickers).toEqual([]);
+        expect(ctx.watchlistTickers).toEqual(['META']);
+        expect(ctx.availability).toEqual({ portfolio: false, watchlist: true });
     });
 });

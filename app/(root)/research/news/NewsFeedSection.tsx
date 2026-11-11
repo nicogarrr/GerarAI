@@ -49,10 +49,17 @@ export async function NewsFeedSection({ lane, ticker, page, tickerContextPromise
   // ninguna empresa»). Fallo parcial con cero tickers disponibles: igualmente
   // no se puede afirmar el vacío — aviso + reintento sin feed.
   if (contextWarning === 'total' || (contextWarning === 'partial' && paraTiTickers.length === 0)) {
+    const sourceKey = failedSource === 'portfolio' ? 'research.newsContextSourcePortfolio' : 'research.newsContextSourceWatchlist';
+    const title = contextWarning === 'total'
+      ? t('research.newsContextErrorTitle')
+      : t('research.newsContextPartialErrorTitle', { source: t(sourceKey) });
+    const body = contextWarning === 'total'
+      ? t('research.newsContextErrorBody')
+      : t('research.newsContextPartialErrorBody', { source: t(sourceKey) });
     return (
       <section className="mx-auto flex w-full max-w-2xl flex-col items-center gap-4 px-4 py-16 text-center">
-        <h2 className="text-xl font-bold text-gray-100">{t('research.newsContextErrorTitle')}</h2>
-        <p className="max-w-md text-sm leading-6 text-gray-400">{t('research.newsContextErrorBody')}</p>
+        <h2 className="text-xl font-bold text-gray-100">{title}</h2>
+        <p className="max-w-md text-sm leading-6 text-gray-400">{body}</p>
         <Button asChild className="min-h-[44px] px-6">
           <Link href={retryHref}>
             <RefreshCcw aria-hidden="true" className="h-4 w-4" />

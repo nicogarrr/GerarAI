@@ -23,7 +23,7 @@ vi.mock('@/lib/actions/research-tools.actions', () => ({
   createKnowledgeCollectionResult: vi.fn(), decideKnowledgePrinciple: vi.fn(), extractKnowledgePrinciples: vi.fn(), installKnowledgeDefaults: vi.fn(), mergeKnowledgePrinciple: vi.fn(), reviseKnowledgePrincipleResult: vi.fn(), setKnowledgeDocumentTicker: vi.fn(), uploadKnowledgeDocumentResult: vi.fn(), searchResearchLibrary: vi.fn(),
 }));
 vi.mock('@/lib/actions/research.actions', () => ({getResearchNews: vi.fn(async () => []), analyzeManualNews: vi.fn(), ingestResearchNewsFeed: vi.fn()}));
-vi.mock('@/lib/actions/ticker-context.actions', () => ({getTickerContext: vi.fn(async () => ({portfolioTickers: [], watchlistTickers: []}))}));
+vi.mock('@/lib/actions/ticker-context.actions', () => ({getTickerContext: vi.fn(async () => ({portfolioTickers: [], watchlistTickers: [], availability: {portfolio: true, watchlist: true}}))}));
 
 import Search from '@/app/(root)/search/page';
 import { FinancialTerminalSection } from '@/components/research/sections/FinancialTerminalSection';

@@ -114,7 +114,10 @@ describe('NewsFeedSection', () => {
         }));
         expect(getResearchNews).not.toHaveBeenCalled();
         expect(flowProps.events).toBeUndefined();
-        getByText('research.newsContextErrorTitle');
+        // El error nombra SOLO la fuente caída, no «cartera ni watchlist».
+        getByText('research.newsContextPartialErrorTitle');
+        getByText('research.newsContextPartialErrorBody');
+        expect(queryByText('research.newsContextErrorTitle')).toBeNull();
         expect(queryByText('research.flow.emptyForYouTitle')).toBeNull();
         expect(getByRole('link', { name: /common.actions.retry/ })).toHaveAttribute('href', '/research/news?lane=para-ti&pagina=2');
     });
