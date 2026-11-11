@@ -1,3 +1,8 @@
+// Preflight behavior is covered in ai/AiAvailabilityNotice.test.tsx.
+vi.mock('@/components/ai/AiAvailabilityNotice', () => ({
+    useAiAvailability: () => ({ canStart: true, refresh: async () => true }),
+    AiAvailabilityNotice: () => null,
+}));
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ThesisDebateResult } from '@/lib/actions/thesis-jobs.actions';
@@ -22,7 +27,7 @@ describe('Thesis bull bear panel with mocked generation', () => {
         render(<ThesisDebatePanel ticker="TEST" initialVerdict="Veredicto previo local" />);
         fireEvent.click(screen.getByRole('button'));
         expect(screen.getByText('Veredicto previo local')).toBeVisible();
-        const busy = screen.getByRole('button', { name: 'Debatiendo…' });
+        const busy = await screen.findByRole('button', { name: 'Debatiendo…' });
         expect(busy).toBeDisabled(); expect(busy).toHaveAttribute('aria-busy', 'true');
         fireEvent.click(busy); expect(mocks.run).toHaveBeenCalledOnce(); expect(mocks.run).toHaveBeenCalledWith('TEST');
         await act(async () => finish(outcome()));

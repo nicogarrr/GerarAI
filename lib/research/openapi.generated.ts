@@ -5681,6 +5681,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/llm/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Llm Availability
+         * @description Only local config/breakers. Never spends tokens or reads another key's quota.
+         */
+        get: operations["get_llm_availability_api_settings_llm_availability_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/llm/test": {
         parameters: {
             query?: never;
@@ -29518,6 +29538,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LLMSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_llm_availability_api_settings_llm_availability_get: {
+        parameters: {
+            query: {
+                feature: "chat" | "thesis" | "analysis" | "debate";
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+                "x-cavaai-email"?: string | null;
+                "x-cavaai-email-signature"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

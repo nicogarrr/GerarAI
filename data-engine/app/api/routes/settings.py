@@ -215,6 +215,14 @@ def _sanitize_go_quota(raw: object) -> dict | None:
     return clean
 
 
+@router.get("/llm/availability")
+def get_llm_availability(feature: Literal["chat", "thesis", "analysis", "debate"], db: Session = Depends(get_db)) -> dict:
+    """Only local config/breakers. Never spends tokens or reads another key's quota."""
+    _require_tenant(db)
+    from app.services.llm_availability import availability
+    return availability(feature)
+
+
 @router.get("/llm/usage", response_model=LlmUsageResponse)
 async def get_llm_usage(db: Session = Depends(get_db)) -> dict:
     """Panel de uso de la cadena de plataforma (Ajustes).

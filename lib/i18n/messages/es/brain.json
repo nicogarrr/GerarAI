@@ -180,5 +180,16 @@
       "olderRun": "Estás viendo una corrida anterior ({date}).",
       "backToLatest": "Ver la última"
     }
+  },
+  "aiAvailability": {
+    "checking": "Comprobando disponibilidad de IA…",
+    "unknown": "No se ha podido comprobar la IA. No se ha enviado ninguna consulta.",
+    "off": "IA desactivada para esta función. Puedes seguir viendo los datos guardados.",
+    "paused": "IA en pausa por saldo, cuota o caída del proveedor. No se enviarán nuevos intentos mientras siga el bloqueo.",
+    "degraded": "IA limitada: se usará un respaldo disponible. La respuesta puede quedar incompleta.",
+    "unverified": "IA configurada. Si el proveedor no responde, verás datos con fuente o secciones N/D, no un análisis completo.",
+    "wait": "El bloqueo conocido se revisará al actualizar el estado. Espera al menos {seconds} s.",
+    "localOnly": "Estado local de esta función, sin consultar ni gastar en modelos. No confirma cuota ni disponibilidad del proveedor.",
+    "refresh": "Actualizar estado"
   }
 }

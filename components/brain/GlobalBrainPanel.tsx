@@ -1,4 +1,5 @@
 'use client';
+import { useAiAvailability, AiAvailabilityNotice } from '@/components/ai/AiAvailabilityNotice';
 import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 
 import { memo, useCallback, useState, useRef, useEffect, type ComponentProps } from 'react';
@@ -286,8 +287,11 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
         };
     }, []);
 
+    const availability = useAiAvailability(knowledge ? 'analysis' : 'chat');
+
     async function handleSend() {
-        if (!input.trim() || loading) return;
+        if (!input.trim() || loading || !availability.canStart) return;
+        if (!await availability.refresh()) return;
 
         const userMsg = input.trim();
         const history = messages.map(({ role, content }) => ({ role, content }));
@@ -509,7 +513,8 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                 </div>
             </CardContent>
 
-            <CardFooter className="shrink-0 p-3 border-t border-slate-800 bg-slate-900/50">
+            <CardFooter className="shrink-0 flex-col gap-2 p-3 border-t border-slate-800 bg-slate-900/50">
+                <AiAvailabilityNotice availability={availability} />
                 <form
                     className="flex w-full gap-2"
                     onSubmit={(e) => { e.preventDefault(); handleSend(); }}
@@ -535,7 +540,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                         placeholder={guideTicker.trim() ? t('brain.panel.tickerQuestion', { ticker: guideTicker.trim().toUpperCase() }) : t('brain.panel.placeholder')}
                         className="min-h-11 bg-slate-950 border-slate-700 focus-visible:ring-indigo-500"
                     />}
-                    <Button type="submit" size="icon" aria-label={t('brain.panel.sendAria')} disabled={loading || !input.trim() || (!!knowledge && (input.trim().length < 3 || input.trim().length > 1200))} aria-busy={loading} className="bg-indigo-600 hover:bg-indigo-500">
+                    <Button type="submit" size="icon" aria-label={t('brain.panel.sendAria')} disabled={loading || !availability.canStart || !input.trim() || (!!knowledge && (input.trim().length < 3 || input.trim().length > 1200))} aria-busy={loading} className="bg-indigo-600 hover:bg-indigo-500">
                         <Send aria-hidden="true" className="h-4 w-4" />
                     </Button>
                 </form>
