@@ -59,3 +59,21 @@ it('shows the cooldown in English too', async () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Too many requests');
     expect(screen.getByRole('button', { name: 'Retry in 60 s' })).toBeDisabled();
 });
+
+it.each([60, 120])('a new server 429 restarts the cooldown immediately even with waitSeconds=%i', async seconds => {
+    const response = () => renderWithRateLimit(async () => { throw new AppError('limited', 'RESEARCH_API_ERROR', 429, { retryAfterSeconds: seconds }); });
+    const first = await renderWithRateLimit(async () => { throw new AppError('limited', 'RESEARCH_API_ERROR', 429); });
+    vi.useFakeTimers();
+    const view = render(first);
+    await act(async () => { vi.advanceTimersByTime(60_000); });
+    expect(screen.getByRole('button')).toBeEnabled();
+    const second = await response();
+    view.rerender(second);
+    // No tick elapses here: a fresh response must lock the button on commit.
+    expect(screen.getByRole('button')).toBeDisabled();
+    expect(screen.getByRole('button')).toHaveTextContent(`Reintentar en ${seconds} s`);
+    await act(async () => { vi.advanceTimersByTime((seconds - 1) * 1000); });
+    expect(screen.getByRole('button')).toBeDisabled();
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(screen.getByRole('button')).toBeEnabled();
+});
