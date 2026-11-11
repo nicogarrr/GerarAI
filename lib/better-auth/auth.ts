@@ -35,7 +35,7 @@ import { AccountApproval } from "@/database/models/account-approval.model";
 import { notifyPendingAccount } from "@/lib/auth/approval-notify";
 import {
     hasLegalAcceptance, legalAcceptanceStamp,
-    LEGAL_ACCEPTANCE_REQUIRED_CODE, LEGAL_ACCEPTANCE_REQUIRED_MESSAGE,
+    LEGAL_ACCEPTANCE_REQUIRED_CODE,
 } from '@/lib/auth/legal-acceptance';
 import { profileInputProblem } from "@/lib/auth/profile-input";
 
@@ -99,7 +99,7 @@ export const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>)
         before: createAuthMiddleware(async (ctx) => {
             if (ctx.path === '/sign-up/email') {
                 if (!hasLegalAcceptance(ctx.body)) {
-                    throw new APIError(400, { code: LEGAL_ACCEPTANCE_REQUIRED_CODE, message: LEGAL_ACCEPTANCE_REQUIRED_MESSAGE });
+                    throw new APIError(400, { code: LEGAL_ACCEPTANCE_REQUIRED_CODE, message: LEGAL_ACCEPTANCE_REQUIRED_CODE });
                 }
                 const email: unknown = (ctx.body as { email?: unknown } | undefined)?.email;
                 if (!isEmailAllowedToSignUp(email, signupPolicy)) {
@@ -158,7 +158,7 @@ export const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>)
                     // Only the explicit email signup can record it.
                     if (ctx?.path !== '/sign-up/email') return;
                     if (!hasLegalAcceptance(ctx.body)) {
-                        throw new APIError(400, { code: LEGAL_ACCEPTANCE_REQUIRED_CODE, message: LEGAL_ACCEPTANCE_REQUIRED_MESSAGE });
+                        throw new APIError(400, { code: LEGAL_ACCEPTANCE_REQUIRED_CODE, message: LEGAL_ACCEPTANCE_REQUIRED_CODE });
                     }
                     return { data: { ...user, ...legalAcceptanceStamp() } };
                 },

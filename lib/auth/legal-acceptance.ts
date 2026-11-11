@@ -14,7 +14,6 @@ export const LEGAL_TEXT_VERSIONS = {
 } as const;
 
 export const LEGAL_ACCEPTANCE_REQUIRED_CODE = 'LEGAL_ACCEPTANCE_REQUIRED';
-export const LEGAL_ACCEPTANCE_REQUIRED_MESSAGE = 'Debes aceptar los términos de uso y la política de privacidad.';
 
 /** Only a real boolean checked by the user counts. Never coerce strings. */
 export function hasLegalAcceptance(body: unknown): boolean {
