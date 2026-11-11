@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { HistoryBackLink } from '@/components/common/HistoryBackLink';
 import { chartPriceUnit } from '@/lib/market/chart-price-units';
 
 import DcaWatchCard from '@/components/watchlist/DcaWatchCard';
@@ -100,7 +101,9 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
         </div>
         <p className="mt-3 text-xs text-gray-500">{t('research.informe.notARating')}</p>
         <div className="mt-3 flex flex-wrap gap-3 text-sm print:hidden">
-          <Link className="inline-flex min-h-[44px] items-center text-teal-300 sm:min-h-0" href={`/research/${enc}`}>{t('research.informe.back')}</Link>
+          {/* Por historial si se llegó desde la ficha (misma pestaña `?view=` y
+              mismo scroll); abierto directamente, enlace a la ficha. */}
+          <HistoryBackLink className="inline-flex min-h-[44px] items-center text-teal-300 sm:min-h-0" href={`/research/${enc}`}>{t('research.informe.back')}</HistoryBackLink>
           {thesis ? <a className="inline-flex min-h-[44px] items-center text-teal-300 sm:min-h-0" href={`/api/thesis/${enc}/pdf`} download>{t('research.informe.thesisPdf')}</a> : null}
         </div>
       </header>
