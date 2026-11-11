@@ -142,7 +142,8 @@ def sector_for_industry(industry: str | None) -> str | None:
 class CompanyEnrichmentService:
     """Completa Company.name/exchange/sector/currency desde Finnhub."""
 
-    def __init__(self, settings=None, client: httpx.Client | None = None, sic_lookup=None) -> None:
+    def __init__(self, settings=None, client: httpx.Client | None = None, sic_lookup=None,
+                 unofficial_client: httpx.Client | None = None) -> None:
         self.settings = settings or get_settings()
         # Sector/industria de reserva por el SIC de la SEC (sic_classification) cuando Finnhub no clasifica.
         # Con un cliente inyectado (tests) solo si se pasa explícitamente: no sale a la red sin pedirlo.
@@ -151,6 +152,11 @@ class CompanyEnrichmentService:
 
             sic_lookup = sec_submissions_sic
         self._sic_lookup = sic_lookup
+        # Sector no oficial (unofficial_sector): None = red real; False = desactivado (cliente de test sin pedirlo,
+        # o APP_ENV=test: pruebas herméticas, como fx_backfill).
+        hermetic = client is not None or getattr(self.settings, "app_env", "") == "test"
+        self._unofficial: httpx.Client | None | bool = (
+            unofficial_client if unofficial_client is not None else (False if hermetic else None))
         self._client = client or httpx.Client(timeout=15)
 
     def close(self) -> None:
@@ -264,6 +270,7 @@ class CompanyEnrichmentService:
         profile = self._finnhub_profile(company.ticker)
         if not profile:
             changed = self._sic_fallback(db, company)
+            self._unofficial_fallback(db, company)
             if persist:
                 db.add(company)
             return changed
@@ -306,6 +313,7 @@ class CompanyEnrichmentService:
                 company.ir_url = ir_url
                 changed = True
         changed = self._sic_fallback(db, company) or changed
+        self._unofficial_fallback(db, company)
 
         if persist:
             db.add(company)
@@ -325,6 +333,24 @@ class CompanyEnrichmentService:
         except Exception as exc:  # noqa: BLE001 - sin SIC la ficha sigue como estaba
             logger.info("SIC de reserva %s: %s", company.ticker, type(exc).__name__)
             return False
+
+    def _unofficial_fallback(self, db: Session, company: Company) -> None:
+        """Sin ninguna clasificación oficial tras Finnhub y el SIC: sector de reserva NO oficial (Wikidata, luego
+        Yahoo), guardado aparte con su fuente y fecha; nunca toca Company.sector. Nunca lanza.
+
+        Con un cliente inyectado (tests) solo si se pasa ``unofficial_client``: no sale a la red sin pedirlo."""
+        if self._unofficial is False:
+            return
+        try:
+            from app.services import unofficial_sector
+            from app.services.estimate_base_rates import sector_of_cik
+
+            if company.id is None:
+                db.flush()
+            unofficial_sector.refresh(db, company, client=self._unofficial or None,
+                                      sic_sector=sector_of_cik(getattr(company, "cik", None)))
+        except Exception as exc:  # noqa: BLE001 - sin sector no oficial la ficha sigue como estaba
+            logger.info("sector no oficial %s: %s", company.ticker, type(exc).__name__)
 
     def enrich_all(self, db: Session, sleep_between: float = 0.8) -> dict:
         """Barre companies con datos debiles y las enriquece (respetando rate limit)."""

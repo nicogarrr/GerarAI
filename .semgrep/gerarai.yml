@@ -26,6 +26,7 @@
 #   llm/thesis_go.py: LLM provider endpoint; custom URLs via egress_guard
 #   services/class_filer_eps_service.py: SEC EDGAR fixed host
 #   services/company_enrichment_service.py: fixed provider APIs (OpenFIGI/Finnhub)
+#   services/unofficial_sector.py: fixed hosts query.wikidata.org (SPARQL) and Yahoo quoteSummary; ISIN/ticker as params, no user URL
 #   services/annual_report_exhibits.py: SEC filing index on the fixed host www.sec.gov (SEC pacer + identity headers)
 #   services/connectors/alpha_vantage.py: Alpha Vantage fixed host (www.alphavantage.co), rate-limited
 #   services/connectors/base.py: connector to a fixed public data API
@@ -173,6 +174,7 @@ rules:
     - /data-engine/app/services/thesis_approval_service.py
     - /data-engine/app/services/thesis_audio_service.py
     - /data-engine/app/services/thesis_job_service.py
+    - /data-engine/app/services/unofficial_sector.py
     - /data-engine/app/workers/dramatiq_app.py
   pattern-either:
   - pattern: httpx.$M(...)

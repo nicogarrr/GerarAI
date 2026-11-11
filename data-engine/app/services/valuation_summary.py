@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.tenancy import tenant_filters
 from app.models import Company, FinancialFact, FundamentalModelVersion, FundamentalValuationSnapshot
+from app.services import unofficial_sector
 from app.services.fair_value_service import resolve_fair_values
 from app.services.financial_health import HealthFact, calculate_health
 from app.valuation.cash_burn_base_rate import cash_burn_base_rate, latest_fiscal_year_values
@@ -151,6 +152,8 @@ def build_summaries(db: Session, companies: list[Company], *, today: date | None
     latest = {}
     for snapshot in snapshots:
         latest.setdefault(snapshot.company_id, snapshot)
+    # Sector de reserva no oficial ya guardado (sin red): solo cuenta cuando no hay clasificación oficial.
+    unofficial = unofficial_sector.stored(db, ids)
     out = {}
     for company in companies:
         reading = readings[company.id]
@@ -188,7 +191,7 @@ def build_summaries(db: Session, companies: list[Company], *, today: date | None
             "reverse_dcf": reverse_summary,
             "health": calculate_health(company_facts, sector=company.sector,
                 company_type=company.company_type, today=today, industry=getattr(company, "industry", None),
-                sic_sector=_sic_sector(company)),
+                sic_sector=_sic_sector(company), unofficial_sector=unofficial_sector.health_basis(unofficial.get(company.id))),
             # Empresa que quema caja: de dónde parte (tasas base medidas), sin tocar la cifra.
             "base_rate": cash_burn_base_rate(latest_fiscal_year_values(company_facts), reading),
         }
