@@ -82,6 +82,16 @@ def _reverse_base_rate_check(company: Company, facts: list[HealthFact], reverse:
                                          f"(DCF inverso)")
 
 
+def _sic_sector(company: Company) -> str | None:
+    """División SIC de la SEC del emisor (tabla de tasas base, sin red); None sin CIK o sin tabla."""
+    from app.services.estimate_base_rates import sector_of_cik
+
+    try:
+        return sector_of_cik(getattr(company, "cik", None))
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
 def build_summaries(db: Session, companies: list[Company], *, today: date | None = None) -> dict[str, dict]:
     today = today or date.today()
     if not companies:
@@ -167,7 +177,8 @@ def build_summaries(db: Session, companies: list[Company], *, today: date | None
             "margin_convention": "discount_to_value_v1",
             "reverse_dcf": reverse_summary,
             "health": calculate_health(company_facts, sector=company.sector,
-                company_type=company.company_type, today=today),
+                company_type=company.company_type, today=today, industry=getattr(company, "industry", None),
+                sic_sector=_sic_sector(company)),
             # Empresa que quema caja: de dónde parte (tasas base medidas), sin tocar la cifra.
             "base_rate": cash_burn_base_rate(latest_fiscal_year_values(company_facts), reading),
         }
