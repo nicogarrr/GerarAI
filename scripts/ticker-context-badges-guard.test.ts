@@ -38,13 +38,20 @@ test('«En cartera» exige posición abierta: quantity numérica y no nula', () 
 });
 
 test('la acción filtra por posición abierta, no por mera presencia', () => {
-    assert.match(action, /openPositionTickers\(positions\)/);
+    assert.match(action, /openPositionTickers\(positionsResult\.value\)/);
     assert.match(action, /quantity: number \| null/);
 });
 
 test('la lectura degrada a conjuntos vacíos, nunca a badges fabricados', () => {
-    assert.match(action, /\.catch\(\(\) => \[\] as Array<\{ ticker: string; quantity: number \| null \}>\)/);
-    assert.match(action, /\.catch\(\(\) => \[\] as Array<\{ symbol: string \}>\)/);
+    // Posiciones: el brazo de fallo de .then devuelve [] y ok:false (nunca
+    // tickers fabricados). Watchlist: getWatchlistState() no lanza; sus
+    // tickers salen de items y la caída se registra en availability, no se
+    // confunde con «sin empresas» (contrato de #5347).
+    assert.match(action, /\(\) => \(\{ ok: false as const, value: \[\] as Array<\{ ticker: string; quantity: number \| null \}> \}\)/);
+    assert.match(action, /getWatchlistState\(\)/);
+    assert.match(action, /watchlistState\.items\.map/);
+    assert.match(action, /portfolio: positionsResult\.ok/);
+    assert.match(action, /watchlist: !watchlistState\.unavailable/);
 });
 
 test('noticias y movers componen los badges junto al ticker', () => {
