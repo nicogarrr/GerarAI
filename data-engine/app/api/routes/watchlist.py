@@ -388,10 +388,13 @@ def watchlist_monitor(
 
 
 
-# Antigüedad máxima del ejercicio que da el PER de la watchlist (regla «per-antiguedad-v1»): 18 meses desde su
-# cierre. El informe anual siguiente se publica a los 2-4 meses del cierre (10-K: 60-90 días; ESEF/UE: 4 meses), así
-# que pasados 18 meses ese informe lleva al menos ~2 meses publicado y el dato de la base está viejo.
-PER_MAX_ANNUAL_AGE_DAYS = 548
+# Antigüedad máxima del ejercicio que da el PER de la watchlist (regla «per-antiguedad-v2»): 18 meses de calendario
+# desde su cierre. El informe anual siguiente se publica a los 2-4 meses del cierre (10-K: 60-90 días; ESEF/UE: 4
+# meses), así que pasados 18 meses ese informe lleva al menos ~2 meses publicado y el dato de la base está viejo.
+# v1 contaba 548 días y nombraba la diferencia de MES DE CALENDARIO: un cierre 2025-07-31 leído el 2027-01-31 (549
+# días, justo 18 meses) salía «hace 18 meses, más de 18», y un cierre 2025-03-15 leído el 2026-11-11 decía «hace 20
+# meses» con 19 cumplidos. v2 cuenta MESES COMPLETOS con la misma regla para el corte y para el texto.
+PER_MAX_ANNUAL_AGE_MONTHS = 18
 
 
 def _today() -> date:
@@ -399,16 +402,43 @@ def _today() -> date:
     return date.today()
 
 
+def _whole_months_and_days(start: date, end: date) -> tuple[int, int]:
+    """Meses completos de calendario entre ``start`` y ``end`` y los días que sobran (``end`` >= ``start``).
+
+    Un mes se cumple el mismo día del mes siguiente; si ese día no existe, el último del mes (31-ene → 28/29-feb).
+    """
+    months = (end.year - start.year) * 12 + end.month - start.month
+    if _add_months(start, months) > end:
+        months -= 1
+    return months, (end - _add_months(start, months)).days
+
+
+def _add_months(day: date, months: int) -> date:
+    """``day`` + ``months`` meses de calendario; sin ese día en el mes destino, su último día."""
+    import calendar
+
+    index = day.year * 12 + day.month - 1 + months
+    year, month = divmod(index, 12)
+    month += 1
+    return date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
+
+
 def _stale_annual_reason(eps_row: FinancialFact, today: date) -> str | None:
-    """Motivo de N/D si el ejercicio del BPA cerró hace más de ``PER_MAX_ANNUAL_AGE_DAYS`` días; si no, ``None``."""
+    """Motivo de N/D si el ejercicio del BPA cerró hace más de ``PER_MAX_ANNUAL_AGE_MONTHS`` meses; si no, ``None``."""
     from app.services.ttm_service import _period_end
 
     end = _period_end(eps_row)
-    if end is None or (today - end).days <= PER_MAX_ANNUAL_AGE_DAYS:
+    if end is None or today <= end:
         return None
-    months = (today.year - end.year) * 12 + today.month - end.month
-    return (f"el último {eps_row.metric} anual es FY{eps_row.fiscal_year} (cierre {end.isoformat()}, hace "
-            f"{months} meses, más de 18): falta en la base el informe anual más reciente y un PER sobre "
+    months, days = _whole_months_and_days(end, today)
+    if (months, days) <= (PER_MAX_ANNUAL_AGE_MONTHS, 0):
+        return None
+    if months == PER_MAX_ANNUAL_AGE_MONTHS:
+        age = f"hace {months} meses y {days} {'día' if days == 1 else 'días'}"
+    else:
+        age = f"hace {months} meses"
+    return (f"el último {eps_row.metric} anual es FY{eps_row.fiscal_year} (cierre {end.isoformat()}, {age}, "
+            f"más de {PER_MAX_ANNUAL_AGE_MONTHS}): falta en la base el informe anual más reciente y un PER sobre "
             "ese ejercicio no es el actual")
 
 @router.get("/metrics/{symbol}", response_model=WatchlistMetricsOut)
@@ -495,7 +525,7 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
         sources.append(f"PER: N/D: {reason}")
         return {"market_cap": market_cap, "per": None,
                 "currency": company.currency, "sources": sources}
-    # Regla «per-antiguedad-v1»: un BPA anual cuyo ejercicio cerró hace más de 18 meses no es «el último
+    # Regla «per-antiguedad-v2»: un BPA anual cuyo ejercicio cerró hace más de 18 meses no es «el último
     # ejercicio»: el informe siguiente ya debería estar publicado y falta en la base (ERF.PA con el PER sobre
     # FY2024 en nov-2026; ASTS citando FY2021). N/D con el motivo, nunca el ratio viejo como si fuera actual.
     if eps_row is not None and (stale := _stale_annual_reason(eps_row, today)):
