@@ -330,6 +330,9 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
 
     // Una sección, un disparador: cada «Reintentar» vuelve a pedir solo su
     // lectura (antes los cuatro reintentos relanzaban el loadData completo).
+    // TODAS las secciones dependen también de userId: un cambio de cuenta sin
+    // desmontar el componente relanza las tres lecturas y el flag `active`
+    // descarta la respuesta tardía de la cuenta anterior.
     useEffect(() => {
         let active = true;
 
@@ -374,7 +377,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         return () => {
             active = false;
         };
-    }, [retryTokens.alerts]);
+    }, [userId, retryTokens.alerts]);
 
     // Solo se cotizan las primeras WATCHLIST_PREVIEW_LIMIT entradas: el resto
     // son un contador y un enlace a /watchlist, no filas anónimas.
@@ -412,7 +415,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         return () => {
             active = false;
         };
-    }, [retryTokens.watchlist]);
+    }, [userId, retryTokens.watchlist]);
 
     useEffect(() => {
         let active = true;
@@ -456,7 +459,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         return () => {
             active = false;
         };
-    }, [retryTokens.opportunities]);
+    }, [userId, retryTokens.opportunities]);
 
     // Derivados memorizados: evita reordenar el estado en cada render
     // (.sort() mutaba el array del estado) y recalcula solo si cambian los datos.

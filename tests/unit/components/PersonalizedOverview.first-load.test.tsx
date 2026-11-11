@@ -55,8 +55,9 @@ describe('PersonalizedOverview primera carga', () => {
 
     const respond = (urlPart: string, body: unknown) => {
         const resolvers = pending.get(urlPart) ?? [];
-        for (const resolve of resolvers) resolve(Response.json(body));
-        pending.delete(urlPart);
+        const [first, ...rest] = resolvers;
+        first?.(Response.json(body));
+        pending.set(urlPart, rest);
     };
 
     beforeEach(() => {
@@ -129,5 +130,26 @@ describe('PersonalizedOverview primera carga', () => {
         for (const call of fetchMock.mock.calls) {
             expect(String(call[0])).not.toContain('opportunities');
         }
+    });
+
+    it('cambio de cuenta relanza las tres secciones y descarta la respuesta tardía de la anterior', async () => {
+        const { rerender } = render(<PersonalizedOverview userId="u1" />);
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+        respond('/api/home/portfolio', { data: summary, error: null });
+        respond('/api/home/alerts', { data: { rules: [], triggered: [] }, error: null });
+        expect(await screen.findByText('desglose 5000')).toBeInTheDocument();
+
+        // Mismo componente, otra cuenta: las TRES secciones se relanzan.
+        // Regresión medida por el auditor: solo cartera recargaba (4 fetch).
+        rerender(<PersonalizedOverview userId="u2" />);
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
+
+        // La respuesta TARDÍA de la cuenta anterior no puede pisar la sección.
+        respond('/api/home/watchlist?limit=3', { data: { unavailable: false, total: 1, items: [{ symbol: 'VIE1', name: 'Cuenta Vieja SA', price: 1, currency: 'EUR', changePercent: 0, priceKind: 'live', priceAsOf: null }] }, error: null });
+        respond('/api/home/portfolio', { data: summary, error: null });
+        respond('/api/home/alerts', { data: { rules: [], triggered: [] }, error: null });
+        respond('/api/home/watchlist?limit=3', { data: { unavailable: false, total: 1, items: [{ symbol: 'NUE1', name: 'Cuenta Nueva SA', price: 2, currency: 'EUR', changePercent: 0, priceKind: 'live', priceAsOf: null }] }, error: null });
+        expect(await screen.findByText('Cuenta Nueva SA')).toBeInTheDocument();
+        expect(screen.queryByText('Cuenta Vieja SA')).not.toBeInTheDocument();
     });
 });
