@@ -34,8 +34,8 @@ export function PositionsTable({ positions, valuation }: { positions: DemoPositi
     }
     return (
         <div className="space-y-2">
-            <Table dense regionLabel={ti('paperTrading.positions.regionLabel')}>
-                <TableHeader>
+            <Table className="block md:table" dense regionLabel={ti('paperTrading.positions.regionLabel')}>
+                <TableHeader className="hidden md:table-header-group">
                     <TableRow>
                         <TableHead>{ti('paperTrading.positions.colInstrument')}</TableHead>
                         <TableHead className="text-right">{ti('paperTrading.positions.colQuantity')}</TableHead>
@@ -45,10 +45,10 @@ export function PositionsTable({ positions, valuation }: { positions: DemoPositi
                         <TableHead className="text-right">{ti('paperTrading.positions.colRealized')}</TableHead>
                     </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="block space-y-3 md:table-row-group md:space-y-0">
                     {positions.map((position) => (
-                        <TableRow key={`${position.currency}|${position.instrumentKey}`}>
-                            <TableCell className="min-w-52 md:min-w-0">
+                        <TableRow className="block rounded-lg border border-gray-800 p-3 md:table-row md:rounded-none md:p-0" key={`${position.currency}|${position.instrumentKey}`}>
+                            <TableCell className="block min-w-0 whitespace-normal [overflow-wrap:anywhere] md:table-cell">
                                 <span className="block font-medium text-gray-100">{position.name}</span>
                                 <span className="block text-xs text-gray-500">
                                     {position.kind === 'opcion' ? ti('paperTrading.positions.kindOption') : ti('paperTrading.positions.kindStock')} · {position.instrumentKey}
@@ -75,15 +75,15 @@ export function PositionsTable({ positions, valuation }: { positions: DemoPositi
                                 ) : null}
                                 {valuation ? <MobileValuation row={valued.get(valuationRowKey(position)) ?? null} currency={position.currency} ti={ti} f={f} /> : null}
                             </TableCell>
-                            <TableCell className="text-right">{f.formatNumber(position.quantity, { maximumFractionDigits: 0 })}</TableCell>
-                            <TableCell className="text-right">{f.formatMoney(position.avgCost, position.currency)}</TableCell>
+                            <TableCell className="block text-left md:table-cell md:text-right"><span className="block text-xs text-gray-400 md:hidden">{ti('paperTrading.positions.colQuantity')}</span>{f.formatNumber(position.quantity, { maximumFractionDigits: 0 })}</TableCell>
+                            <TableCell className="block text-left md:table-cell md:text-right"><span className="block text-xs text-gray-400 md:hidden">{ti('paperTrading.positions.colAvgCost')}</span>{f.formatMoney(position.avgCost, position.currency)}</TableCell>
                             {valuation ? <ValuationCells row={valued.get(valuationRowKey(position)) ?? null} currency={position.currency} ti={ti} f={f} /> : null}
                             <TableCell
-                                className={`text-right ${
+                                className={`block text-left md:table-cell md:text-right ${
                                     position.realizedPnl > 0 ? 'text-teal-300' : position.realizedPnl < 0 ? 'text-red-400' : 'text-gray-400'
                                 }`}
                             >
-                                {f.formatMoney(position.realizedPnl, position.currency)}
+                                <span className="block text-xs text-gray-400 md:hidden">{ti('paperTrading.positions.colRealized')}</span>{f.formatMoney(position.realizedPnl, position.currency)}
                             </TableCell>
                         </TableRow>
                     ))}
