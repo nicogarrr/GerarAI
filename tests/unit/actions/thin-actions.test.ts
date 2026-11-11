@@ -183,9 +183,22 @@ describe('ticker-context: ningún badge es una afirmación falsa', () => {
         expect(researchRequest).toHaveBeenCalledWith('/api/portfolio/positions?page=1&page_size=200', { fast: true });
     });
 
-    it('lectura caída -> su conjunto vacío, nunca inventado', async () => {
+    it('lectura caída -> su conjunto vacío, nunca inventado, y availability lo registra', async () => {
         researchRequest.mockRejectedValue(new Error('500'));
         getWatchlist.mockRejectedValue(new Error('500'));
-        expect(await getTickerContext()).toEqual({ portfolioTickers: [], watchlistTickers: [] });
+        expect(await getTickerContext()).toEqual({
+            portfolioTickers: [],
+            watchlistTickers: [],
+            availability: { portfolio: false, watchlist: false },
+        });
+    });
+
+    it('fallo parcial: solo el origen caído queda no disponible', async () => {
+        researchRequest.mockResolvedValue([{ ticker: 'aapl', quantity: 10 }]);
+        getWatchlist.mockRejectedValue(new Error('500'));
+        const ctx = await getTickerContext();
+        expect(ctx.portfolioTickers).toEqual(['AAPL']);
+        expect(ctx.watchlistTickers).toEqual([]);
+        expect(ctx.availability).toEqual({ portfolio: true, watchlist: false });
     });
 });

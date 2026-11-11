@@ -1313,7 +1313,7 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
     // noticias, filtrado por ticker en la API. La lectura sale del lote con
     // presupuesto lanzado arriba; su fallo degrada a aviso, nunca tumba la ficha.
     const newsPage = fichaNewsPageNumber;
-    const tickerContext = await getTickerContext().catch(() => ({ portfolioTickers: [] as string[], watchlistTickers: [] as string[] }));
+    const tickerContext = await getTickerContext().catch(() => ({ portfolioTickers: [] as string[], watchlistTickers: [] as string[], availability: { portfolio: false, watchlist: false } }));
     const fichaNewsEntry = (await fichaNewsPromise).find((entry) => entry.key === 'ficha-news');
     const fichaNewsError = !fichaNewsEntry || !fichaNewsEntry.ok;
     const fetchedNews: Awaited<ReturnType<typeof getResearchNews>> = fichaNewsEntry && fichaNewsEntry.ok ? fichaNewsEntry.value : [];

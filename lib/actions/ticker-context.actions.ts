@@ -10,28 +10,40 @@ import { openPositionTickers } from '@/lib/ticker-badges';
 export type TickerContext = {
     portfolioTickers: string[];
     watchlistTickers: string[];
+    /**
+     * Qué lecturas respondieron bien. Un fallo NO equivale a «el usuario no
+     * sigue empresas»: los consumidores que deciden a partir del contexto
+     * (p. ej. el carril «Para ti» de noticias) deben distinguir ambos casos.
+     */
+    availability: { portfolio: boolean; watchlist: boolean };
 };
 
 /**
  * Tickers presentes en la cartera y en la watchlist del usuario, para los
  * badges «En cartera / En watchlist» (quick win UX 5). Degradación honesta:
  * si una lectura falla, su conjunto queda vacío — ningún badge es nunca una
- * afirmación falsa de pertenencia.
+ * afirmación falsa de pertenencia — y `availability` registra el fallo para
+ * que nadie confunda «falló la lectura» con «el usuario no sigue empresas».
  */
 export async function getTickerContext(): Promise<TickerContext> {
     const userId = (await requireAuthenticatedUser()).id;
-    const [rawPositions, watchlist] = await Promise.all([
+    const [positionsResult, watchlistResult] = await Promise.allSettled([
         cachedFetch(
             `portfolio:${userId}:positions`,
             // Lectura completa: paginado page/page_size hasta agotar (fetchAllBackendPages lanza si no avanza).
             () => fetchAllBackendPages((page) => researchRequest<PaginatedBackendResponse<{ ticker: string; quantity: number | null }>>(`/api/portfolio/positions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true }), (position) => position.ticker),
             15,
-        ).catch(() => [] as Array<{ ticker: string; quantity: number | null }>),
-        getWatchlist().catch(() => [] as Array<{ symbol: string }>),
+        ),
+        getWatchlist(),
     ]);
-    const positions = rawPositions;
+    const positions = positionsResult.status === 'fulfilled' ? positionsResult.value : [];
+    const watchlist = watchlistResult.status === 'fulfilled' ? watchlistResult.value : [];
     return {
         portfolioTickers: openPositionTickers(positions),
         watchlistTickers: watchlist.map((item) => item.symbol.toUpperCase()),
+        availability: {
+            portfolio: positionsResult.status === 'fulfilled',
+            watchlist: watchlistResult.status === 'fulfilled',
+        },
     };
 }

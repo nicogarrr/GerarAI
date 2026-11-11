@@ -9,6 +9,6 @@ import { getTickerContext } from '@/lib/actions/ticker-context.actions';
  * del primer byte, aunque solo las usa esta sección del final.
  */
 export async function PortfolioNews() {
-    const { portfolioTickers } = await getTickerContext().catch(() => ({ portfolioTickers: [] as string[], watchlistTickers: [] as string[] }));
+    const { portfolioTickers } = await getTickerContext().catch(() => ({ portfolioTickers: [] as string[], watchlistTickers: [] as string[], availability: { portfolio: false, watchlist: false } }));
     return <NewsSection symbols={portfolioTickers.length ? portfolioTickers : undefined} />;
 }
