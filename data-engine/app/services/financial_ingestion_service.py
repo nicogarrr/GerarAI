@@ -605,7 +605,10 @@ def sec_ifrs_metric_map_for(ifrs_facts: dict[str, Any]) -> list[tuple[str, list[
 # 5 (8-nov-2026): ``minority_interest`` (NoncontrollingInterests) y ``net_income_minority``.
 # 6 (9-nov-2026): extensiones ancladas (xbrl_extension_map).
 # 7 (11-nov-2026): activo y pasivo corriente y reservas (current_assets, …).
-ESEF_INGESTION_RULES_VERSION = 8  # v8 (11-nov-2026): deuda corriente desde ShorttermBorrowings + CurrentPortionOfLongtermBorrowings
+# 8 (11-nov-2026): deuda corriente desde ShorttermBorrowings + CurrentPortionOfLongtermBorrowings.
+# 9 (11-nov-2026): remuneración en acciones (stock_based_compensation) con los mismos conceptos que el mapa IFRS
+#    de los 20-F (AdjustmentsForSharebasedPayments, ExpenseFromSharebasedPaymentTransactionsWithEmployees).
+ESEF_INGESTION_RULES_VERSION = 9  # v9 (11-nov-2026): remuneración en acciones (stock_based_compensation)
 
 ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # RevenueFromContractsWithCustomers: emisores que solo etiquetan la cifra
@@ -672,6 +675,12 @@ ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("acquisitions",      ["ifrs-full:CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities"],
                                                                                                         "iso4217:EUR"),
     ("common_stock_repurchased", ["ifrs-full:PaymentsToAcquireOrRedeemEntitysShares"],                 "iso4217:EUR"),
+    # Remuneración en acciones: los mismos conceptos y el mismo orden que SEC_IFRS_METRIC_MAP (20-F/40-F). Solo el
+    # total consolidado sin dimensiones (los movimientos de patrimonio por componente, IncreaseDecreaseThrough…,
+    # no son el gasto). Intertek FY2025: AdjustmentsForSharebasedPayments 24,3 M£. Un concepto propio que mezcla el
+    # gasto con otros costes (Eurofins: SBC + costes de adquisición) no entra: no es la cifra.
+    ("stock_based_compensation", ["ifrs-full:AdjustmentsForSharebasedPayments",
+                                  "ifrs-full:ExpenseFromSharebasedPaymentTransactionsWithEmployees"],    "iso4217:EUR"),
 ]
 
 
