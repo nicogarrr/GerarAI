@@ -3,8 +3,6 @@
 import {useForm} from "react-hook-form";
 import {Button} from "@/components/ui/button";
 import InputField from "@/components/forms/InputField";
-import SelectField from "@/components/forms/SelectField";
-import {INVESTMENT_GOALS, INVESTMENT_GOAL_LABEL_KEYS, PREFERRED_INDUSTRIES, PREFERRED_INDUSTRY_LABEL_KEYS, RISK_TOLERANCE_OPTIONS, RISK_TOLERANCE_LABEL_KEYS} from "@/lib/constants";
 import {useT} from "@/lib/i18n/client";
 import {CountrySelectField} from "@/components/forms/CountrySelectField";
 import FooterLink from "@/components/forms/FooterLink";
@@ -46,9 +44,6 @@ const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false
             email: '',
             password: '',
             country: 'ES',
-            investmentGoals: 'growth',
-            riskTolerance: 'moderate',
-            preferredIndustry: 'technology',
             acceptTerms: false,
         },
         mode: 'onBlur'
@@ -175,36 +170,6 @@ const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false
                     label={t('auth.signUp.countryLabel')}
                     control={control}
                     error={errors.country}
-                    required
-                />
-
-                <SelectField
-                    name="investmentGoals"
-                    label={t('auth.signUp.goalsLabel')}
-                    placeholder={t('auth.signUp.goalsPlaceholder')}
-                    options={INVESTMENT_GOALS.map((o) => ({ value: o.value, label: t(INVESTMENT_GOAL_LABEL_KEYS[o.value]) }))}
-                    control={control}
-                    error={errors.investmentGoals}
-                    required
-                />
-
-                <SelectField
-                    name="riskTolerance"
-                    label={t('auth.signUp.riskLabel')}
-                    placeholder={t('auth.signUp.riskPlaceholder')}
-                    options={RISK_TOLERANCE_OPTIONS.map((o) => ({ value: o.value, label: t(RISK_TOLERANCE_LABEL_KEYS[o.value]) }))}
-                    control={control}
-                    error={errors.riskTolerance}
-                    required
-                />
-
-                <SelectField
-                    name="preferredIndustry"
-                    label={t('auth.signUp.industryLabel')}
-                    placeholder={t('auth.signUp.industryPlaceholder')}
-                    options={PREFERRED_INDUSTRIES.map((o) => ({ value: o.value, label: t(PREFERRED_INDUSTRY_LABEL_KEYS[o.value]) }))}
-                    control={control}
-                    error={errors.preferredIndustry}
                     required
                 />
 

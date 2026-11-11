@@ -7,7 +7,7 @@ import { AuthenticationError, toAppError, getSafeErrorMessage } from "@/lib/type
 import { getT } from "@/lib/i18n/server";
 import { authEndpointErrorMessage } from "@/lib/auth/endpoint-messages";
 
-export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData): Promise<{ success: boolean; error?: string; accountStatus?: string }> => {
+export const signUpWithEmail = async ({ email, password, fullName, country }: SignUpFormData): Promise<{ success: boolean; error?: string; accountStatus?: string }> => {
     const t = await getT();
     try {
         const auth = await getAuth();
@@ -15,9 +15,9 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
             throw new AuthenticationError(t('errors.backend.authUnavailable'));
         }
 
-        // El perfil inversor viaja en el propio sign-up (additionalFields de
-        // better-auth, sin migraciones SQL) en vez de perderse en el destructuring.
-        const response = await callAuthEndpoint('/sign-up/email', { email, password, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry });
+        // El país viaja en el propio sign-up (additionalFields de better-auth,
+        // sin migraciones SQL) en vez de perderse en el destructuring.
+        const response = await callAuthEndpoint('/sign-up/email', { email, password, name: fullName, country });
 
         // The auth endpoint delivers the session in HttpOnly cookies. Never serialize
         // Better Auth's response: it also contains the raw bearer session token.

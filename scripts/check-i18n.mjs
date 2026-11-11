@@ -225,11 +225,6 @@ const KNOWN_ORPHANS = {
   'errors.backend.externalApiError': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
   'errors.backend.notFound': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
   'errors.backend.validationError': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
-  // Consumidas via INVESTMENT_GOAL_LABEL_KEYS/RISK_TOLERANCE_LABEL_KEYS/
-  // PREFERRED_INDUSTRY_LABEL_KEYS (lib/constants.ts): el literal tiene
-  // guiones bajos y el detector de usos no cuenta segmentos con '_'.
-  'auth.risk.very_aggressive': 'consumida via RISK_TOLERANCE_LABEL_KEYS (literal con guion bajo no detectado)',
-  'auth.industries.real_estate': 'consumida via PREFERRED_INDUSTRY_LABEL_KEYS (literal con guion bajo no detectado)',
   // Consumidas via REASON_LABEL_KEYS (HistoricalStressView), LEDGER_LABEL_KEYS y
   // ATTRIBUTION_ND_LABEL_KEYS (portfolio/intelligence): las claves llevan
   // guion bajo y el detector de usos no cuenta segmentos con '_' (misma
