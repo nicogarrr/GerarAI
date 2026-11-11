@@ -45,7 +45,7 @@ function SignalCard({ signal, minSources, t, fmt }: { signal: Awaited<ReturnType
       <div className="flex items-start justify-between gap-2">
         <h2 className="text-sm font-semibold text-gray-100">{bottleneckThemeName(signal.theme, t)}</h2>
         {detected ? (
-          <span className="rounded bg-teal-400/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-teal-300">
+          <span className="rounded bg-teal-400/15 px-1.5 py-0.5 text-xs font-bold uppercase text-teal-300">
             {t('bottlenecks.page.detected')}
           </span>
         ) : (
