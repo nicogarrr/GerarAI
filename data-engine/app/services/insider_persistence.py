@@ -129,7 +129,12 @@ def persist_filing(
             row = existing[fp]
             fresh = _data_quality(tx)
             current = dict(row.data_quality or {})
-            missing = {k: v for k, v in fresh.items() if k in ("holdings_after", "ownership", "alignment_10b5_1") and k not in current}
+            missing = {k: v for k, v in fresh.items() if k in ("holdings_after", "ownership") and k not in current}
+            # A stored JSON null is unknown, not final evidence. Only an explicit
+            # transaction-level Boolean can enrich it; never change legacy flags.
+            explicit_plan = fresh.get("alignment_10b5_1")
+            if type(explicit_plan) is bool and current.get("alignment_10b5_1") is None or "alignment_10b5_1" in fresh and "alignment_10b5_1" not in current:
+                missing["alignment_10b5_1"] = explicit_plan
             if missing:
                 row.data_quality = {**current, **missing}
                 enriched_tx += 1

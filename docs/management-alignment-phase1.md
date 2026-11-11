@@ -18,10 +18,11 @@ Sección de lectura en Research > Seguimiento, junto a Credibilidad. No añade p
 ## Límites y deuda explícita
 
 1. Los valores AAPL/ASTS de los fixtures son sintéticos y NO representan sus cuentas reales. El fixture AENA es un escenario de cobertura ausente, no prueba una causa corporativa concreta. Ninguna de estas atribuciones entra en la UI.
-2. `rule_10b5_1 = false` histórico no prueba una venta fuera de plan. Hasta una reingesta normal con evidencia XML explícita, su clasificación nueva sigue siendo desconocida. No se sube la versión del parser ni se fuerza una descarga/backfill global.
-3. P/S es la clasificación SEC disponible, no prueba por sí sola que toda compra fuera en bolsa en vez de privada. La UI habla de P/S y operaciones declaradas, no atribuye una motivación.
-4. Esta entrega NO migra el transporte SEC preexistente. `connectors/form4.py::fetch_filing_xml` usa `_get_text`/`edgar_common.get_text` contra SEC; `connectors/sec.py` y `connectors/sec_edgar.py` conservan caminos SEC primero y mirror como fallback. Es deuda global pendiente de otro cambio. El guard anti-descarga directo de esta entrega cubre el agregado y el job NUEVOS: solo base persistida, cero llamadas SEC, cero proveedor de pago, cero LLM. No se afirma un guard mirror-only global.
-5. Migración aditiva 0135: tabla nueva; downgrade elimina únicamente esa tabla de resultados regenerables. No modifica hechos financieros ni transacciones existentes.
+2. El nuevo flag solo acepta el checkbox a nivel `transactionCoding.aff10b5One`. Algunos XML reales lo declaran en la raíz (por ejemplo, el fixture `meta_0000950103-26-016314.xml` señalado en auditoría): en esa variante se conserva desconocido, sin atribuir una marca global a todas las operaciones. No hay cobertura completa de todas las variantes XML reales. Una reingesta normal puede enriquecer una clave ausente o JSON null con un Boolean explícito por transacción, sin tocar el Boolean legacy.
+3. `rule_10b5_1 = false` histórico no prueba una venta fuera de plan. Hasta una reingesta normal con evidencia XML explícita, su clasificación nueva sigue siendo desconocida. No se sube la versión del parser ni se fuerza una descarga/backfill global.
+4. P/S es la clasificación SEC disponible, no prueba por sí sola que toda compra fuera en bolsa en vez de privada. La UI habla de P/S y operaciones declaradas, no atribuye una motivación.
+5. Esta entrega NO migra el transporte SEC preexistente. `connectors/form4.py::fetch_filing_xml` usa `_get_text`/`edgar_common.get_text` contra SEC; `connectors/sec.py` y `connectors/sec_edgar.py` conservan caminos SEC primero y mirror como fallback. Es deuda global pendiente de otro cambio. El guard anti-descarga directo de esta entrega cubre el agregado y el job NUEVOS: solo base persistida, cero llamadas SEC, cero proveedor de pago, cero LLM. No se afirma un guard mirror-only global.
+6. Migración aditiva 0135: tabla nueva; downgrade elimina únicamente esa tabla de resultados regenerables. No modifica hechos financieros ni transacciones existentes.
 
 ## Verificación local
 
@@ -33,3 +34,8 @@ Sección de lectura en Research > Seguimiento, junto a Credibilidad. No añade p
 - Render real del componente con CSS del repo inspeccionado a 390 y 1280 px. Es evidencia local con fixtures, no una sesión de producción ni una prueba de ingesta real actual.
 
 No merge ni deploy en esta entrega: revisión por SHA exacta antes de integrar.
+
+## Correcciones de auditoría
+
+- Solo `split` y `reverse_split` impiden comparar saldos. Un `ticker_change` no es un split ni justifica ocultar la variación. Test ORM rojo antes, verde después, y contrapruebas para ambos tipos de split.
+- La reingesta del mismo fingerprint enriquece `alignment_10b5_1: null` con true/false explícitos por transacción. No pisa un valor conocido con ausencia de marca, no duplica filas, no cambia `rule_10b5_1` ni dispara descargas. Test rojo antes con clave null presente, no eliminada.

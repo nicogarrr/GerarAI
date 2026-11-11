@@ -115,7 +115,7 @@ def dilution_years(facts: list[FinancialFact], company: Company, splits: list[Co
             prior = previous["shares"]
             if prior and prior["basis"] == shares["basis"]:
                 delta = _ratio(shares, prior, change=True)
-                if any(prior["date"] < s.effective_date.isoformat() <= shares["date"] for s in splits):
+                if any(s.action_type in {"split", "reverse_split"} and prior["date"] < s.effective_date.isoformat() <= shares["date"] for s in splits):
                     delta = {"value": None, "reason": "Hay un split entre los saldos; no se comparan acciones sin ajustar."}
         fcf = None
         ocf, capex = metrics.get("operating_cash_flow"), metrics.get("capital_expenditure")
@@ -210,7 +210,8 @@ def recompute_alignment(db: Session, company: Company, *, today: date | None = N
     today = today or date.today()
     facts = list(db.scalars(select(FinancialFact).options(selectinload(FinancialFact.source).load_only(Document.source_url, Document.company_id, Document.metadata_)).where(
         FinancialFact.company_id == company.id, FinancialFact.metric.in_(METRICS), *tenant_filters(db, FinancialFact))))
-    splits = list(db.scalars(select(CorporateAction).where(CorporateAction.company_id == company.id, *tenant_filters(db, CorporateAction))))
+    splits = list(db.scalars(select(CorporateAction).where(CorporateAction.company_id == company.id,
+        CorporateAction.action_type.in_(("split", "reverse_split")), *tenant_filters(db, CorporateAction))))
     rows = list(db.execute(select(InsiderTransaction, InsiderFiling.filing_date).join(
         InsiderFiling, InsiderTransaction.filing_id == InsiderFiling.id).where(
         InsiderTransaction.issuer_ticker == company.ticker, InsiderTransaction.code.in_(("P", "S")),

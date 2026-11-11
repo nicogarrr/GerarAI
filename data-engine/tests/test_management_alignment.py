@@ -101,7 +101,7 @@ def test_local_source_url_and_ratio_missing_or_invalid_denominator():
 
 
 def test_split_and_basis_change_and_gaps_do_not_publish_fake_dilution():
-    rows = m.dilution_years(full_facts(), COMPANY, [NS(effective_date=date(2025, 5, 1))], TODAY)
+    rows = m.dilution_years(full_facts(), COMPANY, [NS(action_type="split", effective_date=date(2025, 5, 1))], TODAY)
     assert rows[-1]["shares_change_pct"]["value"] is None
     assert "split" in rows[-1]["shares_change_pct"]["reason"]
     rows = m.dilution_years([fact("shares_outstanding", 10, 2024), fact("shares_diluted", 11)], COMPANY, [], TODAY)
@@ -344,3 +344,47 @@ def test_dei_cover_anchors_to_latest_annual_close_not_restatement_comparative(db
     # A cover after an arbitrary old comparative cannot silently become its annual balance.
     years = m.dilution_years([comparative, dei], COMPANY, [], TODAY)
     assert years[0]["shares"] is None
+
+
+@pytest.mark.parametrize("action_type, expected", [("ticker_change", 8.2), ("split", None), ("reverse_split", None)])
+def test_recompute_only_real_splits_suppress_dilution(db, action_type, expected):
+    from app.models.entities import CorporateAction
+    company = Company(ticker="AAPL", name="Apple", cik=COMPANY.cik, currency="USD", exchange="NASDAQ", company_type="holding", valuation_model="unassigned")
+    db.add(company); db.flush()
+    for f in full_facts():
+        db.add(FinancialFact(company_id=company.id, **{k: v for k, v in vars(f).items() if k not in {"id", "source"}}))
+    db.add(CorporateAction(company_id=company.id, action_type=action_type, effective_date=date(2025, 5, 1), ratio=4))
+    db.flush()
+    row = m.recompute_alignment(db, company, today=TODAY).payload["years"][-1]
+    assert row["shares_change_pct"]["value"] == expected
+    if expected is not None:
+        assert "split" not in row["shares_change_pct"].get("reason", "")
+
+
+@pytest.mark.parametrize("mark, expected", [("1", True), ("0", False)])
+def test_reingestion_enriches_existing_null_plan_only_with_explicit_bool(db, mark, expected):
+    filing = {"accession_number": "0000320193-26-123456", "form": "4", "filing_date": "2026-10-02", "document_url": "https://example.com/form4.xml"}
+    # A pre-2023/no-mark parse already stores the key with JSON null.
+    persist_filing(db, filing, parse_form4_xml(xml(None)))
+    row = db.scalar(select(InsiderTransaction))
+    assert "alignment_10b5_1" in row.data_quality
+    assert row.data_quality["alignment_10b5_1"] is None
+    assert row.rule_10b5_1 is False
+    row.data_quality = {**row.data_quality, "sentinel": "keep", "holdings_after": 777}
+    db.commit()
+    result = persist_filing(db, filing, parse_form4_xml(xml(mark)))
+    assert result["transactions_created"] == 0
+    assert row.data_quality["alignment_10b5_1"] is expected
+    assert row.data_quality["sentinel"] == "keep" and row.data_quality["holdings_after"] == 777
+    assert row.rule_10b5_1 is False  # no changes to legacy consumers
+    # Later missing evidence does not erase the explicit flag; replay is idempotent.
+    persist_filing(db, filing, parse_form4_xml(xml(None)))
+    assert row.data_quality["alignment_10b5_1"] is expected
+    persist_filing(db, filing, parse_form4_xml(xml(mark)))
+    assert row.data_quality["alignment_10b5_1"] is expected
+    assert len(list(db.scalars(select(InsiderTransaction)))) == 1
+
+
+def test_root_level_checkbox_remains_unknown_instead_of_guessing_all_transactions():
+    source = xml(None).replace("<ownershipDocument>", "<ownershipDocument><aff10b5One>1</aff10b5One>")
+    assert parse_form4_xml(source)["transactions"][0]["alignment_10b5_1"] is None
