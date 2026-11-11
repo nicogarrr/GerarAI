@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import { HistoryBackLink } from '@/components/common/HistoryBackLink';
 import { ArrowLeft } from 'lucide-react';
 import InsiderFeed from '@/components/insider/InsiderFeed';
 import InsiderOperationsView from '@/components/insider/InsiderOperationsView';
@@ -101,13 +101,13 @@ export default async function InsiderPage({ searchParams }: PageProps) {
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-6 overflow-x-clip">
             {ticker ? (
-                <Link
+                <HistoryBackLink
                     className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-200"
                     href={`/research/${encodeURIComponent(ticker)}`}
                 >
                     <ArrowLeft aria-hidden="true" className="h-4 w-4" />
                     {t('insider.backToTicker', { ticker })}
-                </Link>
+                </HistoryBackLink>
             ) : null}
             <header className="border-b border-gray-800 pb-4">
                 <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">{t('insider.header.title')}</h1>

@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { HistoryBackLink } from '@/components/common/HistoryBackLink';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/ui/page-header';
@@ -49,10 +49,10 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
       <PageHeader
         back={
           <Button asChild size="sm" variant="ghost">
-            <Link href={ticker ? `/research/${encodeURIComponent(ticker)}` : '/research'}>
+            <HistoryBackLink href={ticker ? `/research/${encodeURIComponent(ticker)}` : '/research'}>
               <ArrowLeft aria-hidden="true" className="h-4 w-4" />
               {ticker ? t('research.backToTicker', { ticker }) : 'Research'}
-            </Link>
+            </HistoryBackLink>
           </Button>
         }
         kicker={t('research.newsKicker')}

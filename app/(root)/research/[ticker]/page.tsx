@@ -23,6 +23,7 @@ import { ownershipLimitations } from '@/lib/research/ownership-display';
 import ThesisAudioPlayer from '@/components/research/ThesisAudioPlayer';
 import MobileCollapse from '@/components/ui/mobile-collapse';
 import CompanyActionsMenu from '@/components/research/CompanyActionsMenu';
+import { HistoryBackLink } from '@/components/common/HistoryBackLink';
 import { collapseVersionHistory, versionHistoryBadges } from '@/lib/research/version-history';
 import { ListingStaleBanner } from '@/components/research/ListingStaleBanner';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
@@ -905,7 +906,7 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
       return (
         <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 text-gray-100">
           <div className="mx-auto max-w-[1600px] space-y-6">
-            <Link className="inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
+            <HistoryBackLink className="inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0" href="/research" sameDestinationOnly={false} historyChildren={<><ArrowLeft className="mr-2 h-4 w-4" />{t('research.fichaBackHistory')}</>}><ArrowLeft className="mr-2 h-4 w-4" />Research</HistoryBackLink>
             <EmptyState
               description={t('research.identity.verifiedDesc', { ticker, name: verification.sec.name, exchange: verification.provider.exchange, currency: verification.provider.currency ? `, ${verification.provider.currency}` : t('research.identity.currencyNa') })}
               icon={ShieldAlert}
@@ -952,7 +953,7 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
     return (
       <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 text-gray-100">
         <div className="mx-auto max-w-[1600px] space-y-6">
-          <Link className="inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
+          <HistoryBackLink className="inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0" href="/research" sameDestinationOnly={false} historyChildren={<><ArrowLeft className="mr-2 h-4 w-4" />{t('research.fichaBackHistory')}</>}><ArrowLeft className="mr-2 h-4 w-4" />Research</HistoryBackLink>
           <EmptyState
             description={state.description}
             icon={ShieldAlert}
@@ -1972,7 +1973,7 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
       <Suspense fallback={null}><ResearchHashScroll /></Suspense>
       <div className="mx-auto max-w-[1600px]">
         {/* Desde md las migas ya llevan a Research: la flecha solo queda en movil. */}
-        <Link className="mb-3 inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 md:hidden" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />{t('research.fichaBackResearch')}</Link>
+        <HistoryBackLink className="mb-3 inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 md:hidden" href="/research" sameDestinationOnly={false} historyChildren={<><ArrowLeft className="mr-2 h-4 w-4" />{t('research.fichaBackHistory')}</>}><ArrowLeft className="mr-2 h-4 w-4" />{t('research.fichaBackResearch')}</HistoryBackLink>
         <header className="mb-6 flex flex-col gap-4 border-b border-gray-800 pb-6">
           <div className="flex items-start gap-3 sm:gap-4">
             <CompanyLogo ticker={ticker} name={company.name || ticker} className="size-12 shrink-0 rounded-xl sm:size-14" />

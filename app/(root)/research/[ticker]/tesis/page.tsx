@@ -6,6 +6,7 @@ import { RATING_KEYS } from '@/lib/research/rating-keys';
 import { canShowThesisText, WithheldThesisText } from '@/components/research/ThesisSummary';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { HistoryBackLink } from '@/components/common/HistoryBackLink';
 import type { ReactNode } from 'react';
 import { ArrowLeft, ChevronDown, FileDown, FileText } from 'lucide-react';
 
@@ -350,12 +351,12 @@ export default async function ThesisReadingPage({ params, searchParams }: PagePr
     <main id="content" className={`print-document min-h-screen bg-surface-0 text-gray-100 ${publicEditorial.variable}`}>
       <div className="mx-auto max-w-5xl">
         <div className="print:hidden">
-          <Link
+          <HistoryBackLink
             href={`/research/${encoded}?view=thesis`}
             className="inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />{t('research.thesisDoc.backToFicha', { ticker })}
-          </Link>
+          </HistoryBackLink>
         </div>
 
         {companyMissing ? (
