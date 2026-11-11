@@ -5,8 +5,15 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const back = vi.fn();
+const go = vi.fn();
 let pathname = '/watchlist';
 let search = '';
+let navigation: EventTarget & { currentEntry: { key: string; index: number; url: string } };
+function emitNavigation(to: string) {
+    const index = navigation.currentEntry.index + 1;
+    navigation.currentEntry = { key: String(index), index, url: `http://localhost${to}` };
+    navigation.dispatchEvent(Object.assign(new Event('currententrychange'), { navigationType: 'push' }));
+}
 vi.mock('next/navigation', () => ({
     usePathname: () => pathname,
     useSearchParams: () => new URLSearchParams(search),
@@ -16,6 +23,8 @@ import { HistoryBackLink, InAppHistoryTracker } from '@/components/common/Histor
 import { inAppHistoryStore } from '@/lib/nav/in-app-history';
 
 function navigate(to: string, view: ReturnType<typeof render>) {
+    window.history.pushState(null, '', to);
+    emitNavigation(to);
     const [p, q = ''] = to.split('?');
     pathname = p;
     search = q;
@@ -36,13 +45,19 @@ describe('HistoryBackLink en el flujo real', () => {
     beforeEach(() => {
         inAppHistoryStore.reset();
         back.mockReset();
+        go.mockReset();
+        window.history.replaceState(null, "", "/");
+        vi.spyOn(window.history, "go").mockImplementation(go);
         vi.spyOn(window.history, 'back').mockImplementation(back);
         pathname = '/watchlist';
         search = '';
+        navigation = Object.assign(new EventTarget(), { currentEntry: { key: 'origin', index: 0, url: 'http://localhost/watchlist' } });
+        vi.stubGlobal('navigation', navigation);
     });
     afterEach(() => {
         inAppHistoryStore.reset();
         vi.restoreAllMocks();
+        vi.unstubAllGlobals();
     });
 
     it('abierta directamente: enlace normal al padre', () => {
@@ -59,7 +74,9 @@ describe('HistoryBackLink en el flujo real', () => {
 
     it('desde la ficha (?view=valoracion): vuelve por historial, sin perder la pestaña', () => {
         pathname = '/research/NVDA';
+        navigation.currentEntry.url = 'http://localhost/research/NVDA?view=valoracion';
         search = 'view=valoracion';
+        window.history.replaceState(null, '', `${pathname}${search ? `?${search}` : ''}`);
         const view = render(<Shell />);
         act(() => navigate('/insider?ticker=NVDA', view));
         const link = screen.getByRole('link', { name: '← NVDA' });
@@ -69,6 +86,7 @@ describe('HistoryBackLink en el flujo real', () => {
     });
 
     it('desde la watchlist: «← NVDA» va a NVDA y el genérico dice «Volver»', () => {
+        window.history.replaceState(null, '', `${pathname}${search ? `?${search}` : ''}`);
         const view = render(<Shell />);
         act(() => navigate('/research/NVDA', view));
         expect(screen.getByRole('link', { name: 'Volver' }).getAttribute('data-back-mode')).toBe('history');
@@ -77,8 +95,23 @@ describe('HistoryBackLink en el flujo real', () => {
         expect(screen.getByRole('link', { name: '← NVDA' }).getAttribute('data-back-mode')).toBe('history');
     });
 
+    it('watchlist to Research then native hash skips same-page history entries', () => {
+        window.history.replaceState(null, '', `${pathname}${search ? `?${search}` : ''}`);
+        const view = render(<Shell />);
+        act(() => navigate('/research/MSFT', view));
+        act(() => {
+            window.history.pushState(null, '', '/research/MSFT#historial-analistas');
+            emitNavigation('/research/MSFT#historial-analistas');
+        });
+        fireEvent.click(screen.getByRole('link', { name: 'Volver' }));
+        expect(go).toHaveBeenCalledWith(-2);
+        expect(back).not.toHaveBeenCalled();
+    });
+
     it('Cmd/Ctrl+clic abre el padre como enlace normal', () => {
         pathname = '/research/NVDA';
+        navigation.currentEntry.url = 'http://localhost/research/NVDA?view=valoracion';
+        window.history.replaceState(null, '', `${pathname}${search ? `?${search}` : ''}`);
         const view = render(<Shell />);
         act(() => navigate('/insider?ticker=NVDA', view));
         fireEvent.click(screen.getByRole('link', { name: '← NVDA' }), { metaKey: true });

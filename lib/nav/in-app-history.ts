@@ -16,19 +16,28 @@
 
 const MAX_ENTRIES = 50;
 
-/** Añade `url` a la pila; si coincide con la penúltima, se trata como «atrás». */
+/** Record a PUSH. URL equality never establishes a browser POP. */
 export function recordNavigation(stack: readonly string[], url: string): readonly string[] {
     if (!url) return stack;
     const last = stack[stack.length - 1];
     if (last === url) return stack;
-    if (stack.length >= 2 && stack[stack.length - 2] === url) return stack.slice(0, -1);
     const next = [...stack, url];
     return next.length > MAX_ENTRIES ? next.slice(next.length - MAX_ENTRIES) : next;
 }
 
-/** URL interna anterior a la actual, o null si la página se abrió directamente. */
+/** Native anchor entries are browser history, but not a new page origin. */
+export function historyBackSteps(stack: readonly string[]): number {
+    const current = stack.at(-1)?.split('#')[0];
+    for (let index = stack.length - 2; index >= 0; index--) {
+        if (stack[index].split('#')[0] !== current) return stack.length - 1 - index;
+    }
+    return 0;
+}
+
+/** Previous distinct in-app destination, excluding anchors on the same page. */
 export function previousInAppUrl(stack: readonly string[]): string | null {
-    return stack.length >= 2 ? stack[stack.length - 2] : null;
+    const steps = historyBackSteps(stack);
+    return steps ? stack[stack.length - 1 - steps] : null;
 }
 
 function pathOf(url: string): string {
@@ -62,6 +71,10 @@ let stackState: readonly string[] = [];
 const listeners = new Set<() => void>();
 
 export const inAppHistoryStore = {
+    replaceStack(stack: readonly string[]): void {
+        stackState = stack;
+        for (const listener of listeners) listener();
+    },
     record(url: string): void {
         const next = recordNavigation(stackState, url);
         if (next === stackState) return;
