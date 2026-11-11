@@ -51,7 +51,9 @@ test('parser adds an explicit nullable flag without changing the shared legacy B
 test('fallback is ordered, annual DEI is accession-anchored, and sources are mandatory', () => {
   assert.match(service, /metrics\.get\("shares_outstanding"\) or metrics\.get\("shares_diluted"\)/);
   assert.match(service, /allow_dei=fact\.accession_number in annual_year/);
-  assert.match(service, /if not _url\(url\) or not filed or fact\.filed > today:/);
+  assert.match(service, /if not _url\(url\):\n        return None/);
+  // SEC exige su fecha de depósito; ESEF/CNMV (filings.xbrl.org no la da) entran con la fecha en que ya eran públicos.
+  assert.match(service, /if \(fact\.source_type == "SEC" and filed is None\) or known is None or known > today:/);
   assert.match(service, /"sources": \[a, b\]/);
   assert.match(service, /"repurchases_label": "Recompras \(bruto\)"/);
   assert.match(service, /"Dilución neta anual" if repurchases and issued else "Variación de acciones"/);
