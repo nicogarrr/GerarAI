@@ -17,7 +17,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import case, desc, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.models import Company, FinancialFact
 from app.services.esef_fact_quarantine import fact_quarantine_reason
@@ -162,9 +162,35 @@ def _facts_for_metric(db: Session, company_id: int, metric: str) -> list[Financi
     return cached(db, "facts_for_metric", (company_id, metric), lambda: _facts_for_metric_uncached(db, company_id, metric))
 
 
+def _attach_sources(db: Session, facts: list[FinancialFact]) -> None:
+    """La relación ``source`` de cada hecho, con cada documento leído UNA vez por llamada.
+
+    Antes cada métrica hacía su ``selectinload``: el snapshot pide ~17 métricas y releía los mismos
+    documentos (con su ``metadata`` JSON, 72 KB en un 10-K grande) 17 veces (medido 11-nov-2026). Ahora
+    los documentos ya leídos en esta llamada de valoración se reutilizan y solo se piden los que faltan;
+    el resultado es el mismo que el ``selectinload`` (sin documento visible → ``None``)."""
+    from sqlalchemy import inspect as sa_inspect
+    from sqlalchemy.orm.attributes import set_committed_value
+
+    from app.models.entities import Document
+
+    pending = [f for f in facts if "source" not in sa_inspect(f).dict]
+    if not pending:
+        return
+    known: dict[int, Document] = cached(db, "snapshot_documents_by_id", None, dict)
+    missing = {f.source_id for f in pending if f.source_id is not None and f.source_id not in known}
+    if missing:
+        found = {d.id: d for d in db.scalars(select(Document).where(Document.id.in_(missing)))}
+        known.update(found)
+        for source_id in missing - set(found):
+            known[source_id] = None  # type: ignore[assignment]  # no visible: como el selectinload
+    for fact in pending:
+        set_committed_value(fact, "source", known.get(fact.source_id) if fact.source_id is not None else None)
+
+
 def _facts_for_metric_uncached(db: Session, company_id: int, metric: str) -> list[FinancialFact]:
-    return [fact for fact in db.scalars(
-            select(FinancialFact).options(selectinload(FinancialFact.source))
+    rows = list(db.scalars(
+            select(FinancialFact)
             .where(FinancialFact.company_id == company_id, FinancialFact.metric == metric)
             .order_by(
                 FinancialFact.fiscal_year.desc().nullslast(),
@@ -174,7 +200,9 @@ def _facts_for_metric_uncached(db: Session, company_id: int, metric: str) -> lis
                 case((FinancialFact.source_type.in_(_PRIMARY_SOURCE_TYPES), 0), else_=1),
                 desc(FinancialFact.created_at),
             )
-        ).all() if not fact_quarantine_reason(fact) and eligible_fact(fact)]
+        ).all())
+    _attach_sources(db, rows)
+    return [fact for fact in rows if not fact_quarantine_reason(fact) and eligible_fact(fact)]
 
 
 def _available_at(

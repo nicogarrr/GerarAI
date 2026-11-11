@@ -44,11 +44,15 @@ def own_consensus(ticker: str, db: Session = Depends(get_db)) -> dict:
     """Consenso propio por métrica y periodo y acierto medido de cada fuente."""
     from app.services.estimate_accuracy import company_accuracy
     from app.services.own_consensus import build_company_consensus
+    from app.valuation.call_cache import valuation_call_cache
 
     company = _company(db, ticker)
     tenant = _tenant(db)
-    acc = company_accuracy(db, company, tenant)
-    result = build_company_consensus(db, company, tenant, measured_errors=acc["measured_errors"])
+    # Una caché acotada a ESTA petición: las cifras reales de cada métrica se leen una vez para el
+    # acierto medido y el consenso (antes, dos lecturas por métrica). Se borra al salir.
+    with valuation_call_cache(db):
+        acc = company_accuracy(db, company, tenant)
+        result = build_company_consensus(db, company, tenant, measured_errors=acc["measured_errors"])
     result["accuracy"] = {"version": acc["version"], "by_source": acc["by_source"],
                           "cases": acc["cases"][-60:]}
     return result
