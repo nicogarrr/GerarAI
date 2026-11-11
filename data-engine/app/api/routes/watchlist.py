@@ -387,6 +387,30 @@ def watchlist_monitor(
     return {"items": items, "earnings_status": earnings_status}
 
 
+
+# Antigüedad máxima del ejercicio que da el PER de la watchlist (regla «per-antiguedad-v1»): 18 meses desde su
+# cierre. El informe anual siguiente se publica a los 2-4 meses del cierre (10-K: 60-90 días; ESEF/UE: 4 meses), así
+# que pasados 18 meses ese informe lleva al menos ~2 meses publicado y el dato de la base está viejo.
+PER_MAX_ANNUAL_AGE_DAYS = 548
+
+
+def _today() -> date:
+    """Fecha de hoy (punto único para que los tests la fijen)."""
+    return date.today()
+
+
+def _stale_annual_reason(eps_row: FinancialFact, today: date) -> str | None:
+    """Motivo de N/D si el ejercicio del BPA cerró hace más de ``PER_MAX_ANNUAL_AGE_DAYS`` días; si no, ``None``."""
+    from app.services.ttm_service import _period_end
+
+    end = _period_end(eps_row)
+    if end is None or (today - end).days <= PER_MAX_ANNUAL_AGE_DAYS:
+        return None
+    months = (today.year - end.year) * 12 + today.month - end.month
+    return (f"el último {eps_row.metric} anual es FY{eps_row.fiscal_year} (cierre {end.isoformat()}, hace "
+            f"{months} meses, más de 18): falta en la base el informe anual más reciente y un PER sobre "
+            "ese ejercicio no es el actual")
+
 @router.get("/metrics/{symbol}", response_model=WatchlistMetricsOut)
 def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
     """Market cap y PER de respaldo para emisoras sin cobertura del
@@ -395,13 +419,13 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
     / EPS diluido del ultimo ejercicio anual. Nulo honesto cuando no hay
     base: nunca se fabrica el numero.
     """
-    from datetime import date, timedelta
+    from datetime import timedelta
 
     company = db.scalar(select(Company).where(Company.ticker == symbol.upper()))
     if company is None:
         return {"market_cap": None, "per": None, "currency": None, "sources": []}
 
-    today = date.today()
+    today = _today()
     sources: list[str] = []
 
     def _cap_row() -> FinancialFact | None:
@@ -471,6 +495,13 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
         sources.append(f"PER: N/D: {reason}")
         return {"market_cap": market_cap, "per": None,
                 "currency": company.currency, "sources": sources}
+    # Regla «per-antiguedad-v1»: un BPA anual cuyo ejercicio cerró hace más de 18 meses no es «el último
+    # ejercicio»: el informe siguiente ya debería estar publicado y falta en la base (ERF.PA con el PER sobre
+    # FY2024 en nov-2026; ASTS citando FY2021). N/D con el motivo, nunca el ratio viejo como si fuera actual.
+    if eps_row is not None and (stale := _stale_annual_reason(eps_row, today)):
+        sources.append(f"PER: N/D: {stale}")
+        return {"market_cap": market_cap, "per": None,
+                "currency": company.currency, "sources": sources}
     # Regla «per-ultimo-ejercicio-v1»: el PER es del ÚLTIMO ejercicio, no del último con beneficio. Filtrar
     # EPS > 0 hacía que una empresa en pérdidas tomara el último año positivo (ABCL: PER 23,8 con el BPA de
     # 2022 tras tres años de pérdidas). Con pérdidas, N/D con la cifra.
@@ -514,7 +545,7 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
         split_events = split_events_by_company(db, [company.id]).get(company.id, [])
         # Cierre anterior a un split ya efectivo: base desconocida (vieja o ya
         # ajustada por el proveedor): PER N/D, como la valoracion (#3227).
-        if split_after_price(split_events, price_row.date, date.today()):
+        if split_after_price(split_events, price_row.date, today):
             sources.append(
                 f"PER: N/D: el último cierre ({price_row.date.isoformat()}) es "
                 "anterior a un split ya efectivo y no se sabe si ya viene ajustado")
