@@ -73,9 +73,8 @@ import { CompanyHeaderQuoteSkeleton } from '@/components/research/CompanyHeaderQ
 import { ChangesSinceVisit } from '@/components/research/ChangesSinceVisit';
 import { DocumentsList } from '@/components/research/DocumentsList';
 import { ChangesFeed } from '@/components/research/ChangesFeed';
-import { AnalystTargetsSection } from '@/components/research/AnalystTargetsSection';
-import { AnalystHistorySection } from '@/components/research/AnalystHistorySection';
-import { AnalystHistorySkeleton } from '@/components/research/AnalystHistoryView';
+import { DeferredResearchSection } from '@/components/research/DeferredResearchSection';
+import { DeferredAnalystTargets, DeferredAnalystHistory } from '@/components/research/DeferredAnalystPanels';
 import { WhatToBelieveSection } from '@/components/research/WhatToBelieveSection';
 import { WhatToBelieveSkeleton } from '@/components/research/WhatToBelieveView';
 import { DcaHitRatesSection } from '@/components/research/DcaHitRatesSection';
@@ -981,6 +980,17 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
   }
 
   const company = snapshot.company;
+  // Independent reads start as soon as listing identity is known, not after
+  // market/news/ownership. Rejections are contained at creation.
+  const overviewPerPromise = activeView === 'overview'
+    ? getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, locale).catch(() => ({ value: null, note: t('research.fichaPerUnavailable') })) : undefined;
+  const overviewOwnershipPromise = activeView === 'overview' ? getOwnershipSignals(ticker).catch(() => null) : undefined;
+  const overviewHoldingPromise = activeView === 'overview' && snapshot.in_portfolio
+    ? getCompanyHolding(ticker).catch(() => ({ status: 'error' as const, message: t('research.fichaHoldingLoadError') })) : undefined;
+  const overviewAnalystsPromise = activeView === 'overview'
+    ? getAnalystTargets(quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker).catch(() => null) : undefined;
+  const overviewKeyStatsPromise = activeView === 'overview' ? getKeyStats(ticker).catch(() => null) : undefined;
+
   // D2a: market, watchlist y workspace de la vista vuelan juntos desde arriba.
   // Aquí ya no se encadena ninguna lectura: solo se recogen, cada una con su
   // degradación honesta.
@@ -1091,11 +1101,9 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
     // Conexión 10b: insiders + 13F en paralelo con el PER; si falla, el panel lo dice.
     // La posición real solo se pide si la empresa está en cartera (misma lectura que Cartera).
     const [per, ownershipSignals, holdingContext] = await Promise.all([
-      getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, locale).catch(() => ({ value: null, note: t('research.fichaPerUnavailable') })),
-      getOwnershipSignals(ticker).catch(() => null),
-      snapshot.in_portfolio
-        ? getCompanyHolding(ticker).catch(() => ({ status: 'error' as const, message: t('research.fichaHoldingLoadError') }))
-        : Promise.resolve(null),
+      overviewPerPromise!,
+      overviewOwnershipPromise!,
+      overviewHoldingPromise ?? Promise.resolve(null),
     ]);
     // Panel de vistazo rápido: datos reales ya existentes, cada fila a su
     // sección. En móvil va arriba (bajo el precio de la cabecera); en PC
@@ -1104,8 +1112,8 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
       glanceModelPromise ?? Promise.resolve(null),
       glanceCapitalPromise ?? Promise.resolve(null),
       glanceCredibilityPromise ?? Promise.resolve(null),
-      getAnalystTargets(quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker).catch(() => null),
-      getKeyStats(ticker).catch(() => null),
+      overviewAnalystsPromise ?? Promise.resolve(null),
+      overviewKeyStatsPromise ?? Promise.resolve(null),
     ]);
     return (
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
@@ -1894,19 +1902,18 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
   // reintento (nunca a vacío fingido ni a una pestaña entera caída); la de
   // entrada conserva el comportamiento de siempre.
   const optionalSection = async (id: string, title: string, build: () => Promise<React.ReactNode>): Promise<TabSection> => {
-    try {
-      return { id, title, node: await build() };
-    } catch (error) {
+    const onError = (error: unknown) => {
       console.warn(`[research] ${ticker} · sección ${id} falló: ${error instanceof Error ? error.message : String(error)}`);
-      return { id, title, node: <SectionLoadError locale={locale} retryHref={`${tabHref(ticker, tabOfView(activeView))}#${id}`} title={title} /> };
-    }
+      return <SectionLoadError locale={locale} retryHref={`${tabHref(ticker, tabOfView(activeView))}#${id}`} title={title} />;
+    };
+    return { id, title, node: <DeferredResearchSection build={build} onError={onError} /> };
   };
 
   // Las seis pestañas y sus secciones, en el orden acordado (opción 1).
   let sections: TabSection[];
   if (activeView === 'overview') {
     sections = [
-      { node: await buildOverviewContent() },
+      { node: <DeferredResearchSection build={buildOverviewContent} /> },
       await optionalSection('noticias', t('research.fichaSecNoticias'), buildNoticiasSection),
     ];
   } else if (activeView === 'thesis') {
@@ -1991,8 +1998,8 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
           {/* Ancla del comando GP del buscador (`ASTS GP` -> #grafico). */}
           {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton />}><CompanyHeaderQuote compact={activeView !== 'overview'} snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
           <ChangesSinceVisit ticker={ticker} />
-          <div className="scroll-mt-6" id="analistas"><MobileCollapse title={t('research.fichaAnalystTargetsTitle')}><Suspense fallback={null}><AnalystTargetsSection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></Suspense></MobileCollapse></div>
-          <div className="scroll-mt-6" id="historial-analistas"><MobileCollapse title={t('research.fichaAnalystHistoryTitle')}><Suspense fallback={<AnalystHistorySkeleton />}><AnalystHistorySection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} /></Suspense></MobileCollapse></div>
+          <div className="scroll-mt-6" id="analistas"><MobileCollapse deferMount title={t('research.fichaAnalystTargetsTitle')}><DeferredAnalystTargets initial={overviewAnalystsPromise} symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></MobileCollapse></div>
+          <div className="scroll-mt-6" id="historial-analistas"><MobileCollapse deferMount title={t('research.fichaAnalystHistoryTitle')}><DeferredAnalystHistory symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} /></MobileCollapse></div>
           <MobileCollapse title={t('research.fichaDcaSignalsTitle')}><Suspense fallback={null}><DcaHitRatesSection ticker={ticker} /></Suspense></MobileCollapse>
         </header>
         {sections.filter((section) => section.id && section.title).length > 1 ? (

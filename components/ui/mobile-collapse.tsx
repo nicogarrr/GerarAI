@@ -18,8 +18,23 @@ import { cn } from '@/lib/utils';
  * dentro del gráfico); entonces no pinta marco propio, solo la línea superior,
  * para no anidar una tarjeta dentro de otra.
  */
-export default function MobileCollapse({ title, children, inset = false }: { title: string; children: React.ReactNode; inset?: boolean }) {
+const DESKTOP = '(min-width: 768px)';
+function subscribeDesktop(notify: () => void) {
+    const media = window.matchMedia(DESKTOP);
+    media.addEventListener('change', notify);
+    return () => media.removeEventListener('change', notify);
+}
+const isDesktop = () => window.matchMedia(DESKTOP).matches;
+const serverDesktop = () => false;
+
+export default function MobileCollapse({ title, children, inset = false, deferMount = false }: { title: string; children: React.ReactNode; inset?: boolean; deferMount?: boolean }) {
     const [open, setOpen] = React.useState(false);
+    const [opened, setOpened] = React.useState(false);
+    const desktop = React.useSyncExternalStore(
+        deferMount ? subscribeDesktop : () => () => {},
+        deferMount ? isDesktop : serverDesktop,
+        serverDesktop,
+    );
     const id = React.useId();
     return (
         <div
@@ -35,7 +50,7 @@ export default function MobileCollapse({ title, children, inset = false }: { tit
                 aria-controls={id}
                 aria-expanded={open}
                 className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 text-left text-sm font-semibold text-gray-100 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-400 md:hidden"
-                onClick={() => setOpen((value) => !value)}
+                onClick={() => { setOpened(true); setOpen((value) => !value); }}
                 type="button"
             >
                 {title}
@@ -50,7 +65,7 @@ export default function MobileCollapse({ title, children, inset = false }: { tit
                 )}
                 id={id}
             >
-                {children}
+                {!deferMount || desktop || opened ? children : null}
             </div>
         </div>
     );
