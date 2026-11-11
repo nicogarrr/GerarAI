@@ -10,7 +10,7 @@ import {signUpWithEmail} from "@/lib/actions/auth.actions";
 import {emailFieldValidation} from "@/lib/validation/email";
 import AccessRequestForm from "@/components/forms/AccessRequestForm";
 import AccountStatusNotice from "@/components/auth/AccountStatusNotice";
-import {afterSignUpRoute, type PendingAccountState} from "@/lib/auth/pending-account";
+import {afterSignUpRoute, cuentaPendienteHref, type PendingAccountState} from "@/lib/auth/pending-account";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import React from "react";
@@ -63,6 +63,12 @@ const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false
                     return;
                 }
                 setRegisteredState(route);
+                // La URL pasa a la de la pantalla de estado (sin navegar: ver
+                // abajo). Antes se quedaba en /sign-up: al recargar, o al
+                // volver a la pestaña al día siguiente, reaparecía el
+                // formulario vacío y el usuario creía que el alta había
+                // fallado (y repetirla daba «email ya registrado").
+                window.history.replaceState(null, '', cuentaPendienteHref(route));
                 return;
             }
             toast.error(t('auth.signUp.failedTitle'), {
