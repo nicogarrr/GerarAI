@@ -763,6 +763,20 @@ def _revenue_size_fx(db: Any, company: Any, rev_actuals: Mapping[str, Actual], t
 
 
 def _facts(db: Any, company: Any, fact_metric: str) -> list[tuple[str, float, date | None, str | None]]:
+    """Cifras reales (periodo, valor, presentado, url, ejercicio) de una métrica.
+
+    ``/own-consensus`` las pide dos veces por métrica (el acierto medido de cada fuente y el consenso;
+    medido 11-nov-2026: 5 lecturas para 3 métricas): dentro de una llamada con caché
+    (``valuation_call_cache``, que esa ruta instala) se leen UNA vez. Cada llamada recibe una lista
+    nueva de tuplas, así que nadie altera lo cacheado; sin caché, una consulta como siempre."""
+    from app.valuation.call_cache import cached
+
+    rows = cached(db, "own_consensus_facts", (getattr(company, "id", None), fact_metric),
+                  lambda: _read_facts(db, company, fact_metric))
+    return list(rows)
+
+
+def _read_facts(db: Any, company: Any, fact_metric: str) -> list[tuple[str, float, date | None, str | None]]:
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
 
