@@ -34,7 +34,10 @@ def _db(n: int):
     for i in range(n):
         _company(session, f"W{i:03d}")
         session.add(WatchItem(symbol=f"W{i:03d}", company=f"W{i}"))
-    _company(session, "SAN")
+    san = _company(session, "SAN")
+    # Real Madrid listing, not a synthetic NASDAQ homonym.
+    san.exchange, san.currency = "BME", "EUR"
+    session.flush()
     session.add(WatchItem(symbol="san.mc", company="Santander"))
     session.commit()
     return engine, session
