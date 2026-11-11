@@ -41,7 +41,8 @@ test('métricas Finnhub solo para líneas US (nunca del ADR ni de un homónimo)'
     // La variante cambia (getStockValuationBasics: solo profile2+metric, sin /quote
     // duplicada ni /price-target); la condición que fija el guard se mantiene:
     // métricas Finnhub SOLO para líneas US, nunca del ADR ni de un homónimo.
-    assert.match(action, /usListing \? getStockValuationBasics\(normalized\) : Promise\.resolve\(null\)/);
+    // r5-valor3: con su propio tope de lectura (lib/watchlist/read-budget); fuera de US, nada.
+    assert.match(action, /usListing\s*\?\s*withinBudget\(getStockValuationBasics\(normalized\), WATCHLIST_QUOTE_BUDGET_MS\)\s*:\s*Promise\.resolve\(\{ value: null, timedOut: false \}\)/);
 });
 
 test('sin correspondencia validada: «sin datos», nunca el ticker desnudo', () => {

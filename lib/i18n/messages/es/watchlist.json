@@ -46,6 +46,7 @@
     "next": "Siguiente",
     "noData": "sin datos",
     "noDataTimedOut": "sin datos: la lectura tardó más de 3 s, recarga",
+    "noDataQuoteTimedOut": "sin precio: la cotización no llegó a tiempo, recarga",
     "closeOn": "Cierre {date}",
     "closeUndated": "Cierre sin fecha de la fuente",
     "noMetricsTitle": "Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado",
