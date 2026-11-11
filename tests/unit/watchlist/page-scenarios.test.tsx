@@ -53,6 +53,27 @@ function order(node: unknown, out: string[] = []): string[] {
   }
   return out;
 }
+function attrValues(node: unknown, name: string, out: unknown[] = []): unknown[] {
+  if (Array.isArray(node)) node.forEach((n) => attrValues(n, name, out));
+  else if (node && typeof node === 'object') {
+    const el = node as El;
+    if (el.props && name in el.props) out.push(el.props[name]);
+    if (el.props) Object.values(el.props).forEach((v) => attrValues(v, name, out));
+  }
+  return out;
+}
+// Texto visible real: solo children, concatenados SIN separador, para que
+// una etiqueta JSX `· {etiqueta}` se lea como "· Finnhub" (con text() y su
+// separador '|' el mutante nunca casaba y la guarda era vacia).
+function rawText(node: unknown): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(rawText).join('');
+  if (node && typeof node === 'object') {
+    const el = node as El;
+    return el.props ? rawText(el.props.children) : '';
+  }
+  return '';
+}
 function text(node: unknown): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   if (Array.isArray(node)) return node.map(text).join('|');
@@ -65,10 +86,10 @@ function text(node: unknown): string {
 
 const full = (symbol: string, price: number, extra: Record<string, unknown> = {}) => ({
   symbol, name: symbol, exchange: 'NASDAQ', currency: 'USD', price, change: 1, changePercent: price / 10,
-  marketCap: price * 1000, marketCapDerived: false, peRatio: price / 5, peKind: 'fy', peSource: 'x', peSourceLabel: 'Yahoo',
+  marketCap: price * 1000, marketCapDerived: false, peRatio: price / 5, peKind: 'fy', peSource: 'x',
   priceKind: 'live', priceAsOf: null, quoteSymbol: symbol, metricsNotApplicable: false, ...extra,
 });
-const empty = (symbol: string) => full(symbol, 0, { price: null, change: null, changePercent: null, marketCap: null, peRatio: null, peKind: null, peSourceLabel: null, priceKind: null });
+const empty = (symbol: string) => full(symbol, 0, { price: null, change: null, changePercent: null, marketCap: null, peRatio: null, peKind: null, priceKind: null });
 const item = (symbol: string) => ({ symbol, addedAt: new Date(0), analysis: null });
 const basic = (s: string) => ({ name: s, exchange: 'NASDAQ', currency: 'USD' });
 
@@ -163,6 +184,37 @@ describe('/watchlist escenarios', () => {
     expect(order(await render({ page: '99' })).join(',')).toBe(names(24, 29));
     m.entry.mockImplementation(async (symbol: string) => full(symbol, Number(symbol.slice(1)) + 1));
     expect(order(await render({ page: '2', sort: 'price', dir: 'asc' })).join(',')).toBe(names(12, 23));
+  });
+
+  it('el PER no muestra etiqueta visible de fuente; la procedencia queda en el title (TTM, FY y N/D)', async () => {
+    // La fixture lleva peSourceLabel DE VERDAD: si la UI vuelve a pintar la
+    // etiqueta (mutante = reintroducir los spans de main en tarjeta o tabla),
+    // este test se pone rojo. Verificado con ambos mutantes por separado.
+    m.state.mockResolvedValue({ items: [item('TTM1'), item('FY1'), item('ND1')], unavailable: false });
+    m.entry.mockImplementation(async (symbol: string) => {
+      if (symbol === 'TTM1') return full(symbol, 100, { peKind: 'ttm', peSource: 'Finnhub TTM', peSourceLabel: 'Finnhub' });
+      if (symbol === 'FY1') return full(symbol, 200, { peKind: 'fy', peSource: 'Finnhub FY', peSourceLabel: 'Finnhub' });
+      return full(symbol, 0, {
+        price: null, change: null, changePercent: null, marketCap: null,
+        peRatio: null, peKind: null, peSource: null, metricsNotApplicable: true,
+      });
+    });
+    const tree = await render();
+    // Las filas son async server components (DatedRow, una por empresa y
+    // vista: tarjeta movil + fila de tabla): hay que resolverlas para ver lo
+    // pintado; el arbol crudo solo envuelve promesas.
+    const rows = find(tree, 'DatedRow');
+    expect(rows).toHaveLength(6);
+    const painted = await Promise.all(rows.map((r) => (r.type as (p: unknown) => Promise<unknown>)(r.props)));
+    // Ninguna etiqueta visible de proveedor junto al PER, ni en tarjeta ni en tabla.
+    const visible = painted.map(rawText).join('');
+    expect(visible).not.toContain('· Finnhub');
+    // La procedencia sigue en el title de la celda del PER (TTM y FY).
+    const titles = painted.flatMap((r) => attrValues(r, 'title'));
+    expect(titles).toContain('Finnhub TTM');
+    expect(titles).toContain('Finnhub FY');
+    // N/D sin cobertura: el title explica por que no hay metricas.
+    expect(titles).toContain('watchlist.page.noMetricsTitle');
   });
 
   it('DatedRow tolera que la promesa de cierres falle y un precio en vivo manda', async () => {

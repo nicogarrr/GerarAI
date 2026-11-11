@@ -163,10 +163,8 @@ export type WatchlistEntryData = {
     peRatio: number | null;
     /** 'ttm' = Finnhub peTTM (línea US); 'fy' = respaldo backend cierre/EPS diluido FY. */
     peKind: 'ttm' | 'fy' | null;
-    /** Procedencia del PER visible: Finnhub (TTM, línea US) o la cadena del backend («PER: cierre … / eps_diluido FY…»). Null sin PER. */
+    /** Procedencia del PER (title de la celda): Finnhub (TTM, línea US) o la cadena del backend («PER: cierre … / eps_diluido FY…»). Null sin PER. */
     peSource: string | null;
-    /** Etiqueta corta de la fuente del PER para mostrar junto al número («Finnhub» o la fuente del cálculo propio). Null sin PER. */
-    peSourceLabel: string | null;
     // F358: frescura del precio: 'live' = sesión en curso; 'close' = último
     // cierre fechado (con fecha en priceAsOf si se conoce). Un cierre NUNCA
     // se pinta como cotización actual.
@@ -256,7 +254,6 @@ export async function getWatchlistEntryData(
     // Etiqueta corta de la fuente del PER de respaldo: la cadena «PER: …»
     // termina con la fuente entre paréntesis («(SEC)», «(ESEF)»…); sin ella,
     // sin etiqueta (nunca se inventa la procedencia).
-    const backendPerLabel = backendPerSource?.match(/\(([^)]+)\)\s*$/)?.[1] ?? null;
 
     return {
         ...base,
@@ -291,13 +288,11 @@ export async function getWatchlistEntryData(
         marketCapDerived: marketCapM === null && backendCap !== null && backendDerived,
         peRatio: peRatio ?? backendPer,
         peKind: peRatio !== null ? 'ttm' : backendPer !== null ? 'fy' : null,
-        // Trazabilidad del número: sin fuente visible un PER erróneo (QA
+        // Trazabilidad del número en el title: sin ella un PER erróneo (QA
         // 2026-10-19: AENA 2,0x por EPS FY mal cargado) parece dato oficial.
+        // Sin etiqueta visible junto al número (decisión del dueño 2026-10-31:
+        // nada de etiquetas de fuente en la UI).
         peSource: peRatio !== null ? 'PER TTM (Finnhub)' : backendPerSource,
-        // Fuente visible a primera vista: el PER del proveedor y el EPS TTM
-        // propio (SEC) son series distintas y sin etiqueta parecen una sola
-        // (QA 31-oct-2026: GOOGL PER 14,5x Finnhub vs EPS TTM SEC 19,91).
-        peSourceLabel: peRatio !== null ? 'Finnhub' : backendPerLabel,
         priceKind,
         priceAsOf,
         metricsNotApplicable: !usListing,
