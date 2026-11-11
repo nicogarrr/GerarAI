@@ -23,7 +23,7 @@ def _setup(db, monkeypatch, *, resolved='0001571283', payload=1571283,
            sec_name='Rexford Industrial Realty, Inc.', name='Rexford Industrial Realty Inc',
            card=None, exchange='NYSE'):
     class SEC:
-        async def cik_for_ticker(self, ticker):
+        async def cik_for_ticker(self, ticker, entity_name=None):
             return resolved
 
         async def company_facts(self, cik):
