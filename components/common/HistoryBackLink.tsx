@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useSyncExternalStore, type ComponentProps, type MouseEvent, type ReactNode } from 'react';
 
-import { inAppHistoryStore, shouldUseHistoryBack } from '@/lib/nav/in-app-history';
+import { historyBackSteps, inAppHistoryStore, shouldUseHistoryBack } from '@/lib/nav/in-app-history';
 
 /**
  * Apunta cada navegación interna en la pila de lib/nav/in-app-history.
@@ -14,7 +14,12 @@ export function InAppHistoryTracker() {
     const pathname = usePathname();
     const search = useSearchParams()?.toString() ?? '';
     useEffect(() => {
-        if (pathname) inAppHistoryStore.record(search ? `${pathname}?${search}` : pathname);
+        const record = () => {
+            if (pathname) inAppHistoryStore.record(`${pathname}${search ? `?${search}` : ''}${window.location.hash}`);
+        };
+        record();
+        window.addEventListener('hashchange', record);
+        return () => window.removeEventListener('hashchange', record);
     }, [pathname, search]);
     return null;
 }
@@ -45,7 +50,9 @@ export function HistoryBackLink({ href, sameDestinationOnly = true, historyChild
         event.preventDefault();
         // = router.back() del App Router, sin exigir el router montado (las
         // páginas que lo usan se renderizan también en tests de servidor).
-        window.history.back();
+        const steps = historyBackSteps(stack);
+        if (steps === 1) window.history.back();
+        else window.history.go(-steps);
     };
     return (
         <Link {...rest} href={href} onClick={handleClick} data-back-mode={useHistory ? 'history' : 'link'}>

@@ -5,6 +5,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const back = vi.fn();
+const go = vi.fn();
 let pathname = '/watchlist';
 let search = '';
 vi.mock('next/navigation', () => ({
@@ -36,6 +37,9 @@ describe('HistoryBackLink en el flujo real', () => {
     beforeEach(() => {
         inAppHistoryStore.reset();
         back.mockReset();
+        go.mockReset();
+        window.history.replaceState(null, "", "/");
+        vi.spyOn(window.history, "go").mockImplementation(go);
         vi.spyOn(window.history, 'back').mockImplementation(back);
         pathname = '/watchlist';
         search = '';
@@ -75,6 +79,18 @@ describe('HistoryBackLink en el flujo real', () => {
         act(() => navigate('/insider?ticker=NVDA', view));
         // La anterior es la ficha: los dos vuelven por historial.
         expect(screen.getByRole('link', { name: '← NVDA' }).getAttribute('data-back-mode')).toBe('history');
+    });
+
+    it('watchlist to Research then native hash skips same-page history entries', () => {
+        const view = render(<Shell />);
+        act(() => navigate('/research/MSFT', view));
+        act(() => {
+            window.history.pushState(null, '', '/research/MSFT#historial-analistas');
+            window.dispatchEvent(new HashChangeEvent('hashchange'));
+        });
+        fireEvent.click(screen.getByRole('link', { name: 'Volver' }));
+        expect(go).toHaveBeenCalledWith(-2);
+        expect(back).not.toHaveBeenCalled();
     });
 
     it('Cmd/Ctrl+clic abre el padre como enlace normal', () => {

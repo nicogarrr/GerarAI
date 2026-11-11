@@ -21,14 +21,25 @@ export function recordNavigation(stack: readonly string[], url: string): readonl
     if (!url) return stack;
     const last = stack[stack.length - 1];
     if (last === url) return stack;
-    if (stack.length >= 2 && stack[stack.length - 2] === url) return stack.slice(0, -1);
+    const previousIndex = stack.lastIndexOf(url);
+    if (previousIndex !== -1) return stack.slice(0, previousIndex + 1);
     const next = [...stack, url];
     return next.length > MAX_ENTRIES ? next.slice(next.length - MAX_ENTRIES) : next;
 }
 
-/** URL interna anterior a la actual, o null si la página se abrió directamente. */
+/** Native anchor entries are browser history, but not a new page origin. */
+export function historyBackSteps(stack: readonly string[]): number {
+    const current = stack.at(-1)?.split('#')[0];
+    for (let index = stack.length - 2; index >= 0; index--) {
+        if (stack[index].split('#')[0] !== current) return stack.length - 1 - index;
+    }
+    return 0;
+}
+
+/** Previous distinct in-app destination, excluding anchors on the same page. */
 export function previousInAppUrl(stack: readonly string[]): string | null {
-    return stack.length >= 2 ? stack[stack.length - 2] : null;
+    const steps = historyBackSteps(stack);
+    return steps ? stack[stack.length - 1 - steps] : null;
 }
 
 function pathOf(url: string): string {

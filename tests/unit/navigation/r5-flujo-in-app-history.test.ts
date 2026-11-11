@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { previousInAppUrl, recordNavigation, shouldUseHistoryBack } from '@/lib/nav/in-app-history';
+import { historyBackSteps, previousInAppUrl, recordNavigation, shouldUseHistoryBack } from '@/lib/nav/in-app-history';
 
 // Flujo real (auditoría r5-fa-flujo, 11-nov): watchlist → ficha → informe → «volver».
 function visit(...urls: string[]) {
@@ -48,5 +48,23 @@ describe('pila de navegación interna', () => {
         const stack = visit(...Array.from({ length: 80 }, (_, i) => `/research/T${i}`));
         expect(stack.length).toBe(50);
         expect(previousInAppUrl(stack)).toBe('/research/T78');
+    });
+});
+
+describe('hash entries preserve the route origin', () => {
+    it('skips multiple native anchors but preserves query-view destinations', () => {
+        const stack = visit('/watchlist', '/research/MSFT', '/research/MSFT#analistas', '/research/MSFT#historial-analistas');
+        expect(previousInAppUrl(stack)).toBe('/watchlist');
+        expect(historyBackSteps(stack)).toBe(3);
+        expect(shouldUseHistoryBack(stack, '/research', false)).toBe(true);
+        expect(previousInAppUrl(visit('/research/MSFT?view=tesis', '/research/MSFT?view=valoracion'))).toBe('/research/MSFT?view=tesis');
+    });
+    it('direct link and its anchors never back out to an untracked site', () => {
+        const stack = visit('/research/MSFT', '/research/MSFT#analistas');
+        expect(previousInAppUrl(stack)).toBeNull();
+        expect(historyBackSteps(stack)).toBe(0);
+    });
+    it('multi-entry back pops to the tracked origin without phantom pages', () => {
+        expect(recordNavigation(visit('/watchlist', '/research/MSFT', '/research/MSFT#analistas'), '/watchlist')).toEqual(['/watchlist']);
     });
 });
