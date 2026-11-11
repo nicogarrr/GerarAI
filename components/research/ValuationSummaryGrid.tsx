@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { getValuationSummaries } from '@/lib/actions/valuation-summary.actions';
-import { baseRateReach, baseRateText, healthMissingLabel, piotroskiSignalText, safetyMargin, valuationSummaryText, type HealthEvidence, type ValuationSummary } from '@/lib/research/valuation-summary';
+import { baseRateReach, baseRateText, reverseBaseRateMissing, healthMissingLabel, piotroskiSignalText, safetyMargin, valuationSummaryText, type HealthEvidence, type ValuationSummary } from '@/lib/research/valuation-summary';
 import { isValidCurrencyCode, type Formatters } from '@/lib/format';
 import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 import { intlLocale } from '@/lib/i18n/locale';
@@ -56,6 +56,8 @@ export function ValuationSummaryCard({ item, quote }: { item: ValuationSummary; 
   const r = item.reverse_dcf;
   const baseRate = baseRateText(item.base_rate, locale);
   const reach = baseRateReach(r.base_rate_check);
+  // #5381: el backend explica el N/D de la tasa base (plazo no medido, divisa sin tipo oficial…); sin esta línea la tarjeta callaba.
+  const reachMissing = r.status === 'ok' ? reverseBaseRateMissing(r.base_rate_check, locale === 'en' ? 'en' : 'es') : null;
   return <article className="min-w-0 rounded-xl border border-gray-800 bg-gray-900/40 p-4">
     <h3 className="font-semibold text-gray-100"><Link className="inline-flex min-h-[44px] items-center underline decoration-gray-700 underline-offset-4" href={`/research/${encodeURIComponent(item.ticker)}`}>{item.ticker}</Link></h3>
     <dl className="mt-3 space-y-3 text-sm">
@@ -67,7 +69,8 @@ export function ValuationSummaryCard({ item, quote }: { item: ValuationSummary; 
       <div><dt className="text-gray-400">{t('researchShared.valuationSummary.reverseDcf')}</dt><dd className="text-gray-100">{r.status === 'ok' && r.required_revenue_growth != null ? t('researchShared.valuationSummary.perYear', { pct: formatPercent(r.required_revenue_growth) }) : na}</dd>
         {r.as_of ? <dd className="text-xs text-gray-400">{valuationSummaryText(r.source, locale)} · {formatMarketDate(r.as_of)}{r.market_price != null && fair.currency && isValidCurrencyCode(fair.currency) ? t('researchShared.valuationSummary.modelPrice', { price: formatPrice(r.market_price, fair.currency) }) : ''}. {t('researchShared.valuationSummary.scenarioNote')}</dd> : null}
         {r.status !== 'ok' && r.reason ? <dd className="text-xs text-gray-400">{valuationSummaryText(r.reason, locale)}</dd> : null}
-        {r.status === 'ok' && reach ? <dd className="text-xs text-gray-500" title={r.base_rate_check?.formula ?? undefined} data-testid="reverse-dcf-base-rate-reach">{t(REACH_KEYS[reach.key], { pct: formatPercent(reach.share, { digits: 0 }), years: r.base_rate_check?.horizon_years ?? '' })}</dd> : null}</div>
+        {r.status === 'ok' && reach ? <dd className="text-xs text-gray-500" title={r.base_rate_check?.formula ?? undefined} data-testid="reverse-dcf-base-rate-reach">{t(REACH_KEYS[reach.key], { pct: formatPercent(reach.share, { digits: 0 }), years: r.base_rate_check?.horizon_years ?? '' })}</dd> : null}
+        {reachMissing ? <dd className="text-xs text-gray-500" data-testid="reverse-dcf-base-rate-missing">{t('researchShared.valuationSummary.reachNone', { reason: reachMissing })}</dd> : null}</div>
       <div><dt className="text-gray-400">{t('researchShared.valuationSummary.piotroski')}</dt><dd className="text-gray-100">{p.score == null ? t('researchShared.valuationSummary.piotroskiPartial', { count: p.evaluated }) : p.partial ? t('researchShared.valuationSummary.piotroskiPartialScore', { score: p.score, count: p.evaluated }) : `${p.score}/9`}</dd>
         <dd className="text-xs text-gray-400">{health.period_end ? t('researchShared.valuationSummary.fiscalYear', { date: formatMarketDate(health.period_end) }) : valuationSummaryText(health.reason ?? '', locale)}</dd></div>
     </dl>
