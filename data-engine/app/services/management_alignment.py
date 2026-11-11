@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.source_urls import filed_package_url, linkable_source_url, sec_filing_url
+from app.core.source_urls import linkable_source_url, sec_filing_url
 from app.core.tenancy import tenant_filters
 from app.models.entities import (
     Company,
@@ -117,9 +117,8 @@ def _evidence(fact: FinancialFact, company: Company, today: date, *, allow_dei: 
             cik = (doc.metadata_ or {}).get("cik")
         url = sec_filing_url(None, fact.accession_number, cik)
     else:
-        # ESEF/CNMV: el informe anual del que sale ESTE ejercicio (metadata.filing_sources), no el snapshot.
-        url = (linkable_source_url(doc.source_url) or filed_package_url(getattr(doc, "metadata_", None), fact.period)
-               if doc is not None else None)
+        # Only the fact's linked document is evidence, not a nearby filing.
+        url = linkable_source_url(doc.source_url) if doc is not None else None
     if not _url(url):
         return None
     filed, known = _filed_or_known(fact, str(url))
