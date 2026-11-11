@@ -193,6 +193,13 @@ def chart_listing_probe(symbol: str, *, timeout: float) -> tuple[bool | None, st
     result = (payload.get("chart") or {}).get("result") if isinstance(payload, dict) else None
     if not result or not isinstance(result[0], dict):
         return False, None
+    # Un listado suspendido/delisted sigue respondiendo 200 con ``meta`` (y el
+    # último precio congelado) pero sin barras recientes: la serie vacía es el
+    # «no existe» del contrato. Caso real 11-nov-2026: SES.TO tras su adquisición
+    # por GFL (1-sep-2026) devolvía meta completa y 0 barras en 5 días y 1 mes.
+    timestamps = result[0].get("timestamp")
+    if not timestamps or not isinstance(timestamps, list):
+        return False, None
     meta = result[0].get("meta") or {}
     name = meta.get("longName") or meta.get("shortName")
     return True, name if isinstance(name, str) and name.strip() else None
