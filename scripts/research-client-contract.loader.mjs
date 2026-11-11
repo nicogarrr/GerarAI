@@ -11,6 +11,7 @@ export async function resolve(specifier, context, nextResolve) {
     ['@/lib/auth/research-identity', 'guard-stub:research-identity'],
     ['@/lib/types/errors', new URL('../lib/types/errors.ts', import.meta.url).href],
     ['@/lib/research/error-detail', new URL('../lib/research/error-detail.ts', import.meta.url).href],
+    ['@/lib/research/rate-limit', new URL('../lib/research/rate-limit.ts', import.meta.url).href],
     ['@/lib/research/client', new URL('../lib/research/client.ts', import.meta.url).href],
     ['@/lib/brain/history', new URL('../lib/brain/history.ts', import.meta.url).href],
     ['@/lib/chat/expert-team', new URL('../lib/chat/expert-team.ts', import.meta.url).href],

@@ -128,3 +128,22 @@ describe('getResearchThesisWorkspace: fallos opcionales no tumban el workspace',
     assert.equal(calls.length, 7);
   });
 });
+
+// Use the real client through the same Node loader as the full guard bundle.
+it('preserves the final 429 Retry-After for the manual cooldown', async () => {
+  const saved = globalThis.fetch;
+  try {
+    globalThis.fetch = (async () => new Response(JSON.stringify({ detail: 'Rate limit exceeded' }), {
+      status: 429, headers: { 'content-type': 'application/json', 'retry-after': '120' },
+    })) as typeof fetch;
+    await assert.rejects(researchRequest('/api/contract', { method: 'POST', body: '{}' }),
+      (error: unknown) => {
+        const limited = error as { statusCode?: number; cause?: { retryAfterSeconds?: number } };
+        assert.equal(limited.statusCode, 429);
+        assert.equal(limited.cause?.retryAfterSeconds, 120);
+        return true;
+      });
+  } finally {
+    globalThis.fetch = saved;
+  }
+});
