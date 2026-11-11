@@ -15,7 +15,8 @@ import type { BaseRateCheck } from '@/lib/research/valuation-summary';
  * desglose por partes). Aquí solo tipos y helpers puros para pintarlo.
  */
 export type ReportCell = { value: number | null; unit: string; source: string; reported: boolean; basis: string; derived_q4: boolean; url?: string | null } | null;
-export type ReportPeriod = { period_end: string; fiscal_quarter: string; revenue: ReportCell; ebitda: ReportCell };
+/** ``ebitda_reason``: por qué no hay EBITDA en el periodo (ausente en backends antiguos). */
+export type ReportPeriod = { period_end: string; fiscal_quarter: string; revenue: ReportCell; ebitda: ReportCell; ebitda_reason?: string | null };
 export type ReportPoint = { value: number | null; unit: string | null; period_end: string | null; provenance: string } | null;
 
 export type AnalystReportData = {

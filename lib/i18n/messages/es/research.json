@@ -2075,6 +2075,13 @@
     "period": "Periodo",
     "revenue": "Ingresos",
     "ebitda": "EBITDA",
+    "ebitdaReason": {
+      "missingDa": "sin amortizaciones (D&A)",
+      "missingOperatingIncome": "sin resultado operativo",
+      "missingBoth": "sin resultado operativo ni D&A",
+      "unitMismatch": "unidades distintas",
+      "financialIssuer": "no aplica a bancos ni aseguradoras"
+    },
     "fyHead": "Ej. {date}",
     "noActuals": "sin cifras guardadas",
     "actualsNote": "Reales de los filings (SEC/ESEF) guardados en GerarAI. EBITDA = resultado operativo + amortizaciones. ¹ Q4 derivado: ejercicio − Q1 − Q2 − Q3. ² EBITDA que da la fuente. ³ Sin resultado operativo etiquetado (IFRS): beneficio antes de impuestos − resultado financiero neto + amortizaciones. Cada cifra enlaza a su filing.",
@@ -2085,6 +2092,7 @@
     "userEstimatesLabel": "Supuestos del usuario, no validados contra histórico.",
     "consensusTitle": "Consenso propio de GerarAI (estimación, aún sin presentar)",
     "consensusNone": "sin estimación propia con las fuentes disponibles",
+    "consensusSharedReason": "* N/D: {reason}.",
     "consensusNote": "Cada celda sale de la primera fuente disponible en orden fijo: guía de la empresa → analistas citados → modelo propio → tasa base de la SEC. «Fórmula» bajo cada cifra muestra cómo se calcula; el enlace abre la fuente citada. El BPA del modelo escala el BPA del mismo periodo anterior con el beneficio operativo estimado (acciones, intereses e impuestos constantes).",
     "operatingIncome": "Beneficio operativo",
     "eps": "BPA diluido",

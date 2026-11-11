@@ -512,7 +512,8 @@ def build_cells(metric: str, actuals: Mapping[str, Actual], *, today: date,
         conf = confidence_for(published.source, horizon_of(end, today), measured) if published else {}
         if published is None:
             cells[period] = Cell(metric, period, end, "sin_estimacion", None, cands, flags, {},
-                                 "ninguna fuente disponible pasa las puertas")
+                                 "ninguna fuente (guía de la empresa, analistas citados, modelo propio o tasa base) "
+                                 "cumple los requisitos para este periodo")
             continue
         cells[period] = Cell(metric, period, end, "estimado", published, [c for c in cands if c is not published],
                              flags, conf)

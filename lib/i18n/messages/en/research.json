@@ -2075,6 +2075,13 @@
     "period": "Period",
     "revenue": "Revenue",
     "ebitda": "EBITDA",
+    "ebitdaReason": {
+      "missingDa": "no D&A",
+      "missingOperatingIncome": "no operating income",
+      "missingBoth": "no operating income or D&A",
+      "unitMismatch": "mismatched units",
+      "financialIssuer": "not applicable to banks or insurers"
+    },
     "fyHead": "FY {date}",
     "noActuals": "no stored figures",
     "actualsNote": "Actuals from the filings (SEC/ESEF) stored in GerarAI. EBITDA = operating income + D&A. ¹ Derived Q4: fiscal year − Q1 − Q2 − Q3. ² EBITDA as given by the source. ³ No operating profit tagged (IFRS): profit before tax − net finance result + D&A. Each figure links to its filing.",
@@ -2085,6 +2092,7 @@
     "userEstimatesLabel": "User assumptions, not validated against history.",
     "consensusTitle": "GerarAI's own consensus (estimate, not yet reported)",
     "consensusNone": "no own estimate with the available sources",
+    "consensusSharedReason": "* N/A: {reason}.",
     "consensusNote": "Each cell comes from the first available source in a fixed order: company guidance → cited analysts → own model → SEC base rate. «Formula» under each figure shows how it is calculated; the link opens the cited source. The model EPS scales the same prior-period EPS by the estimated operating income (shares, interest and taxes held constant).",
     "operatingIncome": "Operating income",
     "eps": "Diluted EPS",
