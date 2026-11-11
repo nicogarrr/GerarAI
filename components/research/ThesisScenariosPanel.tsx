@@ -36,7 +36,34 @@ export function ThesisScenariosPanel({
     <Panel title={t('research.scenarios.title')}>
       <div className="space-y-4">
         {METRICS.map((metric) => (
-          <div className="overflow-x-auto" key={metric.key}>
+          <div className="min-w-0" key={metric.key}>
+            <div className="space-y-3 md:hidden">
+              <h3 className="text-xs font-medium uppercase text-gray-400">{metric.label(t)}</h3>
+              {years.map((year) => (
+                <section aria-label={`${t('research.scenarios.title')} · ${metric.label(t)} · ${year}`} className="min-w-0 rounded-lg border border-gray-800 p-3" key={year}>
+                  <h4 className="text-sm font-semibold text-gray-200">{year}</h4>
+                  <dl className="mt-2 space-y-3">
+                    {KEYS.map((key) => {
+                      const cell = data.escenarios[key].proyecciones.find((row) => row.ejercicio === year)?.[metric.key];
+                      const text = formatScenarioMoney(cell?.valor ?? null, money, metric.digits);
+                      const reason = cell?.motivo ? scenarioReasonText(cell.motivo, locale) : (cell?.valor != null && !text ? t('research.scenarios.unverifiedCurrency') : null);
+                      return (
+                        <div className="min-w-0" key={key}>
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                            <dt className="text-sm text-gray-400 [overflow-wrap:anywhere]">{scenarioNameText(data.escenarios[key].nombre, locale)}</dt>
+                            <dd className="text-sm tabular-nums text-gray-200 [overflow-wrap:anywhere]">
+                              {text ?? (cell?.etiqueta && cell.etiqueta !== 'INFERIDO' && cell.etiqueta !== 'N/D' ? cell.etiqueta : NA)}
+                            </dd>
+                          </div>
+                          {reason ? <p className="mt-1 text-xs leading-5 text-amber-300 [overflow-wrap:anywhere]">{reason}</p> : null}
+                        </div>
+                      );
+                    })}
+                  </dl>
+                </section>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[360px] text-left text-sm">
               <caption className="pb-1 text-left text-xs font-medium uppercase text-gray-500">{metric.label(t)}</caption>
               <thead className="text-xs text-gray-500">
@@ -66,6 +93,7 @@ export function ThesisScenariosPanel({
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         ))}
       </div>
