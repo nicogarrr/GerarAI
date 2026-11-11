@@ -1,7 +1,7 @@
 """Local, read-only readiness. No provider calls and no quota promise."""
-from dataclasses import replace
 import math
 import time
+from dataclasses import replace
 from typing import Literal
 
 from app.core.config import get_settings
@@ -19,7 +19,7 @@ def _candidates(provider, request):
     Composite explicit models *are* resolved via complete(replace(request,...)).
     A shared adapter can therefore contribute multiple distinct candidates.
     """
-    from app.llm.chat_provider import ChatFallbackProvider, SequentialFallbackProvider, GEMINI_MODELS
+    from app.llm.chat_provider import GEMINI_MODELS, ChatFallbackProvider, SequentialFallbackProvider
     seen = set()
     visiting = set()
 

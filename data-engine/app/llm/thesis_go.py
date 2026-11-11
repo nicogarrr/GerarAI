@@ -58,7 +58,7 @@ def create_thesis_narrative_provider(
     válido, ``DisabledProvider`` con motivo si enabled e inválido.
     """
     settings = settings or get_settings()
-    from app.llm.free_only import restricted, free_only_provider
+    from app.llm.free_only import free_only_provider, restricted
     if restricted(settings):
         return free_only_provider(settings, client)
     if current_tenant_llm_config() is not None:

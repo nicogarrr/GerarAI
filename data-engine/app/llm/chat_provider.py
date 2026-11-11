@@ -630,7 +630,7 @@ def _openrouter_backup(settings: Settings, client: httpx.AsyncClient | None) -> 
 
 def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.AsyncClient | None = None) -> LLMProvider:
     settings = settings or get_settings()
-    from app.llm.free_only import restricted, free_only_provider
+    from app.llm.free_only import free_only_provider, restricted
     if restricted(settings):
         return free_only_provider(settings, client)
     if current_tenant_llm_config() is not None:
@@ -724,7 +724,7 @@ def create_background_llm_provider(settings: Settings | None = None, *, client: 
     el primario solo ya es el comportamiento anterior.
     """
     settings = settings or get_settings()
-    from app.llm.free_only import restricted, free_only_provider
+    from app.llm.free_only import free_only_provider, restricted
     if restricted(settings):
         return free_only_provider(settings, client)
     if current_tenant_llm_config() is not None:

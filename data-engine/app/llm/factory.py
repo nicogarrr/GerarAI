@@ -36,7 +36,7 @@ def create_llm_provider(
     settings.
     """
     settings = settings or get_settings()
-    from app.llm.free_only import restricted, free_only_provider
+    from app.llm.free_only import free_only_provider, restricted
     if restricted(settings):
         return free_only_provider(settings, client)
     tenant = current_tenant_llm_config()
