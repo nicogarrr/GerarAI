@@ -229,3 +229,72 @@ def test_consulta_al_proveedor_sin_red(monkeypatch):
 
     monkeypatch.setattr("app.services.connectors.yahoo.httpx.get", timeout)
     assert wtv.probe_yahoo("GOOGL").exists is None
+
+
+def test_new_paused_watch_item_does_not_queue_thesis_and_preserves_data_jobs(call, jobs, probes):
+    probes[0]['GFL'] = wtv.ProbeResult(exists=True, name='GFL Environmental Inc')
+    response = call('POST', '/api/watchlist', {'symbol': 'GFL', 'auto_analysis_enabled': False})
+    assert response.status_code == 201, response.text
+    assert ('thesis', 'GFL') not in jobs
+    assert {kind for kind, _ in jobs} == {'seed', 'dca', 'data'}
+    assert response.json()['auto_analysis_enabled'] is False
+    item = next(item for item in call('GET', '/api/watchlist').json() if item['symbol'] == 'GFL')
+    assert item['auto_analysis_enabled'] is False
+    jobs.clear()
+    updated = call('POST', '/api/watchlist', {'symbol': 'GFL', 'company': 'GFL'})
+    assert updated.json()['auto_analysis_enabled'] is False
+    assert jobs == []
+    resumed = call('POST', '/api/watchlist', {'symbol': 'GFL', 'auto_analysis_enabled': True})
+    assert resumed.json()['auto_analysis_enabled'] is True
+    assert jobs == [('thesis', 'GFL')]
+    jobs.clear()
+    call('POST', '/api/watchlist', {'symbol': 'GFL', 'auto_analysis_enabled': True})
+    assert jobs == []  # no duplicate on repeated resume
+
+
+@pytest.mark.parametrize('choice', [False, True, None])
+def test_concurrent_upsert_respects_explicit_pause_or_preserves_saved_choice(monkeypatch, jobs, choice):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.api.routes import watchlist as route
+    from app.models import Tenant
+    from app.models.entities import Base
+
+    engine = create_engine('sqlite:///:memory:')
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Tenant(id=1, external_id='pause-race'))
+        db.commit()
+        db.info.update(tenant_id=1, user_id='user')
+        db.add(WatchItem(tenant_id=1, symbol='GFL', company='old', auto_analysis_enabled=False))
+        db.commit()
+        real_find = route._find_watch_item
+        first = True
+
+        def race_find(db, symbol):
+            nonlocal first
+            if first:
+                first = False
+                return None  # another tab inserts between read and commit
+            return real_find(db, symbol)
+
+        monkeypatch.setattr(route, '_find_watch_item', race_find)
+        monkeypatch.setattr(wtv, 'resolve_watch_symbol', lambda *_: wtv.WatchSymbolVerdict('known', 'GFL'))
+        monkeypatch.setattr(route, 'invalidate_dca_cache', lambda **_: None)
+        result = route.upsert_watch_item(route.WatchItemCreate(
+            symbol='GFL', company='new', auto_analysis_enabled=choice,
+        ), db)
+        assert result['auto_analysis_enabled'] is (choice is True)
+        assert result['company'] == 'new'
+        assert jobs == ([('thesis', 'GFL')] if choice is True else [])
+    engine.dispose()
+
+
+def test_pause_existing_and_explicit_null_never_resume(call, jobs, probes):
+    probes[0]['GFL'] = wtv.ProbeResult(exists=True, name='GFL Environmental Inc')
+    assert call('POST', '/api/watchlist', {'symbol': 'GFL'}).json()['auto_analysis_enabled'] is True
+    jobs.clear()
+    assert call('POST', '/api/watchlist', {'symbol': 'GFL', 'auto_analysis_enabled': False}).json()['auto_analysis_enabled'] is False
+    assert call('POST', '/api/watchlist', {'symbol': 'GFL', 'auto_analysis_enabled': None}).json()['auto_analysis_enabled'] is False
+    assert jobs == []

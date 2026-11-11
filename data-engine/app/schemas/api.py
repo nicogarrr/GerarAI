@@ -2151,6 +2151,7 @@ class WatchlistAnalysisStateOut(BaseModel):
 
 
 class WatchlistItemOut(BaseModel):
+    auto_analysis_enabled: bool = True
     id: int
     symbol: str
     company: str | None

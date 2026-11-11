@@ -110,3 +110,27 @@ def test_backfill_watchlist_encola_lo_que_falta_por_tenant(monkeypatch):
         other = tracked.backfill_watchlist_theses(db)
         assert other['enqueued'] == ['MSFT'] and calls[-1] == (2, 'MSFT')
     engine.dispose()
+
+
+def test_paused_symbol_blocks_direct_and_backfill_enqueue_for_only_its_tenant(monkeypatch):
+    from app.models import WatchItem
+
+    engine = create_engine('sqlite:///:memory:')
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add_all([Tenant(id=1, external_id='paused1'), Tenant(id=2, external_id='paused2')])
+        db.commit()
+        db.info.update(tenant_id=1, user_id='u1')
+        db.add(WatchItem(tenant_id=1, symbol='GFL', company='GFL', auto_analysis_enabled=False))
+        db.commit()
+        calls = []
+        monkeypatch.setattr(tracked, 'enqueue_generation', lambda db, ticker, **kwargs: calls.append(ticker))
+        tracked.enqueue_tracked_analysis(db, 'GFL')
+        assert calls == []
+        result = tracked.backfill_watchlist_theses(db)
+        assert result['skipped']['GFL'] == 'analisis_pausado'
+        assert calls == []
+        db.info.update(tenant_id=2, user_id='u2')
+        tracked.enqueue_tracked_analysis(db, 'GFL')
+        assert calls == ['GFL']
+    engine.dispose()

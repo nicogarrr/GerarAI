@@ -126,6 +126,8 @@ class WatchItem(TenantOwnedMixin, Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     symbol: Mapped[str] = mapped_column(String(20), index=True)
     company: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Pauses future automatic thesis scheduling, not jobs already in flight.
+    auto_analysis_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
 
 
 class DcaSignalState(TenantOwnedMixin, Base, TimestampMixin):
