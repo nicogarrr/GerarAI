@@ -13,7 +13,8 @@ crecimiento previo, todas. Puro salvo la lectura del JSON (una vez por proceso).
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -143,8 +144,14 @@ def share_reaching(rate: BaseRate | None, growth: float | None) -> Reach | None:
 
 
 def for_annual_revenue(revenue_by_year: dict[int, float], *, sector: str | None = None, horizon: int = 1,
-                       metric: str = "growth", data: dict[str, Any] | None = None) -> BaseRate | None:
-    """Grupo de una empresa con sus ingresos anuales: el último año y su TCAC a 3 años."""
+                       metric: str = "growth", data: dict[str, Any] | None = None,
+                       usd_rate: float | None = 1.0, size_note: str = "") -> BaseRate | None:
+    """Grupo de una empresa con sus ingresos anuales: el último año y su TCAC a 3 años.
+
+    Los tramos de tamaño están en dólares: ``usd_rate`` convierte los ingresos (de su divisa de
+    reporte) a USD solo para elegir el tramo; el crecimiento previo es un cociente y no cambia.
+    ``usd_rate=None`` (otra divisa sin tipo oficial): tamaño desconocido, el grupo se relaja sin él.
+    ``size_note`` (de dónde sale el tipo) se añade a la etiqueta del grupo cuando el tamaño cuenta."""
     years = sorted(y for y, v in revenue_by_year.items() if v and v > 0)
     if not years:
         return lookup(metric=metric, horizon=horizon, revenue=None, prior_growth=None, sector=None, data=data) \
@@ -152,11 +159,65 @@ def for_annual_revenue(revenue_by_year: dict[int, float], *, sector: str | None 
     last = years[-1]
     past = revenue_by_year.get(last - 3)
     prior = (revenue_by_year[last] / past) ** (1 / 3) - 1 if past and past > 0 else None
-    found = lookup(metric=metric, horizon=horizon, revenue=revenue_by_year[last], prior_growth=prior,
+    size = revenue_by_year[last] * usd_rate if usd_rate is not None else None
+    found = lookup(metric=metric, horizon=horizon, revenue=size, prior_growth=prior,
                    sector=sector, data=data)
     if found is None:
         data = data or table()
         item = (data.get("groups") or {}).get(f"h{horizon}|*|*|*", {}).get(metric)
         if item:
             return _rate(item, f"todas · {horizon} año(s)", data, metric, horizon)
+    if found is not None and size_note and "tamaño " in found.group:
+        found = replace(found, group=f"{found.group} · {size_note}")
     return found
+
+
+# Tipo de cambio para el TRAMO de tamaño (órdenes de magnitud: <100M, 100M-1B, 1B-10B, >10B).
+SIZE_FX_MAX_AGE_DAYS = 7  # el oficial del cierre del ejercicio (BCE: días hábiles; puente largo 4-5 días)
+SIZE_FX_FALLBACK_MAX_DAYS = 400  # sin el del cierre: el último oficial, si el cierre no tiene más de 400 días
+SIZE_FX_RECENT_MAX_AGE_DAYS = 10
+
+
+@dataclass(frozen=True)
+class SizeFx:
+    """Divisa de reporte → USD para clasificar el tamaño; ``rate=None`` lleva el motivo (N/D)."""
+    currency: str
+    rate: float | None
+    rate_date: date | None = None
+    source: str | None = None
+    at_close: bool = True
+    reason: str = ""
+
+    @property
+    def note(self) -> str:
+        if self.rate is None or self.currency == "USD":
+            return ""
+        when = self.rate_date.strftime("%d-%m-%Y") if self.rate_date else "s. f."
+        rate = f"{self.rate:.6g}".replace(".", ",")
+        return (f"tamaño en USD con {self.currency}→USD {rate} del {when}"
+                f"{'' if self.at_close else ' (último oficial publicado: no había del cierre)'}")
+
+
+def usd_size_fx(db: Any, currency: str | None, close: date | None, *, today: date) -> SizeFx:
+    """Tipo oficial ``currency``→USD de ``fx_rates`` (point-in-time, nunca inventado) para el tramo.
+
+    Primero el del cierre del ejercicio (≤ ``SIZE_FX_MAX_AGE_DAYS`` días antes); si la tabla no lo
+    tiene, el último publicado (≤ 10 días antes de hoy) siempre que el cierre no tenga más de
+    ``SIZE_FX_FALLBACK_MAX_DAYS`` días, con su fecha a la vista. Si no, N/D con el motivo."""
+    code = (currency or "").strip().upper()
+    if code == "USD":
+        return SizeFx("USD", 1.0)
+    if not code or close is None:
+        return SizeFx(code or "?", None, reason="ingresos sin divisa o sin fecha de cierre: no se clasifica el tamaño")
+    from app.valuation.currency import resolve_fx
+
+    quote = resolve_fx(db, code, "USD", close, max_age_days=SIZE_FX_MAX_AGE_DAYS)
+    if quote is not None:
+        return SizeFx(code, quote.rate, quote.rate_date, quote.source, True)
+    if 0 <= (today - close).days <= SIZE_FX_FALLBACK_MAX_DAYS:
+        quote = resolve_fx(db, code, "USD", today, max_age_days=SIZE_FX_RECENT_MAX_AGE_DAYS)
+        if quote is not None:
+            return SizeFx(code, quote.rate, quote.rate_date, quote.source, False)
+    return SizeFx(code, None, reason=(f"ingresos en otra divisa ({code}): sin tipo oficial {code}→USD al cierre "
+                                      f"del {close.strftime('%d-%m-%Y')}; los tramos de tamaño de la tasa base "
+                                      f"están en dólares"))

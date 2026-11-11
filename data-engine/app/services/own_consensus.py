@@ -726,6 +726,41 @@ def _revenue_in_usd(db: Any, company: Any) -> bool:
     return bool(units) and all(str(u or "").upper().startswith("USD") for u in units)
 
 
+def _revenue_size_fx(db: Any, company: Any, rev_actuals: Mapping[str, Actual], today: date) -> Any:
+    """Tipo oficial divisa de reporte → USD para el tramo de tamaño de la tasa base (``SizeFx``).
+
+    USD: 1. Una sola divisa distinta: el oficial del cierre del último ejercicio (``usd_size_fx``).
+    Varias divisas o sin lectura: N/D con el motivo (nunca se clasifica una divisa como si fuera USD)."""
+    from app.services.estimate_base_rates import SizeFx, usd_size_fx
+
+    if _revenue_in_usd(db, company):
+        return SizeFx("USD", 1.0)
+    nd = "ingresos en otra divisa: los tramos de tamaño de la tasa base están en dólares"
+    try:
+        from sqlalchemy import select
+
+        from app.models import FinancialFact
+        from app.valuation.currency import reporting_currencies
+
+        units = db.scalars(select(FinancialFact.unit).where(
+            FinancialFact.company_id == company.id, FinancialFact.metric == FACT_METRIC["revenue"])).all()
+        currencies = sorted(reporting_currencies(units))
+    except Exception:  # noqa: BLE001 - sin lectura no hay tramo
+        return SizeFx("?", None, reason=nd)
+    if len(currencies) != 1:
+        return SizeFx("?", None, reason=(f"ingresos en varias divisas ({', '.join(currencies)}): los tramos de "
+                                         f"tamaño de la tasa base están en dólares") if currencies else nd)
+    annual = sorted((a for k, a in rev_actuals.items() if k.startswith("fy") and a.value and a.value > 0),
+                    key=lambda a: a.end)
+    close = annual[-1].end if annual else None
+    try:
+        return usd_size_fx(db, currencies[0], close, today=today)
+    except Exception:  # noqa: BLE001 - sin tabla FX legible: N/D con motivo
+        logger.warning("No se pudo leer el tipo %s→USD para %s", currencies[0], getattr(company, "ticker", "?"),
+                       exc_info=True)
+        return SizeFx(currencies[0], None, reason=nd)
+
+
 def _facts(db: Any, company: Any, fact_metric: str) -> list[tuple[str, float, date | None, str | None]]:
     from sqlalchemy import select
     from sqlalchemy.orm import joinedload
@@ -888,7 +923,8 @@ def build_company_consensus(db: Any, company: Any, tenant_id: int, *, today: dat
     out: dict[str, Any] = {"ticker": company.ticker, "as_of": today.isoformat(), "version": CONSENSUS_VERSION,
                            "source_order": list(SOURCE_ORDER), "cells": []}
     rev_actuals = actuals_from_facts(_facts(db, company, FACT_METRIC["revenue"]), metric="revenue")
-    rev_in_usd = _revenue_in_usd(db, company)
+    # Tramos de tamaño en USD: los ingresos en otra divisa se clasifican con el tipo oficial del cierre.
+    size_fx = _revenue_size_fx(db, company, rev_actuals, today)
     if base_rate_for is None:
         from app.services.estimate_base_rates import for_annual_revenue, sector_of_cik
 
@@ -896,7 +932,7 @@ def build_company_consensus(db: Any, company: Any, tenant_id: int, *, today: dat
 
         def _default_rate(acts: Mapping[str, Actual]) -> BaseRate | None:
             annual = {int(k[2:]): a.value for k, a in acts.items() if k.startswith("fy")}
-            return for_annual_revenue(annual, sector=sector)
+            return for_annual_revenue(annual, sector=sector, usd_rate=size_fx.rate, size_note=size_fx.note)
         base_rate_for = _default_rate
     rate = base_rate_for(rev_actuals)
     rev_cells: dict[str, Cell] = {}
@@ -915,8 +951,8 @@ def build_company_consensus(db: Any, company: Any, tenant_id: int, *, today: dat
         elif metric == "operating_income":
             oi_cells, oi_actuals = cells, acts
         if metric in {"revenue", "operating_income"}:
-            if not rev_in_usd:
-                _unavailable_base_rate_checks(cells, "ingresos en otra divisa: los tramos de tamaño de la tasa base están en dólares")
+            if size_fx.rate is None:
+                _unavailable_base_rate_checks(cells, size_fx.reason)
             else:
                 try:
                     from app.services.estimate_base_rates import for_annual_revenue as _far
@@ -924,12 +960,14 @@ def build_company_consensus(db: Any, company: Any, tenant_id: int, *, today: dat
 
                     _sector = _soc(getattr(company, "cik", None))
                     _annual = {int(k[2:]): a.value for k, a in rev_actuals.items() if k.startswith("fy")}
+                    _fx = {"usd_rate": size_fx.rate, "size_note": size_fx.note}
                     if metric == "revenue":
                         attach_base_rate_checks(cells, rev_actuals,
-                                                lambda h: _far(_annual, sector=_sector, horizon=h))
+                                                lambda h: _far(_annual, sector=_sector, horizon=h, **_fx))
                     else:
                         attach_margin_checks(cells, acts, rev_cells, rev_actuals,
-                                             lambda h: _far(_annual, sector=_sector, horizon=h, metric="margin"))
+                                             lambda h: _far(_annual, sector=_sector, horizon=h, metric="margin",
+                                                            **_fx))
                 except Exception:  # noqa: BLE001 - comprobación opcional; fallo registrado y N/D explícito
                     logger.warning("No se pudo comprobar la tasa base de %s para %s", metric, company.ticker,
                                    exc_info=True)
