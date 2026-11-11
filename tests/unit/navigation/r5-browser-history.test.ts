@@ -1,85 +1,59 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackBrowserHistory } from '@/lib/nav/browser-history';
 import { historyBackSteps, inAppHistoryStore } from '@/lib/nav/in-app-history';
-
 let cleanup: () => void;
+let navigation: EventTarget & { currentEntry: { key: string; index: number; url: string } | null };
 const stack = () => inAppHistoryStore.getSnapshot();
-const traverse = (steps: number) => new Promise<void>(resolve => {
-    window.addEventListener('popstate', () => setTimeout(resolve, 0), { once: true });
-    window.history.go(steps);
-});
-const anchor = (hash: string) => new Promise<void>(resolve => {
-    window.addEventListener('hashchange', () => resolve(), { once: true });
-    window.location.hash = hash;
-});
+const entry = (key: string, index: number, path: string, kind = 'push') => {
+    navigation.currentEntry = { key, index, url: `http://localhost${path}` };
+    navigation.dispatchEvent(Object.assign(new Event('currententrychange'), { navigationType: kind }));
+};
 beforeEach(() => {
-    inAppHistoryStore.reset();
-    window.history.replaceState({ nextField: 'preserve' }, '', '/watchlist');
+    navigation = Object.assign(new EventTarget(), { currentEntry: { key: 'origin', index: 3, url: 'http://localhost/watchlist' } });
+    vi.stubGlobal('navigation', navigation);
     cleanup = trackBrowserHistory(window);
 });
-afterEach(() => cleanup());
-
-describe('real browser history entries, independent of URL equality', () => {
-    it('preserves PUSH A→B→A and POP/forward identities', async () => {
-        window.history.pushState({}, '', '/research/MSFT');
-        window.history.pushState({}, '', '/watchlist');
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+describe('browser-owned entry identity and navigation type', () => {
+    it('preserves A→B→A PUSH, POP and forward', () => {
+        entry('B', 4, '/research/MSFT'); entry('A2', 5, '/watchlist');
         expect(stack()).toEqual(['/watchlist', '/research/MSFT', '/watchlist']);
-        await traverse(-1);
+        entry('B', 4, '/research/MSFT', 'traverse');
         expect(stack()).toEqual(['/watchlist', '/research/MSFT']);
-        await traverse(1);
-        expect(stack()).toEqual(['/watchlist', '/research/MSFT', '/watchlist']);
+        entry('A2', 5, '/watchlist', 'traverse');
+        expect(stack()).toHaveLength(3);
     });
-    it('repeated native anchors return all the way to watchlist', async () => {
-        window.history.pushState({}, '', '/research/MSFT');
-        await anchor('#analistas');
-        await anchor('#historial-analistas');
-        await anchor('#analistas');
+    it('counts repeated anchors and identical URL PUSHes', () => {
+        entry('b', 4, '/research/MSFT'); entry('c', 5, '/research/MSFT#a');
+        entry('d', 6, '/research/MSFT#h'); entry('e', 7, '/research/MSFT#a');
         expect(historyBackSteps(stack())).toBe(4);
-        await traverse(-historyBackSteps(stack()));
-        expect(window.location.pathname).toBe('/watchlist');
-        expect(window.location.hash).toBe('');
+        entry('f', 8, '/research/MSFT#a');
+        expect(historyBackSteps(stack())).toBe(5);
+    });
+    it('REPLACE keeps one step and a new PUSH after POP discards forward entries', () => {
+        entry('b', 4, '/b'); entry('r', 4, '/r', 'replace'); entry('c', 5, '/c');
+        entry('r', 4, '/r', 'traverse'); entry('d', 5, '/d');
+        expect(stack()).toEqual(['/watchlist', '/r', '/d']);
+    });
+    it('unknown POP before mount resets, including an adjacent index and same URL', () => {
+        entry('b', 4, '/research/MSFT');
+        entry('unstamped', 2, '/pretracker', 'traverse');
+        expect(stack()).toEqual(['/pretracker']);
+        expect(historyBackSteps(stack())).toBe(0);
+        entry('unknown-forward', 3, '/watchlist', 'traverse');
         expect(stack()).toEqual(['/watchlist']);
     });
-    it('REPLACE changes one entry without introducing a browser step', async () => {
-        window.history.pushState({ nextField: 'x' }, '', '/research/MSFT');
-        window.history.replaceState({ nextField: 'y' }, '', '/research/MSFT?view=tesis');
-        expect(stack()).toEqual(['/watchlist', '/research/MSFT?view=tesis']);
-        expect(window.history.state.nextField).toBe('y');
-        await traverse(-1);
-        expect(stack()).toEqual(['/watchlist']);
-        expect(window.history.state.nextField).toBe('preserve');
-    });
-    it('a PUSH after POP discards the old forward branch', async () => {
-        window.history.pushState(null, '', '/a');
-        window.history.pushState(null, '', '/b');
-        await traverse(-1);
-        window.history.pushState(null, '', '/c');
-        expect(stack()).toEqual(['/watchlist', '/a', '/c']);
-    });
-    it('counts identical URL PUSH entries instead of collapsing them', () => {
-        window.history.pushState(null, '', '/research/MSFT');
-        window.history.pushState(null, '', '/research/MSFT');
-        expect(historyBackSteps(stack())).toBe(2);
-    });
-    it('caps established entries and cannot infer an unknown entry origin', async () => {
-        for (let index = 0; index < 52; index++) window.history.pushState(null, '', `/t${index}`);
+    it('caps entries and resets missing current entry', () => {
+        for (let i = 4; i < 60; i++) entry(String(i), i, `/t${i}`);
         expect(stack()).toHaveLength(50);
-        await traverse(-51);
-        expect(stack()).toHaveLength(1);
-        expect(historyBackSteps(stack())).toBe(0);
+        navigation.currentEntry = null;
+        navigation.dispatchEvent(new Event('currententrychange'));
+        expect(stack()).toEqual([]);
     });
-    it('direct mounts with anchors never manufacture an external origin', async () => {
-        cleanup();
-        window.history.replaceState(null, '', '/research/MSFT');
+    it('has a safe fallback without Navigation API and cleans up listeners', () => {
+        cleanup(); entry('b', 4, '/b'); expect(stack()).toEqual(['/watchlist']);
+        vi.stubGlobal('navigation', undefined);
         cleanup = trackBrowserHistory(window);
-        await anchor('#analistas');
-        expect(historyBackSteps(stack())).toBe(0);
-    });
-    it('cleanup restores methods and stops event tracking', () => {
-        cleanup();
-        const before = stack();
-        window.history.pushState(null, '', '/untracked');
-        window.dispatchEvent(new PopStateEvent('popstate'));
-        expect(stack()).toBe(before);
+        expect(stack()).toEqual([]);
     });
 });

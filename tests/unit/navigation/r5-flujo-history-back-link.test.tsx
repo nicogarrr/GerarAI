@@ -8,6 +8,12 @@ const back = vi.fn();
 const go = vi.fn();
 let pathname = '/watchlist';
 let search = '';
+let navigation: EventTarget & { currentEntry: { key: string; index: number; url: string } };
+function emitNavigation(to: string) {
+    const index = navigation.currentEntry.index + 1;
+    navigation.currentEntry = { key: String(index), index, url: `http://localhost${to}` };
+    navigation.dispatchEvent(Object.assign(new Event('currententrychange'), { navigationType: 'push' }));
+}
 vi.mock('next/navigation', () => ({
     usePathname: () => pathname,
     useSearchParams: () => new URLSearchParams(search),
@@ -18,6 +24,7 @@ import { inAppHistoryStore } from '@/lib/nav/in-app-history';
 
 function navigate(to: string, view: ReturnType<typeof render>) {
     window.history.pushState(null, '', to);
+    emitNavigation(to);
     const [p, q = ''] = to.split('?');
     pathname = p;
     search = q;
@@ -44,10 +51,13 @@ describe('HistoryBackLink en el flujo real', () => {
         vi.spyOn(window.history, 'back').mockImplementation(back);
         pathname = '/watchlist';
         search = '';
+        navigation = Object.assign(new EventTarget(), { currentEntry: { key: 'origin', index: 0, url: 'http://localhost/watchlist' } });
+        vi.stubGlobal('navigation', navigation);
     });
     afterEach(() => {
         inAppHistoryStore.reset();
         vi.restoreAllMocks();
+        vi.unstubAllGlobals();
     });
 
     it('abierta directamente: enlace normal al padre', () => {
@@ -64,6 +74,7 @@ describe('HistoryBackLink en el flujo real', () => {
 
     it('desde la ficha (?view=valoracion): vuelve por historial, sin perder la pestaña', () => {
         pathname = '/research/NVDA';
+        navigation.currentEntry.url = 'http://localhost/research/NVDA?view=valoracion';
         search = 'view=valoracion';
         window.history.replaceState(null, '', `${pathname}${search ? `?${search}` : ''}`);
         const view = render(<Shell />);
@@ -90,7 +101,7 @@ describe('HistoryBackLink en el flujo real', () => {
         act(() => navigate('/research/MSFT', view));
         act(() => {
             window.history.pushState(null, '', '/research/MSFT#historial-analistas');
-            window.dispatchEvent(new HashChangeEvent('hashchange'));
+            emitNavigation('/research/MSFT#historial-analistas');
         });
         fireEvent.click(screen.getByRole('link', { name: 'Volver' }));
         expect(go).toHaveBeenCalledWith(-2);
@@ -99,6 +110,7 @@ describe('HistoryBackLink en el flujo real', () => {
 
     it('Cmd/Ctrl+clic abre el padre como enlace normal', () => {
         pathname = '/research/NVDA';
+        navigation.currentEntry.url = 'http://localhost/research/NVDA?view=valoracion';
         window.history.replaceState(null, '', `${pathname}${search ? `?${search}` : ''}`);
         const view = render(<Shell />);
         act(() => navigate('/insider?ticker=NVDA', view));

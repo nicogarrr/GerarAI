@@ -1,58 +1,39 @@
 import { inAppHistoryStore } from './in-app-history';
 
-const KEY = '__geraraiHistoryEntry';
-let sequence = 0;
+type NavigationEntry = { key: string; index: number; url: string | null };
+type NavigationHistory = EventTarget & { currentEntry: NavigationEntry | null };
 
-/** Track entry identity, not URL identity: repeated links are still PUSHes. */
+/** Only browser-owned entry identities can establish PUSH versus traversal.
+ * Without Navigation API support, use the original safe link, never guess.
+ */
 export function trackBrowserHistory(win: Window): () => void {
-    const history = win.history;
-    const push = history.pushState;
-    const replace = history.replaceState;
-    const url = () => win.location.pathname + win.location.search + win.location.hash;
-    type Entry = { key: number; url: string };
-    let entries: Entry[] = [];
-    let cursor = -1;
-    const publish = () => inAppHistoryStore.replaceStack(entries.slice(0, cursor + 1).map(entry => entry.url));
-    const stamp = (state: unknown, key: number) => ({ ...(state && typeof state === 'object' ? state : {}), [KEY]: key });
-    const add = () => {
-        const entry = { key: ++sequence, url: url() };
-        replace.call(history, stamp(history.state, entry.key), '');
-        entries = [...entries.slice(0, cursor + 1), entry].slice(-50);
-        cursor = entries.length - 1;
-        publish();
-    };
-    add(); // A new mount has no established origin outside this tracker.
-    const pushState: History['pushState'] = function (state, unused, target) {
-        push.call(history, state, unused, target);
-        add();
-    };
-    const replaceState: History['replaceState'] = function (state, unused, target) {
-        const entry = entries[cursor];
-        replace.call(history, stamp(state, entry.key), unused, target);
-        entry.url = url();
-        publish();
-    };
-    const sync = () => {
-        const key = history.state?.[KEY];
-        const index = entries.findIndex(entry => entry.key === key);
-        if (index !== -1 && entries[index].url === url()) {
-            cursor = index;
-            publish();
-        } else {
-            // Native anchor PUSH has no stamp. An unknown POP is not a proven
-            // internal origin, so discard the tracked stack before stamping it.
-            if (key !== undefined) { entries = []; cursor = -1; }
-            add();
+    const navigation = (win as Window & { navigation?: NavigationHistory }).navigation;
+    inAppHistoryStore.replaceStack([]);
+    if (!navigation?.currentEntry) return () => {};
+    const entries = new Map<number, NavigationEntry>();
+    const sync = (event?: Event) => {
+        const kind = (event as Event & { navigationType?: string } | undefined)?.navigationType;
+        const entry = navigation.currentEntry;
+        if (!entry?.url) {
+            entries.clear();
+            inAppHistoryStore.replaceStack([]);
+            return;
         }
+        const known = entries.get(entry.index);
+        // Unknown traversal is not a PUSH, even if its index is adjacent.
+        if (kind === 'traverse' && known?.key !== entry.key) entries.clear();
+        if (kind === 'push') {
+            for (const index of entries.keys()) if (index >= entry.index) entries.delete(index);
+        }
+        entries.set(entry.index, entry);
+        while (entries.size > 50) entries.delete(Math.min(...entries.keys()));
+        const stack = [...entries.values()].filter(item => item.index <= entry.index).sort((a, b) => a.index - b.index).map(item => {
+            const url = new URL(item.url!);
+            return url.pathname + url.search + url.hash;
+        });
+        inAppHistoryStore.replaceStack(stack);
     };
-    history.pushState = pushState;
-    history.replaceState = replaceState;
-    win.addEventListener('popstate', sync);
-    win.addEventListener('hashchange', sync);
-    return () => {
-        if (history.pushState === pushState) history.pushState = push;
-        if (history.replaceState === replaceState) history.replaceState = replace;
-        win.removeEventListener('popstate', sync);
-        win.removeEventListener('hashchange', sync);
-    };
+    sync();
+    navigation.addEventListener('currententrychange', sync);
+    return () => navigation.removeEventListener('currententrychange', sync);
 }
