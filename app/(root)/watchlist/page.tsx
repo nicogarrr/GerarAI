@@ -22,6 +22,7 @@ import WatchlistAddButton from '@/components/watchlist/WatchlistAddButton';
 import DcaLevelBadge from '@/components/watchlist/DcaLevelBadge';
 import { sortWatchlistRows } from '@/lib/watchlist/sort-rows';
 import { peNdNote } from '@/lib/watchlist/pe-nd-reason';
+import { WATCHLIST_ROW_BUDGET_MS } from '@/lib/watchlist/read-budget';
 import { MARKET_CAP_GAP_REASONS, marketCapGapReason, type MarketCapGapReason } from '@/lib/watchlist/market-cap-gap';
 import { emptyWatchlistEntry } from '@/lib/watchlist/entry-fallback';
 import DcaSignalsPanel from '@/components/watchlist/DcaSignalsPanel';
@@ -149,7 +150,7 @@ export default async function WatchlistPage({
     // fuente que Movers y Mercado, etiquetado «Cierre <fecha>», F358), nunca
     // un «sin datos» fabricado ni una espera ilimitada. Las lecturas siguen
     // en vuelo y calientan las cachés para la siguiente carga.
-    const ENTRY_DATA_BUDGET_MS = 3000;
+    const ENTRY_DATA_BUDGET_MS = WATCHLIST_ROW_BUDGET_MS;
     // El master (nombre, bolsa, divisa) en UNA petición agregada al backend,
     // fuera del presupuesto: antes era un GET /api/companies/{ticker} por
     // símbolo y carga (20+ round trips; oleada de 16 medida en prod a ~0,9 s,
@@ -474,7 +475,7 @@ export default async function WatchlistPage({
                                             </Badge>
                                         ) : stock.price === null ? (
                                             <Badge variant="outline" className="mt-1 border-gray-700 text-gray-400">
-                                                {stock.timedOut ? t('watchlist.page.noDataTimedOut') : t('watchlist.page.noData')}
+                                                {stock.timedOut ? t('watchlist.page.noDataTimedOut') : stock.quoteTimedOut ? t('watchlist.page.noDataQuoteTimedOut') : t('watchlist.page.noData')}
                                             </Badge>
                                         ) : null}
                                     </div>
@@ -575,7 +576,7 @@ export default async function WatchlistPage({
                                                             </Badge>
                                                         ) : stock.price === null ? (
                                                             <Badge variant="outline" className="border-gray-700 font-normal text-gray-400">
-                                                                {stock.timedOut ? t('watchlist.page.noDataTimedOut') : t('watchlist.page.noData')}
+                                                                {stock.timedOut ? t('watchlist.page.noDataTimedOut') : stock.quoteTimedOut ? t('watchlist.page.noDataQuoteTimedOut') : t('watchlist.page.noData')}
                                                             </Badge>
                                                         ) : null}
                                                         {stock.monitor && stock.price !== null && stock.monitor.low_52w !== null && stock.monitor.low_52w_sessions >= 120 && stock.price <= stock.monitor.low_52w * 1.02 ? (

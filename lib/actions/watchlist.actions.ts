@@ -16,6 +16,7 @@ import { chartPriceUnit } from '@/lib/market/chart-price-units';
 import { hasPriorClose } from '@/lib/market/session-change';
 import { sessionDateEt } from '@/lib/market/quote-freshness';
 import type { ExtendedQuote } from '@/lib/market/extended-quote';
+import { WATCHLIST_BACKEND_DEADLINE_MS, WATCHLIST_QUOTE_BUDGET_MS, withinBudget } from '@/lib/watchlist/read-budget';
 
 // Helper para obtener userId (researchRequest añade la identidad firmada
 // vía researchIdentityHeaders usando el usuario autenticado).
@@ -176,6 +177,8 @@ export type WatchlistEntryData = {
     quoteSymbol: string | null;
     /** true = la lectura de /api/watchlist/metrics falló (timeout, 5xx, red): una capitalización N/D NO significa que la fuente no la tenga. */
     metricsReadFailed?: boolean;
+    /** true = la cotización no llegó dentro de su propio presupuesto (lib/watchlist/read-budget): sin precio vivo, pero cap/PER del backend sí. */
+    quoteTimedOut?: boolean;
 };
 
 type BackendWatchlistMetrics = components['schemas']['WatchlistMetricsOut'];
@@ -185,11 +188,14 @@ type BackendMetricsRead = { data: BackendWatchlistMetrics | null; failed: boolea
 /** Respaldo propio del backend. Un fallo (timeout, 5xx, red) se distingue de
  *  una respuesta sin dato: antes ambos eran null y la leyenda decía «la fuente
  *  no facilita…» cuando solo no se había podido leer. */
-function fetchBackendMetrics(symbol: string): Promise<BackendMetricsRead> {
-    return researchRequest<BackendWatchlistMetrics>(
-        `/api/watchlist/metrics/${encodeURIComponent(symbol)}`,
+function fetchBackendMetrics(symbol: string, budgetMs: number = WATCHLIST_BACKEND_DEADLINE_MS): Promise<BackendMetricsRead> {
+    // Tope propio (r5-valor3): pasado el presupuesto la lectura cuenta como
+    // fallida («no se pudo leer a tiempo»), nunca como «la fuente no lo da».
+    return withinBudget(
+        researchRequest<BackendWatchlistMetrics>(`/api/watchlist/metrics/${encodeURIComponent(symbol)}`),
+        budgetMs,
     ).then(
-        (data) => ({ data: data ?? null, failed: false }),
+        (read) => (read.timedOut ? { data: null, failed: true } : { data: read.value ?? null, failed: false }),
         () => ({ data: null, failed: true }),
     );
 }
@@ -220,6 +226,7 @@ export async function getWatchlistEntryData(
     precomputedBasics?: ResearchCompanyBasics | null,
 ): Promise<WatchlistEntryData> {
     const normalized = symbol.trim().toUpperCase();
+    const startedAt = Date.now();
     // La página de watchlist resuelve el master en su propia oleada para
     // conservar nombre/divisa aunque la cotización agote su presupuesto;
     // el resto de consumidores (inicio) la leen aquí como siempre.
@@ -239,19 +246,28 @@ export async function getWatchlistEntryData(
     // cumple la igualdad y cotiza en GBX: sus metricas no son las de Finnhub).
     const usListing = isUsQuoteLine(basics, normalized);
     base.metricsNotApplicable = !usListing;
-    const [quote, light, backend] = await Promise.all([
-        getStockQuote(quoteSymbol),
+    // Cada lectura con su propio tope (lib/watchlist/read-budget): antes una
+    // cotización lenta (respaldo Yahoo, hasta 5 s) agotaba el presupuesto de
+    // la fila entera y se perdían también cap y PER del backend, que ya
+    // habían llegado. Una cotización o unas métricas Finnhub cortadas cuentan
+    // como ausentes (sin precio vivo; el cierre datado ocupa la celda).
+    const [quoteRead, lightRead, backend] = await Promise.all([
+        withinBudget(getStockQuote(quoteSymbol), WATCHLIST_QUOTE_BUDGET_MS),
         // La línea US es el listado real: sus métricas Finnhub son de ESTE
         // emisor. Para no-US ni se piden (ADR u homónimo): se usa el
         // respaldo propio del backend research (cap proveedor o derivado
         // precio x acciones; PER = cierre / EPS diluido FY).
         // Solo metric + profile2 (getStockValuationBasics): la versión
         // completa pedía /quote duplicada y /price-target sin uso.
-        usListing ? getStockValuationBasics(normalized) : Promise.resolve(null),
+        usListing
+            ? withinBudget(getStockValuationBasics(normalized), WATCHLIST_QUOTE_BUDGET_MS)
+            : Promise.resolve({ value: null, timedOut: false }),
         !usListing
             ? fetchBackendMetrics(normalized)
             : Promise.resolve(null),
     ]);
+    const quote = quoteRead.value;
+    const light = lightRead.value;
 
     // F358: la cotización llega con frescura validada en origen; solo se
     // muestra precio si hay kind ('live' o 'close' etiquetado), nunca stale.
@@ -280,8 +296,9 @@ export async function getWatchlistEntryData(
     // ventana de despliegues con el proveedor sano): mismo respaldo del
     // backend que las no-US (cap proveedor o derivado precio x acciones,
     // PER cierre/EPS FY), declarado igual («· derivado», «· FY»).
+    // Lo que queda hasta el tope del backend (nunca más allá del corte de la fila).
     const backendUs = usListing && (marketCapM === null || peRatio === null)
-        ? await fetchBackendMetrics(normalized)
+        ? await fetchBackendMetrics(normalized, WATCHLIST_BACKEND_DEADLINE_MS - (Date.now() - startedAt))
         : null;
     const backendRead = backend ?? backendUs;
     const backendAll = backendRead?.data ?? null;
@@ -335,6 +352,7 @@ export async function getWatchlistEntryData(
         priceAsOf,
         metricsNotApplicable: !usListing,
         metricsReadFailed: backendRead?.failed ?? false,
+        quoteTimedOut: quoteRead.timedOut,
     };
 }
 

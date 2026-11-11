@@ -46,6 +46,7 @@
     "next": "Next",
     "noData": "no data",
     "noDataTimedOut": "no data: the read took more than 3 s, reload",
+    "noDataQuoteTimedOut": "no price: the quote did not arrive in time, reload",
     "closeOn": "Close {date}",
     "closeUndated": "Close (no date from the source)",
     "noMetricsTitle": "No data: listed outside the US and the source has no reliable market cap or P/E for that market",
