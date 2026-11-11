@@ -65,10 +65,10 @@ function text(node: unknown): string {
 
 const full = (symbol: string, price: number, extra: Record<string, unknown> = {}) => ({
   symbol, name: symbol, exchange: 'NASDAQ', currency: 'USD', price, change: 1, changePercent: price / 10,
-  marketCap: price * 1000, marketCapDerived: false, peRatio: price / 5, peKind: 'fy', peSource: 'x', peSourceLabel: 'Yahoo',
+  marketCap: price * 1000, marketCapDerived: false, peRatio: price / 5, peKind: 'fy', peSource: 'x',
   priceKind: 'live', priceAsOf: null, quoteSymbol: symbol, metricsNotApplicable: false, ...extra,
 });
-const empty = (symbol: string) => full(symbol, 0, { price: null, change: null, changePercent: null, marketCap: null, peRatio: null, peKind: null, peSourceLabel: null, priceKind: null });
+const empty = (symbol: string) => full(symbol, 0, { price: null, change: null, changePercent: null, marketCap: null, peRatio: null, peKind: null, priceKind: null });
 const item = (symbol: string) => ({ symbol, addedAt: new Date(0), analysis: null });
 const basic = (s: string) => ({ name: s, exchange: 'NASDAQ', currency: 'USD' });
 
@@ -163,6 +163,15 @@ describe('/watchlist escenarios', () => {
     expect(order(await render({ page: '99' })).join(',')).toBe(names(24, 29));
     m.entry.mockImplementation(async (symbol: string) => full(symbol, Number(symbol.slice(1)) + 1));
     expect(order(await render({ page: '2', sort: 'price', dir: 'asc' })).join(',')).toBe(names(12, 23));
+  });
+
+  it('el PER no muestra etiqueta visible de fuente (decisión del dueño 2026-10-31)', async () => {
+    m.state.mockResolvedValue({ items: [item('AAPL')], unavailable: false });
+    const tree = await render();
+    // La celda conserva title={stock.peSource} con la procedencia, pero no se
+    // pinta ninguna etiqueta junto al número. La fixture usa peSource 'x';
+    // cualquier etiqueta visible de proveedor sería un fallo de la directiva.
+    expect(text(tree)).not.toMatch(/· (Finnhub|Yahoo|SEC)/);
   });
 
   it('DatedRow tolera que la promesa de cierres falle y un precio en vivo manda', async () => {

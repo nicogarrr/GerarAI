@@ -25,7 +25,6 @@ export function emptyWatchlistEntry(
         peRatio: null,
         peKind: null,
         peSource: null,
-        peSourceLabel: null,
         priceKind: null,
         priceAsOf: null,
         metricsNotApplicable: false,
