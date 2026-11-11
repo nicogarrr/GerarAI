@@ -25,11 +25,20 @@ from app.services.connectors.form4 import parse_form4_xml
 
 ROOT = Path(__file__).parent / 'fixtures'
 META = ROOT / 'form4/meta_0000950103-26-016314.xml'
+META_BASE_SHA256 = '8b64b5f299d01ca9583247075096a4486ff4b6e54a1457aef749fb0f7b52ef79'
+
+
+def meta_bytes():
+    # Integrity pin against the existing repository base, NOT independent retrieval provenance.
+    raw = META.read_bytes()
+    assert len(raw) == 3835 and hashlib.sha256(raw).hexdigest() == META_BASE_SHA256
+    return raw
+
 AS_OF = date(2026, 11, 11)
 
 
 def test_recorded_meta_plan_is_attributed_by_unique_transaction_note_not_root_alone():
-    parsed = parse_form4_xml(META.read_bytes())
+    parsed = parse_form4_xml(meta_bytes())
     assert parsed['ticker'] == 'META' and len(parsed['transactions']) == 1
     tx = parsed['transactions'][0]
     assert tx['type'] == 'S' and tx['shares'] == 390 and tx['price'] == 640
@@ -42,7 +51,7 @@ def test_recorded_meta_plan_is_attributed_by_unique_transaction_note_not_root_al
     'negated-language', 'note-on-holdings-only', 'shared-note', 'purchase-not-sale', 'duplicate-declaration',
 ])
 def test_controlled_meta_variants_do_not_copy_root_mark_to_transactions(intervention):
-    root = ET.fromstring(META.read_bytes())
+    root = ET.fromstring(meta_bytes())
     tx = root.find('nonDerivativeTable/nonDerivativeTransaction')
     coding = tx.find('transactionCoding')
     note = root.find("footnotes/footnote[@id='F1']")
@@ -72,7 +81,7 @@ def test_controlled_meta_variants_do_not_copy_root_mark_to_transactions(interven
 
 
 def test_mixed_transactions_only_the_uniquely_referenced_sale_is_classified():
-    root = ET.fromstring(META.read_bytes())
+    root = ET.fromstring(meta_bytes())
     table = root.find('nonDerivativeTable')
     other = copy.deepcopy(table[0])
     other.find('transactionCoding').remove(other.find('transactionCoding/footnoteId'))
@@ -168,14 +177,35 @@ def test_recorded_meta_persistence_enriches_unknown_then_excludes_planned_sale(d
     filing = {'accession_number': '0000950103-26-016314', 'form': '4', 'filing_date': '2026-10-28',
               'document_url': 'https://example.com/recorded-meta-fixture.xml'}
     # Controlled removal of attribution first. The original recorded bytes come second.
-    root = ET.fromstring(META.read_bytes())
+    root = ET.fromstring(meta_bytes())
     root.find('nonDerivativeTable/nonDerivativeTransaction/transactionCoding').remove(root.find('nonDerivativeTable/nonDerivativeTransaction/transactionCoding/footnoteId'))
     persist_filing(db, filing, parse_form4_xml(ET.tostring(root)))
     tx = db.scalar(select(InsiderTransaction))
     assert tx.data_quality['alignment_10b5_1'] is None
     legacy = tx.rule_10b5_1
-    persist_filing(db, filing, parse_form4_xml(META.read_bytes()))
+    persist_filing(db, filing, parse_form4_xml(meta_bytes()))
     assert tx.data_quality['alignment_10b5_1'] is True and tx.rule_10b5_1 == legacy
     w = m.insider_windows([(tx, '2026-10-28')], AS_OF)[1]
     assert w['net_value'] == -249600 and w['discretionary_net_value'] == 0
     assert len(w['groups']['planned_sales']) == 1 and not w['groups']['unknown_sales']
+
+
+
+@pytest.mark.parametrize('table_tag,holding_tag', [
+    ('nonDerivativeTable', 'nonDerivativeHolding'), ('derivativeTable', 'derivativeHolding'),
+])
+def test_shared_note_between_sale_and_holding_is_unknown(table_tag, holding_tag):
+    root = ET.fromstring(meta_bytes())
+    table = root.find(table_tag)
+    if table is None:
+        table = ET.SubElement(root, table_tag)
+    holding = ET.SubElement(table, holding_tag)
+    security = ET.SubElement(holding, 'securityTitle')
+    ET.SubElement(security, 'value').text = 'Class A Common Stock'
+    ET.SubElement(security, 'footnoteId', {'id': 'F1'})
+    rows = parse_form4_xml(ET.tostring(root))['transactions']
+    assert len(rows) == 1
+    assert rows[0]['alignment_10b5_1'] is None
+    # Remove only the second reference: unique sale attribution is restored.
+    table.remove(holding)
+    assert parse_form4_xml(ET.tostring(root))['transactions'][0]['alignment_10b5_1'] is True

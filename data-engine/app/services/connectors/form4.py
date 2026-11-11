@@ -342,11 +342,11 @@ def parse_form4_xml(source: str | bytes) -> dict:
             alignment_notes.pop(key, None)
         declared_ids.add(key)
     reference_counts: dict[str, int] = {}
-    for _derivative, nodes in tables:
-        for transaction in nodes:
-            for ref in transaction.iter("footnoteId"):
-                key = ref.get("id") or ""
-                reference_counts[key] = reference_counts.get(key, 0) + 1
+    # Count EVERY document reference, including nonDerivativeHolding and
+    # derivativeHolding. A note reused outside a transaction is not unique.
+    for ref in root.iter("footnoteId"):
+        key = ref.get("id") or ""
+        reference_counts[key] = reference_counts.get(key, 0) + 1
     main_rep = (reporters or [{}])[0]
     multi_reporter = len(reporters) > 1
     if multi_reporter:
