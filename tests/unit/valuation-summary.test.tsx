@@ -118,6 +118,21 @@ describe('shared valuation', () => {
     expect(screen.getByText('Dato pendiente: Beneficios retenidos (ejercicio 2025)')).toBeInTheDocument();
     expect(screen.queryByText(/total_assets|retained_earnings|net_income/)).not.toBeInTheDocument();
   });
+  it('explains the safety-margin formula once per section, not per card', async () => {
+    const other: ValuationSummary = { ...item, ticker: 'OTRO' };
+    vi.mocked(getValuationSummaries).mockResolvedValue({ DEMO: item, OTRO: other });
+    render(<ValuationSummaryGrid quotes={[quote, { ...quote, symbol: 'OTRO' }]} />);
+    await waitFor(() => expect(screen.getByRole('link', { name: 'OTRO' })).toBeInTheDocument());
+    // Con 2+ tarjetas la ayuda se pintaba 2+ veces (6+ en cartera y watchlist).
+    expect(screen.getAllByText(/Solo misma divisa y valor publicable/)).toHaveLength(1);
+  });
+  it('the card itself no longer repeats the formula and keeps the Altman Z double-prime label', () => {
+    render(<ValuationSummaryCard item={item} quote={quote} />);
+    expect(screen.queryByText(/Solo misma divisa y valor publicable/)).toBeNull();
+    // Z'' (doble prima) es una variante real documentada en el backend
+    // (data-engine/app/services/financial_health.py): la etiqueta se queda.
+    expect(screen.getByText(/Altman Z''/)).toBeInTheDocument();
+  });
   it('healthMissingLabel keeps already-written reasons', () => {
     expect(healthMissingLabel('current_liabilities:FY2023')).toBe('Pasivo corriente (ejercicio 2023)');
     expect(healthMissingLabel('long_term_debt')).toBe('Deuda a largo plazo');

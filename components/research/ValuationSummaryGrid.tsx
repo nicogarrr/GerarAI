@@ -47,7 +47,7 @@ export function ValuationSummaryCard({ item, quote }: { item: ValuationSummary; 
         <dd className="text-xs text-gray-400">{valuationSummaryText(fair.label, locale)}{fair.as_of ? ` · ${formatMarketDate(fair.as_of)}` : ''}{fair.stale ? ` · ${t('researchShared.valuationSummary.reviewAge')}` : ''}</dd>
         {fair.value == null && fair.reason ? <dd className="text-xs text-gray-400">{valuationSummaryText(fair.reason, locale)}</dd> : null}
         {baseRate ? <dd className="text-xs text-gray-500">{baseRate}</dd> : null}</div>
-      <div><dt className="text-gray-400">{t('researchShared.valuationSummary.margin')}</dt><dd className="text-gray-100">{margin === null ? na : formatPercent(margin)}</dd><dd className="text-xs text-gray-500">{t('researchShared.valuationSummary.marginHelp')}</dd></div>
+      <div><dt className="text-gray-400">{t('researchShared.valuationSummary.margin')}</dt><dd className="text-gray-100">{margin === null ? na : formatPercent(margin)}</dd></div>
       <div><dt className="text-gray-400">{t('researchShared.valuationSummary.reverseDcf')}</dt><dd className="text-gray-100">{r.status === 'ok' && r.required_revenue_growth != null ? t('researchShared.valuationSummary.perYear', { pct: formatPercent(r.required_revenue_growth) }) : na}</dd>
         {r.as_of ? <dd className="text-xs text-gray-400">{valuationSummaryText(r.source, locale)} · {formatMarketDate(r.as_of)}{r.market_price != null && fair.currency && isValidCurrencyCode(fair.currency) ? t('researchShared.valuationSummary.modelPrice', { price: formatPrice(r.market_price, fair.currency) }) : ''}. {t('researchShared.valuationSummary.scenarioNote')}</dd> : null}
         {r.status !== 'ok' && r.reason ? <dd className="text-xs text-gray-400">{valuationSummaryText(r.reason, locale)}</dd> : null}
@@ -82,6 +82,9 @@ export default function ValuationSummaryGrid({ quotes }: { quotes: SummaryQuote[
   const current = loaded?.key === key ? loaded : null;
   return <section aria-label={t('researchShared.valuationSummary.title')} className="min-w-0 space-y-3">
     <h2 className="text-lg font-semibold text-gray-100">{t('researchShared.valuationSummary.title')}</h2>
+    {/* La formula del margen se explica una vez por seccion: antes iba en cada
+        tarjeta y se repetia tantas veces como empresas (6+ en cartera). */}
+    <p className="text-xs text-gray-500">{t('researchShared.valuationSummary.marginHelp')}</p>
     {!current ? <p role="status" className="text-sm text-gray-400">{t('researchShared.valuationSummary.loading')}</p> : current.failed ? <p className="text-sm text-gray-400">{t('researchShared.valuationSummary.failed')}</p> : <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">{Object.values(current.items).map(item => <ValuationSummaryCard key={item.ticker} item={item} quote={quotes.find(q => q.symbol.toUpperCase() === item.ticker) ?? { symbol: item.ticker, price: null, currency: null }} />)}{Object.keys(current.items).length === 0 ? <p className="text-sm text-gray-400">{t('researchShared.valuationSummary.empty')}</p> : null}</div>}
   </section>;
 }
