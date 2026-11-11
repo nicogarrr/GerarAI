@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.ui_errors import ui_error
 from app.services import market_change, market_themes, movers_cache
+from app.services.bounded_quote_batch import QuoteBatchPool
 from app.services.provenance import SourceKind, coverage_for_age, provenance
 
 router = APIRouter()
@@ -312,6 +313,8 @@ def market_quote(symbol: str) -> dict:
 # llamada por carga en vez de N, y los misses se comparten entre usuarios y
 # workers de gunicorn. Redis caido -> fail-open al fetch directo.
 _QUOTES_BATCH_MAX = 30
+_QUOTES_BATCH_DEADLINE_SECONDS = 6.0
+_quote_batch_pool = QuoteBatchPool(capacity=4)
 _QUOTE_REDIS_PREFIX = "cavaai:market:quote:"
 
 
@@ -350,6 +353,7 @@ def market_quotes_batch(body: MarketQuotesBatchIn) -> dict:
 
     Respuesta por simbolo: payload o null (sin dato NUNCA es error global).
     """
+    deadline = time.monotonic() + _QUOTES_BATCH_DEADLINE_SECONDS
     if len(body.symbols) > _QUOTES_BATCH_MAX:
         raise HTTPException(
             status_code=400,
@@ -383,16 +387,17 @@ def market_quotes_batch(body: MarketQuotesBatchIn) -> dict:
 
     if misses:
         client = _shared_yahoo_client()
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            fetched = list(pool.map(lambda s: _fetch_yahoo_quote(client, s), misses))
-        for symbol, data in zip(misses, fetched):
+        fetched = _quote_batch_pool.fetch(
+            misses, lambda symbol: _fetch_yahoo_quote(client, symbol), deadline,
+        )
+        for symbol, data in fetched.items():
             quotes[symbol] = data
             if not data:
                 continue
             with _quote_cache_lock:
                 if len(_quote_cache) >= _QUOTE_CACHE_MAX:
                     _quote_cache.clear()
-                _quote_cache[symbol] = {"at": now, "data": data}
+                _quote_cache[symbol] = {"at": time.monotonic(), "data": data}
             if redis_client is not None:
                 try:
                     redis_client.set(
