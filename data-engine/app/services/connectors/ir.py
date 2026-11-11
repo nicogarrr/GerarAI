@@ -131,17 +131,17 @@ class IRConnector:
             "Accept": "text/html,application/xhtml+xml",
         }
 
-    async def _fetch(self, url: str) -> str:
+    async def _fetch(self, url: str) -> tuple[str, str]:
         if self.client is not None:
             response = await self.client.get(url, headers=self.headers)
             response.raise_for_status()
-            return response.text
+            return response.text, str(response.url)
         # Sin cliente inyectado: pasa por public_fetch (bloquea IPs privadas,
         # fija la IP resuelta y revalida cada redirección).
-        content, content_type, _final_url = await fetch_public_url_async(
+        content, content_type, final_url = await fetch_public_url_async(
             url, timeout=self.timeout, headers=self.headers
         )
-        return _decode_html(content, content_type)
+        return _decode_html(content, content_type), final_url
 
     async def poll(
         self,
@@ -154,7 +154,7 @@ class IRConnector:
         metadata: dict = {"ir_url": ir_url, "ticker": ticker, "pages_polled": []}
         errors: list[str] = []
         try:
-            root_html = await self._fetch(ir_url)
+            root_html, root_url = await self._fetch(ir_url)
             if not _HTML_SHAPE_RE.search(root_html[:2000]):
                 # 200 sin estructura HTML (JSON de error, texto plano): la
                 # página IR no es tal; la salud la decide solo la página raíz.
@@ -164,15 +164,16 @@ class IRConnector:
             return ConnectorResult.failed("ir", exc, metadata=metadata)
         get_data_source_registry().record_success(_REGISTRY_KEY)
 
-        release_links = discover_press_release_links(root_html, ir_url)
-        pages = discover_press_release_pages(root_html, ir_url)
+        metadata["final_ir_url"] = root_url
+        release_links = discover_press_release_links(root_html, root_url)
+        pages = discover_press_release_pages(root_html, root_url)
         for page_url in pages[: max(0, max_pages)]:
-            if page_url == ir_url:
+            if page_url == root_url:
                 continue
             try:
-                page_html = await self._fetch(page_url)
-                metadata["pages_polled"].append(page_url)
-                release_links.extend(discover_press_release_links(page_html, page_url))
+                page_html, final_page_url = await self._fetch(page_url)
+                metadata["pages_polled"].append(final_page_url)
+                release_links.extend(discover_press_release_links(page_html, final_page_url))
             except Exception as exc:
                 errors.append(f"{page_url}: {exc}")
 
