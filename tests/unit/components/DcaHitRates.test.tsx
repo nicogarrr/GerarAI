@@ -24,7 +24,9 @@ describe('DCA historical evidence display',()=>{
   const fixture=data();fixture.first_period=null;fixture.rows[0].color=color;
   render(<DcaHitRatesCard data={fixture} compact/>);
   expect(screen.queryByText(/n=4/)).not.toBeInTheDocument();
-  expect(screen.getByText('2X')).toHaveStyle({color:color==='#000000'?'#FFFFFF':'#111827'});
+  // Tinta WCAG (readableInk): negra pura sobre fondos claros, blanca sobre oscuros;
+  // antes el umbral YIQ daba gris #111827 (2,04:1 sobre el fondo de reserva #374151).
+  expect(screen.getByText('2X')).toHaveStyle({color:color==='#FFFFFF'?'#000000':'#FFFFFF'});
  });
  it('muestra el tiempo medio en 2X-4X solo con visitas completadas y declara la abierta',()=>{
   const zone_visits={available:true,reason:null,levels:[2,3,4],months_completed:130,first_period:'2015-01',last_period:'2026-09',completed_visits:2,avg_months:2.5,max_months:3,visits:[{start:'2018-06',end:'2018-08',months:3},{start:'2019-01',end:'2019-02',months:2}],open_visit_months:1,params_version:'v1'};
