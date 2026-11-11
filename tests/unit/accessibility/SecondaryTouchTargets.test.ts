@@ -3,7 +3,7 @@ const src=(p:string)=>readFileSync(p,'utf8');
 describe('secondary mobile controls',()=>{
  it('keeps filing and source destinations with44px controls',()=>{
   expect(src('app/(root)/research/[ticker]/filings/page.tsx')).toContain('inline-flex min-h-11 min-w-11');
-  expect(src('app/(root)/research/sources/page.tsx')).toContain('className="h-11 rounded-lg');
+  expect(src('app/(root)/research/sources/page.tsx')).toMatch(/className="h-11[^"]*rounded-lg/);
   expect(src('app/(root)/research/sources/page.tsx')).toContain('min-h-11 min-w-11 items-center text-teal-300');
  });
  it('enlarges only interactive source, disclosure, portfolio and brain controls',()=>{
