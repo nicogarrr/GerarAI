@@ -43,7 +43,7 @@ test('parser adds an explicit nullable flag without changing the shared legacy B
   assert.match(form4, /node\.findtext\("transactionCoding\/aff10b5One"\)/);
   assert.match(form4, /\{"1": True, "true": True, "0": False, "false": False\}\.get\(raw\.strip\(\)\.lower\(\)\)/);
   assert.match(form4, /"rule_10b5_1": _rule_10b5_1\(node, footnotes\)/);
-  assert.match(form4, /"alignment_10b5_1": alignment_plan_flag\(node\)/);
+  assert.match(form4, /"alignment_10b5_1": alignment_plan_flag\(\s*node, root_flag=root\.findtext\("aff10b5One"\)/);
   assert.match(service, /plan = plan if type\(plan\) is bool else None/);
   assert.match(service, /t\["code"\] == "S" and t\["plan"\] is False/);
   assert.match(service, /if not groups\["unknown_sales"\]:/);
