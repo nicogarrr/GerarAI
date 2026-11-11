@@ -54,10 +54,12 @@ def test_feed_urls_are_free_rss_endpoints():
 
 def test_yahoo_items_keep_real_date_and_a_stable_source_label():
     class _Fake(RSSConnector):
-        async def _fetch(self, url):
-            return YAHOO_XML  # _fetch devuelve bytes (contrato de RSSConnector._fetch)
+        async def _fetch(self, url: str) -> tuple[bytes, str]:
+            return YAHOO_XML, url  # contenido y URL efectiva, igual que RSSConnector._fetch
 
     result = asyncio.run(_Fake().poll(yahoo_feed_url("SPCX"), ticker="SPCX"))
+    assert result.status == "ok", result.errors
+    assert len(result.items) == 1
     result = label_yahoo(result)
     item = result.items[0]
     assert item.source == "Yahoo Finance"
