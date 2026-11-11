@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.source_urls import sec_filing_url
+from app.core.source_urls import filed_package_url, linkable_source_url, sec_filing_url
 from app.core.tenancy import tenant_filters
 from app.models.entities import (
     Company,
@@ -58,7 +58,51 @@ def _ratio(a: dict | None, b: dict | None, *, change: bool = False) -> dict:
     return {"value": _round((a["value"] / b["value"] - int(change)) * 100), "sources": [a, b]}
 
 
-def _evidence(fact: FinancialFact, company: Company, today: date, *, allow_dei: bool = False) -> dict | None:
+def _source_date(raw: object) -> date | None:
+    try:
+        return date.fromisoformat(str(raw or "")[:10])
+    except ValueError:
+        return None
+
+
+def _filed_or_known(fact: FinancialFact, url: str) -> tuple[date | None, date | None]:
+    """(fecha de depósito, fecha en que la cifra ya era pública) de un hecho.
+
+    SEC: el depósito del propio hecho. ESEF/CNMV: filings.xbrl.org no da fecha de depósito; el NSM de la FCA sí
+    (``submitted_date`` del informe citado). Sin ella, la descarga del snapshot (``snapshot_fetched_at``) prueba
+    que el informe ya era público ese día: sirve de cota contra la mirada al futuro, nunca como fecha de depósito.
+    """
+    if fact.filed is not None:
+        return fact.filed, fact.filed
+    meta = getattr(fact.source, "metadata_", None) or {}
+    filed = None
+    for src in meta.get("filing_sources") or []:
+        if isinstance(src, dict) and str(src.get("url") or "").strip() == url:
+            filed = _source_date(src.get("submitted_date"))
+            break
+    return filed, filed or _source_date(meta.get("snapshot_fetched_at"))
+
+
+def reporting_currency(facts: list[FinancialFact], company: Company) -> str:
+    """Moneda en la que presenta sus informes: la de los ingresos anuales reportados más recientes.
+
+    No es la de cotización: un ADR o un 40-F (TSM en TWD, CNQ en CAD) cotiza en USD y presenta en su moneda; un
+    emisor ESEF lo deja en ``metadata.reporting_currency``. Sin ingresos reportados, la de cotización.
+    """
+    rows = [f for f in facts if f.metric == "revenue" and f.is_reported and f.fiscal_quarter == "FY"
+            and f.source_type in {"SEC", "ESEF", "CNMV"} and len(str(f.unit or "")) == 3 and str(f.unit).isalpha()]
+    if rows:
+        latest = max(rows, key=lambda f: (f.period, f.filed or date.min, f.id or 0))
+        return str(latest.unit).upper()
+    for f in facts:
+        ccy = str((getattr(f.source, "metadata_", None) or {}).get("reporting_currency") or "")
+        if f.source_type == "ESEF" and len(ccy) == 3 and ccy.isalpha():
+            return ccy.upper()
+    return company.currency
+
+
+def _evidence(fact: FinancialFact, company: Company, today: date, *, allow_dei: bool = False,
+              currency: str | None = None) -> dict | None:
     end = _date(fact.period)
     if (end is None or end > today or not fact.value.is_finite()
             or not fact.is_reported or fact.source_type not in {"SEC", "ESEF", "CNMV"}
@@ -66,19 +110,27 @@ def _evidence(fact: FinancialFact, company: Company, today: date, *, allow_dei: 
                     or allow_dei and fact.metric == "shares_outstanding" and fact.period.endswith(":DEI"))):
         return None
     doc = fact.source
-    # SEC accession, not the generic company listing or another year's document.
-    cik = company.cik
-    if not cik and doc is not None and doc.company_id == company.id:
-        cik = (doc.metadata_ or {}).get("cik")
-    url = sec_filing_url(None, fact.accession_number, cik) if fact.source_type == "SEC" else (doc.source_url if doc else None)
-    filed = fact.filed.isoformat() if fact.filed else None
-    if not _url(url) or not filed or fact.filed > today:
+    if fact.source_type == "SEC":
+        # SEC accession, not the generic company listing or another year's document.
+        cik = company.cik
+        if not cik and doc is not None and doc.company_id == company.id:
+            cik = (doc.metadata_ or {}).get("cik")
+        url = sec_filing_url(None, fact.accession_number, cik)
+    else:
+        # ESEF/CNMV: el informe anual del que sale ESTE ejercicio (metadata.filing_sources), no el snapshot.
+        url = (linkable_source_url(doc.source_url) or filed_package_url(getattr(doc, "metadata_", None), fact.period)
+               if doc is not None else None)
+    if not _url(url):
         return None
-    unit = "shares" if fact.metric in {"shares_outstanding", "shares_diluted"} else company.currency
+    filed, known = _filed_or_known(fact, str(url))
+    # SEC exige su fecha de depósito; un informe ESEF sin ella entra si consta cuándo ya era público.
+    if (fact.source_type == "SEC" and filed is None) or known is None or known > today:
+        return None
+    unit = "shares" if fact.metric in {"shares_outstanding", "shares_diluted"} else (currency or company.currency)
     if fact.unit != unit:
         return None
     return {"value": float(fact.value), "unit": fact.unit, "date": end.isoformat(),
-            "filed": filed, "url": url, "metric": fact.metric, "fact_id": fact.id,
+            "filed": filed.isoformat() if filed else None, "url": url, "metric": fact.metric, "fact_id": fact.id,
             "basis": "dei" if fact.period.endswith(":DEI") else fact.metric}
 
 
@@ -87,16 +139,17 @@ def dilution_years(facts: list[FinancialFact], company: Company, splits: list[Co
     by_year: dict[int, dict[str, dict]] = {}
     annual_year: dict[str, int] = {}
     annual_end: dict[str, date] = {}
+    currency = reporting_currency(facts, company)
     # One annual filing repeats comparative years. A cover belongs to its latest
     # verified close, not whichever comparative happens to be returned last.
     for f in facts:
-        if f.accession_number and f.fiscal_year and f.fiscal_quarter == "FY" and _evidence(f, company, today):
+        if f.accession_number and f.fiscal_year and f.fiscal_quarter == "FY" and _evidence(f, company, today, currency=currency):
             end = date.fromisoformat(f.period[:10])
             if f.accession_number not in annual_end or end > annual_end[f.accession_number]:
                 annual_end[f.accession_number] = end
                 annual_year[f.accession_number] = f.fiscal_year
     for fact in sorted(facts, key=lambda f: (not f.period.endswith(":DEI"), f.filed or date.min, f.id or 0), reverse=True):
-        evidence = _evidence(fact, company, today, allow_dei=fact.accession_number in annual_year)
+        evidence = _evidence(fact, company, today, allow_dei=fact.accession_number in annual_year, currency=currency)
         if evidence is not None:
             if fact.period.endswith(":DEI") and not (annual_end[fact.accession_number] <= date.fromisoformat(evidence["date"]) <= annual_end[fact.accession_number] + timedelta(days=180)):
                 continue
