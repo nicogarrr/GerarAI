@@ -81,6 +81,9 @@ data-engine/storage/raw/
 # fallaba con "Unexpected token Ident", dejando `next dev` en 500 para TODAS las
 # rutas. En Vercel no se reproduce porque allí no existe .venv.
 data-engine/.venv/
+# Sin barra final también: un .venv que es un ENLACE (worktrees que reutilizan el venv de otro checkout)
+# no es un directorio y «data-engine/.venv/» no lo ignora (se coló en #5406).
+data-engine/.venv
 data-engine/venv/
 data-engine/.ruff_cache/
 data-engine/.mypy_cache/
