@@ -28,7 +28,8 @@
       "instrument": "Instrument",
       "price": "Price",
       "change": "Change"
-    }
+    },
+    "providerUnavailable": "Quote provider unavailable. Retrying every minute."
   },
   "metaTitle": "Markets",
   "metaDescription": "Indices, futures, IBEX 35 stocks, commodities and currencies, with the real time of each quote and its source.",

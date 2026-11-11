@@ -28,7 +28,8 @@
       "instrument": "Instrumento",
       "price": "Precio",
       "change": "Cambio"
-    }
+    },
+    "providerUnavailable": "Proveedor de cotizaciones no disponible. Se reintenta cada minuto."
   },
   "metaTitle": "Mercados",
   "metaDescription": "Índices, futuros, acciones del IBEX 35, materias primas y divisas con la hora real de cada cotización y su fuente.",
