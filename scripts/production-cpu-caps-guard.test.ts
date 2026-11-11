@@ -11,11 +11,12 @@ function limits(service: string): string {
     const block = nextService ? rest.slice(0, nextService.index) : rest;
     const deploy = block.indexOf('    deploy:');
     assert.ok(deploy >= 0, 'deploy resource limits must exist');
-    return block.slice(deploy);
+    // Comments document the measured reallocation; they are not YAML values.
+    return block.slice(deploy).split('\n').filter((line) => !line.trimStart().startsWith('#')).join('\n');
 }
 
 test('production backend and default worker preserve measured CPU caps and memory', () => {
-    assert.match(limits('backend'), /limits:\s*\n\s*cpus: "2\.00"\s*\n\s*memory: 2G/);
+    assert.match(limits('backend'), /limits:\s*\n\s*cpus: "2\.00"\s*\n\s*memory: 1472M/);
     // Worker default: 4G desde 2026-10-31 (3G eran el suelo con 1 hilo; el
     // salto a 4 hilos I/O-bound se midio con CPU 0,17 % y 8.709 pendientes).
     assert.match(limits('worker'), /limits:\s*\n\s*cpus: "1\.00"\s*\n\s*memory: 4G/);
@@ -30,4 +31,18 @@ test('default worker does not overlap evidence scans', () => {
     // esperas HTTP. prices va en su propio carril (worker-prices).
     assert.ok(source.includes('"--threads", "${WORKER_THREADS:-4}", "-Q", "default"'));
     assert.ok(!source.includes('"-Q", "default", "prices"'), 'prices fuera del carril default');
+});
+
+function assertGlobalMemoryBudget(compose: string): void {
+    const memory = [...compose.matchAll(/^          memory: ([0-9]+)([MG])$/gm)];
+    assert.ok(memory.length >= 20, 'all production service limits must be counted');
+    const total = memory.reduce((sum, match) => sum + Number(match[1]) * (match[2] === 'G' ? 1024 : 1), 0);
+    assert.ok(total <= 16384, `stack memory ${total} MiB exceeds 16384 MiB`);
+}
+
+test('backend reallocation preserves global memory budget and rejects old 2G', () => {
+    assertGlobalMemoryBudget(source);
+    const mutant = source.replace('memory: 1472M', 'memory: 2G');
+    assert.notEqual(mutant, source, 'negative control must mutate backend limit');
+    assert.throws(() => assertGlobalMemoryBudget(mutant), /stack memory 16960 MiB exceeds 16384 MiB/);
 });
