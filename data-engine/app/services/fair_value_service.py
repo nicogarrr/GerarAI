@@ -118,6 +118,7 @@ def choose(
     today: date | None = None,
     max_age_days: int = THESIS_MAX_AGE_DAYS,
     engine_block: EngineBlock | None = None,
+    absence: str | None = None,
 ) -> dict:
     """Aplica la precedencia. Función pura: la usan todos los consumidores.
 
@@ -201,7 +202,10 @@ def choose(
             )
         missing_inputs = []
     else:
-        reason = None
+        # Regla «vj-sin-candidato-v1»: ni tesis ni valoración del motor dan cifra. El «Sin valor justo» nunca
+        # sale mudo: ``absence`` es el motivo exacto que arma quien consultó la base (``_no_candidate_reason``);
+        # sin él, el motivo general (no hay tesis publicada ni valoración del motor).
+        reason = absence or _no_candidate_reason(None, ENGINE_GAP_NO_RUN)
         missing_inputs = []
     return {
         "value": None,
@@ -215,6 +219,86 @@ def choose(
         "reason": reason,
         "missing_inputs": missing_inputs,
     }
+
+
+# Motivos del lado del motor cuando no hay candidato ni corrida ``insufficient_data`` (regla «vj-sin-candidato-v1»).
+ENGINE_GAP_NO_RUN = "no_run"  # ninguna valoración del motor guardada para la empresa
+ENGINE_GAP_NO_OUTPUT = "no_output"  # corrida guardada sin resultado
+ENGINE_GAP_NON_POSITIVE = "non_positive"  # el resultado no trae un valor por acción positivo
+ENGINE_GAP_ADR = "adr_without_listed"  # ADR sin valor por acción cotizada
+ENGINE_GAP_FAILED = "failed"  # el cálculo en vivo falló
+ENGINE_GAP_NO_VALUE_LIVE = "no_value_live"  # el cálculo en vivo respondió sin valor por acción positivo
+
+
+@dataclass(frozen=True)
+class EngineGap:
+    """Por qué el motor no aporta candidato (sin ser ``insufficient_data``)."""
+
+    kind: str
+    as_of: date | None = None
+
+
+def _engine_gap_text(gap: EngineGap | str, english: bool) -> str:
+    gap = gap if isinstance(gap, EngineGap) else EngineGap(kind=gap)
+    when = (
+        (" from " if english else " del ") + readable_date(gap.as_of, "en" if english else "es")
+        if gap.as_of else ""
+    )
+    if english:
+        texts = {
+            ENGINE_GAP_NO_RUN: "no engine valuation is stored for this company",
+            ENGINE_GAP_NO_OUTPUT: f"the latest stored engine valuation{when} has no result",
+            ENGINE_GAP_NON_POSITIVE: f"the latest stored engine valuation{when} gives no positive value per share",
+            ENGINE_GAP_ADR: f"the latest stored engine valuation{when} has no value per listed share (ADR)",
+            ENGINE_GAP_FAILED: "the valuation engine failed while calculating",
+            ENGINE_GAP_NO_VALUE_LIVE: "the valuation engine gave no positive value per share",
+        }
+    else:
+        texts = {
+            ENGINE_GAP_NO_RUN: "no hay ninguna valoración del motor guardada para esta empresa",
+            ENGINE_GAP_NO_OUTPUT: f"la última valoración del motor guardada{when} no tiene resultado",
+            ENGINE_GAP_NON_POSITIVE: (
+                f"la última valoración del motor guardada{when} no da un valor por acción positivo"
+            ),
+            ENGINE_GAP_ADR: (
+                f"la última valoración del motor guardada{when} no trae valor por acción cotizada (ADR)"
+            ),
+            ENGINE_GAP_FAILED: "el motor de valoración falló al calcular",
+            ENGINE_GAP_NO_VALUE_LIVE: "el motor de valoración no dio un valor por acción positivo",
+        }
+    return texts.get(gap.kind, texts[ENGINE_GAP_NO_RUN])
+
+
+def _no_candidate_reason(thesis_gap: str | None, engine_gap: EngineGap | str) -> str:
+    """Motivo exacto del «Sin valor justo» cuando ni la tesis ni el motor dan cifra.
+
+    ``thesis_gap``: por qué la última tesis publicada no sirve (``thesis_candidates(gaps=...)``) o None si
+    no hay ninguna tesis publicada con valor.
+    """
+    english = current_language() == "en"
+    if thesis_gap:
+        thesis_text = thesis_gap
+    else:
+        thesis_text = "There is no published thesis" if english else "No hay tesis publicada"
+    joiner = " and " if english else " y "
+    return f"{thesis_text}{joiner}{_engine_gap_text(engine_gap, english)}."
+
+
+def _thesis_gap_text(row: ThesisVersion, withheld: str | None) -> str:
+    english = current_language() == "en"
+    if withheld:
+        if english:
+            from app.services.thesis_publication_gate import withheld_reason_en
+
+            withheld = withheld_reason_en(withheld)
+        detail = withheld.strip().rstrip(".")
+        detail = detail[:1].lower() + detail[1:]
+        if english:
+            return f"The latest published thesis (v{int(row.version)}) is withheld ({detail})"
+        return f"La última tesis publicada (v{int(row.version)}) está retenida ({detail})"
+    if english:
+        return f"The latest published thesis (v{int(row.version)}) has no value per listed share"
+    return f"La última tesis publicada (v{int(row.version)}) no trae valor por acción cotizada"
 
 
 def _reading(source: str, candidate: Candidate, *, stale: bool, rule: str) -> dict:
@@ -319,8 +403,14 @@ def _thesis_input_freshness(
     return {int(row.company_id): int(row.company_id) not in stale for row in rows}
 
 
-def thesis_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Candidate]:
-    """Última tesis publicada con valor y modelo actual publicable (fail-closed)."""
+def thesis_candidates(
+    db: Session, company_ids: Iterable[int], *, gaps: dict[int, str] | None = None
+) -> dict[int, Candidate]:
+    """Última tesis publicada con valor y modelo actual publicable (fail-closed).
+
+    ``gaps`` (opcional) recibe, por empresa, por qué su última tesis publicada no es candidata (retenida por la
+    puerta de publicación o sin valor por acción cotizada): el motivo del «Sin valor justo».
+    """
     ids = list(company_ids)
     if not ids:
         return {}
@@ -355,10 +445,14 @@ def thesis_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Cand
     out: dict[int, Candidate] = {}
     for row in rows:
         if reasons[row.id]:
+            if gaps is not None:
+                gaps[int(row.company_id)] = _thesis_gap_text(row, reasons[row.id])
             continue  # el archivo no es evidencia de una valoración publicable actual
         basis = row.valuation_basis if isinstance(row.valuation_basis, dict) else {}
         value = listed_value(basis, fallback={"expected_value": row.expected_value})
         if value is None:
+            if gaps is not None:
+                gaps[int(row.company_id)] = _thesis_gap_text(row, None)
             continue
         out[int(row.company_id)] = Candidate(
             value=value,
@@ -462,7 +556,7 @@ def _engine_block(model: ValuationModel) -> EngineBlock:
 
 
 def persisted_engine_readings(
-    db: Session, company_ids: Iterable[int]
+    db: Session, company_ids: Iterable[int], *, gaps: dict[int, EngineGap] | None = None
 ) -> tuple[dict[int, Candidate], dict[int, EngineBlock]]:
     """Última corrida PERSISTIDA del motor por empresa (lectura barata, por lotes).
 
@@ -475,6 +569,9 @@ def persisted_engine_readings(
     empresa queda sin candidato y con su :class:`EngineBlock`. La caducidad
     de los borradores orientativos se aplica en ``choose`` (misma regla para
     la via por lotes y la individual).
+
+    ``gaps`` (opcional) recibe, por empresa sin candidato ni bloqueo, por qué el motor no aporta cifra
+    (:class:`EngineGap`: sin corrida guardada, corrida sin resultado, valor no positivo o ADR sin valor cotizado).
     """
     ids = list(company_ids)
     if not ids:
@@ -495,6 +592,8 @@ def persisted_engine_readings(
         .where(ranked.c.rank == 1)
     ).all()
     if not models:
+        if gaps is not None:
+            gaps.update({int(company_id): EngineGap(kind=ENGINE_GAP_NO_RUN) for company_id in ids})
         return {}, {}
     blocks = {
         int(model.company_id): _engine_block(model)
@@ -510,6 +609,7 @@ def persisted_engine_readings(
         else []
     )
     out: dict[int, Candidate] = {}
+    payload_gaps: dict[int, str] = {}
     for output in outputs:
         model = by_model[output.valuation_model_id]
         company_id = int(model.company_id)
@@ -517,6 +617,9 @@ def persisted_engine_readings(
             continue
         value = _engine_value(output.output_payload)
         if value is None:
+            payload = output.output_payload if isinstance(output.output_payload, dict) else {}
+            adr = bool(payload.get("adr_ratio")) and not isinstance(payload.get("listed_share_values"), dict)
+            payload_gaps.setdefault(company_id, ENGINE_GAP_ADR if adr else ENGINE_GAP_NON_POSITIVE)
             continue
         out[company_id] = Candidate(
             value=value,
@@ -525,6 +628,18 @@ def persisted_engine_readings(
             estimated_inputs=_estimated_inputs(output.output_payload),
             method_label=_method_label(output.output_payload),
         )
+    if gaps is not None:
+        models_by_company = {int(model.company_id): model for model in models}
+        for company_id in ids:
+            if company_id in out or company_id in blocks:
+                continue
+            model = models_by_company.get(company_id)
+            if model is None:
+                gaps[company_id] = EngineGap(kind=ENGINE_GAP_NO_RUN)
+            else:
+                gaps[company_id] = EngineGap(
+                    kind=payload_gaps.get(company_id, ENGINE_GAP_NO_OUTPUT), as_of=_as_date(model.created_at)
+                )
     return out, blocks
 
 
@@ -540,15 +655,21 @@ def resolve_fair_values(
     """Valor justo por empresa (por lotes, sin recalcular el motor)."""
     companies = list(companies)
     ids = [int(company.id) for company in companies]
-    theses = thesis_candidates(db, ids)
-    engines, blocks = persisted_engine_readings(db, ids)
+    thesis_gaps: dict[int, str] = {}
+    engine_gaps: dict[int, EngineGap] = {}
+    theses = thesis_candidates(db, ids, gaps=thesis_gaps)
+    engines, blocks = persisted_engine_readings(db, ids, gaps=engine_gaps)
     out: dict[int, dict] = {}
     for company in companies:
+        company_id = int(company.id)
         reading = choose(
-            theses.get(int(company.id)),
-            engines.get(int(company.id)),
+            theses.get(company_id),
+            engines.get(company_id),
             today=today,
-            engine_block=blocks.get(int(company.id)),
+            engine_block=blocks.get(company_id),
+            absence=_no_candidate_reason(
+                thesis_gaps.get(company_id), engine_gaps.get(company_id, EngineGap(kind=ENGINE_GAP_NO_RUN))
+            ),
         )
         reading["ticker"] = str(company.ticker).upper()
         reading["currency"] = company.currency
@@ -618,9 +739,11 @@ def resolve_fair_value(
     vigente), para no pagar el cálculo completo cuando no va a ganar.
     """
     today = today or date.today()
-    thesis = thesis_candidates(db, [int(company.id)]).get(int(company.id))
+    thesis_gaps: dict[int, str] = {}
+    thesis = thesis_candidates(db, [int(company.id)], gaps=thesis_gaps).get(int(company.id))
     engine: Candidate | None = None
     block: EngineBlock | None = None
+    engine_gap: EngineGap = EngineGap(kind=ENGINE_GAP_NO_RUN)
     thesis_fresh = (
         thesis is not None
         and thesis.as_of is not None
@@ -638,7 +761,16 @@ def resolve_fair_value(
             try:
                 result = ValuationService().value_company(db, company)
             except Exception:  # noqa: BLE001 - un motor caído degrada a «sin valor»
+                logger.warning("fair value: el motor falló al calcular %s", company.ticker, exc_info=True)
                 result = {}
+                engine_gap = EngineGap(kind=ENGINE_GAP_FAILED)
+            else:
+                engine_gap = EngineGap(
+                    kind=ENGINE_GAP_ADR
+                    if isinstance(result, dict) and result.get("adr_ratio")
+                    and not isinstance(result.get("listed_share_values"), dict)
+                    else ENGINE_GAP_NO_VALUE_LIVE
+                )
             value = _engine_value(result)
             if value is not None:
                 engine = Candidate(
@@ -663,10 +795,18 @@ def resolve_fair_value(
                     as_of=today,
                 )
         else:
-            engines, blocks = persisted_engine_readings(db, [int(company.id)])
+            engine_gaps: dict[int, EngineGap] = {}
+            engines, blocks = persisted_engine_readings(db, [int(company.id)], gaps=engine_gaps)
             engine = engines.get(int(company.id))
             block = blocks.get(int(company.id))
-    reading = choose(thesis, engine, today=today, engine_block=block)
+            engine_gap = engine_gaps.get(int(company.id), engine_gap)
+    reading = choose(
+        thesis,
+        engine,
+        today=today,
+        engine_block=block,
+        absence=_no_candidate_reason(thesis_gaps.get(int(company.id)), engine_gap),
+    )
     reading["ticker"] = str(company.ticker).upper()
     reading["currency"] = company.currency
     return reading
