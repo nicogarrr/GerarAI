@@ -305,3 +305,22 @@ def test_default_worker_db_pool_covers_its_threads():
     env = _service_env(compose, "worker")
     assert env.get("DB_POOL_SIZE") == "${WORKER_DB_POOL_SIZE:-8}"
 
+
+
+def test_web_push_configuration_reaches_all_notification_processes():
+    """An env file alone is not inherited by containers with explicit env maps."""
+    compose = _load_compose()
+    expected = {
+        'WEB_PUSH_ENABLED': '${WEB_PUSH_ENABLED:-false}',
+        'VAPID_PUBLIC_KEY': '${VAPID_PUBLIC_KEY:-}',
+        'VAPID_PRIVATE_KEY': '${VAPID_PRIVATE_KEY:-}',
+        'VAPID_SUBJECT': '${VAPID_SUBJECT:-}',
+        'WEB_PUSH_TIMEOUT_SECONDS': '${WEB_PUSH_TIMEOUT_SECONDS:-10}',
+    }
+    for service in ('backend', 'worker', 'worker-kpis', 'worker-alerts', 'worker-gdelt'):
+        env = _service_env(compose, service)
+        for key, value in expected.items():
+            assert env.get(key) == value, (service, key)
+    # No push keys in services that do not send notifications.
+    for service in ('postgres', 'redis', 'qdrant', 'minio', 'caddy', 'scheduler'):
+        assert not (expected.keys() & _service_env(compose, service).keys()), service

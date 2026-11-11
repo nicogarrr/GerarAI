@@ -69,6 +69,16 @@ x-worker-db-env: &worker-db-env
   DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-30}
   DB_POOL_RECYCLE: ${DB_POOL_RECYCLE:-1800}
 
+# Web Push necesita llegar tanto a la API de suscripcion como a los procesos
+# que entregan alertas. Un .env no se inyecta si el mapa environment lo omite.
+# Apagado y sin claves por defecto: este cableado no habilita ningun envio.
+x-web-push-env: &web-push-env
+  WEB_PUSH_ENABLED: ${WEB_PUSH_ENABLED:-false}
+  VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+  VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+  VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+  WEB_PUSH_TIMEOUT_SECONDS: ${WEB_PUSH_TIMEOUT_SECONDS:-10}
+
 # Configuracion LLM compartida por los procesos que generan texto.
 x-llm-env: &llm-env
   LLM_ENABLED: ${LLM_ENABLED:-true}
@@ -312,7 +322,7 @@ services:
     container_name: cavaai-backend
     restart: unless-stopped
     environment:
-      <<: [*app-env, *llm-env]
+      <<: [*app-env, *llm-env, *web-push-env]
       EIA_API_KEY: ${EIA_API_KEY:-}
       IBKR_FLEX_TOKEN: ${IBKR_FLEX_TOKEN:-}
       IBKR_FLEX_QUERY_ID: ${IBKR_FLEX_QUERY_ID:-}
@@ -442,7 +452,7 @@ services:
     restart: unless-stopped
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "${WORKER_THREADS:-4}", "-Q", "default"]
     environment:
-      <<: [*app-env, *worker-db-env, *llm-env]
+      <<: [*app-env, *worker-db-env, *llm-env, *web-push-env]
       # 4 hilos por proceso: con el pool por defecto (4+2) los hilos se
       # serializaban esperando conexion. Mismo knob WORKER_DB_POOL_SIZE con
       # defecto 8 solo en este servicio: 8+2 = 10 conexiones; el presupuesto
@@ -769,7 +779,7 @@ services:
     # ahogaba los 2 hilos compartidos y los KPI morian de inanicion.
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "4", "-Q", "kpis"]
     environment:
-      <<: [*app-env, *worker-db-env, *llm-env]
+      <<: [*app-env, *worker-db-env, *llm-env, *web-push-env]
       # Limita prefetch local; HLEN sigue contando los jobs en curso.
       dramatiq_queue_prefetch: "4"
       dramatiq_delay_queue_prefetch: "4"
@@ -850,7 +860,7 @@ services:
     # libre. CPU compartida baja (0.20) porque en el mismo host corre spotdl.
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "2", "-Q", "alerts", "computed"]
     environment:
-      <<: [*app-env, *worker-db-env, *llm-env]
+      <<: [*app-env, *worker-db-env, *llm-env, *web-push-env]
       # Claves de mercado que usa el servicio de precios del carril computed
       # (refresh_propicks_prices): sin ellas el contraste FMP/Finnhub degrada
       # en silencio como en el worker default.
@@ -910,7 +920,7 @@ services:
     # por su cuenta y la tasa combinada provocaria 429 en tormenta.
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "2", "-Q", "gdelt"]
     environment:
-      <<: [*app-env, *worker-db-env]
+      <<: [*app-env, *worker-db-env, *web-push-env]
       FMP_API_KEY: ${FMP_API_KEY:-}
       FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
       FRED_API_KEY: ${FRED_API_KEY:-}
