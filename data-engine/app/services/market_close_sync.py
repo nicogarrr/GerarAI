@@ -13,7 +13,6 @@ import logging
 from collections.abc import Callable, Iterable
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -27,12 +26,15 @@ from app.services.propicks_price_service import (
     upsert_prices,
     yahoo_symbol,
 )
+from app.services.us_market_session import (
+    NY_TZ as _NY,
+)
+from app.services.us_market_session import (
+    SESSION_CLOSED_AFTER as _SESSION_CLOSED_AFTER,
+)
 
 logger = logging.getLogger(__name__)
 
-_NY = ZoneInfo("America/New_York")
-# Una barra del dia en curso solo es cierre cuando la sesion US ya termino.
-_SESSION_CLOSED_AFTER = (16, 30)
 CHUNK = 100
 MIN_TARGET_COVERAGE = 0.90
 
@@ -45,13 +47,6 @@ def last_completed_us_session(now: datetime) -> date:
     while day.weekday() >= 5:
         day -= timedelta(days=1)
     return day
-
-
-def _session_open(now: datetime) -> bool:
-    local = now.astimezone(_NY)
-    if local.weekday() >= 5:
-        return False
-    return (local.hour, local.minute) < _SESSION_CLOSED_AFTER
 
 
 def sync_official_closes(
