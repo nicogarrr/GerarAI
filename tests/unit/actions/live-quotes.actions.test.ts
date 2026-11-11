@@ -9,7 +9,8 @@ vi.mock('@/lib/auth/require-user', () => ({ requireAuthenticatedUser }));
 vi.mock('@/lib/cache/memoryTTL', () => ({
     cachedFetch: (...args: unknown[]) => { cacheArgs.push(args); return (args[1] as () => Promise<unknown>)(); },
 }));
-vi.mock('@/lib/market/live-quotes', () => ({
+vi.mock('@/lib/market/live-quotes', async (importOriginal) => ({
+    ...await importOriginal<typeof import('@/lib/market/live-quotes')>(),
     LIVE_QUOTE_GROUPS: [
         { key: 'indices', specs: [{ symbol: '^GSPC' }, { symbol: '^IBEX' }] },
         { key: 'divisas', specs: [{ symbol: 'EURUSD=X' }] },
@@ -43,21 +44,21 @@ describe('getLiveMarkets', () => {
         expect(typeof result.fetchedAt).toBe('number');
     });
 
-    it('fetch que lanza -> null para ese símbolo', async () => {
+    it('fallo total lanza, no es una actualización válida', async () => {
         fetchMock.mockRejectedValue(new Error('timeout'));
-        const result = await getLiveMarkets();
-        expect(result.groups.flatMap((g) => g.quotes)).toEqual([null, null, null]);
+        await expect(getLiveMarkets()).rejects.toThrow('live_quotes_unavailable');
     });
 
     it('respuesta sin meta -> parseYahooQuote recibe null y decide', async () => {
         fetchMock.mockResolvedValue({ ok: true, json: async () => ({ chart: { result: [] } }) } as unknown as Response);
         parseYahooQuote.mockReturnValue(null);
-        await getLiveMarkets();
+        await expect(getLiveMarkets()).rejects.toThrow('live_quotes_unavailable');
         expect(parseYahooQuote).toHaveBeenCalledWith(expect.objectContaining({ symbol: '^GSPC' }), null, expect.anything());
     });
 
     it('usa la caché compartida con TTL 55 (bajo el poll de 60 s)', async () => {
-        fetchMock.mockResolvedValue({ ok: false } as Response);
+        fetchMock.mockResolvedValue({ ok: true, json: async () => ({ chart: { result: [{ meta: {} }] } }) } as unknown as Response);
+        parseYahooQuote.mockReturnValue({ price: 6000 });
         await getLiveMarkets();
         expect(cacheArgs[0][0]).toBe('live-markets:v2');
         expect(cacheArgs[0][2]).toBe(55);

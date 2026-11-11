@@ -36,14 +36,14 @@ const PANEL_DATA: LiveMarketsResult = {
 describe('Mercados en directo en inglés', () => {
     it('panel en inglés', () => {
         render(<LocaleProvider locale="en"><LiveMarketsPanel initial={null} /></LocaleProvider>);
-        expect(screen.getByText('No data yet')).toBeTruthy();
+        expect(screen.getAllByText('Quote provider unavailable. Retrying every minute.')[0]).toBeTruthy();
         expect(screen.getByRole('tab', { name: 'Commodities' })).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Refresh now' })).toBeTruthy();
     });
 
     it('en español no cambia', () => {
         render(<LocaleProvider locale="es"><LiveMarketsPanel initial={null} /></LocaleProvider>);
-        expect(screen.getByText('Sin datos todavía')).toBeTruthy();
+        expect(screen.getAllByText('Proveedor de cotizaciones no disponible. Se reintenta cada minuto.')[0]).toBeTruthy();
         expect(screen.getByRole('tab', { name: 'Materias primas' })).toBeTruthy();
     });
 

@@ -6,6 +6,7 @@ import { RefreshCcw } from 'lucide-react';
 import { getLiveMarkets } from '@/lib/actions/live-quotes.actions';
 import {
     formatQuoteAge,
+    hasLiveQuotes,
     formatQuoteChange,
     formatQuoteChangePercent,
     localizeInstrumentType,
@@ -123,14 +124,16 @@ function QuoteRow({ spec, quote, fetchedAt }: { spec: LiveQuoteSpec; quote: Live
 export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | null }) {
     const t = useT();
     const locale = useLocale();
-    const [data, setData] = useState<LiveMarketsResult | null>(initial);
+    const [data, setData] = useState<LiveMarketsResult | null>(() => hasLiveQuotes(initial) ? initial : null);
     const [refreshing, setRefreshing] = useState(false);
-    const [failed, setFailed] = useState(false);
+    const [failed, setFailed] = useState(() => !hasLiveQuotes(initial));
 
     const refresh = useCallback(async () => {
         setRefreshing(true);
         try {
             const next = await getLiveMarkets();
+            // Also guard old cached/all-null responses during a rolling update.
+            if (!hasLiveQuotes(next)) throw new Error('live_quotes_unavailable');
             setData(next);
             setFailed(false);
         } catch {
@@ -159,11 +162,11 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
     return (
         <div className="mt-4">
             <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
-                <span>
+                <span role="status" aria-live="polite">
                     {data
                         ? t('markets.live.updatedAt', { time: timeFormatter(locale).format(new Date(data.fetchedAt)) })
-                        : t('markets.live.noData')}
-                    {failed ? t('markets.live.lastFailed') : ''}
+                        : t('markets.live.providerUnavailable')}
+                    {failed && data ? t('markets.live.lastFailed') : ''}
                 </span>
                 <Button className="min-w-11" variant="ghost" size="sm" onClick={refresh} disabled={refreshing} aria-label={t('markets.live.refresh')}>
                     <RefreshCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -205,7 +208,7 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                                 </table>
                             ) : (
                                 <p className="py-6 text-center text-sm text-gray-500">
-                                    {t('markets.live.groupEmpty')}
+                                    {t(data ? 'markets.live.groupEmpty' : 'markets.live.providerUnavailable')}
                                 </p>
                             )}
                         </TabsContent>

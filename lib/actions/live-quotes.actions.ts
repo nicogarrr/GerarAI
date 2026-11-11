@@ -4,6 +4,7 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { cachedFetch } from '@/lib/cache/memoryTTL';
 import {
     LIVE_QUOTE_GROUPS,
+    hasLiveQuotes,
     parseYahooQuote,
     yahooChartRequest,
     type LiveMarketsResult,
@@ -50,13 +51,17 @@ async function fetchAll(): Promise<LiveMarketsResult> {
         }
     };
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, specs.length) }, worker));
-    return {
+    const snapshot: LiveMarketsResult = {
         fetchedAt: Date.now(),
         groups: LIVE_QUOTE_GROUPS.map((group) => ({
             key: group.key,
             quotes: group.specs.map((spec) => results.get(spec.symbol) ?? null),
         })),
     };
+    // Reject inside the cache fetcher: outages must not be cached as a fresh
+    // successful snapshot. Partial failures still return per-row nulls.
+    if (!hasLiveQuotes(snapshot)) throw new Error('live_quotes_unavailable');
+    return snapshot;
 }
 
 /**

@@ -421,6 +421,11 @@ export interface LiveMarketsResult {
     groups: { key: LiveQuoteKind; quotes: (LiveQuote | null)[] }[];
 }
 
+/** A successful snapshot needs at least one usable provider quote. */
+export function hasLiveQuotes(result: LiveMarketsResult | null): result is LiveMarketsResult {
+    return result !== null && result.groups.some((group) => group.quotes.some((quote) => quote !== null));
+}
+
 /** Fila del panel: la identidad del instrumento siempre presente, cotice o no. */
 export interface LiveQuoteRow {
     spec: LiveQuoteSpec;
