@@ -19,6 +19,14 @@ def enqueue_tracked_analysis(db: Session, ticker: str) -> None:
     tenant = db.info.get('tenant_id')
     if tenant is None or not db.info.get('user_id'):
         return
+    # Explicit tenant predicate: direct callers and periodic backfill share
+    # this guard. Never interpret a different tenant's paused row as ours.
+    paused = db.scalar(select(WatchItem.id).where(
+        WatchItem.tenant_id == tenant, WatchItem.symbol == ticker.strip().upper(),
+        WatchItem.auto_analysis_enabled.is_(False),
+    ))
+    if paused is not None:
+        return
     now = datetime.now(UTC)
     # Serialize quota and enqueue across workers, including different tickers.
     _lock_generation(db, tenant, 'tracked-daily-quota', False)
@@ -104,18 +112,19 @@ def backfill_watchlist_theses(db: Session, *, limit: int = DAILY_LIMIT) -> dict:
     salieron «datos insuficientes» cuando faltaba un dato que ya puede estar.
     Reutiliza ``enqueue_tracked_analysis`` (dedupe por día, tope diario por
     tenant, nunca dos generaciones activas del mismo ticker).
+    Una fila pausada (auto_analysis_enabled=False) queda fuera de esta pasada;
+    no cancela trabajos ya encolados o en ejecucion.
     """
     from app.models import Company, ThesisVersion
 
     if db.info.get("tenant_id") is None:
         return {"status": "skipped", "reason": "sin tenant"}
     tenant = db.info["tenant_id"]
-    symbols = [
-        item.symbol
-        for item in db.scalars(
-            select(WatchItem).where(WatchItem.tenant_id == tenant).order_by(WatchItem.id)
-        ).all()
-    ]
+    items = list(db.scalars(
+        select(WatchItem).where(WatchItem.tenant_id == tenant).order_by(WatchItem.id)
+    ).all())
+    symbols = [item.symbol for item in items]
+    paused = {item.symbol for item in items if not item.auto_analysis_enabled}
     if not symbols:
         return {"status": "ok", "enqueued": [], "skipped": {}}
     now = datetime.now(UTC)
@@ -140,6 +149,9 @@ def backfill_watchlist_theses(db: Session, *, limit: int = DAILY_LIMIT) -> dict:
     enqueued: list[str] = []
     skipped: dict[str, str] = {}
     for symbol in symbols:
+        if symbol in paused:
+            skipped[symbol] = "analisis_pausado"
+            continue
         if len(enqueued) >= limit:
             skipped[symbol] = "tope_diario"
             continue

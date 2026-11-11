@@ -15018,6 +15018,8 @@ export interface components {
         };
         /** WatchItemCreate */
         WatchItemCreate: {
+            /** Auto Analysis Enabled */
+            auto_analysis_enabled?: boolean | null;
             /** Company */
             company?: string | null;
             /** Symbol */
@@ -15057,6 +15059,11 @@ export interface components {
         /** WatchlistItemOut */
         WatchlistItemOut: {
             analysis: components["schemas"]["WatchlistAnalysisStateOut"] | null;
+            /**
+             * Auto Analysis Enabled
+             * @default true
+             */
+            auto_analysis_enabled: boolean;
             /** Company */
             company: string | null;
             /** Created At */

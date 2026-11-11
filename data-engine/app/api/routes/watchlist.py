@@ -57,6 +57,8 @@ class WatchItemCreate(BaseModel):
         min_length=1, max_length=20, pattern=r"^[A-Za-z0-9]+(?:[.\-][A-Za-z0-9]+)*$"
     )
     company: str | None = Field(default=None, max_length=255)
+    # Omitted on upsert preserves the saved choice; new rows default to True.
+    auto_analysis_enabled: bool | None = None
 
     @field_validator("company")
     @classmethod
@@ -97,6 +99,7 @@ def _payload(item: WatchItem) -> dict:
         "id": item.id,
         "symbol": item.symbol,
         "company": item.company,
+        "auto_analysis_enabled": item.auto_analysis_enabled,
         "created_at": item.created_at.isoformat() if item.created_at else None,
         "updated_at": item.updated_at.isoformat() if item.updated_at else None,
     }
@@ -151,11 +154,14 @@ def upsert_watch_item(
         if symbol != requested:
             item = _find_watch_item(db, symbol)
     created = item is None
+    resume = item is not None and not item.auto_analysis_enabled and payload.auto_analysis_enabled is True
     if item is None:
         item = WatchItem(symbol=symbol, company=payload.company)
         db.add(item)
     elif payload.company is not None:
         item.company = payload.company
+    if payload.auto_analysis_enabled is not None:
+        item.auto_analysis_enabled = payload.auto_analysis_enabled
     try:
         db.commit()
     except IntegrityError:
@@ -168,15 +174,19 @@ def upsert_watch_item(
         if item is None:
             raise
         created = False
-        if payload.company is not None and item.company != payload.company:
+        resume = not item.auto_analysis_enabled and payload.auto_analysis_enabled is True
+        if payload.company is not None:
             item.company = payload.company
-            db.commit()
+        if payload.auto_analysis_enabled is not None:
+            item.auto_analysis_enabled = payload.auto_analysis_enabled
+        db.commit()
     db.refresh(item)
-    if created:
+    if (created or resume) and item.auto_analysis_enabled:
         try:
             enqueue_tracked_analysis(db, symbol)
         except Exception:
             db.rollback()  # Following succeeds even if the analysis outbox fails.
+    if created:
         # Los hechos son por tenant: siembra automatica para que la ficha no
         # salga vacia hasta pulsar «Refrescar SEC» (hallazgo del tester).
         enqueue_fundamentals_seed(db, symbol)

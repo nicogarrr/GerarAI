@@ -24272,6 +24272,17 @@
       },
       "WatchItemCreate": {
         "properties": {
+          "auto_analysis_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Analysis Enabled"
+          },
           "company": {
             "anyOf": [
               {
@@ -24407,6 +24418,11 @@
                 "type": "null"
               }
             ]
+          },
+          "auto_analysis_enabled": {
+            "default": true,
+            "title": "Auto Analysis Enabled",
+            "type": "boolean"
           },
           "company": {
             "anyOf": [

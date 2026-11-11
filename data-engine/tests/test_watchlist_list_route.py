@@ -1,7 +1,7 @@
 """GET /api/watchlist con response_model.
 
-Forma medida contra la ruta y tracked_analysis.tracked_statuses: item con 6
-claves siempre (id, symbol, company, created_at, updated_at, analysis).
+Forma medida contra la ruta y tracked_analysis.tracked_statuses: item con 7
+claves siempre (id, symbol, company, auto_analysis_enabled, created_at, updated_at, analysis).
 analysis null sin workflow; con workflow lleva status/as_of/thesis_status y
 OMITE missing_inputs salvo estado insufficient_data con empresa conocida:
 exclude_unset + test de ausencia. Servicio real sobre SQLite, sin mock.
@@ -66,11 +66,12 @@ def test_watchlist_item_without_analysis(monkeypatch) -> None:
     items = res.json()
     assert len(items) == 1
     item = items[0]
-    # 6 claves siempre; analysis null sin workflow run.
-    assert set(item) == {"id", "symbol", "company", "created_at", "updated_at", "analysis"}
+    # 7 claves siempre; analysis null sin workflow run.
+    assert set(item) == {"id", "symbol", "company", "created_at", "updated_at", "analysis", "auto_analysis_enabled"}
     assert item["symbol"] == "ACME"
     assert item["company"] == "Acme Corp"
     assert item["analysis"] is None
+    assert item["auto_analysis_enabled"] is True
 
 
 def test_watchlist_item_with_analysis_omits_missing_inputs(monkeypatch) -> None:
