@@ -99,6 +99,49 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
         </div>
       </header>
 
+      {/* Orden de lectura de un inversor (auditoría 11-nov): conclusión (cabecera) → por qué
+          (resumen) → qué puede salir mal (riesgos) → valoración → momento (DCA) → datos de
+          mercado y cifras → tesis completa. Antes el resumen quedaba tras dos tablas. */}
+      <section aria-labelledby="informe-resumen" className={BOX}>
+        <h2 className={H2} id="informe-resumen">{t('research.informe.summary')}</h2>
+        {thesis ? (
+          <>
+            <p className="text-xs text-gray-500">{t('research.informe.thesisVersion', { version: thesis.version, date: thesis.created_at ? fmt.formatMarketDate(thesis.created_at) : na })}</p>
+            {thesis.executive_summary ? <p className="mt-2 text-sm leading-relaxed text-gray-200">{cleanThesisText(thesis.executive_summary)}</p> : null}
+            <h3 className="mt-4 text-sm font-semibold text-gray-100">{t('research.informe.keyPoints')}</h3>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-200" data-testid="informe-key-points">
+              {thesis.hypothesis ? <li>{cleanThesisText(thesis.hypothesis)}</li> : null}
+              {(thesis.catalysts ?? []).map((c, i) => <li key={`c-${i}`}>{c.label ? thesisCatalystLabel(c.label, locale, t) : t('research.informe.catalyst')}{c.date ? ` (${fmt.formatMarketDate(c.date)})` : ''}</li>)}
+            </ul>
+          </>
+        ) : <p className="text-sm text-gray-400">{t('research.informe.noThesis')}</p>}
+        <Link className="mt-3 inline-flex min-h-[44px] items-center text-sm text-teal-300 print:hidden sm:min-h-0" href={`/research/${enc}?view=tesis#tesis-actual`}>{t('research.informe.editThesis')}</Link>
+      </section>
+
+      <section aria-labelledby="informe-riesgos" className={BOX}>
+        <h2 className={H2} id="informe-riesgos">{t('research.informe.risks')}</h2>
+        {risks.criteria.length || risks.sections.length ? (
+          <>
+            {risks.criteria.length ? <ul className="list-disc space-y-1 pl-5 text-sm text-gray-200" data-testid="informe-risk-criteria">{risks.criteria.map((c, i) => <li key={i}>{cleanThesisText(c)}</li>)}</ul> : null}
+            {risks.sections.map((s, i) => <div className="mt-3" key={`r-${i}`}><h3 className="text-sm font-semibold text-gray-100">{s.titulo}</h3>{s.parrafos.map((p, j) => <p className="mt-1 text-sm text-gray-300" key={j}>{cleanThesisText(p)}</p>)}</div>)}
+          </>
+        ) : <p className="text-sm text-gray-400">{t('research.informe.noRisks')}</p>}
+      </section>
+
+      <section aria-labelledby="informe-valoracion" className={BOX}>
+        <h2 className={H2} id="informe-valoracion">{t('research.informe.valuation')}</h2>
+        {honestyLines.length ? <ul className="mb-3 space-y-1 text-xs text-gray-300" data-testid="informe-honesty">{honestyLines.map((line) => <li className="rounded-lg border border-gray-800 bg-gray-900/40 p-2" key={line}>{line}</li>)}</ul> : null}
+        {sotp ? <SotpBreakdownView data={sotp} t={t} fmt={fmt} locale={locale} ticker={ticker} editable={false} /> : <p className="text-sm text-gray-400">{t('research.informe.noSotp')}</p>}
+        <Link className="mt-3 inline-flex min-h-[44px] items-center text-sm text-teal-300 print:hidden sm:min-h-0" href={`/research/${enc}?view=valoracion#desglose-partes`}>{t('research.informe.editSotp')}</Link>
+      </section>
+
+      {card ? (
+        <section aria-labelledby="informe-dca" className={BOX}>
+          <h2 className={H2} id="informe-dca">{t('research.informe.dcaTitle')}</h2>
+          <DcaWatchCard data={card} ti={t} locale={locale} />
+        </section>
+      ) : null}
+
       <section aria-labelledby="informe-mercado" className={BOX}>
         <h2 className={H2} id="informe-mercado">{t('research.informe.marketData')}</h2>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm" data-testid="informe-market">
@@ -127,48 +170,8 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
           {mine ? (
             <p className="mt-1 text-gray-200">{t('research.informe.userEstimatesLine', { year: String(mine.year), revenue: mine.revenue === null ? na : `${fmt.formatNumber(mine.revenue, { maximumFractionDigits: 0 })} M`, ebitda: mine.ebitda === null ? na : `${fmt.formatNumber(mine.ebitda, { maximumFractionDigits: 0 })} M` })}</p>
           ) : <p className="mt-1 text-gray-400">{t('research.informe.userEstimatesNone')}</p>}
-          <p className="mt-1 text-xs text-amber-200/80">{t('research.informe.userEstimatesLabel')}</p>
+          {mine ? <p className="mt-1 text-xs text-amber-200/80">{t('research.informe.userEstimatesLabel')}</p> : null}
         </div>
-      </section>
-
-      <section aria-labelledby="informe-resumen" className={BOX}>
-        <h2 className={H2} id="informe-resumen">{t('research.informe.summary')}</h2>
-        {thesis ? (
-          <>
-            <p className="text-xs text-gray-500">{t('research.informe.thesisVersion', { version: thesis.version, date: thesis.created_at ? fmt.formatMarketDate(thesis.created_at) : na })}</p>
-            {thesis.executive_summary ? <p className="mt-2 text-sm leading-relaxed text-gray-200">{cleanThesisText(thesis.executive_summary)}</p> : null}
-            <h3 className="mt-4 text-sm font-semibold text-gray-100">{t('research.informe.keyPoints')}</h3>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-200" data-testid="informe-key-points">
-              {thesis.hypothesis ? <li>{cleanThesisText(thesis.hypothesis)}</li> : null}
-              {(thesis.catalysts ?? []).map((c, i) => <li key={`c-${i}`}>{c.label ? thesisCatalystLabel(c.label, locale, t) : t('research.informe.catalyst')}{c.date ? ` (${fmt.formatMarketDate(c.date)})` : ''}</li>)}
-            </ul>
-          </>
-        ) : <p className="text-sm text-gray-400">{t('research.informe.noThesis')}</p>}
-        <Link className="mt-3 inline-flex min-h-[44px] items-center text-sm text-teal-300 print:hidden sm:min-h-0" href={`/research/${enc}?view=tesis#tesis-actual`}>{t('research.informe.editThesis')}</Link>
-      </section>
-
-      <section aria-labelledby="informe-valoracion" className={BOX}>
-        <h2 className={H2} id="informe-valoracion">{t('research.informe.valuation')}</h2>
-        {honestyLines.length ? <ul className="mb-3 space-y-1 text-xs text-gray-300" data-testid="informe-honesty">{honestyLines.map((line) => <li className="rounded-lg border border-gray-800 bg-gray-900/40 p-2" key={line}>{line}</li>)}</ul> : null}
-        {sotp ? <SotpBreakdownView data={sotp} t={t} fmt={fmt} locale={locale} ticker={ticker} editable={false} /> : <p className="text-sm text-gray-400">{t('research.informe.noSotp')}</p>}
-        <Link className="mt-3 inline-flex min-h-[44px] items-center text-sm text-teal-300 print:hidden sm:min-h-0" href={`/research/${enc}?view=valoracion#desglose-partes`}>{t('research.informe.editSotp')}</Link>
-      </section>
-
-      {card ? (
-        <section aria-labelledby="informe-dca" className={BOX}>
-          <h2 className={H2} id="informe-dca">{t('research.informe.dcaTitle')}</h2>
-          <DcaWatchCard data={card} ti={t} locale={locale} />
-        </section>
-      ) : null}
-
-      <section aria-labelledby="informe-riesgos" className={BOX}>
-        <h2 className={H2} id="informe-riesgos">{t('research.informe.risks')}</h2>
-        {risks.criteria.length || risks.sections.length ? (
-          <>
-            {risks.criteria.length ? <ul className="list-disc space-y-1 pl-5 text-sm text-gray-200" data-testid="informe-risk-criteria">{risks.criteria.map((c, i) => <li key={i}>{cleanThesisText(c)}</li>)}</ul> : null}
-            {risks.sections.map((s, i) => <div className="mt-3" key={`r-${i}`}><h3 className="text-sm font-semibold text-gray-100">{s.titulo}</h3>{s.parrafos.map((p, j) => <p className="mt-1 text-sm text-gray-300" key={j}>{cleanThesisText(p)}</p>)}</div>)}
-          </>
-        ) : <p className="text-sm text-gray-400">{t('research.informe.noRisks')}</p>}
       </section>
 
       {sections.length ? (
