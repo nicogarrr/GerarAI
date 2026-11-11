@@ -31,6 +31,7 @@
     },
     "earningsUnavailable": "Earnings calendar unavailable right now.",
     "earningsPartial": "Earnings calendar incomplete: some dates may be missing.",
+    "earningsNone": "No date announced in the earnings calendar.",
     "unavailable": "Couldn't load your watchlist (service unavailable). This doesn't mean it's empty: reload the page or try again later.",
     "empty": {
       "title": "Your watchlist is empty",

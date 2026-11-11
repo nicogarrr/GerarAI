@@ -31,6 +31,7 @@
     },
     "earningsUnavailable": "Calendario de resultados no disponible ahora mismo.",
     "earningsPartial": "Calendario de resultados incompleto: puede faltar alguna fecha.",
+    "earningsNone": "Sin fecha anunciada en el calendario de resultados.",
     "unavailable": "No se pudo cargar tu watchlist (servicio no disponible). Esto no significa que esté vacía: recarga la página o inténtalo más tarde.",
     "empty": {
       "title": "Tu watchlist está vacía",
