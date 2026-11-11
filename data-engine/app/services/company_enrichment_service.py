@@ -97,6 +97,26 @@ FINNHUB_INDUSTRY_TO_SECTOR: dict[str, str] = {
 }
 
 
+def profile_ir_url(profile: dict | None, requested_ticker: str) -> str | None:
+    """weburl de profile2 SOLO si el perfil es del listado pedido.
+
+    Finnhub devuelve en ``ticker`` el instrumento que resolvió; si difiere
+    del pedido (ADR americano, homónimo de otra bolsa) la web sería de OTRO
+    emisor y la página de inversores alimentaría documentos y catalizadores
+    oficiales equivocados. Sin eco de ticker no hay prueba de identidad.
+    """
+    if not profile:
+        return None
+    echo = (profile.get("ticker") or "").strip().upper()
+    if not echo or echo != requested_ticker.strip().upper():
+        return None
+    url = (profile.get("weburl") or "").strip()
+    if not url.lower().startswith(("http://", "https://")):
+        return None
+    # Company.ir_url es String(500): una URL más larga no cabe, no se recorta.
+    return url if len(url) <= 500 else None
+
+
 def sector_for_industry(industry: str | None) -> str | None:
     """Devuelve el sector GICS declarado para una industria Finnhub, o None."""
     if not industry:
@@ -225,6 +245,7 @@ class CompanyEnrichmentService:
         # o sin datos; si no, una ficha inenriquecible reintentaria en cada
         # ensure dentro del mismo dia.
         company.enrichment_attempted_at = datetime.now(UTC)
+        exchange_placeholder_at_entry = company.exchange in _PLACEHOLDER_EXCHANGES
         profile = self._finnhub_profile(company.ticker)
         if not profile:
             changed = self._sic_fallback(db, company)
@@ -259,6 +280,15 @@ class CompanyEnrichmentService:
             currency = (profile.get("currency") or "").strip()
             if currency:
                 company.currency = currency
+                changed = True
+        # Web oficial del emisor -> ir_url (informes oficiales sin SEC). Con la
+        # bolsa en placeholder al ENTRAR la identidad del listado está en duda
+        # (homónimos): no se promueve aunque esta misma llamada fije la bolsa;
+        # la promueve el backfill diario una vez la ficha tiene bolsa real.
+        if not exchange_placeholder_at_entry and not (company.ir_url or "").strip():
+            ir_url = profile_ir_url(profile, company.ticker)
+            if ir_url:
+                company.ir_url = ir_url
                 changed = True
         changed = self._sic_fallback(db, company) or changed
 
