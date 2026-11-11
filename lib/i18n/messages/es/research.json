@@ -1848,6 +1848,20 @@
     "verdictInLine": "Nuestro DCF base da {value} por acción, en línea con el precio de hoy ({price}).",
     "loading": "Calculando qué hace falta creer…",
     "unavailable": "No se pudo calcular ahora. Reintenta en unos minutos.",
+    "methodUsed": "Esta empresa se valora por {method}.",
+    "engines": {
+      "holdingCompany": "el valor liquidativo (NAV) del holding, con su descuento",
+      "sotp": "la suma de las partes (SOTP)",
+      "bank": "el precio/valor contable justificado por la rentabilidad del capital (banco)",
+      "insurer": "el precio/valor contable justificado por la rentabilidad del capital (aseguradora)",
+      "reit": "el NOI de sus inmuebles capitalizado a un cap rate",
+      "preRevenue": "escenarios de una empresa sin ingresos, con la dilución que exige su financiación",
+      "relative": "múltiplos frente a sus comparables",
+      "ddm": "el descuento de dividendos (DDM)",
+      "fcfe": "el flujo de caja libre para el accionista (FCFE)",
+      "commodity": "el ciclo de su materia prima (precio, coste y volumen)",
+      "scenario": "escenarios ponderados por probabilidad"
+    },
     "notApplicable": "No aplica: {reason}",
     "reasons": {
       "engine_not_dcf": "el método de valoración de esta empresa no es un DCF de flujos de caja libres.",
@@ -1870,6 +1884,8 @@
     "gordonLabel": "Nuestro DCF (crecimiento perpetuo)",
     "exitLabel": "Con salida a {multiple}x",
     "exitExplain": "Mismo DCF, pero el valor final es {multiple} veces el flujo de caja libre del último año proyectado en vez de un crecimiento perpetuo. Es un contraste, no nuestro valor razonable.",
+    "exitLabelNoMultiple": "Con múltiplo de salida (N/D)",
+    "exitExplainNoMultiple": "Mismo DCF, pero con el valor final por un múltiplo del flujo de caja libre del último año proyectado en vez de un crecimiento perpetuo. Múltiplo N/D: el cálculo no indicó qué múltiplo usó, así que no lo mostramos. Es un contraste, no nuestro valor razonable.",
     "exitImplied": "Para llegar a {price} haría falta salir a {implied}x ese flujo de caja.",
     "explain": "El WACC es la rentabilidad que se exige a la inversión: cuanto más bajo, más vale el futuro. Si el precio pide un WACC muy por debajo del nuestro, está descontando menos riesgo o más crecimiento del que proyectamos."
   },

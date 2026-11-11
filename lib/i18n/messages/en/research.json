@@ -1848,6 +1848,20 @@
     "verdictInLine": "Our base DCF gives {value} per share, in line with today's price ({price}).",
     "loading": "Working out what you need to believe…",
     "unavailable": "Couldn't calculate it right now. Try again in a few minutes.",
+    "methodUsed": "This company is valued with {method}.",
+    "engines": {
+      "holdingCompany": "the holding's net asset value (NAV), with its discount",
+      "sotp": "a sum of the parts (SOTP)",
+      "bank": "price/book justified by return on equity (bank)",
+      "insurer": "price/book justified by return on equity (insurer)",
+      "reit": "its properties' NOI capitalised at a cap rate",
+      "preRevenue": "pre-revenue scenarios, with the dilution its funding needs",
+      "relative": "multiples against its peers",
+      "ddm": "a dividend discount model (DDM)",
+      "fcfe": "free cash flow to equity (FCFE)",
+      "commodity": "its commodity cycle (price, cost and volume)",
+      "scenario": "probability-weighted scenarios"
+    },
     "notApplicable": "Not applicable: {reason}",
     "reasons": {
       "engine_not_dcf": "this company's valuation method isn't a free-cash-flow DCF.",
@@ -1870,6 +1884,8 @@
     "gordonLabel": "Our DCF (perpetual growth)",
     "exitLabel": "With a {multiple}x exit",
     "exitExplain": "Same DCF, but the terminal value is {multiple} times the last projected year's free cash flow instead of perpetual growth. It's a cross-check, not our fair value.",
+    "exitLabelNoMultiple": "With an exit multiple (N/A)",
+    "exitExplainNoMultiple": "Same DCF, but the terminal value is a multiple of the last projected year's free cash flow instead of perpetual growth. Multiple N/A: the calculation did not report which multiple it used, so we don't show one. It's a cross-check, not our fair value.",
     "exitImplied": "Reaching {price} would take a {implied}x exit on that cash flow.",
     "explain": "WACC is the return required from the investment: the lower it is, the more the future is worth. If the price needs a WACC far below ours, it's pricing in less risk or more growth than we project."
   },

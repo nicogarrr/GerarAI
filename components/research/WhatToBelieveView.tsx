@@ -48,6 +48,31 @@ function waccSentence(t: ReturnType<typeof useT>, f: Formatters, solved: Implied
     return kind === 'price' ? t('research.whatToBelieve.waccNotAvailable') : null;
 }
 
+/**
+ * Motores que no son un DCF de flujos (claves de engines/*.py → `trace.engine`).
+ * Con «No aplica» la tarjeta dice qué método se usa en su lugar; un motor que no
+ * está aquí (o el propio DCF sin valoración) no añade frase: nunca la clave cruda.
+ */
+const NON_DCF_ENGINES = {
+    holding_company: 'research.whatToBelieve.engines.holdingCompany',
+    sotp: 'research.whatToBelieve.engines.sotp',
+    bank: 'research.whatToBelieve.engines.bank',
+    insurer: 'research.whatToBelieve.engines.insurer',
+    reit: 'research.whatToBelieve.engines.reit',
+    pre_revenue: 'research.whatToBelieve.engines.preRevenue',
+    relative: 'research.whatToBelieve.engines.relative',
+    ddm: 'research.whatToBelieve.engines.ddm',
+    fcfe: 'research.whatToBelieve.engines.fcfe',
+    commodity: 'research.whatToBelieve.engines.commodity',
+    scenario: 'research.whatToBelieve.engines.scenario',
+} as const;
+
+function methodSentence(t: ReturnType<typeof useT>, engine: string | null | undefined): string | null {
+    const key = engine?.trim();
+    if (!key || !Object.hasOwn(NON_DCF_ENGINES, key)) return null;
+    return t('research.whatToBelieve.methodUsed', { method: t(NON_DCF_ENGINES[key as keyof typeof NON_DCF_ENGINES]) });
+}
+
 /** Brecha precio / DCF base por debajo de la cual se dice «en línea» (±0,5 %). */
 const IN_LINE_GAP = 0.005;
 
@@ -79,13 +104,19 @@ export function WhatToBelieveView({ data }: { data: WhatToBelieve | null }) {
     const growth = data?.implied_growth;
     const exit = data?.exit_multiple;
     const multiple = (v: number) => fmt.formatNumber(v, { maximumFractionDigits: 0 });
+    // Sin múltiplo en la respuesta: N/D con su motivo, nunca un 25x supuesto.
+    const exitMultiple = exit?.multiple !== null && exit?.multiple !== undefined && exit.multiple > 0 ? exit.multiple : null;
+    const method = data?.status === 'not_applicable' ? methodSentence(t, data.engine) : null;
     return (
         <section aria-labelledby="what-to-believe-title" className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4" data-testid="what-to-believe">
             <h2 className="text-base font-semibold text-gray-100" id="what-to-believe-title">{t('research.whatToBelieve.title')}</h2>
             {!data ? (
                 <p className="mt-2 text-sm text-gray-400" data-testid="what-to-believe-unavailable" role="status">{t('research.whatToBelieve.unavailable')}</p>
             ) : data.status === 'not_applicable' ? (
-                <p className="mt-2 text-sm text-gray-400" data-testid="what-to-believe-na" role="status">{t('research.whatToBelieve.notApplicable', { reason: reasonLabel(t, data.reason_code) })}</p>
+                <div className="mt-2 text-sm text-gray-400" data-testid="what-to-believe-na" role="status">
+                    <p>{t('research.whatToBelieve.notApplicable', { reason: reasonLabel(t, data.reason_code) })}</p>
+                    {method ? <p className="mt-1 text-gray-300" data-testid="what-to-believe-method">{method}</p> : null}
+                </div>
             ) : (
                 <>
                     {verdict ? <p className="mt-2 break-words text-sm font-medium text-gray-100" data-testid="what-to-believe-verdict">{verdict}</p> : null}
@@ -112,11 +143,11 @@ export function WhatToBelieveView({ data }: { data: WhatToBelieve | null }) {
                                     <p className="tabular-nums text-gray-100">{exit.gordon_value_per_share !== null && exit.gordon_value_per_share !== undefined ? f.money(exit.gordon_value_per_share) : fmt.na}</p>
                                 </div>
                                 <div className="min-w-0">
-                                    <p className="text-xs text-gray-500">{t('research.whatToBelieve.exitLabel', { multiple: multiple(exit.multiple ?? 25) })}</p>
+                                    <p className="text-xs text-gray-500" data-testid="what-to-believe-exit-label">{exitMultiple !== null ? t('research.whatToBelieve.exitLabel', { multiple: multiple(exitMultiple) }) : t('research.whatToBelieve.exitLabelNoMultiple')}</p>
                                     <p className="tabular-nums text-gray-100">{f.money(exit.value_per_share)}</p>
                                 </div>
                             </div>
-                            <p className="mt-2 text-xs text-gray-400">{t('research.whatToBelieve.exitExplain', { multiple: multiple(exit.multiple ?? 25) })}</p>
+                            <p className="mt-2 text-xs text-gray-400" data-testid="what-to-believe-exit-explain">{exitMultiple !== null ? t('research.whatToBelieve.exitExplain', { multiple: multiple(exitMultiple) }) : t('research.whatToBelieve.exitExplainNoMultiple')}</p>
                             {exit.implied_multiple_for_price !== null && exit.implied_multiple_for_price !== undefined && data.current_price ? (
                                 <p className="mt-1 text-xs text-gray-400" data-testid="what-to-believe-exit-implied">
                                     {t('research.whatToBelieve.exitImplied', { price: f.money(data.current_price), implied: multiple(exit.implied_multiple_for_price) })}
