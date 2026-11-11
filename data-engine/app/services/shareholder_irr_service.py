@@ -112,22 +112,86 @@ def _fiscal_year(period: str) -> int | None:
         return None
 
 
+class _FactRow:
+    """Hecho como columnas sueltas (sin hidratar la entidad ORM): lo que leen ``_cite``, ``_share_cite``,
+    ``_is_segment`` y la cuarentena ESEF. ``source_url`` es la MISMA propiedad de ``FinancialFact``."""
+
+    __slots__ = ("id", "metric", "period", "value", "unit", "source_type", "created_at", "is_reported",
+                 "filed", "accession_number", "source")
+
+    def __init__(self, row: Any, source: Any) -> None:
+        (self.id, self.metric, self.period, self.value, self.unit, self.source_type, self.created_at,
+         self.is_reported, self.filed, self.accession_number, _source_id) = row
+        self.source = source
+
+    @property
+    def source_url(self) -> str | None:
+        return FinancialFact.source_url.fget(self)  # type: ignore[attr-defined]
+
+
+_FACT_ROW_COLUMNS = (FinancialFact.id, FinancialFact.metric, FinancialFact.period, FinancialFact.value,
+                     FinancialFact.unit, FinancialFact.source_type, FinancialFact.created_at,
+                     FinancialFact.is_reported, FinancialFact.filed, FinancialFact.accession_number,
+                     FinancialFact.source_id)
+
+
+_PREFETCH_KEY = "irr_company_facts_prefetch_v1"
+
+
+def _read_fact_rows(db: Session, company_ids: list[int]) -> dict[int, list[Any]]:
+    """Hechos de ``company_facts`` (``_FactRow``, con su documento) de varias empresas en DOS consultas.
+
+    Mismo orden por empresa que la consulta de siempre (cierre desc, id desc) y los flujos que no son de
+    ejercicio completo fuera ya en SQL."""
+    from sqlalchemy import and_, or_
+
+    from app.models.entities import Document
+
+    ids = sorted(set(company_ids))
+    out: dict[int, list[Any]] = {cid: [] for cid in ids}
+    if not ids:
+        return out
+    rows = db.execute(
+        select(FinancialFact.company_id, *_FACT_ROW_COLUMNS)
+        .where(FinancialFact.company_id.in_(ids),
+               or_(and_(FinancialFact.metric.in_(_FLOW), FinancialFact.period.like("%:FY")),
+                   FinancialFact.metric.in_(_POINT)))
+        .order_by(FinancialFact.company_id, desc(FinancialFact.period), desc(FinancialFact.id))
+    ).all()
+    source_ids = {r[-1] for r in rows if r[-1] is not None}
+    documents = {d.id: d for d in db.scalars(select(Document).where(Document.id.in_(source_ids)))} if source_ids else {}
+    for row in rows:
+        out[row[0]].append(_FactRow(tuple(row[1:]), documents.get(row[-1]) if row[-1] is not None else None))
+    return out
+
+
+def _take_prefetched_facts(db: Session, company_id: int) -> list[Any] | None:
+    """Filas precargadas por ``_peer_multiples`` para esta empresa; se consumen UNA vez (nadie ve una copia
+    que otro haya modificado y fuera de esa ventana no hay nada precargado)."""
+    info = getattr(db, "info", None)
+    store = info.get(_PREFETCH_KEY) if isinstance(info, dict) else None
+    return store.pop(company_id, None) if store else None
+
+
 def company_facts(db: Session, company: Company) -> tuple[dict[str, dict[int, dict]], dict[str, dict]]:
-    """Ejercicios anuales {métrica: {año: cita}} y último dato de balance {métrica: cita}, mejor fuente."""
+    """Ejercicios anuales {métrica: {año: cita}} y último dato de balance {métrica: cita}, mejor fuente.
+
+    Rendimiento (r5-perf2, 11-nov-2026): se llama para la empresa y para cada comparable de la tesis
+    (9 veces por ``/thesis-v2``) y hidratar ~800 entidades ORM por empresa era el 64 % de la llamada. Ahora:
+    (1) los flujos que no son de ejercicio completo (``:FY``) se descartan ya en SQL (aquí nunca se usaban);
+    (2) se leen columnas sueltas (sin entidad ORM) y los documentos de esas filas en una consulta;
+    (3) la cita se construye solo para el hecho ganador de cada hueco. Mismo orden, misma regla, misma cita
+    (``source_url`` es la propiedad de ``FinancialFact``). Dos consultas por empresa, como antes."""
     from app.services.analyst_report import SOURCE_PRIORITY
     from app.services.esef_fact_quarantine import fact_quarantine_reason
     from app.services.ttm_service import _is_segment
 
-    rows = list(db.scalars(
-        select(FinancialFact)
-        .where(FinancialFact.company_id == company.id, FinancialFact.metric.in_(_FLOW + _POINT))
-        .options(selectinload(FinancialFact.source))
-        .order_by(desc(FinancialFact.period), desc(FinancialFact.id))
-    ).all())
-    annual: dict[str, dict[int, tuple[tuple[float, float], dict]]] = {}
-    point: dict[str, tuple[str, tuple[float, float], dict]] = {}
-    for fact in rows:
-        if fact.value is None or _is_segment(fact) or fact_quarantine_reason(fact):
+    prefetched = _take_prefetched_facts(db, company.id)
+    facts = prefetched if prefetched is not None else _read_fact_rows(db, [company.id])[company.id]
+    annual: dict[str, dict[int, tuple[tuple[float, float], _FactRow]]] = {}
+    point: dict[str, tuple[str, tuple[float, float], _FactRow]] = {}
+    for fact in facts:
+        if fact.value is None or _is_segment(fact) or fact_quarantine_reason(fact):  # type: ignore[arg-type]
             continue
         rank = (float(SOURCE_PRIORITY.get(fact.source_type or "", 50)),
                 -(fact.created_at.timestamp() if fact.created_at else 0.0))
@@ -138,7 +202,7 @@ def company_facts(db: Session, company: Company) -> tuple[dict[str, dict[int, di
                 continue
             slot = annual.setdefault(fact.metric, {})
             if year not in slot or rank < slot[year][0]:
-                slot[year] = (rank, _cite(fact))
+                slot[year] = (rank, fact)
         elif fact.metric in _POINT:
             end = _end(period)
             if fact.metric in _POINT_ANNUAL and period.endswith(":FY"):
@@ -146,12 +210,14 @@ def company_facts(db: Session, company: Company) -> tuple[dict[str, dict[int, di
                 if year is not None:
                     slot = annual.setdefault(fact.metric, {})
                     if year not in slot or rank < slot[year][0]:
-                        slot[year] = (rank, _cite(fact))
+                        slot[year] = (rank, fact)
             cur = point.get(fact.metric)
             if cur is None or end > cur[0] or (end == cur[0] and rank < cur[1]):
-                point[fact.metric] = (end, rank, _share_cite(fact) if fact.metric == "shares_outstanding" else _cite(fact))
-    return ({m: {y: c for y, (_, c) in v.items()} for m, v in annual.items()},
-            {m: c for m, (_, _, c) in point.items()})
+                point[fact.metric] = (end, rank, fact)
+    # La cita solo de los ganadores (antes: una por cada fila que pasaba a ir en cabeza).
+    return ({m: {y: _cite(f) for y, (_, f) in v.items()} for m, v in annual.items()},  # type: ignore[arg-type]
+            {m: _share_cite(f) if m == "shares_outstanding" else _cite(f)  # type: ignore[arg-type]
+             for m, (_, _, f) in point.items()})
 
 
 def _primary_point_at(db: Session, company: Company, metric: str, period: str) -> dict[str, Any] | None:
@@ -309,13 +375,23 @@ def _peer_multiples(db: Session, company: Company, basis: str, today: date) -> l
         logger.info("irr peers: %s", type(exc).__name__)
         return []
     out = []
-    for peer in peers:
-        try:
-            start, _hist, _w, _c = starting_point(db, peer, today=today, basis=basis)
-        except Exception:  # noqa: BLE001
-            start = None
-        out.append({"ticker": peer.ticker, "name": peer.name, "selection": basis_label,
-                    "multiple": start.multiple if start is not None else None})
+    # Los hechos de todos los comparables en dos consultas (antes, dos por comparable); cada uno se consume
+    # una vez en su ``company_facts`` y lo que sobre se descarta al salir.
+    info = getattr(db, "info", None)
+    owns = isinstance(info, dict) and _PREFETCH_KEY not in info
+    if owns and isinstance(info, dict):
+        info[_PREFETCH_KEY] = _read_fact_rows(db, [p.id for p in peers if getattr(p, "id", None) is not None])
+    try:
+        for peer in peers:
+            try:
+                start, _hist, _w, _c = starting_point(db, peer, today=today, basis=basis)
+            except Exception:  # noqa: BLE001
+                start = None
+            out.append({"ticker": peer.ticker, "name": peer.name, "selection": basis_label,
+                        "multiple": start.multiple if start is not None else None})
+    finally:
+        if owns and isinstance(info, dict):
+            info.pop(_PREFETCH_KEY, None)
     return out
 
 

@@ -524,7 +524,12 @@ def _fact_row(
     )
 
 
-def test_company_facts_ramas():
+def _facts_seam(monkeypatch, rows):
+    """Los hechos llegan por ``_read_fact_rows`` (columnas sueltas, r5-perf2); la reducción es la misma."""
+    monkeypatch.setattr(svc, "_read_fact_rows", lambda db, ids: {i: list(rows) for i in ids})
+
+
+def test_company_facts_ramas(monkeypatch):
     seg = SimpleNamespace(metadata_={"segment": "Iberia"})
     rows = [
         _fact_row("revenue", 900e6, source_type="FMP"),  # peor fuente: la gana la SEC
@@ -539,7 +544,8 @@ def test_company_facts_ramas():
         _fact_row("total_debt", 280e6, period="2025-12-31:FY"),
         _fact_row("shares_outstanding", 100e6, period="2026-02-01"),
     ]
-    annual, point = svc.company_facts(_DB([rows]), CO)
+    _facts_seam(monkeypatch, rows)
+    annual, point = svc.company_facts(_DB(), CO)
     assert annual["revenue"][2025]["value"] == 800e6  # SEC (prio 0) gana a FMP (10)
     assert annual["net_income"][2025]["value"] == 50e6
     assert annual["total_equity"][2025]["value"] == 400e6  # saldo anotado por ejercicio
@@ -549,12 +555,13 @@ def test_company_facts_ramas():
     assert "shares_outstanding" not in annual
 
 
-def test_company_facts_empate_fecha_gana_mejor_fuente():
+def test_company_facts_empate_fecha_gana_mejor_fuente(monkeypatch):
     rows = [
         _fact_row("total_debt", 300e6, source_type="FMP", period="2025-12-31:FY"),
         _fact_row("total_debt", 280e6, source_type="SEC", period="2025-12-31:FY"),
     ]
-    _, point = svc.company_facts(_DB([rows]), CO)
+    _facts_seam(monkeypatch, rows)
+    _, point = svc.company_facts(_DB(), CO)
     assert point["total_debt"]["value"] == 280e6
 
 
