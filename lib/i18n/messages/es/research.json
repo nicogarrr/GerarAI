@@ -1615,7 +1615,11 @@
     "caption": "Hechos financieros de la empresa (oficiales y, si se indica, no oficiales): métrica, periodo y valor",
     "colMetric": "Métrica",
     "colPeriod": "Periodo",
-    "colValue": "Valor"
+    "colValue": "Valor",
+    "sourceProvider": "Fuente: {provider}",
+    "sourceUnavailable": "No disponible",
+    "publishedDate": "Publicado: {date}",
+    "publicationUnavailable": "Fecha de publicación no disponible"
   },
   "claimForm": {
     "created": "Afirmación creada",

@@ -1,5 +1,6 @@
 import { EmptyState } from '@/components/ui/empty-state';
 import { PagedList } from '@/components/ui/pagination';
+import { FactSource, factSourceUrl } from '@/components/research/FactSource';
 import { FactCalculatedLabel } from '@/components/research/FactCalculatedLabel';
 import { factDisplayAudit, factStalenessNotice } from '@/lib/research/fact-display-audit';
 import { financialPeriod } from '@/lib/research/financial-display';
@@ -23,11 +24,12 @@ const FACTS_MOBILE_PAGE = 10;
 
 /** La cifra enlaza a su fuente cuando el backend trae URL real del documento. */
 function FactValueLink({ fact, children, locale }: { fact: ResearchFact; children: ReactNode; locale: Locale }) {
-  if (!fact.source_url) return <>{children}</>;
+  const href = factSourceUrl(fact.source_url);
+  if (!href) return <>{children}</>;
   return (
     <a
       className="underline-offset-2 transition hover:text-teal-200 hover:underline"
-      href={fact.source_url}
+      href={href}
       rel="noopener noreferrer"
       target="_blank"
       title={fact.source_title ?? createTranslator(locale)('research.facts.sourceTitle')}
@@ -40,8 +42,8 @@ function FactValueLink({ fact, children, locale }: { fact: ResearchFact; childre
 export function FactCard({ fact, ticker, staleness, locale = 'es' }: { fact: ResearchFact; ticker: string; staleness: string | null; locale?: Locale }) {
   const audit = factDisplayAudit(ticker, fact, locale);
   return (
-    <div className="rounded-lg border border-gray-800 p-3">
-      <div className="flex items-center justify-between gap-2">
+    <div className="min-w-0 rounded-lg border border-gray-800 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="font-medium text-gray-200">{metricLabel(fact.metric, locale)}</span>
         <span className={`text-sm font-semibold ${audit ? 'text-gray-400' : 'text-teal-300'}`}>{audit ? naFor(locale) : <><FactValueLink fact={fact} locale={locale}>{metricValue(fact.value, fact.unit, locale)}</FactValueLink><FactCalculatedLabel fact={fact} locale={locale} /></>}</span>
       </div>
@@ -50,6 +52,7 @@ export function FactCard({ fact, ticker, staleness, locale = 'es' }: { fact: Res
       <div className="mt-1.5 flex flex-wrap gap-2 text-xs text-gray-500">
         <span>{financialPeriod(fact.period, locale)}</span>
       </div>
+      <FactSource fact={fact} locale={locale} />
     </div>
   );
 }
@@ -103,7 +106,7 @@ export function FactTable({ facts, refreshLabel, ticker, locale = 'es' }: { fact
         <tbody>
           {facts.map((fact) => (
             <tr key={fact.id} className="text-gray-300">
-              <th className="border-b border-gray-900 py-2 text-left text-sm font-medium" scope="row">{metricLabel(fact.metric, locale)}</th>
+              <th className="border-b border-gray-900 py-2 text-left text-sm font-medium" scope="row">{metricLabel(fact.metric, locale)}<FactSource fact={fact} locale={locale} /></th>
               <td className="border-b border-gray-900 py-2">{financialPeriod(fact.period, locale)}</td>
               <td className="border-b border-gray-900 py-2 text-right">{factDisplayAudit(ticker, fact, locale) ? <span className="text-gray-400">{naFor(locale)}<span className="mt-1 block text-xs text-amber-300">{factDisplayAudit(ticker, fact, locale)}</span></span> : <><FactValueLink fact={fact} locale={locale}>{metricValue(fact.value, fact.unit, locale)}</FactValueLink><FactCalculatedLabel fact={fact} locale={locale} />{stalenessOf(fact) ? <span className="mt-1 block text-xs text-amber-300">{stalenessOf(fact)}</span> : null}</>}</td>
             </tr>
