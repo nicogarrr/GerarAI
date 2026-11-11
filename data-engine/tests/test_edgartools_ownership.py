@@ -67,6 +67,7 @@ def test_form4_xml_keeps_connector_shape_by_construction():
     for tx, want in zip(parsed["transactions"], expected):
         assert tuple(tx) == FORM4_TX_KEYS == tuple(want)
         assert tx == want
+        assert tx["alignment_10b5_1"] is None
 
 
 def test_form4_values_match_fixture():
@@ -102,6 +103,8 @@ def test_form4_dataframe_normalizes_to_same_keys():
     assert len(parsed["transactions"]) == 2
     for tx in parsed["transactions"]:
         assert tuple(tx) == FORM4_TX_KEYS
+        assert tx["alignment_10b5_1"] is None
+        assert tx["rule_10b5_1"] is None
     buy, sell = parsed["transactions"]
     assert (buy["type"], buy["acquired_disposed"], buy["value"]) == ("P", "A", 1502500.0)
     assert (sell["type"], sell["acquired_disposed"]) == ("S", "D")
@@ -189,3 +192,17 @@ def test_service_13f_shape_matches_manager_pipeline():
     assert [tuple(row) for row in result["holdings"]] == [THIRTEENF_ROW_KEYS] * 2
     assert result["limitations"] and result["snapshot_synced_at"] is None
     assert result["provenance"]["source_kind"] == "official"
+
+
+
+def test_form4_alignment_field_has_exact_position_and_unknown_dataframe_value():
+    assert len(FORM4_TX_KEYS) == 24
+    assert FORM4_TX_KEYS[19:] == (
+        "security_title", "rule_10b5_1", "alignment_10b5_1", "shares_owned_after", "direct_indirect",
+    )
+    # Neither a provider hint nor a legacy flag is transaction XML evidence.
+    frame = pd.DataFrame([{"Code": "S", "Transaction Type": "Sale", "Shares": 1,
+                           "Price": 2, "rule_10b5_1": True, "alignment_10b5_1": True}])
+    row = transactions_from_edgartools_dataframe(frame)["transactions"][0]
+    assert tuple(row) == FORM4_TX_KEYS
+    assert row["alignment_10b5_1"] is None and row["rule_10b5_1"] is None
