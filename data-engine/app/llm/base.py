@@ -385,6 +385,8 @@ class LLMProvider(ABC):
         headers: Mapping[str, str],
         payload: Mapping[str, Any],
     ) -> httpx.Response:
+        from app.llm.free_only import enforce_free_only
+        enforce_free_only(url, payload)
         # Tope duro por corrida (inactivo salvo que haya un guard en el
         # contexto): reserva cupo ANTES de la red; ver app/llm/run_guard.py.
         reserve_request(url, payload, guard_required=bool(getattr(self, "guard_required", False)))

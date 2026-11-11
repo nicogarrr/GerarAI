@@ -751,6 +751,9 @@ class Settings(BaseSettings):
     llm_hidden_reasoning_min_tokens: int = Field(default=1024, ge=1, le=100_000)
     llm_model_overrides: Annotated[dict[str, str], NoDecode] = Field(default_factory=dict)
     llm_max_output_tokens: int = Field(default=16_000, ge=1, le=1_000_000)
+    # Opt-in zero-billing policy for all except explicit verified internal IDs.
+    llm_free_only: bool = False
+    llm_free_only_exempt_tenant_ids: str = ""
     llm_daily_cap_eur: float = Field(default=1.50, ge=0)
     llm_monthly_cap_eur: float = Field(default=40.00, ge=0)
     # Second-order free-model request quota, independent of the shared EUR ledger.
