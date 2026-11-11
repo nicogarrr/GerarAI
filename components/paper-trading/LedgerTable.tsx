@@ -28,8 +28,8 @@ export function LedgerTable({ entries }: { entries: HistoryRow[] }) {
     }
     const sorted = [...entries].sort((a, b) => (b.executedAt ?? b.createdAt) - (a.executedAt ?? a.createdAt));
     return (
-        <Table dense regionLabel={ti('paperTrading.ledger.regionLabel')}>
-            <TableHeader>
+        <Table className="block md:table" dense regionLabel={ti('paperTrading.ledger.regionLabel')}>
+            <TableHeader className="hidden md:table-header-group">
                 <TableRow>
                     <TableHead>{ti('paperTrading.ledger.colDate')}</TableHead>
                     <TableHead>{ti('paperTrading.ledger.colOperation')}</TableHead>
@@ -38,15 +38,15 @@ export function LedgerTable({ entries }: { entries: HistoryRow[] }) {
                     <TableHead>{ti('paperTrading.ledger.colStatus')}</TableHead>
                 </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody className="block space-y-3 md:table-row-group md:space-y-0">
                 {sorted.map((row) => {
                     const rejected = row.status === 'rejected';
                     return (
-                        <TableRow key={row.clientOrderId}>
-                            <TableCell className="whitespace-nowrap">
+                        <TableRow className="block rounded-lg border border-gray-800 p-3 md:table-row md:rounded-none md:p-0" key={row.clientOrderId}>
+                            <TableCell className="block whitespace-normal md:table-cell md:whitespace-nowrap"><span className="block text-xs text-gray-400 md:hidden">{ti('paperTrading.ledger.colDate')}</span>
                                 {f.formatUserDateTime(row.executedAt ?? row.createdAt)}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="block whitespace-normal [overflow-wrap:anywhere] md:table-cell"><span className="block text-xs text-gray-400 md:hidden">{ti('paperTrading.ledger.colOperation')}</span>
                                 <span className="block font-medium text-gray-100">
                                     {row.kind === 'fx' ? row.name : row.symbol}
                                 </span>
@@ -59,10 +59,10 @@ export function LedgerTable({ entries }: { entries: HistoryRow[] }) {
                                     {rejected && row.rejectReason ? ` · ${paperTradingMessage(row.rejectReason, locale)}` : ''}
                                 </span>
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="block text-left md:table-cell md:text-right"><span className="block text-xs text-gray-400 md:hidden">{ti('paperTrading.ledger.colQuantity')}</span>
                                 {f.formatNumber(row.quantity, { maximumFractionDigits: 2 })}
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="block text-left md:table-cell md:text-right"><span className="block text-xs text-gray-400 md:hidden">{ti('paperTrading.ledger.colPrice')}</span>
                                 {rejected || row.fillPrice === null ? (
                                     <span className="text-gray-500">{ti('paperTrading.ledger.nd')}</span>
                                 ) : row.kind === 'fx' ? (
@@ -71,7 +71,7 @@ export function LedgerTable({ entries }: { entries: HistoryRow[] }) {
                                     f.formatMoney(row.fillPrice, row.currency)
                                 )}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="block md:table-cell"><span className="block text-xs text-gray-400 md:hidden">{ti('paperTrading.ledger.colStatus')}</span>
                                 {rejected ? (
                                     <Badge variant="destructive">{ti('paperTrading.ledger.rejectedBadge')}</Badge>
                                 ) : (
