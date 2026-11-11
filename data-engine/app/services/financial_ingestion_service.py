@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
 from app.models import Company, Document, FinancialFact, FinancialStatement, MarketPrice
-from app.services.company_identity_verification import sec_identity_mismatch
+from app.services.company_identity_verification import names_compatible, sec_identity_mismatch
 from app.services.connectors import esef as esef_connector
 from app.services.connectors import fred as fred_connector
 from app.services.connectors import sec_edgar as sec_edgar_connector
@@ -2398,6 +2398,21 @@ class FinancialIngestionService:
                 f"SEC para {ticker}: {identity_problem}; no se atribuyen sus "
                 "hechos (usa la fuente de su mercado local, p. ej. ESEF)"
             )
+
+        # Reparar solo la identidad ausente, despues de las guardas anteriores
+        # y antes del atajo unchanged. El ticker resuelto no basta para escribir
+        # master: exigimos CIK numerico del propio payload y razon social compatible.
+        # Sin commit adicional: persiste con el flujo normal del refresh.
+        if (
+            not card_cik
+            and payload_cik.isascii()
+            and payload_cik.isdigit()
+            and len(payload_cik) == 10
+            and int(payload_cik) > 0
+            and payload_cik == resolved_cik
+            and names_compatible(company.name or "", str(facts_data.get("entityName") or ""))
+        ):
+            company.cik = resolved_cik
 
         # Huella del payload + version de reglas: si nada cambio desde la
         # ultima ingesta completa, el recomputo seria identico (F353: la
