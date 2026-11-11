@@ -6,7 +6,6 @@ queue-watchdog concern. Redis time is authoritative across processes.
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 LEASE_SECONDS = 60
@@ -53,8 +52,13 @@ class KPIConsumer:
 def main() -> int:
     import redis
 
+    from app.core.config import get_settings
+    from app.core.redis_retry import no_retry
+
     try:
-        client = redis.Redis.from_url(os.environ['REDIS_URL'], socket_connect_timeout=3, socket_timeout=3)
+        client = redis.Redis.from_url(
+            get_settings().redis_url, socket_connect_timeout=3, socket_timeout=3, retry=no_retry(),
+        )
         return 0 if healthy(client, 'dramatiq', TOKEN_PATH.read_text()) else 1
     except Exception:
         return 1
