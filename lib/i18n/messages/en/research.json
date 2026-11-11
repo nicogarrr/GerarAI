@@ -1615,7 +1615,11 @@
     "caption": "Company financial facts (official and, where stated, unofficial): metric, period and value",
     "colMetric": "Metric",
     "colPeriod": "Period",
-    "colValue": "Value"
+    "colValue": "Value",
+    "sourceProvider": "Source: {provider}",
+    "sourceUnavailable": "Not available",
+    "publishedDate": "Published: {date}",
+    "publicationUnavailable": "Publication date not available"
   },
   "claimForm": {
     "created": "Claim added",
