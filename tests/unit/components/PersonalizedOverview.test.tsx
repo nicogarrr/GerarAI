@@ -156,6 +156,17 @@ describe('PersonalizedOverview', () => {
         expect(screen.getByRole('link', { name: /Ver\s*empresas a la watchlist/ })).toHaveAttribute('href', '/watchlist');
     });
 
+    it('cartera vacía: sin «Ver detalles» hacia una cartera vacía; con posiciones sí', async () => {
+        setup();
+        const { unmount } = await renderHome();
+        expect(screen.getByText('Primeros pasos')).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /Ver detalles/ })).not.toBeInTheDocument();
+        unmount();
+        setup({ portfolio: summary([holding('AAA')]) });
+        await renderHome();
+        expect(screen.getByRole('link', { name: /Ver detalles/ })).toHaveAttribute('href', '/portfolio');
+    });
+
     it.each([true, false])('primeros pasos: singular, sin watchlist y apertura del Cerebro (ready=%s)', async (ready) => {
         markBrainReady(ready);
         setup({ watch: { unavailable: false, total: 1, items: [watch('AAPL')] } });
