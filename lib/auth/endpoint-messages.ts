@@ -8,6 +8,7 @@ import type { TranslationKey } from '@/lib/i18n/t';
  * que antes (mismas frases en auth.endpointErrors.*).
  */
 const CODE_KEYS: Record<string, TranslationKey> = {
+    AUTH_ENDPOINT_LEGAL_ACCEPTANCE_REQUIRED: 'auth.signUp.acceptTermsRequired',
     AUTH_UNAVAILABLE: 'auth.endpointErrors.unavailable',
     AUTH_ENDPOINT_USER_ALREADY_EXISTS: 'auth.endpointErrors.emailTaken',
     AUTH_ENDPOINT_USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: 'auth.endpointErrors.emailTaken',

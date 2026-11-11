@@ -1,5 +1,6 @@
 'use server';
 
+import { hasLegalAcceptance } from '@/lib/auth/legal-acceptance';
 import { getAuth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { callAuthEndpoint } from "@/lib/auth/endpoint";
@@ -7,17 +8,18 @@ import { AuthenticationError, toAppError, getSafeErrorMessage } from "@/lib/type
 import { getT } from "@/lib/i18n/server";
 import { authEndpointErrorMessage } from "@/lib/auth/endpoint-messages";
 
-export const signUpWithEmail = async ({ email, password, fullName, country }: SignUpFormData): Promise<{ success: boolean; error?: string; accountStatus?: string }> => {
+export const signUpWithEmail = async ({ email, password, fullName, country, acceptTerms }: SignUpFormData): Promise<{ success: boolean; error?: string; accountStatus?: string }> => {
     const t = await getT();
+    if (!hasLegalAcceptance({ acceptTerms })) return { success: false, error: t('auth.signUp.acceptTermsRequired') };
     try {
         const auth = await getAuth();
         if (!auth) {
             throw new AuthenticationError(t('errors.backend.authUnavailable'));
         }
 
-        // El país viaja en el propio sign-up (additionalFields de better-auth,
-        // sin migraciones SQL) en vez de perderse en el destructuring.
-        const response = await callAuthEndpoint('/sign-up/email', { email, password, name: fullName, country });
+        // País y aceptación explícita viajan al endpoint. Las versiones y la
+        // fecha se generan en servidor, nunca desde este payload.
+        const response = await callAuthEndpoint('/sign-up/email', { email, password, name: fullName, country, acceptTerms });
 
         // The auth endpoint delivers the session in HttpOnly cookies. Never serialize
         // Better Auth's response: it also contains the raw bearer session token.
