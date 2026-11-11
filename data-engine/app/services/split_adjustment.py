@@ -26,9 +26,30 @@ from app.models import CorporateAction
 def split_events_by_company(
     db: Session, company_ids: list[int]
 ) -> dict[int, list[tuple[date, Decimal]]]:
-    """Splits/reverse splits por compania, ordenados por fecha efectiva."""
+    """Splits/reverse splits por compania, ordenados por fecha efectiva.
+
+    Dentro de una llamada de valoración (``valuation_call_cache``) la lectura
+    se hace UNA vez por conjunto de compañías: el motor pedía los splits de la
+    misma empresa por cada hecho ajustado (medido 11-nov-2026: 16-33 SELECT
+    iguales a corporate_actions por ``value_company``). Cada llamada recibe
+    listas nuevas, así que nadie puede alterar lo cacheado. Fuera de esa
+    llamada, una consulta como siempre.
+    """
     if not company_ids:
         return {}
+    # Import diferido: ``app.valuation`` importa este módulo al cargarse.
+    from app.valuation.call_cache import cached
+
+    events = cached(
+        db, "split_events_by_company", tuple(sorted(set(company_ids))),
+        lambda: _read_split_events(db, company_ids),
+    )
+    return {company_id: list(rows) for company_id, rows in events.items()}
+
+
+def _read_split_events(
+    db: Session, company_ids: list[int]
+) -> dict[int, list[tuple[date, Decimal]]]:
     rows = db.scalars(
         select(CorporateAction)
         .where(
