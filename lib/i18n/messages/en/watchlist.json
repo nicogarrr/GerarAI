@@ -12,6 +12,7 @@
     },
     "capGap": {
       "timedOut": "the read took more than 3 s; reload to see it",
+      "readFailed": "could not be read in time (the server was slow or returned an error); reload to see it",
       "notApplicable": "the source does not cover market cap for that market",
       "unverifiable": "the source does not provide a verifiable market cap"
     },
@@ -52,6 +53,7 @@
     "peTtm": "P/E (TTM)",
     "peFy": "P/E (FY)",
     "readTimedOut": "The read took more than 3 s; reload to see it.",
+    "readFailed": "Could not be read in time (the server was slow or returned an error); reload to see it.",
     "peNotCovered": "The source does not cover P/E for this market.",
     "peNd": {
       "loss": "Loss-making: FY{year} EPS negative, no P/E.",

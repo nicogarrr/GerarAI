@@ -22,6 +22,7 @@ import WatchlistAddButton from '@/components/watchlist/WatchlistAddButton';
 import DcaLevelBadge from '@/components/watchlist/DcaLevelBadge';
 import { sortWatchlistRows } from '@/lib/watchlist/sort-rows';
 import { peNdNote } from '@/lib/watchlist/pe-nd-reason';
+import { MARKET_CAP_GAP_REASONS, marketCapGapReason, type MarketCapGapReason } from '@/lib/watchlist/market-cap-gap';
 import { emptyWatchlistEntry } from '@/lib/watchlist/entry-fallback';
 import DcaSignalsPanel from '@/components/watchlist/DcaSignalsPanel';
 import { getDcaSignals } from '@/lib/actions/dca-signals.actions';
@@ -254,16 +255,15 @@ export default async function WatchlistPage({
     const displayStocks = metricSort ? sortedStocks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : sortedStocks;
 
     // Capitalización N/D: una sola leyenda por página en vez de repetir el motivo en cada tarjeta/fila.
-    const marketCapGaps = (['timedOut', 'notApplicable', 'unverifiable'] as const)
+    const marketCapGaps = MARKET_CAP_GAP_REASONS
         .map((reason) => ({
             reason,
-            symbols: displayStocks
-                .filter((st) => st.marketCap === null && (reason === 'timedOut' ? st.timedOut : reason === 'notApplicable' ? !st.timedOut && st.metricsNotApplicable : !st.timedOut && !st.metricsNotApplicable))
-                .map((st) => st.symbol),
+            symbols: displayStocks.filter((st) => marketCapGapReason(st) === reason).map((st) => st.symbol),
         }))
         .filter((group) => group.symbols.length > 0);
-    const MARKET_CAP_GAP_TEXT = {
+    const MARKET_CAP_GAP_TEXT: Record<MarketCapGapReason, string> = {
         timedOut: t('watchlist.page.capGap.timedOut'),
+        readFailed: t('watchlist.page.capGap.readFailed'),
         notApplicable: t('watchlist.page.capGap.notApplicable'),
         unverifiable: t('watchlist.page.capGap.unverifiable'),
     };
@@ -500,13 +500,13 @@ export default async function WatchlistPage({
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">{t('watchlist.page.sort.marketCap')}</dt>
-                                        <dd className="break-words font-mono text-sm text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? t('watchlist.page.noMetricsTitle') : undefined}>
+                                        <dd className="break-words font-mono text-sm text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable && !stock.metricsReadFailed ? t('watchlist.page.noMetricsTitle') : undefined}>
                                             {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· {t('watchlist.page.derived')}</span> : null}{stock.marketCap === null ? <sup aria-hidden="true" className="ml-0.5 font-sans text-[10px] text-gray-500">*</sup> : null}
                                         </dd>
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">{stock.peKind === 'fy' ? t('watchlist.page.peFy') : t('watchlist.page.peTtm')}</dt>
-                                        <dd className="font-mono text-sm text-gray-300" title={stock.peSource ?? (stock.peRatio === null && stock.metricsNotApplicable ? t('watchlist.page.noMetricsTitle') : undefined)}>{formatPeRatio(stock.peRatio)}{peNdNoteEl(stock)}</dd>
+                                        <dd className="font-mono text-sm text-gray-300" title={stock.peSource ?? (stock.peRatio === null && stock.metricsNotApplicable && !stock.metricsReadFailed ? t('watchlist.page.noMetricsTitle') : undefined)}>{formatPeRatio(stock.peRatio)}{peNdNoteEl(stock)}</dd>
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500" title={t('watchlist.page.analystTitle')}>{t('watchlist.page.analystTarget')}</dt>
@@ -618,7 +618,7 @@ export default async function WatchlistPage({
                                                 </div>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-right font-mono text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? t('watchlist.page.noMetricsTitle') : undefined}>
+                                        <TableCell className="text-right font-mono text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable && !stock.metricsReadFailed ? t('watchlist.page.noMetricsTitle') : undefined}>
                                             {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· {t('watchlist.page.derived')}</span> : null}{stock.marketCap === null ? <sup aria-hidden="true" className="ml-0.5 font-sans text-[10px] text-gray-500">*</sup> : null}
                                         </TableCell>
                                         <TableCell className="text-right">

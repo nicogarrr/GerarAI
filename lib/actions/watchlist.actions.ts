@@ -174,14 +174,45 @@ export type WatchlistEntryData = {
     metricsNotApplicable: boolean;
     /** Símbolo del listado real validado (p. ej. AENA.MC); null sin listado verificado. Lo usa la celda de objetivos de analistas. */
     quoteSymbol: string | null;
+    /** true = la lectura de /api/watchlist/metrics falló (timeout, 5xx, red): una capitalización N/D NO significa que la fuente no la tenga. */
+    metricsReadFailed?: boolean;
 };
 
 type BackendWatchlistMetrics = components['schemas']['WatchlistMetricsOut'];
 
-function fetchBackendMetrics(symbol: string): Promise<BackendWatchlistMetrics | null> {
+type BackendMetricsRead = { data: BackendWatchlistMetrics | null; failed: boolean };
+
+/** Respaldo propio del backend. Un fallo (timeout, 5xx, red) se distingue de
+ *  una respuesta sin dato: antes ambos eran null y la leyenda decía «la fuente
+ *  no facilita…» cuando solo no se había podido leer. */
+function fetchBackendMetrics(symbol: string): Promise<BackendMetricsRead> {
     return researchRequest<BackendWatchlistMetrics>(
         `/api/watchlist/metrics/${encodeURIComponent(symbol)}`,
-    ).catch(() => null);
+    ).then(
+        (data) => ({ data: data ?? null, failed: false }),
+        () => ({ data: null, failed: true }),
+    );
+}
+
+/** Cap y PER del backend cuando no hay línea de cotización validada: son
+ *  cifras de su propia base (cap del proveedor o precio x acciones, PER
+ *  cierre/BPA FY) y no dependen del símbolo de cotización. */
+function withBackendMetrics(base: WatchlistEntryData, read: BackendMetricsRead): WatchlistEntryData {
+    const metrics = read.data;
+    const cap = metrics && typeof metrics.market_cap === 'number' && Number.isFinite(metrics.market_cap) ? metrics.market_cap : null;
+    const per = metrics && typeof metrics.per === 'number' && Number.isFinite(metrics.per) ? metrics.per : null;
+    const sources = metrics?.sources ?? [];
+    return {
+        ...base,
+        currency: base.currency ?? metrics?.currency ?? null,
+        marketCap: cap,
+        marketCapDerived: cap !== null && sources.some((src) => src.toLowerCase().includes('derivada')),
+        peRatio: per,
+        peKind: per !== null ? 'fy' : null,
+        peSource: sources.find((src) => src.startsWith('PER:')) ?? null,
+        metricsNotApplicable: true,
+        metricsReadFailed: read.failed,
+    };
 }
 
 export async function getWatchlistEntryData(
@@ -195,7 +226,13 @@ export async function getWatchlistEntryData(
     const basics = precomputedBasics !== undefined ? precomputedBasics : await getResearchCompanyBasics(normalized);
     const quoteSymbol = quoteSymbolFor(basics, normalized);
     const base = emptyWatchlistEntry(normalized, basics, quoteSymbol);
-    if (!quoteSymbol) return base;
+    // Sin master no hay empresa en la base: nada que pedir al backend.
+    if (!basics) return base;
+    // Sin línea de cotización validada no hay precio (nunca el gemelo US ni
+    // un sufijo adivinado), pero la capitalización y el PER del backend son
+    // de esta empresa: antes se devolvía la fila vacía sin pedirlos y AIR.PA
+    // salía «la fuente no facilita…» con 154.990 M € en la base.
+    if (!quoteSymbol) return withBackendMetrics(base, await fetchBackendMetrics(normalized));
 
 
     // Linea US derivada de bolsa/divisa, no de quoteSymbol === ticker (CGEO.L
@@ -246,7 +283,8 @@ export async function getWatchlistEntryData(
     const backendUs = usListing && (marketCapM === null || peRatio === null)
         ? await fetchBackendMetrics(normalized)
         : null;
-    const backendAll = backend ?? backendUs;
+    const backendRead = backend ?? backendUs;
+    const backendAll = backendRead?.data ?? null;
     const backendCap = backendAll && typeof backendAll.market_cap === 'number' ? backendAll.market_cap : null;
     const backendPer = backendAll && typeof backendAll.per === 'number' && Number.isFinite(backendAll.per) ? backendAll.per : null;
     const backendDerived = (backendAll?.sources ?? []).some((src) => src.toLowerCase().includes('derivada'));
@@ -296,6 +334,7 @@ export async function getWatchlistEntryData(
         priceKind,
         priceAsOf,
         metricsNotApplicable: !usListing,
+        metricsReadFailed: backendRead?.failed ?? false,
     };
 }
 

@@ -19,6 +19,7 @@ export type PeNdKey =
     | 'watchlist.page.peNd.staleUndated'
     | 'watchlist.page.peNd.other'
     | 'watchlist.page.readTimedOut'
+    | 'watchlist.page.readFailed'
     | 'watchlist.page.peNotCovered';
 
 export type PeNdNote = { key: PeNdKey; params?: Record<string, string> };
@@ -28,6 +29,8 @@ export type PeNdInput = {
     peSource: string | null;
     timedOut?: boolean;
     metricsNotApplicable?: boolean;
+    /** La lectura del backend falló: el PER puede existir (no es «no cubre»). */
+    metricsReadFailed?: boolean;
 };
 
 const ND_PREFIX = /^PER:\s*N\/D:\s*/i;
@@ -59,6 +62,7 @@ export function peNdNote(stock: PeNdInput): PeNdNote | null {
     if (stock.timedOut) return { key: 'watchlist.page.readTimedOut' };
     const reason = peNdReasonFromSource(stock.peSource);
     if (reason) return reason;
+    if (stock.metricsReadFailed) return { key: 'watchlist.page.readFailed' };
     if (stock.metricsNotApplicable) return { key: 'watchlist.page.peNotCovered' };
     return null;
 }
