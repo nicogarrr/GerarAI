@@ -38,7 +38,10 @@ def test_batch_endpoint_40_tickers_bounded_queries(db: Session):
     tickers = [f"T{i:02d}" for i in range(38)]
     for ticker in tickers:
         _company(db, ticker)
-    _company(db, "SAN")  # alias con sufijo: SAN.MC -> SAN
+    san = _company(db, "SAN")  # alias con sufijo: SAN.MC -> SAN
+    # Real Madrid listing, not a synthetic NASDAQ homonym.
+    san.exchange, san.currency = "BME", "EUR"
+    db.flush()
     requested = tickers + ["SAN.MC", "NOPE"]
 
     engine = db.get_bind()

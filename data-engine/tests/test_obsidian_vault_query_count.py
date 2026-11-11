@@ -52,7 +52,7 @@ def _seed(n: int):
     for i in range(n):
         ticker = f"OBS{i:03d}"
         company = Company(
-            ticker=ticker, name=f"Empresa {i}", exchange="NYSE", currency="USD",
+            ticker=ticker, name=f"Empresa {i}", exchange="LONDON STOCK EXCHANGE", currency="USD",
             sector="Tech", industry="Tech", company_type="standard",
             valuation_model="standard_dcf", special_sources=[], special_risks=[], factor_tags=[],
         )

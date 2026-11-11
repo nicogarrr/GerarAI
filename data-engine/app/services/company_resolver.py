@@ -96,11 +96,11 @@ KNOWN_MARKET_SUFFIXES = frozenset({
 
 
 def _base_contradicts_listing(requested: str, company: Company | None) -> bool:
-    """True when ``requested`` is a reviewed listing and ``company`` is another issuer.
+    """Reject a base row contradicting the requested listing's known identity.
 
-    BFIT.AS is Basic-Fit (ISIN NL0011872650); its bare base ticker BFIT is a
-    US homonym. The suffix fallback must not hand a Basic-Fit request the US
-    row: only a base row carrying the listing's own ISIN is the same issuer.
+    Reviewed ISINs protect named issuers (BFIT.AS); otherwise the shared
+    price-source venue mapping protects all known markets. Unknown legacy
+    venues keep the existing fallback, not a claim of verified identity.
     """
     if company is None:
         return False
@@ -109,7 +109,16 @@ def _base_contradicts_listing(requested: str, company: Company | None) -> bool:
     for listing in BY_ISIN.values():
         if listing.ticker == requested:
             return (company.isin or "").strip().upper() != listing.isin
-    return False
+    # Reuse the price connector's reviewed venue mapping: EUR/USD is not
+    # evidence of a market (London listings can trade in USD). If the master
+    # has a known listing, a suffix pointing elsewhere must not select it.
+    # Unknown legacy venues retain their existing fallback; exact and FIGI
+    # matches are handled before this guard.
+    from app.services.connectors.yahoo import yahoo_chart_symbol
+    from app.services.propicks_price_service import yahoo_symbol
+
+    known_symbol = yahoo_symbol(company)
+    return known_symbol is not None and known_symbol.upper() != yahoo_chart_symbol(requested)
 
 
 def resolve_company(db: Session, ticker: str) -> Company | None:
