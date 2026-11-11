@@ -243,3 +243,24 @@ describe('EBITDA derivado de emisores IFRS', () => {
     expect(document.body.textContent).toContain('beneficio antes de impuestos − resultado financiero neto + amortizaciones');
   });
 });
+
+
+describe('informe: estimaciones ausentes no son cero', () => {
+  it.each(['es', 'en'] as const)('ausencia y número no finito se declaran N/D (%s)', (locale) => {
+    const sotp = structuredClone(data.sotp!);
+    Object.assign(sotp.result!, { total_revenue: null, total_ebitda: Infinity });
+    view(locale, { sotp });
+    const box = screen.getByTestId('informe-user-estimates');
+    const na = locale === 'es' ? 'N/D' : 'N/A';
+    expect(box).toHaveTextContent(`EBITDA ${na}`);
+    expect(box).toHaveTextContent(locale === 'es' ? `ingresos ${na}` : `revenue ${na}`);
+    expect(box).not.toHaveTextContent('0 M');
+  });
+
+  it('cero publicado conserva su magnitud, sin confundirse con ausencia', () => {
+    const sotp = structuredClone(data.sotp!);
+    Object.assign(sotp.result!, { total_revenue: 0, total_ebitda: 0 });
+    view('es', { sotp });
+    expect(screen.getByTestId('informe-user-estimates')).toHaveTextContent('ingresos 0 M, EBITDA 0 M');
+  });
+});

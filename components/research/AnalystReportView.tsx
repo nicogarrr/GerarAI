@@ -122,7 +122,7 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
         <div className="mt-3 rounded-lg border border-amber-700/60 bg-amber-950/30 p-3 text-sm" data-testid="informe-user-estimates">
           <p className="text-xs font-semibold text-amber-200">{mine?.author ? t('research.informe.userEstimatesBy', { author: mine.author }) : t('research.informe.userEstimates')}</p>
           {mine ? (
-            <p className="mt-1 text-gray-200">{t('research.informe.userEstimatesLine', { year: String(mine.year), revenue: `${fmt.formatNumber(mine.revenue ?? 0, { maximumFractionDigits: 0 })} M`, ebitda: `${fmt.formatNumber(mine.ebitda ?? 0, { maximumFractionDigits: 0 })} M` })}</p>
+            <p className="mt-1 text-gray-200">{t('research.informe.userEstimatesLine', { year: String(mine.year), revenue: mine.revenue === null ? na : `${fmt.formatNumber(mine.revenue, { maximumFractionDigits: 0 })} M`, ebitda: mine.ebitda === null ? na : `${fmt.formatNumber(mine.ebitda, { maximumFractionDigits: 0 })} M` })}</p>
           ) : <p className="mt-1 text-gray-400">{t('research.informe.userEstimatesNone')}</p>}
           <p className="mt-1 text-xs text-amber-200/80">{t('research.informe.userEstimatesLabel')}</p>
         </div>
