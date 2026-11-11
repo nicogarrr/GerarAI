@@ -131,9 +131,13 @@ def _parse_public_url(url: str) -> tuple[Any, str, int]:
     if not hostname:
         raise ValueError("URL must include a hostname")
     try:
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        explicit_port = parsed.port
+        default_port = 443 if parsed.scheme == "https" else 80
+        port = default_port if explicit_port is None else explicit_port
     except ValueError as exc:
         raise ValueError("URL contains an invalid port") from exc
+    if port != default_port:
+        raise ValueError("Only the standard port for the URL scheme is allowed (http:80, https:443)")
     return parsed, hostname, port
 
 

@@ -105,11 +105,11 @@ def test_malformed_dns_answers_are_rejected(addresses):
         pf._validated_addresses(addresses)
 
 
-def test_ipv6_target_brackets_ip_and_host_with_nondefault_port():
-    parsed, host, port = pf._parse_public_url("https://[2606:4700:4700::1111]:8443/report")
+def test_ipv6_target_brackets_ip_and_host_with_standard_port():
+    parsed, host, port = pf._parse_public_url("https://[2606:4700:4700::1111]:443/report")
     target = pf._build_target(parsed, host, port, [(socket.AF_INET6, 1, 6, "", (host, port, 0, 0))])
-    assert target.request_url == "https://[2606:4700:4700::1111]:8443/report"
-    assert target.host_header == "[2606:4700:4700::1111]:8443"
+    assert target.request_url == "https://[2606:4700:4700::1111]/report"
+    assert target.host_header == "[2606:4700:4700::1111]"
     assert target.sni_hostname is None
 
 

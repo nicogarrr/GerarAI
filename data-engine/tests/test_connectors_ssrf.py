@@ -105,7 +105,8 @@ def test_rss_no_sigue_redireccion_a_red_interna(fake_public_host, location):
 
     assert result.items == []
     assert result.errors, "el sondeo debe fallar"
-    assert "Private, loopback, link-local, or reserved" in " ".join(result.errors)
+    expected = "standard port" if location == "http://localhost:8000/admin" else "Private, loopback, link-local, or reserved"
+    assert expected in " ".join(result.errors)
     assert connected, "la primera petición debe llegar al host público"
     assert not any(h in {"169.254.169.254", "localhost", "127.0.0.1"} for h in connected)
 
