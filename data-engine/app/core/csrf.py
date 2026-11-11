@@ -77,6 +77,10 @@ def validate_csrf_token(token: str | None) -> bool:
     if len(parts) != 3:
         return False
     salt, timestamp_str, signature = parts
+    # compare_digest(str, str) rejects non-ASCII rather than returning False.
+    # A malformed client token is a CSRF rejection, never a server error.
+    if not signature.isascii():
+        return False
     try:
         timestamp = int(timestamp_str)
     except ValueError:
