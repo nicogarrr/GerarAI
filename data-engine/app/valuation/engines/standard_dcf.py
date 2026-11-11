@@ -34,6 +34,7 @@ from app.valuation.engines.base import (
     snapshot_trace,
     wacc_not_above_terminal_result,
 )
+from app.valuation.fact_reference import mean_fact_confidence, missing_confidence_metrics
 from app.valuation.moat_framework import empty_moat_framework
 from app.valuation.normalized_fcf import (
     ProjectionPlan,
@@ -537,11 +538,10 @@ class StandardDCFEngine(ValuationEngine):
         confidence_facts = [
             fact for metric, fact in snapshot.facts.items() if metric in MODEL_INPUT_METRICS
         ]
-        evidence_confidence = (
-            sum(float(fact.confidence) for fact in confidence_facts) / len(confidence_facts)
-            if confidence_facts
-            else 0.0
-        )
+        # Un hecho transitorio sin confianza registrada cuenta 0 (no se inventa)
+        # y queda dicho en la traza (``evidence_confidence_missing``).
+        evidence_confidence = mean_fact_confidence(confidence_facts)
+        confidence_missing = missing_confidence_metrics(confidence_facts)
         own_history = _own_history(context, company.id)
         scenarios = mechanical_dcf_scenarios(
             growth,
@@ -817,6 +817,11 @@ class StandardDCFEngine(ValuationEngine):
                 "probability_method": "source_confidence_plus_company_financials",
                 "evidence_confidence": evidence_confidence,
                 "evidence_confidence_inputs": sorted(MODEL_INPUT_METRICS & set(snapshot.facts)),
+                **(
+                    {"evidence_confidence_missing": confidence_missing}
+                    if confidence_missing
+                    else {}
+                ),
                 "fact_ids": snapshot.fact_ids(),
                 # Periodo VERDADERO de cada input: la base de ventas efectiva
                 # puede ser TTM al ultimo trimestre (revenue_base); etiquetarla
