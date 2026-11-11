@@ -125,7 +125,7 @@ export default async function ResearchSourcesPage({
 
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6">
-      <header className="flex items-center justify-between gap-3 border-b border-gray-800 pb-4">
+      <header className="flex flex-col items-start justify-between gap-3 border-b border-gray-800 pb-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           <Button asChild className="min-w-11" size="sm" variant="ghost">
             <Link href="/research" aria-label={t('research.sourcesPage.back')}>
@@ -151,7 +151,7 @@ export default async function ResearchSourcesPage({
           <h2 className="text-lg font-semibold text-gray-100">{t('research.sourcesPage.documents')}</h2>
         </div>
         <form action="/research/sources" className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[220px_170px_220px_minmax(200px,1fr)_auto] xl:items-end" method="get">
-          <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-ticker">
+          <label className="grid min-w-0 gap-1 text-xs font-medium text-gray-400" htmlFor="sources-ticker">
             {t('research.sourcesPage.filterTicker')}
             <TickerSearchInput
               className="min-h-11 min-w-0 border-gray-800 bg-black/30 text-gray-200"
@@ -161,10 +161,10 @@ export default async function ResearchSourcesPage({
               placeholder={t('research.sourcesPage.tickerPlaceholder')}
             />
           </label>
-          <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-scope">
+          <label className="grid min-w-0 gap-1 text-xs font-medium text-gray-400" htmlFor="sources-scope">
             {t('research.sourcesPage.scope')}
             <select
-              className="h-11 rounded-lg border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm"
+              className="h-11 min-w-0 max-w-full rounded-lg border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm"
               defaultValue={scope}
               id="sources-scope"
               name="scope"
@@ -173,10 +173,10 @@ export default async function ResearchSourcesPage({
               <option value="all">{t('research.sourcesPage.scopeAll')}</option>
             </select>
           </label>
-          <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-source-type">
+          <label className="grid min-w-0 gap-1 text-xs font-medium text-gray-400" htmlFor="sources-source-type">
             {t('research.sourcesPage.sourceType')}
             <select
-              className="h-11 rounded-lg border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm"
+              className="h-11 min-w-0 max-w-full rounded-lg border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm"
               defaultValue={sourceType}
               id="sources-source-type"
               name="source_type"
@@ -187,7 +187,7 @@ export default async function ResearchSourcesPage({
               ))}
             </select>
           </label>
-          <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-q">
+          <label className="grid min-w-0 gap-1 text-xs font-medium text-gray-400" htmlFor="sources-q">
             {t('research.sourcesPage.search')}
             <Input
               className="min-h-11 h-10 border-gray-800 bg-black/30 text-gray-200"
@@ -216,7 +216,20 @@ export default async function ResearchSourcesPage({
             {t('research.sourcesPage.sortNote')}
           </p>
         ) : null}
-        <OverflowScrollRegion label={t('research.sourcesPage.regionLabel')}>
+        {documents.length > 0 ? <div className="space-y-3 lg:hidden print:hidden">
+          {documents.map(document => <section key={document.id} aria-label={`${document.ticker ?? 'GLOBAL'} · ${document.title}`} className="min-w-0 rounded-lg border border-gray-800 p-3 [overflow-wrap:anywhere]">
+            <p className="text-xs font-semibold text-teal-300">{document.ticker ?? 'GLOBAL'}</p>
+            <h3 className="mt-1 text-sm font-semibold text-gray-200">{document.source_url ? <a className="underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={document.source_url} rel="noreferrer" target="_blank">{document.title}</a> : document.title}</h3>
+            <dl className="mt-3 space-y-3 text-sm">
+              <div><dt className="text-xs text-gray-400">{t('research.sourcesPage.colSource')}</dt><dd>{sourceTypeLabel(document.source_type, locale === 'en' ? t : undefined)}</dd></div>
+              <div><dt className="text-xs text-gray-400">{t('research.sourcesPage.colTier')}</dt><dd>{sourceTierDisplay(document.source_tier, locale)}</dd></div>
+              <div><dt className="text-xs text-gray-400">{t('research.sourcesPage.colPublished')}</dt><dd>{document.published_at ? formatDate(document.published_at, undefined, NA) : t('research.sourcesPage.noDate')}</dd></div>
+              <div><dt className="text-xs text-gray-400">URL</dt><dd>{document.source_url ? <a aria-label={t('research.sourcesPage.openSource', { title: document.title })} className="inline-flex min-h-11 min-w-11 items-center text-teal-300 hover:text-teal-200" href={document.source_url} rel="noreferrer" target="_blank">{t('research.sourcesPage.open')}</a> : NA}</dd></div>
+            </dl>
+          </section>)}
+        </div> : null}
+        <OverflowScrollRegion className={documents.length ? 'hidden lg:block print:block' : undefined} label={t('research.sourcesPage.regionLabel')}>
+
           <table className="w-full min-w-[820px] text-left text-sm">
             <caption className="sr-only">{t('research.sourcesPage.caption')}</caption>
             <thead className="text-xs uppercase text-gray-500">
@@ -376,7 +389,7 @@ export default async function ResearchSourcesPage({
             </div>
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="manual-source-type">{t('research.sourcesPage.sourceType')}</label>
-              <select id="manual-source-type" name="source_type" defaultValue="manual_upload" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm">
+              <select id="manual-source-type" name="source_type" defaultValue="manual_upload" className="h-11 min-w-0 max-w-full rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm">
                 <option value="manual_upload">{t('research.sourcesPage.optUserText')}</option>
                 <option value="manual_transcript">{t('research.sourcesPage.typeTranscript')}</option>
                 <option value="company_ir">{t('research.sourcesPage.typeCompanyIr')}</option>
@@ -428,7 +441,7 @@ export default async function ResearchSourcesPage({
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-source-type">{t('research.sourcesPage.sourceType')}</label>
-                <select id="file-source-type" name="source_type" defaultValue="manual_upload" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{locale === 'en' ? sourceTypeLabel(value, t) : text}</option>)}</select>
+                <select id="file-source-type" name="source_type" defaultValue="manual_upload" className="h-11 min-w-0 max-w-full rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{locale === 'en' ? sourceTypeLabel(value, t) : text}</option>)}</select>
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-source-url">{t('research.sourcesPage.fSourceUrl')}</label>
@@ -461,7 +474,7 @@ export default async function ResearchSourcesPage({
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url-source-type">{t('research.sourcesPage.sourceType')}</label>
-                <select id="url-source-type" name="source_type" defaultValue="url" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{locale === 'en' ? sourceTypeLabel(value, t) : text}</option>)}</select>
+                <select id="url-source-type" name="source_type" defaultValue="url" className="h-11 min-w-0 max-w-full rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{locale === 'en' ? sourceTypeLabel(value, t) : text}</option>)}</select>
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url">{t('research.sourcesPage.fUrl')}</label>
