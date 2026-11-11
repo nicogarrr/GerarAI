@@ -72,17 +72,17 @@ class RSSConnector:
             "Accept": "application/atom+xml, application/rss+xml, application/xml, text/xml",
         }
 
-    async def _fetch(self, url: str) -> bytes:
+    async def _fetch(self, url: str) -> tuple[bytes, str]:
         if self.client is not None:
             response = await self.client.get(url, headers=self.headers)
             response.raise_for_status()
-            return response.content
+            return response.content, str(response.url)
         # Sin cliente inyectado: pasa por public_fetch (bloquea IPs privadas,
         # fija la IP resuelta y revalida cada redirección).
-        content, _content_type, _final_url = await fetch_public_url_async(
+        content, _content_type, final_url = await fetch_public_url_async(
             url, timeout=self.timeout, headers=self.headers
         )
-        return content
+        return content, final_url
 
     async def poll(
         self,
@@ -93,7 +93,8 @@ class RSSConnector:
     ) -> ConnectorResult:
         metadata: dict[str, Any] = {"feed_url": url, "ticker": ticker}
         try:
-            content = await self._fetch(url)
+            content, final_url = await self._fetch(url)
+            metadata["final_feed_url"] = final_url
             root = DefusedElementTree.fromstring(content)
             if _local_name(root.tag) not in _FEED_ROOTS:
                 # 200 bien formado que no es un feed (challenge HTML, sitemap,
@@ -106,7 +107,7 @@ class RSSConnector:
             if max_items <= 0:
                 return ConnectorResult(source="rss", items=[], metadata=metadata)
             for entry in entries:
-                item = self._parse_entry(entry, url, feed_title, ticker)
+                item = self._parse_entry(entry, final_url, feed_title, ticker)
                 key = item.external_id or item.url or f"{item.title}:{item.published_at}"
                 if key in seen:
                     continue
