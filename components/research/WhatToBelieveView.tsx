@@ -48,6 +48,23 @@ function waccSentence(t: ReturnType<typeof useT>, f: Formatters, solved: Implied
     return kind === 'price' ? t('research.whatToBelieve.waccNotAvailable') : null;
 }
 
+/** Brecha precio / DCF base por debajo de la cual se dice «en línea» (±0,5 %). */
+const IN_LINE_GAP = 0.005;
+
+/**
+ * Conclusión primero: cuánto vale la acción en nuestro DCF base frente al
+ * precio de hoy. Sin ella la tarjeta solo hablaba de WACC y el inversor tenía
+ * que ir a otra sección a ver si el precio está por encima o por debajo.
+ * Sin valor base o sin precio positivos no hay frase (nunca cifras inventadas).
+ */
+function verdictSentence(t: ReturnType<typeof useT>, f: Formatters, base: number | null | undefined, price: number | null | undefined): string | null {
+    if (base === null || base === undefined || price === null || price === undefined || !(base > 0) || !(price > 0)) return null;
+    const gap = price / base - 1;
+    const vars = { value: f.money(base), price: f.money(price) };
+    if (Math.abs(gap) < IN_LINE_GAP) return t('research.whatToBelieve.verdictInLine', vars);
+    return t(gap > 0 ? 'research.whatToBelieve.verdictAbove' : 'research.whatToBelieve.verdictBelow', { ...vars, gap: f.pct(Math.abs(gap)) });
+}
+
 export function WhatToBelieveView({ data }: { data: WhatToBelieve | null }) {
     const t = useT();
     const fmt = useFormat();
@@ -58,6 +75,7 @@ export function WhatToBelieveView({ data }: { data: WhatToBelieve | null }) {
     };
     const priceLine = data?.implied_wacc_price ? waccSentence(t, f, data.implied_wacc_price, data.wacc_used, 'price') : null;
     const consensusLine = data?.implied_wacc_consensus ? waccSentence(t, f, data.implied_wacc_consensus, data.wacc_used, 'consensus') : null;
+    const verdict = data?.status === 'ok' ? verdictSentence(t, f, data.base_value, data.current_price) : null;
     const growth = data?.implied_growth;
     const exit = data?.exit_multiple;
     const multiple = (v: number) => fmt.formatNumber(v, { maximumFractionDigits: 0 });
@@ -70,6 +88,7 @@ export function WhatToBelieveView({ data }: { data: WhatToBelieve | null }) {
                 <p className="mt-2 text-sm text-gray-400" data-testid="what-to-believe-na" role="status">{t('research.whatToBelieve.notApplicable', { reason: reasonLabel(t, data.reason_code) })}</p>
             ) : (
                 <>
+                    {verdict ? <p className="mt-2 break-words text-sm font-medium text-gray-100" data-testid="what-to-believe-verdict">{verdict}</p> : null}
                     <p className="mt-1 text-xs text-gray-400">{t('research.whatToBelieve.subtitle')}</p>
                     <ul className="mt-3 space-y-2 text-sm text-gray-200">
                         {priceLine ? <li className="break-words" data-testid="what-to-believe-wacc">{priceLine}</li> : null}
