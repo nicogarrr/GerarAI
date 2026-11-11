@@ -11,7 +11,9 @@ function usePanel<T>(symbol: string, read: (symbol: string) => Promise<T | null>
     const [loaded, setLoaded] = useState<{ symbol: string; value: T | null } | null>(null);
     useEffect(() => {
         let active = true;
-        void (initial ?? read(symbol)).catch(() => null).then((value) => {
+        // RSC Flight thenables are awaitable but catch() need not return a Promise.
+        // Assimilate before chaining, including rejected server reads.
+        void Promise.resolve(initial ?? read(symbol)).catch(() => null).then((value) => {
             if (active) setLoaded({ symbol, value });
         });
         return () => { active = false; };
