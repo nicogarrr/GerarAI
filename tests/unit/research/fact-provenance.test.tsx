@@ -61,3 +61,25 @@ it('retains source provenance on stale balance figures and quarantined desktop v
  expect(table.getAllByText('Annual report 2025')).toHaveLength(3);
  expect(table.getByText(/Capitalización pendiente/)).toBeInTheDocument();
 });
+
+
+it.each([null, 'javascript:alert(1)', '/relative', 'not a URL'])('leaves mobile and desktop values unlinked for unsafe or absent URL %s', (source_url) => {
+ render(<FactTable facts={[{...base,source_url}]} ticker="TEST" refreshLabel="Actualizar"/>);
+ expect(screen.queryByRole('link')).toBeNull();
+ expect(screen.getAllByText('Annual report 2025')).toHaveLength(2);
+});
+it('links the actual mobile and desktop numbers through the validated document URL and keeps metric labels with provenance',()=>{
+ render(<FactTable facts={[base]} ticker="TEST" refreshLabel="Actualizar"/>);
+ // The figure link and the source-title link are separate in each surface.
+ const valueLinks=screen.getAllByRole('link').filter(link=>link.textContent!=='Annual report 2025');
+ expect(valueLinks).toHaveLength(2);
+ for(const link of valueLinks){
+  expect(link).toHaveAttribute('href',base.source_url);
+  expect(link).toHaveAttribute('target','_blank');
+  expect(link).toHaveAttribute('rel','noopener noreferrer');
+  expect(link.textContent).not.toBe('');
+ }
+ const rowHeader=within(screen.getByRole('table')).getByRole('rowheader');
+ expect(rowHeader).toHaveTextContent('Ingresos');
+ expect(within(rowHeader).getByRole('link',{name:'Annual report 2025'})).toHaveAttribute('href',base.source_url);
+});

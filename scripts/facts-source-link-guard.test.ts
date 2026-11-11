@@ -12,11 +12,13 @@ describe('cifras de la ficha enlazadas a su fuente', () => {
         assert.ok(actions.includes('source_published_at?: string | null;'));
     });
     it('la fuente solo enlaza con URL real del backend', () => {
-        // #3527: la etiqueta textual de fuente (FactSource) se elimino; la
-        // cifra sigue enlazando a la URL que devuelve el backend via FactValueLink.
+        // La procedencia visible vuelve en FactSource (#5300); la cifra
+        // sigue enlazando, pero solo tras validar la URL del backend.
         assert.ok(panels.includes('function FactValueLink({ fact, children, locale }: { fact: ResearchFact; children: ReactNode; locale: Locale })'));
-        assert.ok(panels.includes('if (!fact.source_url) return <>{children}</>;'));
-        assert.ok(panels.includes('href={fact.source_url}'));
+        assert.ok(panels.includes('const href = factSourceUrl(fact.source_url);'));
+        assert.ok(panels.includes('if (!href) return <>{children}</>;'));
+        assert.ok(panels.includes('href={href}'));
+        assert.ok(!panels.includes('href={fact.source_url}'), 'no enlazar sin validar');
         assert.ok(panels.includes('rel="noopener noreferrer"'));
         assert.ok(panels.includes('target="_blank"'));
     });
@@ -27,7 +29,9 @@ describe('cifras de la ficha enlazadas a su fuente', () => {
     it('sin documento de origen la cifra queda como texto plano', () => {
         // Sin URL solo texto; nunca un enlace ni URLs construidas a mano.
         const link = panels.slice(panels.indexOf('function FactValueLink'), panels.indexOf('export function FactCard'));
-        assert.ok(link.includes('if (!fact.source_url) return <>{children}</>;'));
+        assert.ok(link.includes('const href = factSourceUrl(fact.source_url);'));
+        assert.ok(link.includes('if (!href) return <>{children}</>;'));
+        assert.ok(link.includes('href={href}'));
         assert.ok(!link.includes('sec.gov/cgi-bin'), 'sin URLs construidas a mano');
     });
 });
