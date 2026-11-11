@@ -3,6 +3,7 @@ import type { BetterAuthOptions } from 'better-auth';
 import { parseSetCookieHeader, toCookieOptions } from 'better-auth/cookies';
 import { getAuth } from '@/lib/better-auth/auth';
 import { AppError } from '@/lib/types/errors';
+import { LEGAL_ACCEPTANCE_REQUIRED_CODE, LEGAL_ACCEPTANCE_REQUIRED_MESSAGE } from '@/lib/auth/legal-acceptance';
 import { SIGNUP_NOT_INVITED_CODE, SIGNUP_NOT_INVITED_MESSAGE } from '@/lib/auth/signup-policy';
 import {
     ACCOUNT_PENDING_CODE,
@@ -76,6 +77,7 @@ export async function callAuthEndpoint(
             PASSWORD_TOO_SHORT: 'La contraseña debe tener al menos 8 caracteres.',
             PASSWORD_TOO_LONG: 'La contraseña no puede superar los 128 caracteres.',
             INVALID_EMAIL: 'Introduce un email válido.',
+            [LEGAL_ACCEPTANCE_REQUIRED_CODE]: LEGAL_ACCEPTANCE_REQUIRED_MESSAGE,
         };
         const signupMessage = path === '/sign-up/email' && (response.status === 400 || response.status === 422)
             ? signupMessages[code] : undefined;

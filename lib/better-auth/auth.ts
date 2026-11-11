@@ -33,6 +33,10 @@ import {
 } from "@/lib/auth/account-approval";
 import { AccountApproval } from "@/database/models/account-approval.model";
 import { notifyPendingAccount } from "@/lib/auth/approval-notify";
+import {
+    hasLegalAcceptance, legalAcceptanceStamp,
+    LEGAL_ACCEPTANCE_REQUIRED_CODE, LEGAL_ACCEPTANCE_REQUIRED_MESSAGE,
+} from '@/lib/auth/legal-acceptance';
 import { profileInputProblem } from "@/lib/auth/profile-input";
 
 
@@ -54,7 +58,7 @@ if (!autoApprove && (process.env.SIGNUP_AUTO_APPROVE === 'true' || process.env.S
     console.warn('[auth] SIGNUP_AUTO_APPROVE ignorado: en producción las cuentas nuevas siempre nacen pendientes de aprobación.');
 }
 
-const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => betterAuth({
+export const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => betterAuth({
     ...(database ? { database } : {}),
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL || env.VERCEL_URL || 'http://localhost:3000',
@@ -94,6 +98,9 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
     hooks: {
         before: createAuthMiddleware(async (ctx) => {
             if (ctx.path === '/sign-up/email') {
+                if (!hasLegalAcceptance(ctx.body)) {
+                    throw new APIError(400, { code: LEGAL_ACCEPTANCE_REQUIRED_CODE, message: LEGAL_ACCEPTANCE_REQUIRED_MESSAGE });
+                }
                 const email: unknown = (ctx.body as { email?: unknown } | undefined)?.email;
                 if (!isEmailAllowedToSignUp(email, signupPolicy)) {
                     throw new APIError(403, {
@@ -146,6 +153,15 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
     databaseHooks: {
         user: {
             create: {
+                before: async (user, ctx) => {
+                    // Internal account creation is not evidence of acceptance.
+                    // Only the explicit email signup can record it.
+                    if (ctx?.path !== '/sign-up/email') return;
+                    if (!hasLegalAcceptance(ctx.body)) {
+                        throw new APIError(400, { code: LEGAL_ACCEPTANCE_REQUIRED_CODE, message: LEGAL_ACCEPTANCE_REQUIRED_MESSAGE });
+                    }
+                    return { data: { ...user, ...legalAcceptanceStamp() } };
+                },
                 after: async (createdUser: { id: string; email?: string | null; name?: string | null }) => {
                     if (autoApprove) return;
                     try {
@@ -204,6 +220,11 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
                 input: false,
                 defaultValue: autoApprove ? 'approved' : 'pending',
             },
+            // Optional for old accounts. No defaults or backfill: absence means
+            // unknown, not accepted. Clients cannot write or edit this evidence.
+            termsVersion: { type: 'string', required: false, input: false, returned: false },
+            privacyVersion: { type: 'string', required: false, input: false, returned: false },
+            legalAcceptedAt: { type: 'date', required: false, input: false, returned: false },
             country: { type: 'string', required: false },
             investmentGoals: { type: 'string', required: false },
             riskTolerance: { type: 'string', required: false },

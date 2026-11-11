@@ -35,6 +35,7 @@ const signUpInput = {
     password: 'super-secreta',
     fullName: 'Nico',
     country: 'ES',
+    acceptTerms: true,
 } as unknown as SignUpFormData;
 
 beforeEach(() => {
@@ -44,6 +45,12 @@ beforeEach(() => {
 });
 
 describe('signUpWithEmail', () => {
+    it.each([false, undefined, 'true', 1])('rejects missing or malformed legal acceptance %j before auth or endpoint', async (acceptTerms) => {
+        const result = await signUpWithEmail({ ...signUpInput, acceptTerms } as SignUpFormData);
+        expect(result).toEqual({ success: false, error: expect.stringMatching(/términos/i) });
+        expect(getAuth).not.toHaveBeenCalled();
+        expect(callAuthEndpoint).not.toHaveBeenCalled();
+    });
     it('sin auth disponible -> AUTH_UNAVAILABLE sin llamar al endpoint', async () => {
         getAuth.mockResolvedValue(null);
         const result = await signUpWithEmail(signUpInput);
@@ -59,6 +66,7 @@ describe('signUpWithEmail', () => {
             password: 'super-secreta',
             name: 'Nico',
             country: 'ES',
+            acceptTerms: true,
         });
         expect(result).toEqual({ success: true });
     });

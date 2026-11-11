@@ -7,6 +7,7 @@ export async function resolve(specifier, context, nextResolve) {
     if (specifier === '@/lib/auth/endpoint-messages') return { url: new URL('../lib/auth/endpoint-messages.ts', import.meta.url).href, shortCircuit: true };
     if (specifier === '@/lib/constants') return { url: 'auth-boundary:constants', shortCircuit: true };
     if (specifier === '@/lib/i18n/server') return { url: new URL('./auth-session-boundary.i18n-shim.mjs', import.meta.url).href, shortCircuit: true };
+    if (specifier === '@/lib/auth/legal-acceptance') return { url: new URL('../lib/auth/legal-acceptance.ts', import.meta.url).href, shortCircuit: true };
     return nextResolve(specifier, context);
 }
 export async function load(url, context, nextLoad) {
