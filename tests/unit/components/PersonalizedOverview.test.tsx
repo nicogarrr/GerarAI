@@ -41,6 +41,33 @@ vi.mock('@/components/research/ExternalNewsHeadline', () => ({
     ExternalNewsHeadline: ({ headline, url }: { headline: string; url?: string | null }) => <a href={url ?? undefined}>{headline}</a>,
 }));
 
+import { sectionErrorKey } from '@/lib/section-error';
+
+// Las secciones de la primera carga llegan por route handlers
+// (app/api/home/*); aquí el fetch se resuelve con las mismas acciones
+// simuladas, replicando la forma {data, error} de sectionResponse.
+const homeSectionJson = async (read: () => Promise<unknown>, fallback: unknown) => {
+    try {
+        return Response.json({ data: await read(), error: null });
+    } catch (error) {
+        return Response.json({ data: fallback, error: sectionErrorKey(error) });
+    }
+};
+vi.stubGlobal('fetch', (url: RequestInfo | URL): Promise<Response> => {
+    const u = String(url);
+    if (u.startsWith('/api/home/portfolio')) return homeSectionJson(() => getPortfolioSummary('u1'), null);
+    if (u.startsWith('/api/home/alerts')) return homeSectionJson(
+        () => Promise.all([getUserAlerts(), getRecentTriggeredAlerts(3)]).then(([rules, triggered]) => ({ rules, triggered })),
+        { rules: [], triggered: [] });
+    if (u.startsWith('/api/home/watchlist')) return homeSectionJson(
+        () => getHomeWatchlistPreview(3).then((preview: { unavailable?: boolean }) => {
+            if (preview?.unavailable) throw new Error('No se pudo cargar la watchlist');
+            return preview;
+        }),
+        { unavailable: false, total: 0, items: [] });
+    return Promise.resolve(Response.json({ error: 'no encontrada' }, { status: 404 }));
+});
+
 import PersonalizedOverview from '@/components/PersonalizedOverview';
 
 const holding = (symbol: string, over: Record<string, unknown> = {}) => ({

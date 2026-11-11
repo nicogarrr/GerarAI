@@ -1,10 +1,11 @@
 'use server';
 
 import { getWatchlistEntryData, getWatchlistState } from '@/lib/actions/watchlist.actions';
+import { getResearchCompaniesBasics, getResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
 import { probeQuoteFromBackend, type ProbeQuote } from '@/lib/market/probe-quote';
 import type { ProviderQuotePayload } from '@/lib/market/quote-freshness';
 import { researchRequest } from '@/lib/research/client';
-import { fetchDatedChanges } from '@/lib/market/dated-change';
+import { fetchDatedChanges, type DatedChange } from '@/lib/market/dated-change';
 import { getFairValueReading, getScreenerStocksReal } from '@/lib/actions/screener.actions';
 import { DCF_MIN_UPSIDE_PCT } from '@/lib/overview/dcf-candidates';
 
@@ -56,32 +57,94 @@ export async function getHomeWatchlistPreview(limit: number): Promise<HomeWatchl
     const { items, unavailable } = await getWatchlistState();
     if (unavailable) return { unavailable: true, total: 0, items: [] };
     const pageItems = items.slice(0, limit);
-    // Mismo cierre datado y mismo % que watchlist, Movers y Mercado
-    // (/api/market/changes sobre market_prices): antes la vista previa del
-    // inicio se quedaba con el cierre de la cadena viva Finnhub->Yahoo y
-    // mostraba otra fecha y otro cambio para el mismo símbolo (CGEO.L:
-    // "Cierre 19 oct 0,00%" en inicio frente a "Cierre 16 oct -0,82%" en
-    // watchlist, 19 oct 2026). Misma regla que la página de watchlist: la
-    // cotización viva manda solo cuando es realmente 'live'.
-    const datedChanges = await fetchDatedChanges(pageItems.map((item) => item.symbol));
-    const preview = await mapPool(pageItems, SERVER_CONCURRENCY, async (item): Promise<HomeWatchlistItem> => {
-        try {
-            // Precio y divisa del LISTADO REAL (master), nunca del ticker
-            // desnudo (F253/F254).
-            const data = await getWatchlistEntryData(item.symbol);
-            const dated = data.priceKind === 'live' ? undefined : datedChanges[data.symbol];
+    const pageSymbols = pageItems.map((item) => item.symbol);
+    // Mismo patrón que la página /watchlist (medido en prod): cierres
+    // datados, masters y cotizaciones se lanzan A LA VEZ; antes los cierres
+    // se esperaban en serie y el master era un GET /api/companies/{ticker}
+    // por símbolo (N peticiones) seguido de la cadena quote/metrics por
+    // símbolo, y la sección entera del inicio esperaba esa suma (344 ms
+    // medidos frente a 64 ms de cartera, 11-nov-2026).
+    const datedChangesPromise = fetchDatedChanges(pageSymbols);
+    // El master (nombre, bolsa, divisa) en UNA petición agregada al backend,
+    // fuera del presupuesto: conserva nombre/divisa aunque la cotización
+    // agote el suyo. Si el backend aún no sirve el agregado (despliegue
+    // escalonado front/back) se mantiene la oleada por símbolo.
+    const batchedBasics = await getResearchCompaniesBasics(pageSymbols);
+    const basicsPromises = pageItems.map((item) => {
+        const symbol = item.symbol.trim().toUpperCase();
+        return batchedBasics
+            ? Promise.resolve(batchedBasics[symbol] ?? null)
+            : getResearchCompanyBasics(symbol);
+    });
+    // Presupuesto por símbolo (mismo tope de 3 s que /watchlist): en una
+    // instancia fría la cadena de cotización estiraba la sección a 7-9 s.
+    // Pasado el tope la tarjeta usa el CIERRE DATADO etiquetado (misma
+    // fuente que watchlist, Movers y Mercado, F358), nunca un «sin datos»
+    // fabricado ni una espera ilimitada. Las lecturas siguen en vuelo y
+    // calientan las cachés para la siguiente carga.
+    const ENTRY_DATA_BUDGET_MS = 3000;
+    const entryPromises = pageItems.map((item, index) => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        return Promise.race([
+            basicsPromises[index].then((basics) => getWatchlistEntryData(item.symbol, basics)),
+            new Promise<null>((resolve) => {
+                timer = setTimeout(() => resolve(null), ENTRY_DATA_BUDGET_MS);
+            }),
+        ]).then(
+            (value) => {
+                // Sin clearTimeout el temporizador colgado mantiene la
+                // instancia serverless despierta tras responder.
+                if (timer) clearTimeout(timer);
+                return value;
+            },
+            () => {
+                if (timer) clearTimeout(timer);
+                return null;
+            },
+        );
+    });
+    const [datedChanges, basicsList, entries] = await Promise.all([
+        datedChangesPromise.catch((): Record<string, DatedChange> => ({})),
+        Promise.all(basicsPromises.map((promise) => promise.catch(() => null))),
+        Promise.all(entryPromises),
+    ]);
+    const preview = pageItems.map((item, index): HomeWatchlistItem => {
+        const symbol = item.symbol.trim().toUpperCase();
+        const basics = basicsList[index] ?? null;
+        const entry = entries[index];
+        // Misma regla que la página de watchlist: la cotización viva manda
+        // solo cuando es realmente 'live'; en cualquier otro caso manda el
+        // cierre datado etiquetado (CGEO.L: «Cierre 19 oct 0,00%» en inicio
+        // frente a «Cierre 16 oct -0,82%» en watchlist, 19 oct 2026).
+        const dated = entry && entry.priceKind === 'live'
+            ? undefined
+            : datedChanges[entry?.symbol ?? symbol] ?? datedChanges[item.symbol] ?? datedChanges[symbol];
+        if (dated) {
             return {
-                symbol: data.symbol,
-                name: data.name,
-                price: dated ? dated.price : data.price,
-                currency: dated ? dated.currency : data.currency,
-                changePercent: dated ? dated.changePercent : data.changePercent,
-                priceKind: dated ? 'close' : data.priceKind,
-                priceAsOf: dated ? dated.date : data.priceAsOf,
+                symbol,
+                name: entry?.name ?? basics?.name ?? symbol,
+                price: dated.price,
+                currency: dated.currency,
+                changePercent: dated.changePercent,
+                priceKind: 'close',
+                priceAsOf: dated.date,
             };
-        } catch {
-            return { symbol: item.symbol, name: item.symbol, price: null, currency: null, changePercent: null, priceKind: null, priceAsOf: null };
         }
+        if (entry) {
+            return {
+                symbol: entry.symbol,
+                name: entry.name,
+                price: entry.price,
+                currency: entry.currency,
+                changePercent: entry.changePercent,
+                priceKind: entry.priceKind,
+                priceAsOf: entry.priceAsOf,
+            };
+        }
+        // Presupuesto agotado o proveedor caído sin cierre datado: N/D
+        // honesto, pero CON nombre y divisa del master si se resolvió (un
+        // cierre en € no sale en $); nunca se fabrica un 0.
+        return { symbol, name: basics?.name ?? symbol, price: null, currency: basics?.currency ?? null, changePercent: null, priceKind: null, priceAsOf: null };
     });
     return { unavailable: false, total: items.length, items: preview };
 }

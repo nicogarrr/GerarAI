@@ -1,13 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getWatchlistEntryData, getWatchlistState, fetchDatedChanges, getFairValueReading, getScreenerStocksReal } = vi.hoisted(() => ({
-    getWatchlistEntryData: vi.fn<(symbol: string) => Promise<unknown>>(),
+const { getWatchlistEntryData, getWatchlistState, fetchDatedChanges, getFairValueReading, getScreenerStocksReal, getResearchCompaniesBasics, getResearchCompanyBasics } = vi.hoisted(() => ({
+    getWatchlistEntryData: vi.fn<(symbol: string, basics?: unknown) => Promise<unknown>>(),
     getWatchlistState: vi.fn<() => Promise<unknown>>(),
     fetchDatedChanges: vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({})),
     getFairValueReading: vi.fn<(symbol: string) => Promise<unknown>>(),
     getScreenerStocksReal: vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => []),
+    getResearchCompaniesBasics: vi.fn<(symbols: string[]) => Promise<unknown>>(async () => null),
+    getResearchCompanyBasics: vi.fn<(symbol: string) => Promise<unknown>>(async () => null),
 }));
 vi.mock('@/lib/actions/watchlist.actions', () => ({ getWatchlistEntryData, getWatchlistState }));
+vi.mock('@/lib/actions/market-workspace.actions', () => ({ getResearchCompaniesBasics, getResearchCompanyBasics }));
 vi.mock('@/lib/market/dated-change', () => ({ fetchDatedChanges }));
 vi.mock('@/lib/actions/screener.actions', () => ({ getFairValueReading, getScreenerStocksReal }));
 
@@ -18,6 +21,10 @@ beforeEach(() => {
     vi.resetAllMocks();
     fetchDatedChanges.mockResolvedValue({});
     getScreenerStocksReal.mockResolvedValue([]);
+    // Por defecto el agregado no existe: oleada por símbolo (despliegue
+    // escalonado front/back), que además no encuentra la empresa.
+    getResearchCompaniesBasics.mockResolvedValue(null);
+    getResearchCompanyBasics.mockResolvedValue(null);
 });
 
 describe('getHomeWatchlistPreview', () => {
@@ -55,7 +62,69 @@ describe('getHomeWatchlistPreview', () => {
         expect(preview.total).toBe(3);
         expect(preview.items).toHaveLength(2);
     });
+
+    it('masters en UNA llamada agregada y entradas resueltas con esos basics', async () => {
+        getWatchlistState.mockResolvedValue({ items: [{ symbol: 'AAPL' }, { symbol: 'AENA' }], unavailable: false });
+        getResearchCompaniesBasics.mockResolvedValue({
+            AAPL: { ticker: 'AAPL', name: 'Apple Inc', exchange: 'NASDAQ', currency: 'USD' },
+            AENA: { ticker: 'AENA', name: 'Aena S.M.E. SA', exchange: 'BME', currency: 'EUR' },
+        });
+        getWatchlistEntryData.mockImplementation(async (symbol: string) => ({ symbol, name: symbol, price: 1, currency: 'USD', changePercent: 0, priceKind: 'live', priceAsOf: null }));
+        const preview = await getHomeWatchlistPreview(5);
+        expect(getResearchCompaniesBasics).toHaveBeenCalledTimes(1);
+        expect(getResearchCompaniesBasics).toHaveBeenCalledWith(['AAPL', 'AENA']);
+        expect(getResearchCompanyBasics).not.toHaveBeenCalled();
+        // La entrada recibe el master pre-resuelto (no vuelve a pedirlo).
+        expect(getWatchlistEntryData).toHaveBeenCalledWith('AAPL', expect.objectContaining({ name: 'Apple Inc' }));
+        expect(preview.items).toHaveLength(2);
+    });
+
+    it('sin agregado en el backend: oleada por símbolo como antes', async () => {
+        getWatchlistState.mockResolvedValue({ items: [{ symbol: 'AAPL' }], unavailable: false });
+        getResearchCompaniesBasics.mockResolvedValue(null);
+        getResearchCompanyBasics.mockResolvedValue({ ticker: 'AAPL', name: 'Apple Inc', currency: 'USD' });
+        getWatchlistEntryData.mockResolvedValue({ symbol: 'AAPL', name: 'Apple Inc', price: 150, currency: 'USD', changePercent: 1, priceKind: 'live', priceAsOf: null });
+        await getHomeWatchlistPreview(5);
+        expect(getResearchCompanyBasics).toHaveBeenCalledWith('AAPL');
+        expect(getWatchlistEntryData).toHaveBeenCalledWith('AAPL', expect.objectContaining({ name: 'Apple Inc' }));
+    });
+
+    it('cotización colgada: a los 3 s la tarjeta usa el cierre datado con nombre del master', async () => {
+        vi.useFakeTimers();
+        try {
+            getWatchlistState.mockResolvedValue({ items: [{ symbol: 'CGEO.L' }], unavailable: false });
+            getResearchCompaniesBasics.mockResolvedValue({ 'CGEO.L': { ticker: 'CGEO.L', name: 'CGeo', currency: 'GBP' } });
+            getWatchlistEntryData.mockReturnValue(new Promise(() => {}));
+            fetchDatedChanges.mockResolvedValue({ 'CGEO.L': { price: 3.18, changePercent: -0.82, currency: 'GBp', date: '2026-10-16' } });
+            const promise = getHomeWatchlistPreview(5);
+            await vi.advanceTimersByTimeAsync(3000);
+            const preview = await promise;
+            expect(preview.items[0]).toEqual({
+                symbol: 'CGEO.L', name: 'CGeo', price: 3.18, currency: 'GBp', changePercent: -0.82, priceKind: 'close', priceAsOf: '2026-10-16',
+            });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('cotización colgada y sin cierre datado: N/D honesto con nombre y divisa del master, nunca un 0', async () => {
+        vi.useFakeTimers();
+        try {
+            getWatchlistState.mockResolvedValue({ items: [{ symbol: 'AENA' }], unavailable: false });
+            getResearchCompaniesBasics.mockResolvedValue({ AENA: { ticker: 'AENA', name: 'Aena S.M.E. SA', currency: 'EUR' } });
+            getWatchlistEntryData.mockReturnValue(new Promise(() => {}));
+            const promise = getHomeWatchlistPreview(5);
+            await vi.advanceTimersByTimeAsync(3000);
+            const preview = await promise;
+            expect(preview.items[0]).toEqual({
+                symbol: 'AENA', name: 'Aena S.M.E. SA', price: null, currency: 'EUR', changePercent: null, priceKind: null, priceAsOf: null,
+            });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
 });
+
 
 describe('getHomeOpportunities', () => {
     const row = (symbol: string, has = true) => ({ symbol, has_fundamentals: has });
