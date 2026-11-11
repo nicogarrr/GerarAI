@@ -111,7 +111,7 @@ function ThemeCard({
             <p className="text-xs font-semibold text-gray-500">{rank === null ? NA : `#${rank}`}</p>
             {badge ? (
               <span
-                className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                className={`rounded px-1.5 py-0.5 text-xs font-bold uppercase ${
                   badge.kind === 'turn-up'
                     ? 'bg-teal-400/15 text-teal-300'
                     : badge.kind === 'turn-down'
@@ -168,7 +168,7 @@ function ThemeCard({
                           {row.ticker}
                         </Link>
                         {row.reason ? (
-                          <span className="mt-0.5 block max-w-[11rem] text-[11px] font-normal leading-4 text-gray-500">
+                          <span className="mt-0.5 block max-w-[11rem] text-xs font-normal leading-4 text-gray-500">
                             {themeReasonText(row.reason, fmt.locale)}
                           </span>
                         ) : null}
