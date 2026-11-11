@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import dynamic from 'next/dynamic';
 import PortfolioDataNotice from '@/components/portfolio/PortfolioDataNotice';
 import PortfolioSummary from '@/components/portfolio/PortfolioSummary';
+import { isBlankPortfolio } from '@/lib/portfolio-blank';
 import { hasCostBasis } from '@/lib/portfolio-insight';
 import { windowNav } from '@/lib/portfolio-nav';
 import AddTransactionButton from '@/components/portfolio/AddTransactionButton';
@@ -259,9 +260,12 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                             </div>
 
                             <div className="mb-4">
-                                <p className="text-3xl font-bold text-white">
-                                    {f.formatMoney(summary.totalValue, summary.baseCurrency)}
-                                </p>
+                                {/* Cartera en blanco: sin «0,00 €» (las tarjetas de arriba dicen N/D); solo el estado vacío. */}
+                                {isBlankPortfolio(summary) ? null : (
+                                    <p className="text-3xl font-bold text-white">
+                                        {f.formatMoney(summary.totalValue, summary.baseCurrency)}
+                                    </p>
+                                )}
                                 {summary.holdings.length === 0 ? (
                                     <div className="mt-2 space-y-3">
                                         <p className="text-sm text-gray-400">

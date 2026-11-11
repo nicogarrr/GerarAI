@@ -3,6 +3,7 @@
 import { TrendingUp, TrendingDown, DollarSign, PiggyBank } from 'lucide-react';
 import { useT, useFormat } from '@/lib/i18n/client';
 import { hasCostBasis } from '@/lib/portfolio-insight';
+import { isBlankPortfolio } from '@/lib/portfolio-blank';
 import type { PortfolioSummary as PortfolioSummaryType } from '@/lib/actions/portfolio.actions';
 
 type Props = {
@@ -19,7 +20,9 @@ export default function PortfolioSummary({ summary }: Props) {
   const noData = isEmpty || costReview || !hasCostBasis(summary);
   // Sin posiciones NI caja: el valor total no es 0,00 EUR real, es ausencia de datos.
   // Con caja y sin posiciones el total (la caja) sí es un dato.
-  const nothingYet = isEmpty && summary.totalValue === 0 && summary.cash === 0 && summary.equityValue === 0;
+  const nothingYet = isBlankPortfolio(summary);
+  // Cada N/D por cartera vacía dice por qué (antes: cuatro N/D mudos junto a «Aún no tienes posiciones»).
+  const emptyNote = <p className="text-xs text-gray-500 mt-1">{ti('portfolio.summary.emptyNote')}</p>;
   const isPositive = summary.totalGain >= 0;
   const excluded = summary.totalsExcluded ?? 0;
   const format = (value: number) => f.formatMoney(value, summary.baseCurrency, {
@@ -56,7 +59,7 @@ export default function PortfolioSummary({ summary }: Props) {
         <p className="text-base min-[420px]:text-lg sm:text-2xl font-bold text-gray-100 tracking-tight break-words">
           {nothingYet ? ti('common.na') : format(summary.totalValue)}
         </p>
-        {nothingYet ? null : (
+        {nothingYet ? emptyNote : (
           <p className="text-xs text-gray-500 mt-1">
             {ti('portfolio.summary.netWorth', { equity: format(summary.equityValue), cash: format(summary.cash) })}
           </p>
@@ -73,7 +76,7 @@ export default function PortfolioSummary({ summary }: Props) {
         <p className="text-base min-[420px]:text-lg sm:text-2xl font-bold text-gray-100 tracking-tight break-words">
           {noData ? ti('common.na') : format(summary.totalCost)}
         </p>
-        {noData ? null : (
+        {isEmpty ? emptyNote : noData ? null : (
           <p className="text-xs text-gray-500 mt-1">
             {ti('portfolio.summary.costNote', { value: format(summary.equityValue) })}
             {excluded > 0
@@ -105,6 +108,7 @@ export default function PortfolioSummary({ summary }: Props) {
                 signDisplay: 'auto',
               })}
         </p>
+        {isEmpty ? emptyNote : null}
       </div>
 
       <div className="bg-[#111111] border border-gray-800 rounded-xl p-4 sm:p-5 relative overflow-hidden group hover:border-orange-500/30 transition-colors">
@@ -114,6 +118,7 @@ export default function PortfolioSummary({ summary }: Props) {
             {noData ? ti('common.na') : f.formatPercent(summary.totalGainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
           </p>
         </div>
+        {isEmpty ? emptyNote : null}
         {/* Barra de progreso visual */}
         {!noData ? (
           <div className="w-full bg-gray-800 h-1.5 rounded-full mt-3 overflow-hidden">

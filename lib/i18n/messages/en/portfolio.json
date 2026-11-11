@@ -355,7 +355,8 @@
     "excludedPositionOne": "1 position",
     "excludedPositionMany": "{n} positions",
     "gainTitle": "Gain/Loss",
-    "returnTitle": "Return"
+    "returnTitle": "Return",
+    "emptyNote": "No positions yet"
   },
   "importImage": {
     "cta": "Import screenshot",
