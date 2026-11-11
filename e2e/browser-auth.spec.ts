@@ -23,7 +23,7 @@ test.describe("public authentication shell", () => {
     await expect(page.getByRole("heading", { name: "Crea tu cuenta" })).toBeVisible();
   });
 
-  test("sign-up keeps Radix selects out of native validation and preloads canonical defaults", async ({ page }) => {
+  test("sign-up keeps only country with canonical default and requires legal acceptance", async ({ page }) => {
     await page.goto("/sign-up");
 
     const form = page.locator("form");
@@ -33,12 +33,30 @@ test.describe("public authentication shell", () => {
     // vive en las reglas del formulario, no en el control nativo.
     expect(await form.locator("select[required]").count()).toBe(0);
 
-    // Los defaults deben ser valores canonicos de las opciones (no etiquetas
-    // en mayusculas que dejan el Select en blanco y envian un payload invalido).
-    await expect(form.getByRole("combobox").nth(1)).toHaveText(/Crecimiento a largo plazo/);
-    await expect(form.getByRole("combobox").nth(2)).toHaveText(/Moderado/);
-    await expect(form.getByRole("combobox").nth(3)).toHaveText(/Tecnolog/);
-    await expect(form.getByRole("button", { name: "Crear cuenta", exact: true })).toBeEnabled();
+    // #5357 retiró el perfil inversor del alta, no el país ni el consentimiento.
+    await expect(form.getByRole("combobox")).toHaveCount(1);
+    await expect(form.getByRole("combobox", { name: "País", exact: true })).toHaveText(/España/);
+    for (const name of ["investmentGoals", "riskTolerance", "preferredIndustry"]) {
+      await expect(form.locator(`[name="${name}"]`)).toHaveCount(0);
+    }
+    for (const label of [/Objetivo de inversión/i, /Tolerancia al riesgo/i, /Sector preferido/i]) {
+      await expect(form.getByLabel(label)).toHaveCount(0);
+    }
+    const terms = form.getByRole("checkbox");
+    await expect(terms).not.toBeChecked();
+    await expect(form.getByRole("link", { name: "Términos de uso", exact: true })).toHaveAttribute("href", "/terminos");
+    await expect(form.getByRole("link", { name: "Política de privacidad", exact: true })).toHaveAttribute("href", "/privacidad");
+    await form.getByLabel("Nombre completo", { exact: true }).fill("Usuario de prueba");
+    await form.getByLabel("Email", { exact: true }).fill("local-signup@example.test");
+    await form.getByLabel("Contraseña", { exact: true }).fill("local-only-password");
+    await form.getByRole("button", { name: "Crear cuenta", exact: true }).click();
+    await expect(form.getByText(/Debes aceptar los Términos de uso y la Política de privacidad/)).toBeVisible();
+    await expect(terms).toHaveAttribute("aria-invalid", "true");
+    await terms.check();
+    await expect(terms).toBeChecked();
+    // No enviamos un alta: la aceptación en servidor y su persistencia se
+    // prueban en el pipeline BetterAuth local de #5361.
+    await page.screenshot({ path: "test-results/gerarai-sign-up-country-terms.png", fullPage: true });
   });
 });
 
