@@ -10,6 +10,8 @@ import { thesisCatalystLabel } from '@/lib/research/catalyst-label';
 import { cleanThesisText } from '@/lib/research/thesis-text';
 import { readingSections } from '@/lib/research/thesis-reading-sections';
 import { readableInk } from '@/lib/dca/readable-ink';
+import { dcaEngineText } from '@/lib/dca/engine-text';
+import { readableMissingReason } from '@/lib/research/missing-reason';
 import { valuationSummaryText } from '@/lib/research/valuation-summary';
 import type { Formatters } from '@/lib/format';
 import type { Locale } from '@/lib/i18n/locale';
@@ -68,20 +70,21 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
           <div>
             <p className="text-xs text-gray-500">{t('research.informe.dcaLevel')}</p>
             {zone ? (
-              <p className="mt-1"><span className="inline-block rounded px-2 py-0.5 text-sm font-semibold" data-testid="informe-dca" style={{ backgroundColor: zone.color, color: readableInk(zone.color, zone.fg) }}>{zone.label}</span>
-                <span className="block text-xs text-gray-400">{zone.zone} · {t('research.informe.monthsInZone', { n: zone.months_in_zone })}</span></p>
+              <p className="mt-1"><span className="inline-block rounded px-2 py-0.5 text-sm font-semibold" data-testid="informe-dca" style={{ backgroundColor: zone.color, color: readableInk(zone.color, zone.fg) }}>{dcaEngineText(zone.label, t)}</span>
+                <span className="block text-xs text-gray-400">{dcaEngineText(zone.zone, t)} · {t('research.informe.monthsInZone', { n: zone.months_in_zone })}</span></p>
             ) : <p className="mt-1 text-gray-300">{na}</p>}
           </div>
           <div>
             <p className="text-xs text-gray-500">{t('research.informe.fairValue')}</p>
             <p className="mt-1 text-lg font-semibold text-gray-100" data-testid="informe-fair">{fair?.value != null ? money(fair.value, fairCurrency) : t('research.informe.noFairValue')}</p>
-            <p className="text-xs text-gray-400">{fair?.label ? valuationSummaryText(fair.label, locale) : ''}{fair?.as_of ? ` · ${fmt.formatMarketDate(fair.as_of)}` : ''}</p>
-            {fair?.value == null && fair?.reason ? <p className="text-xs text-gray-400">{valuationSummaryText(fair.reason, locale)}</p> : null}
+            {/* Sin cifra, la etiqueta («Sin valor justo») repetía el titular: solo el motivo, legible. */}
+            {fair?.value != null ? <p className="text-xs text-gray-400">{fair.label ? valuationSummaryText(fair.label, locale) : ''}{fair.as_of ? ` · ${fmt.formatMarketDate(fair.as_of)}` : ''}</p> : null}
+            {fair?.value == null && fair?.reason ? <p className="text-xs text-gray-400" data-testid="informe-fair-reason">{readableMissingReason(valuationSummaryText(fair.reason, locale), locale)}</p> : null}
           </div>
           <div>
             <p className="text-xs text-gray-500">{t('research.informe.fairRange')}</p>
             <p className="mt-1 text-gray-100" data-testid="informe-range">{range ? `${money(range.low, rangeCurrency)} – ${money(range.high, rangeCurrency)}` : na}</p>
-            <p className="text-xs text-gray-400">{range ? (range.source === 'thesis' ? t('research.informe.rangeThesis') : t('research.informe.rangeEngine')) : ''}</p>
+            <p className="text-xs text-gray-400">{range ? (range.source === 'thesis' ? t('research.informe.rangeThesis') : t('research.informe.rangeEngine')) : t('research.informe.rangeNone')}</p>
           </div>
           <div>
             <p className="text-xs text-gray-500">{t('research.informe.price')}</p>
@@ -253,9 +256,16 @@ const CONSENSUS_SOURCE_KEYS = {
 function ConsensusCellView({ cell, t, fmt, big, unit, eps, mobile = false }: { cell: OwnConsensusCell | null; t: T; fmt: Formatters; big: (v: number | null | undefined, unit?: string | null) => string; unit: string | null; eps: boolean; mobile?: boolean }) {
   const Cell = mobile ? 'dd' : 'td';
   if (!cell || cell.status !== 'estimado' || cell.mid == null) {
-    return <Cell className={mobile ? 'text-gray-400' : 'whitespace-nowrap py-1 pl-2 text-gray-500'} title={cell?.reason ?? undefined}>{t('research.informe.na')}{mobile && cell?.reason ? <span className="mt-1 block text-xs leading-5 text-amber-300">{cell.reason}</span> : null}</Cell>;
+    // El motivo del N/D se lee en pantalla también en la tabla de PC (antes solo
+    // en el «title», invisible en táctil y sin descubrir con ratón).
+    return <Cell className={mobile ? 'text-gray-400' : 'py-1 pl-2 text-gray-500'} title={cell?.reason ?? undefined}>{t('research.informe.na')}{cell?.reason ? <span className={mobile ? 'mt-1 block text-xs leading-5 text-amber-300' : 'block max-w-[16rem] text-[11px] leading-4 text-amber-300/90'}>{cell.reason}</span> : null}</Cell>;
   }
-  const value = eps ? fmt.formatNumber(cell.mid, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : big(cell.mid, unit);
+  // BPA con su divisa (la del ejercicio): «68,82» a secas junto a un precio en
+  // US$ invitaba a un PER absurdo cuando la empresa presenta en otra moneda.
+  const epsUnit = chartPriceUnit(unit);
+  const value = eps
+    ? (epsUnit ? fmt.formatMoney(cell.mid / epsUnit.divisor, epsUnit.currency, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : fmt.formatNumber(cell.mid, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+    : big(cell.mid, unit);
   const key = CONSENSUS_SOURCE_KEYS[(cell.source ?? '') as keyof typeof CONSENSUS_SOURCE_KEYS];
   const source = key ? t(key) : (cell.source ?? '');
   const url = consensusSourceUrl(cell);
@@ -267,6 +277,13 @@ function ConsensusCellView({ cell, t, fmt, big, unit, eps, mobile = false }: { c
         {url ? <a className="underline decoration-dotted hover:text-teal-300" href={url} target="_blank" rel="noopener noreferrer">{source}</a> : source}
       </span>
       {reach ? <span className={mobile ? 'block text-xs text-gray-400' : 'block text-[11px] text-gray-500'} title={cell.base_rate_check?.formula ?? undefined} data-testid="consensus-base-rate-reach">{t(REACH_KEYS[reach.key], { pct: fmt.formatPercent(reach.share, { digits: 0 }) })}</span> : null}
+      {/* La fórmula se abre con un toque: en iPhone no hay «pasar el ratón». */}
+      {cell.formula ? (
+        <details className={mobile ? 'mt-1 text-xs text-gray-400' : 'mt-0.5 text-[11px] text-gray-500'} data-testid="consensus-formula">
+          <summary className={mobile ? 'inline-flex min-h-[44px] cursor-pointer items-center text-teal-300' : 'cursor-pointer text-teal-300/80'}>{t('research.informe.formula')}</summary>
+          <span className="block max-w-[20rem] whitespace-normal text-left [overflow-wrap:anywhere]">{cell.formula}</span>
+        </details>
+      ) : null}
     </Cell>
   );
 }

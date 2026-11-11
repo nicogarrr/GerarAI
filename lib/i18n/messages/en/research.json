@@ -2078,7 +2078,7 @@
     "userEstimatesLabel": "User assumptions, not validated against history.",
     "consensusTitle": "GerarAI's own consensus (estimate, not yet reported)",
     "consensusNone": "no own estimate with the available sources",
-    "consensusNote": "Each cell comes from the first available source in a fixed order: company guidance → cited analysts → own model → SEC base rate. Hover a figure to see its formula; the link opens the cited source. The model EPS scales the same prior-period EPS by the estimated operating income (shares, interest and taxes held constant).",
+    "consensusNote": "Each cell comes from the first available source in a fixed order: company guidance → cited analysts → own model → SEC base rate. «Formula» under each figure shows how it is calculated; the link opens the cited source. The model EPS scales the same prior-period EPS by the estimated operating income (shares, interest and taxes held constant).",
     "operatingIncome": "Operating income",
     "eps": "Diluted EPS",
     "consensusSource": {
@@ -2123,7 +2123,9 @@
     },
     "reachEq": "Reached by {pct} of peers in 1 year",
     "reachLt": "Reached by under {pct} of peers in 1 year",
-    "reachGt": "Reached by over {pct} of peers in 1 year"
+    "reachGt": "Reached by over {pct} of peers in 1 year",
+    "rangeNone": "No scenarios in the published thesis and no engine range",
+    "formula": "Formula"
   },
   "insidersV2": {
     "title": "Insiders (Forms 4 and 5)",
