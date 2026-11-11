@@ -193,12 +193,39 @@ def _rule_10b5_1(node: ET.Element, footnotes: dict[str, str]) -> bool:
     return False
 
 
-def alignment_plan_flag(node: ET.Element) -> bool | None:
-    """Explicit transactionCoding.aff10b5One only. Absence is not an unchecked box."""
+# Deliberately narrow affirmative grammar from the recorded META filing.
+# A generic mention, a negation or a document-wide checkbox is not attribution.
+_ATTRIBUTED_PLAN_SALE = re.compile(
+    r"^The sale reported was effected pursuant to a Rule 10b5-1 trading plan adopted by the reporting person on "
+    r"(?:January|February|March|April|May|June|July|August|September|October|November|December) "
+    r"[0-9]{1,2}, [0-9]{4}\.$", re.IGNORECASE,
+)
+
+
+def alignment_plan_flag(
+    node: ET.Element, *, root_flag: str | None = None,
+    footnotes: dict[str, str] | None = None, reference_counts: dict[str, int] | None = None,
+) -> bool | None:
+    """An explicit transaction flag, or uniquely attributed affirmative sale evidence.
+
+    The filing-level checkbox never becomes a per-transaction flag by itself.
+    A false root flag also does not establish false for every transaction.
+    """
     raw = node.findtext("transactionCoding/aff10b5One")
-    if raw is None:
+    if raw is not None:
+        return {"1": True, "true": True, "0": False, "false": False}.get(raw.strip().lower())
+    if (root_flag or "").strip().lower() not in {"1", "true"}:
         return None
-    return {"1": True, "true": True, "0": False, "false": False}.get(raw.strip().lower())
+    if node.findtext("transactionCoding/transactionCode") != "S":
+        return None
+    for ref in node.findall("transactionCoding/footnoteId"):
+        key = ref.get("id") or ""
+        if (reference_counts or {}).get(key) != 1:
+            continue
+        note = " ".join((footnotes or {}).get(key, "").split())
+        if _ATTRIBUTED_PLAN_SALE.fullmatch(note):
+            return True
+    return None
 
 
 def _text(elem: ET.Element | None, path: str) -> str | None:
@@ -305,6 +332,21 @@ def parse_form4_xml(source: str | bytes) -> dict:
     # Multi-reporter (filing conjunto): el XML NO ata filas a reporters, asi
     # que nunca se atribuye en silencio al primero — se marca la transaccion
     # como filing conjunto y se listan todos los reporters.
+    # Duplicate footnote declarations are ambiguous for attribution. Do not
+    # change the legacy parser's notes, only the evidence for this new flag.
+    alignment_notes = dict(footnotes)
+    declared_ids: set[str] = set()
+    for note in root.findall("footnotes/footnote"):
+        key = note.get("id") or ""
+        if key in declared_ids:
+            alignment_notes.pop(key, None)
+        declared_ids.add(key)
+    reference_counts: dict[str, int] = {}
+    for _derivative, nodes in tables:
+        for transaction in nodes:
+            for ref in transaction.iter("footnoteId"):
+                key = ref.get("id") or ""
+                reference_counts[key] = reference_counts.get(key, 0) + 1
     main_rep = (reporters or [{}])[0]
     multi_reporter = len(reporters) > 1
     if multi_reporter:
@@ -355,7 +397,10 @@ def parse_form4_xml(source: str | bytes) -> dict:
                     # RSU vs PSU: dos concesiones del mismo tamano no son duplicados.
                     "security_title": (_text(node, "securityTitle/value") or "").strip() or None,
                     "rule_10b5_1": _rule_10b5_1(node, footnotes),
-                    "alignment_10b5_1": alignment_plan_flag(node),
+                    "alignment_10b5_1": alignment_plan_flag(
+                        node, root_flag=root.findtext("aff10b5One"),
+                        footnotes=alignment_notes, reference_counts=reference_counts,
+                    ),
                     "shares_owned_after": float(owned_after) if owned_after is not None else None,
                     "direct_indirect": nature,
                 }
