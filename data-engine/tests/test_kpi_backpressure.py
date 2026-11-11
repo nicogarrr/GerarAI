@@ -31,9 +31,9 @@ class TestQueueProbes:
             assert workers.kpi_queue_has_capacity(_client_with_depth(9)) is True
             assert workers.kpi_queue_has_capacity(_client_with_depth(10)) is False
 
-    def test_max_pending_invalid_env_defaults_500(self) -> None:
+    def test_max_pending_invalid_env_defaults_100(self) -> None:
         with patch.dict("os.environ", {"KPI_QUEUE_MAX_PENDING": "abc"}):
-            assert workers.kpi_queue_max_pending() == 500
+            assert workers.kpi_queue_max_pending() == 100
 
 
 class TestIngestionDeferral:

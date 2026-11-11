@@ -36,7 +36,7 @@ x-app-env: &app-env
   PYTHONUNBUFFERED: "1"
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cavaai_research}
   REDIS_URL: redis://:${REDIS_PASSWORD:?Define REDIS_PASSWORD en .env.production}@redis:6379/0
-  KPI_QUEUE_MAX_PENDING: ${KPI_QUEUE_MAX_PENDING:-500}
+  KPI_QUEUE_MAX_PENDING: ${KPI_QUEUE_MAX_PENDING:-100}
   KPI_DEFER_LEASE_SECONDS: ${KPI_DEFER_LEASE_SECONDS:-900}
   QDRANT_URL: http://qdrant:6333
   VECTOR_STORE: qdrant
@@ -777,12 +777,14 @@ services:
     restart: unless-stopped
     # Worker dedicado a la cola kpis: la cola default (fan-out de ingesta)
     # ahogaba los 2 hilos compartidos y los KPI morian de inanicion.
-    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "4", "-Q", "kpis"]
+    # Un hilo y prefetch 1: drenado acotado; 1 GiB es candidato a validar
+    # con RSS de extracciones reales, no un pico pesado ya demostrado.
+    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "1", "-Q", "kpis"]
     environment:
       <<: [*app-env, *worker-db-env, *llm-env, *web-push-env]
       # Limita prefetch local; HLEN sigue contando los jobs en curso.
-      dramatiq_queue_prefetch: "4"
-      dramatiq_delay_queue_prefetch: "4"
+      dramatiq_queue_prefetch: "1"
+      dramatiq_delay_queue_prefetch: "1"
       FMP_API_KEY: ${FMP_API_KEY:-}
       FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
       FRED_API_KEY: ${FRED_API_KEY:-}
@@ -823,7 +825,7 @@ services:
       test:
         - CMD-SHELL
         - >-
-          python -c "import os,sys,redis; sys.exit(0 if 'dramatiq' in open('/proc/1/cmdline','rb').read().decode(errors='ignore') and redis.from_url(os.environ['REDIS_URL'], socket_connect_timeout=3).ping() else 1)"
+          python -m app.workers.kpi_consumer_health
       interval: 15s
       timeout: 10s
       retries: 5
@@ -837,7 +839,7 @@ services:
       resources:
         limits:
           cpus: "0.40"
-          memory: 448M
+          memory: 1G
 
   worker-alerts:
     image: cavaai-backend:prod

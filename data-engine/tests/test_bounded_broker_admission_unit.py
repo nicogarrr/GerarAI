@@ -36,7 +36,7 @@ class _FakeRedis:
     def register_script(self, script):
         return lambda *args, **kwargs: None
 
-    def eval(self, script, numkeys, k_msgs, k_dq, k_queue, maxp, msgid, payload):
+    def eval(self, script, numkeys, k_msgs, k_dq, k_queue, k_consumers, maxp, msgid, payload):
         self.eval_calls += 1
         if len(self.msgs) + len(self.dq) >= int(maxp):
             return 0
@@ -46,9 +46,9 @@ class _FakeRedis:
 
 
 class TestMaxPending:
-    def test_sin_variable_500(self, monkeypatch):
+    def test_sin_variable_100(self, monkeypatch):
         monkeypatch.delenv("KPI_QUEUE_MAX_PENDING", raising=False)
-        assert max_pending() == 500
+        assert max_pending() == 100
 
     def test_variable_valida_manda(self, monkeypatch):
         monkeypatch.setenv("KPI_QUEUE_MAX_PENDING", "250")
@@ -56,7 +56,7 @@ class TestMaxPending:
 
     def test_variable_corrupta_cae_al_defecto(self, monkeypatch):
         monkeypatch.setenv("KPI_QUEUE_MAX_PENDING", "muchas")
-        assert max_pending() == 500
+        assert max_pending() == 100
 
     def test_nunca_baja_de_uno(self, monkeypatch):
         monkeypatch.setenv("KPI_QUEUE_MAX_PENDING", "0")
