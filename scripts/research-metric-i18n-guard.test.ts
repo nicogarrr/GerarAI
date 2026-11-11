@@ -53,7 +53,7 @@ test('QA 21-oct: claves vista en prod con fallback en inglés tienen etiqueta', 
 test('F321: la ficha usa metricLabel en hechos y metricas calculadas', () => {
     // Los hechos (tarjeta movil y tabla) viven en FactsPanels.
     assert.match(panels, /\{metricLabel\(fact\.metric, locale\)\}<\/span>/);
-    assert.match(panels, /scope="row">\{metricLabel\(fact\.metric, locale\)\}<\/th>/);
+    assert.match(panels, /scope="row">\{metricLabel\(fact\.metric, locale\)\}<FactSource fact=\{fact\} locale=\{locale\} \/><\/th>/);
     assert.match(page, /\{metricLabel\(metric\.metric, locale\)\}<\/span>/);
 });
 
