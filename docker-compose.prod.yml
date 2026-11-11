@@ -859,7 +859,8 @@ services:
     # en su techo de 10 GiB (un contenedor nuevo lo romperia; hay test). Peor
     # caso: una corrida del embudo (minutos, una vez al dia) retrasa un ciclo
     # de alertas menos que su propia cadencia de 5-15 min; el otro hilo sigue
-    # libre. CPU compartida baja (0.20) porque en el mismo host corre spotdl.
+    # libre. CPU acotada a 0.75 para rafagas cortas; validar throttling/latencia
+    # contra el baseline runtime 0.50 sin recrear otros servicios.
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "2", "-Q", "alerts", "computed"]
     environment:
       <<: [*app-env, *worker-db-env, *llm-env, *web-push-env]
@@ -908,7 +909,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.20"
+          cpus: "0.75"
           memory: 320M
 
   worker-gdelt:
