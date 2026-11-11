@@ -49,6 +49,8 @@ class TenantLLMSettingsMiddleware(dramatiq.Middleware):
                 config = load_config_for_tenant(db, tenant_id)
             finally:
                 db.close()
+        from app.llm.free_only import set_free_only_tenant
+        message.options["_free_only_tenant_token"] = set_free_only_tenant(tenant_id)
         token = set_tenant_llm_config(config)
         self._store_token(message, token)
 
@@ -60,6 +62,10 @@ class TenantLLMSettingsMiddleware(dramatiq.Middleware):
             message._tenant_llm_token = token  # type: ignore[attr-defined]
 
     def _reset(self, message) -> None:
+        from app.llm.free_only import reset_free_only_tenant
+        identity_token = (getattr(message, "options", None) or {}).pop("_free_only_tenant_token", None)
+        if identity_token is not None:
+            reset_free_only_tenant(identity_token)
         from app.llm.tenant_config import reset_tenant_llm_config
 
         options = getattr(message, "options", None)

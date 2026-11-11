@@ -76,6 +76,8 @@ class JevDecisionClient:
             "state": state,
             "questions": dict(questions),
         }
+        from app.llm.free_only import enforce_free_only
+        enforce_free_only(f"{self._base_url}/v1/systemone", payload)
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
             # Guard por corrida: cada POST (reintentos incluidos) reserva 1 POST
