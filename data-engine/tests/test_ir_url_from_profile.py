@@ -91,6 +91,31 @@ def test_profile_ir_url_exige_eco_del_ticker_pedido():
     assert profile_ir_url({k: v for k, v in TSX_PROFILE.items() if k != "ticker"}, "FFH.TO") is None
 
 
+def test_profile_ir_url_rechaza_urls_estructuralmente_invalidas():
+    # Sin host, puerto invalido o credenciales embebidas: nunca se persisten.
+    assert profile_ir_url({**TSX_PROFILE, "weburl": "https:///sin-host"}, "FFH.TO") is None
+    assert profile_ir_url({**TSX_PROFILE, "weburl": "https://example.com:bad/path"}, "FFH.TO") is None
+    assert profile_ir_url({**TSX_PROFILE, "weburl": "https://example.com:99999/path"}, "FFH.TO") is None
+    assert profile_ir_url({**TSX_PROFILE, "weburl": "http://user:pass@example.com/"}, "FFH.TO") is None
+    assert profile_ir_url({**TSX_PROFILE, "weburl": "https://:443/x"}, "FFH.TO") is None
+    # Esquema en mayusculas y puerto valido: URL legitima.
+    assert profile_ir_url({**TSX_PROFILE, "weburl": "HTTPS://WWW.FAIRFAX.CA:8443/ir"}, "FFH.TO") == "HTTPS://WWW.FAIRFAX.CA:8443/ir"
+
+
+def test_backfill_solo_ir_url_marca_company_updated(db):
+    # Perfil sin NADA mas que la web (nombre/bolsa/divisa ya curados): el
+    # Document tiene que declarar company_updated=True e "ir_url" en fields.
+    company = _company(
+        db, "FFH.TO", exchange="TORONTO STOCK EXCHANGE", currency="CAD", name="Fairfax Financial Holdings Ltd"
+    )
+    _backfill(db, company, {"FFH.TO": {"ticker": "FFH.TO", "weburl": "https://www.fairfax.ca/"}})
+    db.refresh(company)
+    assert company.ir_url == "https://www.fairfax.ca/"
+    doc = db.scalar(select(Document).where(Document.source_type == "finnhub_profile"))
+    assert doc.metadata_["company_updated"] is True
+    assert "ir_url" in doc.metadata_["fields"]
+
+
 def test_profile_ir_url_exige_http_y_cabe_en_la_columna():
     assert profile_ir_url({**TSX_PROFILE, "weburl": "ftp://fairfax.ca"}, "FFH.TO") is None
     assert profile_ir_url({**TSX_PROFILE, "weburl": ""}, "FFH.TO") is None

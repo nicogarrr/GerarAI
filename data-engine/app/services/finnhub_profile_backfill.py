@@ -137,6 +137,7 @@ class FinnhubProfileBackfill:
             # nombre; el resto queda como candidato declarado en metadata.
             unknown_exchange = company.exchange in _PLACEHOLDER_EXCHANGES
             adr_candidates: dict[str, str] = {}
+            changed = False
             # Web oficial del emisor (weburl) -> ir_url: abre la vía de
             # informes oficiales (issuer_reports/IR) a emisores sin SEC
             # (Fairfax FFH.TO, Sagicor SFC.TO). Mismo criterio de identidad
@@ -154,7 +155,6 @@ class FinnhubProfileBackfill:
                         company.ir_url = promoted
                         ir_url_written = True
                         changed = True
-            changed = False
             name = (profile.get("name") or "").strip()
             if name and (
                 not (company.name or "").strip()

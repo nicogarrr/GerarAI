@@ -111,10 +111,25 @@ def profile_ir_url(profile: dict | None, requested_ticker: str) -> str | None:
     if not echo or echo != requested_ticker.strip().upper():
         return None
     url = (profile.get("weburl") or "").strip()
-    if not url.lower().startswith(("http://", "https://")):
+    if not url or len(url) > 500:  # Company.ir_url es String(500); no se recorta.
         return None
-    # Company.ir_url es String(500): una URL más larga no cabe, no se recorta.
-    return url if len(url) <= 500 else None
+    # Validación estructural: esquema http(s), host presente, puerto válido y
+    # SIN credenciales embebidas (user:pass@host): la URL alimenta las fuentes
+    # oficiales de la ficha y una forma rara nunca es la web del emisor.
+    from urllib.parse import urlsplit
+
+    try:
+        parts = urlsplit(url)
+        port = parts.port  # ValueError si el puerto no es un número válido
+    except ValueError:
+        return None
+    if parts.scheme not in ("http", "https"):
+        return None
+    if not parts.hostname or port is not None and not (0 < port < 65536):
+        return None
+    if parts.username is not None or parts.password is not None:
+        return None
+    return url
 
 
 def sector_for_industry(industry: str | None) -> str | None:
