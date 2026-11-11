@@ -1,3 +1,8 @@
+// Preflight behavior is covered in ai/AiAvailabilityNotice.test.tsx.
+vi.mock('@/components/ai/AiAvailabilityNotice', () => ({
+    useAiAvailability: () => ({ canStart: true, refresh: async () => true }),
+    AiAvailabilityNotice: () => null,
+}));
 import {renderToString} from 'react-dom/server';
 import {act,render,screen,waitFor,fireEvent} from '@testing-library/react';
 import {expect,it,vi} from 'vitest';

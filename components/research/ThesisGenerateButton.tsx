@@ -1,4 +1,5 @@
 'use client';
+import { useAiAvailability, AiAvailabilityNotice } from '@/components/ai/AiAvailabilityNotice';
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -23,6 +24,7 @@ const MAX_POLLS = 600;
 
 export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { ticker: string; label?: string; emptyCopy?: string }) {
     const router = useRouter();
+    const availability = useAiAvailability('thesis');
     const t = useT();
     const locale = useLocale();
     const searchParams = useSearchParams();
@@ -132,6 +134,8 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
 
     const start = async () => {
         if (busy || startingRef.current) return;
+        if (!availability.canStart) return;
+        if (!await availability.refresh()) return;
         startingRef.current = true;
         setStarting(true);
         setStartedHere(true);
@@ -165,10 +169,11 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
 
     return (
         <div className="flex flex-col gap-2">
+            <AiAvailabilityNotice availability={availability} />
             <div className="flex flex-wrap items-center gap-3">
                 {emptyCopy && !succeededHere ? <span className="text-sm text-gray-400">{emptyCopy}</span> : null}
                 {succeededHere && emptyCopy ? null : (
-                <Button type="button" onClick={start} disabled={busy} aria-busy={busy}>
+                <Button type="button" onClick={start} disabled={busy || !availability.canStart} aria-busy={busy}>
                     {busy ? (
                         <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />
                     ) : (

@@ -1,4 +1,5 @@
 'use client';
+import { useAiAvailability, AiAvailabilityNotice } from '@/components/ai/AiAvailabilityNotice';
 
 import { useState } from 'react';
 import { Scale } from 'lucide-react';
@@ -21,6 +22,7 @@ interface ThesisDebatePanelProps {
  * disponible. Los fallos muestran el error con reintento, nunca un 500.
  */
 export default function ThesisDebatePanel({ ticker, initialVerdict }: ThesisDebatePanelProps) {
+    const availability = useAiAvailability('debate');
     const t = useT();
     const [debate, setDebate] = useState<ThesisDebateResult | null>(null);
     const [running, setRunning] = useState(false);
@@ -38,6 +40,7 @@ export default function ThesisDebatePanel({ ticker, initialVerdict }: ThesisDeba
     const persisted = parsePersistedVerdict(initialVerdict);
 
     const run = async () => {
+        if (!availability.canStart || !await availability.refresh()) return;
         setRunning(true);
         setError(null);
         try {
@@ -57,8 +60,9 @@ export default function ThesisDebatePanel({ ticker, initialVerdict }: ThesisDeba
 
     return (
         <div className="space-y-4">
+            <AiAvailabilityNotice availability={availability} />
             <div className="flex flex-wrap items-center gap-3">
-                <Button type="button" variant="outline" onClick={run} disabled={running} aria-busy={running}>
+                <Button type="button" variant="outline" onClick={run} disabled={running || !availability.canStart} aria-busy={running}>
                     <Scale aria-hidden="true" className="mr-2 h-4 w-4" />
                     {running ? t('research.thesisDebate.running') : debate ? t('research.thesisDebate.retryDebate') : t('research.thesisDebate.generate')}
                 </Button>
@@ -79,7 +83,7 @@ export default function ThesisDebatePanel({ ticker, initialVerdict }: ThesisDeba
             {error ? (
                 <div className="rounded-lg border border-red-900/50 bg-red-950/20 p-4" role="alert">
                     <p className="text-sm text-red-200">{t('research.thesisDebate.failed', { error })}</p>
-                    <Button type="button" size="sm" variant="outline" onClick={run} className="mt-3">
+                    <Button type="button" size="sm" variant="outline" onClick={run} disabled={!availability.canStart} className="mt-3">
                         {t('research.thesisDebate.retry')}
                     </Button>
                 </div>

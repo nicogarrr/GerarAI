@@ -180,5 +180,16 @@
       "olderRun": "You are viewing an earlier run ({date}).",
       "backToLatest": "See the latest"
     }
+  },
+  "aiAvailability": {
+    "checking": "Checking AI availability…",
+    "unknown": "AI status could not be checked. No question was sent.",
+    "off": "AI is disabled for this function. Saved data is still available.",
+    "paused": "AI is paused due to credit, quota or a provider outage. New attempts will not be sent while blocked.",
+    "degraded": "AI is limited: an available backup will be used. The answer may be incomplete.",
+    "unverified": "AI is configured. If the provider fails, you will see sourced data or N/D sections, not a complete analysis.",
+    "wait": "Refresh to check the known block. Wait at least {seconds} s.",
+    "localOnly": "Local status for this function, with no model calls or spending. It does not confirm provider quota or availability.",
+    "refresh": "Refresh status"
   }
 }

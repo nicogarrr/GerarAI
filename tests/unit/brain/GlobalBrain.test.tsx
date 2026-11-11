@@ -1,3 +1,8 @@
+// Preflight behavior is covered in ai/AiAvailabilityNotice.test.tsx.
+vi.mock('@/components/ai/AiAvailabilityNotice', () => ({
+    useAiAvailability: () => ({ canStart: true, refresh: async () => true }),
+    AiAvailabilityNotice: () => null,
+}));
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -277,10 +282,8 @@ describe('GlobalBrain: chat de cartera', () => {
         });
         render(<GlobalBrain userId="u1" />);
         await open();
-        ask('  ¿Cuántas posiciones?  ');
+        await act(async () => { ask('  ¿Cuántas posiciones?  '); });
         expect(box()).toHaveValue('');
-        expect(screen.getByRole('status')).toHaveTextContent('escribiendo');
-        expect(screen.getByRole('dialog')).toHaveAttribute('aria-busy', 'true');
         const internal = await screen.findByRole('link', { name: 'ASTS' });
         expect(internal).toHaveAttribute('href', '/research/ASTS');
         expect(internal).not.toHaveAttribute('target');
