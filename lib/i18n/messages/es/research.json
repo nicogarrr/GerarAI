@@ -892,7 +892,7 @@
     "quoteAsOf": "cotización al {date}",
     "expectedValue": "Valor esperado",
     "archivedMargin": "Margen archivado",
-    "marginOfSafety": "Margen seguridad",
+    "marginOfSafety": "Margen de seguridad",
     "marginUnverified": "Fórmula no verificada; no comparable",
     "marginFormula": "(V - P) / V · base del modelo de esta versión",
     "marginNone": "Sin margen registrado",
