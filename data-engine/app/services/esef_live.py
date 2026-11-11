@@ -86,7 +86,7 @@ def live_lookup_enabled() -> bool:
 class IssuerIdentity:
     lei: str
     legal_name: str
-    method: str  # "isin_gleif" | "name_gleif"
+    method: str  # "isin_gleif" | "name_gleif" | "name_gleif_cross_border"
     isin: str | None = None
 
 
@@ -167,6 +167,25 @@ async def resolve_issuer(
         rows = await gleif_lei_records(http, params)
     except (httpx.HTTPError, ValueError) as exc:
         return None, f"gleif_error: {type(exc).__name__}"
+    cross_border = False
+    if jurisdiction and not rows:
+        # The venue country need not be the issuer's legal domicile. Only
+        # broaden an empty search, and require the COMPLETE legal name:
+        # token overlap could silently choose a subsidiary or a homonym.
+        from app.services.cnmv_mapping import _normalize
+
+        global_params = {"filter[entity.legalName]": company.name, "page[size]": 10}
+        try:
+            global_rows = await gleif_lei_records(http, global_params)
+        except (httpx.HTTPError, ValueError) as exc:
+            return None, f"gleif_error: {type(exc).__name__}"
+        if len(global_rows) >= 10:
+            # The helper exposes one page only. A full page cannot prove
+            # uniqueness: unseen homonyms must not be silently discarded.
+            return None, "nombre_ambiguo: busqueda global de nombre legal sin exhaustividad"
+        rows = [row for row in global_rows if (record := _record(row))
+                and _normalize(company.name) == _normalize(record[1])]
+        cross_border = True
     candidates = [
         r for r in (_record(row) for row in rows)
         if r and r[3] in {"ISSUED", "LAPSED", "PENDING_TRANSFER", "PENDING_ARCHIVAL", ""}
@@ -192,7 +211,10 @@ async def resolve_issuer(
                 pass
     if len(with_filings) == 1:
         lei, name = with_filings[0]
-        return IssuerIdentity(lei=lei, legal_name=name, method="name_gleif"), "ok"
+        return IssuerIdentity(
+            lei=lei, legal_name=name,
+            method="name_gleif_cross_border" if cross_border else "name_gleif",
+        ), "ok"
     if len(with_filings) > 1:
         return None, f"nombre_ambiguo: {len(with_filings)} emisores con filings para {company.name!r}"
     return None, "sin_emisor_esef: ningun LEI con filings en el indice (ni en el NSM de la FCA) para este nombre/ISIN"
