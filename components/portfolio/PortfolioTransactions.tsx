@@ -249,8 +249,11 @@ export default function PortfolioTransactions({ transactions, userId, page, erro
         {error ? (
           <div className="flex flex-col items-center gap-3 px-4 py-12 text-center" role="alert">
             <p className="text-sm text-amber-200">{ti('portfolio.transactions.loadError')}</p>
-            <Button asChild variant="outline" className="min-h-11">
-              <Link href="/portfolio">{ti('common.actions.retry')}</Link>
+            {/* Reintento = refetch de la URL actual (pestaña, filtros y página
+                intactos): un enlace a /portfolio devuelve a Resumen y otro a la
+                misma URL no refetchea desde caché. */}
+            <Button variant="outline" className="min-h-11" onClick={() => router.refresh()}>
+              {ti('common.actions.retry')}
             </Button>
           </div>
         ) : transactions.length === 0 ? (
