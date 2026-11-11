@@ -40,11 +40,16 @@ async function fetchOne(spec: LiveQuoteSpec): Promise<LiveQuote | null> {
 async function fetchAll(): Promise<LiveMarketsResult> {
     const specs = LIVE_QUOTE_GROUPS.flatMap((group) => group.specs.map((spec) => ({ group: group.key, spec })));
     const results = new Map<string, LiveQuote | null>();
-    for (let i = 0; i < specs.length; i += CONCURRENCY) {
-        const batch = specs.slice(i, i + CONCURRENCY);
-        const quotes = await Promise.all(batch.map(({ spec }) => fetchOne(spec)));
-        batch.forEach(({ spec }, j) => results.set(spec.symbol, quotes[j]));
-    }
+    // Reuse each slot as soon as its symbol settles. Fixed waves leave up
+    // to five slots idle behind one slow response in every wave.
+    let next = 0;
+    const worker = async () => {
+        while (next < specs.length) {
+            const { spec } = specs[next++];
+            results.set(spec.symbol, await fetchOne(spec));
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, specs.length) }, worker));
     return {
         fetchedAt: Date.now(),
         groups: LIVE_QUOTE_GROUPS.map((group) => ({
