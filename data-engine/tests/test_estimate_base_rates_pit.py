@@ -149,7 +149,7 @@ def test_year_with_reported_quarters_is_nd_with_reason() -> None:
 def test_reverse_dcf_check_uses_its_own_horizon_and_usd_revenue(monkeypatch) -> None:
     import app.services.estimate_base_rates as ebr
 
-    monkeypatch.setattr(ebr, "for_annual_revenue", lambda annual, sector=None, horizon=1: RATE if horizon == 1 else None)
+    monkeypatch.setattr(ebr, "for_annual_revenue", lambda annual, sector=None, horizon=1, **kw: RATE if horizon == 1 else None)
 
     class Co:
         cik = None
@@ -160,7 +160,7 @@ def test_reverse_dcf_check_uses_its_own_horizon_and_usd_revenue(monkeypatch) -> 
     assert _reverse_base_rate_check(Co(), facts, {"status": "ok", "trace": {}}, 0.2) is None  # type: ignore[arg-type]
     assert _reverse_base_rate_check(Co(), facts, {"trace": {"horizon_years": 5}}, 0.2) is None  # type: ignore[arg-type]
     twd = [HealthFact(1, "revenue", 2025, 1e9, "TWD", date(2025, 12, 31), "u", "sec")]
-    assert _reverse_base_rate_check(Co(), twd, rev, 0.2) is None  # type: ignore[arg-type]
+    assert _reverse_base_rate_check(Co(), twd, rev, 0.2)["share"] is None  # type: ignore[arg-type,index]  # sin db: N/D
     assert _reverse_base_rate_check(Co(), facts, rev, None) is None  # type: ignore[arg-type]
 
 

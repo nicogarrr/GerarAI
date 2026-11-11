@@ -32,23 +32,50 @@ def _number(raw: Any) -> float | None:
 
 
 def _reverse_base_rate_check(company: Company, facts: list[HealthFact], reverse: object,
-                             growth: float | None) -> dict | None:
+                             growth: float | None, *, db: Session | None = None,
+                             today: date | None = None) -> dict | None:
     """¿Con qué frecuencia lo consiguieron? % de empresas comparables (tamaño, crecimiento previo y
     sector, primera cifra publicada en la SEC) cuyos ingresos crecieron al menos lo que exige el
-    precio en el mismo plazo del DCF inverso. Sin plazo guardado o sin ese plazo en la tabla: None."""
+    precio en el mismo plazo del DCF inverso. Sin plazo guardado o sin ese plazo en la tabla: None.
+
+    Los tramos de tamaño están en dólares: ingresos en UNA otra divisa se clasifican con el tipo
+    oficial del cierre de su último ejercicio (``usd_size_fx``, de ``fx_rates``); sin ``db``, sin
+    ese tipo o con varias divisas, el check es N/D con el motivo."""
     if growth is None or not isinstance(reverse, dict):
         return None
     horizon = (reverse.get("trace") or {}).get("horizon_years") if isinstance(reverse.get("trace"), dict) else None
     if not isinstance(horizon, int) or isinstance(horizon, bool) or horizon < 1:
         return None
-    from app.services.estimate_base_rates import for_annual_revenue, sector_of_cik, share_reaching
+    from app.services.estimate_base_rates import (
+        SizeFx,
+        for_annual_revenue,
+        sector_of_cik,
+        share_reaching,
+        usd_size_fx,
+    )
+    from app.valuation.currency import fact_currency
 
-    # Los tramos de tamaño están en dólares: ingresos en otra divisa no se clasifican (N/D).
-    annual = {f.year: f.value for f in facts if f.metric == "revenue" and str(f.unit or "").upper().startswith("USD")}
-    if not annual:
+    revenue = [f for f in facts if f.metric == "revenue" and f.value and f.value > 0]
+    if not revenue:
         return None
+    currencies = {fact_currency(f.unit) for f in revenue}
+    if len(currencies) != 1 or None in currencies:
+        return {"share": None, "reason": "ingresos en varias divisas o sin divisa: los tramos de tamaño de la "
+                                         "tasa base están en dólares"}
+    currency = next(iter(currencies))
+    annual = {f.year: f.value for f in revenue}
+    if currency == "USD":
+        fx = SizeFx("USD", 1.0)
+    elif db is None:
+        fx = SizeFx(currency or "?", None, reason="ingresos en otra divisa: los tramos de tamaño de la tasa base "
+                                                  "están en dólares")
+    else:
+        close = max(revenue, key=lambda f: (f.year, f.period_end)).period_end
+        fx = usd_size_fx(db, currency, close, today=today or date.today())
+    if fx.rate is None:
+        return {"share": None, "reason": fx.reason}
     reach = share_reaching(for_annual_revenue(annual, sector=sector_of_cik(getattr(company, "cik", None)),
-                                              horizon=horizon), growth)
+                                              horizon=horizon, usd_rate=fx.rate, size_note=fx.note), growth)
     if reach is None:
         return None
     return reach.as_dict(implied_formula=f"el precio exige {growth:+.1%}/año de ingresos durante {horizon} años "
@@ -133,7 +160,8 @@ def build_summaries(db: Session, companies: list[Company], *, today: date | None
             "market_price": _number(snapshot.current_price) if snapshot else None,
             "reason": reverse_reason}
         company_facts = [entry[1] for key, entry in selected.items() if key[0] == company.id]
-        reverse_summary["base_rate_check"] = _reverse_base_rate_check(company, company_facts, reverse, growth)
+        reverse_summary["base_rate_check"] = _reverse_base_rate_check(company, company_facts, reverse, growth,
+                                                                       db=db, today=today)
         out[company.ticker.upper()] = {
             "ticker": company.ticker.upper(), "fair_value": reading,
             "margin_convention": "discount_to_value_v1",
