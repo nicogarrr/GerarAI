@@ -82,12 +82,23 @@ const files = [
   ...walk(join(ROOT, "lib")),
 ];
 
+// Forma de clave del diccionario: segmentos camelCase, con dígitos o con
+// guion bajo (`research.whatToBelieve.exit_multiple`), separados por puntos.
+// Antes el guion bajo no entraba en la forma: una clave así ni se comprobaba
+// en t() ni contaba como usada cuando llegaba por un mapa tipado (falsa
+// huérfana), y quien la usaba tenía que renombrarla a camelCase.
+const KEY_SHAPE = "[a-z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)+";
+// `t('a.b')` o `t("a.b")`: la clave va en el grupo 2.
+const T_CALL_KEY = new RegExp(`\\bt\\(\\s*(['"])(${KEY_SHAPE})\\1`, "g");
+// Cualquier literal con forma de clave (mapas tipado → t(variable)).
+const KEY_LITERAL = new RegExp(`(['"])(${KEY_SHAPE})\\1`, "g");
+
 const missingKeys = [];
 for (const file of files) {
   const source = readFileSync(file, "utf8");
-  for (const match of source.matchAll(/\bt\(\s*'([a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)+)'/g)) {
-    if (!validKeys.has(match[1])) {
-      missingKeys.push(`${file.slice(ROOT.length + 1)}: ${match[1]}`);
+  for (const match of source.matchAll(T_CALL_KEY)) {
+    if (!validKeys.has(match[2])) {
+      missingKeys.push(`${file.slice(ROOT.length + 1)}: ${match[2]}`);
     }
   }
 }
@@ -189,11 +200,11 @@ const used = new Set();
 const literals = new Set();
 for (const file of files) {
   const source = readFileSync(file, "utf8");
-  for (const match of source.matchAll(/\bt\(\s*'([^']+)'/g)) used.add(match[1]);
+  for (const match of source.matchAll(/\bt\(\s*(['"])([^'"\n]+)\1/g)) used.add(match[2]);
   // Solo literales con FORMA de clave (mismo patron que el chequeo 1): un
   // "cualquier cosa entre comillas" se come bloques enteros cuando hay
   // comillas sin parear en comentarios y esconde usos reales.
-  for (const match of source.matchAll(/'([a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)+)'/g)) literals.add(match[1]);
+  for (const match of source.matchAll(KEY_LITERAL)) literals.add(match[2]);
 }
 for (const key of literals) if (validKeys.has(key)) used.add(key);
 
@@ -225,38 +236,11 @@ const KNOWN_ORPHANS = {
   'errors.backend.externalApiError': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
   'errors.backend.notFound': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
   'errors.backend.validationError': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
-  // Consumidas via REASON_LABEL_KEYS (HistoricalStressView), LEDGER_LABEL_KEYS y
-  // ATTRIBUTION_ND_LABEL_KEYS (portfolio/intelligence): las claves llevan
-  // guion bajo y el detector de usos no cuenta segmentos con '_' (misma
-  // limitacion documentada arriba).
-  'portfolio.stress.reason_history_gaps': 'consumida via REASON_LABEL_KEYS en components/historical-stress/HistoricalStressView.tsx (guion bajo no detectado)',
-  'portfolio.stress.reason_provider_error': 'consumida via REASON_LABEL_KEYS en components/historical-stress/HistoricalStressView.tsx (guion bajo no detectado)',
-  'portfolio.stress.reason_no_safe_symbol': 'consumida via REASON_LABEL_KEYS en components/historical-stress/HistoricalStressView.tsx (guion bajo no detectado)',
-  'portfolio.stress.reason_currency_mismatch': 'consumida via REASON_LABEL_KEYS en components/historical-stress/HistoricalStressView.tsx (guion bajo no detectado)',
-  'portfolio.stress.reason_currency_unverified': 'consumida via REASON_LABEL_KEYS en components/historical-stress/HistoricalStressView.tsx (guion bajo no detectado)',
-  'portfolio.stress.reason_incomplete_portfolio': 'consumida via REASON_LABEL_KEYS en components/historical-stress/HistoricalStressView.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.ledger_missing_ledger': 'consumida via LEDGER_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.ledger_incomplete_ledger': 'consumida via LEDGER_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.ledger_missing_fx': 'consumida via LEDGER_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.ledger_missing_start_price': 'consumida via LEDGER_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.ledger_missing_start_fx': 'consumida via LEDGER_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.ledger_missing_end_value': 'consumida via LEDGER_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.ledger_fallback': 'fallback de LEDGER_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.attrNd_fundamental_growth': 'consumida via ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.attrNd_multiple': 'consumida via ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.attrNd_dividends': 'consumida via ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.attrNd_buybacks': 'consumida via ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.attrNd_dilution': 'consumida via ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.attrNd_fx': 'consumida via ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.attrNd_sizing': 'consumida via ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-  'portfolio.intelligence.attrNd_fallback': 'fallback de ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
-
   // Vocabulario canonico del diseno (acciones, estados y etiquetas de tabla)
   // definido en el diccionario comun para que los componentes no reescriban
   // el copy uno a uno. Sin consumidor todavia: si acaba sin adoptarse, la
   // accion correcta es borrar la clave de lib/i18n/es.json.
   'common.actions.save': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
-  'common.actions.close': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
   'common.actions.regenerate': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
   'common.actions.export': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
   'common.states.empty': 'estado canonico de lista vacia, sin componente que lo consuma hoy',
