@@ -604,7 +604,8 @@ def sec_ifrs_metric_map_for(ifrs_facts: dict[str, Any]) -> list[tuple[str, list[
 # 4 (8-nov-2026): ``net_income_total`` (ProfitLoss) y ``finance_income_cost`` (EBITDA por componentes).
 # 5 (8-nov-2026): ``minority_interest`` (NoncontrollingInterests) y ``net_income_minority``.
 # 6 (9-nov-2026): extensiones ancladas (xbrl_extension_map).
-ESEF_INGESTION_RULES_VERSION = 7  # v7 (11-nov-2026): activo y pasivo corriente y reservas (current_assets, …)
+# 7 (11-nov-2026): activo y pasivo corriente y reservas (current_assets, …).
+ESEF_INGESTION_RULES_VERSION = 8  # v8 (11-nov-2026): deuda corriente desde ShorttermBorrowings + CurrentPortionOfLongtermBorrowings
 
 ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # RevenueFromContractsWithCustomers: emisores que solo etiquetan la cifra
@@ -648,8 +649,12 @@ ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # etiquetan Current/NoncurrentFinancialLiabilities y si sus prestamos
     # (Basic-Fit FY2025: 294,2 M corriente + 932,6 M no corriente). Solo los
     # conceptos TOTALES de cada plazo; nunca partes sueltas.
+    # Sin total corriente etiquetado, sus dos partes disjuntas (ESEF_PART_CONCEPTS): préstamos a corto y la parte
+    # corriente de la deuda a largo. Intertek FY2025 solo etiqueta ShorttermBorrowings (163,6 M£) y salía sin deuda.
     ("financial_liabilities_current", ["ifrs-full:CurrentFinancialLiabilities",
-                                       "ifrs-full:CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings"],
+                                       "ifrs-full:CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings",
+                                       "ifrs-full:ShorttermBorrowings",
+                                       "ifrs-full:CurrentPortionOfLongtermBorrowings"],
                                                                                                         "iso4217:EUR"),
     ("financial_liabilities_noncurrent", ["ifrs-full:NoncurrentFinancialLiabilities",
                                           "ifrs-full:NoncurrentPortionOfNoncurrentBorrowings",
@@ -720,6 +725,13 @@ ESEF_PART_CONCEPTS: dict[str, list[str]] = {
     "capital_expenditure": [
         "ifrs-full:PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities",
         "ifrs-full:PurchaseOfIntangibleAssetsClassifiedAsInvestingActivities",
+    ],
+    # La taxonomía IFRS desglosa CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings en estas dos partes
+    # disjuntas. El total etiquetado (o CurrentFinancialLiabilities) siempre manda; si falta una parte que el
+    # emisor SÍ etiqueta en otro ejercicio, el periodo queda incompleto (N/D), nunca se toma la otra como total.
+    "financial_liabilities_current": [
+        "ifrs-full:ShorttermBorrowings",
+        "ifrs-full:CurrentPortionOfLongtermBorrowings",
     ],
 }
 # ESEF: concepts that ALREADY include the parts above. Summing a total with its
