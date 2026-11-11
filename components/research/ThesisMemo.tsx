@@ -333,6 +333,89 @@ export default function ThesisMemo({
         </section>
       ) : null}
 
+      {/* Conclusión primero (auditoría fa-tesis r5): resumen y escenarios
+          (precio del modelo, bear/base/bull, valor esperado y margen) antes que
+          la tabla de procedencia y la narrativa larga; en móvil quedaban a
+          varias pantallas de scroll. */}
+      {hideFigures ? (
+        <aside role="note" className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-sm leading-6 text-amber-200">
+          {generatedLabel ? t('research.memo.withheldArchivedDated', { version: thesis.version, date: generatedLabel, reason: withheldReason }) : t('research.memo.withheldArchivedUndated', { version: thesis.version, reason: withheldReason })}
+          {' '}{t('research.memo.withheldArchivedNote')}
+        </aside>
+      ) : <p className="text-sm leading-6 text-gray-300">{cleanThesisText(thesis.executive_summary)}</p>}
+
+      <section>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          {t('research.memo.scenarios')}
+        </h3>
+        {hideFigures ? (
+          <p className="text-sm text-gray-400">
+            {t('research.memo.withheldFigures', { reason: withheldReason })}
+          </p>
+        ) : (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+          {/* El precio guardado es el que usó el modelo al generar la versión,
+              no la cotización de hoy; la fecha solo si quedó persistida. */}
+          <ScenarioCell formatPercent={formatPercent}
+            locale={locale}
+            label={t('research.memo.modelPrice')}
+            value={thesis.current_price}
+            currency={currency}
+            caption={thesis.valuation_basis?.price_as_of ? t('research.memo.quoteAsOf', { date: formatUserDate(thesis.valuation_basis.price_as_of) }) : null}
+          />
+          <ScenarioCell formatPercent={formatPercent} locale={locale} label={`Bear${scenarios.label}`} value={scenarios.values.bear} currency={currency} probability={probabilities['bear']} glossaryKey="bear" />
+          <ScenarioCell formatPercent={formatPercent} locale={locale} label={`Base${scenarios.label}`} value={scenarios.values.base} currency={currency} probability={probabilities['base']} highlight glossaryKey="base" />
+          <ScenarioCell formatPercent={formatPercent} locale={locale} label={`Bull${scenarios.label}`} value={scenarios.values.bull} currency={currency} probability={probabilities['bull']} glossaryKey="bull" />
+          <ScenarioCell formatPercent={formatPercent} locale={locale} label={`${t('research.memo.expectedValue')}${scenarios.label}`} value={scenarios.values.expected} currency={currency} />
+          <div className="rounded-lg border border-gray-800 bg-black/20 p-3">
+            <div className="text-xs uppercase text-gray-500">
+              <GlossaryTerm k="margen_seguridad" icon={false}>
+                {unknownMargin ? t('research.memo.archivedMargin') : t('research.memo.marginOfSafety')}
+              </GlossaryTerm>
+            </div>
+            <div className="mt-1 text-base font-semibold text-gray-100">
+              {marginOfSafetyDisplay(knownMargin ? thesis.margin_of_safety : archivedMargin, thesis.base_value, locale)}
+            </div>
+            <div className="mt-0.5 text-xs text-gray-500">
+              {unknownMargin ? t('research.memo.marginUnverified') : knownMargin ? t('research.memo.marginFormula') : t('research.memo.marginNone')}
+            </div>
+          </div>
+        </div>
+        )}
+        {hideFigures ? null : <ScenarioAssumptions />}
+      </section>
+
+      {!hideFigures && thesis.narrative_sections && thesis.narrative_sections.length > 0 ? (
+        <section
+          aria-label={t('research.memo.narrative')}
+          className="space-y-4 rounded-lg border border-gray-800 bg-gray-900/40 p-4"
+        >
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            {t('research.memo.narrative')}
+          </h3>
+          {thesis.narrative_sections.map((section, index) => (
+            <div key={`${section.titulo}-${index}`} className="space-y-2">
+              <h4 className="text-sm font-semibold text-gray-200">{narrativeTitle(section.titulo)}</h4>
+              {section.parrafos.map((parrafo, pIndex) => (
+                <p key={pIndex} className="text-sm leading-6 text-gray-300">
+                  <NarrativeText text={narrativeParagraph(parrafo)} sourceLabel={t('research.memo.source')} />
+                </p>
+              ))}
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      {hideFigures || hypothesisRepeatsSummary(thesis.hypothesis, thesis.executive_summary) ? null : (
+  <section className="rounded-lg border border-teal-900/60 bg-teal-950/10 p-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-teal-300">{t('research.memo.hypothesis')}</h3>
+          <p className="mt-2 text-sm leading-6 text-gray-200">
+            {cleanThesisText(thesis.hypothesis) ||
+              t('research.memo.hypothesisPending')}
+          </p>
+        </section>
+      )}
+
       {thesis.inputs_provenance && thesis.inputs_provenance.length > 0 ? (
         <section className="rounded-lg border border-gray-800 p-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -383,84 +466,6 @@ export default function ThesisMemo({
 
       {ticker ? <ThesisHumanInputForm ticker={ticker} /> : null}
 
-      {hideFigures ? (
-        <aside role="note" className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-sm leading-6 text-amber-200">
-          {generatedLabel ? t('research.memo.withheldArchivedDated', { version: thesis.version, date: generatedLabel, reason: withheldReason }) : t('research.memo.withheldArchivedUndated', { version: thesis.version, reason: withheldReason })}
-          {' '}{t('research.memo.withheldArchivedNote')}
-        </aside>
-      ) : <p className="text-sm leading-6 text-gray-300">{cleanThesisText(thesis.executive_summary)}</p>}
-
-      {!hideFigures && thesis.narrative_sections && thesis.narrative_sections.length > 0 ? (
-        <section
-          aria-label={t('research.memo.narrative')}
-          className="space-y-4 rounded-lg border border-gray-800 bg-gray-900/40 p-4"
-        >
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-            {t('research.memo.narrative')}
-          </h3>
-          {thesis.narrative_sections.map((section, index) => (
-            <div key={`${section.titulo}-${index}`} className="space-y-2">
-              <h4 className="text-sm font-semibold text-gray-200">{narrativeTitle(section.titulo)}</h4>
-              {section.parrafos.map((parrafo, pIndex) => (
-                <p key={pIndex} className="text-sm leading-6 text-gray-300">
-                  <NarrativeText text={narrativeParagraph(parrafo)} sourceLabel={t('research.memo.source')} />
-                </p>
-              ))}
-            </div>
-          ))}
-        </section>
-      ) : null}
-
-      {hideFigures || hypothesisRepeatsSummary(thesis.hypothesis, thesis.executive_summary) ? null : (
-  <section className="rounded-lg border border-teal-900/60 bg-teal-950/10 p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-teal-300">{t('research.memo.hypothesis')}</h3>
-          <p className="mt-2 text-sm leading-6 text-gray-200">
-            {cleanThesisText(thesis.hypothesis) ||
-              t('research.memo.hypothesisPending')}
-          </p>
-        </section>
-      )}
-
-      <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-          {t('research.memo.scenarios')}
-        </h3>
-        {hideFigures ? (
-          <p className="text-sm text-gray-400">
-            {t('research.memo.withheldFigures', { reason: withheldReason })}
-          </p>
-        ) : (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-          {/* El precio guardado es el que usó el modelo al generar la versión,
-              no la cotización de hoy; la fecha solo si quedó persistida. */}
-          <ScenarioCell formatPercent={formatPercent}
-            locale={locale}
-            label={t('research.memo.modelPrice')}
-            value={thesis.current_price}
-            currency={currency}
-            caption={thesis.valuation_basis?.price_as_of ? t('research.memo.quoteAsOf', { date: formatUserDate(thesis.valuation_basis.price_as_of) }) : null}
-          />
-          <ScenarioCell formatPercent={formatPercent} locale={locale} label={`Bear${scenarios.label}`} value={scenarios.values.bear} currency={currency} probability={probabilities['bear']} glossaryKey="bear" />
-          <ScenarioCell formatPercent={formatPercent} locale={locale} label={`Base${scenarios.label}`} value={scenarios.values.base} currency={currency} probability={probabilities['base']} highlight glossaryKey="base" />
-          <ScenarioCell formatPercent={formatPercent} locale={locale} label={`Bull${scenarios.label}`} value={scenarios.values.bull} currency={currency} probability={probabilities['bull']} glossaryKey="bull" />
-          <ScenarioCell formatPercent={formatPercent} locale={locale} label={`${t('research.memo.expectedValue')}${scenarios.label}`} value={scenarios.values.expected} currency={currency} />
-          <div className="rounded-lg border border-gray-800 bg-black/20 p-3">
-            <div className="text-xs uppercase text-gray-500">
-              <GlossaryTerm k="margen_seguridad" icon={false}>
-                {unknownMargin ? t('research.memo.archivedMargin') : t('research.memo.marginOfSafety')}
-              </GlossaryTerm>
-            </div>
-            <div className="mt-1 text-base font-semibold text-gray-100">
-              {marginOfSafetyDisplay(knownMargin ? thesis.margin_of_safety : archivedMargin, thesis.base_value, locale)}
-            </div>
-            <div className="mt-0.5 text-xs text-gray-500">
-              {unknownMargin ? t('research.memo.marginUnverified') : knownMargin ? t('research.memo.marginFormula') : t('research.memo.marginNone')}
-            </div>
-          </div>
-        </div>
-        )}
-        {hideFigures ? null : <ScenarioAssumptions />}
-      </section>
 
       <section>
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
