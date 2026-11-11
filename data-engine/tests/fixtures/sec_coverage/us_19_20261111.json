@@ -1,0 +1,6404 @@
+{
+  "retrieved_at": "2026-11-11",
+  "source_type": "SEC companyfacts, narrowed snapshots not production",
+  "code_base_sha": "4a28ed7f283cfe9db9a890416d7fb690b1686dec",
+  "identities": [
+    {
+      "cik": 1001085,
+      "name": "BROOKFIELD Corp /ON/",
+      "ticker": "BN",
+      "exchange": "NYSE",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001001085.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "ifrs-full",
+        "invest"
+      ],
+      "taxonomy_before": "ifrs-full",
+      "taxonomy_candidate": "ifrs-full",
+      "mapped_fields": 11,
+      "fields_checked": 12,
+      "sha256": "7fc2b1cb00ab42b7bc20039a32d63e87317cfae7a314ac24d87fa0fff4ff3f00"
+    },
+    {
+      "cik": 844059,
+      "name": "FRP HOLDINGS, INC.",
+      "ticker": "FRPH",
+      "exchange": "Nasdaq",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000844059.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "srt",
+        "us-gaap",
+        "ecd",
+        "ffd"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 11,
+      "fields_checked": 12,
+      "sha256": "6499da22ee328614a28d0d261a619761dc7c04d7cb4296eb4d9f6ccf721c98dc"
+    },
+    {
+      "cik": 1318605,
+      "name": "Tesla, Inc.",
+      "ticker": "TSLA",
+      "exchange": "Nasdaq",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001318605.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "us-gaap",
+        "ffd",
+        "ecd"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 12,
+      "fields_checked": 12,
+      "sha256": "c951e0ae2402dd8cf8f39319928adccc4196b997941fe40b0d4d6b8060802db1"
+    },
+    {
+      "cik": 906345,
+      "name": "CAMDEN PROPERTY TRUST",
+      "ticker": "CPT",
+      "exchange": "NYSE",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000906345.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "invest",
+        "srt",
+        "us-gaap",
+        "ffd"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 11,
+      "fields_checked": 12,
+      "sha256": "daef56baaa796edced2688d492d51f9155484332e8b334e0dc91bbe80e420e87"
+    },
+    {
+      "cik": 945841,
+      "name": "POOL CORP",
+      "ticker": "POOL",
+      "exchange": "Nasdaq",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000945841.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "us-gaap"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 11,
+      "fields_checked": 12,
+      "sha256": "a74c3ae2156edcf980a823c7af4ecf8ceee0ae8c0305b288987ecf5f6bd31700"
+    },
+    {
+      "cik": 1780232,
+      "name": "GFL Environmental Inc.",
+      "ticker": "GFL",
+      "exchange": "NYSE",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001780232.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "ifrs-full",
+        "us-gaap"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "ifrs-full",
+      "mapped_fields": 10,
+      "fields_checked": 12,
+      "sha256": "6645ac32ec90fbf04e812faba641cd98998c64d61dac86adc6608277b7260eb9"
+    },
+    {
+      "cik": 1404912,
+      "name": "KKR & Co. Inc.",
+      "ticker": "KKR",
+      "exchange": "NYSE",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001404912.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "us-gaap",
+        "srt",
+        "ffd"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 11,
+      "fields_checked": 12,
+      "sha256": "c6bd3dd63e650e74207841ab0c9a9f6f2c780e69c943cc5dbb5300e708885a6e"
+    },
+    {
+      "cik": 1326801,
+      "name": "Meta Platforms, Inc.",
+      "ticker": "META",
+      "exchange": "Nasdaq",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001326801.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "us-gaap",
+        "srt",
+        "ecd",
+        "ffd"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 11,
+      "fields_checked": 12,
+      "sha256": "f8e539cea9d363752df2f9bb33078c19ae897ff7f34d49fe4d9a732d032b94f7"
+    },
+    {
+      "cik": 1571283,
+      "name": "Rexford Industrial Realty, Inc.",
+      "ticker": "REXR",
+      "exchange": "NYSE",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001571283.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "invest",
+        "srt",
+        "us-gaap",
+        "ecd",
+        "ffd"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 11,
+      "fields_checked": 12,
+      "sha256": "a4098e18fff4106d34dc986b9b9f6585d935dc4c0de12dacec01b27c3fb8a832"
+    },
+    {
+      "cik": 1018724,
+      "name": "AMAZON COM INC",
+      "ticker": "AMZN",
+      "exchange": "Nasdaq",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001018724.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "us-gaap",
+        "ecd",
+        "ffd"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 11,
+      "fields_checked": 12,
+      "sha256": "acddb7c0a6973a1fd08372de3b292298a34eae7f42a7eedc4bdebd3ac659c8fd"
+    },
+    {
+      "cik": 896159,
+      "name": "Chubb Ltd",
+      "ticker": "CB",
+      "exchange": "NYSE",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000896159.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "invest",
+        "us-gaap",
+        "srt",
+        "ffd"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 9,
+      "fields_checked": 12,
+      "sha256": "2afcfb59864f71e3a8df4439cb3d06b4f8a19f7460a446b95d69da797e349dc3"
+    },
+    {
+      "cik": 3499,
+      "name": "ALEXANDERS INC",
+      "ticker": "ALX",
+      "exchange": "NYSE",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000003499.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "srt",
+        "us-gaap",
+        "ecd",
+        "ffd"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 11,
+      "fields_checked": 12,
+      "sha256": "8543adc2b701f68fd49abc852191c9cd9128b7b9b06c6ae9d2085a95203abf9d"
+    },
+    {
+      "cik": 790051,
+      "name": "CARLISLE COMPANIES INC",
+      "ticker": "CSL",
+      "exchange": "NYSE",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000790051.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "us-gaap"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 11,
+      "fields_checked": 12,
+      "sha256": "a9500c1caa39280a2a80c829d6c4efa808190703610b719098b3e5f6985180a3"
+    },
+    {
+      "cik": 1383312,
+      "name": "BROADRIDGE FINANCIAL SOLUTIONS, INC.",
+      "ticker": "BR",
+      "exchange": "NYSE",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001383312.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "us-gaap",
+        "ffd",
+        "ecd"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 11,
+      "fields_checked": 12,
+      "sha256": "d8bbb40eb99ba7d4f5e64ed90dd98038a7562398a95351f2d02227c3391db2bf"
+    },
+    {
+      "cik": 2035989,
+      "name": "Amrize Ltd",
+      "ticker": "AMRZ",
+      "exchange": "NYSE",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0002035989.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "us-gaap",
+        "srt"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 12,
+      "fields_checked": 12,
+      "sha256": "6580ea54f3c50b1f843d918201ed05f50f587f1ff8508ecaadd51bb71b8d40bd"
+    },
+    {
+      "cik": 745308,
+      "name": "ST JOE Co",
+      "ticker": "JOE",
+      "exchange": "NYSE",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000745308.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "srt",
+        "us-gaap"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 12,
+      "fields_checked": 12,
+      "sha256": "e501ada015ec0b176397b1dafd2ce28b63f535827f06e84b742c0f442257e9e5"
+    },
+    {
+      "cik": 316709,
+      "name": "SCHWAB CHARLES CORP",
+      "ticker": "SCHW",
+      "exchange": "NYSE",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000316709.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "srt",
+        "us-gaap",
+        "ecd",
+        "ffd"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 11,
+      "fields_checked": 12,
+      "sha256": "66986462978831ebb4700fcfcef68fd8e26a9da897c5e972f7c87e3af232e028"
+    },
+    {
+      "cik": 64040,
+      "name": "S&P Global Inc.",
+      "ticker": "SPGI",
+      "exchange": "NYSE",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000064040.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "us-gaap",
+        "ffd"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 12,
+      "fields_checked": 12,
+      "sha256": "417349bfc9240a38de0faca03f430e5a7d2d72511bf635f23fd5e87ab7d41a32"
+    },
+    {
+      "cik": 1823587,
+      "name": "Sky Harbour Group Corp",
+      "ticker": "SKYH",
+      "exchange": "NYSE",
+      "companyfacts_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001823587.json",
+      "fetch": "ok",
+      "taxonomies": [
+        "dei",
+        "us-gaap"
+      ],
+      "taxonomy_before": "us-gaap",
+      "taxonomy_candidate": "us-gaap",
+      "mapped_fields": 12,
+      "fields_checked": 12,
+      "sha256": "3ae04a78f587f2bf053693d6d8b42c81ec32ec9b880e27e02894be948e1bbaea"
+    }
+  ],
+  "snapshots": {
+    "BN": {
+      "cik": 1001085,
+      "entityName": "BROOKFIELD CORPORATION",
+      "facts": {
+        "ifrs-full": {
+          "Revenue": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 75100000000,
+                  "accn": "0001001085-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-03-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "RevenueFromContractsWithCustomers": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 60400000000,
+                  "accn": "0001001085-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-03-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ProfitLossAttributableToOwnersOfParent": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 1307000000,
+                  "accn": "0001001085-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-03-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 518971000000,
+                  "accn": "0001001085-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-03-18",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 16242000000,
+                  "accn": "0001001085-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-03-18",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "Borrowings": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 14301000000,
+                  "accn": "0001001085-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-03-18",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "CashFlowsFromUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 10958000000,
+                  "accn": "0001001085-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-03-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 14752000000,
+                  "accn": "0001001085-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-03-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "AdjustedWeightedAverageShares": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 2367800000,
+                  "accn": "0001001085-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-03-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "NoncontrollingInterests": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2017-12-31",
+                  "val": 51628000000,
+                  "accn": "0001001085-18-000018",
+                  "fy": 2017,
+                  "fp": "FY",
+                  "form": "40-F/A",
+                  "filed": "2018-04-19",
+                  "frame": "CY2017Q4I"
+                }
+              ]
+            }
+          },
+          "DepreciationAndAmortisationExpense": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 10379000000,
+                  "accn": "0001001085-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-03-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "AdjustmentsForDepreciationAndAmortisationExpense": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 10379000000,
+                  "accn": "0001001085-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-03-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ExpenseFromSharebasedPaymentTransactionsWithEmployees": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 123000000,
+                  "accn": "0001001085-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-03-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "FRPH": {
+      "cik": 844059,
+      "entityName": "FRP HOLDINGS, INC.",
+      "facts": {
+        "us-gaap": {
+          "Revenues": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 42846000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 3330000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15"
+                }
+              ]
+            }
+          },
+          "ProfitLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 2962000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 735145000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 428513000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15"
+                }
+              ]
+            }
+          },
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 455657000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2024-12-31",
+                  "val": 148620000,
+                  "accn": "0000844059-25-000009",
+                  "fy": 2024,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2025-03-18"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 105361000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15"
+                }
+              ]
+            }
+          },
+          "DebtLongtermAndShorttermCombinedAmount": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2020-12-31",
+                  "val": 89964000,
+                  "accn": "0000844059-21-000008",
+                  "fy": 2020,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2021-03-19",
+                  "frame": "CY2020Q4I"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 192554000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15"
+                }
+              ]
+            }
+          },
+          "LongTermDebtNoncurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2020-12-31",
+                  "val": 89964000,
+                  "accn": "0000844059-21-000008",
+                  "fy": 2020,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2021-03-19"
+                }
+              ]
+            }
+          },
+          "LongTermDebtCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2020-12-31",
+                  "val": 0,
+                  "accn": "0000844059-21-000008",
+                  "fy": 2020,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2021-03-19"
+                }
+              ]
+            }
+          },
+          "NotesPayable": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 180070000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15"
+                }
+              ]
+            }
+          },
+          "SecuredLongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 192554000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "DebtInstrumentCarryingAmount": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 180070000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 29677000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquirePropertyPlantAndEquipment": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 51137000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 19015000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "DepreciationDepletionAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 11375000,
+                  "accn": "0000844059-26-000037",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-04-15",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2020-01-01",
+                  "end": "2020-12-31",
+                  "val": 92000,
+                  "accn": "0000844059-21-000008",
+                  "fy": 2020,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2021-03-19",
+                  "frame": "CY2020"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "TSLA": {
+      "cik": 1318605,
+      "entityName": "Tesla, Inc.",
+      "facts": {
+        "us-gaap": {
+          "Revenues": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 94827000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "RevenueFromContractWithCustomerExcludingAssessedTax": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 94827000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 3794000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "ProfitLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 3855000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 137806000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 82137000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 82807000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 16513000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsAndShortTermInvestments": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2011-12-31",
+                  "val": 280300000,
+                  "accn": "0001193125-12-137560",
+                  "fy": 2011,
+                  "fp": "FY",
+                  "form": "10-K/A",
+                  "filed": "2012-03-28",
+                  "frame": "CY2011Q4I"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 6584000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "LongTermDebtNoncurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2013-12-31",
+                  "val": 0,
+                  "accn": "0001193125-14-069681",
+                  "fy": 2013,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2014-02-26"
+                }
+              ]
+            }
+          },
+          "LongTermDebtAndCapitalLeaseObligations": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2018-12-31",
+                  "val": 9403672000,
+                  "accn": "0001564590-19-003165",
+                  "fy": 2018,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2019-02-19",
+                  "frame": "CY2018Q4I"
+                }
+              ]
+            }
+          },
+          "LongTermDebtCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2012-12-31",
+                  "val": 50841000,
+                  "accn": "0001193125-14-069681",
+                  "fy": 2013,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2014-02-26",
+                  "frame": "CY2012Q4I"
+                }
+              ]
+            }
+          },
+          "LongTermDebtAndCapitalLeaseObligationsCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2018-12-31",
+                  "val": 2567699000,
+                  "accn": "0001564590-19-003165",
+                  "fy": 2018,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2019-02-19",
+                  "frame": "CY2018Q4I"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiability": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 223000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiabilityNoncurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 152000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiabilityCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 71000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "ConvertibleDebtNoncurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2013-12-31",
+                  "val": 586119000,
+                  "accn": "0001193125-14-069681",
+                  "fy": 2013,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2014-02-26"
+                }
+              ]
+            }
+          },
+          "ConvertibleDebtCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2013-12-31",
+                  "val": 182000,
+                  "accn": "0001193125-14-069681",
+                  "fy": 2013,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2014-02-26"
+                }
+              ]
+            }
+          },
+          "ConvertibleNotesPayableCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2014-12-31",
+                  "val": 601566000,
+                  "accn": "0001564590-15-001031",
+                  "fy": 2014,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2015-02-26",
+                  "frame": "CY2014Q4I"
+                }
+              ]
+            }
+          },
+          "DebtInstrumentCarryingAmount": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 8177000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "DebtCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1569000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 14747000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquirePropertyPlantAndEquipment": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 8527000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 3528000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfShareOutstandingBasicAndDiluted": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2016-01-01",
+                  "end": "2016-12-31",
+                  "val": 144212000,
+                  "accn": "0001564590-17-003118",
+                  "fy": 2016,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2017-03-01",
+                  "frame": "CY2016"
+                }
+              ]
+            }
+          },
+          "MinorityInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 670000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "DepreciationDepletionAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2017-01-01",
+                  "end": "2017-12-31",
+                  "val": 769300000,
+                  "accn": "0001564590-18-002956",
+                  "fy": 2017,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2018-02-23",
+                  "frame": "CY2017"
+                }
+              ]
+            }
+          },
+          "DepreciationAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2017-01-01",
+                  "end": "2017-12-31",
+                  "val": 1636003000,
+                  "accn": "0001564590-18-002956",
+                  "fy": 2017,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2018-02-23",
+                  "frame": "CY2017"
+                }
+              ]
+            }
+          },
+          "Depreciation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 5030000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 2825000000,
+                  "accn": "0001628280-26-003952",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "CPT": {
+      "cik": 906345,
+      "entityName": "CAMDEN PROPERTY TRUST",
+      "facts": {
+        "us-gaap": {
+          "RevenueFromContractWithCustomerExcludingAssessedTax": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 12967000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 384462000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ProfitLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 394898000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 9042989000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 4362523000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12"
+                }
+              ]
+            }
+          },
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 4438253000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 25203000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 37242000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 3900800000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "NotesPayable": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 3900800000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12"
+                }
+              ]
+            }
+          },
+          "SecuredDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 330597000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12"
+                }
+              ]
+            }
+          },
+          "UnsecuredDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 3570193000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 826621000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 108434000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "MinorityInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 75730000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12"
+                }
+              ]
+            }
+          },
+          "DepreciationDepletionAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 611025000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "DepreciationAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 611025000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 16959000,
+                  "accn": "0001628280-26-007697",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-12",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "POOL": {
+      "cik": 945841,
+      "entityName": "POOL CORPORATION",
+      "facts": {
+        "us-gaap": {
+          "Revenues": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 5289396000,
+                  "accn": "0001193125-26-074833",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-26",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "SalesRevenueNet": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2017-01-01",
+                  "end": "2017-12-31",
+                  "val": 2788188000,
+                  "accn": "0000945841-18-000020",
+                  "fy": 2017,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2018-02-28",
+                  "frame": "CY2017"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 406404000,
+                  "accn": "0001193125-26-074833",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-26",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ProfitLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2019-01-01",
+                  "end": "2019-12-31",
+                  "val": 261575000,
+                  "accn": "0000945841-20-000041",
+                  "fy": 2019,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2020-02-27",
+                  "frame": "CY2019"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 3626126000,
+                  "accn": "0001193125-26-074833",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-26"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1185229000,
+                  "accn": "0001193125-26-074833",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-26"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2018-12-31",
+                  "val": 16358000,
+                  "accn": "0000945841-19-000013",
+                  "fy": 2018,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2019-02-27"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 104963000,
+                  "accn": "0001193125-26-074833",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-26"
+                }
+              ]
+            }
+          },
+          "DebtLongtermAndShorttermCombinedAmount": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1199453000,
+                  "accn": "0001193125-26-074833",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-26",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2018-12-31",
+                  "val": 666761000,
+                  "accn": "0000945841-19-000013",
+                  "fy": 2018,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2019-02-27",
+                  "frame": "CY2018Q4I"
+                }
+              ]
+            }
+          },
+          "LongTermDebtNoncurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1186424000,
+                  "accn": "0001193125-26-074833",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-26"
+                }
+              ]
+            }
+          },
+          "ShortTermBorrowings": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 13029000,
+                  "accn": "0001193125-26-074833",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-26"
+                }
+              ]
+            }
+          },
+          "LongTermLineOfCredit": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2011-12-31",
+                  "val": 147300000,
+                  "accn": "0000945841-12-000018",
+                  "fy": 2011,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2012-02-29",
+                  "frame": "CY2011Q4I"
+                }
+              ]
+            }
+          },
+          "DebtCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 13029000,
+                  "accn": "0001193125-26-074833",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-26",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 365850000,
+                  "accn": "0001193125-26-074833",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-26",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquirePropertyPlantAndEquipment": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 56334000,
+                  "accn": "0001193125-26-074833",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-26",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 37288000,
+                  "accn": "0001193125-26-074833",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-26",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "Depreciation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 42678000,
+                  "accn": "0001193125-26-074833",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-26",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 22733000,
+                  "accn": "0001193125-26-074833",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-26",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "GFL": {
+      "cik": 1780232,
+      "entityName": "GFL Environmental Inc.",
+      "facts": {
+        "ifrs-full": {
+          "RevenueFromContractsWithCustomers": {
+            "units": {
+              "CAD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 6615900000,
+                  "accn": "0001104659-26-016748",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ProfitLossAttributableToOwnersOfParent": {
+            "units": {
+              "CAD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 3834100000,
+                  "accn": "0001104659-26-016748",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "CAD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 19295200000,
+                  "accn": "0001104659-26-016748",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "EquityAttributableToOwnersOfParent": {
+            "units": {
+              "CAD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 7302800000,
+                  "accn": "0001104659-26-016748",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalents": {
+            "units": {
+              "CAD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 85600000,
+                  "accn": "0001104659-26-016748",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "Borrowings": {
+            "units": {
+              "CAD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 7422600000,
+                  "accn": "0001104659-26-016748",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "CashFlowsFromUsedInOperatingActivities": {
+            "units": {
+              "CAD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 1316000000,
+                  "accn": "0001104659-26-016748",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "AdjustedWeightedAverageShares": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 378689219,
+                  "accn": "0001104659-26-016748",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "NoncontrollingInterests": {
+            "units": {
+              "CAD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 182600000,
+                  "accn": "0001104659-26-016748",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "AdjustmentsForSharebasedPayments": {
+            "units": {
+              "CAD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 151500000,
+                  "accn": "0001104659-26-016748",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ExpenseFromSharebasedPaymentTransactionsWithEmployees": {
+            "units": {
+              "CAD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 150200000,
+                  "accn": "0001104659-26-016748",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "40-F",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        },
+        "us-gaap": {
+          "SharePrice": {
+            "label": "Share Price",
+            "description": "Price of a single share of a number of saleable stocks of a company.",
+            "units": {
+              "USD/shares": [
+                {
+                  "end": "2020-03-05",
+                  "val": 19,
+                  "accn": "0001104659-21-028535",
+                  "fy": 2020,
+                  "fp": "FY",
+                  "form": "20-F",
+                  "filed": "2021-02-26",
+                  "frame": "CY2020Q1I"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "KKR": {
+      "cik": 1404912,
+      "entityName": "KKR\u00a0&\u00a0CO.\u00a0INC.",
+      "facts": {
+        "us-gaap": {
+          "Revenues": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 19464307000,
+                  "accn": "0001404912-26-000007",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "RevenueFromContractWithCustomerExcludingAssessedTax": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2020-01-01",
+                  "end": "2020-12-31",
+                  "val": 2006791000,
+                  "accn": "0001404912-21-000008",
+                  "fy": 2020,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2021-02-19",
+                  "frame": "CY2020"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 2370463000,
+                  "accn": "0001404912-26-000007",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ProfitLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 6145412000,
+                  "accn": "0001404912-26-000007",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 410144072000,
+                  "accn": "0001404912-26-000007",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 30902561000,
+                  "accn": "0001404912-26-000007",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27"
+                }
+              ]
+            }
+          },
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 78921669000,
+                  "accn": "0001404912-26-000007",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2020-12-31",
+                  "val": 5363009000,
+                  "accn": "0001404912-21-000008",
+                  "fy": 2020,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2021-02-19",
+                  "frame": "CY2020Q4I"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 17151790000,
+                  "accn": "0001404912-26-000007",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2021-12-31",
+                  "val": 36914472000,
+                  "accn": "0001404912-22-000004",
+                  "fy": 2021,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2022-02-28",
+                  "frame": "CY2021Q4I"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 477760000,
+                  "accn": "0001404912-26-000007",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquirePropertyPlantAndEquipment": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2019-01-01",
+                  "end": "2019-12-31",
+                  "val": 194569000,
+                  "accn": "0001404912-20-000006",
+                  "fy": 2019,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2020-02-18",
+                  "frame": "CY2019"
+                }
+              ]
+            }
+          },
+          "MinorityInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 48019108000,
+                  "accn": "0001404912-26-000007",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27"
+                }
+              ]
+            }
+          },
+          "DepreciationAmortizationAndAccretionNet": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": -162529000,
+                  "accn": "0001404912-26-000007",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "DepreciationAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2020-01-01",
+                  "end": "2020-12-31",
+                  "val": 18600000,
+                  "accn": "0001404912-21-000008",
+                  "fy": 2020,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2021-02-19",
+                  "frame": "CY2020"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 722109000,
+                  "accn": "0001404912-26-000007",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "META": {
+      "cik": 1326801,
+      "entityName": "Meta Platforms, Inc.",
+      "facts": {
+        "us-gaap": {
+          "Revenues": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2017-01-01",
+                  "end": "2017-12-31",
+                  "val": 40653000000,
+                  "accn": "0001326801-18-000009",
+                  "fy": 2017,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2018-02-01",
+                  "frame": "CY2017"
+                }
+              ]
+            }
+          },
+          "RevenueFromContractWithCustomerExcludingAssessedTax": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 200966000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 60458000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 366021000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 217243000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 35873000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 39100000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 58744000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "LongTermDebtNoncurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 58744000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiability": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1184000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiabilityNoncurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 876000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiabilityCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 308000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "NotesPayableCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2016-12-31",
+                  "val": 0,
+                  "accn": "0001326801-17-000007",
+                  "fy": 2016,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2017-02-03",
+                  "frame": "CY2016Q4I"
+                }
+              ]
+            }
+          },
+          "DebtInstrumentCarryingAmount": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 59000000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 115800000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquirePropertyPlantAndEquipment": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 69691000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 2574000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "DepreciationDepletionAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 18616000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "Depreciation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 18000000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 20427000000,
+                  "accn": "0001628280-26-003942",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-01-29",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "REXR": {
+      "cik": 1571283,
+      "entityName": "Rexford Industrial Realty, Inc.",
+      "facts": {
+        "us-gaap": {
+          "Revenues": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 1003133000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "RevenueFromContractWithCustomerExcludingAssessedTax": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 589000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "RevenueFromContractWithCustomerIncludingAssessedTax": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2018-01-01",
+                  "end": "2018-12-31",
+                  "val": 473000,
+                  "accn": "0001571283-19-000005",
+                  "fy": 2018,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2019-02-19",
+                  "frame": "CY2018"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 212029000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "ProfitLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 219763000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 12612713000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 8460563000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 8838019000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 165778000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 165778000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 3251909000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "SecuredDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 103649000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "UnsecuredDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 3175000000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "DebtInstrumentCarryingAmount": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 3278649000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 542085000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 232550968,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfShareOutstandingBasicAndDiluted": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2021-01-01",
+                  "end": "2021-12-31",
+                  "val": 139294882,
+                  "accn": "0001571283-22-000006",
+                  "fy": 2021,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2022-02-17",
+                  "frame": "CY2021"
+                }
+              ]
+            }
+          },
+          "MinorityInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 377456000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "DepreciationAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 315919000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 100480000,
+                  "accn": "0001571283-26-000006",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "AMZN": {
+      "cik": 1018724,
+      "entityName": "AMAZON.COM, INC.",
+      "facts": {
+        "us-gaap": {
+          "RevenueFromContractWithCustomerExcludingAssessedTax": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 716924000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "SalesRevenueNet": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2017-01-01",
+                  "end": "2017-12-31",
+                  "val": 177866000000,
+                  "accn": "0001018724-18-000005",
+                  "fy": 2017,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2018-02-02",
+                  "frame": "CY2017"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 77670000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 818042000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 411065000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 86810000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsAndShortTermInvestments": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2016-12-31",
+                  "val": 25981000000,
+                  "accn": "0001018724-17-000011",
+                  "fy": 2016,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2017-02-10"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 90106000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 68836000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06"
+                }
+              ]
+            }
+          },
+          "LongTermDebtNoncurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 65648000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06"
+                }
+              ]
+            }
+          },
+          "LongTermDebtCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 2748000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06"
+                }
+              ]
+            }
+          },
+          "ShortTermBorrowings": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 455000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiability": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 12286000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiabilityNoncurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 10742000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiabilityCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1544000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06"
+                }
+              ]
+            }
+          },
+          "DebtInstrumentCarryingAmount": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 65648000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 139514000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquirePropertyPlantAndEquipment": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2016-01-01",
+                  "end": "2016-12-31",
+                  "val": 6737000000,
+                  "accn": "0001018724-17-000011",
+                  "fy": 2016,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2017-02-10",
+                  "frame": "CY2016"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquireProductiveAssets": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 131819000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 10827000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "DepreciationDepletionAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 65756000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "DepreciationAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2016-01-01",
+                  "end": "2016-12-31",
+                  "val": 8116000000,
+                  "accn": "0001018724-17-000011",
+                  "fy": 2016,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2017-02-10",
+                  "frame": "CY2016"
+                }
+              ]
+            }
+          },
+          "Depreciation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 41860000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 19467000000,
+                  "accn": "0001018724-26-000004",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-06",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "CB": {
+      "cik": 896159,
+      "entityName": "CHUBB LIMITED",
+      "facts": {
+        "us-gaap": {
+          "Revenues": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 59402000000,
+                  "accn": "0000896159-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 10310000000,
+                  "accn": "0000896159-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ProfitLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 10622000000,
+                  "accn": "0000896159-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 272327000000,
+                  "accn": "0000896159-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 73757000000,
+                  "accn": "0000896159-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27"
+                }
+              ]
+            }
+          },
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 79779000000,
+                  "accn": "0000896159-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2022-12-31",
+                  "val": 2012000000,
+                  "accn": "0000896159-23-000007",
+                  "fy": 2022,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2023-02-24"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 2470000000,
+                  "accn": "0000896159-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 15728000000,
+                  "accn": "0000896159-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27"
+                }
+              ]
+            }
+          },
+          "LongTermDebtCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2010-12-31",
+                  "val": 1300000000,
+                  "accn": "0001193125-11-047473",
+                  "fy": 2010,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2011-02-25"
+                }
+              ]
+            }
+          },
+          "ShortTermBorrowings": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1499000000,
+                  "accn": "0000896159-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 12816000000,
+                  "accn": "0000896159-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 401513338,
+                  "accn": "0000896159-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "MinorityInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 6022000000,
+                  "accn": "0000896159-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-27"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "ALX": {
+      "cik": 3499,
+      "entityName": "ALEXANDERS INC",
+      "facts": {
+        "us-gaap": {
+          "Revenues": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 213183000,
+                  "accn": "0000003499-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-09",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "RevenueFromContractWithCustomerExcludingAssessedTax": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2018-01-01",
+                  "end": "2018-12-31",
+                  "val": 232825000,
+                  "accn": "0000003499-19-000004",
+                  "fy": 2018,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2019-02-11",
+                  "frame": "CY2018"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 28224000,
+                  "accn": "0000003499-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-09"
+                }
+              ]
+            }
+          },
+          "ProfitLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2014-01-01",
+                  "end": "2014-12-31",
+                  "val": 67925000,
+                  "accn": "0000003499-15-000003",
+                  "fy": 2014,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2015-02-17",
+                  "frame": "CY2014"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1110708000,
+                  "accn": "0000003499-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-09"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 109156000,
+                  "accn": "0000003499-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-09"
+                }
+              ]
+            }
+          },
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2012-12-31",
+                  "val": 332153000,
+                  "accn": "0000003499-15-000003",
+                  "fy": 2014,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2015-02-17",
+                  "frame": "CY2012Q4I"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 128167000,
+                  "accn": "0000003499-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-09"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 192225000,
+                  "accn": "0000003499-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-09"
+                }
+              ]
+            }
+          },
+          "NotesPayable": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 829451000,
+                  "accn": "0000003499-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-09"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 73444000,
+                  "accn": "0000003499-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-09",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 5135020,
+                  "accn": "0000003499-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-09",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfShareOutstandingBasicAndDiluted": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2020-01-01",
+                  "end": "2020-12-31",
+                  "val": 5120922,
+                  "accn": "0000003499-21-000005",
+                  "fy": 2020,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2021-02-16",
+                  "frame": "CY2020"
+                }
+              ]
+            }
+          },
+          "MinorityInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2012-12-31",
+                  "val": 0,
+                  "accn": "0000003499-13-000006",
+                  "fy": 2012,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2013-02-26",
+                  "frame": "CY2012Q4I"
+                }
+              ]
+            }
+          },
+          "DepreciationDepletionAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 38145000,
+                  "accn": "0000003499-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-09",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "DepreciationAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 35061000,
+                  "accn": "0000003499-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-09",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 394000,
+                  "accn": "0000003499-26-000005",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-09",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "CSL": {
+      "cik": 790051,
+      "entityName": "CARLISLE COMPANIES INCORPORATED",
+      "facts": {
+        "us-gaap": {
+          "Revenues": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2024-01-01",
+                  "end": "2024-12-31",
+                  "val": 5003600000,
+                  "accn": "0000790051-25-000077",
+                  "fy": 2024,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2025-02-14",
+                  "frame": "CY2024"
+                }
+              ]
+            }
+          },
+          "RevenueFromContractWithCustomerExcludingAssessedTax": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 5019900000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "SalesRevenueNet": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2017-01-01",
+                  "end": "2017-12-31",
+                  "val": 4089900000,
+                  "accn": "0000790051-18-000095",
+                  "fy": 2017,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2018-02-16",
+                  "frame": "CY2017"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 740700000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ProfitLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2010-01-01",
+                  "end": "2010-12-31",
+                  "val": 145600000,
+                  "accn": "0001047469-11-000969",
+                  "fy": 2010,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2011-02-16",
+                  "frame": "CY2010"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 6263000000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1795400000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13"
+                }
+              ]
+            }
+          },
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2010-12-31",
+                  "val": 1340700000,
+                  "accn": "0001047469-11-000969",
+                  "fy": 2010,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2011-02-16"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1112100000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsAndShortTermInvestments": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2015-12-31",
+                  "val": 410700000,
+                  "accn": "0001047469-16-010052",
+                  "fy": 2015,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2016-02-08"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1112100000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 2886400000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13"
+                }
+              ]
+            }
+          },
+          "LongTermDebtNoncurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 2881600000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13"
+                }
+              ]
+            }
+          },
+          "LongTermDebtAndCapitalLeaseObligations": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2015-12-31",
+                  "val": 598700000,
+                  "accn": "0001047469-16-010052",
+                  "fy": 2015,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2016-02-08"
+                }
+              ]
+            }
+          },
+          "LongTermDebtCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 4800000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13"
+                }
+              ]
+            }
+          },
+          "DebtCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2015-12-31",
+                  "val": 149900000,
+                  "accn": "0001047469-16-010052",
+                  "fy": 2015,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2016-02-08"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 1101800000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquirePropertyPlantAndEquipment": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 131200000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 43200000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "DepreciationDepletionAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 196500000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "Depreciation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 74600000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 34800000,
+                  "accn": "0000790051-26-000012",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-13",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "BR": {
+      "cik": 1383312,
+      "entityName": "BROADRIDGE FINANCIAL SOLUTIONS, INC.",
+      "facts": {
+        "us-gaap": {
+          "Revenues": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2016-07-01",
+                  "end": "2017-06-30",
+                  "val": 4142600000,
+                  "accn": "0001383312-17-000053",
+                  "fy": 2017,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2017-08-10",
+                  "frame": "CY2017"
+                }
+              ]
+            }
+          },
+          "RevenueFromContractWithCustomerExcludingAssessedTax": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-07-01",
+                  "end": "2026-06-30",
+                  "val": 7476800000,
+                  "accn": "0001628280-26-052243",
+                  "fy": 2026,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-08-04",
+                  "frame": "CY2026"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-07-01",
+                  "end": "2026-06-30",
+                  "val": 1124300000,
+                  "accn": "0001628280-26-052243",
+                  "fy": 2026,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-08-04"
+                }
+              ]
+            }
+          },
+          "ProfitLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2018-07-01",
+                  "end": "2019-06-30",
+                  "val": 482100000,
+                  "accn": "0001383312-19-000042",
+                  "fy": 2019,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2019-08-06",
+                  "frame": "CY2019"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2026-06-30",
+                  "val": 8945300000,
+                  "accn": "0001628280-26-052243",
+                  "fy": 2026,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-08-04"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2026-06-30",
+                  "val": 2840500000,
+                  "accn": "0001628280-26-052243",
+                  "fy": 2026,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-08-04"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2026-06-30",
+                  "val": 402900000,
+                  "accn": "0001628280-26-052243",
+                  "fy": 2026,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-08-04"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2026-06-30",
+                  "val": 402900000,
+                  "accn": "0001628280-26-052243",
+                  "fy": 2026,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-08-04"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2026-06-30",
+                  "val": 3254600000,
+                  "accn": "0001628280-26-052243",
+                  "fy": 2026,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-08-04"
+                }
+              ]
+            }
+          },
+          "LongTermDebtNoncurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2026-06-30",
+                  "val": 3254600000,
+                  "accn": "0001628280-26-052243",
+                  "fy": 2026,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-08-04"
+                }
+              ]
+            }
+          },
+          "LongTermDebtCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2026-06-30",
+                  "val": 0,
+                  "accn": "0001628280-26-052243",
+                  "fy": 2026,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-08-04"
+                }
+              ]
+            }
+          },
+          "ShortTermBorrowings": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2011-06-30",
+                  "val": 400000000,
+                  "accn": "0001193125-12-346911",
+                  "fy": 2012,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2012-08-09",
+                  "frame": "CY2011Q2I"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-07-01",
+                  "end": "2026-06-30",
+                  "val": 1345600000,
+                  "accn": "0001628280-26-052243",
+                  "fy": 2026,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-08-04",
+                  "frame": "CY2026"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquirePropertyPlantAndEquipment": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-07-01",
+                  "end": "2026-06-30",
+                  "val": 67200000,
+                  "accn": "0001628280-26-052243",
+                  "fy": 2026,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-08-04",
+                  "frame": "CY2026"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquireProductiveAssets": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2017-07-01",
+                  "end": "2018-06-30",
+                  "val": 76700000,
+                  "accn": "0001383312-18-000041",
+                  "fy": 2018,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2018-08-07",
+                  "frame": "CY2018"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-07-01",
+                  "end": "2026-06-30",
+                  "val": 117100000,
+                  "accn": "0001628280-26-052243",
+                  "fy": 2026,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-08-04",
+                  "frame": "CY2026"
+                }
+              ]
+            }
+          },
+          "DepreciationDepletionAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2010-07-01",
+                  "end": "2011-06-30",
+                  "val": 36100000,
+                  "accn": "0001193125-11-220708",
+                  "fy": 2011,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2011-08-12",
+                  "frame": "CY2011"
+                }
+              ]
+            }
+          },
+          "DepreciationAmortizationAndAccretionNet": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-07-01",
+                  "end": "2026-06-30",
+                  "val": 137700000,
+                  "accn": "0001628280-26-052243",
+                  "fy": 2026,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-08-04",
+                  "frame": "CY2026"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2023-07-01",
+                  "end": "2024-06-30",
+                  "val": 70600000,
+                  "accn": "0001383312-24-000039",
+                  "fy": 2024,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2024-08-06",
+                  "frame": "CY2024"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "AMRZ": {
+      "cik": "0002035989",
+      "entityName": "Amrize Ltd",
+      "facts": {
+        "us-gaap": {
+          "RevenueFromContractWithCustomerExcludingAssessedTax": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 11815000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 1185000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ProfitLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 1182000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 24249000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 13258000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18"
+                }
+              ]
+            }
+          },
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 13254000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1922000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1922000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiability": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 438000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiabilityNoncurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 327000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiabilityCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 111000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18"
+                }
+              ]
+            }
+          },
+          "DebtInstrumentCarryingAmount": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 5267000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 2208000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquirePropertyPlantAndEquipment": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 788000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 553600000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "MinorityInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": -4000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18"
+                }
+              ]
+            }
+          },
+          "DepreciationDepletionAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 758000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "DepreciationAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 914000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 14000000,
+                  "accn": "0002035989-26-000017",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-18",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "JOE": {
+      "cik": 745308,
+      "entityName": "The St. Joe Company",
+      "facts": {
+        "us-gaap": {
+          "Revenues": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 513246000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 115627000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ProfitLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 115882000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1518426000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 766290000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 775625000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 129614000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 136511000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 391159000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiability": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 529000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "DebtInstrumentCarryingAmount": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 396008000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 190696000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquirePropertyPlantAndEquipment": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 4058000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquireProductiveAssets": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2022-01-01",
+                  "end": "2022-12-31",
+                  "val": 356692000,
+                  "accn": "0001558370-23-001760",
+                  "fy": 2021,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2023-02-22",
+                  "frame": "CY2022"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 57959936,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfShareOutstandingBasicAndDiluted": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2020-01-01",
+                  "end": "2020-12-31",
+                  "val": 59009865,
+                  "accn": "0001558370-21-001636",
+                  "fy": 2020,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2021-02-24",
+                  "frame": "CY2020"
+                }
+              ]
+            }
+          },
+          "MinorityInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 9335000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "DepreciationDepletionAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 47471000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "DepreciationAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2011-01-01",
+                  "end": "2011-12-31",
+                  "val": 15840000,
+                  "accn": "0001193125-12-081993",
+                  "fy": 2011,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2012-02-27",
+                  "frame": "CY2011"
+                }
+              ]
+            }
+          },
+          "Depreciation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2022-01-01",
+                  "end": "2022-12-31",
+                  "val": 8500000,
+                  "accn": "0001558370-23-001760",
+                  "fy": 2021,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2023-02-22",
+                  "frame": "CY2022"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 1232000,
+                  "accn": "0001104659-26-019676",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "SCHW": {
+      "cik": 316709,
+      "entityName": "SCHWAB CHARLES CORP",
+      "facts": {
+        "us-gaap": {
+          "Revenues": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 23921000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 8852000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 490995000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 49425000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 46030000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 69661000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2021-12-31",
+                  "val": 18914000000,
+                  "accn": "0000316709-22-000009",
+                  "fy": 2021,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2022-02-24",
+                  "frame": "CY2021Q4I"
+                }
+              ]
+            }
+          },
+          "LongTermDebtAndCapitalLeaseObligations": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 22199000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "ShortTermBorrowings": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2022-12-31",
+                  "val": 17050000000,
+                  "accn": "0000316709-23-000009",
+                  "fy": 2022,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2023-02-24",
+                  "frame": "CY2022Q4I"
+                }
+              ]
+            }
+          },
+          "CommercialPaper": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1900000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiability": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 37000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25"
+                }
+              ]
+            }
+          },
+          "DebtInstrumentCarryingAmount": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 22237000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 9311000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquirePropertyPlantAndEquipment": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 548000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquireProductiveAssets": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 602000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 1809000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "DepreciationAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2023-01-01",
+                  "end": "2023-12-31",
+                  "val": 804000000,
+                  "accn": "0000316709-24-000018",
+                  "fy": 2023,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2024-02-23",
+                  "frame": "CY2023"
+                }
+              ]
+            }
+          },
+          "Depreciation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2019-01-01",
+                  "end": "2019-12-31",
+                  "val": 322000000,
+                  "accn": "0000316709-20-000012",
+                  "fy": 2019,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2020-02-26",
+                  "frame": "CY2019"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 317000000,
+                  "accn": "0000316709-26-000009",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-25",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "SPGI": {
+      "cik": 64040,
+      "entityName": "S&P Global Inc.",
+      "facts": {
+        "us-gaap": {
+          "Revenues": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2017-01-01",
+                  "end": "2017-12-31",
+                  "val": 6063000000,
+                  "accn": "0000064040-18-000061",
+                  "fy": 2017,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2018-02-09",
+                  "frame": "CY2017"
+                }
+              ]
+            }
+          },
+          "RevenueFromContractWithCustomerExcludingAssessedTax": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 15336000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 4471000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ProfitLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 4820000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 61200000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 31127000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 31235000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "CashAndCashEquivalentsAtCarryingValue": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1745000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 1745000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "DebtLongtermAndShorttermCombinedAmount": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2018-12-31",
+                  "val": 3662000000,
+                  "accn": "0000064040-19-000059",
+                  "fy": 2018,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2019-02-13",
+                  "frame": "CY2018Q4I"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 13088000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "LongTermDebtNoncurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 12370000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "ShortTermBorrowings": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2011-12-31",
+                  "val": 400000000,
+                  "accn": "0001193125-12-043165",
+                  "fy": 2011,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2012-02-07"
+                }
+              ]
+            }
+          },
+          "CommercialPaper": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2014-12-31",
+                  "val": 0,
+                  "accn": "0000064040-15-000004",
+                  "fy": 2014,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2015-02-13"
+                }
+              ]
+            }
+          },
+          "NotesPayableCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2010-12-31",
+                  "val": 500000,
+                  "accn": "0000950123-11-017079",
+                  "fy": 2010,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2011-02-23",
+                  "frame": "CY2010Q4I"
+                }
+              ]
+            }
+          },
+          "DebtCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 718000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 5651000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquirePropertyPlantAndEquipment": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2009-01-01",
+                  "end": "2009-12-31",
+                  "val": 68526000,
+                  "accn": "0000950123-10-016328",
+                  "fy": 2009,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2010-02-24",
+                  "frame": "CY2009"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquireProductiveAssets": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 195000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 305100000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "MinorityInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 108000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11"
+                }
+              ]
+            }
+          },
+          "DepreciationDepletionAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 1179000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "DepreciationAmortizationAndAccretionNet": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2015-01-01",
+                  "end": "2015-12-31",
+                  "val": 90000000,
+                  "accn": "0000064040-16-000042",
+                  "fy": 2015,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2016-02-12",
+                  "frame": "CY2015"
+                }
+              ]
+            }
+          },
+          "Depreciation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 110000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 236000000,
+                  "accn": "0000064040-26-000013",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-02-11",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "SKYH": {
+      "cik": 1823587,
+      "entityName": "Sky Harbour Group Corporation",
+      "facts": {
+        "us-gaap": {
+          "Revenues": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 27540000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "NetIncomeLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 18818000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ProfitLoss": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 7321000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "Assets": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 593176000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19"
+                }
+              ]
+            }
+          },
+          "StockholdersEquity": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2021-12-31",
+                  "val": -18437619,
+                  "accn": "0001437749-22-007387",
+                  "fy": 2021,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2022-03-28",
+                  "frame": "CY2021Q4I"
+                }
+              ]
+            }
+          },
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 171966000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19"
+                }
+              ]
+            }
+          },
+          "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 37024000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19"
+                }
+              ]
+            }
+          },
+          "LongTermDebt": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 187438000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "FinanceLeaseLiability": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 125000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19",
+                  "frame": "CY2025Q4I"
+                }
+              ]
+            }
+          },
+          "NotesPayableCurrent": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2021-12-31",
+                  "val": 1000000,
+                  "accn": "0001437749-22-007387",
+                  "fy": 2021,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2022-03-28",
+                  "frame": "CY2021Q4I"
+                }
+              ]
+            }
+          },
+          "NetCashProvidedByUsedInOperatingActivities": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": -2336000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "PaymentsToAcquirePropertyPlantAndEquipment": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 9509000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "WeightedAverageNumberOfDilutedSharesOutstanding": {
+            "units": {
+              "shares": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 77774000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "MinorityInterest": {
+            "units": {
+              "USD": [
+                {
+                  "end": "2025-12-31",
+                  "val": 44219000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19"
+                }
+              ]
+            }
+          },
+          "DepreciationDepletionAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 6380000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "DepreciationAndAmortization": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 6294000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          },
+          "ShareBasedCompensation": {
+            "units": {
+              "USD": [
+                {
+                  "start": "2025-01-01",
+                  "end": "2025-12-31",
+                  "val": 5769000,
+                  "accn": "0001437749-26-009045",
+                  "fy": 2025,
+                  "fp": "FY",
+                  "form": "10-K",
+                  "filed": "2026-03-19",
+                  "frame": "CY2025"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
