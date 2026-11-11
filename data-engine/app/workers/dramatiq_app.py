@@ -5811,3 +5811,32 @@ def extract_scanned_accounts(
                 "reason": result.get("reason")}
     except Exception as exc:
         return _handle_actor_error(actor_name, exc, ticker=ticker, url=document_url)
+
+
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=600_000, queue_name=COMPUTED_QUEUE_NAME)
+@_coalesce_on_success("recompute_management_alignment", 5 * 60, ("tenant_id", "company_id"), stale_after_seconds=None)
+def recompute_management_alignment(tenant_id: int | None = None, user_id: str | None = None, company_id: int | None = None) -> dict[str, Any]:
+    """Six-hour Research-only aggregation. Reads persisted data, no downloads/LLM."""
+    from sqlalchemy import select
+
+    from app.core.tenancy import tenant_filters
+    from app.models.entities import Company, ManagementAlignmentSnapshot
+    from app.services.earnings_dates_service import followed_companies
+    from app.services.management_alignment import recompute_alignment
+    db = _session(tenant_id, user_id)
+    try:
+        if company_id is not None:
+            companies = list(db.scalars(select(Company).where(Company.id == company_id)))
+        else:
+            ids = {v["company"].id for v in followed_companies(db).values()}
+            ids.update(db.scalars(select(ManagementAlignmentSnapshot.company_id).where(*tenant_filters(db, ManagementAlignmentSnapshot))))
+            companies = list(db.scalars(select(Company).where(Company.id.in_(ids))))
+        for company in companies:
+            recompute_alignment(db, company)
+        db.commit()
+        return {"actor": "recompute_management_alignment", "status": "ok", "companies": len(companies)}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("recompute_management_alignment", exc, tenant_id=tenant_id)
+    finally:
+        db.close()

@@ -112,6 +112,7 @@ ACTOR_CLASS: dict[str, str] = {
     "propicks_radar_scan": CALCULO,
     "propose_paper_trades": CALCULO,
     "recompute_fundamental_metrics": CALCULO,
+    "recompute_management_alignment": CALCULO,
     "refresh_paper_trades": CALCULO,
     "refresh_portfolio_moves": CALCULO,
     "refresh_propicks_prices": CALCULO,

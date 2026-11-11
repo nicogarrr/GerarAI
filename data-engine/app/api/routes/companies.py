@@ -1647,3 +1647,20 @@ def company_share_capital(ticker: str, db: Session = Depends(get_db)) -> dict:
     if not company:
         raise HTTPException(status_code=404, detail=ui_error(404, "company_not_found").detail)
     return build_share_capital(db, company)
+
+
+@router.get("/{ticker}/management-alignment")
+def company_management_alignment(ticker: str, db: Session = Depends(get_db)) -> dict:
+    from app.services.management_alignment import read_alignment
+    company = resolve_company(db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail=ui_error(404, "company_not_found").detail)
+    data = read_alignment(db, company)
+    if data["status"] == "pendiente":
+        from app.workers.dramatiq_app import coalesced_send, recompute_management_alignment
+        try:
+            coalesced_send(recompute_management_alignment, tenant_id=db.info.get("tenant_id"), company_id=company.id)
+        except Exception:
+            logger.warning("No se pudo encolar alineación %s", ticker, exc_info=True)
+            data["reason"] += " No se ha podido encolar el cálculo; el job periódico volverá a intentarlo."
+    return data

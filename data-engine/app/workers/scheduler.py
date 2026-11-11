@@ -41,6 +41,7 @@ from app.workers.dramatiq_app import (
     propicks_radar_scan,
     propose_paper_trades,
     recompute_fundamental_metrics,
+    recompute_management_alignment,
     reconcile_alert_analyses,
     reconcile_alert_deliveries,
     refresh_asts_catalog,
@@ -604,6 +605,8 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # limit gratuito). Retoma donde lo dejo via Document finnhub_profile.
     _register(scheduler, partial(enqueue_for_all_tenants, backfill_finnhub_profiles),
               "cron", job_id="finnhub_profile_backfill_daily", hour=4, minute=50, jitter=300)
+    _register(scheduler, partial(enqueue_for_all_tenants, recompute_management_alignment),
+              "cron", job_id="management_alignment_6h", hour="1,7,13,19", minute=35, jitter=300)
     # Backfill diario presupuestado de fundamentales SEC (100 companias/run;
     # universo US completo en dias-semanas segun su tamano real, luego
     # refresco rodante con frescura 7d). Anti-atasco: pre-filtro de identidad

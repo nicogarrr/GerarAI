@@ -46,6 +46,8 @@ def _data_quality(tx: dict) -> dict:
     if tx.get("multi_reporter"):
         flags.append("joint_filing_attribution")
     quality: dict = {"flags": flags}
+    if "alignment_10b5_1" in tx:
+        quality["alignment_10b5_1"] = tx["alignment_10b5_1"]
     title = str(tx.get("security_title") or "").strip()
     if title:
         quality["security_title"] = title[:120]
@@ -127,7 +129,7 @@ def persist_filing(
             row = existing[fp]
             fresh = _data_quality(tx)
             current = dict(row.data_quality or {})
-            missing = {k: v for k, v in fresh.items() if k in ("holdings_after", "ownership") and k not in current}
+            missing = {k: v for k, v in fresh.items() if k in ("holdings_after", "ownership", "alignment_10b5_1") and k not in current}
             if missing:
                 row.data_quality = {**current, **missing}
                 enriched_tx += 1

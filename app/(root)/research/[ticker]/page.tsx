@@ -1,3 +1,5 @@
+import { getManagementAlignment } from '@/lib/actions/management-alignment.actions';
+import { ManagementAlignmentSection } from '@/components/research/sections/ManagementAlignmentSection';
 import { thesisIsPublic } from '@/lib/research/thesis-publication';
 import { getFormat, getLocale, getT } from '@/lib/i18n/server';
 import { engineNoticeText } from '@/lib/research/engine-notice';
@@ -1931,6 +1933,7 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
       await optionalSection('insiders', t('research.insidersV2.title'), buildInsidersSection),
       await optionalSection('politicos', t('research.politicos.title'), buildPoliticosSection),
       await optionalSection('directiva', t('research.fichaSecDirectiva'), buildDirectivaSection),
+      await optionalSection('incentivos', t('research.managementAlignment.title'), async () => <ManagementAlignmentSection data={await getManagementAlignment(ticker)} locale={locale} />),
       await optionalSection('lecciones', t('research.fichaSecLecciones'), buildLeccionesSection),
       ...(ticker === 'ASTS' ? [await optionalSection('satellites', t('research.fichaSecSatelites'), buildSatellitesSection)] : []),
     ];
