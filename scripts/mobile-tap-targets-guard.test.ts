@@ -14,9 +14,10 @@ const AREA = 'min-h-[44px]';
 describe('ficha movil: objetivos tactiles de al menos 44px', () => {
     it('enlaces de la cabecera de la ficha', () => {
         const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        const i = page.indexOf('>Research</Link>');
+        // «← Research» / «← Volver» (HistoryBackLink: vuelve por historial si se llegó desde la app).
+        const i = page.indexOf('>Research</HistoryBackLink>');
         assert.ok(i > 0, 'Research existe');
-        assert.ok(page.slice(page.lastIndexOf('<Link', i), i).includes(AREA), 'Research con area tactil');
+        assert.ok(page.slice(page.lastIndexOf('<HistoryBackLink', i), i).includes(AREA), 'Research con area tactil');
         // Los enlaces secundarios viven en el menú de cabecera.
         const menu = readFileSync('components/research/CompanyActionsMenu.tsx', 'utf8');
         const item = menu.match(/const ITEM = '([^']+)'/)?.[1] ?? '';

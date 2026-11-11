@@ -1,6 +1,7 @@
 import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { HistoryBackLink } from '@/components/common/HistoryBackLink';
 import { ArrowLeft, FileText, ShieldCheck, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OverflowScrollRegion } from '@/components/ui/overflow-scroll-region';
@@ -128,9 +129,9 @@ export default async function ResearchSourcesPage({
       <header className="flex flex-col items-start justify-between gap-3 border-b border-gray-800 pb-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           <Button asChild className="min-w-11" size="sm" variant="ghost">
-            <Link href="/research" aria-label={t('research.sourcesPage.back')}>
+            <HistoryBackLink href="/research" aria-label={t('research.sourcesPage.back')}>
               <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-            </Link>
+            </HistoryBackLink>
           </Button>
           <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">{t('research.sourcesPage.title')}</h1>
         </div>

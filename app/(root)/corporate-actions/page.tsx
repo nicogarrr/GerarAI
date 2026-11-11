@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import { HistoryBackLink } from '@/components/common/HistoryBackLink';
 import { ArrowLeft, Building2 } from 'lucide-react';
 import CorporateActionsView from '@/components/corporate-actions/CorporateActionsView';
 import BackendOffline from '@/components/system/BackendOffline';
@@ -53,13 +53,13 @@ export default async function CorporateActionsPage({ searchParams }: PageProps) 
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex max-w-6xl flex-col gap-6">
             {ticker ? (
-                <Link
+                <HistoryBackLink
                     className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-200"
                     href={`/research/${encodeURIComponent(ticker)}`}
                 >
                     <ArrowLeft aria-hidden="true" className="h-4 w-4" />
                     {t('corporateActions.backToTicker', { ticker })}
-                </Link>
+                </HistoryBackLink>
             ) : null}
             <header className="flex flex-col gap-3 border-b border-gray-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
                 <div>

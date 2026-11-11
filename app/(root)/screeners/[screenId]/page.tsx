@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { HistoryBackLink } from '@/components/common/HistoryBackLink';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 
@@ -54,9 +55,9 @@ export default async function SavedScreenResultsPage({ params }: { params: Promi
       <ScreenBreadcrumbName name={name} />
       <header className="border-b border-gray-800 pb-5">
         <Button asChild className="mb-4" size="sm" variant="ghost">
-          <Link href="/screeners">
+          <HistoryBackLink href="/screeners">
             <ArrowLeft className="h-4 w-4" />Screeners
-          </Link>
+          </HistoryBackLink>
         </Button>
         <p className="text-sm font-semibold uppercase text-teal-300">{t('screener.savedKicker')}</p>
         <h1 className="mt-1 text-3xl font-bold text-gray-100">{name}</h1>
