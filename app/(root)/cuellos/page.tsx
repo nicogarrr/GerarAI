@@ -49,7 +49,7 @@ function SignalCard({ signal, minSources, t, fmt }: { signal: Awaited<ReturnType
             {t('bottlenecks.page.detected')}
           </span>
         ) : (
-          <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] font-bold uppercase text-gray-500">
+          <span className="rounded bg-gray-800 px-1.5 py-0.5 text-xs font-bold uppercase text-gray-500">
             {fmt.na}
           </span>
         )}
@@ -159,7 +159,7 @@ function DiscoveryCard({ item, t, fmt, locale }: { item: DiscoveryView; t: Trans
           ))}
         </ul>
       ) : null}
-      <p className="mt-3 text-[11px] text-gray-500">
+      <p className="mt-3 text-xs text-gray-500">
         {t('bottlenecks.page.discoveryMeta', { date: fmt.formatUserDate(item.created_at), model: item.model })}{' '}
         {item.theme_last_seen ? fmt.formatUserDate(item.theme_last_seen) : fmt.na}
       </p>
