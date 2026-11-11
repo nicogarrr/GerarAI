@@ -18,7 +18,6 @@
     "postmarket": "after-hours",
     "noTime": "time unknown",
     "updatedAt": "Updated at {time} (Madrid time)",
-    "noData": "No data yet",
     "lastFailed": " · the last update failed; retrying every minute",
     "refresh": "Refresh now",
     "groupEmpty": "Data is not available right now. Retrying every minute.",
