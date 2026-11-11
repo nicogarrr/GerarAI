@@ -318,8 +318,14 @@ def pct(value: float) -> str:
     return f"{value * 100:.0f} %"
 
 
-def _fmt(value: float) -> str:
-    return f"{value:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
+def _fmt(value: float, digits: int = 1) -> str:
+    return f"{value:,.{digits}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _ccy_suffix(anchors: Mapping[str, Any]) -> str:
+    """« USD», « CAD»…: la divisa de las anclas (la del modelo); sin divisa conocida, ninguna (nunca un «$» supuesto)."""
+    ccy = anchors.get("currency")
+    return f" {str(ccy).strip().upper()}" if isinstance(ccy, str) and ccy.strip() else ""
 
 
 def revenue_rule(anchor: Mapping[str, Any], status: str, *, base_year: int, valuation_year: int,
@@ -397,11 +403,13 @@ def code_dilution(anchors: Mapping[str, Any], years: int) -> list[dict[str, Any]
     url = f"/research/{anchors.get('ticker')}?view=valuation"
     if not price or price <= 0:
         return out
+    # Formato español y divisa del modelo (la de los informes desde #5372; el precio ya va convertido a ella).
+    ccy = _ccy_suffix(anchors)
     sbc = anchors.get("sbc_annual_millions")
     if sbc and sbc > 0:
         shares = sbc * years / price
         out.append({"label": "Remuneración en acciones (SBC) hasta el año valorado", "shares": shares,
-                    "why": {"shares": f"SBC {_fmt(sbc)} M$/año × {years} años ÷ precio {price:.2f} = {_fmt(shares)} M"},
+                    "why": {"shares": f"SBC {_fmt(sbc)} M{ccy}/año × {years} años ÷ precio {_fmt(price, 2)}{ccy} = {_fmt(shares)} M"},
                     "sources": [{"label": "SBC anual (SEC)", "url": url, "date": anchors.get("sbc_period_end")}]})
     burn = anchors.get("annual_burn_millions")
     cash = anchors.get("cash_millions")
@@ -414,13 +422,13 @@ def code_dilution(anchors: Mapping[str, Any], years: int) -> list[dict[str, Any]
         if gap > 0:
             shares = gap / price
             out.append({"label": "Ampliaciones para cubrir la quema", "shares": shares,
-                        "why": {"shares": (f"(quema {_fmt(burn)} M$/año × {BURN_YEARS} años − liquidez {_fmt(liquid)} M) "
-                                           f"÷ precio {price:.2f} = {_fmt(shares)} M")},
+                        "why": {"shares": (f"(quema {_fmt(burn)} M{ccy}/año × {BURN_YEARS} años − liquidez {_fmt(liquid)} M) "
+                                           f"÷ precio {_fmt(price, 2)}{ccy} = {_fmt(shares)} M")},
                         "sources": [{"label": "Flujo de caja libre anual (SEC)", "url": url,
                                      "date": anchors.get("burn_period_end")}]})
         else:
             out.append({"label": "Ampliaciones para cubrir la quema", "shares": 0.0,
-                        "why": {"shares": (f"quema {_fmt(burn)} M$/año × {BURN_YEARS} años = {_fmt(burn * BURN_YEARS)} M "
+                        "why": {"shares": (f"quema {_fmt(burn)} M{ccy}/año × {BURN_YEARS} años = {_fmt(burn * BURN_YEARS)} M "
                                            f"≤ liquidez {_fmt(liquid)} M: sin ampliación por regla")},
                         "sources": [{"label": "Flujo de caja libre anual (SEC)", "url": url,
                                      "date": anchors.get("burn_period_end")}]})

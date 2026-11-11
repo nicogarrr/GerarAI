@@ -215,7 +215,7 @@ def test_code_dilution_sbc_and_funding_gap_with_formulas():
                "short_term_investments_millions": 200.0}
     out = {d["label"]: d for d in r.code_dilution(anchors, 4)}
     sbc = out["Remuneración en acciones (SBC) hasta el año valorado"]
-    assert sbc["shares"] == pytest.approx(40 * 4 / 32) and "÷ precio 32.00" in sbc["why"]["shares"]
+    assert sbc["shares"] == pytest.approx(40 * 4 / 32) and "÷ precio 32,00 USD" in sbc["why"]["shares"]
     gap = out["Ampliaciones para cubrir la quema"]
     assert gap["shares"] == pytest.approx((900 * 2 - 1200) / 32)
     rich = {d["label"]: d for d in r.code_dilution({**anchors, "cash_millions": 5000.0}, 4)}
