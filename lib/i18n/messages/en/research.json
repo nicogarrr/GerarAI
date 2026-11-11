@@ -1843,6 +1843,9 @@
   "whatToBelieve": {
     "title": "What you need to believe",
     "subtitle": "What today's price requires from our DCF, with the same inputs.",
+    "verdictAbove": "Our base DCF gives {value} per share: today's price ({price}) is {gap} above it.",
+    "verdictBelow": "Our base DCF gives {value} per share: today's price ({price}) is {gap} below it.",
+    "verdictInLine": "Our base DCF gives {value} per share, in line with today's price ({price}).",
     "loading": "Working out what you need to believe…",
     "unavailable": "Couldn't calculate it right now. Try again in a few minutes.",
     "notApplicable": "Not applicable: {reason}",

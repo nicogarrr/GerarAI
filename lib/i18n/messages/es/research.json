@@ -1843,6 +1843,9 @@
   "whatToBelieve": {
     "title": "Qué hace falta creer",
     "subtitle": "Lo que el precio de hoy exige a nuestro DCF, con sus mismos datos.",
+    "verdictAbove": "Nuestro DCF base da {value} por acción: el precio de hoy ({price}) está un {gap} por encima.",
+    "verdictBelow": "Nuestro DCF base da {value} por acción: el precio de hoy ({price}) está un {gap} por debajo.",
+    "verdictInLine": "Nuestro DCF base da {value} por acción, en línea con el precio de hoy ({price}).",
     "loading": "Calculando qué hace falta creer…",
     "unavailable": "No se pudo calcular ahora. Reintenta en unos minutos.",
     "notApplicable": "No aplica: {reason}",
