@@ -304,7 +304,8 @@ TOTAL_DEBT_CONCEPTS: tuple[str, ...] = tuple(dict.fromkeys(
 # 23 (9-nov-2026): IFRS (20-F/40-F) con activo y pasivo corriente, reservas, fondo de comercio, intangibles y SBC
 #    estándar (CurrentAssets, CurrentLiabilities, RetainedEarnings, Goodwill, IntangibleAssetsOtherThanGoodwill,
 #    AdjustmentsForSharebasedPayments): TSM y CNQ ya tienen Z de Altman y la señal de liquidez del F-score.
-SEC_INGESTION_RULES_VERSION = 23
+# 24: conceptos US GAAP incidentales sin métricas no bloquean estados IFRS.
+SEC_INGESTION_RULES_VERSION = 24
 
 SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # Arrendadores (REIT): su ingreso principal es el del arrendamiento (ASC 842),
@@ -444,7 +445,7 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
 # ``ifrs-full`` y la lectura us-gaap los dejaba con 0 hechos y la tesis
 # «sin datos suficientes» (27/10/2026). Misma estructura que SEC_METRIC_MAP
 # y mismas reglas de admision (ancla de filing, 300-380 dias, fp=FY); solo
-# cambian los conceptos. Se usa unicamente si el filer no trae us-gaap.
+# cambian los conceptos. Se usa si el filer no trae hechos financieros mapeados en us-gaap.
 # Semantica alineada con us-gaap: beneficio y patrimonio ATRIBUIBLES a la
 # dominante (NetIncomeLoss/StockholdersEquity), nunca el total con
 # minoritarios (ProfitLoss/Equity), que en un holding como BN es ~2,5x.
@@ -520,6 +521,21 @@ SEC_IFRS_UNVERIFIED_TOTALS = [("total_equity_total", ["Equity"], "USD")]
 ATTRIBUTABLE_UNVERIFIED = ("atribuible no verificable: el emisor solo etiqueta el total (ProfitLoss/Equity) y "
                            "ninguna señal (minoritarios etiquetados a 0 o línea atribuible a la dominante) "
                            "prueba que no haya minoritarios")
+
+
+def _has_mapped_sec_facts(facts: dict[str, Any]) -> bool:
+    """Una taxonomía US GAAP incidental no equivale a estados financieros.
+
+    Solo decide si conservar US GAAP cuando hay IFRS alternativo. No mezcla
+    taxonomías ni da prioridad a un ticker o a una fecha concreta.
+    """
+    return any(
+        row.get("val") is not None
+        for _metric, concepts, _unit in SEC_METRIC_MAP
+        for concept in concepts
+        for rows in ((facts.get(concept) or {}).get("units") or {}).values()
+        for row in rows
+    )
 
 
 def _ifrs_annual_values(ifrs_facts: dict[str, Any], concept: str) -> dict[tuple[str, str], float]:
@@ -2487,11 +2503,12 @@ class FinancialIngestionService:
         db.info.pop("_fact_bulk_buffer", None)
 
         us_gaap = facts_data.get("facts", {}).get("us-gaap", {})
-        # 40-F/20-F en IFRS (BN): sin us-gaap, la misma lectura va sobre
-        # ifrs-full con su mapa de conceptos; el resto de reglas no cambia.
+        # Un concepto incidental US GAAP (p. ej. SharePrice histórico) no
+        # oculta los estados IFRS. US GAAP con hechos financieros conserva
+        # la prioridad; nunca se mezclan ambas taxonomías.
         metric_map = SEC_METRIC_MAP
         taxonomy = "us-gaap"
-        if not us_gaap and facts_data.get("facts", {}).get("ifrs-full"):
+        if not _has_mapped_sec_facts(us_gaap) and facts_data.get("facts", {}).get("ifrs-full"):
             us_gaap = facts_data["facts"]["ifrs-full"]
             metric_map = sec_ifrs_metric_map_for(us_gaap)
             taxonomy = "ifrs-full"

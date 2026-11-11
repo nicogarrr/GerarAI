@@ -158,3 +158,100 @@ def test_filer_us_gaap_no_cambia_de_taxonomia(db, monkeypatch):
     asyncio.run(FinancialIngestionService().refresh_from_sec(db=db, company=company))
     # Con us-gaap presente no se mezcla ifrs-full.
     assert _annual(db, company, "net_income") == {}
+
+
+def test_residuo_us_gaap_sin_metricas_no_oculta_los_estados_ifrs(db, monkeypatch):
+    """Un SharePrice histórico US GAAP no es una cuenta financiera US GAAP."""
+    class _ResidualUsGaap(_FakeSECBrookfield):
+        async def company_facts(self, cik):
+            return {"cik": 1001085, "facts": {
+                "us-gaap": {"SharePrice": {"units": {"USD/shares": [
+                    {"end": "2020-03-05", "val": 19, "form": "40-F", "filed": "2021-02-26"},
+                ]}}},
+                "ifrs-full": BN_IFRS,
+            }}
+
+    monkeypatch.setattr(ingestion, "SECClient", _ResidualUsGaap)
+    company = Company(
+        ticker="XIFRS", name="Residual taxonomy fixture", exchange="NYSE", currency="USD",
+        company_type="research_candidate", valuation_model="unassigned",
+    )
+    db.add(company)
+    db.commit()
+    asyncio.run(FinancialIngestionService().refresh_from_sec(db=db, company=company))
+    assert _annual(db, company, "revenue")[2025] == 75_100_000_000.0
+    assert _annual(db, company, "net_income")[2025] == 1_307_000_000.0
+    document = db.scalars(select(Document).where(Document.company_id == company.id)).first()
+    assert document.metadata_["xbrl_taxonomy"] == "ifrs-full"
+
+
+@pytest.mark.parametrize("payload,expected", [
+    ({}, False),
+    ({"SharePrice": {"units": {"USD/shares": [{"val": 19}]}}}, False),
+    ({"Revenues": {"units": {"USD": []}}}, False),
+    ({"Revenues": {"units": {"USD": [{"val": None}]}}}, False),
+    ({"Revenues": {"units": {"USD": [{"val": 0}]}}}, True),
+    ({"Assets": {"units": {"CAD": [{"val": 10}]}}}, True),
+])
+def test_taxonomia_financiera_requiere_hechos_mapeados(payload, expected):
+    assert ingestion._has_mapped_sec_facts(payload) is expected
+
+
+def test_gfl_snapshot_publico_con_us_gaap_incidental(db, monkeypatch):
+    import json
+    from pathlib import Path
+
+    bundle = json.loads((Path(__file__).parent / "fixtures/sec_coverage/us_19_20261111.json").read_text())
+    payload = bundle["snapshots"]["GFL"]
+    facts = payload["facts"]["ifrs-full"]
+    anchors = {
+        row["accn"]: row["end"]
+        for tag in facts.values()
+        for rows in tag["units"].values()
+        for row in rows
+        if row.get("start") and row.get("fp") == "FY"
+    }
+
+    class _GFL(_FakeSECBrookfield):
+        async def cik_for_ticker(self, ticker, entity_name=None):
+            return "0001780232"
+
+        async def annual_report_anchors(self, cik):
+            return anchors
+
+        async def index_accessions(self, cik):
+            return set(anchors)
+
+        async def company_facts(self, cik):
+            return payload
+
+    monkeypatch.setattr(ingestion, "SECClient", _GFL)
+    company = Company(ticker="GFL", name="GFL Environmental Inc.", exchange="NYSE", currency="CAD",
+                      company_type="research_candidate", valuation_model="unassigned")
+    db.add(company)
+    db.commit()
+    asyncio.run(FinancialIngestionService().refresh_from_sec(db=db, company=company))
+    expected = next(row["val"] for row in facts["Assets"]["units"]["CAD"] if row["end"] == "2025-12-31")
+    assert _annual(db, company, "total_assets")[2025] == expected
+    asset = db.scalars(select(FinancialFact).where(FinancialFact.company_id == company.id,
+                                                 FinancialFact.metric == "total_assets")).first()
+    assert asset.unit == "CAD"
+    assert asset.source.metadata_["xbrl_taxonomy"] == "ifrs-full"
+
+
+def test_fixture_19_identidades_y_eje_ifrs_bn():
+    import json
+    from pathlib import Path
+
+    bundle = json.loads((Path(__file__).parent / "fixtures/sec_coverage/us_19_20261111.json").read_text())
+    assert len(bundle["identities"]) == 19
+    assert bundle["snapshots"]["BN"]["cik"] == 1001085
+    assert "ifrs-full" in bundle["snapshots"]["BN"]["facts"]
+    for row in bundle["identities"]:
+        payload = bundle["snapshots"][row["ticker"]]
+        assert int(payload["cik"]) == row["cik"]
+        us = payload["facts"].get("us-gaap", {})
+        if row["ticker"] == "GFL":
+            assert us and not ingestion._has_mapped_sec_facts(us)
+        elif us:
+            assert ingestion._has_mapped_sec_facts(us)
