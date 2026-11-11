@@ -18,7 +18,6 @@
     "postmarket": "postmercado",
     "noTime": "sin hora",
     "updatedAt": "Actualizado a las {time} (hora de Madrid)",
-    "noData": "Sin datos todavía",
     "lastFailed": " · la última actualización falló; se reintenta cada minuto",
     "refresh": "Actualizar ahora",
     "groupEmpty": "No hay datos disponibles ahora. Se reintenta cada minuto.",
