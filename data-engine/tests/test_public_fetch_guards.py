@@ -56,8 +56,8 @@ def test_parse_public_url_rechaza_esquema_credenciales_y_puerto_invalido():
         _parse_public_url("https://example.com:99999/x")
     _, host, port = _parse_public_url("https://example.com/x")
     assert (host, port) == ("example.com", 443)
-    _, host, port = _parse_public_url("http://example.com:8080/x")
-    assert (host, port) == ("example.com", 8080)
+    with pytest.raises(ValueError, match="standard port"):
+        _parse_public_url("http://example.com:8080/x")
 
 
 # -- _validated_addresses -----------------------------------------------------
@@ -80,12 +80,12 @@ def test_validated_addresses_dedup_y_orden():
 # -- _build_target ------------------------------------------------------------
 
 
-def test_build_target_puerto_no_estandar_y_sni():
-    parsed, host, port = _parse_public_url("http://example.com:8080/doc.pdf")
+def test_build_target_puerto_estandar_y_sni():
+    parsed, host, port = _parse_public_url("http://example.com:80/doc.pdf")
     target = _build_target(parsed, host, port, _addrinfo("93.184.216.34"))
     assert target.address == "93.184.216.34"
-    assert target.request_url == "http://93.184.216.34:8080/doc.pdf"
-    assert target.host_header == "example.com:8080"
+    assert target.request_url == "http://93.184.216.34/doc.pdf"
+    assert target.host_header == "example.com"
     assert target.sni_hostname == "example.com"
 
 
