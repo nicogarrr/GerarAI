@@ -147,8 +147,10 @@ def test_watchlist_metrics_endpoint_reports_derived_cap_and_per(db):
 
     company = _company(db)
     _price(db, company, Decimal("25.70"), TODAY - _td(days=1))
-    _fact(db, company, "net_income", 1_934_000_000, year=2024)
-    _fact(db, company, "eps_diluted", Decimal("12.89"), year=2024)
+    # Ejercicio relativo a hoy (antes FY2024 fijo): un ejercicio de más de 18 meses ya da PER N/D
+    # (regla «per-antiguedad-v1», tests/test_r5_datos_per_antiguedad.py).
+    _fact(db, company, "net_income", 1_934_000_000, year=TODAY.year - 1)
+    _fact(db, company, "eps_diluted", Decimal("12.89"), year=TODAY.year - 1)
     db.commit()
     refresh_derived_market_cap(db, company, today=TODAY)
 

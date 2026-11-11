@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+from app.api.routes import watchlist as watchlist_route
 from app.api.routes.watchlist import watchlist_metrics
 from app.models.entities import Base, Company, Document, FinancialFact, MarketPrice, Tenant
 from app.services.derived_market_cap_service import _shares_outstanding
@@ -127,7 +128,10 @@ def seed(db, lei=EBRO_LEI):
 
 
 @pytest.mark.parametrize("lei,eps,year", [(EBRO_LEI, "1.351", 2024), (LOG_LEI, "2.13", 2025)])
-def test_watchlist_pdf_provenance_correct_fy_and_raw_unchanged(db, lei, eps, year):
+def test_watchlist_pdf_provenance_correct_fy_and_raw_unchanged(db, lei, eps, year, monkeypatch):
+    # «Hoy» fijo: la tabla revisada fija FY2024 (EBRO) y la regla «per-antiguedad-v1» da N/D a un ejercicio
+    # de más de 18 meses; el 31-mar-2026 ambos ejercicios revisados son el último publicado.
+    monkeypatch.setattr(watchlist_route, "_today", lambda: date(2026, 3, 31))
     company, raw, rows = seed(db, lei)
     original = (raw.value, raw.period, raw.fiscal_year, raw.source_id, raw.is_reported)
     result = watchlist_metrics(company.ticker, db)
