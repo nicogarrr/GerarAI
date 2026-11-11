@@ -62,7 +62,7 @@ describe('shared valuation', () => {
     render(<ValuationSummaryCard item={item} quote={quote} />);
     expect(screen.getByText('No evaluable (1/9 puntos con datos)')).toBeInTheDocument();
     expect(screen.getByText((text) => /^20[,.]0?0?\s*%$/.test(text))).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Beneficio neto: 10 USD/ })).toHaveAttribute('href', 'https://www.sec.gov/test');
+    expect(screen.getByRole('link', { name: /Beneficio neto: 10\s?US\$/ })).toHaveAttribute('href', 'https://www.sec.gov/test');
     expect(screen.getByText(/precio del modelo/)).toBeInTheDocument();
   });
   it('renders unavailable values and full scores without false certainty', () => {

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { getValuationSummaries } from '@/lib/actions/valuation-summary.actions';
 import { baseRateReach, baseRateText, healthMissingLabel, piotroskiSignalText, safetyMargin, valuationSummaryText, type HealthEvidence, type ValuationSummary } from '@/lib/research/valuation-summary';
-import { isValidCurrencyCode } from '@/lib/format';
+import { isValidCurrencyCode, type Formatters } from '@/lib/format';
 import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 import { intlLocale } from '@/lib/i18n/locale';
 import { metricLabel } from '@/lib/research/metric-labels';
@@ -12,13 +12,28 @@ import { readableMissingReason } from '@/lib/research/missing-reason';
 
 export type SummaryQuote = { symbol: string; price: number | null; currency: string | null };
 
+/**
+ * Cifra de una evidencia en la escala que lee una persona: importes compactos
+ * con su divisa («391,04 mil M US$», antes «391.035.000.000 USD»), por acción
+ * con dos decimales, acciones compactas. Una unidad desconocida va tal cual.
+ */
+export function evidenceValue(value: number, unit: string, fmt: Pick<Formatters, 'formatMoneyCompact' | 'formatMoney' | 'formatCompact' | 'formatNumber'>): string {
+  const perShare = /^([A-Za-z]{3})\/share$/.exec(unit);
+  if (perShare && isValidCurrencyCode(perShare[1])) return fmt.formatMoney(value, perShare[1].toUpperCase(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (isValidCurrencyCode(unit)) return fmt.formatMoneyCompact(value, unit);
+  if (unit === 'shares') return fmt.formatCompact(value);
+  return `${fmt.formatNumber(value, { maximumFractionDigits: 4 })}${unit && unit !== 'pure' && unit !== 'decimal' ? ` ${unit}` : ''}`;
+}
+
 function Evidence({ evidence }: { evidence: HealthEvidence[] }) {
   const t = useT();
   const locale = useLocale();
-  const { formatMarketDate } = useFormat();
-  return <ul className="mt-1 space-y-1 text-xs text-gray-400">{evidence.map(f => <li key={f.fact_id}>
-    {f.source_url.startsWith('https://') ? <a className="underline" href={f.source_url} target="_blank" rel="noopener noreferrer">{metricLabel(f.metric)}: {f.value.toLocaleString(intlLocale(locale))} {f.unit}</a> : metricLabel(f.metric)}
-    {' · '}{formatMarketDate(f.period_end)}{' · '}{f.source_type}{' · '}{t('researchShared.valuationSummary.fact', { id: f.fact_id })}
+  const format = useFormat();
+  const { formatMarketDate } = format;
+  // El id interno del hecho queda en el «title» (diagnóstico), no en el texto.
+  return <ul className="mt-1 space-y-1 text-xs text-gray-400">{evidence.map(f => <li key={f.fact_id} title={t('researchShared.valuationSummary.fact', { id: f.fact_id })}>
+    {f.source_url.startsWith('https://') ? <a className="underline" href={f.source_url} target="_blank" rel="noopener noreferrer">{metricLabel(f.metric, locale)}: {evidenceValue(f.value, f.unit, format)}</a> : `${metricLabel(f.metric, locale)}: ${evidenceValue(f.value, f.unit, format)}`}
+    {' · '}{formatMarketDate(f.period_end)}{' · '}{f.source_type}
   </li>)}</ul>;
 }
 
@@ -67,6 +82,13 @@ export function ValuationSummaryCard({ item, quote }: { item: ValuationSummary; 
   </article>;
 }
 
+/** Tarjetas en el orden de la lista de arriba (watchlist/cartera), no en el del backend. */
+export function orderedSummaries(items: Record<string, ValuationSummary>, quotes: SummaryQuote[]): ValuationSummary[] {
+  const rank = new Map<string, number>();
+  quotes.forEach((q, i) => { const k = q.symbol.toUpperCase(); if (!rank.has(k)) rank.set(k, i); });
+  return Object.values(items).sort((a, b) => (rank.get(a.ticker.toUpperCase()) ?? Infinity) - (rank.get(b.ticker.toUpperCase()) ?? Infinity));
+}
+
 /** Same compact reading in portfolio, watchlist and discovery. One batch, no new model. */
 export default function ValuationSummaryGrid({ quotes }: { quotes: SummaryQuote[] }) {
   const t = useT();
@@ -86,6 +108,6 @@ export default function ValuationSummaryGrid({ quotes }: { quotes: SummaryQuote[
     {/* La formula del margen se explica una vez por seccion: antes iba en cada
         tarjeta y se repetia tantas veces como empresas (6+ en cartera). */}
     <p className="text-xs text-gray-500">{t('researchShared.valuationSummary.marginHelp')}</p>
-    {!current ? <p role="status" className="text-sm text-gray-400">{t('researchShared.valuationSummary.loading')}</p> : current.failed ? <p className="text-sm text-gray-400">{t('researchShared.valuationSummary.failed')}</p> : <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">{Object.values(current.items).map(item => <ValuationSummaryCard key={item.ticker} item={item} quote={quotes.find(q => q.symbol.toUpperCase() === item.ticker) ?? { symbol: item.ticker, price: null, currency: null }} />)}{Object.keys(current.items).length === 0 ? <p className="text-sm text-gray-400">{t('researchShared.valuationSummary.empty')}</p> : null}</div>}
+    {!current ? <p role="status" className="text-sm text-gray-400">{t('researchShared.valuationSummary.loading')}</p> : current.failed ? <p className="text-sm text-gray-400">{t('researchShared.valuationSummary.failed')}</p> : <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">{orderedSummaries(current.items, quotes).map(item => <ValuationSummaryCard key={item.ticker} item={item} quote={quotes.find(q => q.symbol.toUpperCase() === item.ticker) ?? { symbol: item.ticker, price: null, currency: null }} />)}{Object.keys(current.items).length === 0 ? <p className="text-sm text-gray-400">{t('researchShared.valuationSummary.empty')}</p> : null}</div>}
   </section>;
 }
