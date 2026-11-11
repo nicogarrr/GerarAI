@@ -107,15 +107,9 @@ def raw_document_url(document_url: str) -> str:
     que es HTML y revienta el parser XML. El documento crudo vive en el
     directorio del filing con el mismo nombre de archivo. Si la URL no es una
     variante renderizada, se devuelve tal cual.
+    Cuerpo compartido en ``edgar_common.raw_document_url``.
     """
-    from urllib.parse import urlparse, urlunparse
-
-    parsed = urlparse(document_url)
-    match = _RENDERED_XSL_RE.search(parsed.path)
-    if not match:
-        return document_url
-    raw_path = parsed.path[: match.start()] + "/" + parsed.path[match.end() :]
-    return urlunparse(parsed._replace(path=raw_path))
+    return edgar_common.raw_document_url(document_url, _RENDERED_XSL_RE)
 
 
 def _is_13dg_xml(text: str) -> bool:
