@@ -26,9 +26,9 @@ describe('/inicio sin esperar a los tickers de la cartera', () => {
 
   it('las noticias siguen pidiéndose con los tickers de la cartera (o generales sin cartera)', async () => {
     const { PortfolioNews } = await import('@/app/(root)/inicio/PortfolioNews');
-    tickerContext.mockResolvedValueOnce({ portfolioTickers: ['KO', 'MSFT'], watchlistTickers: [] });
+    tickerContext.mockResolvedValueOnce({ portfolioTickers: ['KO', 'MSFT'], watchlistTickers: [], availability: { portfolio: true, watchlist: true } });
     expect(((await PortfolioNews()) as { props: { symbols?: string[] } }).props.symbols).toEqual(['KO', 'MSFT']);
-    tickerContext.mockResolvedValueOnce({ portfolioTickers: [], watchlistTickers: ['AAPL'] });
+    tickerContext.mockResolvedValueOnce({ portfolioTickers: [], watchlistTickers: ['AAPL'], availability: { portfolio: true, watchlist: true } });
     expect(((await PortfolioNews()) as { props: { symbols?: string[] } }).props.symbols).toBeUndefined();
     tickerContext.mockRejectedValueOnce(new Error('backend caído'));
     expect(((await PortfolioNews()) as { props: { symbols?: string[] } }).props.symbols).toBeUndefined();
