@@ -1,0 +1,155 @@
+[
+  {
+    "ticker": "ERF.PA",
+    "name": "Eurofins Scientific SE",
+    "isin": "FR0014000MR3",
+    "mic": "XPAR",
+    "quote_unit": "EUR",
+    "evidence": {
+      "ticker": {
+        "url": "https://live.euronext.com/en/product/equities/FR0014000MR3-XPAR",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "Embedded instrument: symbol ERF, ISIN FR0014000MR3, mic XPAR; .PA is the application/provider suffix, not exchange symbol."
+      },
+      "name": {
+        "url": "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=Eurofins+Scientific+SE&page%5Bsize%5D=10",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "EUROFINS SCIENTIFIC SE; LEI 529900JEHFM47DYY3S57; legal jurisdiction LU, not FR."
+      },
+      "isin": {
+        "url": "https://live.euronext.com/en/product/equities/FR0014000MR3-XPAR",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "Embedded instrument isin FR0014000MR3."
+      },
+      "mic": {
+        "url": "https://live.euronext.com/en/product/equities/FR0014000MR3-XPAR",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "Embedded instrument mic XPAR."
+      },
+      "quote_unit": {
+        "url": "https://cdnmedia.eurofins.com/corporate-eurofins/media/dacc22xe/eurofins-first-half-year-2024-report.pdf",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "Issuer H1 2024 report: Euronext Paris shares and share price in euros. Historical primary evidence, not a current quote; pilot must recheck provider unit before ingestion."
+      }
+    }
+  },
+  {
+    "ticker": "WOSG.L",
+    "name": "Watches of Switzerland Group PLC",
+    "isin": "GB00BJDQQ870",
+    "mic": "XLON",
+    "quote_unit": "GBX",
+    "evidence": {
+      "ticker": {
+        "url": "https://www.londonstockexchange.com/en/quote/equity/WOSG/watches-of-switzerland-group-plc",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "Exchange instrument identifies WOSG, Watches of Switzerland Group PLC; .L is the provider suffix."
+      },
+      "name": {
+        "url": "https://api.gleif.org/api/v1/lei-records?filter%5Bisin%5D=GB00BJDQQ870",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "GLEIF ISIN query returns WATCHES OF SWITZERLAND GROUP PLC, LEI 2138008ZOT5K9PJW7168."
+      },
+      "isin": {
+        "url": "https://api.gleif.org/api/v1/lei-records?filter%5Bisin%5D=GB00BJDQQ870",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "GLEIF ISIN relationship GB00BJDQQ870 -> 2138008ZOT5K9PJW7168."
+      },
+      "mic": {
+        "url": "https://www.londonstockexchange.com/en/markets-products/asset-classes/shares/off-book-trade-reporting",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "XLON: Executed on London Stock Exchange UK regulated market."
+      },
+      "quote_unit": {
+        "url": "https://www.thewosgroupplc.com/investors/share-price-information/",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "Issuer IR lists LSE price as 751.00 p, timestamp 10 November 2026. Pence are GBX, not major GBP."
+      }
+    }
+  },
+  {
+    "ticker": "MICC.AS",
+    "name": "The Magnum Ice Cream Company N.V.",
+    "isin": "NL0015002MS2",
+    "mic": "XAMS",
+    "quote_unit": "EUR",
+    "evidence": {
+      "ticker": {
+        "url": "https://live.euronext.com/en/product/equities/NL0015002MS2-XAMS",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "Embedded instrument symbol MICC, isin NL0015002MS2, mic XAMS; .AS is the provider suffix."
+      },
+      "name": {
+        "url": "https://api.gleif.org/api/v1/lei-records?filter%5Bisin%5D=NL0015002MS2",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "GLEIF links ISIN NL0015002MS2 to THE MAGNUM ICE CREAM COMPANY N.V., LEI 25490052LLF3XH6G9847."
+      },
+      "isin": {
+        "url": "https://live.euronext.com/en/product/equities/NL0015002MS2-XAMS",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "Embedded instrument isin NL0015002MS2."
+      },
+      "mic": {
+        "url": "https://live.euronext.com/en/product/equities/NL0015002MS2-XAMS",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "Embedded instrument mic XAMS."
+      },
+      "quote_unit": {
+        "url": "https://unlv-p-001-delivery.sitecorecontenthub.cloud/api/public/content/orig%2FSINGKNgeSuu1JfgjfhtuvA?v=1695fc27",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "Issuer prospectus: shares trade in euro on Euronext Amsterdam and Pounds Sterling on London Main Market. Amsterdam line only."
+      }
+    }
+  },
+  {
+    "ticker": "GCC.MX",
+    "name": "GCC, S.A.B. de C.V.",
+    "isin": null,
+    "mic": "XMEX",
+    "quote_unit": "MXN",
+    "evidence": {
+      "ticker": {
+        "url": "https://www.bmv.com.mx/en/Grupo_BMV/PerfilEmpresa/GCC-5394",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "BMV issuer GCC, series *, shares; .MX is the provider suffix."
+      },
+      "name": {
+        "url": "https://www.bmv.com.mx/en/Grupo_BMV/PerfilEmpresa/GCC-5394",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "GCC, S.A.B. DE C.V."
+      },
+      "mic": {
+        "url": "https://www.bmv.com.mx/docs-pub/INDICES/CTEN_INCM/SP%20BMV%20Agosto%202024%20Indices%20Anuncio%20Elektra.pdf",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "BMV-hosted index notice identifies BMV venue as MIC XMEX; venue mapping, not GCC security identity."
+      },
+      "quote_unit": {
+        "url": "https://cdn.investorcloud.net/gcc/InformacionFinanciera/InformacionAnual/GCC-Reporte-anual-2025-en.pdf",
+        "kind": "primary",
+        "checked_at": "2026-11-11",
+        "quote": "Issuer annual report: GCC BMV share trading prices in nominal Mexican pesos. Financial statements separately in thousands of USD."
+      }
+    },
+    "unresolved": [
+      "Full ISIN MX01GC2M0006 found only in secondary sources. Primary BIVA annual PDF truncates to MX01GC2M0. GLEIF ISIN query has no records. Do not promote a checksum-valid candidate to primary-verified identity."
+    ]
+  }
+]
