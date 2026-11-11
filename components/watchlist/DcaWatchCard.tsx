@@ -1,7 +1,8 @@
 import type { DcaWatchCardData } from '@/lib/dca/types';
 import { dcaEngineText } from '@/lib/dca/engine-text';
 import { readableInk } from '@/lib/dca/readable-ink';
-import { createFormatters, isValidCurrencyCode } from '@/lib/format';
+import { createFormatters } from '@/lib/format';
+import { dcaPrice } from '@/lib/dca/format';
 import type { Locale } from '@/lib/i18n/locale';
 import type { TranslateFn } from '@/lib/i18n/translate';
 
@@ -60,12 +61,8 @@ export default function DcaWatchCard({ data, ti, locale }: { data: DcaWatchCardD
     if (!data.available || !data.current) return <p className="text-xs text-gray-400" role="status">{ti('watchlist.dcaCard.notEnough')}</p>;
     const f = createFormatters(locale);
     const pct = (v: number | null | undefined, sign = false) => (v === null || v === undefined ? '—' : f.formatPercent(v, { fromRatio: true, digits: 1, signDisplay: sign ? 'always' : 'auto' }));
-    // Divisa ISO (o peniques) → importe con el formato de la app («413,96 US$», como la cabecera del Informe);
-    // si no, la etiqueta del backend tal cual. Antes «413,96 USD» junto a «375,44 US$» en la misma página.
-    const money = isValidCurrencyCode(data.currency) ? data.currency : null;
-    const price = (v: number | null | undefined) => (v === null || v === undefined ? '—' : money
-        ? f.formatMoney(v, money, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : `${f.formatNumber(v, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${data.currency_label ? ` ${data.currency_label}` : ''}`);
+    // Mismo formato de importe que el resto de la app («413,96 US$»), con el helper compartido de lib/dca/format.
+    const price = (v: number | null | undefined) => dcaPrice(v, data, locale) ?? '—';
     const cur = data.current;
     const change = data.last_change;
     const why = data.why;

@@ -3,6 +3,8 @@ import type { DcaRun, DcaSignalItem, DcaSignalState } from '@/lib/dca/types';
 import { intlLocale, type Locale } from '../i18n/locale.ts';
 // @ts-expect-error TS5097: idem
 import { t as esT, type TranslationKey, type TranslationVars } from '../i18n/t.ts';
+// @ts-expect-error TS5097: idem
+import { currencySymbolEs, formatMoney, isValidCurrencyCode } from '../format.ts';
 
 /** Traductor del idioma elegido; por defecto el español de referencia. */
 export type DcaT = (key: TranslationKey, vars?: TranslationVars) => string;
@@ -37,10 +39,35 @@ export function dcaPercent(value: number | string | null | undefined, locale: Lo
     return typeof value === 'number' && Number.isFinite(value) ? PERCENT(locale).format(value) : null;
 }
 
-export function dcaPrice(value: number | null | undefined, currencyLabel: string | null, locale: Locale = 'es'): string | null {
+/** Divisa de una respuesta DCA: el código (`currency`) y la etiqueta del backend (`currency_label`). */
+export type DcaCurrency = { currency?: string | null; currency_label?: string | null };
+
+function dcaMoneyCode(unit: DcaCurrency | string | null | undefined): string | null {
+    if (!unit || typeof unit === 'string') return null;
+    return isValidCurrencyCode(unit.currency) ? unit.currency.trim() : null;
+}
+
+/**
+ * Precio DCA. Con la divisa de la respuesta (objeto con `currency`) sale con el
+ * formato de importe de toda la app: «413,96 US$», «118,25 p», «12,40 €»; antes
+ * las vistas DCA pintaban el código del backend («413,96 USD») junto a «US$»
+ * en la misma pantalla. Sin código válido, la etiqueta del backend tal cual
+ * (nunca una divisa prestada). Un texto suelto sigue siendo una etiqueta.
+ */
+export function dcaPrice(value: number | null | undefined, unit: DcaCurrency | string | null | undefined, locale: Locale = 'es'): string | null {
     if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+    const code = dcaMoneyCode(unit);
+    if (code) return formatMoney(value, code, { minimumFractionDigits: 2, maximumFractionDigits: 2 }, undefined, locale);
+    const label = typeof unit === 'string' ? unit : unit?.currency_label ?? null;
     const number = NUMBER(locale).format(value);
-    return currencyLabel ? `${number} ${currencyLabel}` : number;
+    return label ? `${number} ${label}` : number;
+}
+
+/** Unidad para «Precios en …»: el símbolo de la app («US$», «€», «p») o la etiqueta del backend. */
+export function dcaCurrencyUnit(unit: DcaCurrency | null | undefined, locale: Locale = 'es'): string {
+    const code = dcaMoneyCode(unit);
+    if (code) return currencySymbolEs(code, locale);
+    return unit?.currency_label ?? unit?.currency ?? '';
 }
 
 export function dcaRsi(value: number | string | null | undefined, locale: Locale = 'es'): string | null {

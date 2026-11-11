@@ -30,7 +30,7 @@ describe('Backtest DCA en inglés', () => {
         expect(screen.getByLabelText('Base contribution')).toBeTruthy();
         fireEvent.submit(screen.getByRole('button', { name: /^Run$/ }).closest('form')!);
         await waitFor(() => expect(screen.getByText('Money contributed')).toBeTruthy());
-        expect(screen.getAllByText('12,000.00 USD').length).toBe(3);
+        expect(screen.getAllByText('$12,000.00').length).toBe(3);
         expect(screen.getByText('Annual IRR')).toBeTruthy();
         expect(document.body.textContent).toContain('UBER · signals 2016-01 – 2026-09 (129 months) · valued at the close of 2026-09');
         expect(document.body.textContent).toContain('IRR +1.20 pp vs flat; with the same total money it buys +3.4% shares.');

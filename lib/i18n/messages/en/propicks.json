@@ -362,7 +362,7 @@
     "qualityClear": "Clear quality",
     "change": "Change {from}X → {to}X",
     "changeSince": "Change {from}X → {to}X since {date}",
-    "close": "Close {price} {currency}",
+    "close": "Close {price}",
     "signal": "signal {date}",
     "cutFallback": "PULLBACK",
     "unavailable": "The DCA radar is unavailable right now, so it hasn't generated any opportunities.",

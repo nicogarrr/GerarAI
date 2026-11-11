@@ -362,7 +362,7 @@
     "qualityClear": "Calidad clara",
     "change": "Cambio {from}X → {to}X",
     "changeSince": "Cambio {from}X → {to}X desde {date}",
-    "close": "Cierre {price} {currency}",
+    "close": "Cierre {price}",
     "signal": "señal {date}",
     "cutFallback": "RECORTE",
     "unavailable": "Radar DCA no disponible ahora mismo; no se han generado oportunidades.",

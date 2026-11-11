@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { useT } from '@/lib/i18n/client';
+import { useLocale, useT } from '@/lib/i18n/client';
+import { dcaPrice } from '@/lib/dca/format';
 import { dcaEngineText } from '@/lib/dca/engine-text';
 import {
     getRadarDcaOpportunities,
@@ -85,6 +86,7 @@ function StatusLine({ item }: { item: RadarDcaOpportunity }) {
 
 function OpportunityCard({ item }: { item: RadarDcaOpportunity }) {
     const t = useT();
+    const locale = useLocale();
     return (
         <li>
             <Card className="space-y-2 rounded-lg border border-gray-700 bg-gray-800/50 p-4">
@@ -100,7 +102,7 @@ function OpportunityCard({ item }: { item: RadarDcaOpportunity }) {
                 <div className="text-sm text-gray-300">
                     {item.close != null && (
                         <span>
-                            {t('propicks.radarDca.close', { price: item.close, currency: item.currency ?? '' })}
+                            {t('propicks.radarDca.close', { price: dcaPrice(item.close, { currency: item.currency }, locale) ?? '—' })}
                             {item.price_date ? ` · ${item.price_date}` : ''}
                         </span>
                     )}

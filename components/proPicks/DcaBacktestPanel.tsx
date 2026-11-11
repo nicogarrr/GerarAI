@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import DcaHitRatesCard from '@/components/watchlist/DcaHitRatesCard';
 import { getDcaBacktest } from '@/lib/actions/dca-signals.actions';
 import { dcaReasonText } from '@/lib/dca/reason-text';
+import { dcaCurrencyUnit, dcaPrice } from '@/lib/dca/format';
 import { formatMarketDate, parseLocalizedNumberDetailed } from '@/lib/format';
 import type { DcaBacktest, DcaBacktestPlan } from '@/lib/dca/types';
 import type { Locale } from '@/lib/i18n/locale';
@@ -45,9 +46,7 @@ function panelFormats(locale: Locale) {
               }).format(v);
     const pp = (v: number | null | undefined) =>
         v === null || v === undefined ? '—' : `${v >= 0 ? '+' : ''}${num.format(v * 100)} pp`;
-    const money = (v: number | null | undefined, unit: string): string =>
-        v === null || v === undefined ? '—' : `${num.format(v)} ${unit}`;
-    return { pct, pp, money };
+    return { pct, pp };
 }
 
 function Row({ label, plans, render }: { label: string; plans: DcaBacktestPlan[]; render: (p: DcaBacktestPlan) => string }) {
@@ -83,7 +82,7 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
     const [pending, startTransition] = useTransition();
     const t = useT();
     const locale = useLocale();
-    const { pct, pp, money } = panelFormats(locale);
+    const { pct, pp } = panelFormats(locale);
 
     const run = (event: React.FormEvent) => {
         event.preventDefault();
@@ -123,7 +122,9 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
         });
     };
 
-    const unit = result?.currency_label ?? result?.currency ?? '';
+    // Importes con el formato de la app («12.000,00 US$»), el mismo helper que las vistas DCA de la watchlist.
+    const unit = dcaCurrencyUnit(result);
+    const money = (v: number | null | undefined): string => dcaPrice(v, result, locale) ?? '—';
     const plans = result?.plans ?? [];
     const levels = plans.find((p) => p.key === 'levels');
     const fixed = plans.find((p) => p.key === 'fixed_budget');
@@ -206,13 +207,13 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
                                 </tr>
                             </thead>
                             <tbody>
-                                <Row label={t('propicks.dcaBacktest.invested')} plans={plans} render={(p) => money(p.invested, unit)} />
-                                <Row label={t('propicks.dcaBacktest.finalValue')} plans={plans} render={(p) => money(p.final_value, unit)} />
+                                <Row label={t('propicks.dcaBacktest.invested')} plans={plans} render={(p) => money(p.invested)} />
+                                <Row label={t('propicks.dcaBacktest.finalValue')} plans={plans} render={(p) => money(p.final_value)} />
                                 <Row label={t('propicks.dcaBacktest.irr')} plans={plans} render={(p) => pct(p.irr)} />
-                                <Row label={t('propicks.dcaBacktest.avgCost')} plans={plans} render={(p) => money(p.avg_cost, unit)} />
+                                <Row label={t('propicks.dcaBacktest.avgCost')} plans={plans} render={(p) => money(p.avg_cost)} />
                                 <Row label={t('propicks.dcaBacktest.maxDrawdown')} plans={plans} render={(p) => pct(p.max_drawdown)} />
                                 <Row label={t('propicks.dcaBacktest.worstUnrealized')} plans={plans} render={(p) => pct(p.worst_unrealized)} />
-                                <Row label={t('propicks.dcaBacktest.cashLeft')} plans={plans} render={(p) => (p.cash_left ? money(p.cash_left, unit) : '—')} />
+                                <Row label={t('propicks.dcaBacktest.cashLeft')} plans={plans} render={(p) => (p.cash_left ? money(p.cash_left) : '—')} />
                             </tbody>
                         </table>
                     </div>
