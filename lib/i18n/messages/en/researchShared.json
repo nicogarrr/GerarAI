@@ -31,7 +31,8 @@
     },
     "reachEq": "Reached by {pct} of comparable companies over {years} years (SEC base rate, first published figures)",
     "reachLt": "Reached by under {pct} of comparable companies over {years} years (SEC base rate, first published figures)",
-    "reachGt": "Reached by over {pct} of comparable companies over {years} years (SEC base rate, first published figures)"
+    "reachGt": "Reached by over {pct} of comparable companies over {years} years (SEC base rate, first published figures)",
+    "reachNone": "Base rate N/A: {reason}."
   },
   "translate": {
     "reason": {

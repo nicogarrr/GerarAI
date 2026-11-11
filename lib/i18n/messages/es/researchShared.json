@@ -31,7 +31,8 @@
     },
     "reachEq": "Lo logró el {pct} de empresas comparables en {years} años (tasa base SEC, primera cifra publicada)",
     "reachLt": "Lo logró menos del {pct} de empresas comparables en {years} años (tasa base SEC, primera cifra publicada)",
-    "reachGt": "Lo logró más del {pct} de empresas comparables en {years} años (tasa base SEC, primera cifra publicada)"
+    "reachGt": "Lo logró más del {pct} de empresas comparables en {years} años (tasa base SEC, primera cifra publicada)",
+    "reachNone": "Tasa base N/D: {reason}."
   },
   "translate": {
     "reason": {

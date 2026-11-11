@@ -10,6 +10,15 @@ export function baseRateReach(check: BaseRateCheck | null | undefined): { key: '
   const key = check.bound === '<' ? 'reachLt' : check.bound === '>' ? 'reachGt' : 'reachEq';
   return { key, share: check.share };
 }
+/** Motivo del N/D de la tasa base del DCF inverso (valuation_summary._reverse_base_rate_check), o null si hay cifra o no hay motivo. */
+export function reverseBaseRateMissing(check: BaseRateCheck | null | undefined, locale: 'es' | 'en' = 'es'): string | null {
+  if (!check || baseRateReach(check) || typeof check.reason !== 'string' || !check.reason.trim()) return null;
+  const reason = check.reason.trim();
+  if (locale !== 'en') return reason;
+  const horizon = /^la tasa base mide plazos de (.+) años y el DCF inverso usa (\d+): no se compara un plazo distinto$/.exec(reason);
+  if (horizon) return `the base rate measures horizons of ${horizon[1].replace(/ y /g, ' and ')} years and the reverse DCF uses ${horizon[2]}: a different horizon is not compared`;
+  return valuationSummaryText(reason, locale);
+}
 export type HealthEvidence = { fact_id: number; metric: string; value: number; unit: string; period_end: string; source_url: string; source_type: string };
 export type FinancialHealth = {
   status: string; reason?: string; period_end?: string; notice: string;
