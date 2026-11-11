@@ -21,6 +21,7 @@ import WatchlistBuyAction from '@/components/watchlist/WatchlistBuyAction';
 import WatchlistAddButton from '@/components/watchlist/WatchlistAddButton';
 import DcaLevelBadge from '@/components/watchlist/DcaLevelBadge';
 import { sortWatchlistRows } from '@/lib/watchlist/sort-rows';
+import { peNdNote } from '@/lib/watchlist/pe-nd-reason';
 import { emptyWatchlistEntry } from '@/lib/watchlist/entry-fallback';
 import DcaSignalsPanel from '@/components/watchlist/DcaSignalsPanel';
 import { getDcaSignals } from '@/lib/actions/dca-signals.actions';
@@ -351,6 +352,14 @@ export default async function WatchlistPage({
         );
     };
 
+    // Motivo del PER «N/D» (lib/watchlist/pe-nd-reason): lectura cortada,
+    // motivo del backend («en pérdidas», divisas mezcladas…) o mercado sin
+    // cobertura. Visible bajo el N/D: en el iPhone un title no se ve.
+    const peNdNoteEl = (stock: WatchlistStock) => {
+        const note = peNdNote(stock);
+        return note ? <span className="mt-1 block font-sans text-[11px] text-gray-500" data-testid="pe-nd-reason">{t(note.key, note.params)}</span> : null;
+    };
+
     // Sin orden por métrica el cierre llega después: cada fila va en su propio
     // <Suspense> (fallback = fila sin cierre datado).
     const dated = (stock: WatchlistStock, render: (stock: WatchlistStock) => ReactNode): ReactNode =>
@@ -493,7 +502,7 @@ export default async function WatchlistPage({
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">{stock.peKind === 'fy' ? t('watchlist.page.peFy') : t('watchlist.page.peTtm')}</dt>
-                                        <dd className="font-mono text-sm text-gray-300" title={stock.peSource ?? (stock.peRatio === null && stock.metricsNotApplicable ? t('watchlist.page.noMetricsTitle') : undefined)}>{formatPeRatio(stock.peRatio)}{stock.peRatio === null ? (stock.timedOut ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{t('watchlist.page.readTimedOut')}</span> : stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{t('watchlist.page.peNotCovered')}</span> : null) : null}</dd>
+                                        <dd className="font-mono text-sm text-gray-300" title={stock.peSource ?? (stock.peRatio === null && stock.metricsNotApplicable ? t('watchlist.page.noMetricsTitle') : undefined)}>{formatPeRatio(stock.peRatio)}{peNdNoteEl(stock)}</dd>
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500" title={t('watchlist.page.analystTitle')}>{t('watchlist.page.analystTarget')}</dt>
@@ -616,10 +625,12 @@ export default async function WatchlistPage({
                                                 // una app de «datos, no recomendaciones». Color
                                                 // neutro, como en la vista de tarjetas.
                                                 <Badge variant="outline" className="border-gray-700 font-mono text-gray-300" title={stock.peSource ?? undefined}>
-                                                    {formatPeRatio(stock.peRatio)}{stock.peRatio !== null && stock.peKind === 'fy' ? <span className="ml-1 font-sans text-[11px] text-gray-500">· FY</span> : null}{stock.peRatio === null ? (stock.timedOut ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{t('watchlist.page.readTimedOut')}</span> : stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{t('watchlist.page.peNotCovered')}</span> : null) : null}
+                                                    {formatPeRatio(stock.peRatio)}{stock.peKind === 'fy' ? <span className="ml-1 font-sans text-[11px] text-gray-500">· FY</span> : null}
                                                 </Badge>
                                             ) : (
-                                                <span className="text-gray-500">{NA}</span>
+                                                // N/D con su motivo también en la tabla (antes «N/D» pelado:
+                                                // el motivo del backend solo vivía en la tarjeta móvil… y ni allí).
+                                                <span className="text-gray-500" title={stock.peSource ?? undefined}>{NA}{peNdNoteEl(stock)}</span>
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right text-sm">
