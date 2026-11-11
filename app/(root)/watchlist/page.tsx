@@ -326,7 +326,11 @@ export default async function WatchlistPage({
         ? t('watchlist.page.earningsUnavailable')
         : monitorData.earningsStatus === 'partial'
           ? t('watchlist.page.earningsPartial')
-          : null;
+          // Calendario guardado leído bien y sin fecha para esta empresa: es
+          // «sin fecha anunciada», dicho, no un «N/D» pelado (r5-front).
+          : monitorData.earningsStatus === 'stored' || monitorData.earningsStatus === 'ok'
+            ? t('watchlist.page.earningsNone')
+            : null;
     const formatPriceCell = (price: number | null, currency: string | null) =>
         price === null ? NA : currency ? formatPrice(price, currency) : formatNumber(price);
 
