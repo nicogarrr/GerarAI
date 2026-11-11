@@ -261,18 +261,23 @@ def _peer_set(context: ValuationContext) -> tuple[list[Company], dict]:
     second, unauditable definition of "the peers". If it raises, the engine
     refuses instead of falling back to "every company in the database", which
     is not a peer set.
+
+    Solo hace falta la selección (quiénes, con qué base y su traza): se pide
+    al selector directamente (``_find_peers``, como ya hacen la TIR y el
+    pre-ingresos). ``compare()`` además calculaba las 23 métricas de cada
+    comparable (``calculate_all``) que aquí nadie lee: 36 % del tiempo de
+    ``GET /api/valuation/{ticker}`` (medido 11-nov-2026).
     """
     from app.services.peer_comparison_service import PeerComparisonService
 
-    comparison = PeerComparisonService().compare(
-        context.db, context.company, limit=PEER_LIMIT, refresh=False
+    peers, basis, selection_trace = PeerComparisonService()._find_peers(
+        context.db, context.company, PEER_LIMIT
     )
     ids = {
-        row["ticker"]: None
-        for row in comparison.get("companies", [])
-        if not row.get("is_target")
+        peer.ticker: None
+        for peer in peers
+        if peer.id != context.company.id
     }
-    basis = comparison.get("basis")
     # Sin ``PeerRelationship`` curadas el grupo es el respaldo multifactor
     # (sector / tipo / divisa / tamaño): se etiqueta para que nadie lo lea
     # como un grupo de comparables elegido.
@@ -281,7 +286,7 @@ def _peer_set(context: ValuationContext) -> tuple[list[Company], dict]:
         return [], {
             "basis": basis,
             "fallback_only": fallback_only,
-            "trace": comparison.get("selection_trace", {}),
+            "trace": selection_trace,
         }
     rows = list(
         context.db.scalars(select(Company).where(Company.ticker.in_(list(ids)))).all()
@@ -290,8 +295,8 @@ def _peer_set(context: ValuationContext) -> tuple[list[Company], dict]:
     return rows, {
         "basis": basis,
         "fallback_only": fallback_only,
-        "method": (comparison.get("selection_trace") or {}).get("method"),
-        "trace": comparison.get("selection_trace", {}),
+        "method": (selection_trace or {}).get("method"),
+        "trace": selection_trace,
         "limit": PEER_LIMIT,
     }
 
