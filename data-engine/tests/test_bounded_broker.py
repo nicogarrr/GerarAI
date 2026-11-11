@@ -37,6 +37,8 @@ def redis_client(tmp_path):
                 time.sleep(0.02)
         else:
             raise RuntimeError("test Redis did not start")
+        client.zadd("dramatiq:kpis:consumers", {"test-consumer": int(client.time()[0])})
+        client.zadd("custom:kpis:consumers", {"test-consumer": int(client.time()[0])})
         yield client
     finally:
         client.close()
@@ -178,7 +180,13 @@ def test_compose_dedicated_queues_and_fixed_connection_pool():
         command = services[name]["command"]
         assert command[command.index("-Q") + 1:] == queues
         assert command[command.index("--processes") + 1] == "1"
-    assert services["worker-kpis"]["command"][5] == "4"
+    kpi = services["worker-kpis"]
+    assert kpi["command"][5] == "1"
+    assert kpi["environment"]["dramatiq_queue_prefetch"] == "1"
+    assert kpi["environment"]["dramatiq_delay_queue_prefetch"] == "1"
+    assert kpi["environment"]["KPI_QUEUE_MAX_PENDING"] == "${KPI_QUEUE_MAX_PENDING:-100}"
+    assert kpi["deploy"]["resources"]["limits"] == {"cpus": "0.40", "memory": "1G"}
+    assert kpi["healthcheck"]["test"] == ["CMD-SHELL", "python -m app.workers.kpi_consumer_health"]
     # Runtime SQLAlchemy defaults remain 5 + 10, no larger database pool.
     from app.core.database import engine
 
