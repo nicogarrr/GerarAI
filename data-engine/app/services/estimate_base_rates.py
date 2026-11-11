@@ -69,6 +69,17 @@ def sector_of_cik(cik: str | int | None) -> str | None:
     return sectors[idx] if isinstance(idx, int) and 0 <= idx < len(sectors) else None
 
 
+def table_horizons(data: dict[str, Any] | None = None) -> tuple[int, ...]:
+    """Plazos (años) que mide la tabla, de las claves ``h<N>|…`` de sus grupos."""
+    data = data or table()
+    found: set[int] = set()
+    for key in data.get("groups") or {}:
+        head = str(key).split("|", 1)[0]
+        if head.startswith("h") and head[1:].isdigit():
+            found.add(int(head[1:]))
+    return tuple(sorted(found))
+
+
 def lookup(*, metric: str = "growth", horizon: int = 1, revenue: float | None = None,
            prior_growth: float | None = None, sector: str | None = None,
            data: dict[str, Any] | None = None) -> BaseRate | None:

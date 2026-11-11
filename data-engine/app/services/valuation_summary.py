@@ -51,8 +51,18 @@ def _reverse_base_rate_check(company: Company, facts: list[HealthFact], reverse:
         for_annual_revenue,
         sector_of_cik,
         share_reaching,
+        table_horizons,
         usd_size_fx,
     )
+
+    measured = table_horizons()
+    if horizon not in measured:
+        # El TCAC a 6 años no es el de 5 ni el de 7: sin ese plazo medido, N/D con el motivo (no se interpola).
+        plazos = ", ".join(str(h) for h in measured[:-1]) + (f" y {measured[-1]}" if len(measured) > 1 else
+                                                               str(measured[0]) if measured else "")
+        return {"share": None, "horizon_years": horizon,
+                "reason": (f"la tasa base mide plazos de {plazos} años y el DCF inverso usa {horizon}: "
+                           f"no se compara un plazo distinto") if measured else "tasa base sin plazos medidos"}
     from app.valuation.currency import fact_currency
 
     revenue = [f for f in facts if f.metric == "revenue" and f.value and f.value > 0]
