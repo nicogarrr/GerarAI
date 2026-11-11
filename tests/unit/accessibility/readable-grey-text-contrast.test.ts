@@ -54,7 +54,7 @@ describe('texto de lectura en temas/cuellos/macro/mercados/auth/paper-trading', 
         expectLegible(classNamesWith(src, /themeReasonText\(row\.reason/, 1), 'surface-0', 'la razón del ticker');
         // El badge lleva color dinámico por kind dentro de un template
         // literal: tamaño explícito >= 12px (su contraste, medido abajo, cumple).
-        const badgeTpl = src.match(/className=\{`([^`]*font-bold uppercase[^`]*)`\}/s);
+        const badgeTpl = src.match(/className=\{`([^`]*font-bold uppercase[^`]*)`\}/);
         expect(badgeTpl, 'no se encuentra el badge del tema').not.toBeNull();
         const badgeTokens = classTokens(badgeTpl![1].replace(/\$\{[^}]*\}/g, ' '));
         expect(explicitSizePx(badgeTokens), 'el badge del tema no puede bajar de 12px').toBeGreaterThanOrEqual(12);
