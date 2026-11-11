@@ -142,3 +142,31 @@ def test_retry_remains_accepted_even_without_consumer(redis_client):
     broker = BoundedRedisBroker(client=redis_client, middleware=[])
     broker.enqueue(message(options={'retries': 1}), delay=1000)
     assert redis_client.hlen('dramatiq:kpis.DQ.msgs') == 1
+
+
+def test_healthcheck_uses_authenticated_settings_url_without_retries(tmp_path, monkeypatch):
+    from unittest.mock import MagicMock
+
+    from app.core.config import get_settings
+    from app.workers import kpi_consumer_health as health
+
+    expected = 'redis://:test-password@localhost:6399/0'
+    monkeypatch.setattr(get_settings(), 'redis_url', expected)
+    monkeypatch.setenv('REDIS_URL', 'redis://wrong-host:6379/0')
+    path = tmp_path / 'identity'
+    path.write_text('own')
+    monkeypatch.setattr(health, 'TOKEN_PATH', path)
+    client = MagicMock()
+    client.zscore.return_value = 1000
+    client.time.return_value = (1000, 0)
+    captured = {}
+
+    def build(url, **kwargs):
+        captured.update(url=url, **kwargs)
+        return client
+
+    monkeypatch.setattr('redis.Redis.from_url', build)
+    assert health.main() == 0
+    assert captured['url'] == expected
+    assert captured['retry']._retries == 0
+    assert captured['socket_connect_timeout'] == captured['socket_timeout'] == 3

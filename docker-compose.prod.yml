@@ -424,7 +424,9 @@ services:
       resources:
         limits:
           cpus: "2.00"
-          memory: 2G
+          # KPI +576 MiB reasignados del backend: stack total 16 GiB.
+          # Pico backend 965.8 MiB en ~3 h, no 24 h; validar antes de deploy.
+          memory: 1472M
 
   # worker: 1 thread evita solapar reconciliaciones de evidencia.
   # OOM confirmado 30-oct-2026 con 3 refresh_bottlenecks y limite 1280M.
