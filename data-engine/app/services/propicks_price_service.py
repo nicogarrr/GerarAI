@@ -29,6 +29,12 @@ from app.core.tenancy import tenant_filters
 from app.models import CalculatedMetric, Company, MarketPrice, ProPickCandidate, ProPickRun
 from app.services import movers_cache
 from app.services.connectors.yahoo import yahoo_chart_symbol
+from app.services.us_market_session import (
+    NY_TZ as _NY,
+)
+from app.services.us_market_session import (
+    session_open as _us_session_open,
+)
 from app.valuation.currency import SUFFIX_QUOTE_UNIT, listing_quote_unit, normalize_currency
 
 # Dias de CALENDARIO (momentum_from_series resta timedelta(days=...)): 126/252
@@ -241,19 +247,6 @@ def fetch_history_yfinance(
             )
         out[symbol] = bars
     return out
-
-
-_NY = ZoneInfo("America/New_York")
-# Una barra del dia en curso solo es cierre oficial cuando la sesion US ya
-# termino (misma regla que market_close_sync._SESSION_CLOSED_AFTER).
-_SESSION_CLOSED_AFTER = (16, 30)
-
-
-def _us_session_open(now: datetime) -> bool:
-    local = now.astimezone(_NY)
-    if local.weekday() >= 5:
-        return False
-    return (local.hour, local.minute) < _SESSION_CLOSED_AFTER
 
 
 def _bar_is_final(company: Company, bar: PriceBar, now: datetime) -> bool:
