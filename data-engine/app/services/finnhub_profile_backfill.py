@@ -35,6 +35,7 @@ from app.core.tenancy import tenant_filters
 from app.models.entities import Company, Document, FinancialFact
 from app.services.company_enrichment_service import (
     _PLACEHOLDER_EXCHANGES,
+    profile_ir_url,
     sector_for_industry,
 )
 
@@ -137,6 +138,23 @@ class FinnhubProfileBackfill:
             unknown_exchange = company.exchange in _PLACEHOLDER_EXCHANGES
             adr_candidates: dict[str, str] = {}
             changed = False
+            # Web oficial del emisor (weburl) -> ir_url: abre la vía de
+            # informes oficiales (issuer_reports/IR) a emisores sin SEC
+            # (Fairfax FFH.TO, Sagicor SFC.TO). Mismo criterio de identidad
+            # que el resto: con bolsa placeholder no se promueve nada de un
+            # perfil que puede ser del ADR o de un homónimo; queda declarado
+            # en adr_candidates para revisión.
+            weburl = (profile.get("weburl") or "").strip() if profile else ""
+            ir_url_written = False
+            if weburl and not (company.ir_url or "").strip():
+                if unknown_exchange:
+                    adr_candidates["weburl"] = weburl
+                else:
+                    promoted = profile_ir_url(profile, company.ticker)
+                    if promoted:
+                        company.ir_url = promoted
+                        ir_url_written = True
+                        changed = True
             name = (profile.get("name") or "").strip()
             if name and (
                 not (company.name or "").strip()
@@ -211,7 +229,7 @@ class FinnhubProfileBackfill:
                         "date": today.isoformat(),
                         "ticker": company.ticker,
                         "quote_date": quote_date.isoformat() if quote_date else None,
-                        "fields": sorted(fields),
+                        "fields": sorted([*fields, *(("ir_url",) if ir_url_written else ())]),
                         "company_updated": changed,
                         "market_cap_written": cap_written,
                         "empty": not profile,
