@@ -70,7 +70,7 @@ describe('Hechos financieros, afirmaciones y escenarios de la ficha en inglés',
         expect(screen.getByRole('button', { name: 'Add claim' })).toBeTruthy();
         render(<ThesisScenariosPanel adrRatio={null} currency="USD" data={scenarios} locale="en" />);
         expect(screen.getByText('5-year scenarios')).toBeTruthy();
-        expect(screen.getByText('Revenue')).toBeTruthy();
+        expect(screen.getAllByText('Revenue')).toHaveLength(2); // mobile heading + desktop caption
         expect(screen.getAllByText('Fiscal year').length).toBe(3);
         expect(screen.getByText('Model projection DCF v3, as of 2026-10-01.')).toBeTruthy();
     });
