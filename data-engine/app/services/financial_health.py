@@ -1,6 +1,7 @@
 """Conservative, source-citable annual accounting screens, not investment ratings."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 from math import isfinite
@@ -39,7 +40,8 @@ def _known(label: str | None) -> bool:
 
 def calculate_health(facts: list[HealthFact], *, sector: str | None, company_type: str,
                      today: date | None = None, industry: str | None = None,
-                     sic_sector: str | None = None) -> dict[str, Any]:
+                     sic_sector: str | None = None,
+                     unofficial_sector: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Use three consecutive FY anchors. Unknown is never scored as zero.
 
     ROA/turnover use beginning assets; leverage uses average assets, following
@@ -57,12 +59,22 @@ def calculate_health(facts: list[HealthFact], *, sector: str | None, company_typ
     # «Unknown» dejaba sin Piotroski ni Altman a AAPL, TSM, CNQ o Airbus aunque su industria se conociera.
     # Cualquier señal financiera de cualquiera de las dos excluye igual (fail-closed).
     labels = [sector] if _known(sector) else [x for x in (industry, sic_sector) if _known(x)]
+    # Sin NINGUNA clasificación oficial, el sector de reserva no oficial (Wikidata/Yahoo, unofficial_sector.py)
+    # deja entrar al emisor, con su fuente y fecha a la vista. La oficial manda siempre: solo se mira sin etiquetas.
+    basis = dict(unofficial_sector) if not labels and unofficial_sector else None
+    if basis is not None and _known(basis.get("sector")):
+        labels = [str(basis["sector"])]
+        out["sector_basis"] = basis
+        out["notice"] = f"{out['notice']} {basis.get('label') or 'Sector no oficial: ' + str(basis['sector'])}."
     if not labels:
-        out["reason"] = "Sector sin clasificar"
+        why = basis.get("reason") if basis else None
+        out["reason"] = f"Sector sin clasificar: {why}" if why else "Sector sin clasificar"
         return out
     kind = " ".join([*(str(x) for x in labels), str(company_type)]).lower()
     if any(word in kind for word in ("financ", "finanzas", "bank", "insurance", "reit", "real estate", "pre_revenue", "pre-revenue", "etf", "fund", "fondo")):
         out["reason"] = "Modelo no aplicable a financieras, REIT o empresas preingresos"
+        if "sector_basis" in out:
+            out["reason"] += f" ({out['sector_basis'].get('label') or 'sector no oficial'})"
         return out
     usable = [f for f in facts if isfinite(f.value) and f.source_url.startswith("https://")
               and f.period_end <= today and f.unit and f.source_type not in {"seed", "manual", "inferred"}]
