@@ -250,14 +250,27 @@ def analyst_passages_tool(
             .order_by(Document.published_at.desc().nullslast(), Document.id.desc())
             .limit(DOC_MAX_DOCUMENTS)
         ).all()
+        # No chunk LIMIT existed here: retain late matches and Python's
+        # Unicode/whitespace rules. Project only what the reader uses and
+        # keep a bounded number of selected texts, without ORM hydration.
+        hits_by_doc: dict[int, list[str]] = {}
+        if docs:
+            rows = db.execute(
+                select(DocumentChunk.document_id, DocumentChunk.text)
+                .where(DocumentChunk.tenant_id == ctx.tenant_id,
+                       DocumentChunk.document_id.in_([doc.id for doc in docs]))
+                .order_by(DocumentChunk.document_id, DocumentChunk.chunk_index)
+                .execution_options(yield_per=256)
+            )
+            for row in rows:
+                hits = hits_by_doc.setdefault(row.document_id, [])
+                if len(hits) >= DOC_MAX_PASSAGES_PER_DOC:
+                    continue
+                text = row.text or ""
+                if _mentions(text, folded_firms):
+                    hits.append(text[:DOC_PASSAGE_CHARS])
         for doc in docs:
-            chunks = db.scalars(
-                select(DocumentChunk)
-                .where(DocumentChunk.tenant_id == ctx.tenant_id, DocumentChunk.document_id == doc.id)
-                .order_by(DocumentChunk.chunk_index)
-            ).all()
-            hits = [c for c in chunks if _mentions(c.text or "", folded_firms)]
-            for chunk in hits[:DOC_MAX_PASSAGES_PER_DOC]:
+            for text in hits_by_doc.get(doc.id, []):
                 out.append(
                     ToolOutput(
                         source={
@@ -268,7 +281,7 @@ def analyst_passages_tool(
                             "url": doc.source_url or "",
                             "date": doc.published_at.date().isoformat() if doc.published_at else "",
                         },
-                        data={"text": (chunk.text or "")[:DOC_PASSAGE_CHARS]},
+                        data={"text": text},
                     )
                 )
         since = (today or date.today()) - timedelta(days=NEWS_WINDOW_DAYS)
