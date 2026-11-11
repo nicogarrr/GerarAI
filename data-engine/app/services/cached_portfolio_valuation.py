@@ -21,17 +21,12 @@ from app.core.cache import (
     invalidate_portfolio_cache,
     tenant_from_first_db_arg,
 )
+from app.core.cache import (
+    tenant_from_method_db_arg as _extract_tenant_from_db,
+)
 from app.models import Position
 
 logger = logging.getLogger(__name__)
-
-
-def _extract_tenant_from_db(args, kwargs) -> int | None:
-    """Extrae tenant_id del primer argumento (Session db)."""
-    db = kwargs.get("db")
-    if db is None and len(args) >= 2:
-        db = args[1]
-    return db.info.get("tenant_id") if db is not None and hasattr(db, "info") else None
 
 
 class CachedPortfolioValuationService:
