@@ -603,7 +603,8 @@ def sec_ifrs_metric_map_for(ifrs_facts: dict[str, Any]) -> list[tuple[str, list[
 # ``shares_diluted`` = AdjustedWeightedAverageShares cuando el emisor la etiqueta (sin derivar).
 # 4 (8-nov-2026): ``net_income_total`` (ProfitLoss) y ``finance_income_cost`` (EBITDA por componentes).
 # 5 (8-nov-2026): ``minority_interest`` (NoncontrollingInterests) y ``net_income_minority``.
-ESEF_INGESTION_RULES_VERSION = 6  # v6: extensiones ancladas (xbrl_extension_map)
+# 6 (9-nov-2026): extensiones ancladas (xbrl_extension_map).
+ESEF_INGESTION_RULES_VERSION = 7  # v7 (11-nov-2026): activo y pasivo corriente y reservas (current_assets, …)
 
 ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # RevenueFromContractsWithCustomers: emisores que solo etiquetan la cifra
@@ -629,6 +630,12 @@ ESEF_METRIC_MAP: list[tuple[str, list[str], str]] = [
     ("total_assets",      ["ifrs-full:Assets"],                                                          "iso4217:EUR"),
     ("total_liabilities", ["ifrs-full:Liabilities"],                                                     "iso4217:EUR"),
     ("total_equity",      ["ifrs-full:EquityAttributableToOwnersOfParent", "ifrs-full:Equity"],          "iso4217:EUR"),
+    # Balance corriente y reservas (los mismos conceptos que lee SEC_IFRS_METRIC_MAP para los 20-F/40-F): sin
+    # ellos ningún emisor europeo tenía la señal de liquidez de Piotroski ni Altman Z'' (Intertek FY2025,
+    # Eurofins FY2024 los etiquetan). Solo el total consolidado (sin dimensiones), nunca partes.
+    ("current_assets",    ["ifrs-full:CurrentAssets"],                                                   "iso4217:EUR"),
+    ("current_liabilities", ["ifrs-full:CurrentLiabilities"],                                            "iso4217:EUR"),
+    ("retained_earnings", ["ifrs-full:RetainedEarnings"],                                                "iso4217:EUR"),
     ("minority_interest", ["ifrs-full:NoncontrollingInterests"],                                          "iso4217:EUR"),
     ("net_income_minority", ["ifrs-full:ProfitLossAttributableToNoncontrollingInterests"],                "iso4217:EUR"),
     ("cash_and_equivalents", ["ifrs-full:CashAndCashEquivalents"],                                       "iso4217:EUR"),
