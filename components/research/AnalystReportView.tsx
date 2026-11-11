@@ -49,6 +49,12 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
   const priceCurrency = market?.price != null ? market.currency : card?.current?.close != null ? null : sotp?.price_currency;
   const fairCurrency = fair?.currency;
   const priceDate = market?.price_date ?? card?.current?.signal_date ?? sotp?.price_as_of ?? null;
+  // La cabecera muestra un CIERRE (el del informe) y la tarjeta DCA puede usar el precio actual:
+  // el rótulo dice cuál es para que dos precios distintos en la página no parezcan una contradicción.
+  const priceIsClose = market?.price != null ? Boolean(market.price_date) : card?.current?.close != null && card.current.close_kind !== 'live';
+  const priceLabel = priceIsClose && priceDate
+    ? t('research.informe.priceClose', { date: fmt.formatMarketDate(priceDate, { day: 'numeric', month: 'short' }) })
+    : t('research.informe.price');
   const range = fairValueRange(fair, thesis, data.engineRange);
   const rangeCurrency = range?.source === 'engine' ? data.engineRange?.currency : fairCurrency;
   const zone = card?.available ? card.current : undefined;
@@ -87,9 +93,9 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
             <p className="text-xs text-gray-400">{range ? (range.source === 'thesis' ? t('research.informe.rangeThesis') : t('research.informe.rangeEngine')) : t('research.informe.rangeNone')}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500">{t('research.informe.price')}</p>
-            <p className="mt-1 text-lg font-semibold text-gray-100">{money(price, priceCurrency)}</p>
-            <p className="text-xs text-gray-400">{priceDate ? fmt.formatMarketDate(priceDate) : ''}{fair?.value != null && price ? ` · ${t('research.informe.fairVsPrice', { pct: pct(reportVsPrice(fair.value, fairCurrency, price, priceCurrency)) })}` : ''}</p>
+            <p className="text-xs text-gray-500" data-testid="informe-price-label">{priceLabel}</p>
+            <p className="mt-1 text-lg font-semibold text-gray-100" data-testid="informe-price">{money(price, priceCurrency)}</p>
+            <p className="text-xs text-gray-400">{[priceIsClose || !priceDate ? null : fmt.formatMarketDate(priceDate), fair?.value != null && price ? t('research.informe.fairVsPrice', { pct: pct(reportVsPrice(fair.value, fairCurrency, price, priceCurrency)) }) : null].filter(Boolean).join(' · ')}</p>
           </div>
         </div>
         <p className="mt-3 text-xs text-gray-500">{t('research.informe.notARating')}</p>
@@ -145,11 +151,11 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
       <section aria-labelledby="informe-mercado" className={BOX}>
         <h2 className={H2} id="informe-mercado">{t('research.informe.marketData')}</h2>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm" data-testid="informe-market">
-          <Item label={t('research.informe.price')} value={money(price, priceCurrency)} />
+          <Item label={priceLabel} value={money(price, priceCurrency)} />
           <Item label={t('research.informe.marketCap')} value={big(market?.market_cap, market?.market_cap_currency)} note={marketCapNote(t, market)} />
           <Item label={t('research.informe.range52w')} value={r52 ? `${money(r52.low, keyStats?.currency)} – ${money(r52.high, keyStats?.currency)}` : na} />
           <Item label={t('research.informe.avgVolume')} value={count(market?.avg_volume)} note={market?.avg_volume ? t('research.informe.avgVolumeNote', { n: market.avg_volume_sessions }) : undefined} />
-          <Item label={t('research.informe.shortVolume')} value={shortRatio == null ? na : fmt.formatPercent(shortRatio, { fromRatio: true, digits: 1 })} note={shortRatio == null ? undefined : t('research.informe.shortVolumeNote')} />
+          <Item label={t('research.informe.shortVolume')} value={shortRatio == null ? na : fmt.formatPercent(shortRatio, { fromRatio: true, digits: 1 })} note={shortRatio == null ? shortVolumeReason(t, shorts) : t('research.informe.shortVolumeNote')} testId="informe-short-volume" />
           <Item label={t('research.informe.ev')} value={big(market?.enterprise_value, market?.enterprise_value_currency)} note={market?.enterprise_value == null ? evReason(t, market?.enterprise_value_reason) : t('research.informe.evNote')} />
           <Item label={t('research.informe.sharesOut')} value={count(market?.shares_outstanding?.value)} note={market?.shares_outstanding?.period_end ? fmt.formatMarketDate(market.shares_outstanding.period_end) : undefined} />
           <Item label={t('research.informe.sharesDiluted')} value={count(market?.shares_diluted?.value)} note={sotp?.result?.shares_diluted ? t('research.informe.sharesSotp', { n: fmt.formatNumber(sotp.result.shares_diluted, { maximumFractionDigits: 1 }) }) : undefined} />
@@ -186,8 +192,15 @@ export function AnalystReportView({ data, t, fmt, locale }: { data: ReportInputs
   );
 }
 
-function Item({ label, value, note }: { label: string; value: string; note?: string }) {
-  return <div className="min-w-0"><dt className="text-xs text-gray-500">{label}</dt><dd className="text-gray-100">{value}</dd>{note ? <dd className="text-xs text-gray-500">{note}</dd> : null}</div>;
+function Item({ label, value, note, testId }: { label: string; value: string; note?: string; testId?: string }) {
+  return <div className="min-w-0" data-testid={testId}><dt className="text-xs text-gray-500">{label}</dt><dd className="text-gray-100">{value}</dd>{note ? <dd className="text-xs text-gray-500">{note}</dd> : null}</div>;
+}
+
+/** Volumen en corto N/D: el motivo de la fuente (sin consulta, desfasado, fallo) o por qué no hay cifra diaria. */
+function shortVolumeReason(t: T, shorts: ReportInputs['shorts']): string {
+  if (!shorts) return t('research.informe.shortVolumeUnread');
+  if (shorts.reason) return shorts.reason;
+  return t('research.informe.shortVolumeNoRatio');
 }
 
 function evReason(t: T, reason: string | null | undefined): string | undefined {
