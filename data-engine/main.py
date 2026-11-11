@@ -278,9 +278,14 @@ async def request_validation_error_handler(request: Request, exc: RequestValidat
     El cuerpo JSON admite ``NaN``/``Infinity`` (``json.loads`` los acepta) y el
     422 por defecto de FastAPI devuelve el ``input`` rechazado: al serializarlo
     con ``allow_nan=False`` reventaba con ValueError y la petición acababa en
-    500. Mismo contenido que el 422 por defecto, con esos valores como texto.
+    500. Los cuerpos binarios rechazados también pueden contener bytes que no
+    son UTF-8: se muestran con reemplazo, sin cambiar el cuerpo usado por auth.
+    Mismo contenido que el 422 por defecto para entradas válidas en UTF-8.
     """
-    return JSONResponse(status_code=422, content={"detail": _finite_json(jsonable_encoder(exc.errors()))})
+    errors = jsonable_encoder(
+        exc.errors(), custom_encoder={bytes: lambda value: value.decode("utf-8", errors="replace")}
+    )
+    return JSONResponse(status_code=422, content={"detail": _finite_json(errors)})
 
 
 app.add_exception_handler(RequestValidationError, request_validation_error_handler)
