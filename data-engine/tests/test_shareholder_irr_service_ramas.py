@@ -83,7 +83,7 @@ def _punto():
 # --- company_facts: empates de fecha y rango -------------------------------------
 
 
-def test_empates_no_reemplazan_a_la_mejor_fuente():
+def test_empates_no_reemplazan_a_la_mejor_fuente(monkeypatch):
     def fila(metric, value, source_type, period="2025-12-31:FY"):
         return SimpleNamespace(
             metric=metric,
@@ -106,7 +106,9 @@ def test_empates_no_reemplazan_a_la_mejor_fuente():
             fila("revenue", 999e6, "FMP"),  # mismo año, peor fuente: no reemplaza
         ]
     ]
-    annual, point = svc.company_facts(_DB(rows), CO)
+    # Los hechos llegan por ``_read_fact_rows`` (columnas sueltas, r5-perf2); la reducción es la misma.
+    monkeypatch.setattr(svc, "_read_fact_rows", lambda db, ids: {i: list(rows[0]) for i in ids})
+    annual, point = svc.company_facts(_DB(), CO)
     assert point["total_debt"]["value"] == 280e6 and annual["revenue"][2025]["value"] == 800e6
 
 
