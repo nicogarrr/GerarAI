@@ -148,7 +148,7 @@ async def bind_tenant_llm_settings(
     db: Session = Depends(get_db),
 ) -> AsyncIterator[None]:
     """Fija el proveedor del tenant firmado durante todo el request."""
-    from app.llm.free_only import set_free_only_tenant, reset_free_only_tenant
+    from app.llm.free_only import reset_free_only_tenant, set_free_only_tenant
     identity_token = set_free_only_tenant(db.info.get("tenant_id"))
     token = set_tenant_llm_config(None)
     try:

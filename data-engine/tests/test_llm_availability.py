@@ -18,6 +18,7 @@ def test_snapshot_has_no_network_and_does_not_claim_verified_quota():
 
 def test_open_payment_breaker_disables_action_for_matching_key_only(monkeypatch):
     import time
+
     from app.llm import base
     key = ('opencode-free', 'deepseek-v4.1-flash-free', base._credential_fingerprint({'Authorization': 'Bearer test'}))
     monkeypatch.setitem(base._payment_required_breaker, key, time.monotonic() + 60)
@@ -39,6 +40,7 @@ def test_disabled_and_missing_context_never_offer_ai():
 
 def test_all_features_observe_free_quota_breaker(monkeypatch):
     import time
+
     from app.llm import base
     key = ('opencode-free', 'deepseek-v4.1-flash-free', base._credential_fingerprint({'Authorization': 'Bearer test'}))
     monkeypatch.setitem(base._free_quota_breaker, key, time.monotonic() + 40)
@@ -50,6 +52,7 @@ def test_all_features_observe_free_quota_breaker(monkeypatch):
 
 def test_composite_is_degraded_when_only_primary_is_blocked(monkeypatch):
     import time
+
     from app.llm import base
     from app.llm.chat_provider import GO_SUBSCRIPTION_PROVIDER
     s = Settings(app_env='test', llm_free_only=False, opencode_go_api_key='test', chat_go_subscription_enabled=True,
@@ -62,8 +65,10 @@ def test_composite_is_degraded_when_only_primary_is_blocked(monkeypatch):
 
 def test_api_adapter_requires_tenant_and_only_reads_local_snapshot(monkeypatch):
     from types import SimpleNamespace
+
     import pytest
     from fastapi import HTTPException
+
     from app.api.routes.settings import get_llm_availability
     monkeypatch.setattr('app.services.llm_availability.availability', lambda feature: {'feature': feature, 'can_start': False})
     assert get_llm_availability('chat', SimpleNamespace(info={'tenant_id': 8}))['feature'] == 'chat'
@@ -73,6 +78,7 @@ def test_api_adapter_requires_tenant_and_only_reads_local_snapshot(monkeypatch):
 
 def _block(monkeypatch, provider, model):
     import time
+
     from app.llm import base
     key = (provider.name, model, base._credential_fingerprint({'Authorization': f'Bearer {provider._api_key}'}))
     monkeypatch.setitem(base._payment_required_breaker, key, time.monotonic() + 60)
@@ -80,9 +86,11 @@ def _block(monkeypatch, provider, model):
 
 def test_internal_adapter_fallback_is_still_available_and_really_completes(monkeypatch):
     import asyncio
+
     import httpx
-    from app.llm.factory import create_llm_provider
+
     from app.llm.contracts import LLMRequest, Message
+    from app.llm.factory import create_llm_provider
     s = Settings(app_env='test', opencode_go_api_key='test', opencode_go_model='deepseek-v4.1-flash-free',
                  opencode_go_fallback_model='space-bunny-free', llm_free_only=False)
     called = []
@@ -118,8 +126,8 @@ def test_explicit_models_on_shared_backup_instance_are_not_deduplicated(monkeypa
 
 def test_gemini_two_models_and_router_override_are_real_candidates():
     from app.llm.adapters import OpenAICompatibleProvider
-    from app.llm.chat_provider import ChatFallbackProvider, GEMINI_MODELS, SequentialFallbackProvider
     from app.llm.cascade import CascadeProvider
+    from app.llm.chat_provider import GEMINI_MODELS, ChatFallbackProvider, SequentialFallbackProvider
     from app.llm.contracts import LLMRequest, Message
     from app.services.llm_availability import _candidates
     req = LLMRequest([Message('user', 'local')], task='chat')

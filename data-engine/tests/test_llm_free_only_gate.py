@@ -7,14 +7,14 @@ import pytest
 
 from app.core.config import Settings
 from app.llm.adapters import OpenAICompatibleProvider
+from app.llm.chat_provider import create_background_llm_provider, create_chat_llm_provider
 from app.llm.contracts import LLMRequest, Message
 from app.llm.errors import ProviderDisabledError
 from app.llm.factory import create_llm_provider
-from app.llm.chat_provider import create_chat_llm_provider, create_background_llm_provider
-from app.llm.thesis_go import create_thesis_narrative_provider
 from app.llm.free_interactive import create_free_interactive_provider
-from app.llm.tenant_config import TenantLLMConfig, tenant_llm_config_scope
 from app.llm.free_only import free_only_tenant_scope
+from app.llm.tenant_config import TenantLLMConfig, tenant_llm_config_scope
+from app.llm.thesis_go import create_thesis_narrative_provider
 
 FACTORIES = [create_llm_provider, create_chat_llm_provider, create_background_llm_provider,
              create_thesis_narrative_provider, create_free_interactive_provider]
@@ -108,8 +108,9 @@ def test_scope_restores_and_bridge_copies_identity():
 
 def test_http_dependency_binds_internal_id_and_resets(monkeypatch):
     from types import SimpleNamespace
-    from app.services.tenant_llm_settings_service import bind_tenant_llm_settings
+
     from app.llm.free_only import restricted
+    from app.services.tenant_llm_settings_service import bind_tenant_llm_settings
     monkeypatch.setattr('app.services.tenant_llm_settings_service.load_config_for_tenant', lambda *_: None)
     async def exercise():
         dep = bind_tenant_llm_settings(SimpleNamespace(info={'tenant_id': 7}))
@@ -122,8 +123,9 @@ def test_http_dependency_binds_internal_id_and_resets(monkeypatch):
 
 def test_worker_binds_internal_id_then_cleans_after_success_and_skip(monkeypatch):
     from types import SimpleNamespace
-    from app.workers.tenant_llm_middleware import TenantLLMSettingsMiddleware
+
     from app.llm.free_only import restricted
+    from app.workers.tenant_llm_middleware import TenantLLMSettingsMiddleware
     monkeypatch.setattr('app.services.tenant_llm_settings_service.load_config_for_tenant', lambda *_: None)
     middleware = TenantLLMSettingsMiddleware()
     for cleanup in (middleware.after_process_message, middleware.after_skip_message):
@@ -158,7 +160,7 @@ def test_payload_tenant_and_model_alias_cannot_claim_exemption(monkeypatch):
 
 
 def test_early_guard_rejects_non_mapping_payload_and_missing_tenant():
-    from app.llm.free_only import enforce_free_only, FREE_ENDPOINT
+    from app.llm.free_only import FREE_ENDPOINT, enforce_free_only
     with free_only_tenant_scope(8), pytest.raises(ProviderDisabledError):
         enforce_free_only(FREE_ENDPOINT, None, settings())
     with free_only_tenant_scope(None), pytest.raises(ProviderDisabledError):
