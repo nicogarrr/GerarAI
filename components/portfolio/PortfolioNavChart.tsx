@@ -3,6 +3,7 @@
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 import { useT, useFormat } from '@/lib/i18n/client';
+import { navYDomain } from '@/lib/portfolio/nav-domain';
 
 export type NavPoint = {
     date: string;
@@ -44,10 +45,12 @@ export default function PortfolioNavChart({ data, positive, currency = 'USD' }: 
                     dataKey="date"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 10 }}
+                    // #a1a1aa = gray-500 de la paleta del repo (globals.css):
+                    // 7,4:1 sobre el fondo real del grafico (#111111, medido en prod).
+                    tick={{ fill: '#a1a1aa', fontSize: 11 }}
                     interval="preserveStartEnd"
                 />
-                <YAxis hide domain={['dataMin - 50', 'dataMax + 50']} />
+                <YAxis hide domain={navYDomain(data.map((point) => point.value))} />
                 <Tooltip
                     contentStyle={{
                         backgroundColor: '#1f2937',
