@@ -223,6 +223,7 @@
     "emptyHint": "Añade tu primera compra o importa tu historial desde IBKR.",
     "emptyFiltered": "Ningún movimiento coincide con estos filtros",
     "emptyPage": "Sin movimientos en esta página",
+    "loadError": "No pudimos cargar tus movimientos; no significa que no tengas. Reintenta en unos segundos.",
     "firstPage": "Ir a la primera página",
     "typeBuy": "Compra",
     "typeSell": "Venta",

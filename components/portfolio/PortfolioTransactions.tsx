@@ -30,6 +30,13 @@ type Props = {
   transactions: PortfolioTransaction[];
   page?: { total: number; offset: number; filters?: TransactionFilters };
   userId: string;
+  /**
+   * Lectura fallida: la pestaña dice que no se pudieron cargar y ofrece
+   * reintento. Sin este flag, una caída llegaba como `[]` y se pintaba el
+   * estado vacío normal — una afirmación falsa del ledger (F1, misma regla
+   * que el carril «Para ti» de noticias).
+   */
+  error?: string | null;
 };
 
 /**
@@ -165,7 +172,7 @@ const TransactionRow = memo(function TransactionRow({ tx, userId, deleting, setC
   );
 });
 
-export default function PortfolioTransactions({ transactions, userId, page }: Props) {
+export default function PortfolioTransactions({ transactions, userId, page, error }: Props) {
   const ti = useT();
   const f = useFormat();
   const router = useRouter();
@@ -239,7 +246,17 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
         {page.offset + transactions.length < page.total ? <Button asChild variant="outline" className="min-h-11"><Link href={transactionsHref(filters, page.offset + 50)}>{ti('portfolio.transactions.next')}</Link></Button> : null}
       </nav> : null}
       <CardContent className="p-0 flex-1 overflow-hidden">
-        {transactions.length === 0 ? (
+        {error ? (
+          <div className="flex flex-col items-center gap-3 px-4 py-12 text-center" role="alert">
+            <p className="text-sm text-amber-200">{ti('portfolio.transactions.loadError')}</p>
+            {/* Reintento = refetch de la URL actual (pestaña, filtros y página
+                intactos): un enlace a /portfolio devuelve a Resumen y otro a la
+                misma URL no refetchea desde caché. */}
+            <Button variant="outline" className="min-h-11" onClick={() => router.refresh()}>
+              {ti('common.actions.retry')}
+            </Button>
+          </div>
+        ) : transactions.length === 0 ? (
           <div className="text-center py-12 px-4">
             <div className="h-10 w-10 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-gray-500">?</span>

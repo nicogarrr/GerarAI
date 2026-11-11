@@ -64,6 +64,8 @@ type Props = {
     dividends: PortfolioDividendProjection | null;
     userId: string;
     partialMessage?: string | null;
+    /** Error de lectura de movimientos: la pestaña pinta aviso, no el vacío normal. */
+    transactionsError?: string | null;
 };
 
 // F137: la pestaña vive en la URL (?tab=). Antes el estado nacía fijo en
@@ -82,7 +84,7 @@ function normalizeTab(value: string | null): PortfolioTab {
     return (VALID_TABS as readonly string[]).includes(value ?? '') ? (value as PortfolioTab) : 'resumen';
 }
 
-export default function PortfolioTabs({ summary, transactions, transactionPage, scores, tearsheet, forecast, dividends, userId, partialMessage }: Props) {
+export default function PortfolioTabs({ summary, transactions, transactionPage, transactionsError, scores, tearsheet, forecast, dividends, userId, partialMessage }: Props) {
     const ti = useT();
     const f = useFormat();
     const searchParams = useSearchParams();
@@ -362,7 +364,7 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                 {/* Tab: Movimientos */}
                 <TabsContent value="movimientos" className="mt-0">
                     <div className="max-w-4xl">
-                        <PortfolioTransactions transactions={transactions} userId={userId} page={transactionPage} />
+                        <PortfolioTransactions transactions={transactions} userId={userId} page={transactionPage} error={transactionsError} />
                     </div>
                 </TabsContent>
 

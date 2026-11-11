@@ -223,6 +223,7 @@
     "emptyHint": "Log your first purchase or import your history from IBKR.",
     "emptyFiltered": "No transactions match these filters",
     "emptyPage": "No transactions on this page",
+    "loadError": "We could not load your transactions; it does not mean you have none. Retry in a few seconds.",
     "firstPage": "Go to the first page",
     "typeBuy": "Buy",
     "typeSell": "Sell",
