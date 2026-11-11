@@ -763,14 +763,17 @@ def _revenue_size_fx(db: Any, company: Any, rev_actuals: Mapping[str, Actual], t
 
 def _facts(db: Any, company: Any, fact_metric: str) -> list[tuple[str, float, date | None, str | None]]:
     from sqlalchemy import select
-    from sqlalchemy.orm import joinedload
+    from sqlalchemy.orm import selectinload
 
     from app.core.source_urls import sec_filing_url
     from app.models import FinancialFact
 
-    # source_url lee la relación source. Cargarla en el mismo SELECT evita
-    # una consulta por documento (N+1); LEFT JOIN conserva hechos sin fuente.
-    rows = db.scalars(select(FinancialFact).options(joinedload(FinancialFact.source)).where(
+    # source_url lee la relación source. selectinload la carga en UNA consulta
+    # más (IN de los documentos distintos), sin N+1. No joinedload: el JOIN
+    # repetía el documento entero (con su ``metadata`` JSON, 72 KB en QCOM) en
+    # cada fila de hecho y el JSON se decodificaba una vez por hecho (medido
+    # 11-nov-2026: 61 % del tiempo de /own-consensus).
+    rows = db.scalars(select(FinancialFact).options(selectinload(FinancialFact.source)).where(
         FinancialFact.company_id == company.id, FinancialFact.metric == fact_metric)).all()
     cik = getattr(company, "cik", None)
     out: list[Any] = []  # (period, valor, filed, url, fiscal_year): la etiqueta del ejercicio va al final

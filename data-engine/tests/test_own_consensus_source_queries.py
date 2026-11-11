@@ -54,7 +54,9 @@ def test_sources_do_not_add_one_query_per_fact(db, count):
     event.listen(engine, "before_cursor_execute", lambda *a: statements.append(a[2]))
     result = _facts(session, SimpleNamespace(id=cid), "revenue")
     assert sorted(result) == expected
-    assert len(statements) == 1, statements
+    # Constante con 4 o 40 hechos: hechos + UNA lectura de documentos (IN),
+    # sin JOIN que repita el documento por fila (perf r5 11-nov-2026).
+    assert len(statements) == 2, statements
 
 
 def test_missing_sources_and_filtered_urls_preserve_rows(db):
