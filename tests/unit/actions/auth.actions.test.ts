@@ -35,9 +35,6 @@ const signUpInput = {
     password: 'super-secreta',
     fullName: 'Nico',
     country: 'ES',
-    investmentGoals: 'largo plazo',
-    riskTolerance: 'moderada',
-    preferredIndustry: 'tecnología',
 } as unknown as SignUpFormData;
 
 beforeEach(() => {
@@ -54,7 +51,7 @@ describe('signUpWithEmail', () => {
         expect(callAuthEndpoint).not.toHaveBeenCalled();
     });
 
-    it('registro OK: el perfil inversor viaja al endpoint y la respuesta no serializa tokens', async () => {
+    it('registro OK: el país viaja al endpoint y la respuesta no serializa tokens', async () => {
         callAuthEndpoint.mockResolvedValue({ twoFactorRedirect: false });
         const result = await signUpWithEmail(signUpInput);
         expect(callAuthEndpoint).toHaveBeenCalledWith('/sign-up/email', {
@@ -62,9 +59,6 @@ describe('signUpWithEmail', () => {
             password: 'super-secreta',
             name: 'Nico',
             country: 'ES',
-            investmentGoals: 'largo plazo',
-            riskTolerance: 'moderada',
-            preferredIndustry: 'tecnología',
         });
         expect(result).toEqual({ success: true });
     });
