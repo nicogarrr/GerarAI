@@ -1,6 +1,6 @@
 'use server';
 
-import { getStockFinancialDataLight } from '@/lib/actions/finnhub.actions';
+import { getStockPerMetric } from '@/lib/actions/company-per-metric.actions';
 import { isUsQuoteLine, quoteSymbolFor } from '@/lib/market/quote-symbol';
 import { perState, type PerState } from '@/lib/research/per';
 
@@ -15,11 +15,11 @@ export async function getCompanyPer(
     if (!quoteSymbol || !usLine) {
         return perState({ quoteSymbol, ticker: normalized, peTTM: undefined, providerAvailable: false, usLine }, locale);
     }
-    const light = await getStockFinancialDataLight(normalized).catch(() => null);
+    const light = await getStockPerMetric(normalized).catch(() => null);
     return perState({
         quoteSymbol,
         ticker: normalized,
-        peTTM: light?.metrics?.metric?.peTTM,
+        peTTM: light?.metric?.peTTM,
         providerAvailable: light !== null,
         usLine,
     }, locale);
