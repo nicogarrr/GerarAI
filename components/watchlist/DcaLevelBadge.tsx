@@ -45,8 +45,8 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
     const staleText = stale ? dcaStaleText(age, t) : null;
     const metric = dcaSignalMetric(state, signalMonths, t, locale);
     const rsi = dcaRsi(state.metrics?.rsi, locale);
-    const close = dcaPrice(state.close, state.currency_label, locale);
-    const livePrice = state.close_kind === 'live' ? dcaPrice(state.live_price ?? null, state.currency_label, locale) : null;
+    const close = dcaPrice(state.close, state, locale);
+    const livePrice = state.close_kind === 'live' ? dcaPrice(state.live_price ?? null, state, locale) : null;
     const liveTime = state.close_kind === 'live' && state.live_at
         ? `${new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' }).format(new Date(state.live_at))} ET`
         : null;
@@ -64,7 +64,7 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
         })
         : null;
     const prices = (['2x', '3x', '4x'] as const)
-        .map((key) => ({ key, value: dcaPrice(state.level_prices?.[key], state.currency_label, locale) }))
+        .map((key) => ({ key, value: dcaPrice(state.level_prices?.[key], state, locale) }))
         .filter((entry) => entry.value);
     const badge = (
         <Tooltip open={open} onOpenChange={setOpen}>
