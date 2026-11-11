@@ -68,7 +68,8 @@ class _PinnedConnectionMixin:
     def _pinned_target(self, host: str, port: int) -> _PublicTarget:
         if self._target is None:
             raise RuntimeError("Public fetch transport is missing its validated target")
-        expected_port = 443 if self._target.url.lower().startswith("https:") else 80
+        parsed = urlparse(self._target.request_url)
+        expected_port = parsed.port or (443 if parsed.scheme == "https" else 80)
         if port != expected_port:
             raise RuntimeError("Public fetch transport attempted an unexpected port")
         if host != self._target.address:
