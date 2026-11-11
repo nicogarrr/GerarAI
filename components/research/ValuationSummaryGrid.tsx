@@ -47,7 +47,7 @@ export function ValuationSummaryCard({ item, quote }: { item: ValuationSummary; 
         <dd className="text-xs text-gray-400">{valuationSummaryText(fair.label, locale)}{fair.as_of ? ` · ${formatMarketDate(fair.as_of)}` : ''}{fair.stale ? ` · ${t('researchShared.valuationSummary.reviewAge')}` : ''}</dd>
         {fair.value == null && fair.reason ? <dd className="text-xs text-gray-400">{valuationSummaryText(fair.reason, locale)}</dd> : null}
         {baseRate ? <dd className="text-xs text-gray-500">{baseRate}</dd> : null}</div>
-      <div><dt className="text-gray-400">{t('researchShared.valuationSummary.margin')}</dt><dd className="text-gray-100">{margin === null ? na : formatPercent(margin)}</dd><dd className="text-xs text-gray-500">{t('researchShared.valuationSummary.marginHelp')}</dd></div>
+      <div><dt className="text-gray-400">{t('researchShared.valuationSummary.margin')}</dt><dd className="text-gray-100">{margin === null ? na : formatPercent(margin)}</dd></div>
       <div><dt className="text-gray-400">{t('researchShared.valuationSummary.reverseDcf')}</dt><dd className="text-gray-100">{r.status === 'ok' && r.required_revenue_growth != null ? t('researchShared.valuationSummary.perYear', { pct: formatPercent(r.required_revenue_growth) }) : na}</dd>
         {r.as_of ? <dd className="text-xs text-gray-400">{valuationSummaryText(r.source, locale)} · {formatMarketDate(r.as_of)}{r.market_price != null && fair.currency && isValidCurrencyCode(fair.currency) ? t('researchShared.valuationSummary.modelPrice', { price: formatPrice(r.market_price, fair.currency) }) : ''}. {t('researchShared.valuationSummary.scenarioNote')}</dd> : null}
         {r.status !== 'ok' && r.reason ? <dd className="text-xs text-gray-400">{valuationSummaryText(r.reason, locale)}</dd> : null}
@@ -58,7 +58,7 @@ export function ValuationSummaryCard({ item, quote }: { item: ValuationSummary; 
     <details className="mt-3 text-xs text-gray-400"><summary className="min-h-[44px] cursor-pointer py-3 text-teal-300">{t('researchShared.valuationSummary.details')}</summary>
       {health.reason ? <p className="my-2">{valuationSummaryText(health.reason, locale)}</p> : null}
       <ul className="space-y-3">{p.signals.map(signal => <li key={signal.id} className="border-t border-gray-800 pt-2"><p className="text-gray-200">{piotroskiSignalText(signal, locale).label}: {signal.point ?? na}</p><p className="mt-1 break-words">{piotroskiSignalText(signal, locale).formula}</p>{signal.missing_input ? <p>{t('researchShared.valuationSummary.pending', { item: healthMissingLabel(signal.missing_input, locale) })}</p> : null}<Evidence evidence={signal.evidence} /></li>)}</ul>
-      <p className="mt-3">Altman Z&apos;&apos;: {z.score == null ? na : z.score.toLocaleString(intlLocale(locale), { maximumFractionDigits: 2 })}. {t('researchShared.valuationSummary.altmanNote')}</p>
+      <p className="mt-3">Altman Z: {z.score == null ? na : z.score.toLocaleString(intlLocale(locale), { maximumFractionDigits: 2 })}. {t('researchShared.valuationSummary.altmanNote')}</p>
       {z.reason ? <p>{t('researchShared.valuationSummary.pending', { item: healthMissingLabel(z.reason, locale) })}</p> : null}<Evidence evidence={z.evidence ?? []} />
       <p className="mt-2">{valuationSummaryText(health.notice, locale)} {t('researchShared.valuationSummary.profitNote')}</p>
       <p className="mt-2 flex flex-wrap gap-x-4"><a className="inline-flex min-h-[44px] items-center underline" target="_blank" rel="noopener noreferrer" href={p.methodology_url}>{t('researchShared.valuationSummary.piotroskiMethod')}</a><a className="inline-flex min-h-[44px] items-center underline" target="_blank" rel="noopener noreferrer" href={z.methodology_url}>{t('researchShared.valuationSummary.altmanMethod')}</a></p>
@@ -82,6 +82,9 @@ export default function ValuationSummaryGrid({ quotes }: { quotes: SummaryQuote[
   const current = loaded?.key === key ? loaded : null;
   return <section aria-label={t('researchShared.valuationSummary.title')} className="min-w-0 space-y-3">
     <h2 className="text-lg font-semibold text-gray-100">{t('researchShared.valuationSummary.title')}</h2>
+    {/* La formula del margen se explica una vez por seccion: antes iba en cada
+        tarjeta y se repetia tantas veces como empresas (6+ en cartera). */}
+    <p className="text-xs text-gray-500">{t('researchShared.valuationSummary.marginHelp')}</p>
     {!current ? <p role="status" className="text-sm text-gray-400">{t('researchShared.valuationSummary.loading')}</p> : current.failed ? <p className="text-sm text-gray-400">{t('researchShared.valuationSummary.failed')}</p> : <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">{Object.values(current.items).map(item => <ValuationSummaryCard key={item.ticker} item={item} quote={quotes.find(q => q.symbol.toUpperCase() === item.ticker) ?? { symbol: item.ticker, price: null, currency: null }} />)}{Object.keys(current.items).length === 0 ? <p className="text-sm text-gray-400">{t('researchShared.valuationSummary.empty')}</p> : null}</div>}
   </section>;
 }
