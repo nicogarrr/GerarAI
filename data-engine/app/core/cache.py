@@ -93,6 +93,20 @@ def tenant_from_first_db_arg(args: Any, kwargs: Any) -> int | None:
     return _tenant_from_db(db) if db is not None else None
 
 
+def tenant_from_method_db_arg(args: Any, kwargs: Any) -> int | None:
+    """extract_tenant para metodos cuya Session es el segundo argumento.
+
+    El decorador asume (self, db, ...); este extractor cubre ademas la
+    llamada con ``db=``. Lo comparten los servicios cacheados (DCA schedule,
+    valoracion de cartera) para que la clave quede aislada por tenant con la
+    misma regla.
+    """
+    db = kwargs.get("db")
+    if db is None and len(args) >= 2:
+        db = args[1]
+    return _tenant_from_db(db) if db is not None else None
+
+
 def _json_default(value: Any) -> Any:
     """Serializa tipos no-JSON de forma estable entre miss y hit.
 
