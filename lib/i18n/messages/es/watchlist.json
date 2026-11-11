@@ -52,6 +52,16 @@
     "peFy": "PER (FY)",
     "readTimedOut": "La lectura tardó más de 3 s; recarga para verla.",
     "peNotCovered": "La fuente no cubre el PER de este mercado.",
+    "peNd": {
+      "loss": "En pérdidas: BPA FY{year} negativo, sin PER.",
+      "lossUndated": "En pérdidas: BPA negativo, sin PER.",
+      "currency": "BPA en {eps} y precio en {quote}: no se mezclan divisas.",
+      "fx": "Sin tipo de cambio para pasar el cierre a la divisa de las cuentas.",
+      "split": "Split reciente: el cierre aún no es comparable con el BPA.",
+      "stale": "Último BPA anual de FY{year}: demasiado antiguo.",
+      "staleUndated": "Último BPA anual demasiado antiguo.",
+      "other": "Sin base verificable para el PER."
+    },
     "analystTitle": "Consenso medio de precios objetivo por firma. Fuente no oficial.",
     "analystTarget": "Obj. analistas",
     "viewAnalysisOf": "Ver análisis de {symbol}",

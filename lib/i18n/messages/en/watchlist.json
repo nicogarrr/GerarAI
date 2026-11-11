@@ -52,6 +52,16 @@
     "peFy": "P/E (FY)",
     "readTimedOut": "The read took more than 3 s; reload to see it.",
     "peNotCovered": "The source does not cover P/E for this market.",
+    "peNd": {
+      "loss": "Loss-making: FY{year} EPS negative, no P/E.",
+      "lossUndated": "Loss-making: negative EPS, no P/E.",
+      "currency": "EPS in {eps} and price in {quote}: currencies are not mixed.",
+      "fx": "No exchange rate to convert the close to the reporting currency.",
+      "split": "Recent split: the close is not yet comparable with EPS.",
+      "stale": "Latest annual EPS is FY{year}: too old.",
+      "staleUndated": "Latest annual EPS is too old.",
+      "other": "No verifiable basis for P/E."
+    },
     "analystTitle": "Average analyst price target across firms. Unofficial source.",
     "analystTarget": "Analyst target",
     "viewAnalysisOf": "View analysis of {symbol}",
