@@ -8,6 +8,7 @@ import { isValidCurrencyCode } from '@/lib/format';
 import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 import { intlLocale } from '@/lib/i18n/locale';
 import { metricLabel } from '@/lib/research/metric-labels';
+import { readableMissingReason } from '@/lib/research/missing-reason';
 
 export type SummaryQuote = { symbol: string; price: number | null; currency: string | null };
 
@@ -45,7 +46,7 @@ export function ValuationSummaryCard({ item, quote }: { item: ValuationSummary; 
     <dl className="mt-3 space-y-3 text-sm">
       <div><dt className="text-gray-400">{t('researchShared.valuationSummary.fairValue')}</dt><dd className="text-gray-100">{fair.value != null && fair.currency && isValidCurrencyCode(fair.currency) ? formatPrice(fair.value, fair.currency) : na}</dd>
         <dd className="text-xs text-gray-400">{valuationSummaryText(fair.label, locale)}{fair.as_of ? ` · ${formatMarketDate(fair.as_of)}` : ''}{fair.stale ? ` · ${t('researchShared.valuationSummary.reviewAge')}` : ''}</dd>
-        {fair.value == null && fair.reason ? <dd className="text-xs text-gray-400">{valuationSummaryText(fair.reason, locale)}</dd> : null}
+        {fair.value == null && fair.reason ? <dd className="text-xs text-gray-400">{readableMissingReason(valuationSummaryText(fair.reason, locale), locale)}</dd> : null}
         {baseRate ? <dd className="text-xs text-gray-500">{baseRate}</dd> : null}</div>
       <div><dt className="text-gray-400">{t('researchShared.valuationSummary.margin')}</dt><dd className="text-gray-100">{margin === null ? na : formatPercent(margin)}</dd></div>
       <div><dt className="text-gray-400">{t('researchShared.valuationSummary.reverseDcf')}</dt><dd className="text-gray-100">{r.status === 'ok' && r.required_revenue_growth != null ? t('researchShared.valuationSummary.perYear', { pct: formatPercent(r.required_revenue_growth) }) : na}</dd>

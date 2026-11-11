@@ -2078,7 +2078,7 @@
     "userEstimatesLabel": "Supuestos del usuario, no validados contra histórico.",
     "consensusTitle": "Consenso propio de GerarAI (estimación, aún sin presentar)",
     "consensusNone": "sin estimación propia con las fuentes disponibles",
-    "consensusNote": "Cada celda sale de la primera fuente disponible en orden fijo: guía de la empresa → analistas citados → modelo propio → tasa base de la SEC. Pasa el ratón por la cifra para ver su fórmula; el enlace abre la fuente citada. El BPA del modelo escala el BPA del mismo periodo anterior con el beneficio operativo estimado (acciones, intereses e impuestos constantes).",
+    "consensusNote": "Cada celda sale de la primera fuente disponible en orden fijo: guía de la empresa → analistas citados → modelo propio → tasa base de la SEC. «Fórmula» bajo cada cifra muestra cómo se calcula; el enlace abre la fuente citada. El BPA del modelo escala el BPA del mismo periodo anterior con el beneficio operativo estimado (acciones, intereses e impuestos constantes).",
     "operatingIncome": "Beneficio operativo",
     "eps": "BPA diluido",
     "consensusSource": {
@@ -2123,7 +2123,9 @@
     },
     "reachEq": "Lo logró el {pct} de comparables en 1 año",
     "reachLt": "Lo logró menos del {pct} de comparables en 1 año",
-    "reachGt": "Lo logró más del {pct} de comparables en 1 año"
+    "reachGt": "Lo logró más del {pct} de comparables en 1 año",
+    "rangeNone": "Sin escenarios en la tesis publicada ni rango del motor",
+    "formula": "Fórmula"
   },
   "insidersV2": {
     "title": "Insiders (Form 4 y 5)",
