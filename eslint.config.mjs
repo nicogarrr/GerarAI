@@ -2,7 +2,12 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTypescript from "eslint-config-next/typescript";
 
 const eslintConfig = [
-  ...nextVitals,
+  // Next omits .cjs from its JS preset, while our policy overrides apply
+  // globally. Include CommonJS in the preset too, with the same plugins and
+  // rules: never disable the hook policy or silently ignore browser tests.
+  ...nextVitals.map((config) => config.files && config.plugins?.["react-hooks"]
+    ? { ...config, files: [...config.files, "**/*.cjs"] }
+    : config),
   ...nextTypescript,
   {
     ignores: [

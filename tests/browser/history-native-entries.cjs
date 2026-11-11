@@ -1,15 +1,15 @@
 // Run: node tests/browser/history-native-entries.cjs
 // Isolated same-document browser regression, no app server or credentials.
-const { chromium } = require('playwright');
-const ts = require('typescript');
-const fs = require('node:fs');
-const assert = require('node:assert/strict');
-const http = require('node:http');
+(async () => {
+const { chromium } = await import('playwright');
+const { default: ts } = await import('typescript');
+const fs = await import('node:fs');
+const { default: assert } = await import('node:assert/strict');
+const http = await import('node:http');
 const source = ['lib/nav/in-app-history.ts', 'lib/nav/browser-history.ts'].map(file =>
     ts.transpileModule(fs.readFileSync(file, 'utf8').replace(/^import .*;\n/gm, '').replace(/export /g, ''),
         { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText
 ).join('\n');
-(async () => {
     const server = http.createServer((_, res) => res.end('<html><body>History test</body></html>')).listen(0, '127.0.0.1');
     await new Promise(resolve => server.once('listening', resolve));
     const browser = await chromium.launch({ headless: true });
