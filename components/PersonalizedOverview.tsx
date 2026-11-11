@@ -9,7 +9,7 @@ import {
     summarizeDcfProbe,
     type DcfScope,
 } from '@/lib/overview/dcf-candidates';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,8 +24,8 @@ import {
     getHomeOpportunities,
     type HomeOpportunity,
     type HomeWatchlistItem,
+    type HomeWatchlistPreview,
 } from '@/lib/actions/home-overview.actions';
-import { getHomeOverviewBundle, type HomeOverviewBundle } from '@/lib/actions/home-bundle.actions';
 import { sectionErrorKey } from '@/lib/section-error';
 import {
     getRecentTriggeredAlerts,
@@ -282,6 +282,26 @@ function settle<T>(promise: Promise<T>, fallback: T): Promise<{ data: T; error: 
         .catch((error) => ({ data: fallback, error: sectionErrorKey(error) }));
 }
 
+type HomeSectionResponse<T> = { data: T; error: string | null };
+
+// Primera carga: UNA petición por sección a sus route handlers
+// (app/api/home/*). Las server actions de un cliente se ejecutan en serie
+// y el POST agrupado anterior devolvía las tres secciones a la vez: la más
+// rápida esperaba a la más lenta (cartera lista a los 64 ms, respuesta a
+// los 344 ms por la watchlist; medido en prod, 11-nov-2026). Los fetch a
+// route handlers corren EN PARALELO y cada sección pinta en cuanto llega.
+// Oportunidades sigue aparte (sondeo DCF ~7 s, debajo del pliegue) y los
+// «Reintentar» usan la lectura suelta (server action individual).
+async function fetchHomeSection<T>(url: string, fallback: T): Promise<HomeSectionResponse<T>> {
+    try {
+        const response = await fetch(url, { headers: { Accept: 'application/json' } });
+        if (!response.ok) return { data: fallback, error: sectionErrorKey(new Error(String(response.status))) };
+        return (await response.json()) as HomeSectionResponse<T>;
+    } catch (error) {
+        return { data: fallback, error: sectionErrorKey(error) };
+    }
+}
+
 export default function PersonalizedOverview({ userId, afterAlerts }: PersonalizedOverviewProps) {
     const t = useT();
     // Cifras y fechas con el formato del idioma elegido (antes siempre es-ES).
@@ -307,33 +327,12 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
     const retrySection = (section: SectionKey) =>
         setRetryTokens((tokens) => ({ ...tokens, [section]: tokens[section] + 1 }));
 
-    // Primera carga: las TRES lecturas rápidas en UNA server action (Next
-    // ejecuta en serie las server actions de un cliente). Oportunidades NO
-    // va en ese POST: su sondeo DCF cotiza con proveedores externos en
-    // síncrono (~7 s medidos en prod, 31-oct) y, al compartir promesa,
-    // hacía esperar a cartera, alertas y watchlist esos ~7 s antes de
-    // pintar. Se pide aparte, tras el primer pintado (debajo del pliegue).
-    // Cada sección toma su parte; los «Reintentar» usan la lectura suelta.
-    const bundleRef = useRef<{ userId: string; promise: Promise<HomeOverviewBundle> } | null>(null);
-    const firstLoad = useCallback(<K extends keyof HomeOverviewBundle>(
-        key: K,
-        fallback: HomeOverviewBundle[K]['data'],
-    ): Promise<{ data: HomeOverviewBundle[K]['data']; error: string | null }> => {
-        if (!bundleRef.current || bundleRef.current.userId !== userId) {
-            bundleRef.current = {
-                userId,
-                promise: getHomeOverviewBundle(userId, {
-                    watchlistLimit: WATCHLIST_PREVIEW_LIMIT,
-                }),
-            };
-        }
-        return bundleRef.current.promise
-            .then((bundle) => bundle[key])
-            .catch((error) => ({ data: fallback, error: sectionErrorKey(error) }));
-    }, [userId]);
 
     // Una sección, un disparador: cada «Reintentar» vuelve a pedir solo su
     // lectura (antes los cuatro reintentos relanzaban el loadData completo).
+    // TODAS las secciones dependen también de userId: un cambio de cuenta sin
+    // desmontar el componente relanza las tres lecturas y el flag `active`
+    // descarta la respuesta tardía de la cuenta anterior.
     useEffect(() => {
         let active = true;
 
@@ -341,7 +340,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
             setPortfolioLoading(true);
             setPortfolioError(null);
             const result = retryTokens.portfolio === 0
-                ? await firstLoad('portfolio', null)
+                ? await fetchHomeSection('/api/home/portfolio', null as PortfolioSummary | null)
                 : await settle(getPortfolioSummary(userId), null as PortfolioSummary | null);
             if (!active) return;
             setPortfolioSummary(result.data);
@@ -353,7 +352,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         return () => {
             active = false;
         };
-    }, [userId, retryTokens.portfolio, firstLoad]);
+    }, [userId, retryTokens.portfolio]);
 
     useEffect(() => {
         let active = true;
@@ -362,7 +361,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
             setAlertsLoading(true);
             setAlertsError(null);
             const result = retryTokens.alerts === 0
-                ? await firstLoad('alerts', { rules: [], triggered: [] })
+                ? await fetchHomeSection('/api/home/alerts', { rules: [] as Alert[], triggered: [] as TriggeredAlertDelivery[] })
                 : await settle(
                     Promise.all([getUserAlerts(), getRecentTriggeredAlerts(3)]).then(([rules, triggered]) => ({ rules, triggered })),
                     { rules: [] as Alert[], triggered: [] as TriggeredAlertDelivery[] },
@@ -378,7 +377,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         return () => {
             active = false;
         };
-    }, [retryTokens.alerts, firstLoad]);
+    }, [userId, retryTokens.alerts]);
 
     // Solo se cotizan las primeras WATCHLIST_PREVIEW_LIMIT entradas: el resto
     // son un contador y un enlace a /watchlist, no filas anónimas.
@@ -389,7 +388,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
             setWatchlistLoading(true);
             setWatchlistError(null);
             const result = retryTokens.watchlist === 0
-                ? await firstLoad('watchlist', { unavailable: false, total: 0, items: [] })
+                ? await fetchHomeSection(`/api/home/watchlist?limit=${WATCHLIST_PREVIEW_LIMIT}`, { unavailable: false, total: 0, items: [] as WatchlistItem[] } as HomeWatchlistPreview)
                 : await settle(
                     getHomeWatchlistPreview(WATCHLIST_PREVIEW_LIMIT).then((preview) => {
                         if (preview.unavailable) throw new Error('No se pudo cargar la watchlist');
@@ -416,7 +415,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         return () => {
             active = false;
         };
-    }, [retryTokens.watchlist, firstLoad]);
+    }, [userId, retryTokens.watchlist]);
 
     useEffect(() => {
         let active = true;
@@ -424,8 +423,8 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         const load = async () => {
             setOpportunitiesLoading(true);
             setOpportunitiesError(null);
-            // Siempre lectura propia, también en primera carga: no forma
-            // parte del bundle del primer pintado (ver nota sobre firstLoad).
+            // Siempre lectura propia, también en primera carga: nunca se
+            // mezcla con las secciones rápidas del primer pintado.
             const probe = await settle(
                 getHomeOpportunities({
                     marketCapMoreThan: MIN_MARKET_CAP,
@@ -460,7 +459,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         return () => {
             active = false;
         };
-    }, [retryTokens.opportunities, firstLoad]);
+    }, [userId, retryTokens.opportunities]);
 
     // Derivados memorizados: evita reordenar el estado en cada render
     // (.sort() mutaba el array del estado) y recalcula solo si cambian los datos.

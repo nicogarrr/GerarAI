@@ -1,11 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// El inicio pide sus TRES secciones rápidas en UNA server action (Next
-// ejecuta en serie las server actions de un cliente). Oportunidades va en
-// su propia llamada tras el primer pintado: su sondeo DCF cotiza con
-// proveedores externos en síncrono (~7 s medidos en prod, 31-oct) y retenía
-// el POST entero del primer pintado.
+// El inicio pide sus TRES secciones rápidas en PARALELO a route handlers
+// propios (app/api/home/*): las server actions de un cliente se ejecutan en
+// serie y el POST agrupado anterior devolvía las tres secciones a la vez, así
+// la más rápida esperaba a la más lenta (cartera 64 ms, respuesta 344 ms por
+// la watchlist; medido en prod, 11-nov-2026). Oportunidades va en su propia
+// llamada: su sondeo DCF cotiza con proveedores externos en síncrono (~7 s
+// medidos en prod, 31-oct).
 
 vi.mock('@/components/HomeAttention', () => ({ default: () => <div>Atención aislada</div> }));
 
@@ -15,7 +17,6 @@ const getRecentTriggeredAlerts = vi.fn();
 const getHomeWatchlistPreview = vi.fn();
 const getHomeOpportunities = vi.fn();
 const getHoldingSignals = vi.fn();
-const getHomeOverviewBundle = vi.fn();
 
 vi.mock('@/lib/actions/portfolio.actions', () => ({ getPortfolioSummary: (...a: unknown[]) => getPortfolioSummary(...a) }));
 vi.mock('@/lib/actions/alerts.actions', () => ({
@@ -26,7 +27,6 @@ vi.mock('@/lib/actions/home-overview.actions', () => ({
     getHomeWatchlistPreview: (...a: unknown[]) => getHomeWatchlistPreview(...a),
     getHomeOpportunities: (...a: unknown[]) => getHomeOpportunities(...a),
 }));
-vi.mock('@/lib/actions/home-bundle.actions', () => ({ getHomeOverviewBundle: (...a: unknown[]) => getHomeOverviewBundle(...a) }));
 vi.mock('@/lib/actions/holding-signals.actions', () => ({ getHoldingSignals: (...a: unknown[]) => getHoldingSignals(...a) }));
 vi.mock('@/components/portfolio/PortfolioValueBreakdown', () => ({
     PortfolioValueBreakdown: ({ summary }: { summary: { totalValue: number } }) => <div>desglose {summary.totalValue}</div>,
@@ -37,47 +37,119 @@ vi.mock('@/components/research/ExternalNewsHeadline', () => ({
 
 import PersonalizedOverview from '@/components/PersonalizedOverview';
 
-const summary = {
-    totalValue: 5000, totalCost: 4000, totalGain: 1000, totalGainPercent: 25, holdings: [], equityValue: 4000, cash: 1000,
+const holding = {
+    symbol: 'AAPL', quantity: 1, avgPrice: 10, currentPrice: 12, valuationHold: null, value: 1200, cost: 1000, gain: 200,
+    gainPercent: 20, nativeCurrency: 'USD', baseCurrency: 'EUR', fxMissing: false, nativeGain: null, nativeCost: null,
+    valueMissing: false, firstBuyDate: null, holdingDays: null, fiscalBucket: null,
 };
 
+const summary = {
+    totalValue: 5000, totalCost: 4000, totalGain: 1000, totalGainPercent: 25, holdings: [holding], equityValue: 4000, cash: 1000,
+};
+
+type Resolver = (response: Response) => void;
+
 describe('PersonalizedOverview primera carga', () => {
+    const fetchMock = vi.fn();
+    const pending = new Map<string, Resolver[]>();
+
+    const respond = (urlPart: string, body: unknown) => {
+        const resolvers = pending.get(urlPart) ?? [];
+        const [first, ...rest] = resolvers;
+        first?.(Response.json(body));
+        pending.set(urlPart, rest);
+    };
+
     beforeEach(() => {
         vi.clearAllMocks();
+        pending.clear();
+        // Cada sección cuelga hasta que el test la resuelve: así se fija
+        // qué se pide y que ninguna sección espera a otra.
+        fetchMock.mockImplementation((url: RequestInfo | URL) => new Promise<Response>((resolve) => {
+            const key = String(url);
+            pending.set(key, [...(pending.get(key) ?? []), resolve]);
+        }));
+        vi.stubGlobal('fetch', fetchMock);
         getHoldingSignals.mockResolvedValue({ fairValues: {}, dca: null });
-        getHomeOverviewBundle.mockResolvedValue({
-            portfolio: { data: summary, error: null },
-            alerts: { data: { rules: [], triggered: [] }, error: null },
-            watchlist: { data: { unavailable: false, total: 0, items: [] }, error: null },
-        });
         getHomeOpportunities.mockRejectedValue(new Error('sin red'));
     });
 
-    it('una sola server action para las tres secciones rápidas, ninguna lectura suelta', async () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it('tres fetch en paralelo (uno por sección), ninguna server action suelta', async () => {
         render(<PersonalizedOverview userId="u1" />);
-        await waitFor(() => expect(screen.queryAllByText(/Cargando(?:…|\.\.\.)/u)).toHaveLength(0));
-        expect(getHomeOverviewBundle).toHaveBeenCalledTimes(1);
-        expect(getHomeOverviewBundle).toHaveBeenCalledWith('u1', expect.objectContaining({ watchlistLimit: 3 }));
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+        const urls = fetchMock.mock.calls.map((call) => String(call[0]));
+        expect(urls).toContain('/api/home/portfolio');
+        expect(urls).toContain('/api/home/alerts');
+        expect(urls).toContain('/api/home/watchlist?limit=3');
         for (const read of [getPortfolioSummary, getUserAlerts, getRecentTriggeredAlerts, getHomeWatchlistPreview]) {
             expect(read).not.toHaveBeenCalled();
         }
-        // El error de una sección se queda en su sección.
-        expect((await screen.findAllByText(/No se pudieron cargar los datos/)).length).toBeGreaterThan(0);
     });
 
-    it('oportunidades se piden APARTE tras el primer pintado, nunca en el bundle', async () => {
+    it('cada sección pinta en cuanto llega: cartera no espera a la watchlist', async () => {
         render(<PersonalizedOverview userId="u1" />);
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+        // La watchlist sigue colgada: cartera y alertas responden ya.
+        respond('/api/home/portfolio', { data: summary, error: null });
+        respond('/api/home/alerts', { data: { rules: [], triggered: [] }, error: null });
+        expect(await screen.findByText('desglose 5000')).toBeInTheDocument();
+        // La sección de watchlist sigue cargando (skeleton presente): no
+        // hubo que esperarla para pintar cartera.
+        expect(screen.queryAllByText(/Cargando(?:…|\.\.\.)/u).length).toBeGreaterThan(0);
+        // Al llegar la watchlist, su sección termina sin tocar a las demás.
+        respond('/api/home/watchlist?limit=3', { data: { unavailable: false, total: 0, items: [] }, error: null });
         await waitFor(() => expect(screen.queryAllByText(/Cargando(?:…|\.\.\.)/u)).toHaveLength(0));
-        // Regression: en main las oportunidades viajaban DENTRO del POST del
-        // bundle (firstLoad('opportunities')) y su sondeo DCF (~7 s medidos
-        // en prod) hacía esperar a cartera, alertas y watchlist; además el
-        // componente no llamaba a getHomeOpportunities en la primera carga.
+    });
+
+    it('el error de una sección se queda en su sección', async () => {
+        render(<PersonalizedOverview userId="u1" />);
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+        respond('/api/home/portfolio', { data: summary, error: null });
+        respond('/api/home/alerts', { data: { rules: [], triggered: [] }, error: 'ui.sectionError.generic' });
+        respond('/api/home/watchlist?limit=3', { data: { unavailable: false, total: 0, items: [] }, error: null });
+        expect(await screen.findByText('desglose 5000')).toBeInTheDocument();
+        // Oportunidades (rechazada) + alertas: dos secciones con aviso, la
+        // cartera intacta.
+        await waitFor(() => expect(screen.queryAllByText(/No se pudieron cargar los datos/).length).toBeGreaterThanOrEqual(2));
+    });
+
+    it('oportunidades se piden APARTE tras el primer pintado, nunca en las secciones rápidas', async () => {
+        render(<PersonalizedOverview userId="u1" />);
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+        // Regression: en su día las oportunidades viajaban DENTRO del primer
+        // POST (sondeo DCF ~7 s medidos en prod) y retenían el pintado de
+        // cartera, alertas y watchlist.
         expect(getHomeOpportunities).toHaveBeenCalledTimes(1);
         expect(getHomeOpportunities).toHaveBeenCalledWith(
             expect.objectContaining({ marketCapMoreThan: expect.any(Number), limit: 10, candidateLimit: expect.any(Number) }),
         );
-        const bundleArgs = getHomeOverviewBundle.mock.calls[0]?.[1] ?? {};
-        expect(bundleArgs).not.toHaveProperty('marketCapMoreThan');
-        expect(bundleArgs).not.toHaveProperty('candidateLimit');
+        for (const call of fetchMock.mock.calls) {
+            expect(String(call[0])).not.toContain('opportunities');
+        }
+    });
+
+    it('cambio de cuenta relanza las tres secciones y descarta la respuesta tardía de la anterior', async () => {
+        const { rerender } = render(<PersonalizedOverview userId="u1" />);
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+        respond('/api/home/portfolio', { data: summary, error: null });
+        respond('/api/home/alerts', { data: { rules: [], triggered: [] }, error: null });
+        expect(await screen.findByText('desglose 5000')).toBeInTheDocument();
+
+        // Mismo componente, otra cuenta: las TRES secciones se relanzan.
+        // Regresión medida por el auditor: solo cartera recargaba (4 fetch).
+        rerender(<PersonalizedOverview userId="u2" />);
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
+
+        // La respuesta TARDÍA de la cuenta anterior no puede pisar la sección.
+        respond('/api/home/watchlist?limit=3', { data: { unavailable: false, total: 1, items: [{ symbol: 'VIE1', name: 'Cuenta Vieja SA', price: 1, currency: 'EUR', changePercent: 0, priceKind: 'live', priceAsOf: null }] }, error: null });
+        respond('/api/home/portfolio', { data: summary, error: null });
+        respond('/api/home/alerts', { data: { rules: [], triggered: [] }, error: null });
+        respond('/api/home/watchlist?limit=3', { data: { unavailable: false, total: 1, items: [{ symbol: 'NUE1', name: 'Cuenta Nueva SA', price: 2, currency: 'EUR', changePercent: 0, priceKind: 'live', priceAsOf: null }] }, error: null });
+        expect(await screen.findByText('Cuenta Nueva SA')).toBeInTheDocument();
+        expect(screen.queryByText('Cuenta Vieja SA')).not.toBeInTheDocument();
     });
 });

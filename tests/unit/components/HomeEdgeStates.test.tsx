@@ -15,6 +15,22 @@ vi.mock('@/lib/actions/home-overview.actions', () => ({
 }));
 vi.mock('@/lib/actions/holding-signals.actions', () => ({ getHoldingSignals: async () => ({ fairValues: {}, dca: null }) }));
 
+import { GET as homePortfolioGET } from '@/app/api/home/portfolio/route';
+import { GET as homeAlertsGET } from '@/app/api/home/alerts/route';
+import { GET as homeWatchlistGET } from '@/app/api/home/watchlist/route';
+import { NextRequest } from 'next/server';
+
+// La primera carga pide cada sección a su route handler; aquí se llaman los
+// handlers REALES contra las lecturas simuladas de arriba (mismo contrato
+// {data, error} que en producción).
+vi.stubGlobal('fetch', (url: RequestInfo | URL): Promise<Response> => {
+    const u = String(url);
+    if (u.startsWith('/api/home/portfolio')) return homePortfolioGET();
+    if (u.startsWith('/api/home/alerts')) return homeAlertsGET();
+    if (u.startsWith('/api/home/watchlist')) return homeWatchlistGET(new NextRequest(`http://localhost${u}`));
+    return Promise.resolve(Response.json({ error: 'no encontrada' }, { status: 404 }));
+});
+
 import PersonalizedOverview from '@/components/PersonalizedOverview';
 import { LocaleProvider } from '@/lib/i18n/client';
 

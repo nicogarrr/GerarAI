@@ -175,6 +175,9 @@ function rawFetchCalls(file: string): { calls: Call[]; dynamic: number } {
  *  - privacy.actions: backendUrl() tipa el path como union de literales '/api/privacy/export' | '/api/privacy/account' (ambos en OpenAPI).
  *  - lib/research/zip-proxy: el helper de las rutas .zip (vault y tesis); path literal o con ticker, ambos en OpenAPI.
  *  - live-quotes, screener, newsSources, finnhub, propicksSignals: URLs de PROVEEDORES externos (Yahoo, Finnhub, FRED, stooq, Alpha Vantage, NewsAPI, Marketaux); ninguna toca '/api/'.
+ *  - PersonalizedOverview (2026-11-11): fetchHomeSection(url, …) recibe la URL, pero los únicos valores posibles
+ *    son los 3 literales de sus llamadas ('/api/home/portfolio', '/api/home/alerts',
+ *    `/api/home/watchlist?limit=${WATCHLIST_PREVIEW_LIMIT}`), que casan con app/api/home/{portfolio,alerts,watchlist}/route.ts.
  */
 const DYNAMIC_KNOWN: Record<string, number> = {
     'lib/research/zip-proxy.ts': 1,
@@ -189,6 +192,7 @@ const DYNAMIC_KNOWN: Record<string, number> = {
     // empresa, validado por isSafeIconUrl en site-icon), nunca a /api/.
     'app/api/logo/[ticker]/route.ts': 1,
     'lib/utils/propicksSignals.ts': 1,
+    'components/PersonalizedOverview.tsx': 1,
 };
 
 test('contrato: todo fetch() crudo a /api/ apunta a una ruta que existe', () => {
