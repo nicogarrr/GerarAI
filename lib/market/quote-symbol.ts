@@ -15,6 +15,11 @@ const US_EXCHANGE_TOKENS = ['NYSE', 'NEW YORK', 'NASDAQ', 'AMEX', 'BATS', 'ARCA'
 
 const EXCHANGE_YAHOO_SUFFIX: Record<string, string> = {
     BME: '.MC',
+    // Códigos cortos de plaza del master (bolsa «EPA»/«TSX»): verificado
+    // contra Yahoo chart API 2026-11-11 (AIR.PA: PAR/EUR; FFH.TO: TOR/CAD).
+    // Sin ellos AIR.PA y FFH.TO no tenían línea de cotización.
+    EPA: '.PA',
+    TSX: '.TO',
     'BOLSA DE MADRID': '.MC',
     'NYSE EURONEXT - EURONEXT AMSTERDAM': '.AS',
     'TORONTO STOCK EXCHANGE': '.TO',

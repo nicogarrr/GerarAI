@@ -12,6 +12,7 @@
     },
     "capGap": {
       "timedOut": "la lectura tardó más de 3 s; recarga para verla",
+      "readFailed": "no se pudo leer a tiempo (el servidor tardó o dio error); recarga para verla",
       "notApplicable": "la fuente no cubre la capitalización de ese mercado",
       "unverifiable": "la fuente no facilita una capitalización verificable"
     },
@@ -52,6 +53,7 @@
     "peTtm": "PER (TTM)",
     "peFy": "PER (FY)",
     "readTimedOut": "La lectura tardó más de 3 s; recarga para verla.",
+    "readFailed": "No se pudo leer a tiempo (el servidor tardó o dio error); recarga para verla.",
     "peNotCovered": "La fuente no cubre el PER de este mercado.",
     "peNd": {
       "loss": "En pérdidas: BPA FY{year} negativo, sin PER.",

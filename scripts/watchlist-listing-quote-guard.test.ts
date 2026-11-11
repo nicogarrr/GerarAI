@@ -45,7 +45,13 @@ test('métricas Finnhub solo para líneas US (nunca del ADR ni de un homónimo)'
 });
 
 test('sin correspondencia validada: «sin datos», nunca el ticker desnudo', () => {
-    assert.match(action, /if \(!quoteSymbol\) return base;/);
+    // Sin línea validada no se cotiza nada (ni el gemelo US ni un sufijo
+    // adivinado); solo se añaden las cifras propias del backend (cap/PER de su
+    // base, que no dependen de la cotización: r5-valor2, AIR.PA 11-nov-2026).
+    assert.match(action, /if \(!quoteSymbol\) return withBackendMetrics\(base, await fetchBackendMetrics\(normalized\)\);/);
+    const helper = action.slice(action.indexOf('function withBackendMetrics'), action.indexOf('export async function getWatchlistEntryData'));
+    assert.ok(helper.length > 0 && !/getStockQuote|getStockValuationBasics/.test(helper), 'sin línea validada no se pide cotización ni métricas Finnhub');
+    assert.match(helper, /price: null|\.\.\.base/);
 });
 
 test('la divisa visible la pone solo el master: nunca un USD inventado', () => {
