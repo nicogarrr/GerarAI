@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pre-push rapido (articulo de Owen/Boardy: pillar los fallos antes de CI).
 # Solo ficheros CAMBIADOS respecto al remoto: eslint (ts/tsx) y ruff (py de
-# data-engine), mas tsc --noEmit si hay cambios ts/tsx (salta con SKIP_TSC=1).
+# data-engine), mas npm run typecheck si hay cambios ts/tsx (salta con SKIP_TSC=1).
 # Saltar todo: git push --no-verify. Sin dependencias nuevas.
 #
 # Reglas duras (feedback del piloto):
@@ -63,8 +63,8 @@ if [ "$ts_count" -gt 0 ]; then
   echo "pre-push: eslint ($ts_count ficheros)"
   xargs -0 npx eslint < "$ts_list" || rc=1
   if [ "${SKIP_TSC:-0}" != "1" ]; then
-    echo "pre-push: tsc --noEmit (proyecto completo; SKIP_TSC=1 lo salta)"
-    npx tsc --noEmit || rc=1
+    echo "pre-push: npm run typecheck (todos los proyectos; SKIP_TSC=1 lo salta)"
+    npm run typecheck || rc=1
   fi
 fi
 if [ "$py_count" -gt 0 ]; then

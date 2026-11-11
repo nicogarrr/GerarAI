@@ -47,13 +47,13 @@ function makeShims(dir: string) {
     const bin = join(dir, 'bin');
     mkdirSync(bin);
     const log = join(dir, 'lint.log');
-    for (const tool of ['npx', 'uv']) {
-        writeFileSync(join(bin, tool), `#!/bin/sh\nprintf '%s\\n' "$@" >> "${log}"\nexit 0\n`, { mode: 0o755 });
+    for (const tool of ['npx', 'uv', 'npm']) {
+        writeFileSync(join(bin, tool), `#!/bin/sh\nprintf '%s\\n' "$@" >> "${log}"\n[ \"${tool}\" = npm ] && exit \"\${TYPECHECK_EXIT_CODE:-0}\"\nexit 0\n`, { mode: 0o755 });
     }
     return log;
 }
 
-function runHook(dir: string, { withOriginMain = true } = {}) {
+function runHook(dir: string, { withOriginMain = true, skipTsc = true, typecheckExit = '0' } = {}) {
     const { git } = { git: (...a: string[]) => execFileSync('git', a, { cwd: dir, stdio: 'pipe' }) };
     if (withOriginMain) {
         git('update-ref', 'refs/remotes/origin/main', 'HEAD~1');
@@ -64,7 +64,7 @@ function runHook(dir: string, { withOriginMain = true } = {}) {
     const res = spawnSync('bash', ['.githooks/pre-push'], {
         cwd: dir,
         input: `refs/heads/feat ${head} refs/heads/feat ${zero}\n`,
-        env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}`, SKIP_TSC: '1' },
+        env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}`, SKIP_TSC: skipTsc ? '1' : '0', TYPECHECK_EXIT_CODE: typecheckExit },
         encoding: 'utf8',
     });
     let args: string[] = [];
@@ -95,4 +95,14 @@ test('sin ref remoto ni fetch posible: sale 1 SIN chequear (fail-closed)', () =>
     assert.equal(res.status, 1, `debio fallar cerrado: ${res.stdout}${res.stderr}`);
     assert.equal(args.length, 0, `lint corrio sin base: ${JSON.stringify(args)}`);
     assert.match(res.stderr, /fail-closed/);
+});
+
+
+test('sin SKIP_TSC ejecuta el typecheck completo y bloquea si falla', () => {
+    const { dir } = makeRepo();
+    mkdirSync(join(dir, '.githooks'));
+    writeFileSync(join(dir, '.githooks', 'pre-push'), HOOK, { mode: 0o755 });
+    const { res, args } = runHook(dir, { skipTsc: false, typecheckExit: '2' });
+    assert.equal(res.status, 1, `${res.stdout}${res.stderr}`);
+    assert.ok(args.includes('run') && args.includes('typecheck'), JSON.stringify(args));
 });
