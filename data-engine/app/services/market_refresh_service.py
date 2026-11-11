@@ -483,7 +483,14 @@ class MarketRefreshService:
             companies = list(db.scalars(select(Company).order_by(Company.ticker)).all())
         stages: list[dict] = []
 
-        observations, price_errors = await self.price_provider.fetch(companies, as_of=as_of)
+        # Baja probada del listado (delisted_at, 0134): no se piden mas
+        # cotizaciones suyas al proveedor. Las no_trading_data (5+ sesiones
+        # sin barra, estado derivado) SI se siguen pidiendo: solo una barra
+        # nueva puede devolverlas a activas. El resto de etapas (FX,
+        # valoracion de posiciones) usa `rows`/market_prices y no cambia:
+        # la posicion de una baja se sigue valorando con su ultima barra.
+        pollable = [company for company in companies if company.delisted_at is None]
+        observations, price_errors = await self.price_provider.fetch(pollable, as_of=as_of)
         # Batch: one query for every (company, price_date) row we may update.
         observed = [
             (company, observations[company.ticker]) for company in companies if company.ticker in observations

@@ -310,6 +310,15 @@ class FXRate(TenantOwnedMixin, Base, TimestampMixin):
 
 class Company(Base, TimestampMixin):
     __tablename__ = "companies"
+    __table_args__ = (
+        # Baja probada del listado (0134): consulta barata en el refresco de
+        # precios; parcial porque casi todas las filas son NULL.
+        Index(
+            "ix_companies_delisted_at",
+            "delisted_at",
+            postgresql_where=text("delisted_at IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     ticker: Mapped[str] = mapped_column(String(20), unique=True, index=True)
@@ -324,6 +333,16 @@ class Company(Base, TimestampMixin):
     # ISIN del valor (12 caracteres), capturado del Flex XML de IBKR; lo
     # necesita el Modelo 720 y verifica el país emisor por prefijo.
     isin: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    # Baja del listado SOLO con evidencia primaria (comunicado del emisor o
+    # de la bolsa; 0134). N sesiones sin barra NO son una baja: son ausencia
+    # de datos (suspension, proveedor caido) y se derivan sin persistirse
+    # (listing_delisting.listing_data_state). NULL = listado vivo.
+    # Caso real: SES.TO, adquisicion cerrada por GFL el 1-sep-2026.
+    delisted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Referencia de la evidencia primaria de la baja (o del relistado si se
+    # limpio y se volvio a fijar). La escribe mark_delisted; nunca se borra
+    # ningun otro dato de la empresa.
+    listing_note: Mapped[str | None] = mapped_column(String(200), nullable=True)
     company_type: Mapped[str] = mapped_column(String(80))
     valuation_model: Mapped[str] = mapped_column(String(120))
     special_sources: Mapped[list[str]] = mapped_column(JSON, default=list)
