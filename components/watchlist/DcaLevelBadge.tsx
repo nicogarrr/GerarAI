@@ -81,7 +81,8 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
                     aria-label={`${item?.symbol ?? ''}: ${dcaEngineText(state.label, t)}, ${dcaStatusLabel(state.status, t)}${staleText ? `, ${staleText}` : ''}`}
                 >
                     {dcaEngineText(state.label, t)}
-                    {forming ? <span className="font-normal opacity-80">{t('watchlist.dca.badge.provisional')}</span> : null}
+                    {/* Sin opacity-XX: sobre zonas oscuras (p. ej. #b400ff) una opacidad <1 deja la tinta por debajo del 4,5:1 de WCAG AA (axe prod, 11 nov 2026). El matiz «provisional» ya lo dan los paréntesis y el font-normal. */}
+                    {forming ? <span className="font-normal">{t('watchlist.dca.badge.provisional')}</span> : null}
                 </button>
             </TooltipTrigger>
             <TooltipContent
