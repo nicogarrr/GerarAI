@@ -84,6 +84,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/ui/name-avatar.tsx': 'useT lee locale para el texto alternativo de la foto',
   'components/proPicks/WalkForwardResults.tsx': 'importa MethodologyDisclosure client, que ahora consume contexto React de locale',
   'components/proPicks/StrategyFactsheet.tsx': 'useT/useLocale/useFormat: textos y números en el idioma elegido (contexto React de locale)',
+  'components/research/ResearchRateLimited.tsx': 'useState/useEffect mantienen la cuenta atras; useRouter refresca solo con reintento manual; useT consume el locale React',
   'components/research/ThesisTrackRecordCard.tsx': 'useT/useFormat: tarjeta «Nuestro acierto» en el idioma elegido (contexto React de locale)',
 
   'components/settings/LlmUsagePanel.tsx':
