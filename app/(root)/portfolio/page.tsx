@@ -49,6 +49,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
     Awaited<ReturnType<typeof getPortfolioDividendProjection>> | null,
   ] | null = null;
   let partialMessage: string | null = null;
+  let transactionsError: string | null = null;
   try {
     // Cada lectura va con su propio catch para que un módulo lento no
     // oculte el resto de la cartera. Summary/positions son esenciales; scores,
@@ -77,6 +78,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
       console.error('[portfolio] summary failed, rendering retry notice', summaryResult.cause);
     } else {
       result = [summaryResult.value, transactionsResult.value, scoresResult.value, tearsheetResult.value, forecastResult.value, dividendsResult.value];
+      transactionsError = transactionsResult.error;
       const secondaryErrors = [transactionsResult.error, scoresResult.error, tearsheetResult.error]
         .filter((error): error is string => Boolean(error));
       partialMessage = secondaryErrors.length ? ti('portfolio.page.partialPrefix', { errors: [...new Set(secondaryErrors.map((error) => ti(sectionErrorKey(new Error(error)))))].join(' · ') }) : null;
@@ -98,6 +100,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
       summary={summary}
       transactions={transactions.items}
       transactionPage={{ total: transactions.total, offset: transactions.offset, filters: transactions.filters }}
+      transactionsError={transactionsError}
       scores={scores}
       tearsheet={tearsheet}
       forecast={forecast}

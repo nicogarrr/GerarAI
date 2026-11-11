@@ -43,3 +43,19 @@ describe('Movimientos: render por fila', () => {
         expect(h.edit).toHaveBeenCalledTimes(12);
     });
 });
+
+describe('Movimientos: error de lectura vs vacío real (F1)', () => {
+    it('fallo de lectura: aviso con reintento, NUNCA el vacío normal', () => {
+        render(<PortfolioTransactions transactions={[]} userId="u" page={{ total: 0, offset: 0 }} error="caído" />);
+        expect(screen.getByRole('alert')).toHaveTextContent('No pudimos cargar tus movimientos');
+        expect(screen.getByRole('link', { name: 'Reintentar' })).toHaveAttribute('href', '/portfolio');
+        // El vacío normal afirmaría un ledger sin movimientos que no conocemos.
+        expect(screen.queryByText('Aún no tienes movimientos')).toBeNull();
+    });
+
+    it('sin error: el vacío real sigue intacto', () => {
+        render(<PortfolioTransactions transactions={[]} userId="u" page={{ total: 0, offset: 0 }} />);
+        expect(screen.queryByRole('alert')).toBeNull();
+        expect(screen.getByText('Aún no tienes movimientos')).toBeInTheDocument();
+    });
+});
