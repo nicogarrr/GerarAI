@@ -72,7 +72,20 @@ export default async function FilingsYoyPage({ params, searchParams }: {
           {' · '}{sourceLink(data.current.url)}{' · '}{sourceLink(data.previous.url)}
         </p>
         <Panel title={t('research.filingsYoy.keyFigures')}>
-          {data.figures?.length ? <div className="overflow-x-auto"><table className="w-full text-sm">
+          {data.figures?.length ? <>
+            <div className="space-y-3 md:hidden print:hidden">{data.figures.map(fig => <section key={`${fig.metric}-${fig.unit}`} aria-label={metricLabel(fig.metric, locale)} className="min-w-0 rounded-lg border border-gray-800 p-3 [overflow-wrap:anywhere]">
+              <h3 className="text-sm font-semibold text-gray-200">{metricLabel(fig.metric, locale)}</h3>
+              {fig.outflow ? <p className="mt-1 text-xs text-gray-400">{t('research.filingsYoy.outflowNote')}</p> : null}
+              <dl className="mt-3 space-y-3 text-sm">
+                <div><dt className="text-xs text-gray-400">{t('research.filingsYoy.colCurrent')}</dt><dd>{fig.current ? <>{money(fig.current.value, fig.unit, fig.metric, fmt, t, fig.outflow)} {sourceLink(fig.current.source.url)}</> : fmt.na}</dd></div>
+                <div><dt className="text-xs text-gray-400">{t('research.filingsYoy.colPrevious')}</dt><dd>{fig.previous ? <>{money(fig.previous.value, fig.unit, fig.metric, fmt, t, fig.outflow)} {sourceLink(fig.previous.source.url)}</> : fmt.na}</dd></div>
+                <div><dt className="text-xs text-gray-400">{t('research.filingsYoy.colChange')}</dt><dd className={fig.highlight ? 'font-semibold text-amber-300' : 'text-gray-300'}>
+                  {fig.change_pct == null ? fmt.na : `${Number(fig.change_pct) > 0 ? '+' : ''}${fmt.formatNumber(Number(fig.change_pct), { maximumFractionDigits: 1 })}${locale === 'en' ? '%' : ' %'}`}
+                  {' '}<span className="text-xs text-gray-400">{fig.change_pct == null ? fmt.na : t('research.filingsYoy.calculated')}</span>
+                </dd></div>
+              </dl>
+            </section>)}</div>
+            <div className="hidden overflow-x-auto md:block print:block"><table className="w-full text-sm">
             <thead className="text-left text-xs text-gray-500"><tr><th className="py-1 pr-3">{t('research.filingsYoy.colMetric')}</th><th className="pr-3">{t('research.filingsYoy.colCurrent')}</th><th className="pr-3">{t('research.filingsYoy.colPrevious')}</th><th>{t('research.filingsYoy.colChange')}</th></tr></thead>
             <tbody>{data.figures.map((fig) => <tr className="border-t border-gray-800" key={`${fig.metric}-${fig.unit}`}>
               <td className="py-1.5 pr-3">{metricLabel(fig.metric, locale)}{fig.outflow ? <span className="block text-xs text-gray-500">{t('research.filingsYoy.outflowNote')}</span> : null}</td>
@@ -81,7 +94,7 @@ export default async function FilingsYoyPage({ params, searchParams }: {
               <td className={fig.highlight ? 'font-semibold text-amber-300' : 'text-gray-300'}>
                 {fig.change_pct == null ? fmt.na : `${Number(fig.change_pct) > 0 ? '+' : ''}${fmt.formatNumber(Number(fig.change_pct), { maximumFractionDigits: 1 })}${locale === 'en' ? '%' : ' %'}`}
                 {' '}<span className="text-xs text-gray-500">{fig.change_pct == null ? fmt.na : t('research.filingsYoy.calculated')}</span>
-              </td></tr>)}</tbody></table></div>
+              </td></tr>)}</tbody></table></div></>
             : <p className="text-gray-400">{t('research.filingsYoy.noFigures')}</p>}
         </Panel>
         <Panel title={t('research.filingsYoy.textChanges')}>
