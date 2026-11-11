@@ -66,6 +66,10 @@ BASE_DIMENSIONS = frozenset({"concept", "entity", "period", "unit"})
 class EsefError(RuntimeError):
     """filings.xbrl.org schema drift or transport failure; degrade honestly."""
 
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
 
 class EsefRateLimited(EsefError):
     """filings.xbrl.org sigue respondiendo 429 tras los reintentos en linea."""
@@ -297,9 +301,9 @@ class EsefClient:
         except httpx.HTTPStatusError as exc:
             if exc.response is not None and exc.response.status_code in (400, 404):
                 # Filing/entidad inexistente: dato por consulta, no fuente caida.
-                raise EsefError(f"GET {url} failed: {exc!r}") from exc
+                raise EsefError(f"GET {url} failed: {exc!r}", status_code=exc.response.status_code) from exc
             registry.record_failure(REGISTRY_KEY, f"HTTP {exc.response.status_code}")
-            raise EsefError(f"GET {url} failed: {exc!r}") from exc
+            raise EsefError(f"GET {url} failed: {exc!r}", status_code=exc.response.status_code) from exc
         except (httpx.HTTPError, ValueError) as exc:
             registry.record_failure(REGISTRY_KEY, f"{type(exc).__name__}")
             raise EsefError(f"GET {url} failed: {exc!r}") from exc
@@ -346,7 +350,7 @@ class EsefClient:
         except EsefRateLimited:
             raise
         except EsefError as exc:
-            if "404" in str(exc):
+            if exc.status_code == 404:
                 return []
             raise
         filings, total = parse_filings_page(payload)
