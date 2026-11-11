@@ -205,7 +205,7 @@ def test_ficha_minima_sin_precios_no_cuenta_como_empresa_real(call, jobs, probes
     ("status", "body", "expected"),
     [
         (404, {"chart": {"result": None, "error": {"code": "Not Found"}}}, False),
-        (200, {"chart": {"result": [{"meta": {"symbol": "GOOGL", "longName": "Alphabet Inc."}}]}}, True),
+        (200, {"chart": {"result": [{"meta": {"symbol": "GOOGL", "longName": "Alphabet Inc."}, "timestamp": [1, 2, 3]}]}}, True),
         (200, {"chart": {"result": []}}, False),
         (429, {}, None),
         (500, {}, None),
