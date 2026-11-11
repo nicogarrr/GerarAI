@@ -142,7 +142,7 @@ function ScoreBar({ label, value, scale = 'quality', legend }: { label: string; 
       <div className="mt-1 h-1.5 w-full rounded-full bg-gray-800">
         <div className={`h-1.5 rounded-full ${tone}`} style={{ width: `${clamped}%` }} />
       </div>
-      <div className="mt-0.5 text-[10px] leading-4 text-gray-500">{legend}</div>
+      <div className="mt-0.5 text-xs leading-4 text-gray-500">{legend}</div>
     </div>
   );
 }
@@ -335,7 +335,7 @@ export default function ThesisMemo({
 
       {thesis.inputs_provenance && thesis.inputs_provenance.length > 0 ? (
         <section className="rounded-lg border border-gray-800 p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             {t('research.memo.provenanceTitle')}
           </h3>
           <div className="mt-3 space-y-4">
@@ -346,7 +346,7 @@ export default function ThesisMemo({
               if (rows.length === 0) return null;
               return (
                 <div key={group.key}>
-                  <h4 className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{keyedLabel(t, PROVENANCE_GROUP_KEYS, group.key) ?? group.title}</h4>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{keyedLabel(t, PROVENANCE_GROUP_KEYS, group.key) ?? group.title}</h4>
                   <dl className="mt-1 divide-y divide-gray-800/70">
                     {rows.map((item) => {
                       const urls = provenanceUrls(item);
@@ -395,7 +395,7 @@ export default function ThesisMemo({
           aria-label={t('research.memo.narrative')}
           className="space-y-4 rounded-lg border border-gray-800 bg-gray-900/40 p-4"
         >
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             {t('research.memo.narrative')}
           </h3>
           {thesis.narrative_sections.map((section, index) => (
@@ -422,7 +422,7 @@ export default function ThesisMemo({
       )}
 
       <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
           {t('research.memo.scenarios')}
         </h3>
         {hideFigures ? (
@@ -463,7 +463,7 @@ export default function ThesisMemo({
       </section>
 
       <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
           {t('research.memo.evidenceQuality')}
         </h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -476,7 +476,7 @@ export default function ThesisMemo({
 
       {!hideFigures ? <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-lg border border-gray-800 p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             {t('research.memo.catalysts')}
           </h3>
           {thesis.catalysts && thesis.catalysts.length > 0 ? (
@@ -528,7 +528,7 @@ export default function ThesisMemo({
       </div> : null}
 
       {!hideFigures ? <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
           {t('research.memo.debate')}
         </h3>
         {ticker ? (
@@ -541,7 +541,7 @@ export default function ThesisMemo({
       </section> : null}
 
       {!hideFigures ? <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
           {t('research.memo.fullMemo')}
         </h3>
         <ThesisMarkdownPager
