@@ -81,8 +81,8 @@ def test_perdidas_viejas_citan_la_antiguedad_y_no_el_signo(monkeypatch):
 
 
 def test_stale_reason_frontera_exacta():
+    # «per-antiguedad-v2»: 18 meses de calendario completos (2024-12-31 → 2026-06-30, último día de junio).
     row = FinancialFact(metric="eps_diluted", period="2024-12-31:FY", fiscal_year=2024)
-    edge = date.fromordinal(date(2024, 12, 31).toordinal() + wl.PER_MAX_ANNUAL_AGE_DAYS)
-    assert wl._stale_annual_reason(row, edge) is None
-    assert wl._stale_annual_reason(row, date.fromordinal(edge.toordinal() + 1)) is not None
+    assert wl._stale_annual_reason(row, date(2026, 6, 30)) is None
+    assert wl._stale_annual_reason(row, date(2026, 7, 1)) is not None
     assert wl._stale_annual_reason(FinancialFact(metric="eps_diluted", period="FY2024"), TODAY) is None
