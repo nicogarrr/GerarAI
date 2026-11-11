@@ -63,8 +63,9 @@ async def test_429_uses_independent_provider_with_pinned_model():
 @run_async
 async def test_slow_primary_within_its_budget_wins_and_backup_never_starts():
     # Sin carrera (2026-10-27): el respaldo solo arranca si Go falla o agota su plazo.
+    # Márgenes amplios (antes 0,08 s frente a un plazo de 0,2 s: fallaba con la máquina cargada).
     p, b = Fake(delay=.08), Fake(delay=.01)
-    out = await ChatFallbackProvider(p, b, total=.3, delay=.2).complete(LLMRequest([Message("user", "hola")], task="chat"))
+    out = await ChatFallbackProvider(p, b, total=3, delay=2).complete(LLMRequest([Message("user", "hola")], task="chat"))
     assert out.provider == "opencode-go" and not b.calls
 
 
