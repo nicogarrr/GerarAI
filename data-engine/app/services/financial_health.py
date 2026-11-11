@@ -33,8 +33,13 @@ class MissingInput(ValueError):
     pass
 
 
-def calculate_health(facts: list[HealthFact], *, sector: str, company_type: str,
-                     today: date | None = None) -> dict[str, Any]:
+def _known(label: str | None) -> bool:
+    return bool(label) and str(label).strip().lower() not in {"unknown", "other", "otros", "n/a", "none", "-"}
+
+
+def calculate_health(facts: list[HealthFact], *, sector: str | None, company_type: str,
+                     today: date | None = None, industry: str | None = None,
+                     sic_sector: str | None = None) -> dict[str, Any]:
     """Use three consecutive FY anchors. Unknown is never scored as zero.
 
     ROA/turnover use beginning assets; leverage uses average assets, following
@@ -48,11 +53,15 @@ def calculate_health(facts: list[HealthFact], *, sector: str, company_type: str,
         "variant": "Z_double_prime", "score": None, "status": "not_evaluable",
         "methodology_url": ALTMAN_SOURCE},
         "notice": "Indicadores contables, no recomendación ni probabilidad de quiebra."}
-    kind = f"{sector} {company_type}".lower()
-    if not sector or sector.lower() in {"unknown", "other", "n/a"}:
+    # Sin sector del perfil, la industria y la división SIC de la SEC (``sector_of_cik``) dicen qué empresa es:
+    # «Unknown» dejaba sin Piotroski ni Altman a AAPL, TSM, CNQ o Airbus aunque su industria se conociera.
+    # Cualquier señal financiera de cualquiera de las dos excluye igual (fail-closed).
+    labels = [sector] if _known(sector) else [x for x in (industry, sic_sector) if _known(x)]
+    if not labels:
         out["reason"] = "Sector sin clasificar"
         return out
-    if any(word in kind for word in ("financ", "bank", "insurance", "reit", "real estate", "pre_revenue", "pre-revenue", "etf", "fund", "fondo")):
+    kind = " ".join([*(str(x) for x in labels), str(company_type)]).lower()
+    if any(word in kind for word in ("financ", "finanzas", "bank", "insurance", "reit", "real estate", "pre_revenue", "pre-revenue", "etf", "fund", "fondo")):
         out["reason"] = "Modelo no aplicable a financieras, REIT o empresas preingresos"
         return out
     usable = [f for f in facts if isfinite(f.value) and f.source_url.startswith("https://")
