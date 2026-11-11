@@ -34,7 +34,7 @@ from typing import Any
 from urllib.parse import urljoin, urlparse
 
 ANNUAL_RE = re.compile(
-    r"annual[\s_-]*report|integrated[\s_-]*report|rapport[\s_-]*annuel|"
+    r"annual[\s_-]*report|rapport[\s_-]*annuel|"
     r"(?:informe|reporte)[\s_-]*anual|(?<![a-z])ar[\s_-]?20\d\d", re.I)
 INTERIM_RE = re.compile(
     r"interim[\s_-]*report|quarterly[\s_-]*report|(?<![a-z])q[1-4][\s_-]*(?:20\d\d|report)|"

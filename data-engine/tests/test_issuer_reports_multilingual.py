@@ -7,7 +7,7 @@ from app.services.issuer_reports import pick_ir_reports
 BASE = "https://ir.gcc.com/en/inversionistas/media"
 
 
-@pytest.mark.parametrize("name", ["Reporte-anual-2025-en.pdf", "integrated-report-2025.pdf"])
+@pytest.mark.parametrize("name", ["Reporte-anual-2025-en.pdf", "Reporte_anual_2025.pdf"])
 def test_annual_report_variants_are_recognized(name):
     reports = pick_ir_reports(f'<a href="/{name}">Download</a>', BASE)
     assert len(reports) == 1
@@ -23,7 +23,7 @@ def test_actual_gcc_link_forms_find_current_reports_not_2019_archive():
     )
     reports = {report.kind: report for report in pick_ir_reports(html, BASE)}
     assert reports["annual"].date == "2025"
-    assert reports["annual"].url.endswith("GCC-integrated-report-2025-.pdf")
+    assert reports["annual"].url.endswith("GCC-Reporte-anual-2025-en.pdf")
     assert reports["periodic"].url.endswith("GCC-3T2026-en.pdf")
     assert reports["periodic"].date == "2026"
 
