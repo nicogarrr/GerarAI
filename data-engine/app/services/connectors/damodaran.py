@@ -26,11 +26,12 @@ import time
 import warnings
 from dataclasses import dataclass
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 import httpx
 
 from app.services.data_source_health import get_data_source_registry
+from app.services.number_parsing import parse_finite_decimal
 
 # Clave en el registry de salud de fuentes. La URL es fija (un xlsx mensual):
 # cualquier fallo de descarga o un xlsx sin filas validas es de la fuente.
@@ -65,16 +66,6 @@ def reset_cache() -> None:
     _cache.clear()
 
 
-def _decimal(value: object) -> Decimal | None:
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        result = Decimal(str(value))
-    except (InvalidOperation, ValueError):
-        return None
-    return result if result.is_finite() else None
-
-
 def parse_implied_erp_xlsx(content: bytes) -> list[ImpliedErp]:
     """Filas mensuales validas de la hoja «Historical ERP», en orden cronologico."""
     try:
@@ -104,15 +95,15 @@ def parse_implied_erp_xlsx(content: bytes) -> list[ImpliedErp]:
     for row in rows:
         if not row or not isinstance(row[0], datetime | date):
             continue
-        erp = _decimal(row[erp_index]) if erp_index < len(row) else None
+        erp = parse_finite_decimal(row[erp_index]) if erp_index < len(row) else None
         if erp is None or not (Decimal("0") < erp < _MAX_PLAUSIBLE_ERP):
             continue
         month = row[0].date() if isinstance(row[0], datetime) else row[0]
         out[month] = ImpliedErp(
             month=month,
             erp=erp,
-            erp_t12m=_decimal(row[t12m_index]) if t12m_index is not None and t12m_index < len(row) else None,
-            tbond=_decimal(row[tbond_index]) if tbond_index is not None and tbond_index < len(row) else None,
+            erp_t12m=parse_finite_decimal(row[t12m_index]) if t12m_index is not None and t12m_index < len(row) else None,
+            tbond=parse_finite_decimal(row[tbond_index]) if tbond_index is not None and tbond_index < len(row) else None,
         )
     return [out[month] for month in sorted(out)]
 

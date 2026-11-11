@@ -16,7 +16,7 @@ al hecho oficial a igual metrica y ejercicio.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import select
@@ -31,6 +31,7 @@ from app.services.fact_deletion import (
     tenant_condition,
 )
 from app.services.financial_ingestion_service import _name_identity_ok
+from app.services.number_parsing import parse_finite_decimal
 
 SOURCE_TYPE = "YAHOO_FUNDAMENTALS"
 
@@ -114,16 +115,6 @@ YAHOO_METRIC_MAP: list[tuple[str, str, list[str], bool | str]] = [
 OFFICIAL_SOURCE_TYPES = ("SEC", "ESEF", "CNMV")
 
 
-def _dec(value: Any) -> Decimal | None:
-    if value is None:
-        return None
-    try:
-        out = Decimal(str(value))
-    except (InvalidOperation, ValueError):
-        return None
-    return out if out.is_finite() else None
-
-
 def _row_by_period(frame: Any, labels: list[str]) -> dict[str, Decimal]:
     """Primera fila disponible entre `labels`; periodo -> valor (sin NaN)."""
     if frame is None or getattr(frame, "empty", True):
@@ -132,7 +123,7 @@ def _row_by_period(frame: Any, labels: list[str]) -> dict[str, Decimal]:
         if label in frame.index:
             out: dict[str, Decimal] = {}
             for col, raw in frame.loc[label].items():
-                val = _dec(raw)
+                val = parse_finite_decimal(raw)
                 if val is None:
                     continue
                 out[str(col)[:10]] = val
