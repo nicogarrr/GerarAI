@@ -23,7 +23,7 @@ from app.valuation.engines.base import (
     is_adr_without_ratio,
     margin_of_safety,
 )
-from app.valuation.fact_reference import usable_fact
+from app.valuation.fact_reference import mean_fact_confidence, usable_fact
 from app.valuation.moat_framework import empty_moat_framework
 from app.valuation.scenario_definitions import evidence_weighted_probabilities
 from app.valuation.scenario_model import Scenario, probability_weighted_value
@@ -173,9 +173,7 @@ class CommodityCycleEngine(ValuationEngine):
         rows = grid["rows"]
         bear_v, base_v, bull_v = rows[0]["value_per_share"], rows[1]["value_per_share"], rows[2]["value_per_share"]
         sourced_facts = [volume_fact, cost_fact, price_fact, tax_fact, multiple_fact]
-        evidence_confidence = sum(float(fact.confidence) for fact in sourced_facts) / len(
-            sourced_facts
-        )
+        evidence_confidence = mean_fact_confidence(sourced_facts)
         operating_spread = (base_price - float(cost_fact.value)) / max(abs(base_price), 1e-9)
         probabilities = evidence_weighted_probabilities(
             evidence_confidence=evidence_confidence,

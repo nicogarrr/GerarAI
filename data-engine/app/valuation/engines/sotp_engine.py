@@ -26,7 +26,7 @@ from app.valuation.engines.base import (
     is_adr_without_ratio,
     margin_of_safety,
 )
-from app.valuation.fact_reference import split_scaled_value, usable_fact
+from app.valuation.fact_reference import mean_fact_confidence, split_scaled_value, usable_fact
 from app.valuation.moat_framework import empty_moat_framework
 from app.valuation.scenario_definitions import holding_company_scenarios
 from app.valuation.scenario_model import Scenario, probability_weighted_value
@@ -299,9 +299,7 @@ class SOTPEngine(ValuationEngine):
             confidence_sources.append(shares_fact)
         if net_debt_fact is not None:
             confidence_sources.append(net_debt_fact)
-        evidence_confidence = sum(float(fact.confidence) for fact in confidence_sources) / len(
-            confidence_sources
-        )
+        evidence_confidence = mean_fact_confidence(confidence_sources)
         scenarios = holding_company_scenarios(
             nav_per_share,
             holding_discount=discount,
@@ -487,7 +485,7 @@ class SOTPEngine(ValuationEngine):
             discount = 0.0
             discount_source = "none_reported_nav_at_par"
         confidence_sources = [nav_fact, shares_fact] + ([discount_fact] if discount_fact else [])
-        evidence_confidence = sum(float(f.confidence) for f in confidence_sources) / len(confidence_sources)
+        evidence_confidence = mean_fact_confidence(confidence_sources)
         scenarios = holding_company_scenarios(
             nav_per_share, holding_discount=discount, evidence_confidence=evidence_confidence
         )

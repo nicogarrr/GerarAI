@@ -699,8 +699,22 @@ class FinancialSnapshotBuilder:
         if as_of is not None:
             not_after = min(not_after, as_of)
 
-        def _transient(metric: str, cand: bs.Candidate, value: float, unit: str | None) -> FinancialFact:
+        def _transient(
+            metric: str,
+            cand: bs.Candidate,
+            value: float,
+            unit: str | None,
+            *pieces: object,
+        ) -> FinancialFact:
             base = cand.fact
+            # Transitorio: el ``default`` de la columna solo se aplica en el
+            # INSERT. La confianza es la de su pieza más débil (misma regla y
+            # mismo 0,8 de respaldo que ``_derive_net_debt``); sin ella el DCF
+            # reventaba con 500 al promediar la evidencia (PINS).
+            confidence = min(
+                Decimal(str(p.confidence if getattr(p, "confidence", None) is not None else "0.8"))
+                for p in (base, *pieces)
+            )
             return FinancialFact(
                 company_id=company.id,
                 metric=metric,
@@ -711,6 +725,8 @@ class FinancialSnapshotBuilder:
                 fiscal_quarter=getattr(base, "fiscal_quarter", None),
                 source_type=cand.source,
                 is_reported=False,
+                is_adjusted=False,
+                confidence=confidence,
             )
 
         if "net_debt" not in snapshot.facts:
@@ -745,7 +761,9 @@ class FinancialSnapshotBuilder:
                 )
                 if cash is None:
                     continue
-                fact = _transient("net_debt", debt, debt.value - cash.value, getattr(debt.fact, "unit", None))
+                fact = _transient(
+                    "net_debt", debt, debt.value - cash.value, getattr(debt.fact, "unit", None), cash.fact
+                )
                 by_source[debt.source] = bs.Candidate(
                     debt.source, debt.value - cash.value, debt.period, debt.period_end, fact
                 )

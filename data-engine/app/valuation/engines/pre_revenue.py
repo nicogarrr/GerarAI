@@ -46,6 +46,7 @@ from app.valuation.engines.base import (
     snapshot_trace,
     wacc_not_above_terminal_result,
 )
+from app.valuation.fact_reference import mean_fact_confidence
 from app.valuation.funding_gap import estimate_funding_gap
 from app.valuation.moat_framework import empty_moat_framework
 from app.valuation.reverse_dcf import ReverseDCFInputs, solve_required_growth
@@ -484,9 +485,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
         if funding.dilution:
             dilution_pct = float(funding.dilution.get("dilution_pct") or 0.0)
 
-        evidence_confidence = sum(float(fact.confidence) for fact in snapshot.facts.values()) / len(
-            snapshot.facts
-        )
+        evidence_confidence = mean_fact_confidence(snapshot.facts.values())
         scenarios = speculative_causal_scenarios(
             growth,
             margin,

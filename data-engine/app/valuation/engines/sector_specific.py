@@ -58,7 +58,7 @@ from app.valuation.engines.base import (
     is_adr_without_ratio,
     margin_of_safety,
 )
-from app.valuation.fact_reference import split_scaled_value, usable_fact
+from app.valuation.fact_reference import fact_confidence, split_scaled_value, usable_fact
 from app.valuation.moat_framework import empty_moat_framework
 
 # Nombre de la regla de coherencia temporal, para que el trace diga qué se
@@ -151,7 +151,7 @@ def _sourced(fact: FinancialFact | None) -> SourcedValue | None:
     if fact is None:
         return None
     return SourcedValue(
-        float(fact.value), fact.id, fact.period, float(fact.confidence),
+        float(fact.value), fact.id, fact.period, fact_confidence(fact),
         source_type=fact.source_type or "", is_reported=bool(fact.is_reported),
     )
 
@@ -342,7 +342,7 @@ def capm_cost_of_equity(context: ValuationContext) -> SourcedValue | None:
             for fact in pieces
         ],
     }
-    confidence = min(float(fact.confidence) for fact in pieces)
+    confidence = min(fact_confidence(fact) for fact in pieces)
     return SourcedValue(cost, None, rf.period, confidence, source_type="calculated_capm",
                         is_reported=False, estimate=estimate)
 
@@ -471,7 +471,7 @@ def derived_insurer_inputs(
     ]
     growth = book.value / prior_value - 1
     derived["book_value_growth"] = SourcedValue(
-        growth, None, book.period, min(book.confidence, float(prior.confidence)),
+        growth, None, book.period, min(book.confidence, fact_confidence(prior)),
         source_type="derived_from_facts", is_reported=False,
         estimate={
             "metric": "book_value_growth", "value": growth, "period": book.period, "status": "calculado",
@@ -489,7 +489,7 @@ def derived_insurer_inputs(
             reasons["roe"] = "libro medio no positivo"
         else:
             derived["roe"] = SourcedValue(
-                roe, None, income.period, min(book.confidence, income.confidence, float(prior.confidence)),
+                roe, None, income.period, min(book.confidence, income.confidence, fact_confidence(prior)),
                 source_type="derived_from_facts", is_reported=False,
                 estimate={
                     "metric": "roe", "value": roe, "period": income.period, "status": "calculado",

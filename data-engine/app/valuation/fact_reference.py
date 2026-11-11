@@ -127,7 +127,7 @@ def _to_sourced(fact: FinancialFact) -> SourcedFact | None:
         value=value,
         fact_id=fact.id,
         period=fact.period,
-        confidence=float(fact.confidence) if fact.confidence is not None else 0.0,
+        confidence=fact_confidence(fact),
         source_type=fact.source_type or "unspecified",
         is_reported=bool(fact.is_reported),
         unit=fact.unit,
@@ -510,6 +510,46 @@ def resolve_aliases(
                 resolved[canonical] = found
                 break
     return resolved
+
+
+def fact_confidence(fact: object) -> float:
+    """Confianza de un hecho (fila o transitorio) como ``float`` sin reventar.
+
+    Un hecho derivado en memoria (``DERIVED``, puente de fuentes) no pasa por el
+    INSERT, así que el ``default`` de la columna no se aplica y su
+    ``confidence`` puede ser ``None``. La regla es la misma que ``_to_sourced``:
+    sin confianza registrada (o no finita) cuenta como 0,0 — no se inventa una —
+    y quien la promedia lo deja dicho con :func:`missing_confidence_metrics`.
+    """
+    raw = getattr(fact, "confidence", None)
+    if raw is None:
+        return 0.0
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return 0.0
+    return value if math.isfinite(value) else 0.0
+
+
+def has_confidence(fact: object) -> bool:
+    raw = getattr(fact, "confidence", None)
+    if raw is None:
+        return False
+    try:
+        return math.isfinite(float(raw))
+    except (TypeError, ValueError):
+        return False
+
+
+def mean_fact_confidence(facts: Iterable[object]) -> float:
+    """Media de :func:`fact_confidence` (0,0 si no hay hechos)."""
+    values = [fact_confidence(fact) for fact in facts]
+    return sum(values) / len(values) if values else 0.0
+
+
+def missing_confidence_metrics(facts: Iterable[object]) -> list[str]:
+    """Métricas cuyo hecho no trae confianza registrada (ordenadas, sin repetir)."""
+    return sorted({str(getattr(f, "metric", "") or "?") for f in facts if not has_confidence(f)})
 
 
 def mean_confidence(facts: Iterable[SourcedFact]) -> float:
