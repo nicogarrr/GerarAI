@@ -174,7 +174,7 @@ describe('consenso propio en el informe', () => {
 
   it('pinta ingresos, beneficio operativo y BPA con su fuente y enlace; N/D sin consenso', () => {
     view('es', { consensus });
-    const table = screen.getByRole('region', { name: /Consenso propio de GerarAI/ });
+    const table = screen.getAllByRole('region', { name: /Consenso propio de GerarAI/ }).find(region => region.querySelector('table'))!;
     const fy = within(table).getByRole('row', { name: /Ej\./ });
     expect(fy.textContent).toContain('9,63');
     expect(fy.textContent).toContain('modelo propio');
@@ -195,16 +195,16 @@ describe('tasa base: con qué frecuencia lo consiguieron', () => {
   it('la celda de ingresos dice qué % de comparables lo logró, con la fórmula al pasar el ratón', () => {
     const formula = 'crecimiento implícito (fy2027 estimado 512 / fy2026 estimado 253) − 1 = +102,1 %; el 6% …';
     view('es', { consensus: cell({ share: 0.065, bound: '=', formula, n: 63 }) });
-    const reach = screen.getByTestId('consensus-base-rate-reach');
+    const reach = screen.getAllByTestId('consensus-base-rate-reach').at(-1)!;
     expect(reach.textContent).toMatch(/Lo logró el 7\s?% de comparables en 1 año/);
     expect(reach.getAttribute('title')).toBe(formula);
   });
 
   it('fuera de la rejilla dice «menos del»; sin cifra (N/D con motivo) no pinta nada', () => {
     view('en', { consensus: cell({ share: 0.05, bound: '<', formula: 'x' }) });
-    expect(screen.getByTestId('consensus-base-rate-reach').textContent).toMatch(/Reached by under 5\s?% of peers/);
+    expect(screen.getAllByTestId('consensus-base-rate-reach').at(-1)!.textContent).toMatch(/Reached by under 5\s?% of peers/);
     view('es', { consensus: cell({ share: null, reason: 'ejercicio en curso' }) });
-    expect(screen.getAllByTestId('consensus-base-rate-reach')).toHaveLength(1);
+    expect(screen.getAllByTestId('consensus-base-rate-reach')).toHaveLength(2); // desktop + mobile from the first render; none from the N/D render
   });
 });
 

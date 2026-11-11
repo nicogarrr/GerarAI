@@ -250,9 +250,10 @@ const CONSENSUS_SOURCE_KEYS = {
   tasa_base: 'research.informe.consensusSource.tasaBase',
 } as const;
 
-function ConsensusCellView({ cell, t, fmt, big, unit, eps }: { cell: OwnConsensusCell | null; t: T; fmt: Formatters; big: (v: number | null | undefined, unit?: string | null) => string; unit: string | null; eps: boolean }) {
+function ConsensusCellView({ cell, t, fmt, big, unit, eps, mobile = false }: { cell: OwnConsensusCell | null; t: T; fmt: Formatters; big: (v: number | null | undefined, unit?: string | null) => string; unit: string | null; eps: boolean; mobile?: boolean }) {
+  const Cell = mobile ? 'dd' : 'td';
   if (!cell || cell.status !== 'estimado' || cell.mid == null) {
-    return <td className="whitespace-nowrap py-1 pl-2 text-gray-500" title={cell?.reason ?? undefined}>{t('research.informe.na')}</td>;
+    return <Cell className={mobile ? 'text-gray-400' : 'whitespace-nowrap py-1 pl-2 text-gray-500'} title={cell?.reason ?? undefined}>{t('research.informe.na')}{mobile && cell?.reason ? <span className="mt-1 block text-xs leading-5 text-amber-300">{cell.reason}</span> : null}</Cell>;
   }
   const value = eps ? fmt.formatNumber(cell.mid, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : big(cell.mid, unit);
   const key = CONSENSUS_SOURCE_KEYS[(cell.source ?? '') as keyof typeof CONSENSUS_SOURCE_KEYS];
@@ -260,13 +261,13 @@ function ConsensusCellView({ cell, t, fmt, big, unit, eps }: { cell: OwnConsensu
   const url = consensusSourceUrl(cell);
   const reach = eps ? null : baseRateReach(cell.base_rate_check);
   return (
-    <td className="py-1 pl-2 text-gray-100" title={cell.formula ?? undefined}>
-      <span className="whitespace-nowrap">{value}</span>
-      <span className="block text-[11px] text-gray-500">
+    <Cell className={mobile ? 'min-w-0 text-gray-100 [overflow-wrap:anywhere]' : 'py-1 pl-2 text-gray-100'} title={cell.formula ?? undefined}>
+      <span className={mobile ? 'tabular-nums' : 'whitespace-nowrap'}>{value}</span>
+      <span className={mobile ? 'block text-xs text-gray-400' : 'block text-[11px] text-gray-500'}>
         {url ? <a className="underline decoration-dotted hover:text-teal-300" href={url} target="_blank" rel="noopener noreferrer">{source}</a> : source}
       </span>
-      {reach ? <span className="block text-[11px] text-gray-500" title={cell.base_rate_check?.formula ?? undefined} data-testid="consensus-base-rate-reach">{t(REACH_KEYS[reach.key], { pct: fmt.formatPercent(reach.share, { digits: 0 }) })}</span> : null}
-    </td>
+      {reach ? <span className={mobile ? 'block text-xs text-gray-400' : 'block text-[11px] text-gray-500'} title={cell.base_rate_check?.formula ?? undefined} data-testid="consensus-base-rate-reach">{t(REACH_KEYS[reach.key], { pct: fmt.formatPercent(reach.share, { digits: 0 }) })}</span> : null}
+    </Cell>
   );
 }
 
@@ -278,7 +279,21 @@ function ConsensusTable({ t, fmt, big, rows, unit }: { t: T; fmt: Formatters; bi
     return row.isYear ? `${t('research.informe.fyHead', { date })}E` : `${row.period.slice(0, 2).toUpperCase()} · ${date}E`;
   };
   return (
-    <div className="mt-3 overflow-x-auto" role="region" aria-label={title} tabIndex={0} data-testid="informe-consensus">
+    <div className="mt-3 min-w-0" data-testid="informe-consensus">
+      <div className="space-y-3 md:hidden print:hidden">
+        <h3 className="text-xs font-semibold text-gray-400">{title}</h3>
+        {rows.map((row) => (
+          <section className="min-w-0 rounded-lg border border-gray-800 p-3 [overflow-wrap:anywhere]" aria-label={`${title} · ${head(row)}`} key={row.period}>
+            <h4 className="text-sm font-medium text-gray-200">{head(row)}</h4>
+            <dl className="mt-3 space-y-3 text-sm">
+              <div><dt className="text-xs text-gray-400">{t('research.informe.revenue')}</dt><ConsensusCellView cell={row.cells.revenue} t={t} fmt={fmt} big={big} unit={unit} eps={false} mobile /></div>
+              <div><dt className="text-xs text-gray-400">{t('research.informe.operatingIncome')}</dt><ConsensusCellView cell={row.cells.operating_income} t={t} fmt={fmt} big={big} unit={unit} eps={false} mobile /></div>
+              <div><dt className="text-xs text-gray-400">{t('research.informe.eps')}</dt><ConsensusCellView cell={row.cells.eps} t={t} fmt={fmt} big={big} unit={unit} eps mobile /></div>
+            </dl>
+          </section>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto md:block print:block" role="region" aria-label={title} tabIndex={0}>
       <table className="w-full text-right text-sm">
         <caption className="mb-1 text-left text-xs font-semibold text-gray-400">{title}</caption>
         <thead className="text-xs text-gray-500"><tr>
@@ -298,6 +313,7 @@ function ConsensusTable({ t, fmt, big, rows, unit }: { t: T; fmt: Formatters; bi
           ))}
         </tbody>
       </table>
+      </div>
       <p className="mt-1 text-xs text-gray-500">{t('research.informe.consensusNote')}</p>
     </div>
   );
