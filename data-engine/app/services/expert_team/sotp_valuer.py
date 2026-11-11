@@ -653,9 +653,15 @@ def sotp_anchors(db: Session, company: Company, *, today: date | None = None) ->
     base_rate = _base_rate(db, company)
     balance_end = str((cash or debt or {}).get("period_end") or "")[:10] or None
     # Inversiones a corto del MISMO cierre (ShortTermInvestments del XBRL: ASTS 2T-2026 = 2.300 M$, 10-Q).
-    short_term, _ = _fact_millions(db, company, "short_term_investments", period_prefix=balance_end) if balance_end else (None, None)
-    sbc, sbc_end = _fact_millions(db, company, "stock_based_compensation", annual=True)
-    fcf, fcf_end = _fact_millions(db, company, "free_cash_flow", annual=True)
+    # Moneda de los informes (unidad de los hechos SEC; un 40-F canadiense va en CAD): los flujos y las inversiones
+    # a corto se leen en ESA moneda, la del resto del modelo. Antes solo en USD: CNQ/TSM/Airbus quedaban sin SBC ni
+    # consumo de caja (N/D sin motivo) y una fila en USD podía colarse en un modelo en CAD.
+    reporting = _reporting_currency(db, company)
+    money = reporting or "USD"
+    short_term, _ = (_fact_millions(db, company, "short_term_investments", period_prefix=balance_end, unit=money)
+                     if balance_end else (None, None))
+    sbc, sbc_end = _fact_millions(db, company, "stock_based_compensation", annual=True, unit=money)
+    fcf, fcf_end = _fact_millions(db, company, "free_cash_flow", annual=True, unit=money)
     # Un flujo anual de un ejercicio anterior al último presentado no es «el anual» de hoy (FRPH:
     # SBC de 2020 con cuentas de 2025): N/D con su motivo, nunca la cifra vieja como si fuera actual.
     latest_fy = _latest_annual_end(db, company)
@@ -667,9 +673,8 @@ def sotp_anchors(db: Session, company: Company, *, today: date | None = None) ->
         stale["burn"] = (f"Consumo de caja anual N/D: el último flujo de caja libre es de {fcf_end} y el ejercicio "
                          f"más reciente cierra el {latest_fy}")
         fcf = None
-    # Moneda de los informes (unidad de los hechos SEC; un 40-F canadiense va en CAD) frente a la del precio:
-    # todo el modelo va en la de los informes y el precio se convierte con el tipo guardado (BCE).
-    reporting = _reporting_currency(db, company)
+    # Moneda de los informes frente a la del precio: todo el modelo va en la de los informes y el precio se
+    # convierte con el tipo guardado (BCE).
     price_currency = (price_currency or company.currency or "").upper() or None
     fx_note = fx_missing = None
     if price is not None and reporting and price_currency and reporting != price_currency:
