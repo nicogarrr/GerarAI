@@ -184,6 +184,8 @@ import type { ResearchSettled } from '@/lib/research/parallel-fetch';
 import { withResearchTelemetry } from '@/lib/research/fetch-telemetry';
 import { assertTickerShape } from '@/lib/research/assert-ticker-shape';
 
+import { renderWithRateLimit } from '@/lib/research/render-with-rate-limit';
+
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const maxDuration = 60;
@@ -775,7 +777,11 @@ const ENTRY_WORKSPACE: Partial<Record<View, keyof ViewWorkspaces>> = {
   documents: 'documents',
 };
 
-export default async function ResearchCompanyPage({ params, searchParams }: PageProps) {
+export default async function ResearchCompanyPage(props: PageProps) {
+  return renderWithRateLimit(() => ResearchCompanyContent(props));
+}
+
+async function ResearchCompanyContent({ params, searchParams }: PageProps) {
   const [{ ticker: rawTicker }, query] = await Promise.all([params, searchParams]);
   assertTickerShape(rawTicker);
   const t = await getT();

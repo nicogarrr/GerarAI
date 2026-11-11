@@ -4,6 +4,7 @@ import {
 } from '@/lib/auth/research-identity';
 import { AppError, ExternalAPIError } from '@/lib/types/errors';
 import { researchErrorDetail } from '@/lib/research/error-detail';
+import { researchRetryAfterSeconds } from '@/lib/research/rate-limit';
 
 const BACKEND_URL = process.env.FMP_BACKEND_URL ?? 'http://localhost:8000';
 
@@ -85,7 +86,10 @@ async function responseError(response: Response, path: string): Promise<never> {
   } catch {
     // Preserve the HTTP status when the backend did not return JSON.
   }
-  throw new AppError(detail, 'RESEARCH_API_ERROR', response.status, { path });
+  throw new AppError(detail, 'RESEARCH_API_ERROR', response.status, {
+    path,
+    ...(response.status === 429 ? { retryAfterSeconds: researchRetryAfterSeconds(response.headers.get('Retry-After')) } : {}),
+  });
 }
 
 export async function researchRequest<T>(
