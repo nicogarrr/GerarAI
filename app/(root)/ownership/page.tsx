@@ -184,7 +184,24 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                         {holdingsVerificationNote(holdings.status) ? (
                             <p className="mt-2 text-sm text-amber-300">{holdingsVerificationNote(holdings.status)}</p>
                         ) : null}
-                        <OverflowScrollRegion label={t('ownership.page.holdingsAria')} className="mt-4">
+                        <div className="mt-4 space-y-3 md:hidden">
+                            {holdings.holdings.map((row) => (
+                                <article aria-label={row.name_of_issuer ?? NA} className="min-w-0 rounded-lg border border-gray-800 p-3 [overflow-wrap:anywhere]" key={`${row.accession_number}-${row.cusip}-${row.title_of_class}-${row.put_call ?? ''}`}>
+                                    <h3 className="text-sm font-medium text-gray-200">{row.name_of_issuer ?? NA}
+                                        {row.is_amendment ? <Badge className="ml-2" variant="outline">{t('ownership.page.amendment')}</Badge> : null}
+                                    </h3>
+                                    <dl className="mt-3 space-y-2 text-sm">
+                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.class')}</dt><dd className="text-gray-200">{row.title_of_class || NA}</dd></div>
+                                        <div><dt className="text-xs text-gray-400">CUSIP</dt><dd className="font-mono text-gray-200">{row.cusip ?? NA}</dd></div>
+                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.value')}</dt><dd className="tabular-nums text-gray-200">{formatValueUsd(row.value_usd_thousands, holdings.report_date, fmt)}</dd></div>
+                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.shares')}</dt><dd className="tabular-nums text-gray-200">{formatShares(row.shares, fmt)}</dd></div>
+                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.type')}</dt><dd className="text-gray-200">{row.put_call ?? row.share_type ?? NA}</dd></div>
+                                    </dl>
+                                    {row.filing_url ? <a className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm text-teal-300" href={row.filing_url} rel="noreferrer" target="_blank"><FileText aria-hidden="true" className="h-3.5 w-3.5" />XML<ExternalLink aria-hidden="true" className="h-3 w-3" /></a> : null}
+                                </article>
+                            ))}
+                        </div>
+                        <OverflowScrollRegion label={t('ownership.page.holdingsAria')} className="mt-4 hidden md:block">
                             <table className="w-full min-w-[820px] text-left text-sm [&_th]:px-2 [&_td]:px-2 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
                                 <caption className="sr-only">{t('ownership.page.holdingsCaption')}</caption>
                                 <thead className="text-xs uppercase text-gray-500">
@@ -260,7 +277,22 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                             </Badge>
                         </div>
                         <p className="mt-2 text-xs text-gray-500">{changes.compared_accessions?.rule}</p>
-                        <OverflowScrollRegion label={t('ownership.page.changesAria')} className="mt-4">
+                        <div className="mt-4 space-y-3 md:hidden">
+                            {changes.changes.filter((row) => row.change !== 'unchanged').map((row) => (
+                                <article aria-label={row.name_of_issuer ?? NA} className="min-w-0 rounded-lg border border-gray-800 p-3 [overflow-wrap:anywhere]" key={`${row.cusip}-${row.title_of_class}-${row.put_call ?? ''}`}>
+                                    <h3 className="text-sm font-medium text-gray-200">{row.name_of_issuer ?? NA}</h3>
+                                    <Badge className="mt-2" variant="outline">{isChangeKey(row.change) ? t(CHANGE_LABELS[row.change]) : row.change}</Badge>
+                                    <dl className="mt-3 space-y-2 text-sm">
+                                        <div><dt className="text-xs text-gray-400">CUSIP</dt><dd className="font-mono text-gray-200">{row.cusip ?? NA}</dd></div>
+                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.sharesBefore')}</dt><dd className="tabular-nums text-gray-200">{formatShares(row.shares_previous, fmt)}</dd></div>
+                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.sharesNow')}</dt><dd className="tabular-nums text-gray-200">{formatShares(row.shares_latest, fmt)}</dd></div>
+                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.valueBefore')}</dt><dd className="tabular-nums text-gray-200">{formatValueUsd(row.value_usd_thousands_previous, changes.previous_report, fmt)}</dd></div>
+                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.valueNow')}</dt><dd className="tabular-nums text-gray-200">{formatValueUsd(row.value_usd_thousands_latest, changes.latest_report, fmt)}</dd></div>
+                                    </dl>
+                                </article>
+                            ))}
+                        </div>
+                        <OverflowScrollRegion label={t('ownership.page.changesAria')} className="mt-4 hidden md:block">
                             <table className="w-full min-w-[720px] text-left text-sm">
                                 <caption className="sr-only">{t('ownership.page.changesCaption')}</caption>
                                 <thead className="text-xs uppercase text-gray-500">
