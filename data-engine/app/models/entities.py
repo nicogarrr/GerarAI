@@ -3392,3 +3392,13 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, index=True
     )
+
+
+class ManagementAlignmentSnapshot(TenantOwnedMixin, Base, TimestampMixin):
+    """Research-only evidence. Never an input to valuation, thesis or DCA."""
+    __tablename__ = "management_alignment_snapshots"
+    __table_args__ = (UniqueConstraint("tenant_id", "company_id", name="uq_alignment_tenant_company"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)

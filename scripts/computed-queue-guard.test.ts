@@ -13,7 +13,7 @@ const compose = readFileSync('docker-compose.prod.yml', 'utf8');
 // ya esta en su techo de 10 GiB (test_memory_limits_fit_the_12gb_vm), asi que
 // la consume el worker-alerts (jobs cortos y diarios; el otro hilo sigue
 // libre para alertas) con CPU compartida baja (hay un spotdl en el host).
-test('el carril computed (5 actores) va en cola dedicada consumida por el worker-alerts', () => {
+test('el carril computed (6 actores) va en cola dedicada consumida por el worker-alerts', () => {
     for (const actor of [
         'run_propicks_funnel',
         'freeze_propicks_snapshot',
@@ -32,9 +32,10 @@ test('el carril computed (5 actores) va en cola dedicada consumida por el worker
             `${actor} sin queue_name computed`,
         );
     }
+    assert.match(workers, /@dramatiq\.actor\(max_retries=2, min_backoff=30_000, time_limit=600_000, queue_name=COMPUTED_QUEUE_NAME\)\n@_coalesce_on_success\("recompute_management_alignment", 5 \* 60, \("tenant_id", "company_id"\), stale_after_seconds=None\)\ndef recompute_management_alignment\(/);
     assert.match(workers, /COMPUTED_QUEUE_NAME = "computed"/);
     const declaraciones = workers.match(/queue_name=COMPUTED_QUEUE_NAME/g) ?? [];
-    assert.equal(declaraciones.length, 5, 'solo los 5 actores del carril declaran la cola computed');
+    assert.equal(declaraciones.length, 6, 'solo los 6 actores del carril declaran la cola computed');
     // El radar se mantiene ACOTADO: sin time_limit acotado saldria de la cola.
     assert.match(workers, /time_limit=1_800_000,\s*queue_name=COMPUTED_QUEUE_NAME\)\ndef propicks_radar_scan/);
     // Trabajos largos o de ingesta NO entran: recrearian el starvation dentro.

@@ -46,6 +46,8 @@ def _data_quality(tx: dict) -> dict:
     if tx.get("multi_reporter"):
         flags.append("joint_filing_attribution")
     quality: dict = {"flags": flags}
+    if "alignment_10b5_1" in tx:
+        quality["alignment_10b5_1"] = tx["alignment_10b5_1"]
     title = str(tx.get("security_title") or "").strip()
     if title:
         quality["security_title"] = title[:120]
@@ -128,6 +130,11 @@ def persist_filing(
             fresh = _data_quality(tx)
             current = dict(row.data_quality or {})
             missing = {k: v for k, v in fresh.items() if k in ("holdings_after", "ownership") and k not in current}
+            # A stored JSON null is unknown, not final evidence. Only an explicit
+            # transaction-level Boolean can enrich it; never change legacy flags.
+            explicit_plan = fresh.get("alignment_10b5_1")
+            if type(explicit_plan) is bool and current.get("alignment_10b5_1") is None or "alignment_10b5_1" in fresh and "alignment_10b5_1" not in current:
+                missing["alignment_10b5_1"] = explicit_plan
             if missing:
                 row.data_quality = {**current, **missing}
                 enriched_tx += 1

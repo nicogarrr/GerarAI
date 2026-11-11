@@ -193,6 +193,14 @@ def _rule_10b5_1(node: ET.Element, footnotes: dict[str, str]) -> bool:
     return False
 
 
+def alignment_plan_flag(node: ET.Element) -> bool | None:
+    """Explicit transactionCoding.aff10b5One only. Absence is not an unchecked box."""
+    raw = node.findtext("transactionCoding/aff10b5One")
+    if raw is None:
+        return None
+    return {"1": True, "true": True, "0": False, "false": False}.get(raw.strip().lower())
+
+
 def _text(elem: ET.Element | None, path: str) -> str | None:
     if elem is None:
         return None
@@ -347,6 +355,7 @@ def parse_form4_xml(source: str | bytes) -> dict:
                     # RSU vs PSU: dos concesiones del mismo tamano no son duplicados.
                     "security_title": (_text(node, "securityTitle/value") or "").strip() or None,
                     "rule_10b5_1": _rule_10b5_1(node, footnotes),
+                    "alignment_10b5_1": alignment_plan_flag(node),
                     "shares_owned_after": float(owned_after) if owned_after is not None else None,
                     "direct_indirect": nature,
                 }
