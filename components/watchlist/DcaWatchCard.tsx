@@ -92,7 +92,8 @@ export default function DcaWatchCard({ data, ti, locale }: { data: DcaWatchCardD
                                 title={`${ti(TF_KEYS[tf.key as keyof typeof TF_KEYS])}: ${dcaEngineText(tf.zone.label, ti)}`}
                                 data-testid={`dca-tf-${tf.key}`}
                             >
-                                <span className="opacity-80">{ti(TF_SHORT_KEYS[tf.key as keyof typeof TF_SHORT_KEYS])}</span>
+                                {/* Sin opacity-XX: dejaba la etiqueta a 3,37:1 sobre zonas oscuras (#B400FF), bajo WCAG AA. */}
+                                <span>{ti(TF_SHORT_KEYS[tf.key as keyof typeof TF_SHORT_KEYS])}</span>
                                 {tf.zone.key.toUpperCase().replace('-TRIM', '')}
                             </span>
                         ) : (

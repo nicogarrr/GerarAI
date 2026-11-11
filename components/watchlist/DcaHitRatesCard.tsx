@@ -3,6 +3,7 @@ import type { DcaHitRates } from '@/lib/dca/types';
 import { dcaPercent } from '@/lib/dca/format';
 import { dcaReasonText } from '@/lib/dca/reason-text';
 import { dcaEngineText } from '@/lib/dca/engine-text';
+import { readableInk } from '@/lib/dca/readable-ink';
 import { intlLocale, type Locale } from '@/lib/i18n/locale';
 import { t, type TranslationKey, type TranslationVars } from '@/lib/i18n/t';
 
@@ -11,12 +12,12 @@ type TiFn = (key: TranslationKey, vars?: TranslationVars) => string;
 const esT: TiFn = t;
 
 
+// Tinta WCAG compartida: el umbral YIQ anterior (0.299/0.587/0.114 > 150)
+// elegia blanco sobre #00AA78 (2,99:1) y #FF193C (3,87:1), bajo AA, y negro
+// sobre el fondo de reserva #374151 (2,04:1). readableInk mide luminancia
+// WCAG real y elige la opcion con mas contraste.
 function contrast(color: string | null): string {
-    if (!color) return '#111827';
-    const hex = color.replace('#', '');
-    if (hex.length !== 6) return '#111827';
-    const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
-    return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? '#111827' : '#FFFFFF';
+    return readableInk(color ?? '#374151', '#FFFFFF') ?? '#FFFFFF';
 }
 
 /**
