@@ -355,7 +355,8 @@
     "excludedPositionOne": "1 posición",
     "excludedPositionMany": "{n} posiciones",
     "gainTitle": "Ganancia/Pérdida",
-    "returnTitle": "Rendimiento"
+    "returnTitle": "Rendimiento",
+    "emptyNote": "Sin posiciones todavía"
   },
   "importImage": {
     "cta": "Importar captura",
