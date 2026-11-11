@@ -12,7 +12,8 @@ garantizada por identidad de codigo, no por disciplina manual.
 
 Lo que NO vive aqui (sigue en cada conector, es especifico del formulario):
 - el conjunto de formularios aceptados ({"4", "4/A"} vs FORMS_13DG) y el
-  patron XSLT renderizado (xslF345Xnn vs xslSCHEDULE_13[DG]_Xnn);
+  patron XSLT renderizado (xslF345Xnn vs xslSCHEDULE_13[DG]_Xnn), que cada
+  conector pasa como parametro a ``raw_document_url``;
 - la validacion del documento (raiz <ownershipDocument> vs <edgarSubmission>
   o texto SGML heredado) y todo el parse de contenido.
 
@@ -108,6 +109,26 @@ def filing_index_url(cik: str | int, accession_number: str) -> str:
     cik_number = str(int(str(cik).strip()))
     accession = str(accession_number).replace("-", "")
     return f"{ARCHIVES_URL}/{cik_number}/{accession}/"
+
+
+def raw_document_url(document_url: str, rendered_re: re.Pattern[str]) -> str:
+    """URL del documento CRUDO a partir de la de EDGAR.
+
+    Cuerpo comun de ``form4.raw_document_url`` y ``form13dg.raw_document_url``:
+    el submissions JSON apunta ``primaryDocument`` a la version renderizada
+    para humanos (HTML que revienta el parser XML); el documento crudo vive
+    en el directorio del filing con el mismo nombre de archivo. El patron de
+    la ruta renderizada lo fija cada conector (``rendered_re``). Si la URL no
+    es una variante renderizada, se devuelve tal cual.
+    """
+    from urllib.parse import urlparse, urlunparse
+
+    parsed = urlparse(document_url)
+    match = rendered_re.search(parsed.path)
+    if not match:
+        return document_url
+    raw_path = parsed.path[: match.start()] + "/" + parsed.path[match.end() :]
+    return urlunparse(parsed._replace(path=raw_path))
 
 
 def _looks_like_xml(text: str) -> bool:
