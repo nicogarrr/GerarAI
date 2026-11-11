@@ -33,10 +33,13 @@ from html import unescape
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
-ANNUAL_RE = re.compile(r"annual[\s_-]*report|rapport[\s_-]*annuel|informe[\s_-]*anual|(?<![a-z])ar[\s_-]?20\d\d", re.I)
+ANNUAL_RE = re.compile(
+    r"annual[\s_-]*report|rapport[\s_-]*annuel|"
+    r"(?:informe|reporte)[\s_-]*anual|(?<![a-z])ar[\s_-]?20\d\d", re.I)
 INTERIM_RE = re.compile(
     r"interim[\s_-]*report|quarterly[\s_-]*report|(?<![a-z])q[1-4][\s_-]*(?:20\d\d|report)|"
-    r"half[\s_-]*year(?:ly)?[\s_-]*report|rapport[\s_-]*trimestriel", re.I)
+    r"half[\s_-]*year(?:ly)?[\s_-]*report|rapport[\s_-]*trimestriel|"
+    r"(?<![a-z0-9])[1-4]t[\s_-]*20\d\d(?!\d)", re.I)
 NON_ENGLISH_RE = re.compile(r"(?:^|[\s_\-./])(?:french|francais|fran[cç]ais|fr|espanol|deutsch)(?=$|[\s_\-./])", re.I)
 EXCLUDE_RE = re.compile(r"circular|proxy|letter|esg|sustainab|governance|presentation|webcast|notice", re.I)
 _UPLOAD_DATE = re.compile(r"/(20\d\d)/(0[1-9]|1[0-2])/")
