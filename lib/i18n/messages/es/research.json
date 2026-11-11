@@ -2075,6 +2075,8 @@
     "shortVolumeNote": "Volumen corto diario de FINRA (derivado); no es el interés en corto",
     "shortVolumeUnread": "No se pudo leer el dato de FINRA ahora; vuelve a abrir el informe en un rato.",
     "shortVolumeNoRatio": "La fuente no da volumen en corto diario para este valor (solo posiciones publicadas).",
+    "shortVolumeNotQueried": "No hay consulta almacenada de la fuente pública de cortos.",
+    "shortVolumeLookup": "Consultar en «Cortos públicos» →",
     "ev": "Valor empresa (EV)",
     "evNote": "Capitalización + deuda − caja",
     "evMissing": "Falta la caja o la deuda",

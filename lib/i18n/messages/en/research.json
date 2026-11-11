@@ -2075,6 +2075,8 @@
     "shortVolumeNote": "FINRA daily short volume (derived); not short interest",
     "shortVolumeUnread": "The FINRA figure could not be read right now; reopen the report in a while.",
     "shortVolumeNoRatio": "The source gives no daily short volume for this security (published positions only).",
+    "shortVolumeNotQueried": "No stored lookup of the public short-selling source.",
+    "shortVolumeLookup": "Look it up on the Public shorts page →",
     "ev": "Enterprise value (EV)",
     "evNote": "Market cap + debt − cash",
     "evMissing": "Cash or debt missing",
