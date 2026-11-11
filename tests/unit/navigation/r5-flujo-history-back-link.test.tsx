@@ -17,6 +17,7 @@ import { HistoryBackLink, InAppHistoryTracker } from '@/components/common/Histor
 import { inAppHistoryStore } from '@/lib/nav/in-app-history';
 
 function navigate(to: string, view: ReturnType<typeof render>) {
+    window.history.pushState(null, '', to);
     const [p, q = ''] = to.split('?');
     pathname = p;
     search = q;
@@ -64,6 +65,7 @@ describe('HistoryBackLink en el flujo real', () => {
     it('desde la ficha (?view=valoracion): vuelve por historial, sin perder la pestaña', () => {
         pathname = '/research/NVDA';
         search = 'view=valoracion';
+        window.history.replaceState(null, '', `${pathname}${search ? `?${search}` : ''}`);
         const view = render(<Shell />);
         act(() => navigate('/insider?ticker=NVDA', view));
         const link = screen.getByRole('link', { name: '← NVDA' });
@@ -73,6 +75,7 @@ describe('HistoryBackLink en el flujo real', () => {
     });
 
     it('desde la watchlist: «← NVDA» va a NVDA y el genérico dice «Volver»', () => {
+        window.history.replaceState(null, '', `${pathname}${search ? `?${search}` : ''}`);
         const view = render(<Shell />);
         act(() => navigate('/research/NVDA', view));
         expect(screen.getByRole('link', { name: 'Volver' }).getAttribute('data-back-mode')).toBe('history');
@@ -82,6 +85,7 @@ describe('HistoryBackLink en el flujo real', () => {
     });
 
     it('watchlist to Research then native hash skips same-page history entries', () => {
+        window.history.replaceState(null, '', `${pathname}${search ? `?${search}` : ''}`);
         const view = render(<Shell />);
         act(() => navigate('/research/MSFT', view));
         act(() => {
@@ -95,6 +99,7 @@ describe('HistoryBackLink en el flujo real', () => {
 
     it('Cmd/Ctrl+clic abre el padre como enlace normal', () => {
         pathname = '/research/NVDA';
+        window.history.replaceState(null, '', `${pathname}${search ? `?${search}` : ''}`);
         const view = render(<Shell />);
         act(() => navigate('/insider?ticker=NVDA', view));
         fireEvent.click(screen.getByRole('link', { name: '← NVDA' }), { metaKey: true });

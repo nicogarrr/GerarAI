@@ -16,13 +16,11 @@
 
 const MAX_ENTRIES = 50;
 
-/** Añade `url` a la pila; si coincide con la penúltima, se trata como «atrás». */
+/** Record a PUSH. URL equality never establishes a browser POP. */
 export function recordNavigation(stack: readonly string[], url: string): readonly string[] {
     if (!url) return stack;
     const last = stack[stack.length - 1];
     if (last === url) return stack;
-    const previousIndex = stack.lastIndexOf(url);
-    if (previousIndex !== -1) return stack.slice(0, previousIndex + 1);
     const next = [...stack, url];
     return next.length > MAX_ENTRIES ? next.slice(next.length - MAX_ENTRIES) : next;
 }
@@ -73,6 +71,10 @@ let stackState: readonly string[] = [];
 const listeners = new Set<() => void>();
 
 export const inAppHistoryStore = {
+    replaceStack(stack: readonly string[]): void {
+        stackState = stack;
+        for (const listener of listeners) listener();
+    },
     record(url: string): void {
         const next = recordNavigation(stackState, url);
         if (next === stackState) return;

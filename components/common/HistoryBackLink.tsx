@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useSyncExternalStore, type ComponentProps, type MouseEvent, type ReactNode } from 'react';
 
+import { trackBrowserHistory } from '@/lib/nav/browser-history';
 import { historyBackSteps, inAppHistoryStore, shouldUseHistoryBack } from '@/lib/nav/in-app-history';
 
 /**
@@ -11,16 +11,7 @@ import { historyBackSteps, inAppHistoryStore, shouldUseHistoryBack } from '@/lib
  * Se monta una vez en el layout autenticado; no pinta nada.
  */
 export function InAppHistoryTracker() {
-    const pathname = usePathname();
-    const search = useSearchParams()?.toString() ?? '';
-    useEffect(() => {
-        const record = () => {
-            if (pathname) inAppHistoryStore.record(`${pathname}${search ? `?${search}` : ''}${window.location.hash}`);
-        };
-        record();
-        window.addEventListener('hashchange', record);
-        return () => window.removeEventListener('hashchange', record);
-    }, [pathname, search]);
+    useEffect(() => trackBrowserHistory(window), []);
     return null;
 }
 

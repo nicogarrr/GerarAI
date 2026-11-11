@@ -28,10 +28,10 @@ describe('pila de navegación interna', () => {
         expect(shouldUseHistoryBack(stack, '/research', false)).toBe(true);
     });
 
-    it('detecta el «atrás» y no deja una página fantasma en la pila', () => {
+    it('a new link to a previously visited URL is still a PUSH', () => {
         const stack = visit('/watchlist', '/research/NVDA', '/watchlist');
-        expect(stack).toEqual(['/watchlist']);
-        expect(previousInAppUrl(stack)).toBeNull();
+        expect(stack).toEqual(['/watchlist', '/research/NVDA', '/watchlist']);
+        expect(previousInAppUrl(stack)).toBe('/research/NVDA');
     });
 
     it('repetir la misma URL no cambia la pila', () => {
@@ -64,7 +64,7 @@ describe('hash entries preserve the route origin', () => {
         expect(previousInAppUrl(stack)).toBeNull();
         expect(historyBackSteps(stack)).toBe(0);
     });
-    it('multi-entry back pops to the tracked origin without phantom pages', () => {
-        expect(recordNavigation(visit('/watchlist', '/research/MSFT', '/research/MSFT#analistas'), '/watchlist')).toEqual(['/watchlist']);
+    it('a repeated anchor is a new entry, not an inferred POP', () => {
+        expect(historyBackSteps(visit('/watchlist', '/research/MSFT', '/research/MSFT#analistas', '/research/MSFT#historial', '/research/MSFT#analistas'))).toBe(4);
     });
 });
