@@ -127,5 +127,10 @@
     "horizonPending": "Not matured yet.",
     "best": "Best horizon for this stock: {horizon}, by hit rate.",
     "bestInsufficient": "Not enough samples to pick a horizon (at least {min} per horizon)."
+  },
+  "rateLimit": {
+    "title": "Too many requests",
+    "message": "Wait a few seconds before trying again. Your data has not changed.",
+    "wait": "Retry in {seconds} s"
   }
 }

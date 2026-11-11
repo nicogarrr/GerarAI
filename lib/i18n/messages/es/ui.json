@@ -127,5 +127,10 @@
     "horizonPending": "Pendiente de vencer.",
     "best": "Mejor horizonte para esta acción: {horizon}, por acierto.",
     "bestInsufficient": "Faltan muestras para elegir horizonte (mínimo {min} por horizonte)."
+  },
+  "rateLimit": {
+    "title": "Demasiadas peticiones",
+    "message": "Espera unos segundos antes de volver a intentarlo. Tus datos no han cambiado.",
+    "wait": "Reintentar en {seconds} s"
   }
 }
