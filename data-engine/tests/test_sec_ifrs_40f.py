@@ -213,7 +213,7 @@ def test_gfl_snapshot_publico_con_us_gaap_incidental(db, monkeypatch):
     }
 
     class _GFL(_FakeSECBrookfield):
-        async def cik_for_ticker(self, ticker):
+        async def cik_for_ticker(self, ticker, entity_name=None):
             return "0001780232"
 
         async def annual_report_anchors(self, cik):
