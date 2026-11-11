@@ -93,7 +93,7 @@ class _FakeSEC:
             raise self._submissions_exc
         return self._submissions_payload
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         if self._cik_exc is not None:
             raise self._cik_exc
         return self._cik

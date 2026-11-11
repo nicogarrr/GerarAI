@@ -47,7 +47,7 @@ def _company(db: Session) -> Company:
 
 
 class _FakeSECClient:
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0001234567"
 
     async def company_facts(self, cik):
@@ -124,7 +124,7 @@ def test_refresh_sec_endpoint_encaja_con_response_model(db, monkeypatch):
 
 
 class _FakeSECClientMultiyear:
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0001234567"
 
     async def company_facts(self, cik):
@@ -185,7 +185,7 @@ class _FakeSECClientFilingYear:
     """Simula el formato real companyfacts: fy = anio del filing, no del dato,
     con el mismo periodo re-presentado en varios 10-K."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0001234567"
 
     async def company_facts(self, cik):
@@ -239,7 +239,7 @@ class _StaleAliasSECClient:
     vive en RevenueFromContractWithCustomerExcludingAssessedTax (caso MSFT
     real, detectado en prod 24/9)."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000789019"
 
     async def company_facts(self, cik):

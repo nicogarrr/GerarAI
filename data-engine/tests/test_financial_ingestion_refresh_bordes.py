@@ -118,7 +118,7 @@ class _FakeSECBordes:
     con signo negado (2305) y portada dei con tres guards (2450, 2452->2438,
     2460)."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):

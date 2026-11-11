@@ -65,7 +65,7 @@ def _company(db, *, ticker="XYZ", name="Alfa Industrias, S.A.", exchange="BME", 
 
 def _fake_sec(entity_name: str):
     class _Fake:
-        async def cik_for_ticker(self, ticker):
+        async def cik_for_ticker(self, ticker, entity_name=None):
             return "0000000077"
 
         async def company_facts(self, cik):

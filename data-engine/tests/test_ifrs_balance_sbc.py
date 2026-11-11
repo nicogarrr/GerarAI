@@ -48,7 +48,7 @@ CNQ_IFRS = {
 
 
 class _FakeSEC:
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0001017413"
 
     async def annual_report_anchors(self, cik):

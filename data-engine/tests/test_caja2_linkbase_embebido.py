@@ -54,7 +54,7 @@ def _flow(val, year):
 class _FakeBX:
     fetched: list[str] = []
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return BX_CIK
 
     async def annual_report_anchors(self, cik_):

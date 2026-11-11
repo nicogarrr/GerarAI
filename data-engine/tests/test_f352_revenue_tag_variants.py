@@ -51,7 +51,7 @@ class _FakeSECAKAM:
     """AKAM: "Revenues" muere en FY2017; el revenue reciente (FY2025) vive
     bajo la variante IncludingAssessedTax."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0001086222"
 
     async def company_facts(self, cik):
@@ -70,7 +70,7 @@ class _FakeSECAKAM:
 class _FakeSECDTE:
     """DTE (utility): solo informa RegulatedAndUnregulatedOperatingRevenue."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000936340"
 
     async def company_facts(self, cik):

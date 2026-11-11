@@ -41,7 +41,7 @@ class FakeSEC:
     def filing_index_url(cik, accession):
         return f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accession.replace('-', '')}/"
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         if "cik" in self.fail:
             raise RuntimeError("red")
         return self._cik

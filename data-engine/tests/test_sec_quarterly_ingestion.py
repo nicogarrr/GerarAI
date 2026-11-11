@@ -45,7 +45,7 @@ class _FakeSECQuarterly:
     en dos filings (manda el filed mas reciente), YTD de Q2 (181d, fuera),
     TTM (365d, fuera), segmento mensual (31d, fuera) y balance instantaneo."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0009999999"
 
     async def company_facts(self, cik):
@@ -138,7 +138,7 @@ class _FakeSECFilingPeriodFp:
     fp etiqueta TODOS los trimestres como Q1. La etiqueta se deriva del cierre
     del periodo contra el mes modal de cierre de ejercicio (septiembre)."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000320193"
 
     async def company_facts(self, cik):

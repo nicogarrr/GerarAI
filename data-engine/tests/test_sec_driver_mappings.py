@@ -55,7 +55,7 @@ def _instant(val, year, accn, filed):
 
 
 class _FakeSECChubb:
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000896159"
 
     async def annual_report_anchors(self, cik):
@@ -78,7 +78,7 @@ class _FakeSECChubb:
 
 
 class _FakeSECRocketLab:
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0001819994"
 
     async def annual_report_anchors(self, cik):

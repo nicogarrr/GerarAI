@@ -48,7 +48,7 @@ class _FakeSECDei:
     """UNH real: dei ECSO en portada 10-K/10-Q; una enmienda 10-Q/A actualiza
     el mismo `end` (manda el filed mas reciente); un 8-K queda fuera."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000731766"
 
     async def company_facts(self, cik):

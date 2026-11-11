@@ -46,7 +46,7 @@ class FakeRedis:
 class BoomSEC:
     """Si alguien llama a la SEC en un test de hit, el test debe fallar."""
 
-    async def cik_for_ticker(self, ticker):  # pragma: no cover - no debe llamarse
+    async def cik_for_ticker(self, ticker, entity_name=None):  # pragma: no cover - no debe llamarse
         raise AssertionError("SEC llamada pese al hit de Redis")
 
 
@@ -80,7 +80,7 @@ def test_resolved_value_is_written_to_redis_with_status_ttl(monkeypatch):
     monkeypatch.setattr(svc, "_materials_redis", lambda: redis)
 
     class FakeResolverSEC:
-        async def cik_for_ticker(self, ticker):
+        async def cik_for_ticker(self, ticker, entity_name=None):
             raise RuntimeError("sin red")
 
     out = asyncio.run(svc.materials_for_events(_events(), date(2026, 7, 24), sec=FakeResolverSEC()))
@@ -96,7 +96,7 @@ def test_redis_down_fail_open_still_resolves(monkeypatch):
     monkeypatch.setattr(svc, "_materials_redis", lambda: None)
 
     class FakeResolverSEC:
-        async def cik_for_ticker(self, ticker):
+        async def cik_for_ticker(self, ticker, entity_name=None):
             raise RuntimeError("sin red")
 
     out = asyncio.run(svc.materials_for_events(_events(), date(2026, 7, 24), sec=FakeResolverSEC()))
@@ -109,7 +109,7 @@ def test_redis_error_on_read_and_write_never_breaks(monkeypatch):
     monkeypatch.setattr(svc, "_materials_redis", lambda: redis)
 
     class FakeResolverSEC:
-        async def cik_for_ticker(self, ticker):
+        async def cik_for_ticker(self, ticker, entity_name=None):
             raise RuntimeError("sin red")
 
     out = asyncio.run(svc.materials_for_events(_events(), date(2026, 7, 24), sec=FakeResolverSEC()))

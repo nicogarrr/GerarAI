@@ -97,7 +97,7 @@ class _FakeSECClientCable(_FakeSECClientBase):
     DebtWeightedAverageInterestRate. FY2012 con el tag neto POSITIVO
     (ingreso neto): no debe generar interest_expense."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0001091667"
 
     def _build_payload(self):
@@ -190,7 +190,7 @@ class _FakeSECClientSoloIngresoNeto(_FakeSECClientBase):
     """Emisor con el tag neto siempre POSITIVO (ingreso financiero neto):
     no hay gasto que ingerir y no se inventa."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0009999999"
 
     def _build_payload(self):
@@ -260,7 +260,7 @@ class _FakeSECClientBanco(_FakeSECClientBase):
     alcance. La guarda bank_like lo excluye: los anos sin tag estricto
     quedan N/D, no se rellenan con el residuo."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000895421"
 
     def _build_payload(self):

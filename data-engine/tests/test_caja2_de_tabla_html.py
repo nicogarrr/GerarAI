@@ -76,7 +76,7 @@ def _flow(val, year):
 class _FakeBN:
     fetched: list[str] = []
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return BN_CIK
 
     async def annual_report_anchors(self, cik_):

@@ -312,7 +312,7 @@ def _fake_sec(stem, accn, form, cik, taxonomy, base_facts):
     class _Fake:
         fetched: list[str] = []
 
-        async def cik_for_ticker(self, ticker):
+        async def cik_for_ticker(self, ticker, entity_name=None):
             return cik
 
         async def annual_report_anchors(self, cik_):
