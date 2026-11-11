@@ -130,7 +130,7 @@
   },
   "rateLimit": {
     "title": "Demasiadas peticiones",
-    "message": "Espera unos segundos antes de volver a intentarlo. Tus datos no han cambiado.",
+    "message": "Espera a que termine la cuenta atrás antes de volver a intentarlo. Tus datos no han cambiado.",
     "wait": "Reintentar en {seconds} s"
   }
 }

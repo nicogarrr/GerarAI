@@ -130,7 +130,7 @@
   },
   "rateLimit": {
     "title": "Too many requests",
-    "message": "Wait a few seconds before trying again. Your data has not changed.",
+    "message": "Wait for the countdown to finish before trying again. Your data has not changed.",
     "wait": "Retry in {seconds} s"
   }
 }

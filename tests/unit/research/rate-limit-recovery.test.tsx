@@ -11,6 +11,7 @@ it('renders a clear 429 state before Next redacts the server error, with a coold
     vi.useFakeTimers();
     render(result);
     expect(screen.getByRole('alert')).toHaveTextContent('Demasiadas peticiones');
+    expect(screen.getByRole('alert')).toHaveTextContent('Espera a que termine la cuenta atrás antes de volver a intentarlo. Tus datos no han cambiado.');
     const retry = screen.getByRole('button');
     expect(retry).toBeDisabled();
     fireEvent.click(retry);
@@ -57,6 +58,7 @@ it('shows the cooldown in English too', async () => {
     const result = await renderWithRateLimit(async () => { throw new AppError('limited', 'RESEARCH_API_ERROR', 429); });
     render(<LocaleProvider locale="en">{result}</LocaleProvider>);
     expect(screen.getByRole('alert')).toHaveTextContent('Too many requests');
+    expect(screen.getByRole('alert')).toHaveTextContent('Wait for the countdown to finish before trying again. Your data has not changed.');
     expect(screen.getByRole('button', { name: 'Retry in 60 s' })).toBeDisabled();
 });
 
