@@ -331,12 +331,17 @@ class EsefClient:
 
         /api/entities/{lei}/filings (verificado 2026-11-03 con Basic-Fit N.V.,
         LEI 724500HUXGTQC07CAZ61: 5 filings 2021-2025 con json_url). Un LEI
-        sin filings responde 404: lista vacia, no error de fuente.
+        sin filings responde 404: lista vacia, no error de fuente. Se recorre
+        meta.count completo; un fallo en paginas posteriores se propaga, nunca
+        se devuelve una historia parcial como si estuviera completa.
         """
+        if page_size <= 0:
+            raise ValueError("page_size must be positive")
+        url = f"{ENTITIES_API}/{lei}/filings"
         try:
             payload = await self._get_json(
-                f"{ENTITIES_API}/{lei}/filings",
-                params={"page[size]": page_size},
+                url,
+                params={"page[size]": page_size, "page[number]": 1},
             )
         except EsefRateLimited:
             raise
@@ -344,7 +349,12 @@ class EsefClient:
             if "404" in str(exc):
                 return []
             raise
-        filings, _ = parse_filings_page(payload)
+        filings, total = parse_filings_page(payload)
+        pages = max(1, -(-total // page_size))
+        for page in range(2, pages + 1):
+            payload = await self._get_json(url, params={"page[size]": page_size, "page[number]": page})
+            rows, _ = parse_filings_page(payload)
+            filings.extend(rows)
         return [f for f in filings if f.lei == lei]
 
     async def search_entities_by_name(self, name: str) -> list[tuple[str, str]]:
