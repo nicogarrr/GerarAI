@@ -491,6 +491,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
     }, [portfolioSummary]);
 
     const visibleOpportunities = opportunities.slice(0, OPPORTUNITY_TILE_LIMIT);
+    const portfolioIsEmpty = !portfolioLoading && !portfolioError && !(portfolioSummary && portfolioSummary.holdings.length > 0);
 
     return (
         <div className="space-y-6">
@@ -511,9 +512,16 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                         <Wallet aria-hidden="true" className="h-5 w-5 text-blue-400" />
                         {t('home.portfolio.title')}
                     </CardTitle>
-                    <Link href="/portfolio" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-blue-400 hover:text-blue-300 text-sm transition-colors">
-                        <span className="whitespace-nowrap">{t('home.portfolio.details')}</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
-                    </Link>
+                    {portfolioIsEmpty ? (
+                        // Sin posiciones, «Ver detalles» llevaba a una cartera vacía: los
+                        // primeros pasos de abajo ya dicen qué hacer. El hueco conserva la
+                        // altura de la cabecera (sin salto al terminar de cargar).
+                        <span aria-hidden="true" className="min-h-[44px]" />
+                    ) : (
+                        <Link href="/portfolio" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-blue-400 hover:text-blue-300 text-sm transition-colors">
+                            <span className="whitespace-nowrap">{t('home.portfolio.details')}</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
+                        </Link>
+                    )}
                 </CardHeader>
                 <CardContent className="pt-4">
                     {portfolioLoading ? (
