@@ -48,7 +48,7 @@ from app.services.fact_deletion import (
     drop_shadowed_facts,
     tenant_condition,
 )
-from app.services.financial_ingestion_service import BANK_REVENUE_TICKERS
+from app.services.financial_ingestion_service import _is_bank_like
 from app.services.provenance import Coverage, SourceKind, provenance
 from app.services.source_documents import get_or_create_source_document
 
@@ -70,14 +70,6 @@ def _disabled(ticker: str) -> dict[str, Any]:
         "reason": "EDGARTOOLS_ENABLED=false (via off por defecto; ver informe de enchufado)",
         "provenance": provenance(SOURCE, SourceKind.OFFICIAL, coverage=Coverage.UNAVAILABLE),
     }
-
-
-def _is_bank_like(company: Any) -> bool:
-    """Gate de composicion de revenue bancario (misma regla que la via actual)."""
-    industry = str(getattr(company, "industry", "") or "").strip().lower()
-    if any(k in industry for k in ("bank", "thrift", "savings", "capital markets")):
-        return True
-    return str(getattr(company, "ticker", "") or "").strip().upper() in BANK_REVENUE_TICKERS
 
 
 def _tenant_filter(db: Session, model: Any) -> Any:
