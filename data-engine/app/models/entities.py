@@ -945,9 +945,13 @@ class FinancialFact(TenantOwnedMixin, Base, TimestampMixin):
 
     @property
     def source_url(self) -> str | None:
-        from app.core.source_urls import linkable_source_url
+        from app.core.source_urls import filed_package_url, linkable_source_url
 
-        return linkable_source_url(self.source.source_url) if self.source is not None else None
+        if self.source is None:
+            return None
+        # Sin URL en el documento (ESEF: el snapshot normalizado no es un filing), el informe anual verificado
+        # del que sale ESTE ejercicio (metadata.filing_sources); antes todo hecho ESEF quedaba sin fuente.
+        return linkable_source_url(self.source.source_url) or filed_package_url(self.source.metadata_, self.period)
 
     @property
     def source_title(self) -> str | None:
