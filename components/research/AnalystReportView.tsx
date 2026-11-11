@@ -219,6 +219,21 @@ function cellText(cell: ReportCell, big: (v: number | null | undefined, unit?: s
   return `${big(cell.value, cell.unit)}${marks}`;
 }
 
+const EBITDA_REASON_KEYS = {
+  missing_da: 'research.informe.ebitdaReason.missingDa',
+  missing_operating_income: 'research.informe.ebitdaReason.missingOperatingIncome',
+  missing_operating_income_and_da: 'research.informe.ebitdaReason.missingBoth',
+  unit_mismatch: 'research.informe.ebitdaReason.unitMismatch',
+  financial_issuer: 'research.informe.ebitdaReason.financialIssuer',
+} as const;
+
+/** Un EBITDA «—» dice por qué (antes BX, TSM o un IFRS sin D&A salían con guiones mudos todos los años). */
+function ebitdaReason(t: T, row: ReportPeriod) {
+  if (row.ebitda?.value != null || !row.ebitda_reason) return null;
+  const key = EBITDA_REASON_KEYS[row.ebitda_reason as keyof typeof EBITDA_REASON_KEYS];
+  return key ? <span className="block whitespace-normal text-[11px] leading-4 text-gray-500" data-testid="informe-ebitda-reason">{t(key)}</span> : null;
+}
+
 /** La cifra real enlazada al filing del que sale (si el informe trae su URL). */
 function SourcedValue({ cell, text }: { cell: ReportCell; text: string }) {
   const url = cell?.url && /^https?:\/\//.test(cell.url) ? cell.url : null;
@@ -245,7 +260,7 @@ function PeriodTable({ t, fmt, big, title, rows, kind }: { t: T; fmt: Formatters
             <tr className="border-t border-gray-800" key={row.period_end}>
               <th className="whitespace-nowrap py-1 text-left font-normal text-gray-300" scope="row">{head(row)}</th>
               <td className="whitespace-nowrap py-1 pl-2 text-gray-100"><SourcedValue cell={row.revenue} text={cellText(row.revenue, big)} /></td>
-              <td className="whitespace-nowrap py-1 pl-2 text-gray-100"><SourcedValue cell={row.ebitda} text={cellText(row.ebitda, big)} /></td>
+              <td className="whitespace-nowrap py-1 pl-2 text-gray-100"><SourcedValue cell={row.ebitda} text={cellText(row.ebitda, big)} />{ebitdaReason(t, row)}</td>
             </tr>
           ))}
         </tbody>
@@ -269,9 +284,11 @@ const CONSENSUS_SOURCE_KEYS = {
   tasa_base: 'research.informe.consensusSource.tasaBase',
 } as const;
 
-function ConsensusCellView({ cell, t, fmt, big, unit, eps, mobile = false }: { cell: OwnConsensusCell | null; t: T; fmt: Formatters; big: (v: number | null | undefined, unit?: string | null) => string; unit: string | null; eps: boolean; mobile?: boolean }) {
+function ConsensusCellView({ cell, t, fmt, big, unit, eps, mobile = false, shared }: { cell: OwnConsensusCell | null; t: T; fmt: Formatters; big: (v: number | null | undefined, unit?: string | null) => string; unit: string | null; eps: boolean; mobile?: boolean; shared?: string | null }) {
   const Cell = mobile ? 'dd' : 'td';
   if (!cell || cell.status !== 'estimado' || cell.mid == null) {
+    // Un motivo que se repite en varias celdas va una sola vez en la nota del consenso.
+    if (cell?.reason && cell.reason === shared) return <Cell className={mobile ? 'text-gray-400' : 'py-1 pl-2 text-gray-500'} title={cell.reason}>{t('research.informe.na')}<sup aria-hidden="true">*</sup></Cell>;
     // El motivo del N/D se lee en pantalla también en la tabla de PC (antes solo
     // en el «title», invisible en táctil y sin descubrir con ratón).
     return <Cell className={mobile ? 'text-gray-400' : 'py-1 pl-2 text-gray-500'} title={cell?.reason ?? undefined}>{t('research.informe.na')}{cell?.reason ? <span className={mobile ? 'mt-1 block text-xs leading-5 text-amber-300' : 'block max-w-[16rem] text-[11px] leading-4 text-amber-300/90'}>{cell.reason}</span> : null}</Cell>;
@@ -307,6 +324,10 @@ function ConsensusCellView({ cell, t, fmt, big, unit, eps, mobile = false }: { c
 function ConsensusTable({ t, fmt, big, rows, unit }: { t: T; fmt: Formatters; big: (v: number | null | undefined, unit?: string | null) => string; rows: ConsensusRow[]; unit: string | null }) {
   const title = t('research.informe.consensusTitle');
   if (!rows.length) return <p className="mt-3 text-sm text-gray-400" data-testid="informe-consensus">{title}: {t('research.informe.consensusNone')}</p>;
+  // El motivo de N/D más repetido (p. ej. «ninguna fuente … cumple los requisitos») se dice una vez.
+  const reasonCount = new Map<string, number>();
+  for (const row of rows) for (const c of Object.values(row.cells)) if (c?.reason && (c.status !== 'estimado' || c.mid == null)) reasonCount.set(c.reason, (reasonCount.get(c.reason) ?? 0) + 1);
+  const [shared] = [...reasonCount.entries()].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1]).map(([r]) => r);
   const head = (row: ConsensusRow) => {
     const date = fmt.formatMarketDate(row.period_end, { year: '2-digit', month: 'short' });
     return row.isYear ? `${t('research.informe.fyHead', { date })}E` : `${row.period.slice(0, 2).toUpperCase()} · ${date}E`;
@@ -319,9 +340,9 @@ function ConsensusTable({ t, fmt, big, rows, unit }: { t: T; fmt: Formatters; bi
           <section className="min-w-0 rounded-lg border border-gray-800 p-3 [overflow-wrap:anywhere]" aria-label={`${title} · ${head(row)}`} key={row.period}>
             <h4 className="text-sm font-medium text-gray-200">{head(row)}</h4>
             <dl className="mt-3 space-y-3 text-sm">
-              <div><dt className="text-xs text-gray-400">{t('research.informe.revenue')}</dt><ConsensusCellView cell={row.cells.revenue} t={t} fmt={fmt} big={big} unit={unit} eps={false} mobile /></div>
-              <div><dt className="text-xs text-gray-400">{t('research.informe.operatingIncome')}</dt><ConsensusCellView cell={row.cells.operating_income} t={t} fmt={fmt} big={big} unit={unit} eps={false} mobile /></div>
-              <div><dt className="text-xs text-gray-400">{t('research.informe.eps')}</dt><ConsensusCellView cell={row.cells.eps} t={t} fmt={fmt} big={big} unit={unit} eps mobile /></div>
+              <div><dt className="text-xs text-gray-400">{t('research.informe.revenue')}</dt><ConsensusCellView cell={row.cells.revenue} t={t} fmt={fmt} big={big} unit={unit} eps={false} mobile shared={shared} /></div>
+              <div><dt className="text-xs text-gray-400">{t('research.informe.operatingIncome')}</dt><ConsensusCellView cell={row.cells.operating_income} t={t} fmt={fmt} big={big} unit={unit} eps={false} mobile shared={shared} /></div>
+              <div><dt className="text-xs text-gray-400">{t('research.informe.eps')}</dt><ConsensusCellView cell={row.cells.eps} t={t} fmt={fmt} big={big} unit={unit} eps mobile shared={shared} /></div>
             </dl>
           </section>
         ))}
@@ -339,14 +360,15 @@ function ConsensusTable({ t, fmt, big, rows, unit }: { t: T; fmt: Formatters; bi
           {rows.map((row) => (
             <tr className="border-t border-gray-800" key={row.period}>
               <th className="whitespace-nowrap py-1 text-left font-normal text-gray-300" scope="row">{head(row)}</th>
-              <ConsensusCellView cell={row.cells.revenue} t={t} fmt={fmt} big={big} unit={unit} eps={false} />
-              <ConsensusCellView cell={row.cells.operating_income} t={t} fmt={fmt} big={big} unit={unit} eps={false} />
-              <ConsensusCellView cell={row.cells.eps} t={t} fmt={fmt} big={big} unit={unit} eps />
+              <ConsensusCellView cell={row.cells.revenue} t={t} fmt={fmt} big={big} unit={unit} eps={false} shared={shared} />
+              <ConsensusCellView cell={row.cells.operating_income} t={t} fmt={fmt} big={big} unit={unit} eps={false} shared={shared} />
+              <ConsensusCellView cell={row.cells.eps} t={t} fmt={fmt} big={big} unit={unit} eps shared={shared} />
             </tr>
           ))}
         </tbody>
       </table>
       </div>
+      {shared ? <p className="mt-1 text-xs text-amber-300/90" data-testid="consensus-common-reason">{t('research.informe.consensusSharedReason', { reason: shared })}</p> : null}
       <p className="mt-1 text-xs text-gray-500">{t('research.informe.consensusNote')}</p>
     </div>
   );

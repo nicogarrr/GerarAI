@@ -190,6 +190,23 @@ def _ebitda_from_components(best: dict[tuple[str, str, date], FactRow], kind: st
     }
 
 
+def _ebitda_reason(best: dict[tuple[str, str, date], FactRow], kind: str, end: date, *, derive: bool) -> str:
+    """Por qué un periodo no tiene EBITDA (el Informe lo enseña en la celda en vez de un «—» mudo)."""
+    op = best.get(("operating_income", kind, end))
+    da = best.get(("depreciation_amortization", kind, end))
+    if op is not None and da is not None:
+        return "unit_mismatch"
+    if not derive and op is None:
+        return "financial_issuer"
+    if op is None and da is None:
+        return "missing_operating_income_and_da"
+    if da is None:
+        return "missing_da"
+    # Con D&A y sin resultado operativo: tampoco hay componentes IFRS (resultado financiero neto, antes de
+    # impuestos) en la misma unidad y cierre.
+    return "missing_operating_income"
+
+
 def build_estimates(rows: list[FactRow], *, annual: int = ANNUAL_PERIODS, quarters: int = QUARTER_PERIODS,
                     derive_ebitda: bool = True) -> dict:
     """Ingresos y EBITDA reales por ejercicio (últimos ``annual``) y trimestre (últimos ``quarters``).
@@ -211,7 +228,9 @@ def build_estimates(rows: list[FactRow], *, annual: int = ANNUAL_PERIODS, quarte
             ebitda = _ebitda(best, kind, end, derive=derive_ebitda)
             if revenue is None and ebitda is None:
                 continue
-            out.append({"period_end": end, "fiscal_quarter": quarter, "revenue": revenue, "ebitda": ebitda})
+            reason = None if ebitda is not None else _ebitda_reason(best, kind, end, derive=derive_ebitda)
+            out.append({"period_end": end, "fiscal_quarter": quarter, "revenue": revenue, "ebitda": ebitda,
+                        "ebitda_reason": reason})
         return out
 
     return {"annual": periods("FY", annual), "quarterly": periods("Q", quarters)}
