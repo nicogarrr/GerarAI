@@ -42,7 +42,7 @@ class _FakeSECAAPL:
     """AAPL-like: el 10-K de FY2020 trae fp=FY con duraciones mezcladas:
     el ejercicio completo (363 dias) y segmentos de Q2 (91 d) y Q4 (90 d)."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000320193"
 
     async def company_facts(self, cik):
@@ -90,7 +90,7 @@ class _FakeSECCalendarTTM:
     cierran en fin de trimestre (caso real AA/AAL 2020). Superan el filtro de
     duracion, pero su mes de cierre no es el modal del emisor (diciembre)."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0001675149"
 
     async def company_facts(self, cik):
@@ -134,7 +134,7 @@ class _FakeSECWeekFiscal:
     el dia exacto del cierre varia cada ano; el filtro modal por MES debe
     conservarlos todos y rechazar el TTM de marzo."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000320193"
 
     async def company_facts(self, cik):

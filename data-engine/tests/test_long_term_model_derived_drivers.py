@@ -68,7 +68,7 @@ def _flow(val, year, accn, filed):
 
 
 class _FakeSECCamden:
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000906345"
 
     async def annual_report_anchors(self, cik):

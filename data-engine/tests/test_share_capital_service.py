@@ -150,7 +150,7 @@ def test_ingestion_capital_flows_duration_and_provenance(setup, monkeypatch):
     from app.services import financial_ingestion_service as ingestion
 
     class FakeSEC:
-        async def cik_for_ticker(self, ticker):
+        async def cik_for_ticker(self, ticker, entity_name=None):
             return "0009999999"
 
         async def annual_report_anchors(self, cik):

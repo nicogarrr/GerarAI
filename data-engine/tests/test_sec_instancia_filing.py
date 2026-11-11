@@ -68,7 +68,7 @@ SUBMISSIONS = {"filings": {"recent": {
 class _FakeSECTsmc:
     fetched: list[str] = []
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0001046179"
 
     async def annual_report_anchors(self, cik):

@@ -88,7 +88,7 @@ class _FakeSECMini:
     _anchors = None
     llamadas = None
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0001234567"
 
     async def company_facts(self, cik):

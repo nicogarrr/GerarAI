@@ -40,7 +40,7 @@ class _FakeSECClientWWW:
     """WWW-like: caja estricta hasta FY2022; desde FY2023 solo el tag
     combinado (caja + restringida), con `filed` mas reciente."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0001104711"
 
     async def company_facts(self, cik):
@@ -92,7 +92,7 @@ def test_cash_fallback_to_restricted_tag_with_coverage_note(db, monkeypatch):
 
 def test_no_note_when_strict_cash_reported(db, monkeypatch):
     class _FakeSECClientStrict:
-        async def cik_for_ticker(self, ticker):
+        async def cik_for_ticker(self, ticker, entity_name=None):
             return "0001234567"
 
         async def company_facts(self, cik):

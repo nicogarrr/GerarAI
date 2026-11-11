@@ -70,7 +70,7 @@ def _entry(start, end, val, fp, form="10-Q", filed="2026-07-31", accn="000032019
 class _FakeSEC:
     facts: dict = {}
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000320193"
 
     async def company_facts(self, cik):

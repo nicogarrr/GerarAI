@@ -71,7 +71,7 @@ def _facts(db, company, metric):
 
 
 class _FakeSECConCortes:
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):
@@ -246,7 +246,7 @@ class _FakeSECConCik:
              "accn": "0000000001-25-000001"},
         ]}}}}}
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):
@@ -292,7 +292,7 @@ def test_payload_sin_cik_declarado_no_se_puede_contrastar(db, monkeypatch):
 
 
 class _FakeSECShares:
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):
@@ -401,7 +401,7 @@ def test_fmp_derivatives_use_only_own_annual_pair(db):
 
 
 class _FakeSECSinCik:
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return None
 
 
@@ -416,7 +416,7 @@ def test_refresh_from_sec_sin_cik_fail_closed(db, monkeypatch):
 
 
 class _FakeSECCaidaEnCik:
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         raise ConnectionError("red caida")
 
 
@@ -431,7 +431,7 @@ def test_refresh_from_sec_error_resolviendo_cik_es_runtime_error(db, monkeypatch
 
 
 class _FakeSECCaidaEnFacts:
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):
@@ -449,7 +449,7 @@ def test_refresh_from_sec_error_leyendo_facts_es_runtime_error(db, monkeypatch):
 class _FakeSECEntidadAjena:
     """Mismo ticker, otro emisor (PRIM en BME vs Perimeter en NYSE)."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):
@@ -485,7 +485,7 @@ class _FakeSECAnclasCaidas:
              "accn": "0000000001-25-000001"},
         ]}}}}}
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):
@@ -523,7 +523,7 @@ class _FakeSECEstable:
              "accn": "0000000001-25-000001"},
         ]}}}}}
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):
@@ -565,7 +565,7 @@ class _FakeSECIfrs:
              "accn": "0000000001-25-000002"},
         ]}}}}}
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):
@@ -606,7 +606,7 @@ class _FakeSECConDei:
              "filed": "2025-10-31", "accn": _DEI_ACCN},
         ]}}}}}
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):
@@ -720,7 +720,7 @@ class _FakeSECPlanB:
     """companyfacts no trae el 10-K de 2025 (sin hechos us-gaap); submissions
     lo lista con XBRL y la instancia se sirve doblada."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):
@@ -811,7 +811,7 @@ class _FakeSECQuarterly:
              "accn": "0000000001-26-000011"},
         ]}}}}}
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):
@@ -863,7 +863,7 @@ class _FakeSECDedupeDei:
         },
     }}
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):

@@ -184,7 +184,7 @@ class _FakeSEC:
     def __init__(self, payload):
         self._payload = payload
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000939767"
 
     async def company_facts(self, cik):

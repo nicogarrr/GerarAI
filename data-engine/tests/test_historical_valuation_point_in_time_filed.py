@@ -70,7 +70,7 @@ A19, A20 = "0000000001-20-000010", "0000000001-21-000010"
 
 
 class _FakeSECRestatement:
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):

@@ -81,7 +81,7 @@ def _row(fy: int, val: float, accn: str, filed: str) -> dict:
 
 def _fake(concepts: dict[str, list[dict]]):
     class _Fake:
-        async def cik_for_ticker(self, ticker):
+        async def cik_for_ticker(self, ticker, entity_name=None):
             return "0000000001"
 
         async def company_facts(self, cik):

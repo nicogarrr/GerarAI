@@ -58,7 +58,7 @@ class _FakeSECChubb:
     es fail-closed: cada hecho entra solo si su `accn` esta anclado a la fecha
     de portada del 10-K (annual_report_anchors) y el mes de cierre coincide."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000896159"
 
     async def annual_report_anchors(self, cik):

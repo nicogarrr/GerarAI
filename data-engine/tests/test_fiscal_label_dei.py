@@ -124,7 +124,7 @@ def _ingest(db, ticker, cik, gaap, anchors, preexisting=()):
     db.commit()
 
     class _FakeSEC:
-        async def cik_for_ticker(self, _ticker):
+        async def cik_for_ticker(self, _ticker, entity_name=None):
             return cik
 
         async def company_facts(self, _cik):

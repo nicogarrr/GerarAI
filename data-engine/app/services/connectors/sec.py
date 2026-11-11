@@ -394,7 +394,7 @@ class SECClient:
     async def ticker_map(self) -> dict:
         return await self._get_json(self.ticker_map_url)
 
-    async def cik_for_ticker(self, ticker: str) -> str | None:
+    async def cik_for_ticker(self, ticker: str, entity_name: str | None = None) -> str | None:
         ticker = ticker.upper()
         manifest_cik = sec_edgar.manifest_cik(ticker)
         if manifest_cik:
@@ -402,7 +402,16 @@ class SECClient:
         # EDGAR nombra las clases con guion (BRK-B) y el master con punto
         # (BRK.B): el match exacto nunca casa para esos emisores. El
         # fallback normalizado exige match único (fail closed).
-        return (await self._ticker_index()).lookup(ticker)
+        index = await self._ticker_index()
+        found = index.lookup(ticker)
+        if found is not None:
+            return found
+        # Listado local de un emisor que presenta 40-F/20-F (índice por la
+        # línea americana): solo con la razón social de la ficha para
+        # contrastar la identidad (fail closed sin ella).
+        if entity_name:
+            return index.lookup_foreign_base(ticker, entity_name)
+        return None
 
     async def _ticker_index(self) -> CikIndex:
         """Indice del mapa de la SEC, uno por entrada de cache.
@@ -418,7 +427,7 @@ class SECClient:
             return current[1]
         mapping = await self.ticker_map()
         index = CikIndex(
-            (str(item.get("ticker", "")), str(item["cik_str"]).zfill(10))
+            (str(item.get("ticker", "")), str(item["cik_str"]).zfill(10), str(item.get("title", "") or ""))
             for item in mapping.values()
             if isinstance(item, dict) and item.get("cik_str") is not None
         )

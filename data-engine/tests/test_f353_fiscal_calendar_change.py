@@ -95,7 +95,7 @@ class _FakeSEC:
     facts = None
     anchors: dict = {}
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000000"
 
     async def company_facts(self, cik):

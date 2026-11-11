@@ -57,7 +57,7 @@ def _q1(year, val):
 class _FakeBankSEC:
     """Banco: Revenues solo hasta 2022; desde 2023 los dos componentes."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000072971"
 
     async def company_facts(self, cik):
@@ -75,7 +75,7 @@ class _FakeBankSEC:
 class _FakeHalfBankSEC:
     """Solo intereses netos: sin NoninterestIncome no se compone nada."""
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000000001"
 
     async def company_facts(self, cik):
@@ -94,7 +94,7 @@ class _FakeFeeSubtotalBankSEC:
     2026 Q1: taguea SOLO el subtotal (sin componentes ni agregado).
     """
 
-    async def cik_for_ticker(self, ticker):
+    async def cik_for_ticker(self, ticker, entity_name=None):
         return "0000763931"
 
     async def company_facts(self, cik):

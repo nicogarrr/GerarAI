@@ -40,7 +40,7 @@ class FakeSEC:
     def __init__(self, n, drop=()):
         self.n = n
         self.drop = drop
-    async def cik_for_ticker(self, ticker): return "0000320193"
+    async def cik_for_ticker(self, ticker, entity_name=None): return "0000320193"
     async def company_facts(self, cik): return _payload(self.n, self.drop)
     async def annual_report_anchors(self, cik): return {}
     async def index_accessions(self, cik): return {f"0000000001-{i:06d}" for i in range(self.n)}

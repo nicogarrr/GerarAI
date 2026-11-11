@@ -2340,7 +2340,10 @@ class FinancialIngestionService:
         ticker = company.ticker.upper()
 
         try:
-            cik = await sec.cik_for_ticker(ticker)
+            # El nombre de la ficha habilita el fallback por línea US para
+            # listados locales de emisores 40-F/20-F (contraste de razón
+            # social dentro de cik_for_ticker; fail closed sin él).
+            cik = await sec.cik_for_ticker(ticker, entity_name=str(getattr(company, "name", "") or ""))
         except Exception as e:
             raise RuntimeError(f"SEC fetch failed: {e}") from e
 
