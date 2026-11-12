@@ -46,7 +46,7 @@ ALERT_TYPE = "queue_stuck"
 DEFAULT_QUEUES = (
     "alerts", "computed", "dca-manual", "default", "documents", "externa",
     "finnhub", "gdelt", "ibkr-sync", "knowledge", "kpis", "official-closes",
-    "prices", "thesis", "yahoo",
+    "prices", "sec", "thesis", "yahoo",
 )
 
 _SAMPLE_PREFIX = "queue_watchdog:sample:"  # {ts, depth} del ultimo tick muestreador

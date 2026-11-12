@@ -19,6 +19,7 @@ from dramatiq.middleware import CurrentMessage
 from app.core.config import get_settings
 from app.core.errors import redact_secrets
 from app.workers.bounded_broker import BoundedRedisBroker, QueueCapacityError, max_pending
+from app.workers.sec_batch import ACTOR_TIME_LIMIT_MS, SecBatch, bounded_poll
 from app.workers.task_trace import TaskTraceMiddleware
 from app.workers.tenant_llm_middleware import TenantLLMSettingsMiddleware
 
@@ -801,6 +802,7 @@ FINNHUB_QUEUE_NAME = "finnhub"
 # dividendos, calendario de resultados) comparte carril: el freno/pacer de
 # Yahoo es global en Redis, y una racha de 429 no debe atascar default.
 YAHOO_QUEUE_NAME = "yahoo"
+SEC_QUEUE_NAME = "sec"
 KPI_DEFERRED_KEY = "kpi_deferred"
 KPI_DEFER_MAX_ATTEMPTS = 5
 
@@ -2949,13 +2951,15 @@ def backfill_company_price_history(
         db.close()
 
 
-@dramatiq.actor(max_retries=2, min_backoff=15_000)
-@_coalesce_on_success("refresh_sec_filings", 210 * 60, ("tenant_id", "ticker"))
+@dramatiq.actor(max_retries=2, min_backoff=15_000, queue_name=SEC_QUEUE_NAME, time_limit=ACTOR_TIME_LIMIT_MS)
+@_coalesce_on_success("refresh_sec_filings", 210 * 60, ("tenant_id", "ticker", "start_after"))
 def refresh_sec_filings(
     tenant_id: int | None = None,
     user_id: str | None = None,
     ticker: str | None = None,
     limit: int = 20,
+    start_after: str | None = None,
+    document_budget: int | None = None,
 ) -> dict[str, Any]:
     actor_name = "refresh_sec_filings"
     try:
@@ -2971,17 +2975,21 @@ def refresh_sec_filings(
             enqueue_capped = False
             errors: list[dict] = []
             emitted: set[str] = set()
-            companies = _companies(db, ticker)
-            for company in companies:
-                if not company.cik:
-                    continue
+            batch = SecBatch(_companies(db, ticker), start_after)
+            remaining_documents = (
+                settings.document_enqueue_max_per_poll if document_budget is None
+                else max(0, min(document_budget, settings.document_enqueue_max_per_poll))
+            )
+            for company in batch.companies:
+                if not batch.can_start():
+                    break
                 try:
                     result = _run(
-                        service.poll_sec(
+                        bounded_poll(service.poll_sec(
                             company.cik,
                             ticker=company.ticker,
-                            limit=limit,
-                        )
+                            limit=max(1, min(limit, 20)),
+                        ))
                     )
                     if result.errors:
                         errors.extend(
@@ -3006,7 +3014,7 @@ def refresh_sec_filings(
                             if _document_ingest_excluded(tenant_id, company.ticker):
                                 skipped_excluded += 1
                                 break
-                            if queued_documents >= settings.document_enqueue_max_per_poll:
+                            if queued_documents >= remaining_documents:
                                 enqueue_capped = True
                                 break
                             if _document_url_ingested(db, item.url):
@@ -3040,8 +3048,23 @@ def refresh_sec_filings(
                             "message": str(exc),
                         }
                     )
+                # Failed companies are recorded and revisited on the next
+                # scheduled sweep; never loop on one failing upstream source.
+                batch.checkpoint(company.ticker)
+            if batch.has_more:
+                # Cursor is in the message: a retry resumes the same batch.
+                # Include cursor in coalescence so a fresh preceding chunk
+                # cannot suppress its continuation. Preserve tenant/user.
+                refresh_sec_filings.send(
+                    tenant_id=tenant_id, user_id=user_id, ticker=ticker,
+                    limit=limit, start_after=batch.cursor,
+                    document_budget=max(0, remaining_documents - queued_documents),
+                )
             return {
-                "status": _batch_status(processed, errors),
+                "status": "partial" if batch.has_more else _batch_status(processed, errors),
+                "truncated": batch.has_more,
+                "next_cursor": batch.cursor if batch.has_more else None,
+                "companies_attempted": batch.completed,
                 "actor": actor_name,
                 "companies_processed": processed,
                 "news_ingested": ingested,

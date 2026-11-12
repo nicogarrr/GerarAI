@@ -19,7 +19,8 @@ Clases (definicion completa en el docstring de `queue_taxonomy.py`):
 | --- | --- | --- | --- |
 | `default` | ingesta 24, calculo 10, interactiva 1 | `worker` | `${WORKER_THREADS:-4}` |
 | `prices` | ingesta 2 | `worker-prices` | `${WORKER_THREADS:-2}` |
-| `externa` | ingesta 2, calculo 1 | `worker-externa` | `${EXTERNA_THREADS:-2}` |
+| `externa` | ingesta 2, calculo 1 | `worker-externa` | `${EXTERNA_THREADS:-2}` compartidos con sec |
+| `sec` | ingesta 1 | `worker-externa` (`-Q externa sec`) | mismo proceso/hilos, sin recursos adicionales |
 | `finnhub` | ingesta 1 | `worker-finnhub` | `${FINNHUB_THREADS:-2}` |
 | `yahoo` | ingesta 6 | `worker-yahoo` | `${YAHOO_THREADS:-2}` |
 | `gdelt` | ingesta 2 | `worker-gdelt` | 2 |
@@ -54,3 +55,30 @@ Notas:
   DELAYED, no la dead-letter; detalles en el docstring de la taxonomia).
 - Watchdog de colas: `app/services/queue_watchdog.py` alerta en la app
   cuando una cola declarada supera su umbral de pendientes.
+
+## SEC: lotes y aislamiento del worker default
+
+`refresh_sec_filings` se enruta a `sec`, consumida por el worker externa
+existente. Comparte sus 2 hilos por defecto: no es un worker SEC dedicado,
+no aumenta RAM/CPU ni garantiza aislamiento de otros jobs externa.
+`review_theses` y el resto de tesis/cerebro/DCA no cambian.
+
+Cada mensaje trata hasta 3 empresas con CIK ordenadas por ticker. Tras 60s
+no inicia otra; cada poll asincrono tiene timeout30s (incluye pacing/retries)
+y el hard limit del actor es180s. La ingesta sincrona en vuelo puede superar
+el presupuesto blando; no se promete un deadline duro de60s. El SECClient
+conserva el pacer global Redis, cuota, cooldown y Retry-After sin alteraciones.
+No hay fanout: una continuacion por lote con tenant/user/ticker, cursor y
+presupuesto de documentos restante. No se multiplica el maximo de documentos
+al partir una pasada. Los fallos por empresa quedan visibles y se revisitan
+en la siguiente pasada programada; no se reintentan en un bucle inmediato.
+El cursor en el mensaje es el checkpoint entre lotes. Un crash dentro del
+lote puede repetir hasta3 empresas (ingesta con dedup existente), no reanuda
+exactamente tras cada commit de empresa.
+
+Rollout pendiente de autorizacion: cambiar el actor no mueve los mensajes
+que ya llevan queue_name=default en Redis. Operaciones debe inspeccionarlos
+y decidir drenaje o reencolado preservando payload/tenant antes de afirmar
+que todo el backlog SEC quedo aislado. No hacer purgas genericas. Verificar
+consumer de sec, profundidad/edad default y externa y ausencia de600s SEC.
+No hay deploy ni migracion de cola en este PR.
