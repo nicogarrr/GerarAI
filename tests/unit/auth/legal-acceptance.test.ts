@@ -102,3 +102,61 @@ describe('strict legal acceptance helpers', () => {
         expect(LEGAL_TEXT_VERSIONS.terms).not.toBe(LEGAL_TEXT_VERSIONS.privacy);
     });
 });
+
+describe('Lighthouse CI session script signup contract', () => {
+    it('creates an explicitly consenting ephemeral account before approval, login and backend seeding', async () => {
+        const mongoose = (await import('mongoose')).default;
+        vi.stubEnv('CI', 'true');
+        vi.stubEnv('LHCI_BASE_URL', 'http://localhost:3000');
+        vi.stubEnv('LHCI_BACKEND_URL', 'http://127.0.0.1:8100');
+        vi.stubEnv('MONGODB_URI', 'mongodb://127.0.0.1:27017/cavaai_lhci');
+        vi.stubEnv('RESEARCH_AUTH_SECRET', 'local-lhci-contract-test-secret');
+        vi.stubEnv('GITHUB_ENV', '');
+        const connect = vi.spyOn(mongoose, 'connect').mockResolvedValue(mongoose);
+        const disconnect = vi.spyOn(mongoose, 'disconnect').mockResolvedValue(undefined);
+        const updateOne = vi.fn(async ({ email }, { $set }) => {
+            const user = records.user.find((record) => record.email === email);
+            expect(user?.termsVersion).toBe(LEGAL_TEXT_VERSIONS.terms);
+            expect(user?.privacyVersion).toBe(LEGAL_TEXT_VERSIONS.privacy);
+            expect(user?.legalAcceptedAt).toBeTruthy();
+            Object.assign(user!, $set);
+            return { matchedCount: 1 };
+        });
+        const originalDb = Object.getOwnPropertyDescriptor(mongoose.connection, 'db');
+        Object.defineProperty(mongoose.connection, 'db', {
+            configurable: true, value: { collection: () => ({ updateOne }) },
+        });
+        const statuses: number[] = [];
+        const payloads: Record<string, unknown>[] = [];
+        const fetchMock = vi.fn(async (url: string, options: RequestInit) => {
+            if (url.startsWith('http://localhost:3000/api/auth/')) {
+                payloads.push(JSON.parse(String(options.body)));
+                const response = await auth.handler(new Request(url, options));
+                statuses.push(response.status);
+                return response;
+            }
+            expect(url).toMatch(/^http:\/\/127\.0\.0\.1:8100\/api\//);
+            expect(records.session).toHaveLength(1);
+            return new Response(null, { status: 200 });
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        try {
+            const script = '../../../scripts/lhci/session.mjs';
+            await import(script);
+            expect(statuses).toEqual([200, 200]);
+            expect(payloads[0].acceptTerms).toBe(true);
+            expect(connect).toHaveBeenCalledOnce();
+            expect(updateOne).toHaveBeenCalledOnce();
+            expect(disconnect).toHaveBeenCalledOnce();
+            expect(fetchMock).toHaveBeenCalledTimes(13); // signup, login, 11 signed seeds
+            expect(records.user).toHaveLength(1);
+            expect(records.user[0].accountStatus).toBe('approved');
+        } finally {
+            if (originalDb) Object.defineProperty(mongoose.connection, 'db', originalDb);
+            else Reflect.deleteProperty(mongoose.connection, 'db');
+            vi.unstubAllEnvs();
+            vi.unstubAllGlobals();
+        }
+    });
+});

@@ -62,7 +62,9 @@ const password = `Lhci-${randomUUID()}`;
 const res = await fetch(`${base}/api/auth/sign-up/email`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Origin: base },
-    body: JSON.stringify({ email, password, name: 'Lighthouse CI' }),
+    // Explicit consent belongs to this ephemeral test account only. Keep the
+    // real signup contract; never bypass or auto-consent real users.
+    body: JSON.stringify({ email, password, name: 'Lighthouse CI', acceptTerms: true }),
 });
 // Errores sin cuerpo remoto: solo fase y status (un 500 podría traer datos sensibles).
 if (!res.ok) throw new Error(`sign-up falló: HTTP ${res.status}`);
