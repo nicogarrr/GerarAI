@@ -69,11 +69,23 @@ export function shouldUseHistoryBack(
 
 let stackState: readonly string[] = [];
 const listeners = new Set<() => void>();
+let notificationQueued = false;
+
+function notifyAfterCommit(): void {
+    if (notificationQueued) return;
+    notificationQueued = true;
+    queueMicrotask(() => {
+        notificationQueued = false;
+        for (const listener of listeners) listener();
+    });
+}
 
 export const inAppHistoryStore = {
     replaceStack(stack: readonly string[]): void {
         stackState = stack;
-        for (const listener of listeners) listener();
+        // Navigation API events can fire in Next's useInsertionEffect.
+        // Keep entry identity current, but notify React after its commit.
+        notifyAfterCommit();
     },
     record(url: string): void {
         const next = recordNavigation(stackState, url);

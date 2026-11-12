@@ -95,7 +95,7 @@ describe('HistoryBackLink en el flujo real', () => {
         expect(screen.getByRole('link', { name: '← NVDA' }).getAttribute('data-back-mode')).toBe('history');
     });
 
-    it('watchlist to Research then native hash skips same-page history entries', () => {
+    it('watchlist to Research then native hash skips same-page history entries', async () => {
         window.history.replaceState(null, '', `${pathname}${search ? `?${search}` : ''}`);
         const view = render(<Shell />);
         act(() => navigate('/research/MSFT', view));
@@ -103,6 +103,7 @@ describe('HistoryBackLink en el flujo real', () => {
             window.history.pushState(null, '', '/research/MSFT#historial-analistas');
             emitNavigation('/research/MSFT#historial-analistas');
         });
+        await act(async () => {});
         fireEvent.click(screen.getByRole('link', { name: 'Volver' }));
         expect(go).toHaveBeenCalledWith(-2);
         expect(back).not.toHaveBeenCalled();
