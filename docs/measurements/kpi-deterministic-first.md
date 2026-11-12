@@ -127,3 +127,16 @@ decimal rates0.627 and0.59. This is2/2 manually supported candidates in the
 development set, NOT an unbiased100% precision estimate. Reserved validation
 emitted no candidates, so its precision is undefined. All remain unapproved
 candidates; no live candidate or fact was written during this dry-run.
+
+## Review correction: monetary sentence boundaries
+
+Independent review found the first implementation could truncate
+`USD 123.4 million, up from last year.` to `USD 123` by backtracking to the
+decimal point. This was wrong and also hid trailing forecast qualifiers.
+The monetary parser now full-matches an entire trimmed source line, allowing
+only the explicit result grammar plus an optional final period. ANY trailing
+prose, including a comma after million/billion, is conservatively rejected.
+It never extracts a prefix of that line. Six red-before/green-after cases
+cover both scales and comparative/forecast/guidance suffixes;18 additional
+DB-backed cases verify decimal dot/comma, integer, scale and final period.
+The real sample stays2/322; this correction adds no measured coverage.

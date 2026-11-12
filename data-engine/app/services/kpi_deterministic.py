@@ -214,7 +214,7 @@ _MONEY_SENTENCE = re.compile(
     rf"(?P<label>[A-Za-z][A-Za-z _]{{1,60}}?)\s+(?:in|for)\s+"
     rf"(?P<period>FY|Q[1-4])\s*(?P<year>20\d{{2}})\s+"
     rf"(?:was|were|totaled|amounted to)\s+(?P<currency>USD|EUR|GBP)\s+"
-    rf"(?P<value>{NUMBER})(?:\s+(?P<scale>thousand|million|billion))?(?=[.;\n]|$)", re.I,
+    rf"(?P<value>{NUMBER})(?:\s+(?P<scale>thousand|million|billion))?\.?", re.I,
 )
 
 
@@ -225,7 +225,14 @@ def _explicit_money(chunks, active):
             aliases.setdefault(name.casefold(), set()).add(key)
     result = []
     for chunk in chunks:
-        for match in _MONEY_SENTENCE.finditer(chunk.text):
+        for line in chunk.text.splitlines():
+            # Full-match only. A decimal point can NEVER terminate a partial
+            # amount, and trailing prose (including forecast qualifiers) is
+            # unsupported rather than silently removed from the citation.
+            quote = line.strip()
+            match = _MONEY_SENTENCE.fullmatch(quote)
+            if match is None:
+                continue
             keys = aliases.get(match.group("label").strip().casefold(), set())
             if len(keys) != 1:
                 continue
@@ -233,9 +240,8 @@ def _explicit_money(chunks, active):
             currency = match.group("currency").upper()
             if active[key].canonical_unit != currency:
                 continue
-            quote = match.group()
             # Never match inside HTML/JSON or a projected sentence.
-            prefix = chunk.text[max(0, match.start() - 80):match.start()]
+            prefix = quote
             if any(token in prefix for token in ("{", "<", '"')) or re.search(
                 r"\b(?:forecast|guidance|expect|project|target)\w*\b", prefix, re.I
             ):

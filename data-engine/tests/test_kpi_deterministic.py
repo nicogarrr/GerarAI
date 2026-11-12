@@ -294,3 +294,35 @@ def test_explicit_currency_and_period_narrative_generalizes_beyond_sample():
     assert parser.extract([chunk(text.replace("EUR", "$"))], [row(unit="USD")], source_type="IR") == []
     assert parser.extract([chunk("We expect " + text)], [row(unit="EUR")], source_type="IR") == []
     assert parser.extract([chunk("We EXPECT " + text)], [row(unit="EUR")], source_type="IR") == []
+
+
+@pytest.mark.parametrize("scale", ["million", "billion"])
+@pytest.mark.parametrize("suffix", [", up from last year.", ", according to our forecast.", ", according to our GUIDANCE."])
+def test_money_sentence_never_truncates_decimal_or_hides_suffix(db, scale, suffix):
+    session, doc, _ = db
+    text = f"Revenue in FY2024 was USD 123.4 {scale}{suffix}"
+    session.scalar(select(DocumentChunk)).text = text
+    session.commit()
+    # Conservative abstention on any unsupported trailing prose. The quote
+    # must never shrink to 'USD 123', losing the scale or forecast qualifier.
+    assert parser.extract([chunk(text)], [row()], source_type="IR") == []
+    out = asyncio.run(service.KPIExtractionService().extract_document(session, doc, mode="deterministic-only"))
+    assert out == []
+    assert session.scalar(select(FinancialFact)) is None
+
+
+@pytest.mark.parametrize("scale,multiplier", [("million", Decimal("1e6")), ("billion", Decimal("1e9"))])
+@pytest.mark.parametrize("value", ["123.4", "123,4", "123"])
+@pytest.mark.parametrize("ending", [".", "", "\n"])
+def test_money_decimal_scale_and_final_period_preserved(db, scale, multiplier, value, ending):
+    session, doc, _ = db
+    text = f"Revenue in FY2024 was USD {value} {scale}{ending}"
+    session.scalar(select(DocumentChunk)).text = text
+    session.commit()
+    out = asyncio.run(service.KPIExtractionService().extract_document(session, doc, mode="deterministic-only"))
+    assert len(out) == 1
+    assert out[0].normalized_value == Decimal(value.replace(",", ".")) * multiplier
+    assert scale in out[0].source_locator["quote"]
+    assert value in out[0].source_locator["quote"]
+    assert out[0].source_locator["quote"] in text
+    assert session.scalar(select(FinancialFact)) is None
