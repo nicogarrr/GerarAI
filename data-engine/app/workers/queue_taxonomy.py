@@ -74,7 +74,6 @@ ACTOR_CLASS: dict[str, str] = {
     "ingest_sec_bottleneck_filings": INGESTA,
     "ingest_spy_daily": INGESTA,
     "ingest_uk_pdmr_filings": INGESTA,
-    "refresh_asts_catalog": INGESTA,
     "refresh_bottlenecks": INGESTA,
     "refresh_earnings_calendar": INGESTA,
     "refresh_esef_fundamentals": INGESTA,

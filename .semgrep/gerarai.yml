@@ -31,8 +31,6 @@
 #   services/connectors/alpha_vantage.py: Alpha Vantage fixed host (www.alphavantage.co), rate-limited
 #   services/connectors/base.py: connector to a fixed public data API
 #   services/connectors/ca_insider_yahoo.py: connector to a fixed public data API
-#   services/connectors/celestrak_ast.py: connector to a fixed public data API
-#   services/connectors/celestrak_ast_supgp.py: connector to a fixed public data API
 #   services/connectors/cnmv.py: connector to a fixed public data API
 #   services/connectors/cnmv_shorts.py: connector to a fixed public data API
 #   services/connectors/damodaran.py: connector to a fixed public data API
@@ -117,8 +115,6 @@ rules:
     - /data-engine/app/services/connectors/alpha_vantage.py
     - /data-engine/app/services/connectors/base.py
     - /data-engine/app/services/connectors/ca_insider_yahoo.py
-    - /data-engine/app/services/connectors/celestrak_ast.py
-    - /data-engine/app/services/connectors/celestrak_ast_supgp.py
     - /data-engine/app/services/connectors/cnmv.py
     - /data-engine/app/services/connectors/cnmv_shorts.py
     - /data-engine/app/services/connectors/damodaran.py

@@ -25,9 +25,9 @@ describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
         for (const key of ['thesis']) assert.equal(tabOf(key), 'tesis');
         for (const key of ['financials', 'terminal', 'capital']) assert.equal(tabOf(key), 'finanzas');
         for (const key of ['valuation', 'model', 'supuestos', 'market-opportunity', 'peers', 'moat']) assert.equal(tabOf(key), 'valoracion');
-        for (const key of ['changes', 'holders', 'insiders', 'politicos', 'directiva', 'lecciones', 'satellites']) assert.equal(tabOf(key), 'seguimiento');
+        for (const key of ['changes', 'holders', 'insiders', 'politicos', 'directiva', 'lecciones']) assert.equal(tabOf(key), 'seguimiento');
         for (const key of ['documents', 'sources', 'chat']) assert.equal(tabOf(key), 'fuentes');
-        assert.equal(MODULES.length, 22);
+        assert.equal(MODULES.length, 21);
     });
     it('las claves de módulo y los grupos históricos siguen abriendo lo suyo', () => {
         assert.equal(asView('moat'), 'valuation');
@@ -140,7 +140,7 @@ describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
 
     it('los paneles del resumen van plegados por defecto en móvil (feedback Nico)', () => {
         const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        const expectedTitles = { fichaLatestNews: 'Últimas noticias', fichaFinancialQuality: 'Calidad financiera según la empresa', fichaLatestChanges: 'Últimos cambios', fichaWhereNext: 'Por dónde seguir', fichaSatellitesPanel: 'Satélites AST' };
+        const expectedTitles = { fichaLatestNews: 'Últimas noticias', fichaFinancialQuality: 'Calidad financiera según la empresa', fichaLatestChanges: 'Últimos cambios', fichaWhereNext: 'Por dónde seguir' };
         const ES = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8'));
         for (const [key, title] of Object.entries(expectedTitles)) {
             assert.equal(ES[key], title, `clave ${key} conserva el título visible`);

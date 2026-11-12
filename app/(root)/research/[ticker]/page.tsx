@@ -96,10 +96,8 @@ import { missingLayerAction, missingLayerLabel } from '@/lib/research/missing-la
 import { metricLabel } from '@/lib/research/metric-labels';
 import { methodLabel } from '@/lib/research/framework-terms';
 import { MoatPanel, MoatClassificationPanel, MoatChecklistPanel } from '@/components/research/MoatPanel';
-import { AstOrbitPanel } from '@/components/research/AstOrbitPanel';
 import { ThesisScenariosPanel } from '@/components/research/ThesisScenariosPanel';
 import { getThesisWithScenarios } from '@/lib/actions/thesis-scenarios.actions';
-import { getAstOrbitOverview, getAstsAnalysis } from '@/lib/actions/asts-orbits.actions';
 import {
   DecisionAndRealityPanel,
   LongTermModelPanel,
@@ -645,7 +643,6 @@ type ViewWorkspaces = {
   financials: Awaited<ReturnType<typeof getResearchFinancialsWorkspace>>;
   model: Awaited<ReturnType<typeof getResearchLongTermModel>>;
   moat: Awaited<ReturnType<typeof getResearchMoatWorkspace>>;
-  satellites: { orbits: Awaited<ReturnType<typeof getAstOrbitOverview>>; analysis: Awaited<ReturnType<typeof getAstsAnalysis>> } | null;
   peers: Awaited<ReturnType<typeof getResearchPeersWorkspace>>;
   valuation: Awaited<ReturnType<typeof getResearchValuationWorkspace>>;
   documents: Awaited<ReturnType<typeof getResearchDocumentsWorkspace>>;
@@ -687,7 +684,6 @@ const EMPTY_VIEW_DATA: { [K in keyof ViewWorkspaces]: ViewWorkspaces[K] } = {
   financials: { facts: [], calculatedMetrics: [], ttm: null },
   model: null,
   moat: null,
-  satellites: null,
   peers: { comparison: null, analysis: null },
   valuation: null,
   documents: [],
@@ -745,14 +741,6 @@ function launchTabData(
       tasks.push({ key: 'lecciones', promise: withResearchTelemetry('decision-lessons', () => getDecisionLessons(ticker)) });
       tasks.push({ key: 'insiders', promise: withResearchTelemetry('insider-summary', () => getInsiderSummary(ticker)) });
       tasks.push({ key: 'politicos', promise: withResearchTelemetry('politician-ticker-trades', () => getPoliticianTickerTrades(ticker)) });
-      // Solo ASTS tiene orbitales: pedirlo para otro ticker sería una
-      // llamada segura de quedar sin usar.
-      if (ticker === 'ASTS') {
-        tasks.push({ key: 'satellites', promise: withResearchTelemetry('ast-orbits', async () => {
-          const [orbits, analysis] = await Promise.all([getAstOrbitOverview().catch(() => null), getAstsAnalysis()]);
-          return { orbits, analysis };
-        }) });
-      }
       break;
     case 'documents':
       tasks.push({ key: 'documents', promise: withResearchTelemetry('documents-workspace', () => getResearchDocumentsWorkspace(ticker, false)) });
@@ -1307,7 +1295,6 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
           </div>
         </Panel>
         <OwnershipSignalsPanel locale={locale} signals={ownershipSignals} ticker={ticker} />
-        {ticker === 'ASTS' ? <Panel collapsible="mobile" title={t('research.fichaSatellitesPanel')}><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=seguimiento#satellites`}>{t('research.fichaOrbitalSignal')}</Link></Panel> : null}
         <p role="status" className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
           {researchValuabilityLabel(researchValuability(snapshot), t)}
         </p>
@@ -1728,14 +1715,6 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
     );
   };
 
-  const buildSatellitesSection = async (): Promise<React.ReactNode> => {
-    const t = await getT();
-    // El panel ya degrada solo cuando no hay datos; aquí la lectura llega del
-    // lote en paralelo (null si degradó, igual que antes).
-    const satellites = ticker === 'ASTS' ? await viewData('satellites') : null;
-    return ticker === 'ASTS' ? <AstOrbitPanel analysis={satellites?.analysis ?? null} data={satellites?.orbits ?? null} locale={locale} /> : <EmptyState title={t('research.fichaOrbitalOnlyAsts')} />;
-  };
-
   const buildPeersSection = async (): Promise<React.ReactNode> => {
     const t = await getT();
     const locale = await getLocale();
@@ -1943,7 +1922,6 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
       await optionalSection('directiva', t('research.fichaSecDirectiva'), buildDirectivaSection),
       await optionalSection('incentivos', t('research.managementAlignment.title'), async () => <ManagementAlignmentSection data={await getManagementAlignment(ticker)} locale={locale} />),
       await optionalSection('lecciones', t('research.fichaSecLecciones'), buildLeccionesSection),
-      ...(ticker === 'ASTS' ? [await optionalSection('satellites', t('research.fichaSecSatelites'), buildSatellitesSection)] : []),
     ];
   } else {
     sections = [

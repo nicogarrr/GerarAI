@@ -44,7 +44,6 @@ from app.workers.dramatiq_app import (
     recompute_management_alignment,
     reconcile_alert_analyses,
     reconcile_alert_deliveries,
-    refresh_asts_catalog,
     refresh_bottlenecks,
     refresh_earnings_calendar,
     refresh_esef_fundamentals,
@@ -93,7 +92,7 @@ JOB_DEFAULTS = {
 # scheduler. APScheduler guarda el siguiente disparo en memoria y los intervalos
 # no disparan al arrancar: con deploys seguidos (cada reinicio reinicia el
 # contador) el rss de 15 min llego a pasar mas de una hora sin correr. Los de
-# 2 h o mas (CelesTrak, universo completo, noticias del universo) no se tocan:
+# 2 h o mas (universo completo, noticias del universo) no se tocan:
 # son pesados o limitados por la fuente. El escalonado evita una rafaga y nunca
 # supera el propio intervalo del job (el de 1 min no se retrasa). Es un adelanto
 # best-effort, no una garantia de ejecucion unica: un reinicio posterior vuelve a
@@ -293,8 +292,6 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # The existing consumer still validates every report and bounds its retries.
     _register(scheduler, partial(coalesced_send, retry_deferred_tenant_ibkr_connections),
               "cron", job_id="tenant_ibkr_deferred_recovery", hour=16, minute=50)
-    # One global GP + SupGP fetch every 2 h, never per tenant or more often.
-    _register(scheduler, partial(coalesced_send, refresh_asts_catalog), "interval", job_id="asts_celestrak_refresh", hours=2)
     _register(scheduler, partial(coalesced_send, refresh_subtel_decrees), "interval", job_id="subtel_decrees_refresh", hours=24)
     _register(
         scheduler,

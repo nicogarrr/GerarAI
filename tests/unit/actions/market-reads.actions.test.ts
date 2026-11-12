@@ -18,7 +18,6 @@ import { getMarketRegimeResult } from '@/lib/actions/market-regime.actions';
 import { getMarketMoversResult, getMarketMovers, getMarketIndicesResult, getMarketIndices } from '@/lib/actions/market.actions';
 import { generateWorkProduct } from '@/lib/actions/work-products.actions';
 import { getCalendarFeed, createCalendarFeed, revokeCalendarFeed } from '@/lib/actions/calendar-feed.actions';
-import { getAstOrbitOverview, getAstsAnalysis } from '@/lib/actions/asts-orbits.actions';
 import { askKnowledge } from '@/lib/actions/knowledge-chat.actions';
 import { getMacroEvents, getEightKDigest } from '@/lib/actions/macro-calendar.actions';
 import { getMarketThemes } from '@/lib/actions/market-themes.actions';
@@ -108,16 +107,6 @@ describe('calendar-feed: el token solo se muestra al crear', () => {
         expect(researchRequest).toHaveBeenCalledWith('/api/calendar/feed', { method: 'POST', body: JSON.stringify({ scope: 'followed' }) });
         await revokeCalendarFeed();
         expect(researchRequest).toHaveBeenCalledWith('/api/calendar/feed', { method: 'DELETE' });
-    });
-});
-
-describe('asts-orbits', () => {
-    it('overview sin caché; análisis caído -> null (panel opcional)', async () => {
-        researchRequest.mockResolvedValue({ status: 'disponible' });
-        await getAstOrbitOverview();
-        expect(researchRequest).toHaveBeenCalledWith('/api/market/asts/orbits', { cache: 'no-store', fast: true });
-        researchRequest.mockRejectedValue(new Error('timeout'));
-        expect(await getAstsAnalysis()).toBeNull();
     });
 });
 

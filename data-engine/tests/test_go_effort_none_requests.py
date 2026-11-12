@@ -33,18 +33,6 @@ def _go_provider(captured: list):
     return create_llm_provider(settings, client=client, max_retries=0), settings
 
 
-def test_asts_envia_effort_de_la_tabla_y_tope_con_sitio() -> None:
-    from app.services import asts_llm_service as S
-    captured: list = []
-    provider, settings = _go_provider(captured)
-    with mock.patch.object(S, "create_llm_provider", return_value=provider), mock.patch.object(S, "get_settings", return_value=settings):
-        asyncio.run(S._analyze_with_llm("SINTETICO"))
-    payload = captured[0]
-    assert payload["reasoning_effort"] == settings.reasoning_effort_for("asts") == "low"
-    assert payload["max_tokens"] == 4000 and payload["temperature"] == 0 and payload["model"] == "deepseek-v4.1-flash"
-    assert "response_format" not in payload  # el adaptador Go lo elimina (#2181)
-
-
 def test_traduccion_publica_envia_effort_de_la_tabla() -> None:
     import app.services.public_headline_translation as H
     captured: list = []

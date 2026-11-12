@@ -95,17 +95,13 @@
       },
       "others": {
         "title": "Otras fuentes públicas",
-        "text": "FRED (series macroeconómicas, cuando está configurada), CelesTrak (elementos orbitales), GDELT (noticias), CNMV (posiciones cortas en España) y FINRA (interés corto en EE. UU.).",
+        "text": "FRED (series macroeconómicas, cuando está configurada), GDELT (noticias), CNMV (posiciones cortas en España) y FINRA (interés corto en EE. UU.).",
         "cta": "Ver research"
       }
     },
     "fmpNotice": {
       "lead": "FMP solo cubre mercado US:",
       "body": "el plan gratuito de Financial Modeling Prep quedó limitado a compañías US (sus endpoints antiguos responden «Legacy Endpoint» o 402 fuera de ese mercado). La API acepta el refresco con FMP para cualquier emisor, pero fuera de US el proveedor lo rechaza y el refresco falla con aviso. No hay sustitución automática: si el emisor reporta a SEC EDGAR o ESEF, puedes lanzar tú el refresco desde esas fuentes (acción separada en la ficha); y si ninguna fuente cubre al emisor, los financieros se muestran como no disponibles en lugar de estimarse. En el refresco de precios del backend, los listados US se consultan primero en FMP si hay clave y la cotización trae fecha válida; Finnhub es el fallback. Yahoo Finance aporta el refresco intradía de cartera y las series históricas de ProPicks, también para listados no-US cuando el símbolo de su bolsa se conoce. Sin cotización o símbolo fiable, se muestra sin precio."
-    },
-    "orbital": {
-      "title": "Señal orbital AST: semieje mayor",
-      "body": "Para cada objeto del grupo AST de CelesTrak calculamos el semieje mayor con a = (μ / (2πn / 86.400)²)^(1/3), con μ terrestre = 398.600,4418 km³/s² y n en revoluciones al día. Conservamos hasta 32 épocas distintas por ID NORAD. Comparamos solo una ventana de 24 a 72 horas con al menos tres épocas separadas por dos horas. Una caída de 2 km o más invita a revisar fuentes, no prueba despliegue, maniobra ni causa: la resistencia atmosférica, ajustes orbitales y revisiones de elementos también pueden producir cambios. BSTAR y las derivadas del movimiento medio son parámetros de ajuste, no telemetría independiente. La señal es exploratoria y no sustituye una confirmación primaria. El grupo AST se consulta cada dos horas como máximo. GP (catálogo general) y SupGP (elementos suplementarios AST-E) se guardan y representan en series independientes: no se comparan entre sí. Una fuente puede faltar sin invalidar la otra. Nunca se consulta CelesTrak al abrir la vista; después de 30 horas sin descarga válida se ocultan señal e historial caducados de cada fuente. La época orbital y la fecha de descarga son distintas."
     },
     "engines": {
       "title": "Motores de valoración",
@@ -261,7 +257,7 @@
       "llmStrong": "Modelos de lenguaje",
       "llmRest": ": OpenCode (modelos DeepSeek), Groq, Google (Gemini) y OpenRouter, según la configuración de proveedores. Intervienen en las funciones con IA y reciben el contexto enviado por esas funciones, que puede incluir datos de investigación y de cartera.",
       "marketStrong": "Proveedores de datos de mercado",
-      "marketRest": ": Finnhub, Financial Modeling Prep, Yahoo Finance, SEC EDGAR, CNMV, FRED, GDELT, CelesTrak y otras fuentes gratuitas configuradas. Estas consultas se hacen por ticker y no incluyen tus datos personales.",
+      "marketRest": ": Finnhub, Financial Modeling Prep, Yahoo Finance, SEC EDGAR, CNMV, FRED, GDELT y otras fuentes gratuitas configuradas. Estas consultas se hacen por ticker y no incluyen tus datos personales.",
       "hostingStrong": "Hosting y bases de datos",
       "hostingRest": ": Vercel (frontend, con las funciones en la región de Fráncfort, fra1), Oracle Cloud (servidor del motor de datos en la región eu-madrid-1, Madrid, España), MongoDB Atlas (cuentas y datos auxiliares) y PostgreSQL en el propio servidor.",
       "storageStrong": "Almacenamiento y búsqueda",
@@ -335,7 +331,7 @@
     },
     "s5": {
       "title": "5. Datos y proveedores externos",
-      "pPre": "El servicio combina datos de proveedores públicos y privados (SEC EDGAR, CNMV, Finnhub, FMP, Yahoo Finance, FRED, GDELT y CelesTrak, entre otros) y puede enviar contexto de investigación y, según la función, datos de cartera a un proveedor de modelos de lenguaje cuando actives las funciones correspondientes. Consulta la",
+      "pPre": "El servicio combina datos de proveedores públicos y privados (SEC EDGAR, CNMV, Finnhub, FMP, Yahoo Finance, FRED y GDELT, entre otros) y puede enviar contexto de investigación y, según la función, datos de cartera a un proveedor de modelos de lenguaje cuando actives las funciones correspondientes. Consulta la",
       "pLink": "política de privacidad",
       "pPost": "para el detalle y los subencargados."
     },

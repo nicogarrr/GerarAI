@@ -65,7 +65,6 @@ PARAM_DEFAULTS = {
     "name": "GenerateThesisWorkflow",
     "filename": "feed.ics",
     "cik": "0001067983",
-    "norad_cat_id": "1",
     "theme_id": "1",
     "node_id": "1",
     "source_id": "1",
