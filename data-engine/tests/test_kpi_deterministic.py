@@ -54,7 +54,7 @@ def test_unknown_alias_collision_and_source_rejected():
     assert parser.extract([chunk("Margin | Q12025 | count | 12")], [row("margin", "decimal")], source_type="IR") == []
 
 
-XML = '''<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL" xmlns:x="http://www.xbrl.org/2003/instance" xmlns:us-gaap="http://fasb.org/us-gaap/2025" xmlns:dei="http://xbrl.sec.gov/dei/2025">
+XML = '''<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL" xmlns:x="http://www.xbrl.org/2003/instance" xmlns:us-gaap="http://fasb.org/us-gaap/2025" xmlns:dei="http://xbrl.sec.gov/dei/2025" xmlns:iso4217="http://www.xbrl.org/2003/iso4217">
 <x:context id="fy"><x:entity><x:identifier>000123</x:identifier></x:entity><x:period><x:startDate>2024-01-01</x:startDate><x:endDate>2024-12-31</x:endDate></x:period></x:context>
 <x:unit id="usd"><x:measure>iso4217:USD</x:measure></x:unit>
 <ix:nonNumeric name="dei:DocumentFiscalYearFocus" contextRef="fy">2024</ix:nonNumeric>
@@ -326,3 +326,39 @@ def test_money_decimal_scale_and_final_period_preserved(db, scale, multiplier, v
     assert value in out[0].source_locator["quote"]
     assert out[0].source_locator["quote"] in text
     assert session.scalar(select(FinancialFact)) is None
+
+
+def test_new_conflict_demotes_existing_pending_without_changing_approved_or_rejected(db):
+    session, doc, _ = db
+    session.scalar(select(DocumentChunk)).text = "Revenue in FY2025 was USD 12."
+    session.commit()
+    initial = asyncio.run(service.KPIExtractionService().extract_document(session, doc, mode="deterministic-only"))
+    assert initial[0].status == "pending_approval"
+    original_id = initial[0].id
+    session.add(DocumentChunk(document_id=doc.id, chunk_index=71, text="Revenue in FY2025 was USD 99."))
+    session.commit()
+    updated = asyncio.run(service.KPIExtractionService().extract_document(session, doc, mode="deterministic-only"))
+    assert len(updated) == 2
+    assert all(c.status == "needs_review" for c in updated)
+    assert next(c for c in updated if c.id == original_id).reconciliation_status == "needs_review"
+    # Human decisions are immutable to this automatic conflict reconciliation.
+    initial[0].status = "approved"
+    updated[1].status = "rejected"
+    session.commit()
+    again = asyncio.run(service.KPIExtractionService().extract_document(session, doc, mode="deterministic-only"))
+    assert {c.status for c in again} == {"approved", "rejected"}
+
+
+def test_xbrl_currency_prefix_must_resolve_official_namespace():
+    valid = XML
+    assert len(parser.extract([chunk(valid)], [row()], source_type="SEC", cik="123")) == 1
+    invalid = valid.replace('http://www.xbrl.org/2003/iso4217', 'https://example.invalid/private-units')
+    assert parser.extract([chunk(invalid)], [row()], source_type="SEC", cik="123") == []
+    assert parser.extract([chunk(XML.replace(' xmlns:iso4217="http://www.xbrl.org/2003/iso4217"', ""))], [row()], source_type="SEC", cik="123") == []
+
+
+def test_xbrl_nested_namespace_rebinding_abstains_and_alias_resolves_uri():
+    shadow = XML.replace('<x:measure>', '<x:measure xmlns:iso4217="https://example.invalid/private-units">')
+    assert parser.extract([chunk(shadow)], [row()], source_type="SEC", cik="123") == []
+    alias = XML.replace('xmlns:iso4217=', 'xmlns:money=').replace('iso4217:USD', 'money:USD')
+    assert len(parser.extract([chunk(alias)], [row()], source_type="SEC", cik="123")) == 1

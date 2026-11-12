@@ -140,3 +140,11 @@ It never extracts a prefix of that line. Six red-before/green-after cases
 cover both scales and comparative/forecast/guidance suffixes;18 additional
 DB-backed cases verify decimal dot/comma, integer, scale and final period.
 The real sample stays2/322; this correction adds no measured coverage.
+
+Further review corrections: when a later chunk exposes a conflicting value,
+an existing pending candidate is demoted to needs_review, including its
+reconciliation status. Approved/rejected human decisions are not modified.
+XBRL unit QName prefixes must resolve to the official
+http://www.xbrl.org/2003/iso4217 namespace; missing, spoofed or shadow-rebound
+prefixes cause abstention. The lexical prefix itself need not be iso4217.
+Both original review counterexamples were reproduced red before fixing.

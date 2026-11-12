@@ -90,7 +90,14 @@ def _xbrl(chunk, active, cik):
     if not cik or "nonFraction" not in chunk.text:
         return []
     try:
-        namespaces = dict(value for _, value in ET.iterparse(StringIO(chunk.text), events=("start-ns",)))
+        namespaces = {}
+        for _, (prefix, uri) in ET.iterparse(StringIO(chunk.text), events=("start-ns",)):
+            # Complete fragments with shadowed/rebound prefixes are outside
+            # this parser's supported subset; never resolve against a later
+            # declaration that has a different lexical scope.
+            if prefix in namespaces and namespaces[prefix] != uri:
+                return []
+            namespaces[prefix] = uri
         if not re.fullmatch(r"https?://fasb.org/us-gaap/20\d{2}(?:-\d{2}-\d{2})?", namespaces.get("us-gaap", "")):
             return []
         if not re.fullmatch(r"https?://xbrl.sec.gov/dei/20\d{2}(?:-\d{2}-\d{2})?", namespaces.get("dei", "")):
@@ -144,7 +151,10 @@ def _xbrl(chunk, active, cik):
                 continue
         except (ValueError, InvalidOperation):
             continue
-        currency = str(units.get(fact.get("unitRef"), "")).removeprefix("iso4217:")
+        measure = str(units.get(fact.get("unitRef"), ""))
+        prefix, separator, currency = measure.partition(":")
+        if not separator or namespaces.get(prefix) != "http://www.xbrl.org/2003/iso4217":
+            continue
         if currency not in {"USD", "EUR", "GBP"} or active[key].canonical_unit != currency:
             continue
         if fact.get("sign") == "-":

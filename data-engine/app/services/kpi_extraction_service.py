@@ -477,6 +477,13 @@ class KPIExtractionService:
                 )
             )
             if existing is not None:
+                # A later source chunk can expose a conflict on retry. Never
+                # leave an earlier auto-pending value approvable in that case.
+                # Human approved/rejected decisions remain immutable here.
+                if observation.get("_conflict") and existing.status in {"pending_approval", "needs_review"}:
+                    existing.status = "needs_review"
+                    existing.reconciliation_status = "needs_review"
+                    existing.trace = {**(existing.trace or {}), "deterministic_conflict": True}
                 created.append(existing)
                 continue
             confidence = max(0.0, min(1.0, float(observation.get("confidence") or 0)))
