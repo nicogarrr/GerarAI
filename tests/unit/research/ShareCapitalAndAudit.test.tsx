@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { ShareCapitalPanel } from '@/components/research/ShareCapitalPanel';
 import { SourceAuditDetail, weakClaimEs } from '@/components/research/SourceAuditDetail';
 import ThesisMarkdownPager from '@/components/research/ThesisMarkdownPager';
+// This suite tests pager behavior, not Vite's cold markdown dependency load.
+// Warm the real module before the test clock starts. Keep next/dynamic and
+// the real renderer: findByText still verifies async content after each turn.
+import '@/components/research/ThesisMarkdown';
 import { auditFixLabel } from '@/lib/audit-status-copy';
 import { beforeEach, vi } from 'vitest';
 
@@ -148,6 +152,10 @@ describe('ThesisMarkdownPager', () => {
         expect(await screen.findByText('Texto tres')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Sección siguiente' })).toBeDisabled();
         expect(screen.getByText('3/3')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Sección anterior' }));
+        expect(await screen.findByText('Texto dos')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Sección siguiente' }));
+        expect(await screen.findByText('Texto tres')).toBeInTheDocument();
     });
     it('si el inicio ya salió de la vista al cambiar de página, vuelve a colocarlo', () => {
         const { container } = render(<ThesisMarkdownPager pages={pages} />);
