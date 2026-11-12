@@ -762,6 +762,7 @@ services:
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "1", "-Q", "kpis"]
     environment:
       <<: [*app-env, *worker-db-env, *llm-env, *web-push-env]
+      KPI_EXTRACTION_MODE: ${KPI_EXTRACTION_MODE:-auto}
       # Limita prefetch local; HLEN sigue contando los jobs en curso.
       dramatiq_queue_prefetch: "1"
       dramatiq_delay_queue_prefetch: "1"

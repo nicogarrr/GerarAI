@@ -168,3 +168,16 @@ def test_daily_cap_defers_without_losing_document_until_next_utc_day(engine, mon
         deferred = doc.metadata_[dramatiq_app.KPI_DEFERRED_KEY]
         assert deferred["attempts"] == 0
         assert deferred["not_before"] > doc.metadata_["kpi_daily_deferred"]["at"]
+
+
+def test_actor_determinista_no_declara_completas_las_metricas_pendientes(engine, monkeypatch):
+    monkeypatch.setattr(dramatiq_app, "_session", lambda *a: _open(engine))
+    doc_id = _document(engine, metadata={"kpi_deferred": {"attempts": 1},
+        "kpi_deterministic": {"mode": "deterministic-only", "unresolved_metrics": ["revenue"]}})
+    _fake_service(monkeypatch, candidates=[])
+    out = dramatiq_app.extract_document_kpis.fn(doc_id)
+    assert out["status"] == "partial"
+    assert out["unresolved_metrics"] == ["revenue"]
+    assert out["mode"] == "deterministic-only"
+    with _open(engine) as db:
+        assert db.get(Document, doc_id).metadata_["kpi_deterministic"]["unresolved_metrics"] == ["revenue"]
