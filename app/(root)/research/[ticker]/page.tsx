@@ -1276,7 +1276,7 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
             Están aquí, en el resumen, y no repartidos por las 16 píldoras
             planas que había antes.
         */}
-        <Panel className="hidden md:block" collapsible="mobile"
+        <Panel collapsible="mobile"
           description={t('research.fichaWhereNextDesc')}
           density="compact"
           title={t('research.fichaWhereNext')}

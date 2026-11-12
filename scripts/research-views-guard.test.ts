@@ -148,6 +148,10 @@ describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
             assert.ok(i > 0, `panel ${title} existe`);
             const openTag = page.slice(page.lastIndexOf('<Panel', i), i);
             assert.ok(openTag.includes('collapsible="mobile"'), `panel ${title} plegable en móvil`);
+            // Plegable != oculto: `hidden md:block` deja el collapsible muerto y
+            // en móvil el panel desaparece del todo (caso «Por dónde seguir», cuyos
+            // 4 saltos no están en el menú de cabecera móvil).
+            assert.ok(!openTag.includes('hidden md:block'), `panel ${title} no se oculta en móvil: va plegado`);
         }
         // «Última tesis» es lo esencial de la ficha: abierta en móvil, con veredicto y cifras clave.
         const tesis = page.indexOf("title={t('research.fichaLatestThesis')}");
