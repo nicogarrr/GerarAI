@@ -7,11 +7,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sqlalchemy import select
+import pytest
+from sqlalchemy import create_engine, select
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session
 
-from app.core.database import SessionLocal, init_db
-from app.models.entities import Company, ConnectorState, Schedule13DGFiling, WatchItem
+from app.models.entities import Base, Company, ConnectorState, Schedule13DGFiling, WatchItem
 from app.services import schedule13dg_monitor
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -71,16 +72,24 @@ class _FakeClient:
         return _FakeResponse(json.dumps(self.payload))
 
 
+@pytest.fixture(autouse=True)
+def _own_databases():
+    # Own the complete schema, not DELETE subsets of a suite-wide DB:
+    # watchlist_tickers also reads portfolio positions from previous tests.
+    yield
+    for engine in _isolated_engines:
+        engine.dispose()
+    _isolated_engines.clear()
+
+
+_isolated_engines = []
+
+
 def _db(cik: str = CIK, ticker: str = "ZZT"):
-    init_db()
-    db = SessionLocal()
-    db.query(Schedule13DGFiling).delete()
-    db.query(ConnectorState).filter(
-        ConnectorState.connector == schedule13dg_monitor.CONNECTOR_NAME
-    ).delete()
-    db.query(WatchItem).delete()
-    db.query(Company).filter(Company.ticker.in_([ticker])).delete()
-    db.commit()
+    engine = create_engine("sqlite:///:memory:")
+    _isolated_engines.append(engine)
+    Base.metadata.create_all(engine)
+    db = Session(engine)
     db.add(WatchItem(symbol=ticker, company="ZZ Test Corp"))
     if db.scalar(select(Company).where(Company.ticker == ticker)) is None:
         db.add(
@@ -271,3 +280,41 @@ def test_scan_first_commit_failure_is_recorded_not_raised():
         assert state.last_error and "OperationalError" in state.last_error
     finally:
         db.close()
+
+
+def test_scan_fixture_ignores_positions_from_unrelated_shared_database():
+    from uuid import uuid4
+
+    from app.core.database import SessionLocal, init_db
+    from app.models import Position
+
+    init_db()
+    # Residue of an earlier test, in the suite-wide DB and same NULL tenant.
+    # This used to add an unexpected SEC issuer to the one-company fixture.
+    with SessionLocal() as shared:
+        company = Company(
+            ticker="POISON_" + uuid4().hex[:8], name="Prior test",
+            exchange="NASDAQ", cik="9999999",
+            company_type="compounders", valuation_model="dcf",
+        )
+        shared.add(company)
+        shared.flush()
+        position = Position(company_id=company.id, tenant_id=None, quantity=1)
+        shared.add(position)
+        shared.commit()
+        cid, pid = company.id, position.id
+    try:
+        db = _db()
+        try:
+            stats = schedule13dg_monitor.scan(db, client=_FakeClient(), fetcher=_fetcher, delay_seconds=0)
+            assert stats["status"] == "ok"
+            assert stats["tickers_scanned"] == 1
+            assert stats["filings_new"] == 1
+            assert stats["errors"] == []
+        finally:
+            db.close()
+    finally:
+        with SessionLocal() as shared:
+            shared.query(Position).filter(Position.id == pid).delete()
+            shared.query(Company).filter(Company.id == cid).delete()
+            shared.commit()
