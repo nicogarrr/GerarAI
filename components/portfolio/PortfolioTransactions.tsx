@@ -206,7 +206,7 @@ export default function PortfolioTransactions({ transactions, userId, page, erro
   return (
     <Card className="bg-[#111111] border-gray-800 h-full flex flex-col">
       <CardHeader className="pb-3 pt-5 border-b border-gray-800/50">
-        <CardTitle className="text-gray-100 text-base font-medium flex items-center gap-2">
+        <CardTitle as="h2" className="text-gray-100 text-base font-medium flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-blue-500"></span>
           {ti('portfolio.transactions.title')}
         </CardTitle>

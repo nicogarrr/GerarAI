@@ -31,7 +31,7 @@ export default function PortfolioScores({ scores }: PortfolioScoresProps) {
     return (
         <Card className="bg-gray-800/50 border-gray-700">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg text-gray-100">{ti('portfolio.scoresExtra.title')}</CardTitle>
+                <CardTitle as="h2" className="text-lg text-gray-100">{ti('portfolio.scoresExtra.title')}</CardTitle>
                 <Link href="/metodologia" className="inline-flex min-h-[44px] items-center text-sm text-purple-300 underline-offset-2 hover:text-purple-200 hover:underline">
                     {ti('portfolio.scoresExtra.methodologyLink')}
                 </Link>

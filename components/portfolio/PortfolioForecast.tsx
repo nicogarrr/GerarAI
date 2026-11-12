@@ -53,7 +53,7 @@ function ExcludedList({ items, ti = esT, f = esF }: { items: PortfolioForecastEx
           <li key={item.ticker}>
             <Link
               href={`/research/${encodeURIComponent(item.ticker)}?view=thesis`}
-              className="font-medium text-teal-300 underline-offset-2 hover:text-teal-200 hover:underline"
+              className="font-medium text-teal-300 underline underline-offset-2 hover:text-teal-200"
             >
               {item.ticker}
             </Link>{' '}
@@ -134,7 +134,7 @@ export default function PortfolioForecast({ forecast, ti = esT, f = esF }: { for
               {ti('portfolio.forecast.activateHeaviestPre')}
               <Link
                 href={`/research/${encodeURIComponent(heaviest.ticker)}?view=thesis`}
-                className="font-medium text-teal-300 underline-offset-2 hover:text-teal-200 hover:underline"
+                className="font-medium text-teal-300 underline underline-offset-2 hover:text-teal-200"
               >
                 {heaviest.ticker}
               </Link>{' '}
@@ -218,7 +218,7 @@ export default function PortfolioForecast({ forecast, ti = esT, f = esF }: { for
                   <td className="py-2 pr-4 font-medium">
                     <Link
                       href={`/research/${encodeURIComponent(item.ticker)}?view=thesis`}
-                      className="text-teal-300 underline-offset-2 hover:text-teal-200 hover:underline"
+                      className="text-teal-300 underline underline-offset-2 hover:text-teal-200"
                     >
                       {item.ticker}
                     </Link>
