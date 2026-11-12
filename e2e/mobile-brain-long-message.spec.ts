@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { mockBrainLayoutActions } from './fixtures/brain-layout-actions';
+
 const runUiE2E = process.env.E2E_UI_RUN === "1";
 
 // iPhone 14 viewport: 390x844 con táctil.
@@ -28,6 +30,7 @@ test.describe("Cerebro a 390px: los mensajes largos no se cortan", () => {
   test.skip(!runUiE2E, "Set E2E_UI_RUN=1 to run browser tests.");
 
   test("un enlace largo se lee entero en la burbuja y la página no desborda", async ({ page }) => {
+    await mockBrainLayoutActions(page, LONG_TOKEN);
     // /research/assistant abre el Cerebro (redirect de compatibilidad).
     await page.goto("/research/assistant");
     const dialog = page.getByRole("dialog");
@@ -35,6 +38,7 @@ test.describe("Cerebro a 390px: los mensajes largos no se cortan", () => {
     await expect(input).toBeVisible({ timeout: 30_000 });
 
     await input.fill(`Lee ${LONG_URL} y resume ${LONG_TOKEN}`);
+    await expect(dialog.getByRole("button", { name: "Enviar pregunta", exact: true })).toBeEnabled();
     await input.press("Enter");
 
     const bubble = dialog.getByText(LONG_TOKEN, { exact: false }).first();
