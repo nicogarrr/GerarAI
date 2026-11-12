@@ -63,7 +63,7 @@ function WithholdingNote({ position, ti = esT, f = esF }: { position: DividendPo
         <>
             {position.source_withholding_rate === null
                 ? ti('common.na')
-                : `${f.formatNumber(position.source_withholding_rate * 100, { maximumFractionDigits: 1 })}%`}
+                : f.formatPercent(position.source_withholding_rate, { digits: 1 })}
             {position.domicile_country ? (
                 <span className="ml-1 text-xs text-gray-500">({position.domicile_country})</span>
             ) : null}
@@ -98,7 +98,7 @@ function FiscalYearCard({ year, data, baseCurrency, ti = esT, f = esF }: { year:
                     <div className="flex items-baseline justify-between gap-3">
                         <dt className="text-xs text-gray-500">{ti('portfolio.dividends.effRate')}</dt>
                         <dd className="text-sm font-medium text-gray-100">
-                            {`${f.formatNumber(data.effective_avg_rate * 100, { maximumFractionDigits: 1 })}%`}
+                            {f.formatPercent(data.effective_avg_rate, { digits: 1 })}
                         </dd>
                     </div>
                 ) : null}

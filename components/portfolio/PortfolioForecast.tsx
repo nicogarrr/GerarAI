@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { Panel } from '@/components/ui/panel';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import { createFormatters, type Formatters } from '@/lib/format';
-import { intlLocale } from '@/lib/i18n/locale';
 import { t } from '@/lib/i18n/t';
 import { forecastExcludedReason } from '@/lib/portfolio/forecast-excluded-reason';
 
@@ -19,22 +18,15 @@ const SCENARIO_KEYS = {
   bull: 'portfolio.forecast.scenarioBull',
 } as const;
 
-function fmtNumber(digits: number, f: Formatters) {
-  return new Intl.NumberFormat(intlLocale(f.locale), {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-}
-
 function pct(value: number | null | undefined, digits = 1, ti: TFunction = esT, f: Formatters = esF): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return ti('common.na');
-  return `${fmtNumber(digits, f).format(value * 100)}%`;
+  return f.formatPercent(value, { digits });
 }
 
 function signedPct(value: number | null | undefined, digits = 1, ti: TFunction = esT, f: Formatters = esF): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return ti('common.na');
-  const rendered = fmtNumber(digits, f).format(value * 100);
-  return value > 0 ? `+${rendered}%` : `${rendered}%`;
+  // `always`: «+» en positivos y «−» en negativos; un cero redondeado sale sin signo.
+  return f.formatPercent(value, { digits, signDisplay: 'always' });
 }
 
 function Veracity({ value }: { value: string }) {

@@ -27,11 +27,11 @@ describe('ShareCapitalPanel', () => {
     it('cambio neto: positivo con signo +, negativo con signo menos', () => {
         const up = { series: [fact('2025-06-30', 100), fact('2026-06-30', 110, { previous_date: '2025-06-30', net_change_pct: 10, change_status: 'DERIVADO' })] };
         const { unmount } = render(<ShareCapitalPanel data={capital(up)} />);
-        expect(screen.getAllByText('+10,00%').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('+10,00 %').length).toBeGreaterThan(0);
         unmount();
         const down = { series: [fact('2025-06-30', 100), fact('2026-06-30', 95, { previous_date: '2025-06-30', net_change_pct: -5, change_status: 'DERIVADO' })] };
         render(<ShareCapitalPanel data={capital(down)} />);
-        expect(screen.getAllByText('-5,00%').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('-5,00 %').length).toBeGreaterThan(0);
     });
     it('un split entre fechas o un salto brusco NO se presenta como emisión/recompra', () => {
         const split = { series: [fact('2025-06-30', 100), fact('2026-06-30', 400, { previous_date: '2025-06-30', split_between_dates: true })] };

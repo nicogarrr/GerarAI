@@ -44,7 +44,7 @@ describe('PortfolioForecast sin tesis publicada', () => {
         render(<PortfolioForecast forecast={fc({ portfolio: portfolio({ covered_count: 0, position_count: 3 }), positions: [],
             excluded: [ex('AAA', 0.1, 'no_published_thesis'), ex('BBB', 0.6, 'no_published_thesis'), ex('CCC', null, 'no_published_thesis')] })} />);
         expect(screen.getByRole('link', { name: 'BBB' })).toHaveAttribute('href', '/research/BBB?view=thesis');
-        expect(screen.getByText(/60,0% de la cartera\) para activar/)).toBeInTheDocument();
+        expect(screen.getByText(/60,0 % de la cartera\) para activar/)).toBeInTheDocument();
         expect(screen.getByText(/3 de 3 posiciones sin tesis publicada vigente/)).toBeInTheDocument();
     });
 
@@ -71,20 +71,20 @@ describe('PortfolioForecast con datos', () => {
     it('escenarios: signo explicito, falta de escenario es N/D, horizontes mezclados', () => {
         render(<PortfolioForecast forecast={fc()} />);
         const bear = screen.getByText('Bajista').parentElement!;
-        expect(bear.textContent).toContain('-5,0%');
-        expect(bear.textContent).toContain('aporte total -20,0%');
+        expect(bear.textContent).toContain('-5,0\u00a0%');
+        expect(bear.textContent).toContain('aporte total -20,0\u00a0%');
         const base = screen.getAllByText('Base')[0].parentElement!;
-        expect(base.textContent).toContain('+8,0%');
+        expect(base.textContent).toContain('+8,0\u00a0%');
         expect(base.textContent).toContain('horizontes mezclados');
-        expect(base.textContent).toContain('Cobertura 90,0%');
+        expect(base.textContent).toContain('Cobertura 90,0\u00a0%');
         const bull = screen.getByText('Alcista').parentElement!;
         expect(within(bull).getAllByText('N/D').length).toBeGreaterThan(0);
-        expect(bull.textContent).not.toContain('0,0%');
+        expect(bull.textContent).not.toContain('0,0\u00a0%');
     });
 
     it('esperado del CAGR global; sin el, avisa de cobertura incompleta', () => {
         const { unmount } = render(<PortfolioForecast forecast={fc()} />);
-        expect(screen.getByText('+6,0%')).toBeInTheDocument();
+        expect(screen.getByText('+6,0 %')).toBeInTheDocument();
         expect(screen.getByText(/Media de los CAGR por escenario/)).toBeInTheDocument();
         unmount();
         render(<PortfolioForecast forecast={fc({ portfolio: portfolio({ expected_cagr: null }) })} />);
@@ -103,9 +103,9 @@ describe('PortfolioForecast con datos', () => {
             pos({ ticker: 'CCC', expected_cagr: null, partial_expected_cagr: null, weight: null, cagr: { bear: null, base: null, bull: null } }),
         ] })} />);
         const row = (t: string) => screen.getByRole('link', { name: t }).closest('tr')!;
-        expect(row('AAA').textContent).toContain('25,0%');
+        expect(row('AAA').textContent).toContain('25,0\u00a0%');
         expect(row('AAA').textContent).toContain('sobre subset valorado');
-        expect(row('BBB').textContent).toContain('Parcial +4,0% · masa 50%');
+        expect(row('BBB').textContent).toContain('Parcial +4,0\u00a0% · masa 50\u00a0%');
         expect(row('BBB').textContent).toContain('modelo v2');
         expect(row('BBB').textContent).toContain('MANUAL');
         expect(row('CCC').textContent).not.toMatch(/\d,\d%/);
@@ -120,7 +120,7 @@ describe('PortfolioForecast con datos', () => {
 
     it('lista excluidas con peso y supuestos', () => {
         render(<PortfolioForecast forecast={fc({ excluded: [{ ticker: 'XX', weight: 0.125, reason: 'sin tesis', reason_code: 'c' }] })} />);
-        expect(screen.getByText(/12,5% de la cartera\. sin tesis/)).toBeInTheDocument();
+        expect(screen.getByText(/12,5 % de la cartera\. sin tesis/)).toBeInTheDocument();
         expect(screen.getByText('Supuesto 1')).toBeInTheDocument();
     });
 });

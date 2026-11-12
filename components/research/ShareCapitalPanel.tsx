@@ -16,11 +16,11 @@ const ShareCapitalChart = dynamic(() => import('@/components/research/ShareCapit
 
 /** Cifras con el formato del idioma elegido (es-ES por defecto). */
 function useNums() {
-  const { formatCompact, formatNumber, na } = useFormat();
+  const { formatCompact, formatPercent, na } = useFormat();
   return {
     na,
     compact: (value: number) => formatCompact(value),
-    percent: (value: number | null) => value == null ? na : `${value > 0 ? '+' : ''}${formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`,
+    percent: (value: number | null) => value == null ? na : formatPercent(value, { fromRatio: false, digits: 2, signDisplay: 'always' }),
   };
 }
 function Source({ fact }: { fact: CapitalFact }) {

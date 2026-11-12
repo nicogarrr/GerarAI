@@ -128,7 +128,11 @@ describe('PortfolioForecast montado con react-dom/server', () => {
     it('los porcentajes se renderizan en formato es-ES con coma decimal', async () => {
         const { readFileSync } = await import('node:fs');
         const source = readFileSync('components/portfolio/PortfolioForecast.tsx', 'utf8');
-        assert.ok(/Intl\.NumberFormat\(intlLocale\(/.test(source), 'el formato se liga al locale (es-ES por defecto)');
+        // Desde r5-a11y los porcentajes salen del helper compartido del locale
+        // (`f.formatPercent`, es-ES por defecto: «12,3 %»), no de un Intl propio
+        // con el «%» pegado a mano.
+        assert.ok(/\bf\.formatPercent\(/.test(source), 'el formato se liga al locale vía formatPercent (es-ES por defecto)');
+        assert.ok(!/\}%`/.test(source), 'sin «%» pegado a mano');
         assert.ok(!source.includes('.toFixed('), 'toFixed rompe la coma decimal es-ES');
         assert.ok(source.includes('Number.isFinite'), 'Infinity/NaN se filtran a Sin datos');
     });

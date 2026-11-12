@@ -83,7 +83,7 @@ describe('PortfolioDividends escenarios y meses', () => {
         })} />);
         const card = screen.getByText('Escenario 2026').closest('div')!;
         expect(within(card).getByText('IRPF (escenario)').nextSibling!.textContent).toBe('N/D');
-        expect(card.textContent).toMatch(/19,3%/);
+        expect(card.textContent).toMatch(/19,3\u00a0%/);
         expect(card.textContent).toMatch(/excluye BN \(sin datos, no cero\)/);
         expect(card.textContent).toContain('Base no EUR');
     });
@@ -123,7 +123,7 @@ describe('PortfolioDividends posiciones', () => {
     it('cantidad fraccionaria con coma y 6 decimales; retencion con pais', () => {
         render(<PortfolioDividends projection={proj({ positions: [position({ quantity: 0.000001, source_withholding_rate: 0.195 })] })} />);
         expect(screen.getAllByText('0,000001').length).toBeGreaterThan(0);
-        expect(document.body.textContent).toMatch(/19,5%/);
+        expect(document.body.textContent).toMatch(/19,5\u00a0%/);
         expect(document.body.textContent).toContain('(US)');
     });
 
