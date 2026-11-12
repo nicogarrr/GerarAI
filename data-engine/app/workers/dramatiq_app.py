@@ -1546,99 +1546,6 @@ def evaluate_alert_rules(
         db.close()
 
 
-@dramatiq.actor(max_retries=2, min_backoff=30_000)
-@_coalesce_on_success("refresh_asts_catalog", 110 * 60)
-def refresh_asts_catalog() -> dict[str, Any]:
-    """One global network fetch, explicit tenant-scoped persisted copies."""
-    from app.services.asts_catalog_service import (
-        MIN_FETCH_INTERVAL,
-        latest_download_at,
-        persist_catalog,
-        record_download_attempt,
-    )
-    from app.services.connectors.celestrak_ast import fetch_catalog
-    from app.services.connectors.celestrak_ast_supgp import fetch_supgp
-
-    contexts = tenant_contexts()
-    if not contexts:
-        return {"actor": "refresh_asts_catalog", "status": "skipped", "reason": "no_tenants"}
-    # Lease first, then check the persisted last attempt while holding it.
-    # This avoids a second worker racing between the timestamp read and the
-    # outbound HTTP request. The 2h TTL is a fallback; the durable timestamp
-    # remains authoritative across restarts and failed network attempts.
-    lease = acquire_job_lease("celestrak_ast_2h", ttl_seconds=7200, redis_url=_lease_redis_url())
-    if lease is None:
-        return {"actor": "refresh_asts_catalog", "status": "skipped", "reason": "celestrak_2h_minimum"}
-    fetched_at = datetime.now(UTC)
-    attempts_recorded = False
-    try:
-        recent = []
-        for tenant_id, user_id in contexts:
-            db = _session(tenant_id, user_id)
-            try:
-                last = latest_download_at(db)
-                if last is not None:
-                    recent.append(last.replace(tzinfo=UTC) if last.tzinfo is None else last)
-            finally:
-                db.close()
-        if recent and fetched_at - max(recent) < MIN_FETCH_INTERVAL:
-            return {"actor": "refresh_asts_catalog", "status": "skipped", "reason": "celestrak_2h_minimum"}
-        # All context writes must succeed before the first network call.
-        for tenant_id, user_id in contexts:
-            db = _session(tenant_id, user_id)
-            try:
-                record_download_attempt(db, fetched_at)
-            finally:
-                db.close()
-        attempts_recorded = True
-    finally:
-        # If validation failed or the actor skipped, release the lease. Once
-        # outbound I/O starts, keep the full 2h TTL as an extra rate guard.
-        if not attempts_recorded:
-            release_job_lease("celestrak_ast_2h", lease, redis_url=_lease_redis_url())
-    catalog = None
-    gp_error = None
-    try:
-        catalog = _run(fetch_catalog(fetched_at=fetched_at))
-    except Exception as exc:
-        gp_error = type(exc).__name__
-    # Each source is attempted independently; one failed endpoint does not
-    # relabel the other source or renew the failed source's freshness.
-    supgp = None
-    supgp_error = None
-    try:
-        supgp = _run(fetch_supgp(catalog, fetched_at=fetched_at))
-    except Exception as exc:
-        supgp_error = type(exc).__name__
-    if catalog is None and supgp is None:
-        return {
-            "actor": "refresh_asts_catalog",
-            "status": "error",
-            "gp_error": gp_error,
-            "supgp_error": supgp_error,
-        }
-    errors = []
-    for tenant_id, user_id in contexts:
-        db = _session(tenant_id, user_id)
-        try:
-            persist_catalog(db, catalog or [], fetched_at, supgp=supgp)
-        except Exception as exc:
-            _rollback(db)
-            errors.append({"tenant_id": tenant_id, "type": type(exc).__name__})
-        finally:
-            db.close()
-    return {
-        "actor": "refresh_asts_catalog",
-        "status": "partial" if errors or gp_error or supgp_error else "ok",
-        "gp_error": gp_error,
-        "count": len(catalog) if catalog is not None else 0,
-        "supgp_count": len(supgp) if supgp is not None else 0,
-        "supgp_error": supgp_error,
-        "tenant_count": len(contexts),
-        "errors": errors,
-    }
-
-
 @dramatiq.actor(max_retries=2, min_backoff=60_000)
 @_coalesce_on_success("refresh_subtel_decrees", 23 * 60 * 60)
 def refresh_subtel_decrees() -> dict[str, Any]:
@@ -3868,8 +3775,8 @@ def refresh_ticker_news(
 # con scope="all"): ~34 min de red cada una y cabeza de cola medida de
 # ~104 min. La descarga solo depende del ticker (misma URL de Yahoo para
 # todos los tenants); lo estrictamente de tenant es el etiquetado y la
-# ingesta. Mismo patron que refresh_asts_catalog («One global network fetch,
-# explicit tenant-scoped persisted copies»): refresh_ticker_news_universe
+# ingesta. Patron «una descarga global, copias persistidas por tenant»:
+# refresh_ticker_news_universe
 # descarga cada feed UNA vez y deja el resultado crudo en Redis;
 # persist_ticker_news_universe (un mensaje por tenant) etiqueta e ingiere su
 # propio universo desde esa cache, con fail-open a red en miss. Ningun

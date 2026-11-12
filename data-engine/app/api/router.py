@@ -4,7 +4,6 @@ from app.api.routes import (
     alerts,
     analyst_notes,
     analyst_report,
-    asts,
     audit,
     bottlenecks,
     cache,
@@ -134,7 +133,6 @@ api_router.include_router(language.router, prefix="/settings", tags=["settings"]
 api_router.include_router(market.router, prefix="/market", tags=["market"])
 api_router.include_router(market_context.router, prefix="/market", tags=["market"])
 api_router.include_router(money_flows.router, prefix="/market/flows", tags=["market", "flows"])
-api_router.include_router(asts.router, prefix="/market/asts", tags=["market", "asts"])
 api_router.include_router(
     macro_calendar.router, prefix="/macro-calendar", tags=["macro-calendar"]
 )

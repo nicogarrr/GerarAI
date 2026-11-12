@@ -53,7 +53,6 @@ export const MODULES = [
   { key: 'politicos', tab: 'seguimiento', anchor: 'politicos' },
   { key: 'directiva', tab: 'seguimiento', anchor: 'directiva', path: 'management-credibility' },
   { key: 'lecciones', tab: 'seguimiento', anchor: 'lecciones', path: 'decision-lessons' },
-  { key: 'satellites', tab: 'seguimiento', anchor: 'satellites' },
   { key: 'documents', tab: 'fuentes' },
   { key: 'sources', tab: 'fuentes', anchor: 'fuentes' },
   { key: 'chat', tab: 'fuentes', anchor: 'chat' },

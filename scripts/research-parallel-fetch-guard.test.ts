@@ -58,7 +58,7 @@ const VERCEL = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url
 
 /** Lecturas de la API de research que la ficha puede lanzar. */
 const RESEARCH_READERS =
-  /getResearch\w+|getMoatQualityScore|getCompanyMarketSnapshot|getWatchlist\(|getProfile\(|getAstOrbitOverview|askResearchCompanyChat/;
+  /getResearch\w+|getMoatQualityScore|getCompanyMarketSnapshot|getWatchlist\(|getProfile\(|askResearchCompanyChat/;
 
 /**
  * (1) `await` dentro de un bucle: el antipatron clasico del fan-out secuencial.
@@ -89,7 +89,7 @@ export function findSequentialLoopAwaits(source: string): string[] {
  */
 export function findUnbudgetedReads(source: string): string[] {
   const findings: string[] = [];
-  const pattern = /await\s+((?:getResearch\w+|getMoatQualityScore|getCompanyMarketSnapshot|getAstOrbitOverview|askResearchCompanyChat)\s*\()/g;
+  const pattern = /await\s+((?:getResearch\w+|getMoatQualityScore|getCompanyMarketSnapshot|askResearchCompanyChat)\s*\()/g;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(source)) !== null) {
     const lineStart = source.lastIndexOf('\n', match.index) + 1;
@@ -132,8 +132,8 @@ export function findNakedPromiseAll(source: string): string[] {
   while ((match = head.exec(source)) !== null) {
     const args = callArgsAt(source, match.index + match[0].length);
     if (!RESEARCH_READERS.test(args)) continue;
-    if (!/\b(getResearch\w+|getMoatQualityScore|getCompanyMarketSnapshot|getAstOrbitOverview)\s*\(/.test(args)) continue;
-    const readers = args.match(/get(?:Research\w+|MoatQualityScore|CompanyMarketSnapshot|AstOrbitOverview)\s*\(/g) ?? [];
+    if (!/\b(getResearch\w+|getMoatQualityScore|getCompanyMarketSnapshot)\s*\(/.test(args)) continue;
+    const readers = args.match(/get(?:Research\w+|MoatQualityScore|CompanyMarketSnapshot)\s*\(/g) ?? [];
     const catches = args.match(/\.catch\s*\(/g) ?? [];
     if (readers.length > catches.length) {
       findings.push(`Promise.all naked sobre lecturas degradables en offset ${match.index}`);
@@ -276,7 +276,7 @@ describe('la ficha real no serializa sus lecturas', () => {
     // Toda lectura de la ficha deja rastro: si aparece una sin `withResearch-
     // Telemetry` ni por el lote, el waterfall vuelve a ser invisible.
     const readers = PAGE.match(
-      /(?:\bgetResearch\w+|\bgetMoatQualityScore|\bgetCompanyMarketSnapshot|\bgetAstOrbitOverview|\baskResearchCompanyChat)\s*\(/g,
+      /(?:\bgetResearch\w+|\bgetMoatQualityScore|\bgetCompanyMarketSnapshot|\baskResearchCompanyChat)\s*\(/g,
     ) ?? [];
     const tracked = PAGE.match(/withResearchTelemetry\(/g) ?? [];
     assert.ok(readers.length > 0, 'debe haber lecturas que medir');

@@ -257,11 +257,6 @@ export default async function MetodologiaPage() {
       </section>
 
       <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5">
-        <h2 className="text-lg font-semibold text-gray-100">{t('landing.metodologia.orbital.title')}</h2>
-        <p className="mt-2 text-sm leading-6 text-gray-400">{t('landing.metodologia.orbital.body')}</p>
-      </section>
-
-      <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Calculator className="h-5 w-5 text-teal-300" />
           <h2 className="text-lg font-semibold text-gray-100">{t('landing.metodologia.engines.title')}</h2>

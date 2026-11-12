@@ -95,17 +95,13 @@
       },
       "others": {
         "title": "Other public sources",
-        "text": "FRED (macroeconomic series, when configured), CelesTrak (orbital elements), GDELT (news), CNMV (short positions in Spain) and FINRA (short interest in the US).",
+        "text": "FRED (macroeconomic series, when configured), GDELT (news), CNMV (short positions in Spain) and FINRA (short interest in the US).",
         "cta": "See research"
       }
     },
     "fmpNotice": {
       "lead": "FMP only covers the US market:",
       "body": "Financial Modeling Prep's free plan is now limited to US companies (its legacy endpoints answer \"Legacy Endpoint\" or 402 outside that market). The API accepts an FMP refresh for any issuer, but outside the US the provider rejects it and the refresh fails with a notice. There is no automatic fallback: if the issuer reports to SEC EDGAR or ESEF, you can run the refresh yourself from those sources (a separate action on the company page); and if no source covers the issuer, financials are shown as unavailable instead of being estimated. In the backend price refresh, US listings are queried on FMP first when a key exists and the quote carries a valid date; Finnhub is the fallback. Yahoo Finance provides the intraday portfolio refresh and the ProPicks price history, also for non-US listings when their exchange symbol is known. Without a reliable quote or symbol, it is shown without a price."
-    },
-    "orbital": {
-      "title": "AST orbital signal: semi-major axis",
-      "body": "For each object in CelesTrak's AST group we compute the semi-major axis with a = (μ / (2πn / 86,400)²)^(1/3), with Earth μ = 398,600.4418 km³/s² and n in revolutions per day. We keep up to 32 distinct epochs per NORAD ID. We only compare a 24-to-72-hour window with at least three epochs two hours apart. A drop of 2 km or more is a reason to review sources, not proof of deployment, manoeuvre or cause: atmospheric drag, orbit adjustments and element revisions can also produce changes. BSTAR and the mean-motion derivatives are fitting parameters, not independent telemetry. The signal is exploratory and does not replace primary confirmation. The AST group is polled at most every two hours. GP (general catalogue) and SupGP (supplementary AST-E elements) are stored and plotted as independent series: they are not compared with each other. One source may be missing without invalidating the other. CelesTrak is never polled when the view is opened; after 30 hours without a valid download, stale signals and history from each source are hidden. The orbital epoch and the download date are different things."
     },
     "engines": {
       "title": "Valuation engines",
@@ -261,7 +257,7 @@
       "llmStrong": "Language models",
       "llmRest": ": OpenCode (DeepSeek models), Groq, Google (Gemini) and OpenRouter, depending on the provider configuration. They take part in the AI features and receive the context sent by those features, which may include research and portfolio data.",
       "marketStrong": "Market data providers",
-      "marketRest": ": Finnhub, Financial Modeling Prep, Yahoo Finance, SEC EDGAR, CNMV, FRED, GDELT, CelesTrak and other configured free sources. These queries are made per ticker and do not include your personal data.",
+      "marketRest": ": Finnhub, Financial Modeling Prep, Yahoo Finance, SEC EDGAR, CNMV, FRED, GDELT and other configured free sources. These queries are made per ticker and do not include your personal data.",
       "hostingStrong": "Hosting and databases",
       "hostingRest": ": Vercel (frontend, with functions in the Frankfurt region, fra1), Oracle Cloud (data engine server in the eu-madrid-1 region, Madrid, Spain), MongoDB Atlas (accounts and auxiliary data) and PostgreSQL on the server itself.",
       "storageStrong": "Storage and search",
@@ -335,7 +331,7 @@
     },
     "s5": {
       "title": "5. Data and external providers",
-      "pPre": "The service combines data from public and private providers (SEC EDGAR, CNMV, Finnhub, FMP, Yahoo Finance, FRED, GDELT and CelesTrak, among others) and may send research context and, depending on the feature, portfolio data to a language model provider when you enable the corresponding features. See the",
+      "pPre": "The service combines data from public and private providers (SEC EDGAR, CNMV, Finnhub, FMP, Yahoo Finance, FRED and GDELT, among others) and may send research context and, depending on the feature, portfolio data to a language model provider when you enable the corresponding features. See the",
       "pLink": "privacy policy",
       "pPost": "for details and sub-processors."
     },

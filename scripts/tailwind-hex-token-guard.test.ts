@@ -36,11 +36,6 @@ const HEX = /#[0-9a-f]{3,8}\b/i;
  */
 const ALLOWLIST: readonly { file: string; hex: string; why: string }[] = [
     {
-        file: 'components/research/AstSmaChart.tsx',
-        hex: '#0B1414',
-        why: 'Fondo del grafico con tinte verde. No existe token equivalente (las superficies son neutras): declararlo en globals.css o aceitarlo aqui.',
-    },
-    {
         file: 'components/portfolio/PortfolioAllocation.tsx',
         hex: '#111111',
         why: 'Panel, 1/255 por encima de `surface-1`. Fuera de la propiedad de este cambio (PR de otro agente): migrar a `bg-surface-1`.',

@@ -50,7 +50,6 @@ NAMES_WITH_EN = {
     "paper_trade_proposal",
     "thesis_deep_narrative",
     "thesis_news_narrative",
-    "asts_llm_service",
     "knowledge_analysis",
     "knowledge_chat",
     "news_headline_translation",
