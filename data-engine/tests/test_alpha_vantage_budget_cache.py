@@ -35,6 +35,15 @@ from app.services.connectors.alpha_vantage import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _aislar_cache_redis_del_entorno(monkeypatch):
+    # El presupuesto inyectado sin Redis NO aisla la cache de respuestas.
+    # Otro test/proceso con AAPL cacheado hacia que dedup gastara 0 HTTP,
+    # aunque el contrato exige exactamente 1. Cache Redis se prueba con
+    # dobles explicitos en test_alpha_vantage_bordes.py, no en este modulo.
+    monkeypatch.setattr(AlphaVantageClient, "_redis_cache_client", lambda self: None)
+
+
 def _quote_payload(symbol: str = "AAPL") -> dict:
     return {
         "Global Quote": {
@@ -533,3 +542,23 @@ async def test_cliente_usa_espera_async_sin_bloquear():
     with patch("httpx.AsyncClient.get", new=fake_get):
         await asyncio.gather(client.quote("AAPL"), client.quote("MSFT"), trabajo_paralelo())
     assert progreso == 3
+
+
+@pytest.mark.anyio
+async def test_cache_externa_previa_no_contamina_la_prueba(monkeypatch):
+    """Una cache de otro test/proceso no puede saltarse el fake HTTP local."""
+    import json
+
+    class CachePrevia:
+        def get(self, key):
+            return json.dumps({"payload": _quote_payload(), "fetched_at": "prior-test"})
+        def set(self, *args, **kwargs):
+            pytest.fail("El test unitario no debe escribir cache Redis externa")
+
+    monkeypatch.setattr("app.core.cache._redis_client", lambda: CachePrevia())
+    client = _client()
+    with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=_response(_quote_payload()))) as get:
+        a, b = await asyncio.gather(client.quote("AAPL"), client.quote("AAPL"))
+    assert get.await_count == 1
+    assert a["price"] == b["price"] == 123.45
+    assert client.budget.status()["used"] == 1
