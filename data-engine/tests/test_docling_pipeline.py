@@ -10,10 +10,13 @@ dependencia ausente, fallback cuando Docling lanza, y que el shape de chunks
 from __future__ import annotations
 
 import hashlib
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock
+
+import pytest
 
 import app.services.docling_pipeline as pipeline
 from app.services.docling_pipeline import (
@@ -118,15 +121,30 @@ def _fake_converter(*items):
     return SimpleNamespace(convert=lambda path: SimpleNamespace(document=doc))
 
 
-def test_imports_are_lazy_and_never_raise_without_optional_deps():
-    assert "docling" not in sys.modules
-    assert "docling.document_converter" not in sys.modules
-    assert "markitdown" not in sys.modules
-    # Re-importar los modulos no exige las dependencias opcionales.
-    import importlib
+@pytest.mark.parametrize("ambient_loaded", [False, True])
+def test_imports_are_lazy_and_never_raise_without_optional_deps(monkeypatch, ambient_loaded):
+    if ambient_loaded:
+        # An earlier test may legitimately have imported optional packages.
+        # That must not decide whether a NEW process imports them eagerly.
+        monkeypatch.setitem(sys.modules, "markitdown", ModuleType("markitdown"))
+    code = r"""
+import importlib
+import importlib.abc
+import sys
 
-    importlib.reload(pipeline)
-    assert "docling" not in sys.modules
+optional = {"docling", "docling.document_converter", "markitdown"}
+class RejectOptional(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname in optional:
+            raise AssertionError("eager optional import: " + fullname)
+sys.meta_path.insert(0, RejectOptional())
+assert not (optional & sys.modules.keys())
+import app.services.docling_pipeline as pipeline
+importlib.reload(pipeline)
+assert not (optional & sys.modules.keys())
+"""
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=20)
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_decide_lane_plain_goes_fast():

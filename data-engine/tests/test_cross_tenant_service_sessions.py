@@ -23,6 +23,7 @@ producen datos de otro tenant.
 
 from __future__ import annotations
 
+from concurrent.futures import Future, ThreadPoolExecutor
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -32,7 +33,7 @@ from sqlalchemy import select
 import main
 from app.core import auth as auth_module
 from app.core.database import SessionLocal, init_db
-from app.models import FinancialFact, InsiderFiling
+from app.models import FinancialFact, InsiderFiling, Tenant
 from app.seed import seed
 from tests.auth_helpers import auth_settings, signed_request
 
@@ -255,6 +256,17 @@ def test_screener_items_cache_does_not_leak_ratios_between_tenants(monkeypatch):
             }
         ]
 
+    # Prior tests may leave unrelated refreshes queued/running. Own the pool
+    # for these two tenant requests and never await another tenant's future.
+    pool = ThreadPoolExecutor(max_workers=2)
+    monkeypatch.setattr(screeners, "_real_refresh_executor", pool)
+
+    class ForeignFuture(Future):
+        def result(self, timeout=None):
+            raise AssertionError("must not wait on unrelated tenant future")
+
+    foreign = ForeignFuture()
+    monkeypatch.setitem(screeners._real_refresh_futures, -999, foreign)
     monkeypatch.setattr(screeners, "_refetch_real_items", _refetch)
     monkeypatch.setattr(
         screeners,
@@ -277,9 +289,10 @@ def test_screener_items_cache_does_not_leak_ratios_between_tenants(monkeypatch):
             client, SECRET, tenant, user,
             "GET", "/api/screeners/real", params={"limit": 1},
         )
-        # Los refrescos son por tenant: se drenan todos los pendientes.
-        for future in list(screeners._real_refresh_futures.values()):
-            future.result(timeout=5)
+        # Drain only THIS request's tenant, never unrelated stale futures.
+        with SessionLocal() as db:
+            tenant_id = db.scalar(select(Tenant.id).where(Tenant.external_id == tenant))
+        screeners._real_refresh_futures[tenant_id].result(timeout=5)
         response = signed_request(
             client, SECRET, tenant, user,
             "GET", "/api/screeners/real", params={"limit": 1},
@@ -287,8 +300,12 @@ def test_screener_items_cache_does_not_leak_ratios_between_tenants(monkeypatch):
         assert response.status_code == 200
         return response.json()["screener"]
 
-    items_a = _real_as(f"tenant-a-{suffix}", f"user-a-{suffix}")
-    items_b = _real_as(f"tenant-b-{suffix}", f"user-b-{suffix}")
+    try:
+        items_a = _real_as(f"tenant-a-{suffix}", f"user-a-{suffix}")
+        items_b = _real_as(f"tenant-b-{suffix}", f"user-b-{suffix}")
+    finally:
+        pool.shutdown(wait=True)
+    assert not foreign.done()
     assert items_a and items_b, "el refresh propio debe poblar el bucket"
     assert items_a[0]["name"] != items_b[0]["name"], (
         "el tenant B leyo del items-LKG los items calculados para el tenant A"

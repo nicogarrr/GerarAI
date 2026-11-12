@@ -9,6 +9,8 @@ Expected Behavior:
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -17,8 +19,29 @@ import main
 
 @pytest.fixture(scope="module")
 def client():
-    with TestClient(main.app) as test_client:
-        yield test_client
+    # The real lifespan shuts these down. Own this module's pools rather
+    # than poisoning readiness tests that run later in the same process.
+    names = ("_HEALTH_REQUIRED_EXECUTOR", "_HEALTH_PROBE_EXECUTOR", "_HEALTH_LLM_EXECUTOR")
+    originals = {name: getattr(main, name) for name in names}
+    owned = []
+    with pytest.MonkeyPatch.context() as patch:
+        for name, workers in zip(names, (2, 4, 1)):
+            pool = ThreadPoolExecutor(max_workers=workers)
+            owned.append(pool)
+            patch.setattr(main, name, pool)
+        try:
+            with TestClient(main.app) as test_client:
+                yield test_client
+            # Observe the real lifespan shutdown before fallback cleanup.
+            assert all(pool._shutdown for pool in owned)
+        finally:
+            for pool in owned:
+                pool.shutdown(wait=True)
+    # Preserve real shutdown coverage AND prove parent-process pools survive.
+    assert all(pool._shutdown for pool in owned)
+    for name, original in originals.items():
+        assert getattr(main, name) is original
+        assert original.submit(lambda: "alive").result(timeout=2) == "alive"
 
 
 @pytest.mark.parametrize(
