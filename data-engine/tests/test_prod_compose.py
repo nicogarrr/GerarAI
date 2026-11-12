@@ -334,3 +334,8 @@ def test_retired_minio_cannot_be_recreated_by_production_compose():
         assert "minio" not in service.get("depends_on", {}), name
         assert "minio" not in str(service.get("image", "")).lower(), name
     assert "garage" in compose["services"]
+
+
+def test_kpi_worker_can_select_zero_euro_deterministic_mode_without_llm_free_only_change():
+    env = _service_env(_load_compose(), "worker-kpis")
+    assert env["KPI_EXTRACTION_MODE"] == "${KPI_EXTRACTION_MODE:-auto}"

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import UTC, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import Any, NamedTuple
 
 from sqlalchemy import func, select
@@ -194,7 +196,13 @@ class CompanyKPIRegistryService:
 
 class KPIExtractionService:
     def __init__(self, provider: LLMProvider | None = None) -> None:
-        self.provider = provider or create_llm_provider()
+        self._provider = provider
+
+    @property
+    def provider(self):
+        if self._provider is None:
+            self._provider = create_llm_provider()
+        return self._provider
 
     async def extract_document(
         self,
@@ -202,7 +210,11 @@ class KPIExtractionService:
         document: Document,
         *,
         commit: bool = True,
+        mode: str | None = None,
     ) -> list[KPIExtractionCandidate]:
+        mode = mode or os.getenv("KPI_EXTRACTION_MODE", "auto")
+        if mode not in {"auto", "deterministic-only"}:
+            raise ValueError("Unsupported KPI extraction mode")
         if document.company_id is None:
             raise ValueError("KPI extraction requires a company-specific document")
         company = db.get(Company, document.company_id)
@@ -214,7 +226,9 @@ class KPIExtractionService:
             KPIExtractionCandidate.document_id == document.id,
             *tenant_filters(db, KPIExtractionCandidate),
         ).order_by(KPIExtractionCandidate.id)))
-        if existing_candidates:
+        if existing_candidates and any(
+            not (row.trace or {}).get("deterministic") for row in existing_candidates
+        ):
             return existing_candidates
         from app.services.ir_content_guard import normalized_digest, soft_404
 
@@ -226,24 +240,11 @@ class KPIExtractionService:
                 select(DocumentChunk)
                 .where(DocumentChunk.document_id == document.id)
                 .order_by(DocumentChunk.chunk_index)
-                .limit(30)
+                .limit(500)
             ).all()
         )
         if not chunks:
             return []
-        try:
-            from app.services.jev_gates import kpi_chunk_keep_flags
-
-            keep_flags = await kpi_chunk_keep_flags([chunk.text for chunk in chunks])
-        except Exception:  # noqa: BLE001 — Jev best-effort: sin filtro, como hoy
-            keep_flags = None
-        if keep_flags is not None:
-            chunks = [
-                chunk for chunk, keep in zip(chunks, keep_flags) if keep
-            ]
-            if not chunks:
-                # Jev no ve senal KPI en ningun chunk: se ahorra la llamada LLM.
-                return []
         if document.source_type == "IR":
             visible = "\n".join(chunk.text for chunk in chunks)
             if soft_404(document.source_url, visible):
@@ -259,7 +260,46 @@ class KPIExtractionService:
                 return []
         else:
             digest = None
+        from app.services.kpi_deterministic import VERSION, extract
+
         chunk_map = {chunk.id: chunk for chunk in chunks}
+        deterministic = extract(chunks, registry, source_type=document.source_type,
+                                cik=(document.metadata_ or {}).get("cik") or company.cik)
+        zero_response = SimpleNamespace(model=VERSION, provider="deterministic", request_id=None,
+                                       usage=SimpleNamespace(input_tokens=0, output_tokens=0))
+        deterministic_candidates = self._persist_observations(
+            db, document, company, registry, chunk_map,
+            {"observations": deterministic}, zero_response, None, commit=commit)
+        deterministic_candidates = list({row.id: row for row in
+            [*existing_candidates, *deterministic_candidates]}.values())
+        covered = {row.metric_key for row in deterministic_candidates}
+        unresolved = [row for row in registry if row.active and row.metric_key not in covered]
+        document.metadata_ = {**(document.metadata_ or {}), "kpi_deterministic": {
+            "version": VERSION, "mode": mode, "covered_metrics": sorted(covered),
+            "unresolved_metrics": [row.metric_key for row in unresolved],
+            "candidates": len(deterministic_candidates), "complete": not unresolved,
+        }}
+        if commit:
+            db.commit()
+        if mode == "deterministic-only" or not unresolved:
+            return deterministic_candidates
+        # Only unresolved metric keys reach Jev/provider/budget. Exact row
+        # candidates stay pending human approval, never canonical facts.
+        registry = unresolved
+        chunks = chunks[:30]  # preserve the existing bounded LLM retrieval set
+        try:
+            from app.services.jev_gates import kpi_chunk_keep_flags
+
+            keep_flags = await kpi_chunk_keep_flags([chunk.text for chunk in chunks])
+        except Exception:  # noqa: BLE001 — Jev best-effort: sin filtro, como hoy
+            keep_flags = None
+        if keep_flags is not None:
+            chunks = [
+                chunk for chunk, keep in zip(chunks, keep_flags) if keep
+            ]
+            if not chunks:
+                # Jev no ve senal KPI en ningun chunk: se ahorra la llamada LLM.
+                return deterministic_candidates
         source_text = "\n\n".join(
             f"[chunk:{chunk.id}]\n{chunk.text}" for chunk in chunks
         )[:30000]
@@ -375,6 +415,11 @@ class KPIExtractionService:
                     error=type(exc).__name__,
                 )
                 raise
+        return deterministic_candidates + self._persist_observations(
+            db, document, company, registry, chunk_map, payload, response, digest, commit=commit)
+
+    def _persist_observations(self, db, document, company, registry, chunk_map,
+                              payload, response, digest, *, commit):
         registry_by_key = {row.metric_key: row for row in registry}
         created: list[KPIExtractionCandidate] = []
         for observation in payload["observations"]:
@@ -388,6 +433,11 @@ class KPIExtractionService:
                 continue
             quote = str(observation.get("quote") or "").strip()
             locator_valid = bool(quote) and self._contains_quote(chunk.text, quote)
+            context = (observation.get("_deterministic") or {}).get("context")
+            if context:
+                context_chunk = chunk_map.get(context.get("chunk_id"))
+                locator_valid = locator_valid and context_chunk is not None and self._contains_quote(
+                    context_chunk.text, str(context.get("quote") or ""))
             raw_value = str(observation.get("raw_value") or "").strip()
             raw_unit = str(observation.get("raw_unit") or "unknown").strip()
             normalized, normalization_trace = self._normalize(
@@ -413,7 +463,7 @@ class KPIExtractionService:
             )
             reconciliation = (
                 "reconciled"
-                if locator_valid and value_matches_quote and value_in_quote and period_valid
+                if locator_valid and value_matches_quote and value_in_quote and period_valid and not observation.get("_conflict")
                 else "needs_review"
             )
             status = "pending_approval" if reconciliation == "reconciled" else "needs_review"
@@ -444,13 +494,14 @@ class KPIExtractionService:
                 period=period[:40],
                 fiscal_year=fiscal_year,
                 fiscal_quarter=fiscal_quarter if period_valid else None,
-                source_locator={"chunk_id": chunk.id, "quote": quote},
+                source_locator={"chunk_id": chunk.id, "quote": quote, **({"context": context} if context else {})},
                 reconciliation_status=reconciliation,
                 status=status,
                 confidence=Decimal(str(confidence)),
                 extraction_model=response.model,
-                prompt_version=PROMPT_VERSION,
+                prompt_version=response.model if observation.get("_deterministic") else PROMPT_VERSION,
                 trace={
+                    "deterministic": observation.get("_deterministic"),
                     "provider": response.provider,
                     "request_id": response.request_id,
                     "locator_verified": locator_valid,

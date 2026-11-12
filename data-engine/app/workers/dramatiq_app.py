@@ -1154,8 +1154,13 @@ def extract_document_kpis(
         if meta.pop(KPI_DEFERRED_KEY, None) is not None:
             document.metadata_ = meta
             db.commit()
+        deterministic = meta.get("kpi_deterministic", {})
+        unresolved = deterministic.get("unresolved_metrics", [])
+        deterministic_only = deterministic.get("mode") == "deterministic-only"
         return {
-            "status": "ok",
+            "status": "partial" if deterministic_only and unresolved else "ok",
+            "mode": deterministic.get("mode", "auto"),
+            "unresolved_metrics": unresolved,
             "document_id": document_id,
             "candidate_ids": [candidate.id for candidate in candidates],
             "candidates": len(candidates),
