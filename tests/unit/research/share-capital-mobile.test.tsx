@@ -23,7 +23,7 @@ it('balance cards share pagination, signed change, date and source with the tabl
  fireEvent.click(screen.getAllByRole('button',{name:'Siguiente'})[0]);
  const cards=screen.getAllByRole('region',{name:/^Saldos ·/});
  expect(cards).toHaveLength(2);
- expect(within(cards[0]).getByText('-5,50%')).toBeVisible();
+ expect(within(cards[0]).getByText('-5,50 %')).toBeVisible();
  expect(within(cards[0]).getByRole('link')).toHaveAttribute('href',fact.source_url);
  expect(screen.getAllByRole('button',{name:'Siguiente'})[0]).toBeDisabled();
  fireEvent.click(screen.getAllByRole('button',{name:'Anterior'})[0]);

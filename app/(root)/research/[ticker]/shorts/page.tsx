@@ -21,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ShortsPage({ params, searchParams }: { params: Promise<{ ticker: string }>; searchParams: Promise<{ page?: string }> }) {
   await requireAuthenticatedUser();
   const t = await getT();
-  const { formatMarketDate, formatNumber, formatUserDateTime, na: NA, locale } = await getFormat();
+  const { formatMarketDate, formatNumber, formatPercent, formatUserDateTime, na: NA, locale } = await getFormat();
   const ticker = (await params).ticker.toUpperCase();
   const query = await searchParams;
   const result = await getPublicShorts(ticker).catch(() => null);
@@ -42,12 +42,12 @@ export default async function ShortsPage({ params, searchParams }: { params: Pro
           <p className="mb-4 text-sm text-gray-400">{shortsText(data.note, locale)}</p>
           <a href={data.source_url} target="_blank" rel="noopener noreferrer" className="text-teal-300">{t('research.publicShorts.officialSource', { source: data.source })}</a>
           {data.source === 'CNMV' ? <>
-            <p className="my-4 text-2xl">{t('research.publicShorts.publicTotal', { percent: data.public_total_percent == null ? NA : `${formatNumber(data.public_total_percent, { maximumFractionDigits: 2 })}%` })} <span className="text-xs text-gray-400">{derived}</span></p>
-            {!rows.length ? <p>{t('research.publicShorts.noNotifications')}</p> : <ul className="mt-3 space-y-3">{rows.slice((page - 1) * 10, page * 10).map(row => <li className="rounded border border-gray-800 p-3" key={row.holder}><h2>{row.holder}</h2><p>{formatNumber(row.percent, { maximumFractionDigits: 2 })}% · {official} · {t('research.publicShorts.positionDate', { date: formatMarketDate(row.position_date) })}</p></li>)}</ul>}
+            <p className="my-4 text-2xl">{t('research.publicShorts.publicTotal', { percent: data.public_total_percent == null ? NA : formatPercent(data.public_total_percent, { fromRatio: false, digits: 2 }) })} <span className="text-xs text-gray-400">{derived}</span></p>
+            {!rows.length ? <p>{t('research.publicShorts.noNotifications')}</p> : <ul className="mt-3 space-y-3">{rows.slice((page - 1) * 10, page * 10).map(row => <li className="rounded border border-gray-800 p-3" key={row.holder}><h2>{row.holder}</h2><p>{formatPercent(row.percent, { fromRatio: false, digits: 2 })} · {official} · {t('research.publicShorts.positionDate', { date: formatMarketDate(row.position_date) })}</p></li>)}</ul>}
             <nav aria-label={t('research.publicShorts.pagesLabel')} className="mt-4 flex gap-4">{page > 1 && <Link className="text-teal-300" href={`?page=${page - 1}`}>{t('research.publicShorts.previous')}</Link>}<span>{page} / {pages}</span>{page < pages && <Link className="text-teal-300" href={`?page=${page + 1}`}>{t('research.publicShorts.next')}</Link>}</nav>
           </> : <dl className="mt-4 grid gap-3 sm:grid-cols-2">
             <div><dt>{t('research.publicShorts.tradeDate')}</dt><dd>{data.date ? formatMarketDate(data.date) : NA}</dd></div>
-            <div><dt>{t('research.publicShorts.shortRatio')}</dt><dd>{data.short_volume_ratio == null ? NA : `${formatNumber(data.short_volume_ratio * 100, { maximumFractionDigits: 2 })}%`} · {derived}</dd></div>
+            <div><dt>{t('research.publicShorts.shortRatio')}</dt><dd>{data.short_volume_ratio == null ? NA : formatPercent(data.short_volume_ratio, { digits: 2 })} · {derived}</dd></div>
             <div><dt>{t('research.publicShorts.shortVolume')}</dt><dd>{data.short_volume == null ? NA : formatNumber(data.short_volume, { maximumFractionDigits: 0 })}</dd></div>
             <div><dt>{t('research.publicShorts.finraVolume')}</dt><dd>{data.total_volume == null ? NA : formatNumber(data.total_volume, { maximumFractionDigits: 0 })}</dd></div>
           </dl>}

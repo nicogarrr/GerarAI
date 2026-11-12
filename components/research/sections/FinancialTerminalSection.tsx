@@ -9,16 +9,16 @@ import { Stat } from '@/components/ui/stat';
 import { getFinancialTerminal } from '@/lib/actions/research-tools.actions';
 import { financialDefinition, financialFormula, financialPeriod, financialSegment, loadedFinancialRange } from '@/lib/research/financial-display';
 import { metricLabel } from '@/lib/research/metric-labels';
-import { formatConfidence, naFor } from '@/lib/format';
+import { formatConfidence, formatPercent, naFor } from '@/lib/format';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locale';
 import type { TranslationKey } from '@/lib/i18n/t';
 import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 import { formatProvenanceValue } from '@/lib/research/provenance-format';
 import { annualSummary } from '@/lib/research/terminal-summary';
 
+/** TACC con signo: el helper compartido pone el espacio duro en es-ES («+8,4 %») y nada en inglés («+8.4%»). */
 function pctText(raw: number, locale: Locale): string {
-  const text = new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(Math.abs(raw));
-  return `${raw > 0 ? '+' : raw < 0 ? '−' : ''}${text} %`;
+  return formatPercent(raw, { fromRatio: false, digits: 1, signDisplay: 'always' }, undefined, locale);
 }
 
 /** Media, mínimo, máximo y TACC de los ejercicios cargados (determinista, sin modelo). */
@@ -61,7 +61,7 @@ function value(raw: string | number | null, unit: string, t: TranslateFn, locale
 export function FinancialTerminalSection({ terminal, metrics, years, periodicity, locale = DEFAULT_LOCALE }: { terminal: FinancialTerminalData; metrics?: string; years: number; periodicity: string; locale?: Locale }) {
   const t = createTranslator(locale);
   return <div className="grid min-w-0 gap-6">
-    <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">{[[t('research.terminalSection.coverage'), `${terminal.coverage.percent.toFixed(0)}%`], [t('research.terminalSection.available'), `${terminal.coverage.available}/${terminal.coverage.requested}`], [t('research.terminalSection.yearsLoaded'), loadedFinancialRange(terminal.metrics) ?? naFor(locale)], [t('research.terminalSection.periodicity'), label(terminal.periodicity, t)]].map(([label, data]) => <Stat key={label} label={label} size="sm" value={data} />)}</section>
+    <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">{[[t('research.terminalSection.coverage'), formatPercent(terminal.coverage.percent, { fromRatio: false, digits: 0 }, undefined, locale)], [t('research.terminalSection.available'), `${terminal.coverage.available}/${terminal.coverage.requested}`], [t('research.terminalSection.yearsLoaded'), loadedFinancialRange(terminal.metrics) ?? naFor(locale)], [t('research.terminalSection.periodicity'), label(terminal.periodicity, t)]].map(([label, data]) => <Stat key={label} label={label} size="sm" value={data} />)}</section>
     <form className="rounded-xl border border-gray-800 bg-surface-1 p-4" method="get">
       <input type="hidden" name="view" value="finanzas" />
 <div className="mb-3 flex items-center gap-2"><SlidersHorizontal aria-hidden="true" className="h-4 w-4 text-teal-300" /><h3 className="font-semibold text-gray-200">{t('research.terminalSection.controls')}</h3></div><div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_120px_160px_auto]"><label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>{t('research.terminalSection.metrics')}</span><Input defaultValue={metrics} name="metrics" placeholder={t('research.terminalSection.metricsPlaceholder')} /></label><label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>{t('research.terminalSection.yearsLabel')}</span><Input defaultValue={years} max="20" min="1" name="years" type="number" /></label><label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>{t('research.terminalSection.periodicity')}</span><select className="h-11 rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 sm:h-9 sm:text-sm" defaultValue={periodicity} name="periodicity"><option value="annual">{t(STATUS_KEYS.annual)}</option><option value="quarterly">{t(STATUS_KEYS.quarterly)}</option><option value="all">{t(STATUS_KEYS.all)}</option></select></label><Button type="submit">{t('research.terminalSection.apply')}</Button></div></form>
