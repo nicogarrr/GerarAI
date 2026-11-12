@@ -29,7 +29,7 @@ if grep -qiE '^[A-Z0-9_]+=.*(cambia-esto|cambia_esto|cambia esto|genera-|genera_
   exit 1
 fi
 
-for key in POSTGRES_PASSWORD MINIO_ROOT_PASSWORD RESEARCH_AUTH_SECRET \
+for key in POSTGRES_PASSWORD RESEARCH_AUTH_SECRET \
            GARAGE_RPC_SECRET GARAGE_ACCESS_KEY GARAGE_SECRET_KEY BACKEND_DOMAIN; do
   grep -qE "^${key}=.+" "${ENV_FILE}" || {
     echo "[deploy] ERROR: falta ${key} con valor en ${ENV_FILE}"

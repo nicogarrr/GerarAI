@@ -22,6 +22,12 @@
 #   ./scripts/backup.sh [--stop-storage]
 set -euo pipefail
 
+# Retirado con MinIO de produccion. El cuerpo legacy se conserva solo como
+# referencia del formato antiguo; NO es un backup/restore valido de Garage.
+# Ni COMPOSE_CMD permite saltarse el bloqueo: podria apuntar a produccion.
+echo "ERROR: flujo legacy MinIO retirado. No se ha tocado ningun dato. Usa el flujo de backup/restore Garage validado por operaciones; este script no lo sustituye." >&2
+exit 1
+
 # .env.production no se carga solo (no es el nombre por defecto de compose);
 # sin el las variables obligatorias (POSTGRES_PASSWORD, MINIO_ROOT_*, ...)
 # hacen fallar cualquier subcomando. COMPOSE_CMD externo tiene prioridad.

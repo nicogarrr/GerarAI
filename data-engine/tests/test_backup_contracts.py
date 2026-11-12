@@ -489,7 +489,7 @@ def test_endpoint_minio_se_parsea_como_en_document_store():
 def test_pins_de_imagen_coinciden_con_docker_compose():
     assert _kit.compose_image("postgres") == _kit.POSTGRES_IMAGE
     assert _kit.compose_image("qdrant") == _kit.QDRANT_IMAGE
-    assert _kit.compose_image("minio", "docker-compose.prod.yml") == _kit.MINIO_IMAGE
+    assert _kit.compose_image("minio", "docker-compose.yml") == _kit.MINIO_IMAGE
 
 
 def test_pin_del_cliente_postgres_cuadra_con_el_servidor():

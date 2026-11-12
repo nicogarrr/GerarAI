@@ -245,7 +245,7 @@ def test_data_services_explicitly_reset_inherited_host_ports():
     """Omitting ports does not remove mappings from a merged base file."""
     compose = _load_compose()
     source = COMPOSE_PATH.read_text()
-    for name in ("postgres", "redis", "minio"):
+    for name in ("postgres", "redis"):
         assert compose["services"][name]["ports"] == []
         section = re.split(r"\n  [A-Za-z_][\w-]*:", source.split(f"\n  {name}:\n", 1)[1], maxsplit=1)[0]
         assert "ports: !reset []" in section
@@ -322,5 +322,15 @@ def test_web_push_configuration_reaches_all_notification_processes():
         for key, value in expected.items():
             assert env.get(key) == value, (service, key)
     # No push keys in services that do not send notifications.
-    for service in ('postgres', 'redis', 'qdrant', 'minio', 'caddy', 'scheduler'):
+    for service in ('postgres', 'redis', 'qdrant', 'garage', 'caddy', 'scheduler'):
         assert not (expected.keys() & _service_env(compose, service).keys()), service
+
+
+def test_retired_minio_cannot_be_recreated_by_production_compose():
+    compose = _load_compose()
+    assert "minio" not in compose["services"]
+    assert "minio_data" not in compose.get("volumes", {})
+    for name, service in compose["services"].items():
+        assert "minio" not in service.get("depends_on", {}), name
+        assert "minio" not in str(service.get("image", "")).lower(), name
+    assert "garage" in compose["services"]
