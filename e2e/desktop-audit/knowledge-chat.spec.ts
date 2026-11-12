@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockBrainLayoutActions } from '../fixtures/brain-layout-actions';
 test.skip(process.env.E2E_UI_RUN !== "1", "Set E2E_UI_RUN=1");
 
 // Nico (30-oct): en la Biblioteca y en las cartas el Cerebro sigue el patrón
@@ -6,6 +7,7 @@ test.skip(process.env.E2E_UI_RUN !== "1", "Set E2E_UI_RUN=1");
 // la página; el botón de la página abre ese mismo panel flotante.
 for (const path of ["/knowledge", "/inversores/cartas"]) {
   test(`${path}: Cerebro docked and collapsed, opens on demand with the library context`, async ({ page }) => {
+    await mockBrainLayoutActions(page);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(String(e)));
     page.on("console", (m) => {
