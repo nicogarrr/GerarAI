@@ -91,12 +91,18 @@ def _xbrl(chunk, active, cik):
         return []
     try:
         namespaces = {}
-        for _, (prefix, uri) in ET.iterparse(StringIO(chunk.text), events=("start-ns",)):
-            # Complete fragments with shadowed/rebound prefixes are outside
-            # this parser's supported subset; never resolve against a later
-            # declaration that has a different lexical scope.
-            if prefix in namespaces and namespaces[prefix] != uri:
+        root_started = False
+        for event, value in ET.iterparse(StringIO(chunk.text), events=("start-ns", "start")):
+            if event == "start":
+                root_started = True
+                continue
+            # Supported subset: namespace declarations on the root ONLY.
+            # Any local declaration, including a sibling that never scopes
+            # the unit measure, makes this fragment unsupported. Never merge
+            # declarations from unrelated XML scopes into a global QName map.
+            if root_started:
                 return []
+            prefix, uri = value
             namespaces[prefix] = uri
         if not re.fullmatch(r"https?://fasb.org/us-gaap/20\d{2}(?:-\d{2}-\d{2})?", namespaces.get("us-gaap", "")):
             return []

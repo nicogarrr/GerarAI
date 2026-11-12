@@ -148,3 +148,9 @@ XBRL unit QName prefixes must resolve to the official
 http://www.xbrl.org/2003/iso4217 namespace; missing, spoofed or shadow-rebound
 prefixes cause abstention. The lexical prefix itself need not be iso4217.
 Both original review counterexamples were reproduced red before fixing.
+
+XML namespace scope restriction: the supported inline-XBRL subset accepts
+namespace declarations ONLY on the root. A local declaration anywhere in
+the fragment causes abstention, including an official unit namespace on a
+context sibling that cannot scope the unit. This deliberately rejects some
+valid locally-declared XML rather than guessing QName scope.

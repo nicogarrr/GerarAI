@@ -362,3 +362,9 @@ def test_xbrl_nested_namespace_rebinding_abstains_and_alias_resolves_uri():
     assert parser.extract([chunk(shadow)], [row()], source_type="SEC", cik="123") == []
     alias = XML.replace('xmlns:iso4217=', 'xmlns:money=').replace('iso4217:USD', 'money:USD')
     assert len(parser.extract([chunk(alias)], [row()], source_type="SEC", cik="123")) == 1
+
+
+def test_xbrl_sibling_namespace_declaration_cannot_authorize_unit_qname():
+    xml = XML.replace(' xmlns:iso4217="http://www.xbrl.org/2003/iso4217"', '')
+    xml = xml.replace('<x:context id="fy">', '<x:context id="fy" xmlns:iso4217="http://www.xbrl.org/2003/iso4217">')
+    assert parser.extract([chunk(xml)], [row()], source_type="SEC", cik="123") == []
