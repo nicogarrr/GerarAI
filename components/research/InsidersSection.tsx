@@ -61,7 +61,7 @@ function RowCard({ row, locale }: { row: InsiderRow; locale: Locale }) {
         {row.late
           ? t('research.insidersV2.filedLate', { date: fmtDate(row.filing_date, locale), days: row.days_late ?? 0 })
           : t('research.insidersV2.filedOnTime', { date: fmtDate(row.filing_date, locale) })}
-        {row.source_url ? <>{' · '}<a className="text-teal-300 underline-offset-2 hover:underline" href={row.source_url} rel="noreferrer" target="_blank">{t('research.insidersV2.filing', { form: `Form ${row.form}` })}</a></> : null}
+        {row.source_url ? <>{' · '}<a className="text-teal-300 underline underline-offset-2" href={row.source_url} rel="noreferrer" target="_blank">{t('research.insidersV2.filing', { form: `Form ${row.form}` })}</a></> : null}
       </p>
     </li>
   );
@@ -154,7 +154,7 @@ export function InsidersSection({ ticker, summary, locale = DEFAULT_LOCALE }: { 
         {(summary.transactions_total ?? summary.transactions.length) > rows.length ? (
           <p className="mt-2 text-xs text-gray-500">
             {t('research.insidersV2.showing', { shown: rows.length, total: summary.transactions_total ?? rows.length })}{' '}
-            <Link className="text-teal-300" href={`/insider?ticker=${encodeURIComponent(ticker)}`}>Form 4 →</Link>
+            <Link className="text-teal-300 underline underline-offset-2" href={`/insider?ticker=${encodeURIComponent(ticker)}`}>Form 4 →</Link>
           </p>
         ) : null}
       </section>

@@ -279,7 +279,7 @@ export default async function ResearchSourcesPage({
                     {ticker ? (
                       <p>
                         {t('research.sourcesPage.emptyTicker', { ticker })}{' '}
-                        <Link className="text-teal-300 hover:text-teal-200" href={sourcesHref('', 1, filters)}>
+                        <Link className="text-teal-300 underline underline-offset-2 hover:text-teal-200" href={sourcesHref('', 1, filters)}>
                           {t('research.sourcesPage.removeTickerFilter')}
                         </Link>
                       </p>
@@ -303,7 +303,7 @@ export default async function ResearchSourcesPage({
                     ) : sourceType || query ? (
                       <p className="mt-2 text-xs text-gray-500">
                         {t('research.sourcesPage.tryClearing')}{' '}
-                        <Link className="text-teal-300 hover:text-teal-200" href={sourcesHref(ticker, 1, { scope })}>
+                        <Link className="text-teal-300 underline underline-offset-2 hover:text-teal-200" href={sourcesHref(ticker, 1, { scope })}>
                           {t('research.sourcesPage.clearFiltersLower')}
                         </Link>.
                       </p>

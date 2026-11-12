@@ -45,7 +45,7 @@ export function SourceAuditDetail({ audit, ticker, locale = 'es' }: { audit: Res
     <>
       <p className="mt-3 text-xs text-gray-500">
         {date ? `${date} · ` : ''}
-        <Link className="text-teal-300 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>
+        <Link className="text-teal-300 underline underline-offset-2 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>
           {t('research.auditDetail.viewThesis')}{audit.thesis_version != null ? ` v${audit.thesis_version}` : ''}
         </Link>
       </p>

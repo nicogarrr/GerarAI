@@ -39,7 +39,7 @@ export function PoliticiansSection({ ticker, data, locale = DEFAULT_LOCALE }: { 
   const footer = (
     <p className="text-xs text-gray-500">
       {t('research.politicos.footer')}{' '}
-      <Link className="text-teal-300" href="/insider#politicos">{t('research.politicos.seeAll')}</Link>
+      <Link className="text-teal-300 underline underline-offset-2" href="/insider#politicos">{t('research.politicos.seeAll')}</Link>
     </p>
   );
   if (data === null) return <p className="text-sm text-gray-400" role="status">{t('research.politicos.loadError')}</p>;
@@ -71,7 +71,7 @@ export function PoliticiansSection({ ticker, data, locale = DEFAULT_LOCALE }: { 
             <p className={`mt-1 text-xs ${trade.days_late ? 'text-amber-300' : 'text-gray-500'}`}>
               {t('research.politicos.tradeDates', { tx: fmtIsoDate(trade.tx_date, locale), filed: fmtIsoDate(trade.filing_date, locale) })}
               {' · '}{trade.days_late ? t('research.politicos.late', { days: trade.days_late }) : t('research.politicos.onTime')}
-              {trade.source_url ? <>{' · '}<a className="text-teal-300 underline-offset-2 hover:underline" href={trade.source_url} rel="noreferrer" target="_blank">{t('research.politicos.ptr')}</a></> : null}
+              {trade.source_url ? <>{' · '}<a className="text-teal-300 underline underline-offset-2" href={trade.source_url} rel="noreferrer" target="_blank">{t('research.politicos.ptr')}</a></> : null}
             </p>
           </li>
         ))}

@@ -445,7 +445,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
     <Card className="bg-gray-800/50 border-gray-700">
       <CardHeader className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 space-y-1">
-          <CardTitle className="text-gray-100">{ti('portfolio.holdings.title')}</CardTitle>
+          <CardTitle as="h2" className="text-gray-100">{ti('portfolio.holdings.title')}</CardTitle>
           <p className="text-xs font-normal text-gray-500">
             {ti('portfolio.holdings.pnlNote', { currency: cashCurrency })}
           </p>
