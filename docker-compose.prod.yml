@@ -250,38 +250,6 @@ services:
           cpus: "0.50"
           memory: 768M
 
-  minio:
-    # Datos solo en la red Docker. !reset elimina publicaciones heredadas.
-    ports: !reset []
-    # Build local desde el codigo fuente de MinIO (la imagen de quay ya no es publica): docker/minio/Dockerfile.
-    build:
-      context: ./docker/minio
-      dockerfile: Dockerfile
-    image: cavaai-minio:RELEASE.2025-10-15T17-29-55Z
-    container_name: cavaai-minio
-    restart: unless-stopped
-    command: server --address ":9000" /data
-    volumes:
-      - minio_data:/data
-    environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:?Define MINIO_ROOT_USER en .env.production}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:?Define MINIO_ROOT_PASSWORD en .env.production}
-    logging: *default-logging
-    healthcheck:
-      # La imagen minio/minio no incluye curl/mc: sonda HTTP al endpoint live con bash (/dev/tcp).
-      test:
-        - CMD-SHELL
-        - >-
-          bash -c 'exec 3<>/dev/tcp/127.0.0.1/9000; printf "GET /minio/health/live HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3; read -r status <&3; [[ $$status == *" 200 "* ]]'
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: 256M
-
   garage:
     # Garage (S3 compatible, mantenido, nodo unico). Convive con MinIO durante
     # la migracion: MinIO no se toca hasta cerrar la migracion (rollback =
@@ -417,8 +385,6 @@ services:
       redis:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
-      minio:
         condition: service_healthy
     deploy:
       resources:
@@ -1145,8 +1111,6 @@ volumes:
     name: cavaai-prod-redis
   qdrant_data:
     name: cavaai-prod-qdrant
-  minio_data:
-    name: cavaai-prod-minio
   garage_meta:
     name: cavaai-prod-garage-meta
   garage_data:

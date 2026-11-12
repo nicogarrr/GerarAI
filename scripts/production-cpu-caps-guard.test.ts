@@ -44,5 +44,5 @@ test('backend reallocation preserves global memory budget and rejects old 2G', (
     assertGlobalMemoryBudget(source);
     const mutant = source.replace('memory: 1472M', 'memory: 2G');
     assert.notEqual(mutant, source, 'negative control must mutate backend limit');
-    assert.throws(() => assertGlobalMemoryBudget(mutant), /stack memory 16960 MiB exceeds 16384 MiB/);
+    assert.throws(() => assertGlobalMemoryBudget(mutant), /stack memory 16704 MiB exceeds 16384 MiB/);
 });
