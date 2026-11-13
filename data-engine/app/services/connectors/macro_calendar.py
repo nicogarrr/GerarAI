@@ -182,8 +182,12 @@ async def fetch_fomc(user_agent: str, client: httpx.AsyncClient | None = None) -
     except httpx.TransportError as exc:
         registry.record_failure(FOMC_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
         raise
+    events = parse_fomc_html(text)
+    if not events:
+        registry.record_failure(FOMC_REGISTRY_KEY, "200 sin reuniones FOMC verificables")
+        raise ValueError("FOMC no devolvió reuniones verificables")
     registry.record_success(FOMC_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
-    return parse_fomc_html(text)
+    return events
 
 
 async def fetch_bls(user_agent: str, client: httpx.AsyncClient | None = None) -> list[dict[str, Any]]:
@@ -201,5 +205,9 @@ async def fetch_bls(user_agent: str, client: httpx.AsyncClient | None = None) ->
         # BLS responde 200 con una pagina "Access Denied" a clientes no conformes.
         registry.record_failure(BLS_REGISTRY_KEY, "200 sin iCalendar (Access Denied o cambio de formato)")
         raise ValueError("BLS no devolvio un iCalendar")
+    events = parse_bls_ics(text)
+    if not events:
+        registry.record_failure(BLS_REGISTRY_KEY, "iCalendar sin publicaciones BLS verificables")
+        raise ValueError("BLS no devolvió publicaciones verificables")
     registry.record_success(BLS_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
-    return parse_bls_ics(text)
+    return events
