@@ -7,6 +7,7 @@
     "lookupWindowLimit": "Consulta o fecha de negociación fuera del límite de 4 días.",
     "noStoredLookup": "No hay consulta almacenada. Usa Actualizar para consultar la fuente pública.",
     "dailyVolumeNote": "Volumen corto diario fuera de bolsa, no posiciones abiertas ni porcentaje total del mercado. No implica sentimiento bajista por sí solo.",
-    "cnmvScopeNote": "Solo posiciones públicas >=0,5%. La suma no es el total de cortos del mercado; fechas distintas por titular."
+    "cnmvScopeNote": "Solo posiciones públicas >=0,5%. La suma no es el total de cortos del mercado; fechas distintas por titular.",
+    "finraSettlementStale": "Fecha de liquidación FINRA de hace más de 35 días; el volumen diario conserva su propia fecha."
   }
 }
