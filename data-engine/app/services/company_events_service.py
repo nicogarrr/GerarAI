@@ -253,9 +253,10 @@ class CompanyEventsService:
                 "source": "Finnhub /calendar/earnings",
             }
         for row in eps_rows or []:
-            period = str(row.get("period") or "")
-            if not period:
+            day = self._parse_day(row.get("period"))
+            if day is None or day > today:
                 continue
+            period = day.isoformat()
             entry = by_period.setdefault(
                 period,
                 {
