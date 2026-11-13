@@ -17,7 +17,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 import httpx
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models.entities import EtfHolding
@@ -150,6 +150,12 @@ def refresh_etf_holdings(db: Session | None = None, client: httpx.Client | None 
                     weights[ticker] = weight
                 if conflicting:
                     out[etf] = "pesos duplicados contradictorios: se conserva la carga anterior"
+                    continue
+                stored_as_of = session.scalar(
+                    select(func.max(EtfHolding.as_of)).where(EtfHolding.etf == etf)
+                )
+                if stored_as_of is not None and as_of < stored_as_of:
+                    out[etf] = "fichero anterior al guardado: se conserva la carga anterior"
                     continue
                 session.execute(delete(EtfHolding).where(EtfHolding.etf == etf))
                 seen: set[str] = set()
