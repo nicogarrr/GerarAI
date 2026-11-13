@@ -157,14 +157,14 @@ class CompanyEventsService:
             start = end + timedelta(days=1)
 
         calendar_rows: list[dict[str, Any]] = []
-        calendar_ok = False
+        calendar_chunks_ok = 0
         for chunk_start, chunk_end in chunks:
             payload = await self._calendar_fetcher(
                 chunk_start.isoformat(), chunk_end.isoformat()
             )
             if payload is None:
                 continue
-            calendar_ok = True
+            calendar_chunks_ok += 1
             for row in payload.get("earningsCalendar") or []:
                 if str(row.get("symbol", "")).upper() == company.ticker.upper():
                     calendar_rows.append(row)
@@ -173,19 +173,31 @@ class CompanyEventsService:
 
         next_event = self._next_event(calendar_rows, today)
         history = self._history(calendar_rows, eps_rows, today)
+        calendar_status = (
+            "unavailable" if not calendar_chunks_ok else
+            "ok" if calendar_chunks_ok == len(chunks) else "partial"
+        )
+        warnings = []
+        if calendar_status == "partial":
+            warnings.append(
+                f"Calendario de resultados parcial: {calendar_chunks_ok} de {len(chunks)} "
+                "rangos consultados. Pueden faltar eventos; una ausencia no confirma que no haya resultados."
+            )
+        elif calendar_status == "unavailable":
+            warnings.append("Calendario de resultados no disponible: Finnhub sin respuesta o sin cobertura.")
+        if eps_rows is None:
+            warnings.append("Histórico de BPA no disponible: pueden faltar cifras y sorpresas de resultados.")
 
         return {
             "ticker": company.ticker,
             "company_name": company.name,
             "as_of": _utcnow().isoformat(),
-            "calendar_status": "ok" if calendar_ok else "unavailable",
+            "calendar_status": calendar_status,
             "eps_history_status": "ok" if eps_rows is not None else "unavailable",
             "next_event": next_event,
             "history": history,
             "source": "Finnhub (calendar/earnings + stock/earnings, tier gratuito)",
-            "note": None
-            if (calendar_ok or eps_rows is not None)
-            else "Sin datos de calendario de resultados: Finnhub no disponible o sin cobertura para este ticker.",
+            "note": " ".join(warnings) or None,
         }
 
     @staticmethod
