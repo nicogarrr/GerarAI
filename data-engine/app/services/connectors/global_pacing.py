@@ -116,7 +116,10 @@ class GlobalPacer:
         if client is not None:
             try:
                 now_ms = int(self._wall() * 1000)
-                wait_ms = client.eval(
+                # El cliente Redis es sincrono: fuera del event loop para que un
+                # Redis lento (hasta socket_timeout) no pare todas las rutas.
+                wait_ms = await asyncio.to_thread(
+                    client.eval,
                     _CLAIM_SLOT_LUA, 2, self._slot_key, self._cooldown_key,
                     now_ms, interval_ms, self._slot_ttl_ms,
                 )
