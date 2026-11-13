@@ -157,7 +157,11 @@ class RSSConnector:
                     break
         link = urljoin(feed_url, link) if link else None
         external_id = _child_text(entry, "guid", "id") or link
-        published = _published_at(_child_text(entry, "pubdate", "published", "updated", "date"))
+        # Publication takes precedence over modification, regardless of XML order.
+        published = _published_at(
+            _child_text(entry, "pubdate") or _child_text(entry, "published")
+            or _child_text(entry, "date") or _child_text(entry, "updated")
+        )
         author = _child_text(entry, "author", "creator")
         return ConnectorItem(
             source=feed_title or "rss",
