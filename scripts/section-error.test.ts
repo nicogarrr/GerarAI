@@ -25,8 +25,11 @@ describe('sectionErrorKey', () => {
     it('categoriza fallos de red', () => {
         assert.equal(sectionErrorKey(new Error('fetch failed')), 'ui.sectionError.network');
         assert.equal(sectionErrorKey(new Error('ECONNREFUSED')), 'ui.sectionError.network');
-        assert.equal(sectionErrorKey(new Error('request timeout')), 'ui.sectionError.network');
         assert.match(dict.network, /conectar/);
+        // Un timeout no es «sin conexión»: el servicio existe pero tardó demasiado.
+        assert.equal(sectionErrorKey(new Error('request timeout')), 'ui.sectionError.timeout');
+        assert.equal(sectionErrorKey(new Error('The operation timed out')), 'ui.sectionError.timeout');
+        assert.match(dict.timeout, /tard/);
     });
     it('categoriza sesion caducada', () => {
         assert.equal(sectionErrorKey(new Error('401 Unauthorized')), 'ui.sectionError.session');
