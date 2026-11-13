@@ -181,6 +181,17 @@ class CompanyEventsService:
                     calendar_rows.append(row)
 
         eps_rows = await self._eps_fetcher(company.ticker)
+        eps_status = "ok" if eps_rows is not None else "unavailable"
+        if eps_rows is not None:
+            usable_eps = [
+                row for row in eps_rows
+                if isinstance(row, dict)
+                and (day := self._parse_day(row.get("period"))) is not None
+                and day <= today
+            ]
+            if len(usable_eps) != len(eps_rows):
+                eps_status = "partial" if usable_eps else "unavailable"
+            eps_rows = usable_eps
 
         next_event = self._next_event(calendar_rows, today)
         history = self._history(calendar_rows, eps_rows, today)
@@ -196,7 +207,11 @@ class CompanyEventsService:
             )
         elif calendar_status == "unavailable":
             warnings.append("Calendario de resultados no disponible: Finnhub sin respuesta o sin cobertura.")
-        if eps_rows is None:
+        if eps_status == "partial":
+            warnings.append(
+                "Histórico de BPA parcial: se han omitido filas con periodo ausente, inválido o futuro."
+            )
+        elif eps_status == "unavailable":
             warnings.append("Histórico de BPA no disponible: pueden faltar cifras y sorpresas de resultados.")
 
         return {
@@ -204,7 +219,7 @@ class CompanyEventsService:
             "company_name": company.name,
             "as_of": _utcnow().isoformat(),
             "calendar_status": calendar_status,
-            "eps_history_status": "ok" if eps_rows is not None else "unavailable",
+            "eps_history_status": eps_status,
             "next_event": next_event,
             "history": history,
             "source": "Finnhub (calendar/earnings + stock/earnings, tier gratuito)",
