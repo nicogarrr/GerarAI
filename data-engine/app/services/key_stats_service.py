@@ -246,7 +246,8 @@ class KeyStatsService:
             rng = Range52w(low=yahoo["low_52w"], high=yahoo["high_52w"], source=YAHOO_RANGE_SOURCE)
         stats.range_52w = rng
         stats.next_earnings = own.get("earnings")
-        if stats.next_earnings is None and yahoo and yahoo["earnings"]:
+        if (stats.next_earnings is None and yahoo and yahoo["earnings"]
+                and yahoo["earnings"] >= today.isoformat()):
             stats.next_earnings = KeyDate(
                 date=yahoo["earnings"],
                 upcoming=True,
