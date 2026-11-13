@@ -226,6 +226,8 @@ def build_feed(
             if wanted in ticker_list(row["tx_issuer_ticker"] or row["filing_issuer_ticker"])
         ]
 
+    future_rows = [row for row in rows if (row["tx_date"] or row["filing_date"] or "") > today.isoformat()]
+    rows = [row for row in rows if (row["tx_date"] or row["filing_date"] or "") <= today.isoformat()]
     txs = [_tx_dict_from_row(row, i) for i, row in enumerate(rows)]
     txs.sort(key=lambda t: (str(t["date"] or ""), str(t["accession_number"])), reverse=True)
 
@@ -272,6 +274,7 @@ def build_feed(
         "days": days,
         "side": side,
         "ticker": wanted,
+        "excluded_future_rows": len(future_rows),
         "totals": {
             "buy_count": len(buys),
             "buy_value": _sum(buys),
