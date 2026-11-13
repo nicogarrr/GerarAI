@@ -12350,6 +12350,16 @@
             "title": "Cusip",
             "type": "string"
           },
+          "known_value_usd": {
+            "default": 0,
+            "title": "Known Value Usd",
+            "type": "number"
+          },
+          "missing_value_count": {
+            "default": 0,
+            "title": "Missing Value Count",
+            "type": "integer"
+          },
           "name_of_issuer": {
             "title": "Name Of Issuer",
             "type": "string"
@@ -12361,6 +12371,17 @@
           "new_count": {
             "title": "New Count",
             "type": "integer"
+          },
+          "notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice"
           },
           "sellers_count": {
             "title": "Sellers Count",

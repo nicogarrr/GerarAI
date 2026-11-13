@@ -325,6 +325,7 @@ def most_bought(db: Session) -> dict[str, Any]:
                     "buyers": [],
                     "sellers": 0,
                     "value_usd": 0.0,
+                    "missing_value_count": 0,
                 },
             )
             if row["change"] in ("new", "increased"):
@@ -335,8 +336,10 @@ def most_bought(db: Session) -> dict[str, Any]:
                 elif row["change"] == "new":
                     same["change"] = "new"
                 value = _value_usd(row["value_usd_thousands_latest"], result["latest_report"])
-                # nosemgrep: gerarai-money-none-to-zero -- agregado informativo de filings/flujos (ranking/listado): una fila sin cifra no suma; no es un importe del usuario
-                entry["value_usd"] += value or 0.0
+                if value is None:
+                    entry["missing_value_count"] += 1
+                else:
+                    entry["value_usd"] += value
             elif row["change"] in ("closed", "decreased"):
                 entry["sellers"] += 1
     ranked = [e for e in issuers.values() if e["buyers"]]
@@ -352,7 +355,14 @@ def most_bought(db: Session) -> dict[str, Any]:
             "buyers_count": len(e["buyers"]),
             "new_count": sum(1 for b in e["buyers"] if b["change"] == "new"),
             "sellers_count": e["sellers"],
-            "value_usd": e["value_usd"] or None,
+            "value_usd": e["value_usd"] if not e["missing_value_count"] else None,
+            "known_value_usd": e["value_usd"],
+            "missing_value_count": e["missing_value_count"],
+            "notice": (
+                "Importe incompleto: faltan valores declarados de algunas posiciones compradoras; "
+                "el subtotal conocido no es el total."
+                if e["missing_value_count"] else None
+            ),
             "buyers": e["buyers"],
         }
         for e in ranked[:MOST_BOUGHT_TOP]

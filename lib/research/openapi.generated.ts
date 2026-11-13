@@ -11230,12 +11230,24 @@ export interface components {
             buyers_count: number;
             /** Cusip */
             cusip: string;
+            /**
+             * Known Value Usd
+             * @default 0
+             */
+            known_value_usd: number;
+            /**
+             * Missing Value Count
+             * @default 0
+             */
+            missing_value_count: number;
             /** Name Of Issuer */
             name_of_issuer: string;
             /** Name Of Issuer Filed */
             name_of_issuer_filed: string;
             /** New Count */
             new_count: number;
+            /** Notice */
+            notice?: string | null;
             /** Sellers Count */
             sellers_count: number;
             /** Value Usd */
