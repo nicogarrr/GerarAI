@@ -2720,7 +2720,11 @@ class IBKRImportService:
         try:
             from app.services.company_enrichment_service import CompanyEnrichmentService
 
-            CompanyEnrichmentService().enrich(db, company)
+            # SAVEPOINT: si el enriquecimiento falla tras un flush erróneo, se
+            # deshace solo él; el import conserva lo ya escrito y la sesión no
+            # queda en PendingRollback para las filas siguientes.
+            with db.begin_nested():
+                CompanyEnrichmentService().enrich(db, company)
         except Exception:  # noqa: BLE001 — nunca bloquear el import por el enriquecimiento
             pass
         return company
