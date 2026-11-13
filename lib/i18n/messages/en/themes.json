@@ -54,7 +54,10 @@
     "suppliers": "Who gets paid",
     "exposure": "Your exposure: ",
     "inPortfolio": "in your portfolio",
-    "inWatchlist": "on your watchlist"
+    "inWatchlist": "on your watchlist",
+    "backendText": {
+      "leaseCurrencyMismatch": "Finance leases without a comparable amount: different or unavailable currency"
+    }
   },
   "fundamentals": {
     "ariaLabel": "Fundamentals: {title}",

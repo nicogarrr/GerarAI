@@ -54,7 +54,10 @@
     "suppliers": "Quién cobra",
     "exposure": "Tu exposición: ",
     "inPortfolio": "en cartera",
-    "inWatchlist": "en seguimiento"
+    "inWatchlist": "en seguimiento",
+    "backendText": {
+      "leaseCurrencyMismatch": "Leases financieros sin importe comparable: moneda distinta o no disponible"
+    }
   },
   "fundamentals": {
     "ariaLabel": "Fundamentales: {title}",
