@@ -48,6 +48,17 @@ const EXACT: Record<string, string> = {
   'rate limit backend unavailable': 'El servicio de control de peticiones no está disponible ahora mismo. Reintenta en unos segundos.',
   'research authentication is not configured': 'El motor de análisis no está configurado todavía. Inténtalo más tarde.',
   'tenant access is not active': 'Tu cuenta no está activa. Cierra sesión y vuelve a entrar; si sigue fallando, contacta con soporte.',
+  // Validaciones pydantic de cartera, alertas y plan (llegan como texto de
+  // `detail` cuando la ruta hace `HTTPException(detail=str(exc))`).
+  'currency must be a currency code such as eur, usd or gbp': 'La divisa debe ser un código como EUR, USD o GBp.',
+  'currency must be an iso 4217 code such as eur or usd': 'La divisa debe ser un código ISO 4217 como EUR o USD.',
+  'base_currency must be an iso 4217 code such as eur or usd': 'La divisa base debe ser un código ISO 4217 como EUR o USD.',
+  'fees allow at most 4 decimal places': 'Las comisiones admiten como máximo 4 decimales.',
+  'trade_date cannot be in the future': 'La fecha de la operación no puede ser futura.',
+  'date cannot be in the future': 'La fecha no puede ser futura.',
+  'value must be a finite number': 'El valor debe ser un número finito.',
+  'must be at least 0.000001 (6 decimal places)': 'Debe ser al menos 0,000001 (6 decimales).',
+  'must be at least 0.0000000001 (10 decimal places)': 'Debe ser al menos 0,0000000001 (10 decimales).',
 };
 
 /** Sujeto de «X not found» → español. */
@@ -107,7 +118,8 @@ function byStatus(status: number): string {
 export function spanishBackendMessage(message: string | null | undefined, fallback: string = GENERIC): string {
   const text = (message ?? '').trim();
   if (!text) return fallback;
-  const key = text.toLowerCase().replace(/[.\s]+$/, '');
+  // Pydantic antepone «Value error, » a los ValueError de validación.
+  const key = text.replace(/^Value error,\s*/i, '').toLowerCase().replace(/[.\s]+$/, '');
   if (EXACT[key]) return EXACT[key];
 
   // «404 Not Found», «500 Internal Server Error» (cuerpo sin detail).

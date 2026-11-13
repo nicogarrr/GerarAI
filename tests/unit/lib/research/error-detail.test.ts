@@ -16,7 +16,7 @@ describe('researchErrorDetail', () => {
         const out = researchErrorDetail({ detail: [
             { loc: ['body', 'quantity'], msg: 'x' }, { loc: ['body', 'quantity'], msg: 'y' }, { loc: ['query', 'price'] },
         ] }, 'fb');
-        expect(out).toBe('Datos no válidos en: quantity, price. Revisa esos campos y vuelve a intentarlo.');
+        expect(out).toBe('Datos no válidos en: cantidad, precio. Revisa esos campos y vuelve a intentarlo.');
     });
     it('lista sin campos identificables: mensaje genérico, nunca el JSON crudo', () => {
         const out = researchErrorDetail({ detail: [{ loc: ['body'] }, null, { loc: 'x' }, { loc: ['body', ' ', 3] }] }, 'fb');
@@ -24,6 +24,12 @@ describe('researchErrorDetail', () => {
     });
     it('toma el último segmento con nombre de una ruta anidada', () => {
         expect(researchErrorDetail({ detail: [{ loc: ['body', 'items', 0, 'ticker'] }] }, 'fb')).toContain('ticker');
+    });
+    it('traduce los nombres técnicos de campo conocidos y conserva los desconocidos', () => {
+        const out = researchErrorDetail({ detail: [
+            { loc: ['body', 'base_currency'], msg: 'x' }, { loc: ['body', 'trade_date'], msg: 'y' }, { loc: ['body', 'campo_raro'], msg: 'z' },
+        ] }, 'fb');
+        expect(out).toBe('Datos no válidos en: divisa base, fecha de la operación, campo_raro. Revisa esos campos y vuelve a intentarlo.');
     });
     it('detail objeto con message o detail anidado', () => {
         expect(researchErrorDetail({ detail: { message: 'anidado' } }, 'fb')).toBe('anidado');

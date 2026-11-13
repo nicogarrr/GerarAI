@@ -224,6 +224,12 @@ const KNOWN: ReadonlyArray<readonly [RegExp, string]> = [
   [/^El chat no coincide con la prueba del bot\.?$/, 'The chat does not match the bot proof.'],
   [/^Vinculación ya utilizada\.?$/, 'Link already used.'],
   [/^Se requiere el chat privado del usuario del bot\.?$/, "The bot user's private chat is required."],
+  // Validación local del frontend (server actions)
+  [/^Introduce un ticker válido\.?$/, 'Enter a valid ticker.'],
+  [/^Alerta no válida\.?$/, 'Invalid alert.'],
+  [/^Selecciona un documento no vacío\.?$/, 'Choose a non-empty document.'],
+  [/^Completa el valor izquierdo y el derecho de cada criterio\.?$/, 'Fill in the left and right value of each criterion.'],
+  [/^Añade al menos un criterio\.?$/, 'Add at least one criterion.'],
   // Alertas, paper trading, watchlist y calendario
   [/^El operador no coincide con la dirección de la alerta: «por encima» usa > o >=, «por debajo» usa < o <=\.?$/, 'The operator does not match the alert direction: «above» uses > or >=, «below» uses < or <=.'],
   [/^Moneda no reconocida \(ISO 4217 o subunidad como GBp\)\.?$/, 'Unrecognised currency (ISO 4217 or a sub-unit such as GBp).'],

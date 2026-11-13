@@ -25,13 +25,48 @@ function nonEmptyText(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
+/**
+ * Nombres técnicos de campo del motor (pydantic `loc`) con su etiqueta en
+ * español para el resumen de validación; lo desconocido se muestra tal cual.
+ */
+const FIELD_LABELS: Record<string, string> = {
+  ticker: 'ticker',
+  symbol: 'símbolo',
+  name: 'nombre',
+  currency: 'divisa',
+  base_currency: 'divisa base',
+  quote_currency: 'divisa destino',
+  monthly_contribution: 'aportación mensual',
+  monthly_contribution_currency: 'divisa de la aportación',
+  trade_date: 'fecha de la operación',
+  price: 'precio',
+  fees: 'comisiones',
+  rate: 'tipo de cambio',
+  quantity: 'cantidad',
+  value: 'valor',
+  threshold: 'umbral',
+  date: 'fecha',
+  year: 'año',
+  fiscal_year: 'año fiscal',
+  email: 'email',
+  password: 'contraseña',
+  file: 'archivo',
+  title: 'título',
+  text: 'texto',
+  operator: 'operador',
+};
+
+function fieldLabel(field: string): string {
+  return FIELD_LABELS[field] ?? field;
+}
+
 export function researchErrorDetail(payload: unknown, fallback: string): string {
   if (!payload || typeof payload !== 'object') return fallback;
   const { detail, message } = payload as { detail?: unknown; message?: unknown };
   const text = nonEmptyText(detail);
   if (text) return text;
   if (Array.isArray(detail)) {
-    const fields = [...new Set(detail.map(fieldOf).filter((field): field is string => field !== null))];
+    const fields = [...new Set(detail.map(fieldOf).filter((field): field is string => field !== null).map(fieldLabel))];
     return fields.length
       ? `Datos no válidos en: ${fields.join(', ')}. Revisa esos campos y vuelve a intentarlo.`
       : 'El motor de análisis rechazó los datos enviados. Revisa el formulario y vuelve a intentarlo.';
