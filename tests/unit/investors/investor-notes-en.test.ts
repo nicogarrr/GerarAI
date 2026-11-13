@@ -8,8 +8,9 @@ import { OWNERSHIP_TEXT_EN, ownershipLimitations, ownershipNote } from '@/lib/re
 // Las frases salen de investor_portfolio.py; se juntan los literales que Python
 // concatena entre paréntesis para poder buscarlas enteras.
 // Las notas de fila salen de investor_portfolio.py; los avisos de
-// comparación incompleta, de manager_holding_ingestion_service.py.
-const BACKEND = ['investor_portfolio.py', 'manager_holding_ingestion_service.py']
+// comparación incompleta, de manager_holding_ingestion_service.py; la nota de
+// total incompleto del resumen y la ficha, de investors.py.
+const BACKEND = ['investor_portfolio.py', 'manager_holding_ingestion_service.py', 'investors.py']
     .map((file) => readFileSync(path.resolve(__dirname, `../../../data-engine/app/services/${file}`), 'utf8'))
     .join('\n')
     .replace(/"\s*\n\s*"/g, '');
@@ -34,6 +35,12 @@ describe('cartera de un inversor: notas del backend en inglés', () => {
             .toBe('Incomplete comparison: valid quantities are missing or the units are not comparable; no purchase, sale or unchanged position is inferred.');
         expect(ownershipNote('Comparación incompleta: faltan acciones válidas en uno o ambos periodos; no se infiere una compra, venta ni posición sin cambios.', 'en'))
             .toBe('Incomplete comparison: valid share counts are missing in one or both periods; no purchase, sale or unchanged position is inferred.');
+    });
+
+    it('la nota de total incompleto del resumen y la ficha sale en inglés', () => {
+        expect(ownershipNote('Valor total incompleto: faltan importes declarados de algunas posiciones; no se calculan pesos con un subtotal.', 'en'))
+            .toBe('Incomplete total value: declared amounts for some positions are missing; no weights are derived from a subtotal.');
+        expect(ownershipNote('Sin datos: no presenta 13F', 'en')).toBe('No data: no 13F on file.');
     });
 
     it('con English la nota de cada fila sale en inglés', () => {

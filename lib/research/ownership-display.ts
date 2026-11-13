@@ -24,6 +24,8 @@ const TEXT_KEYS = [
     'no13f',
     'comparisonIncompleteRow',
     'comparisonIncompleteRowUnits',
+    'incompleteTotal',
+    'no13fShort',
     'comparisonIncompleteLimitation',
 ] as const;
 const LIMITATION_KEYS = ['limitQuarterlyLag', 'limitLongOnly', 'limitAsFiled', 'limitAmendments'] as const;
@@ -40,6 +42,8 @@ export const OWNERSHIP_BACKEND_TEXT_KEY_LITERALS = [
     'ownership.backendText.no13f',
     'ownership.backendText.comparisonIncompleteRow',
     'ownership.backendText.comparisonIncompleteRowUnits',
+    'ownership.backendText.incompleteTotal',
+    'ownership.backendText.no13fShort',
     'ownership.backendText.comparisonIncompleteLimitation',
     'ownership.backendText.limitQuarterlyLag',
     'ownership.backendText.limitLongOnly',

@@ -62,4 +62,35 @@ describe('Ficha del inversor en inglés', () => {
         const select = screen.getByRole('combobox', { name: 'Investor content' });
         expect(Array.from(select.querySelectorAll('option')).map((option) => option.textContent)).toEqual(['Portfolio', 'Allocation', 'Latest changes', 'Letters', 'Videos']);
     });
+
+    it('la nota de total incompleto sale en inglés; en español no cambia', async () => {
+        const noted = { ...portfolio, note: 'Valor total incompleto: faltan importes declarados de algunas posiciones; no se calculan pesos con un subtotal.' } as unknown as InvestorPortfolio;
+        mocks.locale = 'en';
+        const en = withLocale(await Portfolio({ portfolio: noted, view: 'posiciones' }));
+        expect(screen.getByText('Incomplete total value: declared amounts for some positions are missing; no weights are derived from a subtotal.')).toBeTruthy();
+        en.unmount();
+        mocks.locale = 'es';
+        withLocale(await Portfolio({ portfolio: noted, view: 'posiciones' }));
+        expect(screen.getByText(/Valor total incompleto: faltan importes declarados/)).toBeTruthy();
+    });
+
+    it('el peso se deriva del total cuando el backend no lo trae; sin total queda N/A', async () => {
+        const noWeights = {
+            ...portfolio,
+            note: null,
+            coverage: null,
+            positions: [
+                { ...portfolio.positions[0], weight_pct: datum(null) },
+                { ...portfolio.positions[0], issuer: 'Coca-Cola Co', cusip: '2', value_usd: datum(null), weight_pct: datum(null) },
+            ],
+        } as unknown as InvestorPortfolio;
+        mocks.locale = 'en';
+        const en = withLocale(await Portfolio({ portfolio: noWeights, view: 'distribucion' }));
+        expect(screen.getByText(/25\.0\s*%/)).toBeTruthy();
+        expect(screen.getAllByText('N/A').length).toBeGreaterThan(0);
+        en.unmount();
+        const noTotal = { ...noWeights, total_value_usd: datum(null) } as unknown as InvestorPortfolio;
+        withLocale(await Portfolio({ portfolio: noTotal, view: 'posiciones' }));
+        expect(screen.queryByText(/25\.0\s*%/)).toBeNull();
+    });
 });

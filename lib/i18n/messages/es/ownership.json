@@ -8,6 +8,8 @@
     "no13f": "Sin 13F: solo posiciones documentadas en 13D/Forms 3/4. El valor y el peso no están disponibles (N/D) mientras no haya valoracion con fuente; no es la cartera completa.",
     "comparisonIncompleteRow": "Comparación incompleta: faltan acciones válidas en uno o ambos periodos; no se infiere una compra, venta ni posición sin cambios.",
     "comparisonIncompleteRowUnits": "Comparación incompleta: faltan cantidades válidas o las unidades no son comparables; no se infiere una compra, venta ni posición sin cambios.",
+    "incompleteTotal": "Valor total incompleto: faltan importes declarados de algunas posiciones; no se calculan pesos con un subtotal.",
+    "no13fShort": "Sin datos: no presenta 13F",
     "comparisonIncompleteLimitation": "Comparación incompleta en algunas posiciones: consulta el aviso de cada fila.",
     "limitQuarterlyLag": "Periodicidad trimestral con hasta 45 días de retardo en la declaración",
     "limitLongOnly": "Solo posiciones largas cotizadas en EE. UU.; sin cortos ni valores fuera del 13F",
