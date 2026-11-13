@@ -132,7 +132,7 @@ def refresh_etf_holdings(db: Session | None = None, client: httpx.Client | None 
                     except Exception as exc:  # noqa: BLE001
                         logger.warning("etf_holdings %s enlace %s fallo: %s", etf, link, exc)
                         continue
-                    if as_of and as_of <= date.today() and len(rows) >= MIN_ROWS and (best is None or as_of > best[0]):
+                    if as_of and as_of <= date.today() and len({ticker for ticker, _ in rows}) >= MIN_ROWS and (best is None or as_of > best[0]):
                         best = (as_of, link, rows)
                 if best is None:
                     out[etf] = "ningun fichero valido: se conserva la carga anterior (si la hay)"
