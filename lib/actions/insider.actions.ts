@@ -165,7 +165,10 @@ export interface InsiderFeedSignal {
     accession_number?: string;
     tx_line?: number;
     insider_count?: number;
-    total_value?: number;
+    /** null when any purchase amount is unknown; never a partial sum presented as complete. */
+    total_value?: number | null;
+    known_total_value?: number | null;
+    window_value_missing?: number;
     window_start?: string;
 }
 

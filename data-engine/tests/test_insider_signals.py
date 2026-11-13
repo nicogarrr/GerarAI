@@ -440,7 +440,8 @@ def test_signals_carry_sec_source_url(monkeypatch):
 
 def test_cluster_survives_malformed_value_strings():
     # Form 4 fields arrive from XML: a non-numeric value must not crash
-    # signal detection, and unknown values simply do not add to the total.
+    # signal detection; unknown values make the total unavailable and the
+    # known subtotal is explicitly labelled as a minimum.
     txs = [
         _buy("A", "0000000001", None, 1, value=100_000.0),
         _buy("B", "0000000002", None, 2, value=50_000.0),
@@ -451,7 +452,9 @@ def test_cluster_survives_malformed_value_strings():
     signals = insider_service.detect_signals(txs)
     cluster = [s for s in signals if s["signal"] == "cluster_buy"]
     assert len(cluster) == 1
-    assert cluster[0]["total_value"] == 100_000.0
+    assert cluster[0]["total_value"] is None
+    assert cluster[0]["known_total_value"] == 100_000.0
+    assert cluster[0]["window_value_missing"] == 2
     assert cluster[0]["insider_count"] == 3
 
 

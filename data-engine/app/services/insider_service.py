@@ -14,6 +14,7 @@ envuelto en try/except -> devuelve {"status": "skipped", ...}).
 from __future__ import annotations
 
 import logging
+import math
 import re
 import time
 from collections.abc import Callable
@@ -111,12 +112,13 @@ def _parse_date(value: Any) -> date | None:
 
 def _to_float(value: Any) -> float | None:
     """Parse a numeric field that may arrive as str/None/garbage from Form 4 XML."""
-    if value is None:
+    if value is None or isinstance(value, bool):
         return None
     try:
-        return float(value)
-    except (TypeError, ValueError):
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
         return None
+    return number if math.isfinite(number) and number >= 0 else None
 
 
 def _is_c_suite(tx: dict) -> bool:
@@ -253,10 +255,16 @@ def detect_signals(transactions: list[dict]) -> list[dict]:
             ]
             insiders = {tx.get("insider_cik") or tx.get("insider") for tx in window}
             if len(insiders) >= CLUSTER_MIN_INSIDERS:
-                total = sum(
-                    value
-                    for value in (_to_float(tx.get("value")) for tx in window)
-                    if value is not None
+                values = [_to_float(tx.get("value")) for tx in window]
+                missing = sum(value is None for value in values)
+                subtotal = sum(value for value in values if value is not None)
+                known_total = subtotal if missing < len(window) and math.isfinite(subtotal) else None
+                total = known_total if not missing else None
+                amount_note = (
+                    "importe total sin datos: compras sin importe verificable"
+                    if known_total is None else
+                    f"${known_total:,.0f} como mínimo; {missing} de {len(window)} compras sin importe"
+                    if missing else f"${known_total:,.0f}"
                 )
                 signals.append(
                     {
@@ -268,9 +276,11 @@ def detect_signals(transactions: list[dict]) -> list[dict]:
                         "window_start": dated[start][0].isoformat(),
                         "buy_count": len(window),
                         "total_value": total,
+                        "known_total_value": known_total,
+                        "window_value_missing": missing,
                         "detail": (
                             f"{len(insiders)} insiders compran {ticker} "
-                            f"en {CLUSTER_WINDOW_DAYS} dias (${total:,.0f})"
+                            f"en {CLUSTER_WINDOW_DAYS} dias ({amount_note})"
                         ),
                     }
                 )
