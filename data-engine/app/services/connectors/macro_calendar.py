@@ -16,9 +16,10 @@ from __future__ import annotations
 
 import re
 import time
-from datetime import date
+from datetime import UTC, date, datetime
 from html import unescape
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 
@@ -132,12 +133,30 @@ def parse_bls_ics(text: str) -> list[dict[str, Any]]:
                 except ValueError:
                     day = None
                 if day is not None:
-                    time_et = f"{stamp.group(4)}:{stamp.group(5)}" if stamp.group(4) else None
+                    time_et = None
+                    if stamp.group(4):
+                        raw_start = current.get("DTSTART", "")
+                        zone_name = current.get("DTSTART_TZID", "US-Eastern").strip('"')
+                        zone_name = "America/New_York" if zone_name == "US-Eastern" else zone_name
+                        try:
+                            zone = UTC if raw_start.endswith("Z") else ZoneInfo(zone_name)
+                            local_start = raw_start.rstrip("Z")
+                            pattern = "%Y%m%dT%H%M" if len(local_start) == 13 else "%Y%m%dT%H%M%S"
+                            moment = datetime.strptime(local_start, pattern).replace(tzinfo=zone)
+                            eastern = moment.astimezone(ZoneInfo("America/New_York"))
+                        except (ValueError, ZoneInfoNotFoundError):
+                            pass
+                        else:
+                            day, time_et = eastern.date(), eastern.strftime("%H:%M")
                     events.append({"title": summary, "date": day.isoformat(), "time_et": time_et})
             current = None
         elif current is not None and ":" in line:
             key, _, value = line.partition(":")
             current.setdefault(key.split(";")[0], value)
+            if key.split(";")[0] == "DTSTART":
+                tzid = re.search(r"(?:^|;)TZID=([^;]+)", key)
+                if tzid:
+                    current.setdefault("DTSTART_TZID", tzid.group(1))
     return events
 
 
