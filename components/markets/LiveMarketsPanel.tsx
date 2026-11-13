@@ -67,7 +67,7 @@ function identityLine(quote: LiveQuote, locale: Locale): string {
     return parts.join(' · ');
 }
 
-function QuoteRow({ spec, quote, fetchedAt }: { spec: LiveQuoteSpec; quote: LiveQuote | null; fetchedAt: number }) {
+function QuoteRow({ spec, quote, fetchedAt, nowMs }: { spec: LiveQuoteSpec; quote: LiveQuote | null; fetchedAt: number; nowMs: number | null }) {
     const t = useT();
     const locale = useLocale();
     const { na } = useFormat();
@@ -85,7 +85,11 @@ function QuoteRow({ spec, quote, fetchedAt }: { spec: LiveQuoteSpec; quote: Live
         );
     }
     const changeClass = quote.changePercent === null ? 'text-gray-500' : quote.changePercent >= 0 ? 'text-good' : 'text-bad';
-    const age = quoteAgeSeconds(fetchedAt, quote.timestamp);
+    // Edad contra el reloj actual (no contra el momento de la descarga): si
+    // los refrescos fallan y se conserva el último dato bueno, el rótulo sigue
+    // creciendo en vez de quedar congelado. nowMs es null hasta montar para no
+    // romper la hidratación (el HTML del servidor usa fetchedAt).
+    const age = quoteAgeSeconds(Math.max(fetchedAt, nowMs ?? 0), quote.timestamp);
     const session = sessionLabel(quote.session, t);
     return (
         <tr className="border-b border-gray-800/60">
@@ -127,6 +131,15 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
     const [data, setData] = useState<LiveMarketsResult | null>(() => hasLiveQuotes(initial) ? initial : null);
     const [refreshing, setRefreshing] = useState(false);
     const [failed, setFailed] = useState(() => !hasLiveQuotes(initial));
+    // Reloj del rótulo de antigüedad: null hasta montar (hidratación); luego
+    // late cada 30 s para que «hace N min» envejezca aunque fallen los refrescos.
+    const [nowMs, setNowMs] = useState<number | null>(null);
+    useEffect(() => {
+        const tickClock = () => setNowMs(Date.now());
+        tickClock();
+        const timer = setInterval(tickClock, 30_000);
+        return () => clearInterval(timer);
+    }, []);
 
     const refresh = useCallback(async () => {
         setRefreshing(true);
@@ -136,6 +149,7 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
             if (!hasLiveQuotes(next)) throw new Error('live_quotes_unavailable');
             setData(next);
             setFailed(false);
+            setNowMs(Date.now());
         } catch {
             // Conservamos lo ultimo bueno; la antigüedad por fila sigue siendo honesta.
             setFailed(true);
@@ -202,7 +216,7 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                                     </thead>
                                     <tbody>
                                         {resolveGroupRows(tab.key, group.quotes).map(({ spec, quote }) => (
-                                            <QuoteRow key={spec.symbol} spec={spec} quote={quote} fetchedAt={data?.fetchedAt ?? 0} />
+                                            <QuoteRow key={spec.symbol} spec={spec} quote={quote} fetchedAt={data?.fetchedAt ?? 0} nowMs={nowMs} />
                                         ))}
                                     </tbody>
                                 </table>
