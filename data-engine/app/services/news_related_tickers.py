@@ -203,9 +203,8 @@ def _listed(value, unit, company) -> tuple[Decimal, str | None] | None:
     amount = _positive_close(value)
     if amount is None:
         return None
-    if company is None or not unit:
-        # Fila legacy sin unidad declarada: el cierre tal cual (como antes).
-        return amount, getattr(company, "currency", None)
+    if company is None:
+        return None
     return listing_price(amount, quote_currency=unit, company=company)
 
 
@@ -224,7 +223,7 @@ def _session_change(company, latest: tuple, previous: tuple) -> float | None:
     close, p_close = _positive_close(close), _positive_close(p_close)
     if close is None or p_close is None:
         return None
-    if unit == p_unit or not unit or not p_unit:
+    if unit == p_unit and unit:
         last, prev = Decimal(str(close)), Decimal(str(p_close))
     else:
         a = _listed(close, unit, company)
