@@ -106,6 +106,11 @@ def _parse_float(value: Any) -> float | None:
     return -number if negative else number
 
 
+def _estimate_count(value: Any) -> float | None:
+    count = _parse_float(value)
+    return count if count is not None and count >= 0 and count.is_integer() else None
+
+
 def normalize_earnings_row(row: dict[str, Any], day: date) -> dict[str, Any]:
     """Normaliza una fila del calendario de earnings a un evento propio."""
     return {
@@ -114,7 +119,7 @@ def normalize_earnings_row(row: dict[str, Any], day: date) -> dict[str, Any]:
         "date": day.isoformat(),
         "time": row.get("time"),
         "eps_forecast": _parse_float(row.get("epsForecast")),
-        "n_estimates": _parse_float(row.get("noOfEsts")),
+        "n_estimates": _estimate_count(row.get("noOfEsts")),
         "fiscal_quarter_ending": row.get("fiscalQuarterEnding"),
         "market_cap": _parse_float(row.get("marketCap")),
     }
