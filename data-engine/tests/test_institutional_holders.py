@@ -244,9 +244,17 @@ def _datasets_sin_apple():
     return q4, q3
 
 
-def test_ingesta_guarda_snapshot_vacio_sin_holders_en_ningun_periodo():
+def test_ingesta_guarda_snapshot_vacio_sin_holders_en_ningun_periodo(monkeypatch):
     """Bug auditado: si el CUSIP no aparece ni en el trimestre actual ni en el
     anterior no se guardaba nada, y la ficha servía el trimestre viejo como actual."""
+    # Esta fixture llega a febrero de 2027: fijar la fecha del escenario,
+    # sin convertir filings todavía futuros en historia observada.
+    class ScenarioDate(date):
+        @classmethod
+        def today(cls):
+            return date(2027, 2, 15)
+
+    monkeypatch.setattr(ds, "date", ScenarioDate)
     db = _db()
     cusips = ih.universe_cusips(db)
     assert ih.ingest_parsed(db, _parsed(), ["c2", "c1"], cusips)["companies"] == 1
