@@ -42,6 +42,18 @@ it('traduce el aviso y conserva limitaciones de comparación sin duplicarlas', a
  expect(screen.getAllByText(/Incomplete comparison: valid share counts/)).toHaveLength(2);
  expect(screen.getAllByText('Incomplete comparison for some positions: see each row notice.')).toHaveLength(1);
 });
+it('traduce el aviso nuevo de unidades no comparables (#5479) y sigue traduciendo el anterior', async () => {
+ mocks.locale='en';
+ const noticeNew = 'Comparación incompleta: faltan cantidades válidas o las unidades no son comparables; no se infiere una compra, venta ni posición sin cambios.';
+ const noticeOld = 'Comparación incompleta: faltan acciones válidas en uno o ambos periodos; no se infiere una compra, venta ni posición sin cambios.';
+ mocks.changes.mockResolvedValue({...mobileChanges, changes:[
+  {...mobileChanges.changes[0], change:'unknown', notice:noticeNew, shares_previous:null},
+  {...mobileChanges.changes[0], cusip:'987654321', change:'unknown', notice:noticeOld, shares_previous:null},
+ ]});
+ render(await OwnershipPage({searchParams:Promise.resolve({})}));
+ expect(screen.getAllByText('Incomplete comparison: valid quantities are missing or the units are not comparable; no purchase, sale or unchanged position is inferred.')).toHaveLength(2);
+ expect(screen.getAllByText('Incomplete comparison: valid share counts are missing in one or both periods; no purchase, sale or unchanged position is inferred.')).toHaveLength(2);
+});
 it('no oculta avisos nuevos y no clasifica las filas desconocidas como compras', async () => {
  mocks.changes.mockResolvedValue({...mobileChanges,changes:[mobileChanges.changes[0],{...mobileChanges.changes[0],cusip:'987654321',change:'unknown',notice:'Aviso nuevo de la fuente'}]});
  render(await OwnershipPage({searchParams:Promise.resolve({})}));
