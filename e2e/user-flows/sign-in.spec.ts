@@ -1,5 +1,7 @@
 import { expect, expectHealthyPage, runUiE2E, test, VIEWPORTS, visit } from "./support";
 
+import { ensureSignInAccount } from "./sign-in-account";
+
 const EMAIL = "e2e-user-flows@example.com";
 const PASSWORD = "Correcta-Clave-123";
 
@@ -9,12 +11,10 @@ for (const vp of VIEWPORTS) {
     test.use(vp.use);
 
     test("validación, contraseña incorrecta con copy y acceso correcto", async ({ page, health, baseURL }) => {
-      // Cuenta real de Better Auth (Mongo). Si ya existe, el alta responde 4xx
-      // y da igual: lo que se prueba es el inicio de sesión.
-      await page.request.post(`${baseURL}/api/auth/sign-up/email`, {
-        data: { email: EMAIL, password: PASSWORD, name: "Flujo E2E" },
-        headers: { Origin: baseURL ?? "" },
-        failOnStatusCode: false,
+      // Alta real en Mongo desechable: cumple el consentimiento legal y
+      // solo admite éxito verificable o el duplicado documentado del fixture.
+      await ensureSignInAccount(page.request, baseURL ?? "", {
+        email: EMAIL, password: PASSWORD, name: "Flujo E2E",
       });
       // El intento fallido es un 401 esperado del propio flujo.
       health.allowResponse(/\/api\/auth\/sign-in\/email/, 401);
