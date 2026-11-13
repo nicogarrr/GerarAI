@@ -13,6 +13,7 @@ a proposito, como cualquier guarda defensiva muerta.
 from __future__ import annotations
 
 import asyncio
+from datetime import date
 from unittest.mock import MagicMock
 
 import httpx
@@ -68,7 +69,7 @@ def test_fetch_short_volume_sin_cliente_crea_uno(monkeypatch):
             transport=httpx.MockTransport(lambda request: httpx.Response(200, text=DAILY))
         ),
     )
-    row = asyncio.run(si.fetch_short_volume("ACME", lookback_days=0))
+    row = asyncio.run(si.fetch_short_volume("ACME", date(2026, 10, 30), lookback_days=0))
     assert row is not None and row["date"] == "2026-10-30" and row["short_volume"] == 100
 
 
