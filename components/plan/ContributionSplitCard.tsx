@@ -12,8 +12,7 @@ import { splitNoteText, splitReasonText, splitSummaryText } from '@/lib/plan/spl
 export default function ContributionSplitCard({ split }: { split: ContributionSplit | null }) {
     const t = useT();
     const f = useFormat();
-    // Mismo formato que formatSplitAmount de lib/plan/contribution-split,
-    // pero ligado al locale activo.
+    // Importe + divisa ligados al locale activo.
     const formatSplitAmount = (value: number, currencyCode: string | null | undefined): string => {
         const text = f.formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         return currencyCode ? `${text} ${currencyCode}` : text;
