@@ -781,5 +781,30 @@
     "irpfScenario": "IRPF (Spanish income tax, scenario)",
     "taxDue": "Estimated tax still due",
     "netScenario": "Net (scenario)"
+  },
+  "dividendProjectionBackendText": {
+    "taxResidence": "Spanish tax residence assumed.",
+    "w8ben": "Valid W-8BEN assumed for US dividends (without a W-8BEN the rate would be 30%).",
+    "ordinaryType": "Ordinary dividend type assumed: the category is not verified (REIT, ADR, ETF, PID may be treated differently) and it is not inferred from the domicile.",
+    "withholdingRatesScenario": "Withholding rates are a scenario (AEAT Annex III: US treaty 0/15 depending on conditions), not a check of each payment.",
+    "onlySavingsIncome": "Assumed to be the only savings income of the year; the real IRPF (Spanish income tax) depends on the rest of the tax base.",
+    "savingsScale": "Savings-income scale of the 2025 tax return applied to future years (an assumption, subject to legislative change).",
+    "esWithholdingOnAccount": "The 19% Spanish (ES) withholding is a payment on account, not a foreign tax or a double-taxation relief.",
+    "canadaTreatyCeiling": "Canada (e.g. BN): the ES-CA treaty ceiling (15%) is used as the scenario; Canada withholds 25% if the broker does not apply the treaty (CRA, Part XIII), and the effective withholding is not verified.",
+    "caymanZeroScenarioNote": "Issuer in the Cayman Islands (e.g. BABA): 0% scenario = Cayman law only (20-F Item 10.E); it is NOT the broker’s effective withholding and does not cover a possible Chinese withholding (20% conditional IIT, uncertain treaty for ADSs). The conditions are shown next to the amount.",
+    "issuerVerifiedByTicker": "Issuer verified by ticker (BN: Ontario; BABA: Cayman Islands). The database domicile or the listing market do not determine the withholding.",
+    "domicileWithoutVerifiedRate": "Domiciles without a verified rate (e.g. GB: HMRC IFM28125 distinguishes categories) are shown as no data.",
+    "noData": "Data not available",
+    "noDataAllMissing": "Data not available: every position with a projected dividend this year lacks an exchange rate or a verified withholding (no data, not zero).",
+    "scenarioNotAvailableCurrency": "Tax scenario not available: the base currency is not EUR.",
+    "conditionalScenario": "Conditional scenario (see “Fiscal assumptions and sources”); not the final net.",
+    "caymanIssuerNoVerifiedRate": "Issuer incorporated in the Cayman Islands (ADSs on the NYSE; the Hong Kong headquarters is what the database shows as domicile). No verified withholding rate.",
+    "noDomicileNoVerifiedRate": "No verified domicile or issuer; withholding not verified.",
+    "caymanZeroScenarioConditions": "0% scenario = Cayman Islands law only (20-F Item 10.E): no Cayman withholding. Conditions: Alibaba does not believe it is a Chinese tax resident, but if the Chinese authorities treated it as one, 20% IIT could apply to a non-resident individual holder, with an uncertain treaty reduction for ADSs. Depositary fees are separate. Broker’s effective withholding: NOT verified.",
+    "declaredFutureExDate": "Declared with a future ex-date according to the data provider (not verified against a primary source); it does not feed the replica.",
+    "ingested": "INGESTED",
+    "subsetPrefix": "Covered subset: some positions are excluded for lacking an exchange rate or a verified withholding (no data, not zero). ",
+    "issuerInTemplate": "Issuer in {domicilio} with no verified withholding rate.",
+    "dbDomicileTemplate": "Database domicile: {domicilio}; no verified withholding rate for that country (not inferred from the market, and 0% is not assumed)."
   }
 }
