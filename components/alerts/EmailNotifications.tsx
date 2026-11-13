@@ -23,10 +23,14 @@ export default function EmailNotifications() {
     const refresh = useCallback(async () => {
         try {
             setStatus(await getEmailAlertStatus());
+            setError(null);
         } catch {
-            setStatus(null);
+            // Advertir, no ocultar: se conserva el último estado conocido y se
+            // avisa del fallo. Antes setStatus(null) dejaba el placeholder
+            // invisible para siempre, también tras guardar.
+            setError(ti('alerts.email.errorLoad'));
         }
-    }, []);
+    }, [ti]);
 
     useEffect(() => {
         queueMicrotask(() => {
@@ -50,7 +54,11 @@ export default function EmailNotifications() {
     return (
         <section data-testid="email-notifications" className="rounded-lg border border-gray-700/60 bg-surface-1 p-4 space-y-3">
             <h2 className="text-lg font-semibold text-white">{ti('alerts.email.title')}</h2>
-            {!status ? (
+            {!status && error ? (
+                <p role="alert" className="text-sm text-red-300" data-testid="email-load-error">
+                    {error}
+                </p>
+            ) : !status ? (
                 <p aria-hidden="true" className="h-5" data-testid="email-loading-space" />
             ) : !status.smtp ? (
                 <p className="text-sm text-gray-400" data-testid="email-server-off">
@@ -81,7 +89,7 @@ export default function EmailNotifications() {
                     </fieldset>
                 </>
             )}
-            {error ? (
+            {status && error ? (
                 <p role="alert" className="text-sm text-red-300">
                     {error}
                 </p>
