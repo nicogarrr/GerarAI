@@ -113,6 +113,7 @@
     "countPlural": "salidas",
     "degradedUnavailable": "El calendario de IPOs de NASDAQ no responde ahora mismo. Esto no significa que no haya salidas a bolsa.",
     "degradedPartial": "El calendario de IPOs de NASDAQ falló en alguno de los meses: la lista puede estar incompleta.",
+    "staleCopy": "Copia guardada de {months} con más de una hora: la actualización está pendiente o falló; puede faltar algún cambio reciente.",
     "upcomingTitle": "Próximas salidas",
     "pricedTitle": "Precio fijado en el periodo",
     "emptyUpcoming": "La fuente no publica próximas salidas con fecha en este periodo.",

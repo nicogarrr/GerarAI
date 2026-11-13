@@ -113,6 +113,7 @@
     "countPlural": "listings",
     "degradedUnavailable": "The NASDAQ IPO calendar is not responding right now. This does not mean there are no listings.",
     "degradedPartial": "The NASDAQ IPO calendar failed for one of the months: the list may be incomplete.",
+    "staleCopy": "Saved copy of {months} over an hour old: the update is pending or failed, so a recent change may be missing.",
     "upcomingTitle": "Upcoming listings",
     "pricedTitle": "Priced in the period",
     "emptyUpcoming": "The source does not publish upcoming listings with a date in this period.",

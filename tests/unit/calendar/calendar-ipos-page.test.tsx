@@ -70,6 +70,18 @@ describe('página de IPOs', () => {
         expect(screen.getByText(/falló en alguno de los meses/)).toBeInTheDocument();
     });
 
+    it('copia caducada: declara los meses servidos desde la copia guardada', async () => {
+        getIpoCalendar.mockResolvedValue({ ...calendarOk, stale_months: ['diciembre'] });
+        render(await IposPage());
+        expect(screen.getByText(/Copia guardada de diciembre con más de una hora/)).toBeInTheDocument();
+    });
+
+    it('sin copia caducada no pinta el aviso', async () => {
+        getIpoCalendar.mockResolvedValue({ ...calendarOk, stale_months: [] });
+        render(await IposPage());
+        expect(screen.queryByText(/Copia guardada/)).not.toBeInTheDocument();
+    });
+
     it('backend caído: pantalla de reintento, no un error en crudo', async () => {
         getIpoCalendar.mockRejectedValue(new Error('ECONNREFUSED'));
         render(await IposPage());

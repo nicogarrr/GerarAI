@@ -87,6 +87,12 @@ export default async function IposPage() {
                 </p>
             ) : null}
 
+            {calendar.stale_months?.length ? (
+                <p role="status" className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-3 text-sm text-amber-200">
+                    {ti('calendar.ipos.staleCopy', { months: calendar.stale_months.join(', ') })}
+                </p>
+            ) : null}
+
             <section className="rounded-lg border border-gray-800 bg-surface-1 p-4">
                 <h2 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-gray-200">
                     {ti('calendar.ipos.upcomingTitle')}
