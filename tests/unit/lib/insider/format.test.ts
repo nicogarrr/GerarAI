@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import {
-    insiderCodeLabel, insiderName, insiderRole, isInstitutionalInsiderName,
+    INSIDER_FORMAT_KEY_LITERALS, insiderCodeLabel, insiderName, insiderRole, isInstitutionalInsiderName,
     signalLabel, signalTooltip, sideLabel,
 } from '@/lib/insider/format';
 
@@ -150,5 +150,25 @@ describe('insiderRole: cargos compuestos observados en móvil', () => {
     it('no inventa la expansión de CLO ni de divisiones desconocidas', () => {
         expect(insiderRole('Officer, Director', 'CFO and CLO')).toBe('CFO and CLO · Director');
         expect(insiderRole('Officer', 'SVP, Government Affairs Europe')).toBe('SVP, Government Affairs Europe');
+    });
+});
+
+describe('diccionarios de formato insider', () => {
+    it('todas las claves consumidas por objeto existen y no están vacías en es y en', async () => {
+        const es = (await import('@/lib/i18n/messages/es/insider.json')).default;
+        const en = (await import('@/lib/i18n/messages/en/insider.json')).default;
+        for (const key of INSIDER_FORMAT_KEY_LITERALS) {
+            const path = key.replace(/^insider\./, '').split('.');
+            let esNode: unknown = es;
+            let enNode: unknown = en;
+            for (const part of path) {
+                esNode = (esNode as Record<string, unknown>)[part];
+                enNode = (enNode as Record<string, unknown>)[part];
+            }
+            expect(typeof esNode, `es ${key}`).toBe('string');
+            expect(typeof enNode, `en ${key}`).toBe('string');
+            expect((esNode as string).length, `es ${key}`).toBeGreaterThan(0);
+            expect((enNode as string).length, `en ${key}`).toBeGreaterThan(0);
+        }
     });
 });

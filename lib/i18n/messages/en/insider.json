@@ -156,7 +156,54 @@
     },
     "excludedFutureRows": "{count} transactions dated in the future excluded from the observed feed; they are not included in the totals.",
     "amountMinKnown": "≥ {known} as a minimum · {missing} without an amount",
-    "amountNa": "amount N/A"
+    "amountNa": "amount N/A",
+    "roleTitles": {
+      "chiefExecutive": "CEO",
+      "chiefFinancial": "CFO",
+      "chiefOperating": "COO",
+      "chiefTechnology": "CTO",
+      "chiefLegal": "Chief Legal Officer",
+      "generalCounsel": "General Counsel",
+      "chiefAccounting": "Chief Accounting Officer",
+      "chiefCommercial": "Chief Commercial Officer",
+      "chiefMedical": "Chief Medical Officer",
+      "chiefInformation": "Chief Information Officer",
+      "chiefHumanResources": "Chief Human Resources Officer",
+      "chiefStrategy": "Chief Strategy Officer",
+      "chiefInvestment": "Chief Investment Officer",
+      "chiefMarketing": "Chief Marketing Officer",
+      "chiefRevenue": "Chief Revenue Officer",
+      "chiefProduct": "Chief Product Officer",
+      "chiefRisk": "Chief Risk Officer",
+      "chiefCompliance": "Chief Compliance Officer",
+      "chiefData": "Chief Data Officer",
+      "seniorVicePresident": "Senior Vice President",
+      "executiveVicePresident": "Executive Vice President",
+      "vicePresident": "Vice President",
+      "executiveChair": "Executive Chair",
+      "chair": "Chair of the Board",
+      "president": "President",
+      "governmentAffairs": "Government Affairs",
+      "officer": "Officer",
+      "treasurer": "Treasurer",
+      "secretary": "Secretary"
+    },
+    "roleParts": {
+      "multipleInsiders": "Multiple insiders",
+      "director": "Director",
+      "owner10": "10% owner",
+      "insider": "Insider"
+    },
+    "signalLabels": {
+      "cluster_buy": "Cluster buy",
+      "c_suite_buy": "CEO/CFO buy",
+      "big_buy": "Large buy"
+    },
+    "signalTooltips": {
+      "cluster_buy": "3 or more different insiders buy within 30 days",
+      "c_suite_buy": "The CEO or CFO buys shares",
+      "big_buy": "A single purchase above $1M"
+    }
   },
   "statusCopy": {
     "reason": {
