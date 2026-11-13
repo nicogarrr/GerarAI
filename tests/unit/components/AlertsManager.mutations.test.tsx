@@ -148,7 +148,7 @@ describe('alerts manager load and mutation contracts', () => {
         expect(api.deleteAlert).not.toHaveBeenCalled();
         fireEvent.click(button);
         api.getUserAlertsResult.mockResolvedValueOnce({ ok: true, alerts: [] });
-        fireEvent.click(screen.getByRole('button', { name: 'Eliminar', exact: true }));
+        fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
         await screen.findByText('No tienes alertas configuradas');
         expect(api.deleteAlert).toHaveBeenCalledExactlyOnceWith('42');
         expect(toast.success).toHaveBeenCalledWith('Alerta eliminada');
@@ -158,7 +158,7 @@ describe('alerts manager load and mutation contracts', () => {
         const error = new Error('synthetic deletion failure');
         api.deleteAlert.mockRejectedValueOnce(error);
         fireEvent.click(await load());
-        fireEvent.click(screen.getByRole('button', { name: 'Eliminar', exact: true }));
+        fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
         await waitFor(() => expect(showErrorToast).toHaveBeenCalledWith(error, expect.objectContaining({ onRetry: expect.any(Function) })));
         expect(screen.getByRole('button', { name: /^Eliminar alerta:/ })).toBeEnabled();
         expect(toast.success).not.toHaveBeenCalled();
