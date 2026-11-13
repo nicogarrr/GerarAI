@@ -141,6 +141,9 @@ class QueueSample:
     depth: int
     ready_age_seconds: float | None  # None: cola vacia; 0: cabeza vista por primera vez
     in_flight: int = 0  # mensajes fetched-sin-ack en los sets __acks__.<worker>.<queue>
+    # True SOLO si hay evidencia de cola sin consumidor (hoy solo kpis publica
+    # un lease de consumidor por cola). False = no medido o con consumidor.
+    no_consumer: bool = False
 
 
 def _in_flight_count(client: Any, *, namespace: str, queue: str, now_ms: float) -> int:
@@ -167,6 +170,22 @@ def _in_flight_count(client: Any, *, namespace: str, queue: str, now_ms: float) 
     for worker in live:
         total += int(client.scard(f"{namespace}:__acks__.{_as_str(worker)}.{queue}"))
     return total
+
+
+def _kpi_consumer_absent(client: Any, *, namespace: str, now_ms: float) -> bool:
+    """kpis con mensajes y ningun consumidor con lease fresco.
+
+    Los heartbeats del broker son por worker, no por cola: un worker vivo de
+    otra cola no prueba consumidor. kpis publica su propio lease
+    (kpi_consumer_health.consumer_key), asi que es la unica cola donde
+    "sin consumidor" es medible. Redis fallando = no afirmar (False)."""
+    from app.workers.kpi_consumer_health import LEASE_SECONDS, consumer_key
+
+    try:
+        fresh = client.zcount(consumer_key(namespace), now_ms / 1000 - LEASE_SECONDS, "+inf")
+        return int(fresh) == 0
+    except Exception:  # noqa: BLE001 - sin medida no se afirma
+        return False
 
 
 def _as_str(raw: Any) -> str:
@@ -239,7 +258,9 @@ def sample_queues(client: Any, *, namespace: str = "dramatiq", queues: tuple[str
     for queue in queues:
         base = f"{namespace}:{queue}"
         depth = int(client.hlen(f"{base}.msgs")) + int(client.hlen(f"{base}.DQ.msgs"))
-        samples.append(QueueSample(queue=queue, depth=depth,
+        no_consumer = (queue == "kpis" and depth > 0
+                       and _kpi_consumer_absent(client, namespace=namespace, now_ms=now_ms))
+        samples.append(QueueSample(queue=queue, depth=depth, no_consumer=no_consumer,
                                    ready_age_seconds=_ready_head_age(client, base, queue, now_ms),
                                    in_flight=_in_flight_count(client, namespace=namespace,
                                                               queue=queue, now_ms=now_ms)))
@@ -297,6 +318,7 @@ def detect_stuck(samples: list[QueueSample], previous: dict[str, dict[str, float
             "ready_age_seconds": round(age, 1),
             "net_rate_per_s": round(net_rate, 4),
             "in_flight": sample.in_flight,
+            "no_consumer": sample.no_consumer,
         })
     return stuck
 
@@ -339,6 +361,14 @@ def tick_result(client: Any, *, namespace: str, queues: tuple[str, ...], now: da
 
 def _message(item: dict[str, Any]) -> tuple[str, str, str]:
     title = f"Cola {item['queue']} atascada"
+    if item.get("no_consumer"):
+        message = (
+            f"La cola {item['queue']} tiene {item['depth']} mensajes pendientes y NINGUN "
+            f"consumidor activo (sin lease de consumo reciente); el mensaje en cabeza lleva "
+            f"{item['ready_age_seconds']:.0f} s listo. Comprobar que el worker de esa cola "
+            "esta arrancado y sano (docker ps / logs)."
+        )
+        return "high", f"Cola {item['queue']} sin consumidor", message
     message = (
         f"La cola {item['queue']} no decrece: {item['depth']} mensajes pendientes, "
         f"el mensaje en cabeza lleva {item['ready_age_seconds']:.0f} s listo sin "
