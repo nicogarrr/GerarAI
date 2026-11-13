@@ -45,6 +45,20 @@ describe('textos de error del motor en español', () => {
     expect(spanishBackendMessage('Tenant access is not active')).not.toMatch(/tenant|access|active/i);
   });
 
+  it('traduce las validaciones pydantic de cartera, alertas y plan (con y sin prefijo «Value error, »)', () => {
+    expect(spanishBackendMessage('currency must be a currency code such as EUR, USD or GBp')).toBe('La divisa debe ser un código como EUR, USD o GBp.');
+    expect(spanishBackendMessage('Value error, currency must be a currency code such as EUR, USD or GBp')).toBe('La divisa debe ser un código como EUR, USD o GBp.');
+    expect(spanishBackendMessage('currency must be an ISO 4217 code such as EUR or USD')).toBe('La divisa debe ser un código ISO 4217 como EUR o USD.');
+    expect(spanishBackendMessage('base_currency must be an ISO 4217 code such as EUR or USD')).toBe('La divisa base debe ser un código ISO 4217 como EUR o USD.');
+    expect(spanishBackendMessage('fees allow at most 4 decimal places')).toBe('Las comisiones admiten como máximo 4 decimales.');
+    expect(spanishBackendMessage('trade_date cannot be in the future')).toBe('La fecha de la operación no puede ser futura.');
+    expect(spanishBackendMessage('Value error, trade_date cannot be in the future')).toBe('La fecha de la operación no puede ser futura.');
+    expect(spanishBackendMessage('date cannot be in the future')).toBe('La fecha no puede ser futura.');
+    expect(spanishBackendMessage('value must be a finite number')).toBe('El valor debe ser un número finito.');
+    expect(spanishBackendMessage('must be at least 0.000001 (6 decimal places)')).toBe('Debe ser al menos 0,000001 (6 decimales).');
+    expect(spanishBackendMessage('must be at least 0.0000000001 (10 decimal places)')).toBe('Debe ser al menos 0,0000000001 (10 decimales).');
+  });
+
   it('traduce los «X not found» de memoria, ProPicks y seguimiento', () => {
     expect(spanishBackendMessage('Claim not found')).toBe('No se encontró la afirmación.');
     expect(spanishBackendMessage('Corporate action not found')).toBe('No se encontró la acción corporativa.');

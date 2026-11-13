@@ -15,6 +15,47 @@
 // Ruta relativa con extensión .ts: este módulo se importa desde tests con node --test.
 // @ts-expect-error TS5097
 import { knownBackendMessageEn } from './backend-error-en.ts';
+// Import relativo con atributo, igual que lib/research/shorts-text.ts: los
+// textos viven en los diccionarios y aquí solo se cruzan, así el guard de
+// i18n no cuenta literales de este archivo y los techos no se tocan.
+import esErrors from '../i18n/messages/es/errors.json' with { type: 'json' };
+
+// Validaciones pydantic de cartera, alertas y plan (llegan como texto de
+// `detail` cuando la ruta hace `HTTPException(detail=str(exc))`).
+type ValidationKey = keyof typeof esErrors.backendValidation;
+
+// Uso por literal para el guard de i18n (claves consumidas por iteración,
+// igual que SHORTS_BACKEND_TEXT_KEY_LITERALS): sin estas cadenas el guard
+// las marcaría como huérfanas nuevas.
+export const BACKEND_ERROR_VALIDATION_KEY_LITERALS = [
+  'errors.backendValidation.currencyCode',
+  'errors.backendValidation.currencyIso',
+  'errors.backendValidation.baseCurrencyIso',
+  'errors.backendValidation.feesDecimals',
+  'errors.backendValidation.tradeDateFuture',
+  'errors.backendValidation.dateFuture',
+  'errors.backendValidation.finiteNumber',
+  'errors.backendValidation.min6Decimals',
+  'errors.backendValidation.min10Decimals',
+] as const;
+
+/** Mensaje exacto del motor (en minúsculas) → clave de diccionario. */
+const VALIDATION_MESSAGES: [string, ValidationKey][] = [
+  ['currency must be a currency code such as eur, usd or gbp', 'currencyCode'],
+  ['currency must be an iso 4217 code such as eur or usd', 'currencyIso'],
+  ['base_currency must be an iso 4217 code such as eur or usd', 'baseCurrencyIso'],
+  ['fees allow at most 4 decimal places', 'feesDecimals'],
+  ['trade_date cannot be in the future', 'tradeDateFuture'],
+  ['date cannot be in the future', 'dateFuture'],
+  ['value must be a finite number', 'finiteNumber'],
+  ['must be at least 0.000001 (6 decimal places)', 'min6Decimals'],
+  ['must be at least 0.0000000001 (10 decimal places)', 'min10Decimals'],
+];
+
+// Sin genéricos con ángulos ni flechas antes de EXACT: un `>` seguido más
+// abajo de un `<` crea un falso nodo JSX para el guard de i18n y le infla
+// el recuento de literales.
+const validationTexts: { [key: string]: string } = esErrors.backendValidation;
 
 const GENERIC = 'No se pudo completar la operación. Inténtalo de nuevo.';
 const ENGINE_DOWN = 'El motor de análisis no responde ahora mismo. Reintenta en unos segundos.';
@@ -49,6 +90,9 @@ const EXACT: Record<string, string> = {
   'research authentication is not configured': 'El motor de análisis no está configurado todavía. Inténtalo más tarde.',
   'tenant access is not active': 'Tu cuenta no está activa. Cierra sesión y vuelve a entrar; si sigue fallando, contacta con soporte.',
 };
+
+// Las validaciones pydantic se cruzan desde el diccionario (ver arriba).
+for (const [message, key] of VALIDATION_MESSAGES) EXACT[message] = validationTexts[key];
 
 /** Sujeto de «X not found» → español. */
 const NOT_FOUND_SUBJECT: Record<string, string> = {
@@ -107,7 +151,8 @@ function byStatus(status: number): string {
 export function spanishBackendMessage(message: string | null | undefined, fallback: string = GENERIC): string {
   const text = (message ?? '').trim();
   if (!text) return fallback;
-  const key = text.toLowerCase().replace(/[.\s]+$/, '');
+  // Pydantic antepone «Value error, » a los ValueError de validación.
+  const key = text.replace(/^Value error,\s*/i, '').toLowerCase().replace(/[.\s]+$/, '');
   if (EXACT[key]) return EXACT[key];
 
   // «404 Not Found», «500 Internal Server Error» (cuerpo sin detail).

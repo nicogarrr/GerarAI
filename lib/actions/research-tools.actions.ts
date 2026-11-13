@@ -387,7 +387,7 @@ export async function createKnowledgeCollection(formData: FormData) {
 export async function uploadKnowledgeDocument(formData: FormData) {
   const file = formData.get('file');
   if (!(file instanceof File) || file.size === 0) {
-    throw new ValidationError('Choose a non-empty document', 'file');
+    throw new ValidationError('Selecciona un documento no vacío', 'file');
   }
   for (const key of ['collection_id', 'author', 'source_url', 'publication_date', 'ticker']) {
     if (!String(formData.get(key) ?? '').trim()) formData.delete(key);
@@ -532,11 +532,11 @@ function criteriaFromForm(formData: FormData): ScreenCriterion[] {
     const left = String(formData.get(`left${suffix}`) ?? '').trim();
     const right = String(formData.get(`right${suffix}`) ?? '').trim();
     if (!left && !right) continue;
-    if (!left || !right) throw new ValidationError('Both sides of each criterion are required', `left${suffix}`);
+    if (!left || !right) throw new ValidationError('Completa el valor izquierdo y el derecho de cada criterio', `left${suffix}`);
     const operator = String(formData.get(`operator${suffix}`) ?? '>=') as ScreenCriterion['operator'];
     criteria.push({ left, operator, right });
   }
-  if (!criteria.length) throw new ValidationError('Add at least one criterion', 'left');
+  if (!criteria.length) throw new ValidationError('Añade al menos un criterio', 'left');
   return criteria;
 }
 

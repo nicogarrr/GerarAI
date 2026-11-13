@@ -76,7 +76,7 @@ function toAlert(alert: ResearchAlertRule): Alert {
 export async function createAlert(input: CreateAlertInput): Promise<Alert> {
     const symbol = input.symbol.trim().toUpperCase();
     if (!/^[A-Z0-9.\-]{1,20}$/.test(symbol)) {
-        throw new ValidationError('A valid ticker is required', 'symbol');
+        throw new ValidationError('Introduce un ticker válido', 'symbol');
     }
     if (input.type === 'price_above' || input.type === 'price_below') {
         const threshold = Number(input.condition.value);
@@ -129,7 +129,7 @@ export async function createAlertResult(input: CreateAlertInput): Promise<Create
         if (isNextRedirectError(error)) throw error;
         if (error instanceof AppError) {
             if (error.code === 'VALIDATION_ERROR') {
-                return { ok: false, cause: 'validation', message: error.message };
+                return { ok: false, cause: 'validation', message: await backendMessageForRequest(error.message) };
             }
             if (error.code === 'RESEARCH_API_ERROR' && error.statusCode === 409) {
                 return { ok: false, cause: 'duplicate', message: await backendMessageForRequest('Ya tienes esta alerta configurada.') };
@@ -221,7 +221,7 @@ export async function getUserAlertsResult(): Promise<UserAlertsResult> {
 }
 
 export async function deleteAlert(alertId: string): Promise<void> {
-    if (!/^\d+$/.test(alertId)) throw new ValidationError('Invalid alert id', 'alertId');
+    if (!/^\d+$/.test(alertId)) throw new ValidationError('Alerta no válida', 'alertId');
     await researchRequest(`/api/alerts/rules/${alertId}`, {
         method: 'DELETE',
     });
