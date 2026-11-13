@@ -62,6 +62,7 @@ export default function PushNotifications() {
     const [support, setSupport] = useState<Support>('checking');
     const [status, setStatus] = useState<PushStatus | null>(null);
     const [statusLoading, setStatusLoading] = useState(true);
+    const [loadFailed, setLoadFailed] = useState(false);
     const [thisDevice, setThisDevice] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -69,8 +70,11 @@ export default function PushNotifications() {
     const refresh = useCallback(async () => {
         try {
             setStatus(await getPushStatus());
+            setLoadFailed(false);
         } catch {
-            setStatus(null);
+            // No confundir una lectura fallida con preferencias vacías o un
+            // servidor sin configurar. Conservamos el último estado leído.
+            setLoadFailed(true);
         } finally {
             setStatusLoading(false);
         }
@@ -87,6 +91,15 @@ export default function PushNotifications() {
             void refresh();
         });
     }, [refresh]);
+
+    async function retryStatus() {
+        setBusy(true);
+        try {
+            await refresh();
+        } finally {
+            setBusy(false);
+        }
+    }
 
     async function enableDevice() {
         if (!status?.public_key) return;
@@ -182,13 +195,13 @@ export default function PushNotifications() {
                     <p className="text-sm text-gray-400">
                         {ti('alerts.push.intro')}
                     </p>
-                    <Button type="button" onClick={enableDevice} disabled={busy || !serverReady}>
+                    <Button type="button" onClick={enableDevice} disabled={busy || loadFailed || !serverReady}>
                         {ti('alerts.push.enable')}
                     </Button>
                 </>
             ) : (
                 <>
-                    <fieldset className="space-y-2" disabled={busy}>
+                    <fieldset className="space-y-2" disabled={busy || loadFailed}>
                         <legend className="sr-only">{ti('alerts.push.legend')}</legend>
                         {(status?.preferences ?? []).map((pref) => (
                             <label key={pref.event_type} className="flex min-h-11 items-center gap-3 text-sm text-gray-200">
@@ -202,11 +215,19 @@ export default function PushNotifications() {
                             </label>
                         ))}
                     </fieldset>
-                    <Button type="button" variant="outline" onClick={disableDevice} disabled={busy}>
+                    <Button type="button" variant="outline" onClick={disableDevice} disabled={busy || loadFailed}>
                         {ti('alerts.push.disable')}
                     </Button>
                 </>
             )}
+            {loadFailed ? (
+                <div className="space-y-2">
+                    <p role="alert" className="text-sm text-red-300">{ti('alerts.push.errorLoad')}</p>
+                    <Button type="button" variant="outline" className="min-h-11" onClick={() => void retryStatus()} disabled={busy}>
+                        {ti('alerts.push.retryLoad')}
+                    </Button>
+                </div>
+            ) : null}
             {error ? (
                 <p role="alert" className="text-sm text-red-300">
                     {error}
