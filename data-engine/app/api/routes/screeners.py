@@ -6,7 +6,7 @@ from typing import Annotated, Any, Literal, Protocol
 from zoneinfo import ZoneInfo
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -868,7 +868,7 @@ def active_vendor_allows_cold_wait(vendor: str, settings) -> bool:
 def real_time_screener(
     marketCapMoreThan: float | None = None,
     sector: str | None = None,
-    limit: int = 25,
+    limit: Annotated[int, Query(ge=1, le=200)] = 25,
     db: Session = Depends(get_db),
 ) -> dict:
     """Screener real con cache por parámetros y stale-while-revalidate.
