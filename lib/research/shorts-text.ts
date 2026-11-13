@@ -9,6 +9,8 @@ import type { Locale } from '@/lib/i18n/locale';
 const SHORTS_EN: Record<string, string> = {
   'Fecha FINRA ausente, inválida o futura: no se puede verificar la vigencia del dato guardado.':
     'Missing, invalid or future FINRA date: the freshness of the stored figure cannot be verified.',
+  'Fecha de consulta ausente o futura: no se puede verificar la antigüedad del dato guardado.':
+    'Missing or future lookup date: the age of the stored figure cannot be verified.',
   'No hay mapeo revisado para esta bolsa o empresa.': 'There is no reviewed mapping for this exchange or company.',
   'La fuente no devolvió datos verificables; el dato anterior conserva su fecha.':
     'The source returned no verifiable data; the previous figure keeps its date.',
