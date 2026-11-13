@@ -264,8 +264,16 @@ def build_feed(
     buys = [t for t in form4 if t["type"] == "P"]
     sells = [t for t in form4 if t["type"] == "S"]
 
-    def _sum(items: list[dict]) -> float:
-        return sum(float(t["value"]) for t in items if t.get("value") is not None)
+    def _amounts(items: list[dict], prefix: str) -> dict[str, float | int | None]:
+        known = sum(float(t["value"]) for t in items if t.get("value") is not None)
+        missing = sum(t.get("value") is None for t in items)
+        # Un subtotal no se publica como total. Se conserva para auditoria,
+        # y la UI ya representa los importes desconocidos con un guion.
+        return {
+            f"{prefix}_value": None if missing else known,
+            f"{prefix}_known_value": known,
+            f"{prefix}_value_missing": missing,
+        }
 
     total_filings = (
         db.scalar(
@@ -291,9 +299,9 @@ def build_feed(
         "excluded_future_rows": len(future_rows),
         "totals": {
             "buy_count": len(buys),
-            "buy_value": _sum(buys),
+            **_amounts(buys, "buy"),
             "sell_count": len(sells),
-            "sell_value": _sum(sells),
+            **_amounts(sells, "sell"),
             "filings_total": total_filings,
             "filings_with_transactions": with_data,
             "filings_pending": max(0, total_filings - with_data),
