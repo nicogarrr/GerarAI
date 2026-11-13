@@ -43,6 +43,10 @@ def finnhub_test_clock(monkeypatch):
         def __init__(self):
             self.waits = []
 
+        async def sleep_async(self, seconds):
+            # Async Finnhub pacing must advance the same monotonic clock.
+            self.sleep(seconds)
+
         def monotonic(self):
             return self.now
 
@@ -57,6 +61,7 @@ def finnhub_test_clock(monkeypatch):
         redis_client_factory=lambda: None,
         monotonic=clock.monotonic,
         sleep=clock.sleep,
+        sleep_async=clock.sleep_async,
     ))
     return clock
 
