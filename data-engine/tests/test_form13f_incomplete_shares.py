@@ -6,7 +6,7 @@ from app.services.connectors.form13f import aggregate_rows
 
 def _row(shares):
     return {'cusip': '037833100', 'title_of_class': 'COM', 'ssh_prnamt': shares,
-            'value_usd_thousands': '100', 'voting_sole': '50'}
+            'value_usd_thousands': '100', 'voting_sole': '50', 'ssh_prnamt_type': 'SH'}
 
 
 @pytest.mark.parametrize('missing', [None, '', 'bad', 'NaN', 'Infinity', '-1', 'True'])
