@@ -109,4 +109,15 @@ describe('InsiderOperationsView', () => {
         expect(screen.getAllByText(/ops/).length).toBeGreaterThan(0);
         expect(screen.getAllByText(/última/).length).toBeGreaterThan(0);
     });
+
+
+    it('declara las operaciones futuras excluidas del agregado', () => {
+        render(<InsiderOperationsView result={ok([company()], { excluded_future_rows: 3 })} days={365} />);
+        expect(screen.getByRole('status')).toHaveTextContent('3 operaciones con fecha futura excluidas del agregado del periodo; no entran en las cifras.');
+    });
+
+    it('sin exclusiones no pinta aviso', () => {
+        render(<InsiderOperationsView result={ok([company()])} days={365} />);
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
 });

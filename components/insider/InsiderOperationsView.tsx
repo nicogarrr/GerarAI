@@ -193,6 +193,11 @@ export default function InsiderOperationsView({ result, days }: { result: Inside
                     <p className="pb-2 leading-5">{t('insider.operations.coverageBody')}</p>
                 </details>
             </div>
+            {result.excluded_future_rows ? (
+                <p role="status" className="text-xs text-amber-300">
+                    {t('insider.operations.excludedFutureRows', { count: f.formatNumber(result.excluded_future_rows, { maximumFractionDigits: 0 }) })}
+                </p>
+            ) : null}
             {result.companies.length === 0 ? (
                 <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-center text-sm text-gray-400">
                     {t('insider.operations.empty', { days: daysText })}

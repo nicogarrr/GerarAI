@@ -109,4 +109,15 @@ describe('InsiderFeed', () => {
         expect(screen.getByRole('link', { name: 'SEDI' })).toHaveAttribute('href', 'https://www.sedi.ca');
         expect(screen.getAllByRole('link', { name: /12\.500/ })).toHaveLength(2);
     });
+
+
+    it('declara las operaciones futuras excluidas del feed', () => {
+        render(<InsiderFeed feed={feed({ excluded_future_rows: 2 })} side="all" days={90} />);
+        expect(screen.getByRole('status')).toHaveTextContent('2 operaciones con fecha futura excluidas del feed observado; no entran en los totales.');
+    });
+
+    it('sin exclusiones no pinta aviso', () => {
+        render(<InsiderFeed feed={feed({ excluded_future_rows: 0 })} side="all" days={90} />);
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
 });
