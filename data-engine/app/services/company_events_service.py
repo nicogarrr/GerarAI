@@ -335,6 +335,14 @@ class CompanyEventsService:
                     for entry in filings:
                         entry["source"] = "SEC EDGAR (efts.sec.gov)"
                     note = payload.get("_fallback_note") or partial_source
+                excluded_dates = self._unverifiable_filing_dates(payload)
+                if excluded_dates:
+                    sec_status = "partial"
+                    date_notice = (
+                        f"Se han omitido {len(excluded_dates)} filings con fecha de presentación "
+                        "ausente, inválida o futura; el índice mostrado es parcial."
+                    )
+                    note = f"{note} {date_notice}" if note else date_notice
             elif timed_out:
                 note = "SEC EDGAR no respondió a tiempo; se listan los documentos ya importados."
             else:
@@ -364,6 +372,17 @@ class CompanyEventsService:
         values = recent.get(name) or []
         return values[index] if index < len(values) else None
 
+    def _unverifiable_filing_dates(self, payload: dict[str, Any]) -> set[int]:
+        recent = (payload.get("filings") or {}).get("recent") or {}
+        today = _utcnow().date()
+        allowed = {form.upper() for form in FILING_FORMS}
+        return {
+            index for index, _ in enumerate(recent.get("accessionNumber") or [])
+            if str(self._column(recent, "form", index)).upper() in allowed
+            and ((day := self._parse_day(self._column(recent, "filingDate", index))) is None
+                 or day > today)
+        }
+
     def _map_submissions(
         self, cik: str, payload: dict[str, Any], ticker: str, limit: int
     ) -> list[dict[str, Any]]:
@@ -371,7 +390,10 @@ class CompanyEventsService:
         accessions = recent.get("accessionNumber") or []
         allowed = {form.upper() for form in FILING_FORMS}
         items: list[dict[str, Any]] = []
+        excluded_dates = self._unverifiable_filing_dates(payload)
         for index, accession in enumerate(accessions):
+            if index in excluded_dates:
+                continue
             form = self._column(recent, "form", index)
             if not form or str(form).upper() not in allowed:
                 continue
