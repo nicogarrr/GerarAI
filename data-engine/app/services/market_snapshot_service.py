@@ -101,8 +101,13 @@ def build_snapshot(db: Session, as_of: date, generated_at: datetime | None = Non
 
 
 def latest_snapshot(db: Session) -> dict:
+    now = datetime.now(UTC)
     snapshot = db.scalar(
         select(MarketRegimeSnapshot)
+        .where(
+            MarketRegimeSnapshot.snapshot_date <= now.date(),
+            MarketRegimeSnapshot.generated_at <= now,
+        )
         .order_by(
             desc(MarketRegimeSnapshot.snapshot_date),
             desc(MarketRegimeSnapshot.id),
