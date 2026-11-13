@@ -331,6 +331,15 @@ def _fact_tenant_clause(tenant: int | None):
 _SPENDER_METRICS = ("capital_expenditure", "finance_lease_additions")
 
 
+def _observed_quarter(fact: FinancialFact) -> bool:
+    try:
+        end, quarter = fact.period.rsplit(":", 1)
+        period_end = date.fromisoformat(end)
+    except (AttributeError, ValueError):
+        return False
+    return quarter in {"Q1", "Q2", "Q3", "Q4"} and period_end <= date.today()
+
+
 def _latest_quarterly_facts_batch(
     db: Session, company_ids: list[int], tenant: int | None
 ) -> dict[tuple[int, str], FinancialFact]:
@@ -361,7 +370,8 @@ def _latest_quarterly_facts_batch(
     ).all()
     latest: dict[tuple[int, str], FinancialFact] = {}
     for row in rows:
-        latest.setdefault((row.company_id, row.metric), row)
+        if _observed_quarter(row):
+            latest.setdefault((row.company_id, row.metric), row)
     return latest
 
 
@@ -387,7 +397,7 @@ def _latest_quarterly_fact(
             FinancialFact.id.desc(),
         )
     ).all()
-    return rows[0] if rows else None
+    return next((row for row in rows if _observed_quarter(row)), None)
 
 
 def period_label(fact: FinancialFact) -> str:
