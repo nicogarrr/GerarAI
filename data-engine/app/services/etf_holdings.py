@@ -66,7 +66,9 @@ def parse_procure(text: str) -> tuple[date | None, list[tuple[str, Decimal]]]:
             continue
         if not _TICKER.match(ticker) or weight is None:
             continue
-        as_of = max(as_of, day) if as_of else day
+        if as_of is not None and as_of != day:
+            raise ValueError("ETF mixed snapshot dates")
+        as_of = day
         rows.append((ticker, weight))
     return as_of, rows
 
@@ -88,7 +90,9 @@ def parse_tema(text: str) -> tuple[date | None, list[tuple[str, Decimal]]]:
             day = datetime.strptime((rec.get("holdings_date") or "").strip(), "%Y-%m-%d").date()
         except ValueError:
             continue
-        as_of = max(as_of, day) if as_of else day
+        if as_of is not None and as_of != day:
+            raise ValueError("ETF mixed snapshot dates")
+        as_of = day
         rows.append((ticker, weight))
     return as_of, rows
 
