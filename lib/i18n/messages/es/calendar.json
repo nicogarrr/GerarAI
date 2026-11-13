@@ -33,6 +33,7 @@
     "countPlural": "eventos",
     "degradedUnavailable": "El calendario público de NASDAQ no responde: no se pueden mostrar resultados ni dividendos. Esto no significa que no haya eventos.",
     "degradedPartial": "El calendario público de NASDAQ falló para algunos días: la lista puede estar incompleta.",
+    "staleCopy": "Copia guardada de {days} con más de una hora: la actualización está pendiente o falló; puede faltar algún cambio reciente.",
     "emptyNoFollow1": "No tienes posiciones abiertas ni watchlist, así que no hay catalizadores que seguir.",
     "emptyNoFollow2": "Sigue una empresa o registra una compra y aquí verás sus resultados y dividendos.",
     "addWatchlist": "Añadir a la watchlist",

@@ -26,6 +26,9 @@ export type CatalystCalendar = {
     count: number;
     events: CatalystEvent[];
     errors: string[];
+    // Días servidos desde copia guardada (>1 h, actualización pendiente o
+    // fallida): la página lo declara, nunca lo disimula.
+    stale_days?: string[];
 };
 
 /** GET /api/calendar/catalysts — catalizadores de posiciones y watchlist (14 días por defecto). */
