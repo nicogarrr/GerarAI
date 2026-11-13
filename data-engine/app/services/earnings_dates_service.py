@@ -135,7 +135,10 @@ def fetch_yahoo_dates(symbols: dict[str, str]) -> dict[str, dict[str, Any]]:
                     raw = min(int(item["raw"]) for item in dates if item.get("raw"))
                     result[ticker] = {
                         "date": datetime.fromtimestamp(raw, ZoneInfo(zone)).date(),
-                        "estimate": bool(earnings.get("isEarningsDateEstimate")),
+                        "estimate": (
+                            earnings.get("isEarningsDateEstimate")
+                            if isinstance(earnings.get("isEarningsDateEstimate"), bool) else None
+                        ),
                     }
             except Exception as exc:  # noqa: BLE001
                 logger.info("earnings_dates yahoo %s: %s", symbol, exc)
@@ -183,10 +186,12 @@ def fetch_nasdaq_dates(tickers: set[str], today: date) -> dict[str, dict[str, An
 
 def merge_candidate(yahoo: dict | None, nasdaq: dict | None) -> dict[str, Any] | None:
     """Una fila por ticker segun las reglas del modulo; None si ninguna fuente tiene fecha."""
+    estimate = yahoo.get("estimate") if yahoo else None
+    confirmed = not estimate if isinstance(estimate, bool) else None
     if yahoo and nasdaq and yahoo["date"] == nasdaq["date"]:
         return {
             "date": yahoo["date"], "session": nasdaq["session"], "fiscal": nasdaq["fiscal"],
-            "confirmed": not yahoo["estimate"], "source": "nasdaq+yahoo",
+            "confirmed": confirmed, "source": "nasdaq+yahoo",
             "label": f"{SOURCE_NASDAQ_LABEL} + {SOURCE_YAHOO_LABEL}",
         }
     if yahoo:
@@ -199,7 +204,7 @@ def merge_candidate(yahoo: dict | None, nasdaq: dict | None) -> dict[str, Any] |
         disagreed = nasdaq is not None and nasdaq["date"] != yahoo["date"]
         return {
             "date": yahoo["date"], "session": None, "fiscal": None,
-            "confirmed": False if disagreed else not yahoo["estimate"],
+            "confirmed": False if disagreed else confirmed,
             "source": "yahoo",
             "label": (
                 f"{SOURCE_YAHOO_LABEL} (NASDAQ publica otra fecha: sin confirmar)"
