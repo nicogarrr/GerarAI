@@ -168,7 +168,7 @@ def test_finnhub_con_redis_caido_mantiene_pacing_local(monkeypatch):
     reloj = [1000.0]
     esperas: list[float] = []
 
-    def fake_sleep(seconds):
+    async def fake_sleep(seconds):
         esperas.append(seconds)
         reloj[0] += seconds
 
@@ -178,7 +178,7 @@ def test_finnhub_con_redis_caido_mantiene_pacing_local(monkeypatch):
     monkeypatch.setattr(pacer, "_local_next", 0.0)
     monkeypatch.setattr(pacer, "_local_blocked_until", 0.0)
     monkeypatch.setattr(pacer, "_monotonic", lambda: reloj[0])
-    monkeypatch.setattr(pacer, "_sleep", fake_sleep)
+    monkeypatch.setattr(pacer, "_sleep_async", fake_sleep)
     monkeypatch.setattr(pacer, "_factory", lambda: None)  # Redis caido
 
     async def dos_llamadas():
