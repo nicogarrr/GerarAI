@@ -45,7 +45,8 @@
       "closed": "closed",
       "increased": "increased",
       "decreased": "decreased",
-      "unchanged": "unchanged"
+      "unchanged": "unchanged",
+      "unknown": "incomplete comparison"
     },
     "noMoves": "No moves between the two latest reports.",
     "changesUnavailable": "Quarterly changes not available yet",

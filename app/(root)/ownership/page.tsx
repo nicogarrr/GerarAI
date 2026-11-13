@@ -26,7 +26,7 @@ import SyncButton from './SyncButton';
 import { MostBought } from './_components/MostBought';
 import { Overlap } from './_components/Overlap';
 import { holdingsVerificationNote, ownershipManagerName } from '@/lib/ownership-display';
-import { ownershipLimitations } from '@/lib/research/ownership-display';
+import { ownershipLimitations, ownershipNote } from '@/lib/research/ownership-display';
 
 const CHANGE_LABELS = {
     new: 'ownership.page.change.new',
@@ -34,6 +34,7 @@ const CHANGE_LABELS = {
     increased: 'ownership.page.change.increased',
     decreased: 'ownership.page.change.decreased',
     unchanged: 'ownership.page.change.unchanged',
+    unknown: 'ownership.page.change.unknown',
 } as const satisfies Record<string, TranslationKey>;
 const isChangeKey = (value: string): value is keyof typeof CHANGE_LABELS => Object.hasOwn(CHANGE_LABELS, value);
 
@@ -126,6 +127,8 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
         holdings = holdingsRead.value;
         changes = changesRead.value;
     }
+
+    const allLimitations = [...new Set([...limitations, ...(changes?.limitations ?? [])])];
 
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-6 overflow-x-clip">
@@ -273,7 +276,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                 <span className="ml-2 text-xs font-normal text-gray-500">{t('ownership.page.changesLag')}</span>
                             </h2>
                             <Badge className="md:ml-auto" variant="outline">
-                                {t('ownership.page.moves', { n: fmt.formatNumber(changes.changes.filter((c) => c.change !== 'unchanged').length, { maximumFractionDigits: 0 }) })}
+                                {t('ownership.page.moves', { n: fmt.formatNumber(changes.changes.filter((c) => c.change !== 'unchanged' && c.change !== 'unknown').length, { maximumFractionDigits: 0 }) })}
                             </Badge>
                         </div>
                         <p className="mt-2 text-xs text-gray-500">{changes.compared_accessions?.rule}</p>
@@ -282,6 +285,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                 <article aria-label={row.name_of_issuer ?? NA} className="min-w-0 rounded-lg border border-gray-800 p-3 [overflow-wrap:anywhere]" key={`${row.cusip}-${row.title_of_class}-${row.put_call ?? ''}`}>
                                     <h3 className="text-sm font-medium text-gray-200">{row.name_of_issuer ?? NA}</h3>
                                     <Badge className="mt-2" variant="outline">{isChangeKey(row.change) ? t(CHANGE_LABELS[row.change]) : row.change}</Badge>
+                                    {row.notice ? <p className="mt-2 text-xs text-amber-400/90">{ownershipNote(row.notice, fmt.locale)}</p> : null}
                                     <dl className="mt-3 space-y-2 text-sm">
                                         <div><dt className="text-xs text-gray-400">CUSIP</dt><dd className="font-mono text-gray-200">{row.cusip ?? NA}</dd></div>
                                         <div><dt className="text-xs text-gray-400">{t('ownership.page.col.sharesBefore')}</dt><dd className="tabular-nums text-gray-200">{formatShares(row.shares_previous, fmt)}</dd></div>
@@ -313,6 +317,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                             <td className="py-3 font-mono text-xs text-gray-400">{row.cusip ?? NA}</td>
                                             <td className="py-3">
                                                 <Badge variant="outline">{isChangeKey(row.change) ? t(CHANGE_LABELS[row.change]) : row.change}</Badge>
+                                                {row.notice ? <p className="mt-1 text-xs text-amber-400/90">{ownershipNote(row.notice, fmt.locale)}</p> : null}
                                             </td>
                                             <td className="py-3 text-right text-gray-400">{formatShares(row.shares_previous, fmt)}</td>
                                             <td className="py-3 text-right text-gray-200">{formatShares(row.shares_latest, fmt)}</td>
@@ -338,13 +343,13 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                     </section>
                 )
             ) : null}
-            {limitations.length ? (
+            {allLimitations.length ? (
                 <details className="rounded-lg border border-gray-800 bg-surface-1 px-4 py-3 text-sm text-gray-500">
                     <summary className="min-h-11 cursor-pointer select-none py-3 text-xs font-medium text-gray-400 hover:text-gray-300">
                         {t('ownership.page.limits')}
                     </summary>
                     <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5">
-                        {limitations.map((item) => <li key={item}>{ownershipLimitations(item, fmt.locale, NA)}</li>)}
+                        {allLimitations.map((item) => <li key={item}>{ownershipLimitations(item, fmt.locale, NA)}</li>)}
                     </ul>
                 </details>
             ) : null}

@@ -17,6 +17,10 @@ const LIMITATION_LABELS: Record<string, string> = {
  *  diferencias entre 13F, códigos del Form 4, posiciones curadas) y el aviso de
  *  los gestores sin 13F. Con inglés se traducen; un texto nuevo sale tal cual. */
 export const OWNERSHIP_TEXT_EN: Record<string, string> = {
+    'Comparación incompleta: faltan acciones válidas en uno o ambos periodos; no se infiere una compra, venta ni posición sin cambios.':
+        'Incomplete comparison: valid share counts are missing in one or both periods; no purchase, sale or unchanged position is inferred.',
+    'Comparación incompleta en algunas posiciones: consulta el aviso de cada fila.':
+        'Incomplete comparison for some positions: see each row notice.',
     'Opción (put/call): importe nocional, no posición en acciones.': 'Option (put/call): notional amount, not a share position.',
     'Diferencia entre dos 13F trimestrales (fecha = cierre del trimestre, no del trade).':
         'Difference between two quarterly 13Fs (date = quarter end, not the trade date).',

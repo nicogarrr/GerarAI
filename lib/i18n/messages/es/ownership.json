@@ -45,7 +45,8 @@
       "closed": "cerrada",
       "increased": "aumentada",
       "decreased": "reducida",
-      "unchanged": "sin cambios"
+      "unchanged": "sin cambios",
+      "unknown": "comparación incompleta"
     },
     "noMoves": "Sin movimientos entre los dos últimos informes.",
     "changesUnavailable": "Cambios trimestrales no disponibles todavía",
