@@ -1099,6 +1099,9 @@ class MostBoughtItemOut(BaseModel):
     new_count: int
     sellers_count: int
     value_usd: float | None = None
+    known_value_usd: float = 0
+    missing_value_count: int = 0
+    notice: str | None = None
     buyers: list[MostBoughtBuyerOut]
 
 
