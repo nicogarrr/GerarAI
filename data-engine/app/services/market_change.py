@@ -7,6 +7,7 @@ distintas (cotizacion en vivo vs cierres de BD)."""
 from __future__ import annotations
 
 from collections.abc import Collection
+from datetime import date
 from types import SimpleNamespace
 
 from sqlalchemy import and_, func, select
@@ -33,7 +34,7 @@ def common_sessions(db: Session) -> tuple:
     de fin de semana o de un solo ticker tampoco define la sesion."""
     rows = db.execute(
         select(MarketPrice.date, func.count(func.distinct(MarketPrice.company_id)))
-        .where(MarketPrice.source.in_(OFFICIAL_CLOSE_SOURCES))
+        .where(MarketPrice.source.in_(OFFICIAL_CLOSE_SOURCES), MarketPrice.date <= date.today())
         .group_by(MarketPrice.date)
         .order_by(MarketPrice.date.desc())
         .limit(30)
@@ -71,7 +72,8 @@ def compute_session_changes(
     # Coste acotado por índice (uq company_id+date): un max() por compañía en
     # cada CTE y una lectura por clave; nunca un row_number sobre toda la
     # historia.
-    official = MarketPrice.source.in_(OFFICIAL_CLOSE_SOURCES)
+    today = date.today()
+    official = and_(MarketPrice.source.in_(OFFICIAL_CLOSE_SOURCES), MarketPrice.date <= today)
     # Cada fecha se busca con un MAX correlacionado por compañía (una bajada
     # del índice único company_id+date) en vez de agrupar TODOS los cierres
     # oficiales del universo: 385 ms → 7,5 ms con 500 compañías y 5 años en
@@ -99,6 +101,7 @@ def compute_session_changes(
             .where(
                 last_close.company_id == Company.id,
                 last_close.source.in_(OFFICIAL_CLOSE_SOURCES),
+                last_close.date <= today,
             )
             .correlate(Company)
             .scalar_subquery()
@@ -271,7 +274,8 @@ def ticker_close_change(db: Session, company_id: int) -> dict | None:
         return None
     rows = db.execute(
         select(MarketPrice.date, MarketPrice.close, MarketPrice.quote_currency)
-        .where(MarketPrice.company_id == company_id, MarketPrice.source.in_(OFFICIAL_CLOSE_SOURCES))
+        .where(MarketPrice.company_id == company_id, MarketPrice.source.in_(OFFICIAL_CLOSE_SOURCES),
+               MarketPrice.date <= date.today())
         .order_by(MarketPrice.date.desc())
         .limit(2)
     ).all()
