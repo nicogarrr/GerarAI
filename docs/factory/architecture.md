@@ -554,7 +554,7 @@ Todas las entidades que heredan `TenantOwnedMixin` tienen `tenant_id FK → tena
 | Contenedor | Imagen | CPU límite | Memoria límite | Puertos |
 |---|---|---|---|---|
 | `cavaai-caddy` | caddy:2-alpine | 0.10 | 64 MB | 80, 443 (BIND_IP) |
-| `cavaai-postgres` | postgres:17 | 0.75 | 896 MB | interno |
+| `cavaai-postgres` | postgres:17 | 2.00 | 896 MB | interno |
 | `cavaai-redis` | redis:7-alpine | 0.25 | 896 MB | interno |
 | `cavaai-qdrant` | qdrant/qdrant:v1.19.2 | 0.50 | 768 MB | 127.0.0.1:6333 |
 | `cavaai-minio` | cavaai-minio (local) | 0.25 | 256 MB | interno |
