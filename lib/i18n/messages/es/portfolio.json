@@ -781,5 +781,30 @@
     "irpfScenario": "IRPF (escenario)",
     "taxDue": "Cuota pendiente estimada",
     "netScenario": "Neto (escenario)"
+  },
+  "dividendProjectionBackendText": {
+    "taxResidence": "Residencia fiscal en España asumida.",
+    "w8ben": "W-8BEN vigente asumido para dividendos US (sin W-8BEN el tipo sería 30 %).",
+    "ordinaryType": "Tipo de dividendo ordinario asumido: no se verifica la categoría (REIT, ADR, ETF, PID pueden tener tratamiento distinto) y no se deduce del domicilio.",
+    "withholdingRatesScenario": "Los tipos de retención son escenario (Anexo III AEAT: convenio US 0/15 según condiciones), no verificación particular de cada pago.",
+    "onlySavingsIncome": "Única renta del ahorro del año asumida; el IRPF real depende del resto de la base.",
+    "savingsScale": "Escala del ahorro de la Renta 2025 aplicada a años futuros (hipótesis, sujeta a cambio legislativo).",
+    "esWithholdingOnAccount": "La retención ES del 19 % es pago a cuenta, no impuesto extranjero ni deducción por doble imposición.",
+    "canadaTreatyCeiling": "Canadá (p. ej. BN): se usa el techo del convenio ES-CA (15 %) como escenario; Canadá retiene 25 % si el broker no aplica el convenio (CRA, Part XIII), y la retención efectiva no está verificada.",
+    "caymanZeroScenarioNote": "Emisor en Islas Caimán (p. ej. BABA): escenario 0 % = solo ley de Caimán (20-F Item 10.E); NO es la retención efectiva del broker y no cubre una posible retención china (20 % IIT condicional, convenio incierto para ADS). Las condiciones se muestran junto al importe.",
+    "issuerVerifiedByTicker": "Emisor verificado por ticker (BN: Ontario; BABA: Islas Caimán). Domicilio de la base de datos o mercado de cotización no determinan la retención.",
+    "domicileWithoutVerifiedRate": "Domicilios sin tipo verificado (p.ej. GB: HMRC IFM28125 distingue categorías) salen como sin datos.",
+    "noData": "Sin datos",
+    "noDataAllMissing": "Sin datos: todas las posiciones con dividendo proyectado este año carecen de tipo de cambio o de retención verificada (N/D, no cero).",
+    "scenarioNotAvailableCurrency": "Escenario fiscal no disponible: la divisa base no es EUR.",
+    "conditionalScenario": "Escenario condicionado (ver «Supuestos fiscales y fuentes»); no es el neto final.",
+    "caymanIssuerNoVerifiedRate": "Emisor constituido en Islas Caimán (ADS en NYSE; la sede en Hong Kong es la que figura como domicilio en la base de datos). Sin tipo de retención verificado.",
+    "noDomicileNoVerifiedRate": "Sin domicilio ni emisor verificado; retención no verificada.",
+    "caymanZeroScenarioConditions": "Escenario 0 % = solo ley de Islas Caimán (20-F Item 10.E): sin retención en Caimán. Condiciones: Alibaba no cree ser residente fiscal en China, pero si las autoridades chinas la trataran como tal podría aplicarse 20 % de IIT a un tenedor persona física no residente, con reducción por convenio incierta para ADS. Comisiones del depositario aparte. Retención efectiva del broker: NO verificada.",
+    "declaredFutureExDate": "Declarado con ex_date futura según el proveedor de datos (no verificado contra fuente primaria); no alimenta la réplica.",
+    "ingested": "INGESTADO",
+    "subsetPrefix": "Subconjunto cubierto: hay posiciones excluidas sin tipo de cambio o sin retención verificada (sin datos, no cero). ",
+    "issuerInTemplate": "Emisor en {domicilio} sin tipo de retención verificado.",
+    "dbDomicileTemplate": "Domicilio en base de datos: {domicilio}; sin tipo de retención verificado para ese país (no se deduce del mercado ni se asume 0 %)."
   }
 }

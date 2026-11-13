@@ -102,7 +102,6 @@
   "lib/paper-trading/messages-en.ts": 49,
   "lib/paper-trading/options.ts": 20,
   "lib/plan/split-text.ts": 8,
-  "lib/portfolio-dividends-text.ts": 27,
   "lib/portfolio/holding-signals.ts": 8,
   "lib/portfolio/image-import.ts": 2,
   "lib/portfolio/import-identity-warning.ts": 1,
