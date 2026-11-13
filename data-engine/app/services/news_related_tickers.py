@@ -17,7 +17,7 @@ import time
 import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -191,10 +191,18 @@ def quotes_for(db: Session, company_ids: set[int]) -> dict[int, dict]:
     return out
 
 
-def _listed(value, unit, company) -> tuple[Decimal, str | None] | None:
-    if value is None:
+def _positive_close(value) -> Decimal | None:
+    try:
+        amount = Decimal(str(value))
+    except (TypeError, ValueError, InvalidOperation):
         return None
-    amount = Decimal(str(value))
+    return amount if amount.is_finite() and amount > 0 else None
+
+
+def _listed(value, unit, company) -> tuple[Decimal, str | None] | None:
+    amount = _positive_close(value)
+    if amount is None:
+        return None
     if company is None or not unit:
         # Fila legacy sin unidad declarada: el cierre tal cual (como antes).
         return amount, getattr(company, "currency", None)
@@ -210,8 +218,12 @@ def _session_change(company, latest: tuple, previous: tuple) -> float | None:
     +2 %, no -99 %. Divisas distintas: sin variacion.
     """
     (close, adj, unit), (p_close, p_adj, p_unit) = latest, previous
-    if adj is not None and p_adj is not None and adj > 0 and p_adj > 0:
+    adj, p_adj = _positive_close(adj), _positive_close(p_adj)
+    if adj is not None and p_adj is not None:
         close, p_close = adj, p_adj
+    close, p_close = _positive_close(close), _positive_close(p_close)
+    if close is None or p_close is None:
+        return None
     if unit == p_unit or not unit or not p_unit:
         last, prev = Decimal(str(close)), Decimal(str(p_close))
     else:
