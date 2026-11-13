@@ -35,6 +35,7 @@ logger = logging.getLogger("gerarai.fund_holders")
 PROVIDER = "sec_nport"
 NAMESPACE = "secnport"
 TOTAL = "__total__"
+INTEGRITY_REF = "nport:component-integrity-v1"
 TOP_N = 10
 LIMITATIONS = (
     "N-PORT: fondos y ETF registrados en EE. UU.; la cartera pública es la del último mes de cada trimestre fiscal del fondo, con hasta 60 días de retraso.",
@@ -46,7 +47,8 @@ LIMITATIONS = (
 def summarize(latest: dict[str, nport.FundReport], cusip: str) -> dict[str, Any]:
     holders = [r for r in latest.values() if r.shares.get(cusip, Decimal(0)) > 0]
     total_shares = sum((r.shares[cusip] for r in holders), Decimal(0))
-    total_value = sum((r.value.get(cusip, Decimal(0)) for r in holders), Decimal(0))
+    values = [r.value.get(cusip) for r in holders]
+    total_value = sum(values, Decimal(0)) if all(value is not None for value in values) else None
     key = lambda r: (r.series_id, r.accession)  # noqa: E731
     top = sorted(holders, key=lambda r: (-r.shares[cusip], key(r)))[:TOP_N]
     by_weight = sorted((r for r in holders if r.weight.get(cusip) is not None), key=lambda r: (-r.weight[cusip], key(r)))[:TOP_N]
@@ -80,9 +82,10 @@ def persist(db: Session, company: Company, cusip: str, summary: dict[str, Any], 
     facts = [
         PublicFinancialFact(source_document_id=doc.id, metric=metric, value=Decimal(value), unit=unit, period_end=today,
                             fiscal_quarter=f"Q{dataset.quarter}", filed=None, concept_namespace=NAMESPACE, concept_name=TOTAL,
-                            accession=None, confidence=Decimal(1), derived=True, derived_from_refs=[f"dataset:{dataset.url}"])
+                            accession=None, confidence=Decimal(1), derived=True, derived_from_refs=[f"dataset:{dataset.url}", INTEGRITY_REF])
         for metric, value, unit in (("nport.total.funds", summary["funds"], "count"), ("nport.total.shares", summary["shares"], "shares"),
                                     ("nport.total.value", summary["value"], "USD"))
+        if value is not None
     ]
     roles: dict[str, list[str]] = {}
     reps: dict[str, nport.FundReport] = {}
@@ -123,8 +126,10 @@ def fund_holders(db: Session, ticker: str) -> dict[str, Any] | None:
     doc = snap.doc
     totals: dict[str, float] = {}
     funds: dict[str, dict[str, Any]] = {}
+    integrity_checked = False
     for f in db.scalars(select(PublicFinancialFact).where(PublicFinancialFact.source_document_id == doc.id).order_by(PublicFinancialFact.id)):
         if f.concept_name == TOTAL:
+            integrity_checked |= INTEGRITY_REF in (f.derived_from_refs or [])
             totals[f.metric.rsplit(".", 1)[1]] = float(f.value)
             continue
         acc = f.accession or ""
@@ -147,9 +152,17 @@ def fund_holders(db: Session, ticker: str) -> dict[str, Any] | None:
             by_weight.append(row)
     top.sort(key=lambda r: (-(r["shares"] or 0), r["series_id"]))
     by_weight.sort(key=lambda r: (-(r["weight_pct"] or 0), r["series_id"]))
+    if not integrity_checked:
+        base["limitations"].append(
+            "Snapshot N-PORT previo: integridad de importes y pesos no verificada hasta recalcular."
+        )
+    if "value" not in totals or any(row["value_usd"] is None or row["weight_pct"] is None for row in funds.values()):
+        base["limitations"].append(
+            "Datos N-PORT incompletos: los importes o pesos con componentes ausentes no se presentan como totales completos."
+        )
     return {**base, "status": "ok", "dataset": doc.listing_key.split(":")[1],
             "source": {"dataset_url": doc.source_url, "page": nport.DATASETS_PAGE, "fetched_at": doc.fetched_at.isoformat()},
-            "totals": {"funds": int(totals.get("funds", 0)), "shares": totals.get("shares", 0.0), "value_usd": totals.get("value", 0.0)},
+            "totals": {"funds": int(totals.get("funds", 0)), "shares": totals.get("shares", 0.0), "value_usd": totals.get("value")},
             "top_funds": top, "by_weight": by_weight}
 
 
