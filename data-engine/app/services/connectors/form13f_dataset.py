@@ -162,8 +162,8 @@ def parse_dataset(source: str | IO[bytes], cusips: set[str], *, url: str = "") -
                 continue
             try:
                 amount = Decimal(_get(index, row, "SSHPRNAMT").replace(",", ""))
-            except ArithmeticError:
-                continue
+            except ArithmeticError as exc:
+                raise ValueError("Cantidad 13F ilegible: cartera no verificable") from exc
             # No se puede descartar esta posición y afirmar que el gestor
             # vendió todo. El job conserva el snapshot previo al fallar.
             if not amount.is_finite():
