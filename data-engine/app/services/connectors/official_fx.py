@@ -78,7 +78,7 @@ def parse_nbg(payload: str | bytes, *, url: str = "") -> list[OfficialQuote]:
         if code not in {"USD", "EUR"}:
             continue
         rate = _positive(row.get("rate"))
-        quantity = _positive(row.get("quantity") or 1)
+        quantity = _positive(row.get("quantity"))
         stamp = str(row.get("validFromDate") or data[0].get("date") or "")[:10]
         if rate is None or quantity is None or not stamp:
             raise ValueError(f"NBG: tipo o fecha inválidos para {code}")
