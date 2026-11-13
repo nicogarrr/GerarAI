@@ -154,6 +154,19 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
     (IBEX .MC, .PA, .DE...); Finnhub free no los sirve. Devuelve None ante
     cualquier dato incompleto en lugar de inventar valores.
     """
+    def number(value, *, positive=False, timestamp=False):
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            result = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if not math.isfinite(result) or (positive and result <= 0):
+            return None
+        if timestamp and (result < 0 or not result.is_integer()):
+            return None
+        return int(result) if timestamp else result
+
     symbol = _yahoo_chart_symbol(symbol)
     try:
         resp = client.get(
@@ -184,7 +197,7 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
             and closes_raw[-1] is None
             and len(_stamps0) == len(closes_raw)
             and all(isinstance(v, (int, float)) for v in (_reg.get("start"), _reg.get("end"), _rmt))
-            and isinstance(_rmp, (int, float)) and _rmp > 0
+            and number(_rmp, positive=True) is not None
             and _reg["start"] <= _stamps0[-1] < _reg["end"]
             and _rmt >= _reg["end"]
         ):
@@ -213,16 +226,18 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
                 None,
             )
         closes = [value for value in closes_raw if value is not None]
-        if last_idx is None or not closes or closes[-1] <= 0:
+        if last_idx is None or not closes:
             return None
-        last = float(closes[-1])
+        last = number(closes[-1], positive=True)
+        if last is None:
+            return None
         # Cierre previo REAL o None: antes caia a `last` y la variacion salia
         # como 0,00 % inventado (sin cierre previo no hay variacion que dar).
         if len(closes) >= 2:
-            previous = float(closes[-2])
+            previous = number(closes[-2], positive=True)
         else:
             cpc = meta.get("chartPreviousClose")
-            previous = float(cpc) if isinstance(cpc, (int, float)) and cpc > 0 else None
+            previous = number(cpc, positive=True)
         if previous is not None and previous <= 0:
             previous = None
         # Todas las magnitudes deben pertenecer a la misma vela seleccionada;
@@ -232,13 +247,13 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
             value = values[last_idx] if last_idx < len(values) else None
             # Dato ausente -> None; antes se rellenaba con el cierre y el
             # rango del dia salia 0 (maxima = minima = apertura = cierre).
-            return float(value) if value is not None else None
+            return number(value, positive=True)
 
-        change = (last - previous) if previous is not None else None
+        change = number(last - previous) if previous is not None else None
         timestamps = result.get("timestamp") or []
-        candle_ts = timestamps[last_idx] if last_idx < len(timestamps) else None
+        candle_ts = number(timestamps[last_idx], timestamp=True) if last_idx < len(timestamps) else None
         candle_date = None
-        if isinstance(candle_ts, (int, float)):
+        if candle_ts is not None:
             from datetime import datetime
             from zoneinfo import ZoneInfo
 
@@ -254,15 +269,18 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
                 except (KeyError, ValueError):
                     tz = None
             if tz is not None:
-                candle_date = datetime.fromtimestamp(candle_ts, tz).date().isoformat()
+                try:
+                    candle_date = datetime.fromtimestamp(candle_ts, tz).date().isoformat()
+                except (ValueError, OverflowError, OSError):
+                    candle_ts = None
         return {
             "c": last,
             # Preserve the daily candle contract; paper fills use timestamped spot only.
-            "live_c": meta.get("regularMarketPrice"),
-            "live_t": meta.get("regularMarketTime"),
+            "live_c": number(meta.get("regularMarketPrice"), positive=True),
+            "live_t": number(meta.get("regularMarketTime"), timestamp=True),
             "currency": meta.get("currency"),
             "d": change,
-            "dp": (change / previous * 100) if change is not None else None,
+            "dp": number(change / previous * 100) if change is not None else None,
             "h": selected_value("high"),
             "l": selected_value("low"),
             "o": selected_value("open"),
