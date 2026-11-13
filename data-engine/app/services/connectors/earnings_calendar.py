@@ -16,6 +16,7 @@ navegador, de ahi las cabeceras por defecto.
 from __future__ import annotations
 
 import asyncio
+import math
 import time
 from datetime import date, timedelta
 from typing import Any
@@ -99,6 +100,8 @@ def _parse_float(value: Any) -> float | None:
     try:
         number = float(text.replace(",", "").strip("()%$"))
     except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number):
         return None
     return -number if negative else number
 
