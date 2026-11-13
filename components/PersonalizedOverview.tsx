@@ -10,7 +10,7 @@ import {
     type DcfScope,
 } from '@/lib/overview/dcf-candidates';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import Link from 'next/link';
+import IntentLink from '@/components/layout/IntentLink';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -136,10 +136,10 @@ function FirstSteps({ watchlistCount }: { watchlistCount: number | null }) {
                                 : t('home.steps.followTodo')}
                         </p>
                     </div>
-                    <Link href={watchlistDone ? '/watchlist' : '/watchlist?anadir=1'} className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200">
+                    <IntentLink href={watchlistDone ? '/watchlist' : '/watchlist?anadir=1'} className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200">
                         {watchlistDone ? t('home.steps.view') : t('home.steps.add')}
                         <span className="sr-only">{t('home.steps.watchlistSr')}</span>
-                    </Link>
+                    </IntentLink>
                 </li>
                 <li className={stepClass}>
                     <Circle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
@@ -147,9 +147,9 @@ function FirstSteps({ watchlistCount }: { watchlistCount: number | null }) {
                         <p className="text-sm font-medium text-gray-100">{t('home.steps.buyTitle')}</p>
                         <p className="text-xs text-gray-400">{t('home.steps.buyBody')}</p>
                     </div>
-                    <Link href="/portfolio?anadir=1" className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200">
+                    <IntentLink href="/portfolio?anadir=1" className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200">
                         {t('home.steps.add')}<span className="sr-only">{t('home.steps.investmentSr')}</span>
-                    </Link>
+                    </IntentLink>
                 </li>
                 <li className={stepClass}>
                     <Circle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
@@ -231,7 +231,7 @@ function InlineSectionError({ message, onRetry }: { message: string; onRetry: ()
     return (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
             <span>{text}</span>
-            <button type="button" onClick={onRetry} className="underline hover:text-amber-100">{t('common.actions.retry')}</button>
+            <button type="button" onClick={onRetry} className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-amber-100">{t('common.actions.retry')}</button>
         </div>
     );
 }
@@ -518,9 +518,9 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                         // altura de la cabecera (sin salto al terminar de cargar).
                         <span aria-hidden="true" className="min-h-[44px]" />
                     ) : (
-                        <Link href="/portfolio" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-blue-400 hover:text-blue-300 text-sm transition-colors">
+                        <IntentLink href="/portfolio" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-blue-400 hover:text-blue-300 text-sm transition-colors">
                             <span className="whitespace-nowrap">{t('home.portfolio.details')}</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
-                        </Link>
+                        </IntentLink>
                     )}
                 </CardHeader>
                 <CardContent className="pt-4">
@@ -558,7 +558,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {sortedHoldings
                                     .map((h) => (
-                                        <Link
+                                        <IntentLink
                                             key={h.symbol}
                                             href={`/research/${h.symbol}`}
                                             className="flex min-h-[44px] flex-wrap items-center justify-between gap-3 p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors border border-gray-700/30"
@@ -593,10 +593,10 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                     <HomeFairValueHint holding={h} signals={holdingSignals} />
                                                 </span>
                                             </span>
-                                        </Link>
+                                        </IntentLink>
                                     ))}
                             </div>
-                            <Link
+                            <IntentLink
                                 href={topMover ? `/research/${topMover.symbol}?view=changes` : '/portfolio'}
                                 className="inline-flex min-h-[44px] items-center gap-1 text-sm text-teal-300 hover:text-teal-200"
                             >
@@ -604,7 +604,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                     {topMover ? t('home.portfolio.reviewMover', { symbol: topMover.symbol }) : t('home.portfolio.reviewAll')}
                                 </span>
                                 <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
-                            </Link>
+                            </IntentLink>
                         </div>
                     ) : (
                         <FirstSteps watchlistCount={watchlistLoading || watchlistError ? null : watchlistTotal} />
@@ -621,9 +621,9 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                         <BellRing aria-hidden="true" className="h-5 w-5 text-amber-400" />
                         {t('home.alerts.title')}
                     </CardTitle>
-                    <Link href="/alerts" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-amber-400 hover:text-amber-300 text-sm transition-colors">
+                    <IntentLink href="/alerts" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-amber-400 hover:text-amber-300 text-sm transition-colors">
                         <span className="whitespace-nowrap">{t('home.alerts.manage')}</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
-                    </Link>
+                    </IntentLink>
                 </CardHeader>
                 <CardContent className="pt-4">
                     {alertsLoading ? (
@@ -662,12 +662,12 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                     {(item.ticker || item.sourceUrl) && (
                                         <span className="mt-2 inline-flex flex-wrap gap-3">
                                             {item.ticker && (
-                                                <Link
+                                                <IntentLink
                                                     className="inline-flex min-h-[44px] items-center text-xs text-teal-400 after:absolute after:inset-0 after:rounded-lg after:content-[''] hover:text-teal-300 hover:underline"
                                                     href={alertThesisHref(item.ticker)}
                                                 >
                                                     {t('home.alerts.reviewThesis', { symbol: item.ticker })}
-                                                </Link>
+                                                </IntentLink>
                                             )}
                                             {item.sourceUrl && (
                                                 <a
@@ -691,13 +691,13 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                     ) : alerts.length > 0 ? (
                         <div className="space-y-2">
                             {alerts.slice(0, 3).map((alert) => (
-                                <Link
+                                <IntentLink
                                     href="/alerts"
                                     className="flex min-h-11 min-w-0 items-center break-words rounded px-1 -mx-1 py-0.5 text-sm text-gray-300 transition-colors hover:text-amber-300"
                                     key={alert._id}
                                 >
                                     {alertRuleLabel(alert, t, locale)}
-                                </Link>
+                                </IntentLink>
                             ))}
                             <p className="text-xs text-gray-500">
                                 {`${alerts.length === 1 ? t('home.alerts.rulesActiveOne') : t('home.alerts.rulesActiveOther', { n: alerts.length })} · ${t('home.alerts.noneTriggered')}`}
@@ -707,9 +707,9 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                         <div className="text-center py-6">
                             <p className="text-gray-400 text-sm">{t('common.states.noAlerts')}</p>
                             <p className="text-gray-500 text-sm mt-2">{t('common.states.noAlertsHint')}</p>
-                            <Link href="/alerts" className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-lg border border-teal-400/20 px-5 text-sm text-teal-400 transition-colors hover:text-teal-300">
+                            <IntentLink href="/alerts" className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-lg border border-teal-400/20 px-5 text-sm text-teal-400 transition-colors hover:text-teal-300">
                                 {t('home.alerts.createFirst')}
-                            </Link>
+                            </IntentLink>
                         </div>
                     )}
                 </CardContent>
@@ -724,9 +724,9 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                         <Eye aria-hidden="true" className="h-5 w-5 text-yellow-400" />
                         {t('home.watchlist.recent')}
                     </CardTitle>
-                    <Link href="/watchlist" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-yellow-400 hover:text-yellow-300 text-sm transition-colors">
+                    <IntentLink href="/watchlist" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-yellow-400 hover:text-yellow-300 text-sm transition-colors">
                         <span className="whitespace-nowrap">{t('home.watchlist.viewAll')}</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
-                    </Link>
+                    </IntentLink>
                 </CardHeader>
                 <CardContent className="pt-4">
                     {watchlistLoading ? (
@@ -737,7 +737,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                         <div className="space-y-3">
                             <div className="space-y-1">
                                 {watchlist.map((stock) => (
-                                    <Link
+                                    <IntentLink
                                         key={stock.symbol}
                                         href={`/research/${stock.symbol}`}
                                         className="flex min-h-[44px] items-center justify-between gap-2 p-3 bg-gray-900/30 rounded-lg hover:bg-gray-800/80 transition-colors group"
@@ -768,16 +768,16 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                 </>
                                             )}
                                         </div>
-                                    </Link>
+                                    </IntentLink>
                                 ))}
                             </div>
                             <p className="text-xs text-gray-500">
                                 {watchlistTotal > watchlist.length ? t('home.watchlist.lastNOfTotal', { n: watchlist.length, total: watchlistTotal }) : t('home.watchlist.totalCount', { total: watchlistTotal })} ·{' '}
                                 {/* Enlace dentro de un párrafo: subrayado siempre (WCAG 2.2 SC 1.4.1),
                                     no solo distinguible por el color amarillo. */}
-                                <Link href="/watchlist" className="inline-flex min-h-[44px] items-center text-yellow-400 underline underline-offset-2">
+                                <IntentLink href="/watchlist" className="inline-flex min-h-[44px] items-center text-yellow-400 underline underline-offset-2">
                                     {t('home.watchlist.seeFullList')}
-                                </Link>
+                                </IntentLink>
                             </p>
                         </div>
                     ) : (
@@ -785,9 +785,9 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                             <p className="text-gray-400 text-sm">{t('home.watchlist.empty')}</p>
                             {/* /watchlist tiene su propio «Añadir empresa» (con alta por
                                 símbolo): es el destino directo, sin pasar por /search. */}
-                            <Link href="/watchlist" className="mt-2 inline-flex min-h-[44px] items-center justify-center rounded-lg border border-yellow-400/30 px-4 text-sm text-yellow-400 hover:bg-yellow-950/30">
+                            <IntentLink href="/watchlist" className="mt-2 inline-flex min-h-[44px] items-center justify-center rounded-lg border border-yellow-400/30 px-4 text-sm text-yellow-400 hover:bg-yellow-950/30">
                                 {t('home.watchlist.addCompanies')}
-                            </Link>
+                            </IntentLink>
                         </div>
                     )}
                 </CardContent>
@@ -801,9 +801,9 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                         <Gem aria-hidden="true" className="h-5 w-5 text-purple-400" />
                         {t('home.opportunities.title')}
                     </CardTitle>
-                    <Link href="/screener" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-purple-400 hover:text-purple-300 text-sm transition-colors">
+                    <IntentLink href="/screener" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-purple-400 hover:text-purple-300 text-sm transition-colors">
                         <span className="whitespace-nowrap">{t('home.opportunities.refine')}</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
-                    </Link>
+                    </IntentLink>
                 </CardHeader>
                 <CardContent className="pt-4">
                     {opportunitiesLoading ? (
@@ -828,7 +828,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                     // en la etiqueta en vez de suponer dólares.
                                     const priceLabel = isValidCurrencyCode(op.currency) ? t('home.opportunities.price') : t('home.opportunities.priceUnknownCurrency', { na: NA });
                                     return (
-                                        <Link key={op.symbol} href={`/research/${op.symbol}?view=valuation`}>
+                                        <IntentLink key={op.symbol} href={`/research/${op.symbol}?view=valuation`}>
                                             <div className="p-4 bg-gray-900/40 rounded-xl border border-gray-700/30 hover:border-purple-500/50 hover:bg-gray-800 transition-all group">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div>
@@ -857,7 +857,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                     <p className="text-xs text-amber-500/90 mt-1 text-right">{t('home.opportunities.orientation')}</p>
                                                 ) : null}
                                             </div>
-                                        </Link>
+                                        </IntentLink>
                                     );
                                 })}
                             </div>
