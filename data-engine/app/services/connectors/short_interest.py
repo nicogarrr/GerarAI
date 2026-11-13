@@ -172,8 +172,11 @@ async def fetch_short_volume(
             # el lookback: los demas dias responderan igual.
             registry.record_failure(REGISTRY_KEY, "200 sin la cabecera oficial RegSHO")
             return None
-        registry.record_success(REGISTRY_KEY)
         row = parse_regsho_daily(response.text, symbol)
+        if row is not None and row["date"] != current.isoformat():
+            registry.record_failure(REGISTRY_KEY, "RegSHO: fecha de fila distinta del fichero consultado")
+            return None
+        registry.record_success(REGISTRY_KEY)
         if row is not None:
             return row
     return None
