@@ -57,9 +57,9 @@ _SUFFIX = {
     "inc", "corp", "corporation", "co", "company", "ltd", "plc", "sa", "nv", "ag", "se",
     "the", "group", "holdings", "holding", "limited", "llc", "lp", "spa", "oyj", "ab", "as",
 }
-_CASHTAG = re.compile(r"\$([A-Za-z]{1,6}(?:\.[A-Za-z]{1,2})?)\b")
+_CASHTAG = re.compile(r"\$([A-Za-z]{1,6}(?:\.[A-Za-z]{1,2})?)\b(?![\w-]|\.[A-Za-z])")
 _EXCHANGE = re.compile(
-    r"\b(?:NYSE|NASDAQ|AMEX|BME|LSE|EPA|ETR)\s*:\s*([A-Za-z]{1,6}(?:\.[A-Za-z]{1,2})?)\b",
+    r"\b(?:NYSE|NASDAQ|AMEX|BME|LSE|EPA|ETR)\s*:\s*([A-Za-z]{1,6}(?:\.[A-Za-z]{1,2})?)\b(?![\w-]|\.[A-Za-z])",
     re.IGNORECASE,
 )
 _WORD = re.compile(r"[a-z0-9&']+")
