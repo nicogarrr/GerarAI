@@ -72,14 +72,24 @@ class FundReport:
     series_name: str = ""
     net_assets: Decimal | None = None
     shares: dict[str, Decimal] = field(default_factory=dict)
-    value: dict[str, Decimal] = field(default_factory=dict)
-    weight: dict[str, Decimal] = field(default_factory=dict)
+    value: dict[str, Decimal | None] = field(default_factory=dict)
+    weight: dict[str, Decimal | None] = field(default_factory=dict)
 
     @property
     def display_name(self) -> str:
         """Nombre de la serie; si el fondo la deja vacía o en «N/A», el del registrante."""
         name = self.series_name.strip()
         return name if name and name.upper() not in {"N/A", "NA", "NONE", "-"} else self.registrant
+
+
+def _add_component(totals: dict[str, Decimal | None], cusip: str, value: Decimal | None) -> None:
+    """A missing component makes the whole reported aggregate unknown."""
+    before = totals.get(cusip, Decimal(0))
+    totals[cusip] = (
+        before + value
+        if before is not None and value is not None and value.is_finite()
+        else None
+    )
 
 
 def parse_dataset(source: str | IO[bytes], cusips: set[str]) -> dict[str, FundReport]:
@@ -117,11 +127,11 @@ def parse_dataset(source: str | IO[bytes], cusips: set[str]) -> dict[str, FundRe
                     continue
                 rep_.shares[cusip] = rep_.shares.get(cusip, Decimal(0)) + shares
                 value = _dec(_get(index, row, "CURRENCY_VALUE"))
-                if value is not None and _get(index, row, "CURRENCY_CODE").upper() in {"", "USD"}:
-                    rep_.value[cusip] = rep_.value.get(cusip, Decimal(0)) + value
+                if _get(index, row, "CURRENCY_CODE").upper() not in {"", "USD"}:
+                    value = None
+                _add_component(rep_.value, cusip, value)
                 pct = _dec(_get(index, row, "PERCENTAGE"))
-                if pct is not None:
-                    rep_.weight[cusip] = rep_.weight.get(cusip, Decimal(0)) + pct
+                _add_component(rep_.weight, cusip, pct)
     return reports
 
 
