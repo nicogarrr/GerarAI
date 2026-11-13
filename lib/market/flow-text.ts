@@ -8,6 +8,18 @@
 import { naFor } from '@/lib/format';
 import type { Locale } from '@/lib/i18n/locale';
 import type { FlowSource, MoneyFlow } from '@/lib/market/flows';
+// Textos nuevos del backend que ya no caben en el mapa de abajo (el guard de
+// i18n tiene este fichero en su techo): viven en los diccionarios y aquí solo
+// se cruzan. Import relativo con atributo por los tests con node
+// --experimental-strip-types.
+import esThemes from '../i18n/messages/es/themes.json' with { type: 'json' };
+import enThemes from '../i18n/messages/en/themes.json' with { type: 'json' };
+
+// Uso por literal para el guard de i18n (claves consumidas por objeto).
+export const FLOW_BACKEND_TEXT_KEY_LITERALS = ['themes.flow.backendText.leaseCurrencyMismatch'] as const;
+const FLOW_DICT_EN: Record<string, string> = {
+  [esThemes.flow.backendText.leaseCurrencyMismatch]: enThemes.flow.backendText.leaseCurrencyMismatch,
+};
 
 const FLOW_EN: Record<string, string> = {
   // Temas
@@ -139,6 +151,7 @@ const FLOW_PATTERNS_EN: Array<[RegExp, (...groups: string[]) => string]> = [
 export function flowText<T extends string | null | undefined>(text: T, locale: Locale): T | string {
   if (locale !== 'en' || !text) return text;
   if (Object.hasOwn(FLOW_EN, text)) return FLOW_EN[text];
+  if (Object.hasOwn(FLOW_DICT_EN, text)) return FLOW_DICT_EN[text];
   for (const [pattern, render] of FLOW_PATTERNS_EN) {
     const match = pattern.exec(text);
     if (match) return render(...match.slice(1).map((group) => flowText(group, locale) as string));
